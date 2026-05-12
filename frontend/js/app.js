@@ -36,6 +36,8 @@
 document.addEventListener('DOMContentLoaded', async () => {
     if (await _redirectIfSetupRequired()) return;
 
+    new SignOutController('signout-btn').bind();
+
     const nodeMap = new NodeMap('map');
     const packetFeed = new SimplePacketFeed('packet-tbody');
 
