@@ -32,6 +32,21 @@ class TestDefaultCatalog(unittest.TestCase):
             self.assertTrue(entry.description)
             self.assertTrue(entry.category)
 
+    def test_log_buttons_never_use_sudo(self) -> None:
+        # journalctl + the `meshpoint logs` CLI both read the system
+        # journal as the meshpoint service user without elevation.
+        # Prefixing them with sudo hangs the terminal on a password
+        # prompt because /etc/sudoers.d/meshpoint intentionally does
+        # not whitelist journalctl.
+        for entry in DEFAULT_CATALOG:
+            if entry.category != "Logs":
+                continue
+            self.assertFalse(
+                entry.command.startswith("sudo "),
+                f"Log catalog entry '{entry.id}' must not use sudo: "
+                f"{entry.command!r}",
+            )
+
 
 class TestCommandCatalogWrapper(unittest.TestCase):
     def test_payload_is_json_serializable(self) -> None:

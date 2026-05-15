@@ -71,18 +71,25 @@ DEFAULT_CATALOG: tuple[CommandEntry, ...] = (
         dangerous=True,
     ),
     CommandEntry(
+        id="meshpoint-logs",
+        label="Live logs (meshpoint logs)",
+        command="meshpoint logs",
+        category=CATEGORY_LOGS,
+        description="Live-tail the service log via the CLI wrapper; Ctrl-C to stop.",
+    ),
+    CommandEntry(
         id="journal-tail",
         label="Tail journal (100 lines)",
-        command="sudo journalctl -u meshpoint -n 100 --no-pager",
+        command="journalctl -u meshpoint -n 100 --no-pager",
         category=CATEGORY_LOGS,
         description="Last 100 log lines from the service.",
     ),
     CommandEntry(
         id="journal-follow",
         label="Follow journal",
-        command="sudo journalctl -u meshpoint -f",
+        command="journalctl -u meshpoint -f",
         category=CATEGORY_LOGS,
-        description="Live-tail the service log; Ctrl-C to stop.",
+        description="Live-tail the raw journal; Ctrl-C to stop.",
     ),
     CommandEntry(
         id="disk-free",

@@ -79,7 +79,7 @@ class UpdateApplier:
         self,
         *,
         repo_path: str = "/opt/meshpoint",
-        install_script: str = "scripts/install.sh",
+        install_script: str = "/opt/meshpoint/scripts/install.sh",
         service_name: str = "meshpoint",
         runner: Runner = shell_runner,
     ) -> None:
