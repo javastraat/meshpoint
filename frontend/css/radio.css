@@ -8,11 +8,21 @@
 /* Page-level shell. The radio tab content is wrapped in
  * <div class="r-stage"><div class="r-shell">...</div></div>. */
 
+/* Allow internal vertical scroll on the Radio section. The shared
+   .section rule clamps overflow so each route can pick its own
+   scroll story; Radio has more telemetry than fits on one screen
+   for most laptops, so we let it scroll within the section. */
+.section[data-section="radio"] {
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
 .r-stage {
     position: relative;
     padding: 1.5rem;
     max-width: 960px;
     margin: 0 auto;
+    padding-bottom: 3rem;
 }
 
 .r-shell {
