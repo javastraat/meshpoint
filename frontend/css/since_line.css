@@ -17,7 +17,11 @@
     color: var(--text-muted);
 }
 
+/* The .since-line__prefix span is no longer rendered; the
+ * "Last visit" / "First visit" copy is part of __when now.
+ * Selector kept as a documented no-op to ease search history. */
 .since-line__prefix {
+    display: none;
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.12em;

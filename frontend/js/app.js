@@ -291,7 +291,7 @@ async function _loadInitial(nodeMap, nodeList, packetFeed) {
         const nodesData = await nodesRes.json();
         const packetsData = await packetsRes.json();
 
-        _setText('sidebar-device-name', device.device_name || 'Meshpoint');
+        _setText('sidebar-device-name', _resolveDeviceLabel(device));
 
         const nodes = nodesData.nodes || nodesData || [];
         nodeMap.loadNodes(nodes, device);
@@ -353,7 +353,7 @@ async function _updateStats() {
 
         _setText('stat-uptime-val', _formatUptime(device.uptime_seconds || 0));
 
-        _setText('sidebar-device-name', device.device_name || 'Meshpoint');
+        _setText('sidebar-device-name', _resolveDeviceLabel(device));
         const statusText = device.firmware_version
             ? `online · v${device.firmware_version}`
             : 'online';
@@ -412,6 +412,24 @@ async function _checkForUpdate() {
 function _setText(id, value) {
     const el = document.getElementById(id);
     if (el) el.textContent = value;
+}
+
+/**
+ * Pick the most user-meaningful name for the device label.
+ *
+ * Order:
+ *  1. transmit.long_name -- this is what the device broadcasts in
+ *     NodeInfo and what shows up on meshradar / meshmap / other
+ *     people's dashboards. Most users customise this and never
+ *     touch device_name, so it's the right primary label.
+ *  2. device.device_name -- internal fallback, defaults to "Meshpoint".
+ *  3. The literal string "Meshpoint" if neither is populated.
+ */
+function _resolveDeviceLabel(device) {
+    if (!device) return 'Meshpoint';
+    const long = (device.long_name || '').trim();
+    const fallback = (device.device_name || '').trim();
+    return long || fallback || 'Meshpoint';
 }
 
 async function _redirectIfSetupRequired() {

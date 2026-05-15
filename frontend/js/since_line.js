@@ -2,10 +2,11 @@
  * "Since you last looked" delta line.
  *
  * Renders a single muted line at the top of a page summarising what
- * has changed since the user last visited it. Format:
+ * has changed since the user last visited it. Two states:
  *
- *     Since 4 min ago: 12 packets · 1 NodeInfo broadcast · 2 messages
- *     Since just now: nothing yet
+ *     Last visit 4 min ago · 12 packets · 1 NodeInfo · 2 messages
+ *     First visit · waiting for activity
+ *     Last visit 4 min ago · no new activity
  *
  * Single responsibility: render. The page-specific data fetch lives
  * in the caller, which passes a snapshot to update().
@@ -23,10 +24,9 @@ class SinceLine {
         root.setAttribute('role', 'status');
         root.setAttribute('aria-live', 'polite');
         root.innerHTML = `
-            <span class="since-line__prefix">Since</span>
-            <span class="since-line__when" id="since-line-when">just now</span>
+            <span class="since-line__when" id="since-line-when">First visit</span>
             <span class="since-line__sep" aria-hidden="true">·</span>
-            <span class="since-line__items" id="since-line-items">nothing yet</span>
+            <span class="since-line__items" id="since-line-items">waiting for activity</span>
         `;
         this._host.insertBefore(root, this._host.firstChild);
         this._root = root;
@@ -43,13 +43,22 @@ class SinceLine {
         const whenEl = this._root.querySelector('#since-line-when');
         const itemsEl = this._root.querySelector('#since-line-items');
         const last = snapshot && snapshot.lastVisitAt;
-        whenEl.textContent = _formatRelative(last);
-
         const items = (snapshot && Array.isArray(snapshot.items))
             ? snapshot.items.filter((i) => i && i.count > 0)
             : [];
+
+        if (!last) {
+            whenEl.textContent = 'First visit';
+            itemsEl.textContent = items.length === 0
+                ? 'waiting for activity'
+                : items.map((i) => `${i.count} ${i.label}`).join(' · ');
+            this._root.classList.toggle('since-line--quiet', items.length === 0);
+            return;
+        }
+
+        whenEl.textContent = `Last visit ${_formatRelative(last)}`;
         if (items.length === 0) {
-            itemsEl.textContent = 'nothing yet';
+            itemsEl.textContent = 'no new activity';
             this._root.classList.add('since-line--quiet');
             return;
         }

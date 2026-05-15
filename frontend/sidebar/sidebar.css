@@ -110,27 +110,33 @@
 
 /* Visual sizing of the brand mark inside the frame.
  *
- * The shipped PNG has roughly 12-15% transparent padding baked in
- * around the actual mark, so simply matching the image element to
- * the frame size leaves the visible logo looking smaller than the
- * frame container suggests. We push the image element to nearly
- * fill the frame AND apply a small scale to crop into the PNG's
- * internal padding, so the mark itself reads as the visual anchor
- * (not "small icon floating in a big square").
+ * The shipped PNG has roughly 25-30% transparent padding baked in
+ * around the actual mark. To make the mark dominate the frame
+ * instead of floating inside a too-large square, we render the
+ * image element 1.5x the frame size and clip-path it back down
+ * to frame dimensions. This effectively crops into the PNG's
+ * internal whitespace so the mark itself fills the visible area.
  *
- * scale(1.08) + 52x52 image inside 56x56 frame keeps the rendered
- * pixels within the frame bounds (52 * 1.08 = 56.16) so we don't
- * need to clip and the surrounding ring + pip stay intact. */
+ * Geometry: 84x84 image, clip-path inset 14px on each side,
+ * leaving a 56x56 visible region matching the frame. Adjust the
+ * inset down if a tighter PNG asset is shipped later (smaller
+ * crop = more visible padding); adjust up to crop deeper.
+ *
+ * The clip-path is relative to the image's own coordinate space,
+ * so the frame's hover scale composes cleanly without warping
+ * the crop.
+ */
 .sidebar__logo {
     position: relative;
     z-index: 2;
-    width: 52px;
-    height: 52px;
-    border-radius: 12px;
+    width: 84px;
+    height: 84px;
+    flex-shrink: 0;
+    border-radius: 14px;
     display: block;
-    transform: scale(1.08);
+    clip-path: inset(14px round 14px);
     filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
-    transition: transform var(--motion-fast) var(--ease-out-expo);
+    transition: clip-path var(--motion-fast) var(--ease-out-expo);
 }
 
 /* Animated accent ring sitting just outside the logo. Kept low
