@@ -108,14 +108,29 @@
         inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
+/* Visual sizing of the brand mark inside the frame.
+ *
+ * The shipped PNG has roughly 12-15% transparent padding baked in
+ * around the actual mark, so simply matching the image element to
+ * the frame size leaves the visible logo looking smaller than the
+ * frame container suggests. We push the image element to nearly
+ * fill the frame AND apply a small scale to crop into the PNG's
+ * internal padding, so the mark itself reads as the visual anchor
+ * (not "small icon floating in a big square").
+ *
+ * scale(1.08) + 52x52 image inside 56x56 frame keeps the rendered
+ * pixels within the frame bounds (52 * 1.08 = 56.16) so we don't
+ * need to clip and the surrounding ring + pip stay intact. */
 .sidebar__logo {
     position: relative;
     z-index: 2;
-    width: 44px;
-    height: 44px;
-    border-radius: 10px;
+    width: 52px;
+    height: 52px;
+    border-radius: 12px;
     display: block;
+    transform: scale(1.08);
     filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+    transition: transform var(--motion-fast) var(--ease-out-expo);
 }
 
 /* Animated accent ring sitting just outside the logo. Kept low
