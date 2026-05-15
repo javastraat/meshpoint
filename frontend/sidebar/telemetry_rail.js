@@ -66,14 +66,19 @@ class SidebarTelemetryRail {
         if (calibrating || value == null) {
             this._noiseEl.textContent = value == null ? 'calibrating' : `${value.toFixed(0)} dBm`;
             this._noiseEl.title = (
-                'Noise floor only counts weak packets (RSSI < -85 dBm, '
-                + 'SNR < 12 dB) so strong nearby signals do not bias '
-                + 'the reading. Will settle once a few weak packets '
-                + 'arrive.'
+                'Noise floor estimate is the lowest value of '
+                + '(rssi - snr) seen across recent packets. Settles '
+                + 'after a few packets arrive; tightens further when '
+                + 'weaker / further-away packets are heard.'
             );
         } else {
             this._noiseEl.textContent = `${value.toFixed(0)} dBm`;
-            this._noiseEl.title = '';
+            this._noiseEl.title = (
+                'Upper bound on the noise floor, derived from '
+                + 'received-packet metadata. Lower readings are '
+                + 'better; the estimate tightens as more weak packets '
+                + 'are heard.'
+            );
         }
         if (bw) {
             this._noiseBwEl.textContent = `${bw.toFixed(0)} kHz`;

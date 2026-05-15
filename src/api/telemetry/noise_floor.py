@@ -1,25 +1,42 @@
 """Noise floor tracker.
 
 Derives an estimated RF noise floor (in dBm) from per-packet RSSI and
-SNR measurements, smooths the result with an exponential moving
-average, and keeps a rolling buffer of recent samples for sparkline
-rendering on the dashboard.
+SNR measurements, takes the rolling minimum across a window of
+recent samples, and keeps the buffer for sparkline rendering.
 
 Math:
     noise_dBm = rssi_dBm - snr_dB
 
 That falls out of the SNR definition: SNR is "signal above noise"
-in dB, so noise = signal - SNR. Per-packet samples are noisy on
-their own; ``alpha=0.15`` EMA settles in ~10 packets while staying
-responsive to real channel changes.
+in dB, so noise = signal - SNR.
+
+Estimator choice — rolling min:
+    For *any* successfully decoded packet, ``rssi - snr`` is an
+    upper bound on the actual in-band noise floor: if the noise
+    were higher, the demod could not have decoded. Strong nearby
+    packets give loose bounds (AGC and demod nonlinearity inflate
+    the apparent noise); weaker packets give tighter ones. Taking
+    the minimum across a window of recent packets converges toward
+    the true floor without filtering out the strong packets that
+    rural setups depend on for *any* signal at all.
+
+    An earlier version filtered to RSSI < -85 dBm + SNR < 12 dB
+    before feeding an EMA. Rural users hearing only one strong
+    neighbour got zero accepted samples and "calibrating" stuck
+    forever. The min-based estimator handles both regimes from
+    the same code path.
 
 Sanity clamp:
-    The theoretical thermal floor is roughly
-        N0 = -174 + 10*log10(BW_Hz) + NF
-    For typical SX126x noise figure (~6 dB) the floor sits around
-    -117/-114/-111 dBm at 125/250/500 kHz. Samples that compute to
-    a noise level *below* the theoretical floor are physically
-    impossible and are dropped as bad data.
+    Theoretical thermal floor ``N0 = -174 + 10*log10(BW_Hz) + NF``
+    sits around -117/-114/-111 dBm at 125/250/500 kHz with a 6 dB
+    receiver NF. Samples *below* the floor (minus 3 dB slack for
+    measurement noise) are physically impossible and dropped.
+
+Saturation guard:
+    The SX126x demod's SNR register clips around +22 dB. Packets
+    with SNR >= 18 dB are likely clipped and would underestimate
+    the noise floor; we drop those. SNR < 18 dB is honest data
+    even on a strong packet.
 
 This class is sync and lock-free; the FastAPI app holds a single
 instance and feeds it from ``_on_packet_received``. ``snapshot()``
@@ -32,21 +49,18 @@ import time
 from collections import deque
 from dataclasses import dataclass
 
-DEFAULT_ALPHA: float = 0.15
 DEFAULT_BUFFER_SIZE: int = 120
 STALE_AFTER_SECONDS: float = 30.0
 NOISE_FIGURE_DB: float = 6.0
 
-# Only weak packets give a useful noise floor reading. Strong packets
-# saturate the SX126x demodulator's SNR register (it caps around
-# +22 dB), so ``noise = rssi - snr`` for a strong nearby packet
-# *underestimates* the noise floor by however far the SNR was
-# clipped. We restrict samples to packets that are far enough away
-# that the demod is operating near sensitivity.
-MAX_RSSI_FOR_FLOOR_DBM: float = -85.0
-MAX_SNR_FOR_FLOOR_DB: float = 12.0
-# Number of accepted samples before we consider the EMA settled.
-CALIBRATING_BELOW: int = 5
+# Drop samples whose SNR is at/above the SX126x demod's register
+# ceiling (it clips around +22 dB). A clipped SNR underestimates the
+# noise floor; <18 dB readings are honest even on a strong packet.
+MAX_SNR_FOR_FLOOR_DB: float = 18.0
+# Number of accepted samples before the rolling-min estimate is
+# considered settled. Below this threshold the UI shows
+# "calibrating" rather than a number.
+CALIBRATING_BELOW: int = 3
 
 
 @dataclass(slots=True)
@@ -59,16 +73,13 @@ class NoiseSample:
 
 
 class NoiseFloorTracker:
-    """Per-process noise floor estimator and rolling buffer."""
+    """Per-process noise floor estimator using rolling min over a buffer."""
 
     def __init__(
         self,
-        alpha: float = DEFAULT_ALPHA,
         buffer_size: int = DEFAULT_BUFFER_SIZE,
     ) -> None:
-        self._alpha = alpha
         self._buffer: deque[NoiseSample] = deque(maxlen=buffer_size)
-        self._ema: float | None = None
         self._last_bandwidth_khz: float | None = None
         self._last_sample_at: float | None = None
 
@@ -90,13 +101,9 @@ class NoiseFloorTracker:
         if snr_db == 0.0 and rssi_dbm < -50:
             return None
 
-        # Strong nearby packets have a clipped SNR reading from the
-        # demodulator and underestimate the floor. Skip them; the
-        # estimator is biased low without this filter and rural users
-        # see "noisy red" when they should see "clean green".
-        if rssi_dbm > MAX_RSSI_FOR_FLOOR_DBM:
-            return None
-        if snr_db > MAX_SNR_FOR_FLOOR_DB:
+        # SX126x demod clips SNR around +22 dB. >=18 dB is treated as
+        # likely-clipped and would bias the estimate low.
+        if snr_db >= MAX_SNR_FOR_FLOOR_DB:
             return None
 
         sample_dbm = rssi_dbm - snr_db
@@ -104,14 +111,9 @@ class NoiseFloorTracker:
             return None
 
         ts = timestamp if timestamp is not None else time.time()
-        if self._ema is None:
-            self._ema = sample_dbm
-        else:
-            self._ema = self._alpha * sample_dbm + (1 - self._alpha) * self._ema
-
         sample = NoiseSample(
             timestamp=ts,
-            noise_dbm=self._ema,
+            noise_dbm=sample_dbm,
             bandwidth_khz=bandwidth_khz or 0.0,
         )
         self._buffer.append(sample)
@@ -123,9 +125,34 @@ class NoiseFloorTracker:
     def reset(self) -> None:
         """Drop all state. Called on bandwidth changes or test setup."""
         self._buffer.clear()
-        self._ema = None
         self._last_bandwidth_khz = None
         self._last_sample_at = None
+
+    @property
+    def rolling_min(self) -> float | None:
+        """Lowest sample in the current buffer (the noise-floor estimate).
+
+        ``rssi - snr`` is an upper bound on the true noise floor for
+        each individual packet, so the running minimum across the
+        buffer converges toward the actual floor as more packets
+        arrive. Returns None when the buffer is empty.
+        """
+        if not self._buffer:
+            return None
+        return min(s.noise_dbm for s in self._buffer)
+
+    @property
+    def rolling_mean(self) -> float | None:
+        """Average sample over the buffer.
+
+        Indicative of channel busyness rather than the noise floor:
+        rises during heavy nearby traffic, falls when the band is
+        quiet. Exposed for the future channel-utilisation widget.
+        """
+        if not self._buffer:
+            return None
+        total = sum(s.noise_dbm for s in self._buffer)
+        return total / len(self._buffer)
 
     def snapshot(self) -> dict:
         """Serialise current state for the websocket frame."""
@@ -134,9 +161,14 @@ class NoiseFloorTracker:
             self._last_sample_at is None
             or (now - self._last_sample_at) > STALE_AFTER_SECONDS
         )
+        floor = self.rolling_min
+        mean = self.rolling_mean
         return {
             "value_dbm": (
-                round(self._ema, 1) if self._ema is not None else None
+                round(floor, 1) if floor is not None else None
+            ),
+            "mean_dbm": (
+                round(mean, 1) if mean is not None else None
             ),
             "bandwidth_khz": self._last_bandwidth_khz,
             "samples_dbm": [

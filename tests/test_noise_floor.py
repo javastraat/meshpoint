@@ -1,13 +1,11 @@
 """Unit tests for src/api/telemetry/noise_floor.py."""
 from __future__ import annotations
 
-import math
 import time
 import unittest
 
 from src.api.telemetry.noise_floor import (
     CALIBRATING_BELOW,
-    MAX_RSSI_FOR_FLOOR_DBM,
     MAX_SNR_FOR_FLOOR_DB,
     NOISE_FIGURE_DB,
     STALE_AFTER_SECONDS,
@@ -39,18 +37,25 @@ class TestTheoreticalFloor(unittest.TestCase):
 
 class TestNoiseFloorTracker(unittest.TestCase):
 
-    def test_first_sample_seeds_ema_with_value(self) -> None:
+    def test_first_sample_records_raw_noise_value(self) -> None:
         tracker = NoiseFloorTracker()
         sample = tracker.update(rssi_dbm=-90, snr_db=5, bandwidth_khz=250)
         self.assertIsNotNone(sample)
         self.assertEqual(sample.noise_dbm, -95.0)
 
-    def test_ema_smooths_subsequent_samples(self) -> None:
-        tracker = NoiseFloorTracker(alpha=0.5)
-        tracker.update(rssi_dbm=-90, snr_db=5, bandwidth_khz=250)
-        # Second sample at -100 (rssi=-95, snr=-5) should land halfway.
-        sample = tracker.update(rssi_dbm=-95, snr_db=-5, bandwidth_khz=250)
-        self.assertAlmostEqual(sample.noise_dbm, -92.5, places=1)
+    def test_rolling_min_picks_lowest_observed_value(self) -> None:
+        tracker = NoiseFloorTracker()
+        tracker.update(rssi_dbm=-65, snr_db=7, bandwidth_khz=250)   # -72
+        tracker.update(rssi_dbm=-95, snr_db=5, bandwidth_khz=250)   # -100
+        tracker.update(rssi_dbm=-80, snr_db=2, bandwidth_khz=250)   # -82
+        self.assertEqual(tracker.rolling_min, -100.0)
+
+    def test_rolling_mean_averages_buffer(self) -> None:
+        tracker = NoiseFloorTracker()
+        tracker.update(rssi_dbm=-65, snr_db=7, bandwidth_khz=250)   # -72
+        tracker.update(rssi_dbm=-95, snr_db=5, bandwidth_khz=250)   # -100
+        # Mean of -72 and -100 is -86.
+        self.assertAlmostEqual(tracker.rolling_mean, -86.0, places=1)
 
     def test_none_inputs_return_none(self) -> None:
         tracker = NoiseFloorTracker()
@@ -85,13 +90,15 @@ class TestNoiseFloorTracker(unittest.TestCase):
         snap = tracker.snapshot()
         self.assertEqual(len(snap["samples_dbm"]), 5)
 
-    def test_snapshot_includes_bandwidth_and_floor(self) -> None:
+    def test_snapshot_value_is_rolling_min(self) -> None:
         tracker = NoiseFloorTracker()
-        tracker.update(rssi_dbm=-95, snr_db=8, bandwidth_khz=250)
+        tracker.update(rssi_dbm=-65, snr_db=7, bandwidth_khz=250)   # -72
+        tracker.update(rssi_dbm=-95, snr_db=8, bandwidth_khz=250)   # -103
         snap = tracker.snapshot()
         self.assertEqual(snap["bandwidth_khz"], 250)
         self.assertAlmostEqual(snap["theoretical_floor_dbm"], -114.0, delta=0.5)
         self.assertEqual(snap["value_dbm"], -103.0)
+        self.assertEqual(snap["mean_dbm"], -87.5)
         self.assertFalse(snap["stale"])
 
     def test_snapshot_marks_stale_when_no_recent_sample(self) -> None:
@@ -110,6 +117,7 @@ class TestNoiseFloorTracker(unittest.TestCase):
         tracker.reset()
         snap = tracker.snapshot()
         self.assertIsNone(snap["value_dbm"])
+        self.assertIsNone(snap["mean_dbm"])
         self.assertEqual(len(snap["samples_dbm"]), 0)
         self.assertTrue(snap["stale"])
 
@@ -120,49 +128,79 @@ class TestNoiseFloorTracker(unittest.TestCase):
         self.assertIsNone(tracker.update(rssi_dbm=-200, snr_db=5))
 
 
-class TestStrongPacketRejection(unittest.TestCase):
-    """Strong nearby packets bias the floor low (clipped SNR register).
-
-    The tracker should drop them so the EMA only sees weak packets
-    where ``noise = rssi - snr`` is a faithful estimate.
+class TestSaturationGuardAndAcceptance(unittest.TestCase):
+    """The tracker must accept strong packets so rural-mountain
+    setups (one near neighbour, no weak traffic) get a number, while
+    still rejecting samples whose SNR is at the demod register
+    ceiling (which would underestimate the floor).
     """
 
-    def test_strong_rssi_is_rejected(self) -> None:
+    def test_strong_rssi_is_accepted(self) -> None:
+        # Tower-Relay-style packet: -65 dBm, 7 dB SNR. Earlier
+        # versions filtered these out and rural users got stuck on
+        # "calibrating" forever. Now the rolling-min estimator
+        # tolerates them; the upper bound just stays loose until a
+        # weaker packet arrives.
         tracker = NoiseFloorTracker()
-        # A strong nearby packet at -50 dBm with the SNR register
-        # clipped at +22 dB would compute noise = -72 dBm. That's
-        # what users were seeing as "red" in rural-quiet locations.
-        result = tracker.update(rssi_dbm=-50, snr_db=22, bandwidth_khz=250)
-        self.assertIsNone(result)
-        snap = tracker.snapshot()
-        self.assertIsNone(snap["value_dbm"])
-
-    def test_high_snr_is_rejected_even_when_rssi_is_low(self) -> None:
-        # Even a weak-looking RSSI with extreme SNR is suspect: SNR
-        # >12 dB is rare for a packet truly near the noise floor.
-        tracker = NoiseFloorTracker()
-        result = tracker.update(rssi_dbm=-95, snr_db=18, bandwidth_khz=250)
-        self.assertIsNone(result)
-
-    def test_weak_packet_below_threshold_is_accepted(self) -> None:
-        tracker = NoiseFloorTracker()
-        # -95 dBm RSSI with +5 dB SNR is exactly the kind of packet
-        # we want — likely far away, demod working near sensitivity.
-        sample = tracker.update(rssi_dbm=-95, snr_db=5, bandwidth_khz=250)
+        sample = tracker.update(
+            rssi_dbm=-65, snr_db=7, bandwidth_khz=250,
+        )
         self.assertIsNotNone(sample)
-        self.assertEqual(sample.noise_dbm, -100.0)
+        self.assertEqual(sample.noise_dbm, -72.0)
 
-    def test_filter_thresholds_match_docstring(self) -> None:
-        self.assertEqual(MAX_RSSI_FOR_FLOOR_DBM, -85.0)
-        self.assertEqual(MAX_SNR_FOR_FLOOR_DB, 12.0)
+    def test_clipped_snr_is_rejected(self) -> None:
+        # SNR at/above 18 dB is treated as likely-clipped on the
+        # SX126x register (which saturates around +22 dB) and would
+        # bias the floor estimate low.
+        tracker = NoiseFloorTracker()
+        self.assertIsNone(
+            tracker.update(rssi_dbm=-50, snr_db=22, bandwidth_khz=250),
+        )
+        self.assertIsNone(
+            tracker.update(rssi_dbm=-90, snr_db=18, bandwidth_khz=250),
+        )
+
+    def test_below_clip_threshold_still_accepted_at_strong_rssi(self) -> None:
+        tracker = NoiseFloorTracker()
+        sample = tracker.update(
+            rssi_dbm=-50, snr_db=10, bandwidth_khz=250,
+        )
+        self.assertIsNotNone(sample)
+        self.assertEqual(sample.noise_dbm, -60.0)
+
+    def test_clip_threshold_matches_docstring(self) -> None:
+        self.assertEqual(MAX_SNR_FOR_FLOOR_DB, 18.0)
+
+
+class TestRollingMinConvergesAsWeakPacketsArrive(unittest.TestCase):
+    """The whole point of the rolling-min approach: as more packets
+    are heard (especially weaker ones), the estimate tightens
+    toward the true noise floor without ever sticking on
+    "calibrating" while real packets are arriving.
+    """
+
+    def test_strong_only_packets_yield_loose_estimate(self) -> None:
+        tracker = NoiseFloorTracker()
+        for _ in range(5):
+            tracker.update(rssi_dbm=-65, snr_db=7, bandwidth_khz=250)
+        self.assertEqual(tracker.rolling_min, -72.0)
+
+    def test_arrival_of_weaker_packet_tightens_estimate(self) -> None:
+        tracker = NoiseFloorTracker()
+        for _ in range(5):
+            tracker.update(rssi_dbm=-65, snr_db=7, bandwidth_khz=250)
+        tracker.update(rssi_dbm=-100, snr_db=5, bandwidth_khz=250)
+        self.assertEqual(tracker.rolling_min, -105.0)
 
 
 class TestCalibratingFlag(unittest.TestCase):
 
     def test_calibrating_until_threshold_samples_collected(self) -> None:
         tracker = NoiseFloorTracker()
+        # Use any accepted packet shape (strong or weak both work
+        # now that the RSSI filter is gone).
         for _ in range(CALIBRATING_BELOW - 1):
-            tracker.update(rssi_dbm=-95, snr_db=5, bandwidth_khz=250)
+            tracker.update(rssi_dbm=-65, snr_db=7, bandwidth_khz=250)
         snap = tracker.snapshot()
         self.assertTrue(snap["calibrating"])
         self.assertEqual(snap["samples_count"], CALIBRATING_BELOW - 1)
@@ -170,7 +208,7 @@ class TestCalibratingFlag(unittest.TestCase):
     def test_not_calibrating_once_enough_samples_collected(self) -> None:
         tracker = NoiseFloorTracker()
         for _ in range(CALIBRATING_BELOW):
-            tracker.update(rssi_dbm=-95, snr_db=5, bandwidth_khz=250)
+            tracker.update(rssi_dbm=-65, snr_db=7, bandwidth_khz=250)
         snap = tracker.snapshot()
         self.assertFalse(snap["calibrating"])
         self.assertEqual(snap["samples_count"], CALIBRATING_BELOW)
