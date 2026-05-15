@@ -19,7 +19,17 @@ from src.api.auth.auth_bootstrap import AuthSubsystem, build_auth_subsystem
 from src.api.auth.dependencies import SESSION_COOKIE_NAME, require_auth
 from src.api.auth.jwt_session import JwtSessionService
 from src.api.auth.ws_guard import WS_AUTH_CLOSE_CODE, authenticate_websocket
-from src.api.routes import analytics, auth_routes, config_routes, device, identity_routes, messages, nodeinfo_routes, nodes, packets, stats_routes, system_metrics, telemetry, update_check
+from src.api.dangerous import DangerousActionRegistry
+from src.api.dangerous.handlers import (
+    build_clear_database_action,
+    build_force_nodeinfo_action,
+    build_restart_concentrator_action,
+    build_restart_service_action,
+    build_wipe_phantoms_action,
+)
+from src.api.routes import analytics, auth_config_routes, auth_routes, config_routes, dangerous_routes, device, identity_routes, messages, nodeinfo_routes, nodes, packets, public_radar_routes, stats_routes, system_metrics, telemetry, terminal_routes, update_check, update_routes
+from src.api.terminal import CommandCatalog, SessionManager
+from src.api.update import ReleaseChannelRegistry, UpdateApplier
 from src.api.upstream_client import UpstreamClient
 from src.api.websocket_manager import WebSocketManager
 from src.config import AppConfig, load_config, validate_activation
@@ -50,8 +60,23 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
 
     auth_subsystem = build_auth_subsystem(config)
     auth_routes.init_routes(auth_subsystem.service)
+    auth_config_routes.init_routes(auth_subsystem.service)
     auth_deps.init_auth(auth_subsystem.jwt_service)
-    audit_deps.init_audit(AuditLogWriter())
+    audit_writer = AuditLogWriter()
+    audit_deps.init_audit(audit_writer)
+    session_manager = SessionManager(cwd="/opt/meshpoint")
+    terminal_routes.init_routes(
+        session_manager=session_manager,
+        command_catalog=CommandCatalog(),
+        jwt_service=auth_subsystem.jwt_service,
+        audit_writer=audit_writer,
+    )
+    update_routes.init_routes(
+        applier=UpdateApplier(),
+        registry=ReleaseChannelRegistry(),
+    )
+    # Dangerous registry is wired in lifespan so clear-db / wipe-phantoms /
+    # force-nodeinfo can close over the live pipeline objects.
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -70,6 +95,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
         pipeline = _build_pipeline(config)
         pipeline.on_packet(_on_packet_received)
         pipeline.on_packet(lambda pkt: print_packet(pkt))
+        pipeline.on_packet(public_radar_routes.public_radar_packet_callback)
 
         if config.transmit.enabled:
             _inject_tx_gain_into_source(pipeline)
@@ -105,6 +131,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
         _init_routes(
             pipeline, config, identity, auth_subsystem, tx_service, message_repo
         )
+        _init_dangerous_registry(pipeline)
         print_banner(config)
         logger.info("Meshpoint started -- listening for packets")
         yield
@@ -112,6 +139,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
             await nodeinfo_broadcaster.stop()
         await upstream.stop()
         await pipeline.stop()
+        session_manager.shutdown()
         logger.info("Meshpoint stopped")
 
     app = FastAPI(
@@ -122,6 +150,11 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
 
     app.include_router(auth_routes.router)
     app.include_router(identity_routes.router)
+    app.include_router(auth_config_routes.router)
+    app.include_router(public_radar_routes.router)
+    app.include_router(terminal_routes.router)
+    app.include_router(update_routes.router)
+    app.include_router(dangerous_routes.router)
 
     protected = [Depends(require_auth)]
     app.include_router(nodes.router, dependencies=protected)
@@ -764,6 +797,77 @@ def _init_routes(
         crypto=crypto,
         tx_service=tx_service,
     )
+
+
+def _init_dangerous_registry(coord: PipelineCoordinator) -> None:
+    """Compose the Settings → Dangerous registry now that the pipeline is live.
+
+    Restart actions don't need pipeline state -- they go through
+    ``systemctl`` -- but database / phantom / nodeinfo operations
+    have to close over the running coordinator. Doing this from the
+    lifespan keeps the wiring honest: by the time these handlers
+    fire, every collaborator has been instantiated.
+    """
+    import asyncio
+    loop = asyncio.get_running_loop()
+
+    def _dispatch(coro):
+        return asyncio.run_coroutine_threadsafe(coro, loop)
+
+    async def _clear_database_coro() -> int:
+        db = coord.database
+        removed = 0
+        for table in ("packets", "messages", "nodes"):
+            try:
+                rc = await db.execute(f"DELETE FROM {table}")
+                if rc and getattr(rc, "rowcount", 0):
+                    removed += int(rc.rowcount)
+            except Exception:
+                logger.exception("clear_database: failed on table %s", table)
+        try:
+            await db.commit()
+        except Exception:
+            pass
+        return removed
+
+    async def _wipe_phantoms_coro() -> int:
+        try:
+            row = await coord.node_repo._db.execute(
+                "DELETE FROM nodes WHERE last_seen IS NULL OR rssi IS NULL"
+            )
+            await coord.node_repo._db.commit()
+            return int(getattr(row, "rowcount", 0) or 0)
+        except Exception:
+            logger.exception("wipe_phantoms: failed")
+            return 0
+
+    async def _force_nodeinfo_coro() -> bool:
+        if nodeinfo_broadcaster is None:
+            return False
+        try:
+            await nodeinfo_broadcaster.broadcast_now()
+            return True
+        except Exception:
+            logger.exception("force_nodeinfo: broadcast failed")
+            return False
+
+    registry = DangerousActionRegistry([
+        build_restart_service_action(),
+        build_restart_concentrator_action(),
+        build_clear_database_action(
+            dispatch=_dispatch,
+            clear_coro_factory=_clear_database_coro,
+        ),
+        build_wipe_phantoms_action(
+            dispatch=_dispatch,
+            wipe_coro_factory=_wipe_phantoms_coro,
+        ),
+        build_force_nodeinfo_action(
+            dispatch=_dispatch,
+            broadcast_coro_factory=_force_nodeinfo_coro,
+        ),
+    ])
+    dangerous_routes.init_routes(registry)
 
 
 async def _gate_ws_or_close(

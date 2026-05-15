@@ -22,6 +22,10 @@
     <link rel="stylesheet" href="css/radio_cards.css" />
     <link rel="stylesheet" href="css/radio_channels.css" />
     <link rel="stylesheet" href="css/stats.css" />
+    <link rel="stylesheet" href="css/settings.css" />
+    <link rel="stylesheet" href="css/configuration.css" />
+    <link rel="stylesheet" href="css/terminal.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
     <link rel="stylesheet" href="css/responsive.css" />
 </head>
 <body>
@@ -295,9 +299,35 @@
             </section>
 
             <section class="section" data-section="terminal" style="display:none">
-                <div id="terminal-panel" class="section__placeholder">
-                    <h2>Terminal</h2>
-                    <p>Coming in v0.7.4. Full shell access for technical operators.</p>
+                <div id="terminal-panel" class="terminal-panel">
+                    <header class="terminal-panel__head">
+                        <div class="terminal-panel__title-row">
+                            <h2 class="terminal-panel__title">Terminal</h2>
+                            <span class="terminal-panel__status" data-term-status data-state="idle">idle</span>
+                        </div>
+                        <div class="terminal-panel__actions">
+                            <button class="terminal-button terminal-button--ghost" type="button" data-term-toggle-drawer aria-expanded="false">
+                                <span aria-hidden="true">⌘</span> Commands
+                            </button>
+                            <button class="terminal-button terminal-button--ghost" type="button" data-term-clear>Clear</button>
+                            <button class="terminal-button terminal-button--primary" type="button" data-term-connect>Connect</button>
+                            <button class="terminal-button terminal-button--danger" type="button" data-term-disconnect disabled>Disconnect</button>
+                        </div>
+                    </header>
+                    <div class="terminal-panel__body">
+                        <div class="terminal-panel__shell">
+                            <div id="terminal-host" class="terminal-host"></div>
+                            <p class="terminal-panel__hint" data-term-hint>Press Connect to open a shell. The session is admin-only and audited.</p>
+                        </div>
+                        <aside class="terminal-drawer" data-term-drawer aria-hidden="true">
+                            <div class="terminal-drawer__head">
+                                <h3 class="terminal-drawer__title">Quick commands</h3>
+                                <button class="terminal-drawer__close" type="button" data-term-close-drawer aria-label="Close commands">&times;</button>
+                            </div>
+                            <p class="terminal-drawer__hint">Click to insert at the prompt. Buttons marked dangerous require typed confirmation.</p>
+                            <div class="terminal-drawer__list" data-term-command-list></div>
+                        </aside>
+                    </div>
                 </div>
             </section>
 
@@ -308,9 +338,137 @@
             <section class="section" data-section="configuration/mqtt" style="display:none"><div id="cfg-mqtt-panel" class="section__placeholder"><h2>Configuration · MQTT</h2><p>Skeleton; broker + topic root + region.</p></div></section>
             <section class="section" data-section="configuration/gps" style="display:none"><div id="cfg-gps-panel" class="section__placeholder"><h2>Configuration · GPS</h2><p>Skeleton; UART vs static. gpsd integration in v0.7.5.</p></div></section>
 
-            <section class="section" data-section="settings/updates" style="display:none"><div id="settings-updates-panel" class="section__placeholder"><h2>Settings · Updates</h2><p>Skeleton; release channels + apply.</p></div></section>
-            <section class="section" data-section="settings/auth" style="display:none"><div id="settings-auth-panel" class="section__placeholder"><h2>Settings · Auth</h2><p>Skeleton; password change + viewer role + lockout.</p></div></section>
-            <section class="section" data-section="settings/dangerous" style="display:none"><div id="settings-dangerous-panel" class="section__placeholder"><h2>Settings · Dangerous</h2><p>Skeleton; restart + clear DB + wipe phantoms.</p></div></section>
+            <section class="section" data-section="settings/updates" style="display:none">
+                <div id="settings-updates-panel" class="update-panel">
+                    <header class="update-panel__head">
+                        <h2 class="update-panel__title">Updates</h2>
+                        <p class="update-panel__subtitle">Pin the install tree to a release channel and apply changes from the dashboard.</p>
+                    </header>
+                    <article class="update-card">
+                        <div class="update-card__row">
+                            <label class="update-field">
+                                <span class="update-field__label">Channel</span>
+                                <select class="update-field__input" data-update-channel></select>
+                            </label>
+                            <div class="update-version">
+                                <span class="update-version__label">Local</span>
+                                <span class="update-version__value" data-update-local-version>--</span>
+                            </div>
+                            <div class="update-version">
+                                <span class="update-version__label">Remote</span>
+                                <span class="update-version__value" data-update-remote-version>--</span>
+                            </div>
+                        </div>
+                        <p class="update-card__description" data-update-description></p>
+                        <label class="update-field" data-update-custom-row style="display:none">
+                            <span class="update-field__label">Custom branch</span>
+                            <input class="update-field__input" type="text" placeholder="e.g. feat/v0.7.4" data-update-custom-branch>
+                        </label>
+                        <div class="update-card__actions">
+                            <button class="terminal-button terminal-button--primary" type="button" data-update-apply>Apply update</button>
+                            <button class="terminal-button terminal-button--ghost" type="button" data-update-rollback disabled>Roll back last apply</button>
+                        </div>
+                        <p class="update-status" data-update-status aria-live="polite"></p>
+                    </article>
+                    <section class="update-log" data-update-log></section>
+                </div>
+            </section>
+            <section class="section" data-section="settings/auth" style="display:none">
+                <div id="settings-auth-panel" class="auth-panel">
+                    <header class="auth-panel__head">
+                        <h2 class="auth-panel__title">Authentication</h2>
+                        <p class="auth-panel__subtitle">Manage admin credentials, sessions, the viewer role, and lockout policy.</p>
+                    </header>
+
+                    <div class="auth-panel__grid">
+                        <article class="auth-card" data-pwc-root>
+                            <h3 class="auth-card__title">Change password</h3>
+                            <p class="auth-card__hint">Rotates this account's password and invalidates other browser sessions immediately.</p>
+                            <form class="auth-card__form" data-pwc-form autocomplete="off">
+                                <label class="auth-field">
+                                    <span class="auth-field__label">Current password</span>
+                                    <input class="auth-field__input" type="password" required autocomplete="current-password" data-pwc-current>
+                                </label>
+                                <label class="auth-field">
+                                    <span class="auth-field__label">New password</span>
+                                    <input class="auth-field__input" type="password" required minlength="8" autocomplete="new-password" data-pwc-new>
+                                </label>
+                                <div class="auth-strength" role="progressbar" aria-valuemin="0" aria-valuemax="5" aria-valuenow="0" data-pwc-strength>
+                                    <span></span><span></span><span></span><span></span><span></span>
+                                </div>
+                                <label class="auth-field">
+                                    <span class="auth-field__label">Confirm new password</span>
+                                    <input class="auth-field__input" type="password" required minlength="8" autocomplete="new-password" data-pwc-confirm>
+                                </label>
+                                <div class="auth-card__actions">
+                                    <button class="auth-button auth-button--primary" type="submit" data-pwc-submit>Update password</button>
+                                </div>
+                                <p class="auth-status" data-pwc-status aria-live="polite"></p>
+                            </form>
+                        </article>
+
+                        <article class="auth-card" data-sigout-all-root>
+                            <h3 class="auth-card__title">Sign out everywhere</h3>
+                            <p class="auth-card__hint">Invalidates every outstanding session, including this one. You'll be redirected to /login.</p>
+                            <div class="auth-card__actions">
+                                <button class="auth-button auth-button--danger" type="button" data-sigout-all-btn>Sign out all sessions</button>
+                            </div>
+                            <p class="auth-status" data-sigout-all-status aria-live="polite"></p>
+                        </article>
+
+                        <article class="auth-card" data-viewer-root>
+                            <h3 class="auth-card__title">Viewer role <span class="auth-pill" data-viewer-state data-state="disabled">Disabled</span></h3>
+                            <p class="auth-card__hint">Read-only login for sharing the dashboard with trusted observers. Viewers cannot reach Settings or the Terminal.</p>
+                            <form class="auth-card__form" data-viewer-form autocomplete="off">
+                                <label class="auth-field">
+                                    <span class="auth-field__label">Viewer password</span>
+                                    <input class="auth-field__input" type="password" required minlength="8" autocomplete="new-password" data-viewer-password>
+                                </label>
+                                <label class="auth-field">
+                                    <span class="auth-field__label">Confirm</span>
+                                    <input class="auth-field__input" type="password" required minlength="8" autocomplete="new-password" data-viewer-confirm>
+                                </label>
+                                <div class="auth-card__actions">
+                                    <button class="auth-button auth-button--primary" type="submit" data-viewer-enable>Enable viewer</button>
+                                    <button class="auth-button auth-button--ghost" type="button" data-viewer-disable disabled>Disable viewer</button>
+                                </div>
+                                <p class="auth-status" data-viewer-status aria-live="polite"></p>
+                            </form>
+                        </article>
+
+                        <article class="auth-card" data-lockout-root>
+                            <h3 class="auth-card__title">Failed-login lockout</h3>
+                            <p class="auth-card__hint">After this many failures, login is blocked for the cooldown window. Defaults to 5 attempts / 5 minutes.</p>
+                            <form class="auth-card__form" data-lockout-form autocomplete="off">
+                                <div class="auth-field-row">
+                                    <label class="auth-field">
+                                        <span class="auth-field__label">Attempts before lockout</span>
+                                        <input class="auth-field__input" type="number" min="1" max="100" required value="5" data-lockout-attempts>
+                                    </label>
+                                    <label class="auth-field">
+                                        <span class="auth-field__label">Cooldown (minutes)</span>
+                                        <input class="auth-field__input" type="number" min="1" max="1440" required value="5" data-lockout-cooldown>
+                                    </label>
+                                </div>
+                                <div class="auth-card__actions">
+                                    <button class="auth-button auth-button--primary" type="submit" data-lockout-submit>Save lockout</button>
+                                </div>
+                                <p class="auth-status" data-lockout-status aria-live="polite"></p>
+                            </form>
+                        </article>
+                    </div>
+                </div>
+            </section>
+            <section class="section" data-section="settings/dangerous" style="display:none">
+                <div id="settings-dangerous-panel" class="dangerous-panel">
+                    <header class="dangerous-panel__head">
+                        <h2 class="dangerous-panel__title">Dangerous actions</h2>
+                        <p class="dangerous-panel__subtitle">Operations that can leave the host in a degraded state. Each requires typed confirmation and is recorded in the audit log.</p>
+                    </header>
+                    <p class="dangerous-panel__status" data-dangerous-status aria-live="polite"></p>
+                    <div class="dangerous-panel__list" data-dangerous-list></div>
+                </div>
+            </section>
         </main>
 
         <div id="node-backdrop" class="nd-backdrop"></div>
@@ -337,6 +495,24 @@
     <script src="js/radio_settings.js"></script>
     <script src="js/stats_tab.js"></script>
     <script src="js/signout_controller.js"></script>
+    <script src="js/settings/password_change_form.js"></script>
+    <script src="js/settings/sign_out_all_form.js"></script>
+    <script src="js/settings/viewer_role_form.js"></script>
+    <script src="js/settings/lockout_config_form.js"></script>
+    <script src="js/settings/auth_panel_controller.js"></script>
+    <script src="js/settings/update_log_view.js"></script>
+    <script src="js/settings/update_panel_controller.js"></script>
+    <script src="js/settings/dangerous_panel_controller.js"></script>
+    <script src="js/configuration/transmit_card.js"></script>
+    <script src="js/configuration/mqtt_card.js"></script>
+    <script src="js/configuration/gps_card.js"></script>
+    <script src="js/configuration/configuration_panel.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+    <script src="js/terminal/dangerous_modal.js"></script>
+    <script src="js/terminal/command_drawer.js"></script>
+    <script src="js/terminal/terminal_client.js"></script>
+    <script src="js/terminal/terminal_panel.js"></script>
     <script src="sidebar/router.js"></script>
     <script src="sidebar/sidebar_controller.js"></script>
     <script src="js/app.js"></script>

@@ -55,6 +55,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     new SignOutController('signout-btn').bind();
 
+    _bootAuthPanel(router);
+    _bootTerminalPanel(router);
+    _bootUpdatePanel(router);
+    _bootConfigurationPanel(router);
+    _bootDangerousPanel(router);
+
     const nodeMap = new NodeMap('map');
     const packetFeed = new SimplePacketFeed('packet-tbody');
 
@@ -113,6 +119,78 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     setInterval(_checkForUpdate, 300_000);
 });
+
+function _bootDangerousPanel(router) {
+    const root = document.getElementById('settings-dangerous-panel');
+    if (!root || !window.DangerousPanelController) return;
+    const controller = new window.DangerousPanelController(root);
+    controller.bind();
+    let primed = false;
+    router.onRouteChange((route) => {
+        if (route !== 'settings/dangerous') return;
+        if (primed) return;
+        primed = true;
+        controller.refresh();
+    });
+}
+
+function _bootConfigurationPanel(router) {
+    if (!window.ConfigurationPanel) return;
+    const panel = new window.ConfigurationPanel();
+    panel.bind();
+    router.onRouteChange((route) => {
+        if (!route || !route.startsWith('configuration/')) return;
+        panel.onSectionEnter(route);
+    });
+}
+
+function _bootUpdatePanel(router) {
+    const root = document.getElementById('settings-updates-panel');
+    if (!root || !window.UpdatePanelController) return;
+    const controller = new window.UpdatePanelController(root);
+    controller.bind();
+    let primed = false;
+    router.onRouteChange((route) => {
+        if (route !== 'settings/updates') return;
+        if (primed) return;
+        primed = true;
+        controller.refresh();
+    });
+}
+
+function _bootTerminalPanel(router) {
+    const root = document.getElementById('terminal-panel');
+    if (!root || !window.TerminalPanelController) return;
+    const controller = new window.TerminalPanelController(root);
+    controller.bind();
+    let primed = false;
+    router.onRouteChange((route) => {
+        if (route !== 'terminal') return;
+        if (!primed) {
+            primed = true;
+            controller.refresh();
+        }
+        controller.onSectionEnter();
+    });
+}
+
+function _bootAuthPanel(router) {
+    const root = document.getElementById('settings-auth-panel');
+    if (!root || !window.AuthPanelController) return;
+    const controller = new window.AuthPanelController(root);
+    controller.bind();
+    let primed = false;
+    const maybeRefresh = (route) => {
+        if (route !== 'settings/auth') return;
+        if (primed) return;
+        primed = true;
+        controller.refresh();
+    };
+    router.onRouteChange(maybeRefresh);
+    if ((location.hash || '').replace(/^#\//, '') === 'settings/auth') {
+        maybeRefresh('settings/auth');
+    }
+}
 
 async function _loadIdentity() {
     try {
