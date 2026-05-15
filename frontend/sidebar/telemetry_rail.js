@@ -58,14 +58,22 @@ class SidebarTelemetryRail {
         if (!data) return;
         const value = data.value_dbm;
         const stale = !!data.stale;
+        const calibrating = !!data.calibrating;
         const bw = data.bandwidth_khz;
         const samples = Array.isArray(data.samples_dbm) ? data.samples_dbm : [];
         const floor = data.theoretical_floor_dbm;
 
-        if (value == null) {
-            this._noiseEl.textContent = '--';
+        if (calibrating || value == null) {
+            this._noiseEl.textContent = value == null ? 'calibrating' : `${value.toFixed(0)} dBm`;
+            this._noiseEl.title = (
+                'Noise floor only counts weak packets (RSSI < -85 dBm, '
+                + 'SNR < 12 dB) so strong nearby signals do not bias '
+                + 'the reading. Will settle once a few weak packets '
+                + 'arrive.'
+            );
         } else {
             this._noiseEl.textContent = `${value.toFixed(0)} dBm`;
+            this._noiseEl.title = '';
         }
         if (bw) {
             this._noiseBwEl.textContent = `${bw.toFixed(0)} kHz`;
@@ -76,6 +84,9 @@ class SidebarTelemetryRail {
         this._noiseChip.classList.toggle(
             'telemetry-rail__noise--stale', stale,
         );
+        this._noiseChip.classList.toggle(
+            'telemetry-rail__noise--calibrating', calibrating,
+        );
 
         // Margin coloring on the readout label, mirrors sparkline logic.
         this._noiseChip.classList.remove(
@@ -83,7 +94,7 @@ class SidebarTelemetryRail {
             'telemetry-rail__noise--busy',
             'telemetry-rail__noise--noisy',
         );
-        if (value != null && floor != null) {
+        if (!calibrating && value != null && floor != null) {
             const margin = value - floor;
             if (margin > 15) {
                 this._noiseChip.classList.add('telemetry-rail__noise--noisy');

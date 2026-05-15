@@ -6,6 +6,9 @@ import time
 import unittest
 
 from src.api.telemetry.noise_floor import (
+    CALIBRATING_BELOW,
+    MAX_RSSI_FOR_FLOOR_DBM,
+    MAX_SNR_FOR_FLOOR_DB,
     NOISE_FIGURE_DB,
     STALE_AFTER_SECONDS,
     NoiseFloorTracker,
@@ -115,6 +118,69 @@ class TestNoiseFloorTracker(unittest.TestCase):
         # Without a bandwidth we accept any value in [-150, 0].
         self.assertIsNotNone(tracker.update(rssi_dbm=-90, snr_db=5))
         self.assertIsNone(tracker.update(rssi_dbm=-200, snr_db=5))
+
+
+class TestStrongPacketRejection(unittest.TestCase):
+    """Strong nearby packets bias the floor low (clipped SNR register).
+
+    The tracker should drop them so the EMA only sees weak packets
+    where ``noise = rssi - snr`` is a faithful estimate.
+    """
+
+    def test_strong_rssi_is_rejected(self) -> None:
+        tracker = NoiseFloorTracker()
+        # A strong nearby packet at -50 dBm with the SNR register
+        # clipped at +22 dB would compute noise = -72 dBm. That's
+        # what users were seeing as "red" in rural-quiet locations.
+        result = tracker.update(rssi_dbm=-50, snr_db=22, bandwidth_khz=250)
+        self.assertIsNone(result)
+        snap = tracker.snapshot()
+        self.assertIsNone(snap["value_dbm"])
+
+    def test_high_snr_is_rejected_even_when_rssi_is_low(self) -> None:
+        # Even a weak-looking RSSI with extreme SNR is suspect: SNR
+        # >12 dB is rare for a packet truly near the noise floor.
+        tracker = NoiseFloorTracker()
+        result = tracker.update(rssi_dbm=-95, snr_db=18, bandwidth_khz=250)
+        self.assertIsNone(result)
+
+    def test_weak_packet_below_threshold_is_accepted(self) -> None:
+        tracker = NoiseFloorTracker()
+        # -95 dBm RSSI with +5 dB SNR is exactly the kind of packet
+        # we want — likely far away, demod working near sensitivity.
+        sample = tracker.update(rssi_dbm=-95, snr_db=5, bandwidth_khz=250)
+        self.assertIsNotNone(sample)
+        self.assertEqual(sample.noise_dbm, -100.0)
+
+    def test_filter_thresholds_match_docstring(self) -> None:
+        self.assertEqual(MAX_RSSI_FOR_FLOOR_DBM, -85.0)
+        self.assertEqual(MAX_SNR_FOR_FLOOR_DB, 12.0)
+
+
+class TestCalibratingFlag(unittest.TestCase):
+
+    def test_calibrating_until_threshold_samples_collected(self) -> None:
+        tracker = NoiseFloorTracker()
+        for _ in range(CALIBRATING_BELOW - 1):
+            tracker.update(rssi_dbm=-95, snr_db=5, bandwidth_khz=250)
+        snap = tracker.snapshot()
+        self.assertTrue(snap["calibrating"])
+        self.assertEqual(snap["samples_count"], CALIBRATING_BELOW - 1)
+
+    def test_not_calibrating_once_enough_samples_collected(self) -> None:
+        tracker = NoiseFloorTracker()
+        for _ in range(CALIBRATING_BELOW):
+            tracker.update(rssi_dbm=-95, snr_db=5, bandwidth_khz=250)
+        snap = tracker.snapshot()
+        self.assertFalse(snap["calibrating"])
+        self.assertEqual(snap["samples_count"], CALIBRATING_BELOW)
+
+    def test_calibrating_when_no_samples_yet(self) -> None:
+        tracker = NoiseFloorTracker()
+        snap = tracker.snapshot()
+        self.assertTrue(snap["calibrating"])
+        self.assertEqual(snap["samples_count"], 0)
+        self.assertIsNone(snap["value_dbm"])
 
 
 class TestNoiseFigureSanity(unittest.TestCase):

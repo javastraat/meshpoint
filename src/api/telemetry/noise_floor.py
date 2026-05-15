@@ -37,6 +37,17 @@ DEFAULT_BUFFER_SIZE: int = 120
 STALE_AFTER_SECONDS: float = 30.0
 NOISE_FIGURE_DB: float = 6.0
 
+# Only weak packets give a useful noise floor reading. Strong packets
+# saturate the SX126x demodulator's SNR register (it caps around
+# +22 dB), so ``noise = rssi - snr`` for a strong nearby packet
+# *underestimates* the noise floor by however far the SNR was
+# clipped. We restrict samples to packets that are far enough away
+# that the demod is operating near sensitivity.
+MAX_RSSI_FOR_FLOOR_DBM: float = -85.0
+MAX_SNR_FOR_FLOOR_DB: float = 12.0
+# Number of accepted samples before we consider the EMA settled.
+CALIBRATING_BELOW: int = 5
+
 
 @dataclass(slots=True)
 class NoiseSample:
@@ -77,6 +88,15 @@ class NoiseFloorTracker:
         # placeholder; treat that as "unknown" rather than reporting
         # noise = rssi which would be wildly optimistic.
         if snr_db == 0.0 and rssi_dbm < -50:
+            return None
+
+        # Strong nearby packets have a clipped SNR reading from the
+        # demodulator and underestimate the floor. Skip them; the
+        # estimator is biased low without this filter and rural users
+        # see "noisy red" when they should see "clean green".
+        if rssi_dbm > MAX_RSSI_FOR_FLOOR_DBM:
+            return None
+        if snr_db > MAX_SNR_FOR_FLOOR_DB:
             return None
 
         sample_dbm = rssi_dbm - snr_db
@@ -122,6 +142,8 @@ class NoiseFloorTracker:
             "samples_dbm": [
                 round(s.noise_dbm, 1) for s in self._buffer
             ],
+            "samples_count": len(self._buffer),
+            "calibrating": len(self._buffer) < CALIBRATING_BELOW,
             "last_seen_at": (
                 self._last_sample_at if self._last_sample_at else None
             ),
