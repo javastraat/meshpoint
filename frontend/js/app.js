@@ -477,7 +477,7 @@ function _bootCommandPaletteAndKeymap(router) {
         ['configuration/meshcore', 'Go to Configuration · MeshCore', 'Configuration'],
         ['settings/auth', 'Go to Settings · Auth', 'Settings'],
         ['settings/updates', 'Go to Settings · Updates', 'Settings'],
-        ['settings/dangerous', 'Go to Settings · Dangerous', 'Settings'],
+        ['settings/dangerous', 'Go to Settings · Meshpoint', 'Settings'],
     ];
     routeCommands.forEach(([routeId, label, group]) => {
         palette.register({

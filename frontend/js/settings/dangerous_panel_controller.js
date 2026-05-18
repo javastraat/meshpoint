@@ -3,9 +3,9 @@
  *
  * Single responsibility: load the action catalog from
  * ``GET /api/dangerous/actions``, render one card per action, and
- * route every press through ``DangerousModal`` (typed-confirmation)
- * before invoking ``POST /api/dangerous/invoke``. Live result is
- * surfaced inline next to the action so the operator sees the
+ * route every press through ``DangerousModal`` for a click-to-confirm
+ * dialog before invoking ``POST /api/dangerous/invoke``. Live result
+ * is surfaced inline next to the action so the operator sees the
  * outcome without leaving the panel.
  */
 
