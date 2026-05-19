@@ -4,6 +4,8 @@ Click-by-click test checklist for the v0.7.4 release. Files in this directory li
 
 This file is the master index. It carries the cross-cutting checks (audit log, role guards, design polish, accessibility) that span every feature, plus the sign-off matrix that gates the release.
 
+**Results log:** append every run to [RESULTS.md](RESULTS.md). Only tick a matrix `[x]` when the full per-feature checklist is green for that column. `partial` in the matrix means work started but ship gate not met.
+
 ## Sign-off matrix
 
 One row per feature, one column per hardware unit. Box gets checked when the per-feature file is fully green for that unit. Anything red blocks the release.
@@ -23,17 +25,17 @@ One row per feature, one column per hardware unit. Box gets checked when the per
 | Configuration > Identity         | [ ]           | [ ]               | n/a            | [ ]          |
 | Configuration > Radio            | [ ]           | [ ]               | n/a            | [ ]          |
 | Configuration > Channels         | [ ]           | [ ]               | n/a            | [ ]          |
-| Configuration > Transmit         | [ ]           | [ ]               | n/a            | [ ]          |
+| Configuration > Transmit         | partial       | [ ]               | n/a            | [ ]          |
 | Configuration > MQTT             | [ ]           | [ ]               | n/a            | [ ]          |
 | Configuration > GPS              | [ ]           | [ ]               | n/a            | [ ]          |
-| Dangerous actions                | [ ]           | [ ]               | n/a            | n/a          |
+| Dangerous actions                | partial       | [ ]               | n/a            | n/a          |
 | Real radar blips on auth pages   | [ ]           | [ ]               | [ ]            | [ ]          |
 | Smart upgrade indicator          | [ ]           | [ ]               | n/a            | [ ]          |
 | MQTT hierarchical paths (PR #35) | [ ]           | [ ]               | n/a            | n/a          |
 | MeshCore Channel Config (otto)   | [ ]           | [ ]               | n/a            | [ ]          |
 | MeshCore map fix (PR #51)        | [ ]           | [ ]               | n/a            | [ ]          |
 | Native relay (onboard SX1302)    | [x] .141      | [ ]               | n/a            | n/a          |
-| Spectral-scan noise floor        | [ ]           | [ ]               | n/a            | [ ]          |
+| Spectral-scan noise floor        | partial       | [ ]               | n/a            | [ ]          |
 
 ## Per-feature template
 
@@ -146,6 +148,7 @@ Single deliverable: a screen recording of an admin walking through the entire da
 
 ## Per-feature files
 
+- [RESULTS.md](RESULTS.md) — append-only test run log (evidence for ship gate)
 - [foundation.md](foundation.md) — sidebar navigation refactor, IA refactor, map zero-scrollbar
 - [auth.md](auth.md) — password change, viewer role, sign-out-everywhere, configurable lockout
 - [terminal.md](terminal.md) — PTY session, command guide drawer, irreversibles confirmation

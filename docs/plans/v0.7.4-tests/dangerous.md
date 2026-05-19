@@ -1,32 +1,29 @@
 # Dangerous Actions — Restart, Clear DB, Wipe Phantoms, Force NodeInfo, Restart Concentrator
 
-Settings > Dangerous subsection. Every action routes through the shared typed-confirmation modal: the operator types the action's exact label (GitHub-repo-deletion pattern) before the Invoke button activates. The friction is the point -- these are admin endpoints exposed to anyone who phishes a session cookie.
+Settings > Meshpoint subsection (route `settings/dangerous`). Every action routes through `DangerousModal`: Confirm/Cancel before invoke (typed-confirmation was removed in v0.7.4 UI; see commit `30e52ec`).
 
-## 1. Restart service (typed-confirmation)
+## 1. Restart service
 
-**Status:** [ ] Not started  [x] In progress  [ ] Pass  [ ] Blocked
-**Hardware:** `.141`
+**Status:** [ ] Not started  [ ] In progress  [x] Pass  [ ] Blocked
+**Hardware:** `.141` (2026-05-19 @ `e64492b`; see [RESULTS.md](RESULTS.md))
 
 ### Functional walkthrough
 
-1. [ ] Settings > Dangerous. Expected: card layout, one card per action; danger pills graded by stakes.
-2. [ ] Restart Service card has description ("Restarts the meshpoint systemd service. Recovers in ~5 seconds.") and an Invoke button.
-3. [ ] Click Invoke. Expected: typed-confirmation modal opens. Modal copy lists the action label, the consequence, and a text input with "Type `restart service` to confirm".
-4. [ ] Type a wrong value (e.g. `restart`). Confirm button stays disabled.
-5. [ ] Type the exact label. Confirm enables. Click Confirm. Expected:
+1. [x] Settings > Meshpoint. Expected: card layout, one card per action; danger pills graded by stakes.
+2. [x] Restart Service card has description and an Invoke button.
+3. [x] Click Invoke. Expected: confirmation modal (Confirm/Cancel). *(Not typed-confirmation.)*
+4. [x] Click Confirm. Expected:
        - Modal closes.
-       - Inline status on the card: "Restarting service…" with progress.
-       - WS disconnects briefly; reconnects automatically.
-       - Inline status updates to "Service restarted." within 10s.
-       - Audit log `action: "dangerous.restart_service", result: "success"`.
-6. [ ] Page does NOT reload, but live data resumes.
+       - Inline status on the card: `service restart initiated` (success).
+       - Audit log `action: "dangerous.restart_service"`, `params.success: true`.
+5. [x] Page does NOT full-reload; dashboard reachable again after ~10s. *(WS may drop during restart.)*
 
 ### Acceptance
 
 - [x] Backend tests cover invoke + role gate (`tests/test_dangerous_actions.py`, `tests/test_dangerous_routes.py`).
-- [ ] Typed-confirmation flow blocks the action until the label is typed exactly.
-- [ ] Inline status feedback present.
-- [ ] Audit log entry.
+- [x] Confirmation modal blocks accidental invoke.
+- [x] Inline status feedback present.
+- [x] Audit log entry with `success: true` (detached `systemctl` restart; fix `e64492b`).
 
 ## 2. Restart concentrator (typed-confirmation)
 

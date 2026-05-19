@@ -163,7 +163,7 @@ Foundational chrome for v0.7.4. Lands Week 1 because every other feature renders
 ## 8. Audit log emission infrastructure
 
 **Status:** [ ] Not started  [x] In progress  [ ] Pass  [ ] Blocked
-**Hardware:** `.141`
+**Hardware:** `.141` (restart_service audit verified 2026-05-19; see [RESULTS.md](RESULTS.md))
 
 ### Functional walkthrough
 
@@ -172,7 +172,7 @@ Foundational chrome for v0.7.4. Lands Week 1 because every other feature renders
 3. [ ] Sign out everywhere. Expected: one row with `action: "logout_all"`.
 4. [ ] Switch release channel from `main` to `dev`. Expected: one row with `action: "channel_switch"`, `params: {from: "main", to: "dev"}`.
 5. [ ] Run a terminal command (e.g. `echo hello`). Expected: one row with `action: "terminal_command"`, `params: {command: "echo hello"}`.
-6. [ ] Restart the service from Dangerous. Expected: one row with `action: "restart_service"`.
+6. [x] Restart the service from Settings > Meshpoint. Expected: one row with `action: "dangerous.restart_service"`, `params.success: true`. *(2026-05-19 .141 @ `e64492b`.)*
 
 ### Negative paths
 

@@ -86,21 +86,23 @@ Read/write home for everything that lands in `local.yaml`. Six subsections, each
 
 ## 4. Configuration > Transmit
 
-**Status:** [ ] Not started  [ ] In progress  [ ] Pass  [ ] Blocked
-**Hardware:** `.141`
+**Status:** [ ] Not started  [x] In progress  [ ] Pass  [ ] Blocked
+**Hardware:** `.141` (relay save validated 2026-05-19 @ `e64492b`; see [RESULTS.md](RESULTS.md))
 
 ### Functional walkthrough
 
-1. [ ] Configuration > Transmit. Expected: TX power slider (0-30 dBm), Max duty percent slider (with regional default reminder card), Relay enable toggle, per-reason rate limits, signal/type/hop filter toggles.
+1. [x] Configuration > Transmit. Expected: TX power, max duty, relay enable, relay max/minute fields, Save button visible. *(2026-05-19 .141: form renders; Save visible.)*
 2. [ ] Change TX power from 20 to 17 dBm. Save. Expected: `transmit.tx_power: 17` in `local.yaml`, audit log entry.
 3. [ ] Toggle relay enable off. Save. Expected: `relay.enabled: false`. Subsequent packet feed shows no relay activity.
 4. [ ] Toggle relay enable back on. Save.
 5. [ ] Change max_duty_percent. Note the regional default reminder displayed (e.g. "US default 10%, EU 868 default 1%").
+6. [x] Change relay max/minute (e.g. 18), Save. Expected: `relay.max_relay_per_minute` in `local.yaml`. *(2026-05-19 .141: API + UI + yaml verified; restored to 20 after test.)*
 
 ### Acceptance
 
-- [ ] Persists across restart.
-- [ ] Existing `tests/test_duty_cycle_resolver.py` still passes.
+- [x] Persists across restart. *(2026-05-19 .141: relay rate 18 survived restart_service.)*
+- [x] Existing `tests/test_duty_cycle_resolver.py` still passes. *(670 pytest pass on tree @ `e64492b`.)*
+- [x] Relay settings round-trip via `PUT /api/config/transmit` and `GET /api/config` `transmit.relay`. *(2026-05-19; fix in `e64492b`.)*
 
 ## 5. Configuration > MQTT
 
