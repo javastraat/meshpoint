@@ -417,6 +417,13 @@ select.update-field__input option:checked {
     font-weight: 600;
 }
 
+.update-version__branch {
+    font-family: 'JetBrains Mono', Menlo, monospace;
+    font-size: 11px;
+    color: rgba(243, 244, 246, 0.55);
+    min-height: 1.2em;
+}
+
 .update-status {
     margin: 0;
     font-size: 13px;

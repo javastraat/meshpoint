@@ -13,6 +13,9 @@
  * always knows what just happened.
  */
 
+const UPDATE_CHANNEL_STORAGE_KEY = 'meshpoint_update_channel_id';
+const UPDATE_CUSTOM_BRANCH_STORAGE_KEY = 'meshpoint_update_custom_branch';
+
 class UpdatePanelController {
     constructor(rootEl) {
         this.root = rootEl;
@@ -24,7 +27,9 @@ class UpdatePanelController {
         this.statusEl = rootEl.querySelector('[data-update-status]');
         this.descriptionEl = rootEl.querySelector('[data-update-description]');
         this.localVersionEl = rootEl.querySelector('[data-update-local-version]');
+        this.localBranchEl = rootEl.querySelector('[data-update-local-branch]');
         this.remoteVersionEl = rootEl.querySelector('[data-update-remote-version]');
+        this.remoteBranchEl = rootEl.querySelector('[data-update-remote-branch]');
         this.logView = new window.UpdateLogView(
             rootEl.querySelector('[data-update-log]')
         );
@@ -35,6 +40,7 @@ class UpdatePanelController {
             rootEl.querySelector('[data-update-release-notes]')
         );
         this._channels = [];
+        this._installStatus = null;
         this._lastResult = null;
         this._releaseNotesToken = 0;
     }
@@ -46,10 +52,9 @@ class UpdatePanelController {
     }
 
     async refresh() {
-        await Promise.all([
-            this._loadChannels(),
-            this._loadVersionStatus(),
-        ]);
+        await this._loadChannels();
+        await this._loadInstallStatus();
+        this._syncChannelPickerToInstall();
     }
 
     async _loadChannels() {
@@ -69,20 +74,37 @@ class UpdatePanelController {
         }
     }
 
-    async _loadVersionStatus() {
+    async _loadInstallStatus() {
         try {
-            const response = await fetch('/api/device/update-check', {
+            const response = await fetch('/api/update/install_status', {
                 credentials: 'same-origin',
             });
             if (!response.ok) return;
-            const body = await response.json();
-            if (this.localVersionEl) {
-                this.localVersionEl.textContent = body.local_version || '--';
-            }
-            if (this.remoteVersionEl) {
-                this.remoteVersionEl.textContent = body.remote_version || 'unknown';
-            }
-        } catch (_e) { /* badge handles its own error path */ }
+            this._installStatus = await response.json();
+            this._renderVersionCards(this._installStatus);
+        } catch (_e) { /* install status is best-effort */ }
+    }
+
+    _renderVersionCards(status) {
+        if (!status) return;
+        if (this.localVersionEl) {
+            this.localVersionEl.textContent = status.local_version || '--';
+        }
+        if (this.remoteVersionEl) {
+            this.remoteVersionEl.textContent = status.remote_version || 'unknown';
+        }
+        if (this.localBranchEl) {
+            const branch = status.install_branch || '';
+            const sha = status.install_sha_short || '';
+            const parts = [];
+            if (branch) parts.push(branch);
+            if (sha) parts.push(`@ ${sha}`);
+            this.localBranchEl.textContent = parts.join(' ');
+        }
+        if (this.remoteBranchEl) {
+            const branch = status.remote_branch || status.install_branch || '';
+            this.remoteBranchEl.textContent = branch ? `origin/${branch}` : '';
+        }
     }
 
     _renderChannelOptions() {
@@ -90,7 +112,38 @@ class UpdatePanelController {
         this.channelSelect.innerHTML = this._channels
             .map((c) => `<option value="${this._escape(c.id)}">${this._escape(c.label)}</option>`)
             .join('');
+    }
+
+    _syncChannelPickerToInstall() {
+        if (!this.channelSelect || !this._channels.length) return;
+        const status = this._installStatus || {};
+        let channelId = status.active_channel_id
+            || sessionStorage.getItem(UPDATE_CHANNEL_STORAGE_KEY);
+        if (!this._channels.some((c) => c.id === channelId)) {
+            channelId = this._channels[0]?.id;
+        }
+        if (channelId) {
+            this.channelSelect.value = channelId;
+        }
+        const channel = this._currentChannel();
+        if (channel?.tier === 'custom') {
+            const branch = status.install_branch
+                || sessionStorage.getItem(UPDATE_CUSTOM_BRANCH_STORAGE_KEY)
+                || '';
+            if (this.customInput && branch) {
+                this.customInput.value = branch;
+            }
+        }
         this._onChannelChanged();
+    }
+
+    _rememberChannelForReload(channel, customBranch) {
+        sessionStorage.setItem(UPDATE_CHANNEL_STORAGE_KEY, channel.id);
+        if (channel.tier === 'custom' && customBranch) {
+            sessionStorage.setItem(UPDATE_CUSTOM_BRANCH_STORAGE_KEY, customBranch);
+        } else {
+            sessionStorage.removeItem(UPDATE_CUSTOM_BRANCH_STORAGE_KEY);
+        }
     }
 
     _onChannelChanged() {
@@ -150,6 +203,7 @@ class UpdatePanelController {
             + 'The service will restart at the end of the chain.'
         );
         if (!confirmed) return;
+        this._rememberChannelForReload(channel, customBranch);
         const branch = channel.tier === 'custom' ? customBranch : (channel.branch || '');
         this.progressView?.start({
             mode: 'apply',
@@ -234,10 +288,13 @@ class UpdatePanelController {
                 (entry) => entry.step === 'restart service' && entry.returncode === 0,
             );
             if (restarted) {
+                await this._loadInstallStatus();
                 const online = await this.progressView?.waitForServiceRecovery();
                 if (online) {
                     window.setTimeout(() => window.location.reload(), 800);
                 }
+            } else {
+                await this.refresh();
             }
         } else {
             const msg = typeof failureMessage === 'function'

@@ -33,6 +33,7 @@ from src.api.auth.jwt_session import SessionClaims
 from src.api.update.apply import ApplyResult, UpdateApplier
 from src.api.update.channels import ReleaseChannelRegistry
 from src.api.update.streaming import stream_update
+from src.api.update.install_status import build_install_status_payload
 from src.api.update.release_notes import (
     ChangelogParser,
     format_section_for_preview,
@@ -91,6 +92,15 @@ async def list_channels(
 ) -> dict:
     _applier_instance, registry = _require_initialized()
     return {"channels": registry.to_payload()}
+
+
+@router.get("/install_status")
+async def install_status(
+    _claims: SessionClaims = Depends(require_admin),
+) -> dict:
+    """Live install branch, matched channel, and upstream version on that branch."""
+    _applier_instance, registry = _require_initialized()
+    return build_install_status_payload(registry=registry)
 
 
 @router.get("/release_notes")

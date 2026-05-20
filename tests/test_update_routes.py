@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from typing import Optional
+from unittest import mock
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -65,6 +66,28 @@ class TestUpdateRoutes(unittest.TestCase):
         body = response.json()
         self.assertIn("channels", body)
         self.assertGreater(len(body["channels"]), 0)
+
+    def test_install_status_returned_for_admin(self) -> None:
+        self.client.cookies.set("meshpoint_session", self.admin_token)
+        with mock.patch(
+            "src.api.routes.update_routes.build_install_status_payload",
+            return_value={
+                "local_version": "0.7.3.1",
+                "install_branch": "feat/v0.7.4",
+                "install_sha_short": "ac6895a",
+                "active_channel_id": "rc-074",
+                "active_channel_label": "Release candidate (v0.7.4)",
+                "channel_tier": "rc",
+                "remote_version": "0.7.3.1",
+                "remote_branch": "feat/v0.7.4",
+                "update_available": False,
+            },
+        ):
+            response = self.client.get("/api/update/install_status")
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["active_channel_id"], "rc-074")
+        self.assertEqual(body["install_branch"], "feat/v0.7.4")
 
     def test_channels_rejects_anonymous(self) -> None:
         client = TestClient(self.client.app)
