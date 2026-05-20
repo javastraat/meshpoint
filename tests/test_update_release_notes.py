@@ -111,6 +111,49 @@ class TestSelectPreviewSection(unittest.TestCase):
         self.assertEqual(section.version, "0.7.4")
         self.assertFalse(section.is_unreleased)
 
+    def test_rc_tier_prefers_unreleased_over_older_shipped_release(self) -> None:
+        """Pi-shaped CHANGELOG: Unreleased holds RC bullets, no v0.7.4 header yet."""
+        from src.api.update.release_notes import ChangelogBullet
+
+        pi_sections = [
+            ChangelogSection(
+                header="Unreleased",
+                version=None,
+                date=None,
+                is_unreleased=True,
+                bullets=[
+                    ChangelogBullet(
+                        headline="New sidebar IA",
+                        detail="Persistent nav for Dashboard.",
+                    ),
+                ],
+            ),
+            ChangelogSection(
+                header="v0.7.3.1 (May 13, 2026)",
+                version="0.7.3.1",
+                date="May 13, 2026",
+                is_unreleased=False,
+                bullets=[
+                    ChangelogBullet(
+                        headline="WS auth close frame",
+                        detail="accept before close.",
+                    ),
+                ],
+            ),
+        ]
+        rc = select_preview_section(
+            pi_sections, tier="rc", channel_id="rc-074", installed_version="0.7.3.1",
+        )
+        stable = select_preview_section(
+            pi_sections, tier="stable", installed_version="0.7.3.1",
+        )
+        self.assertIsNotNone(rc)
+        self.assertIsNotNone(stable)
+        assert rc is not None and stable is not None
+        self.assertTrue(rc.is_unreleased)
+        self.assertEqual(stable.version, "0.7.3.1")
+        self.assertNotEqual(rc.header, stable.header)
+
     def test_rc_tier_falls_back_to_unreleased_when_no_version_block(self) -> None:
         from src.api.update.release_notes import ChangelogBullet
 

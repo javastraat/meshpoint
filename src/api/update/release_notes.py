@@ -193,11 +193,13 @@ def select_preview_section(
             for section in sections:
                 if section.version == target and section.bullets:
                     return section
-        for section in sections:
-            if section.version and section.bullets:
-                return section
+        # RC content often lives under ``Unreleased`` until the version
+        # header is cut; prefer that over an older shipped release.
         for section in sections:
             if section.is_unreleased and section.bullets:
+                return section
+        for section in sections:
+            if section.version and section.bullets:
                 return section
         return None
     if tier == "stable":
