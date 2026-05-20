@@ -10,10 +10,7 @@ from __future__ import annotations
 import unittest
 from typing import Optional
 
-from src.api.update.apply import (
-    ApplyAttempt,
-    UpdateApplier,
-)
+from src.api.update.apply import UpdateApplier
 
 
 class _RecorderRunner:
@@ -51,10 +48,18 @@ class TestUpdateApplier(unittest.TestCase):
                 "git fetch",
                 "git checkout",
                 "git reset",
+                "stop service",
                 "install.sh",
                 "restart service",
             ],
         )
+        stop_idx = next(
+            i for i, c in enumerate(runner.calls) if "systemctl stop" in " ".join(c)
+        )
+        install_idx = next(
+            i for i, c in enumerate(runner.calls) if "install.sh" in " ".join(c)
+        )
+        self.assertLess(stop_idx, install_idx)
         # Restart is detached; runner is not invoked for systemctl.
         joined = " ".join(" ".join(c) for c in runner.calls)
         self.assertNotIn("systemctl restart", joined)
@@ -79,8 +84,8 @@ class TestUpdateApplier(unittest.TestCase):
         )
         starts = [e for e in events if e[1] == "started"]
         completions = [e for e in events if e[1] == "completed"]
-        self.assertEqual(len(starts), 5)
-        self.assertEqual(len(completions), 5)
+        self.assertEqual(len(starts), 6)
+        self.assertEqual(len(completions), 6)
 
     def test_rollback_runs_reset_then_restart(self) -> None:
         runner = _RecorderRunner()

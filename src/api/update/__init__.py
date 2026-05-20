@@ -9,7 +9,7 @@ flow:
   description, and stability tier so the UI can warn when the user
   picks something risky.
 * ``UpdateApplier`` performs ``git fetch`` + ``git checkout -f`` +
-  ``git reset --hard origin/<branch>`` +
+  ``git reset --hard origin/<branch>`` + ``systemctl stop meshpoint`` +
   ``bash scripts/install.sh`` + ``systemctl restart meshpoint`` in
   sequence, capturing stdout/stderr for the dashboard log pane.
 * ``WatchdogMonitor`` polls the API after a successful apply; if

@@ -5,6 +5,7 @@
 Queued for the next version bump. Bullets in this section will be folded into the release header (and dated) when the version is cut.
 
 - **MeshCore contact roster at startup.** The USB companion often returns 0 contacts on the first fetch right after connect; a deferred ~20s retry logs the full peer list and syncs friendly names into SQLite. Packet-driven enrichment no longer limits name updates to only the node that triggered the last packet.
+- **Dashboard Apply update stops meshpoint before install.sh.** The apply chain now runs `systemctl stop meshpoint` before `scripts/install.sh`, so the SX1302 HAL is not held by a live process during installer work (avoids SIGSEGV seen when Apply ran install against a running service).
 
 ### v0.7.4 (May 2026)
 

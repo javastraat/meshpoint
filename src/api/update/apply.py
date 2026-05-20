@@ -1,8 +1,10 @@
 """Run the multi-step update from the dashboard.
 
 The applier walks ``git fetch`` -> ``git checkout -B`` (hard reset to
-``origin/<branch>``) -> ``bash scripts/install.sh`` -> ``systemctl
-restart meshpoint``. Each step
+``origin/<branch>``) -> ``systemctl stop meshpoint`` -> ``bash
+scripts/install.sh`` -> ``systemctl restart meshpoint``. Stopping the
+service before ``install.sh`` avoids SPI/HAL races that can SIGSEGV the
+running process. Each step
 is its own subprocess invocation so the dashboard can stream a
 running log to the operator and so a step that exits non-zero stops
 the chain immediately with the failing step labelled.
@@ -182,6 +184,11 @@ class UpdateApplier:
                 label="git reset",
                 args=["sudo", "git", "reset", "--hard", f"origin/{branch}"],
                 cwd=self._repo_path,
+                timeout_seconds=60,
+            ),
+            ApplyAttempt(
+                label="stop service",
+                args=["sudo", "systemctl", "stop", self._service_name],
                 timeout_seconds=60,
             ),
             ApplyAttempt(
