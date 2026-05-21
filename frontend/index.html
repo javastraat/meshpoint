@@ -231,23 +231,19 @@
         <main class="app__content" id="app-content">
             <header class="topbar" id="topbar" role="banner">
                 <div class="topbar__group">
-                    <span class="topbar-lamp" role="status" aria-live="polite">
-                        <span class="topbar-lamp__dot" aria-hidden="true"></span>
-                        <span class="topbar-lamp__label">CONNECTING</span>
-                    </span>
-                </div>
-                <div class="topbar__group">
-                    <span class="topbar-ident" aria-label="Device short name">
-                        <span class="topbar-ident__label">CALL</span>
-                        <span class="topbar-ident__value">----</span>
-                    </span>
-                </div>
-                <div class="topbar__group">
-                    <span class="topbar-radio" aria-label="Active radio configuration">
-                        <span class="topbar-radio__region">--</span>
-                        <span class="topbar-radio__sep">·</span>
-                        <span class="topbar-radio__freq">--</span>
-                        <span class="topbar-radio__preset">--</span>
+                    <span class="topbar-meshtastic" aria-label="Meshtastic configuration">
+                        <span class="topbar-meshtastic__brand">Meshtastic</span>
+                        <span class="topbar-meshtastic__lamp" role="status" aria-live="polite">
+                            <span class="topbar-meshtastic__dot" aria-hidden="true"></span>
+                            <span class="topbar-meshtastic__status">CONNECTING</span>
+                        </span>
+                        <span class="topbar-meshtastic__call">----</span>
+                        <span class="topbar-meshtastic__sep" aria-hidden="true">·</span>
+                        <span class="topbar-meshtastic__region">--</span>
+                        <span class="topbar-meshtastic__sep" aria-hidden="true">·</span>
+                        <span class="topbar-meshtastic__freq">--</span>
+                        <span class="topbar-meshtastic__sep topbar-meshtastic__sep--bar" aria-hidden="true">|</span>
+                        <span class="topbar-meshtastic__preset">--</span>
                     </span>
                 </div>
                 <div class="topbar__group topbar__group--meshcore" id="topbar-meshcore-group" hidden>
@@ -711,9 +707,7 @@
     <script src="sidebar/radio_tx_badge.js"></script>
     <script src="js/reconnect_storyboard.js"></script>
     <script src="js/tab_title_telemetry.js"></script>
-    <script src="topbar/topbar_lamp.js"></script>
-    <script src="topbar/topbar_identity_badge.js"></script>
-    <script src="topbar/topbar_radio_chip.js"></script>
+    <script src="topbar/topbar_meshtastic_chip.js"></script>
     <script src="topbar/topbar_meshcore_chip.js"></script>
     <script src="topbar/topbar_actions.js"></script>
     <script src="topbar/topbar_controller.js"></script>

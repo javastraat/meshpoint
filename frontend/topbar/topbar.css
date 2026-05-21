@@ -1,12 +1,9 @@
 /* Topbar — chrome strip pinned above every section.
  *
- * Layout: full-width flex row with three regions (left lamp + ident
- * + radio chips, flexible spacer, right actions). 48px tall on
- * desktop, drops to 44px under 720px.
+ * Layout: Meshtastic + MeshCore protocol chips, spacer, actions.
+ * 48px tall on desktop, 44px under 720px.
  *
- * Visual goal: reads like the front panel of a piece of lab gear —
- * monospace labels, segmented amber identity, cyan radio readout,
- * subtle border-bottom that mirrors the sidebar's right edge. */
+ * Protocol chips use a permanent border glow (not hover-only). */
 
 .topbar {
     flex-shrink: 0;
@@ -54,129 +51,113 @@
     flex: 1 1 auto;
 }
 
-/* --- Lamp ------------------------------------------------------- */
+/* --- Meshtastic chip (cyan group, permanent glow) ----------------- */
 
-.topbar-lamp {
+.topbar-meshtastic {
     display: inline-flex;
     align-items: center;
     gap: 0.45rem;
-    padding: 0.25rem 0.6rem 0.25rem 0.55rem;
-    border-radius: 999px;
-    border: 1px solid var(--border);
-    background: rgba(0, 0, 0, 0.25);
+    padding: 0.25rem 0.55rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(6, 182, 212, 0.45);
+    background: rgba(6, 182, 212, 0.08);
+    box-shadow:
+        0 0 14px rgba(6, 182, 212, 0.22),
+        inset 0 0 18px rgba(6, 182, 212, 0.05);
     font-family: var(--font-mono);
-    font-size: 0.62rem;
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+}
+
+.topbar-meshtastic:hover {
+    border-color: rgba(6, 182, 212, 0.55);
+    box-shadow:
+        0 0 18px rgba(6, 182, 212, 0.32),
+        inset 0 0 22px rgba(6, 182, 212, 0.07);
+}
+
+.topbar-meshtastic--unknown { opacity: 0.55; }
+
+.topbar-meshtastic__brand {
+    font-size: 0.58rem;
     font-weight: 700;
     letter-spacing: 0.12em;
-    color: var(--text-secondary);
     text-transform: uppercase;
-    transition: border-color 0.2s, color 0.2s, background 0.2s;
+    color: var(--accent-cyan);
+    text-shadow: 0 0 8px rgba(6, 182, 212, 0.4);
+    border-right: 1px solid rgba(6, 182, 212, 0.28);
+    padding-right: 0.45rem;
+    margin-right: 0.05rem;
 }
 
-.topbar-lamp__dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--text-muted);
-    transition: background 0.2s, box-shadow 0.2s;
-}
-
-.topbar-lamp--online {
-    color: var(--accent-green, #00e5a0);
-    border-color: rgba(0, 229, 160, 0.4);
-    background: rgba(0, 229, 160, 0.08);
-}
-
-.topbar-lamp--online .topbar-lamp__dot {
-    background: var(--accent-green, #00e5a0);
-    box-shadow: 0 0 10px rgba(0, 229, 160, 0.7);
-    animation: topbar-lamp-pulse 2.4s ease-in-out infinite;
-}
-
-.topbar-lamp--offline {
-    color: var(--accent-red, #ef4444);
-    border-color: rgba(239, 68, 68, 0.4);
-    background: rgba(239, 68, 68, 0.06);
-}
-
-.topbar-lamp--offline .topbar-lamp__dot {
-    background: var(--accent-red, #ef4444);
-    box-shadow: 0 0 10px rgba(239, 68, 68, 0.6);
-}
-
-.topbar-lamp--reconnecting {
-    color: var(--accent-amber, #f59e0b);
-    border-color: rgba(245, 158, 11, 0.4);
-    background: rgba(245, 158, 11, 0.06);
-}
-
-.topbar-lamp--reconnecting .topbar-lamp__dot {
-    background: var(--accent-amber, #f59e0b);
-    animation: topbar-lamp-blink 0.9s steps(2, end) infinite;
-}
-
-@keyframes topbar-lamp-pulse {
-    0%, 100% {
-        box-shadow: 0 0 10px rgba(0, 229, 160, 0.7);
-        transform: scale(1);
-    }
-    50% {
-        box-shadow: 0 0 14px rgba(0, 229, 160, 0.95);
-        transform: scale(1.12);
-    }
-}
-
-@keyframes topbar-lamp-blink {
-    0% { opacity: 1; }
-    50% { opacity: 0.25; }
-    100% { opacity: 1; }
-}
-
-/* --- LCD identity badge ----------------------------------------- */
-
-.topbar-ident {
+.topbar-meshtastic__lamp {
     display: inline-flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.3rem 0.7rem;
-    border-radius: var(--radius-sm);
-    border: 1px solid rgba(245, 158, 11, 0.35);
-    background:
-        linear-gradient(180deg, rgba(15, 12, 6, 0.95) 0%, rgba(8, 6, 3, 0.95) 100%);
+    gap: 0.3rem;
+}
+
+.topbar-meshtastic__dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
+.topbar-meshtastic__lamp--online .topbar-meshtastic__dot {
+    background: var(--accent-green, #00e5a0);
     box-shadow:
-        inset 0 1px 0 rgba(255, 200, 100, 0.06),
-        inset 0 0 14px rgba(245, 158, 11, 0.08),
-        0 1px 0 rgba(0, 0, 0, 0.4);
-    position: relative;
+        0 0 8px rgba(0, 229, 160, 0.75),
+        0 0 14px rgba(0, 229, 160, 0.35);
+    animation: topbar-meshtastic-pulse 2.4s ease-in-out infinite;
 }
 
-.topbar-ident__label {
-    font-family: var(--font-mono);
+.topbar-meshtastic__lamp--offline .topbar-meshtastic__dot {
+    background: var(--accent-red, #ef4444);
+    box-shadow:
+        0 0 6px rgba(239, 68, 68, 0.55),
+        0 0 10px rgba(239, 68, 68, 0.2);
+}
+
+.topbar-meshtastic__lamp--reconnecting .topbar-meshtastic__dot {
+    background: var(--accent-amber, #f59e0b);
+    animation: topbar-meshtastic-blink 0.9s steps(2, end) infinite;
+}
+
+.topbar-meshtastic__status {
     font-size: 0.58rem;
-    color: rgba(245, 158, 11, 0.55);
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-}
-
-.topbar-ident__value {
-    font-family: var(--font-mono);
-    font-size: 0.95rem;
     font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.topbar-meshtastic--online .topbar-meshtastic__status {
+    color: var(--accent-green, #00e5a0);
+}
+
+.topbar-meshtastic--offline .topbar-meshtastic__status {
+    color: var(--accent-red, #ef4444);
+}
+
+.topbar-meshtastic--reconnecting .topbar-meshtastic__status {
     color: var(--accent-amber, #f59e0b);
-    letter-spacing: 0.22em;
-    text-shadow:
-        0 0 6px rgba(245, 158, 11, 0.6),
-        0 0 14px rgba(245, 158, 11, 0.3);
-    min-width: 4ch;
-    text-align: center;
-    line-height: 1;
 }
 
-.topbar-ident.topbar-ident--flicker .topbar-ident__value {
-    animation: topbar-ident-flicker 280ms ease-out;
+.topbar-meshtastic__call {
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    color: var(--text-primary);
+    text-shadow: 0 0 6px rgba(6, 182, 212, 0.2);
+    min-width: 3ch;
 }
 
-@keyframes topbar-ident-flicker {
+.topbar-meshtastic__call--flicker {
+    animation: topbar-meshtastic-flicker 280ms ease-out;
+}
+
+@keyframes topbar-meshtastic-flicker {
     0%   { opacity: 1; }
     20%  { opacity: 0.2; }
     40%  { opacity: 0.95; }
@@ -184,55 +165,55 @@
     100% { opacity: 1; }
 }
 
-/* --- Radio chip ------------------------------------------------- */
-
-.topbar-radio {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.25rem 0.55rem;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--border);
-    background: rgba(6, 182, 212, 0.04);
-    font-family: var(--font-mono);
-    font-size: 0.7rem;
-    color: var(--text-secondary);
-    transition: border-color 0.2s, background 0.2s;
+@keyframes topbar-meshtastic-pulse {
+    0%, 100% {
+        box-shadow: 0 0 8px rgba(0, 229, 160, 0.75);
+        transform: scale(1);
+    }
+    50% {
+        box-shadow: 0 0 12px rgba(0, 229, 160, 0.95);
+        transform: scale(1.1);
+    }
 }
 
-.topbar-radio:hover { border-color: rgba(6, 182, 212, 0.4); }
+@keyframes topbar-meshtastic-blink {
+    0% { opacity: 1; }
+    50% { opacity: 0.25; }
+    100% { opacity: 1; }
+}
 
-.topbar-radio--unknown { opacity: 0.5; }
-
-.topbar-radio__sep {
+.topbar-meshtastic__sep {
     color: var(--text-muted);
     opacity: 0.5;
+}
+
+.topbar-meshtastic__sep--bar {
+    opacity: 0.35;
     margin: 0 0.05rem;
 }
 
-.topbar-radio__region {
+.topbar-meshtastic__region {
     font-weight: 700;
     color: var(--text-primary);
     letter-spacing: 0.04em;
 }
 
-.topbar-radio__freq {
+.topbar-meshtastic__freq {
     color: var(--accent-cyan);
-    text-shadow: 0 0 6px rgba(6, 182, 212, 0.25);
-    letter-spacing: 0.02em;
+    text-shadow: 0 0 8px rgba(6, 182, 212, 0.35);
 }
 
-.topbar-radio__preset {
+.topbar-meshtastic__preset {
     font-size: 0.62rem;
     text-transform: uppercase;
     letter-spacing: 0.08em;
     color: var(--text-muted);
-    border-left: 1px solid var(--border);
+    border-left: 1px solid rgba(6, 182, 212, 0.22);
     padding-left: 0.4rem;
-    margin-left: 0.1rem;
+    margin-left: 0.05rem;
 }
 
-/* --- MeshCore companion chip (purple group) --------------------- */
+/* --- MeshCore companion chip (purple group, permanent glow) ------- */
 
 .topbar-meshcore {
     display: inline-flex;
@@ -240,16 +221,21 @@
     gap: 0.45rem;
     padding: 0.25rem 0.55rem;
     border-radius: var(--radius-sm);
-    border: 1px solid rgba(168, 85, 247, 0.35);
-    background: rgba(168, 85, 247, 0.06);
+    border: 1px solid rgba(168, 85, 247, 0.45);
+    background: rgba(168, 85, 247, 0.08);
+    box-shadow:
+        0 0 14px rgba(168, 85, 247, 0.22),
+        inset 0 0 18px rgba(168, 85, 247, 0.05);
     font-family: var(--font-mono);
     font-size: 0.7rem;
     color: var(--text-secondary);
-    transition: border-color 0.2s, background 0.2s;
 }
 
 .topbar-meshcore:hover {
-    border-color: rgba(168, 85, 247, 0.55);
+    border-color: rgba(168, 85, 247, 0.58);
+    box-shadow:
+        0 0 18px rgba(168, 85, 247, 0.32),
+        inset 0 0 22px rgba(168, 85, 247, 0.07);
 }
 
 .topbar-meshcore__brand {
@@ -387,13 +373,15 @@
 
 @media (max-width: 900px) {
     .topbar { gap: 0.5rem; padding: 0.35rem 0.7rem; min-height: 44px; }
-    .topbar-radio__preset { display: none; }
-    .topbar-ident__label { display: none; }
+    .topbar-meshtastic__preset { display: none; }
     .topbar-meshcore__channel { display: none; }
 }
 
 @media (max-width: 600px) {
-    .topbar-radio { display: none; }
+    .topbar-meshtastic__region,
+    .topbar-meshtastic__freq,
+    .topbar-meshtastic__sep--bar,
+    .topbar-meshtastic__preset { display: none; }
     .topbar-meshcore__name { max-width: 5rem; }
-    .topbar-ident__value { font-size: 0.82rem; letter-spacing: 0.18em; }
+    .topbar-meshtastic__call { font-size: 0.78rem; }
 }

@@ -1,30 +1,20 @@
 /**
  * Topbar — orchestrator.
  *
- * Owns the topbar shell that sits above every section. Coordinates
- * four small components:
- *   - TopbarLamp           (websocket connection state)
- *   - TopbarIdentityBadge  (LCD-style short-name)
- *   - TopbarRadioChip      (region · frequency · preset)
- *   - TopbarMeshcoreChip   (companion lamp · name · MHz · channel)
- *   - TopbarActions        (right-side quick-action buttons)
+ * Coordinates protocol chips and quick actions:
+ *   - TopbarMeshtasticChip  (WS lamp · short name · region · MHz · preset)
+ *   - TopbarMeshcoreChip    (companion lamp · name · MHz · channel)
+ *   - TopbarActions         (right-side quick-action buttons)
  *
- * Data sources: /api/config for radio + identity values; the existing
- * dashboardWS instance for connection state. Refreshes itself on a
- * 10-second cadence so pulled-config changes from any sub-route
- * propagate without forcing a manual reload.
+ * Data: /api/config on a 10s cadence; dashboard WebSocket for connection lamp.
  */
 class TopbarController {
     constructor(rootEl, dashboardWs) {
         this._root = rootEl;
         this._ws = dashboardWs;
         this._refreshTimer = null;
-        this._lamp = new TopbarLamp(rootEl.querySelector('.topbar-lamp'));
-        this._identity = new TopbarIdentityBadge(
-            rootEl.querySelector('.topbar-ident'),
-        );
-        this._radio = new TopbarRadioChip(
-            rootEl.querySelector('.topbar-radio'),
+        this._meshtastic = new TopbarMeshtasticChip(
+            rootEl.querySelector('.topbar-meshtastic'),
         );
         this._meshcore = new TopbarMeshcoreChip(
             rootEl.querySelector('#topbar-meshcore-group'),
@@ -49,14 +39,17 @@ class TopbarController {
 
     _wireWebSocket() {
         if (!this._ws) {
-            this._lamp.setState('offline');
+            this._meshtastic.setConnectionState('offline');
             return;
         }
-        this._ws.on('connected', () => this._lamp.setState('online'));
-        this._ws.on('disconnected', () => this._lamp.setState('reconnecting'));
-        // Initial probe in case we attached after the first event.
+        this._ws.on('connected', () => {
+            this._meshtastic.setConnectionState('online');
+        });
+        this._ws.on('disconnected', () => {
+            this._meshtastic.setConnectionState('reconnecting');
+        });
         if (this._ws.socket && this._ws.socket.readyState === 1) {
-            this._lamp.setState('online');
+            this._meshtastic.setConnectionState('online');
         }
     }
 
@@ -65,18 +58,15 @@ class TopbarController {
             const res = await fetch('/api/config', { credentials: 'same-origin' });
             if (!res.ok) return;
             const cfg = await res.json();
-            this._radio.setRadio(cfg.radio || null);
-            this._meshcore.setMeshcore(cfg.meshcore || null);
             const tx = cfg.transmit || {};
-            this._identity.setShortName(tx.short_name);
+            this._meshtastic.setMeshtastic({
+                shortName: tx.short_name,
+                radio: cfg.radio || null,
+            });
+            this._meshcore.setMeshcore(cfg.meshcore || null);
         } catch (_e) { /* swallow; next tick will retry */ }
     }
 
-    /**
-     * Public hook so other components can register a topbar action
-     * without poking at the inner DOM. Used by Sprint D for the
-     * command palette and theme toggle.
-     */
     registerAction(spec) {
         return this._actions.register(spec);
     }
