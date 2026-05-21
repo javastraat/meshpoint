@@ -529,6 +529,7 @@
 /* ---- Active accent bar (FLIP target) ---- */
 .sidebar__active-bar {
     position: absolute;
+    top: 0;
     left: 0;
     width: 2px;
     height: 22px;
@@ -539,6 +540,7 @@
     transform: translateY(0);
     transition: transform var(--motion-base) var(--ease-out-expo);
     opacity: 0;
+    z-index: 2;
 }
 
 .sidebar__active-bar[data-visible="true"] {

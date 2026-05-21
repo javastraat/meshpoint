@@ -43,6 +43,13 @@ class SidebarController {
         this._wireRouterSubscription();
         this._applyIdentity();
         this._refreshCollapseAffordance();
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => this._refreshAccentBar());
+        });
+        if (this._navEl && typeof ResizeObserver !== 'undefined') {
+            this._navResizeObserver = new ResizeObserver(() => this._refreshAccentBar());
+            this._navResizeObserver.observe(this._navEl);
+        }
     }
 
     setIdentity(identity) {
@@ -141,16 +148,22 @@ class SidebarController {
             this._activeBar.dataset.visible = 'false';
             return;
         }
-        // Bar lives inside .sidebar__nav (below the header). Offsets must be
-        // relative to the nav scrollport, not the full .sidebar column.
-        const navRect = nav.getBoundingClientRect();
-        const linkRect = link.getBoundingClientRect();
-        const offsetTop = linkRect.top - navRect.top + nav.scrollTop;
-        const itemHeight = linkRect.height;
+        // Bar is the last child of .sidebar__nav (after the long <ul>). Without
+        // top:0 in CSS its static position sits at the bottom of the list, which
+        // made translateY look ~one header/list too low. Measure from nav top.
+        const offsetTop = this._linkOffsetInNav(link, nav);
+        const itemHeight = link.offsetHeight || link.getBoundingClientRect().height;
         const barHeight = parseInt(getComputedStyle(this._activeBar).height, 10) || 22;
         const yCenter = offsetTop + (itemHeight - barHeight) / 2;
-        this._activeBar.style.transform = `translateY(${yCenter}px)`;
+        this._activeBar.style.transform = `translateY(${Math.round(yCenter)}px)`;
         this._activeBar.dataset.visible = 'true';
+    }
+
+    /** Offset from top of .sidebar__nav content box to the active link row. */
+    _linkOffsetInNav(link, nav) {
+        const navRect = nav.getBoundingClientRect();
+        const linkRect = link.getBoundingClientRect();
+        return linkRect.top - navRect.top + nav.scrollTop;
     }
 
     _refreshAccentBar() {
