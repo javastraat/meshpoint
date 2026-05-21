@@ -563,6 +563,12 @@
     vertical-align: 1px;
 }
 
+.msg-chat__placeholder-tag--all {
+    background: rgba(255, 255, 255, 0.12);
+    color: var(--msg-text-dim);
+    border: 1px solid var(--msg-border);
+}
+
 .msg-chat__placeholder-tag--mt { background: var(--msg-mt); }
 .msg-chat__placeholder-tag--mc { background: var(--msg-mc); }
 

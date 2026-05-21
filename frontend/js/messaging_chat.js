@@ -143,13 +143,18 @@ class MessagingChat {
                 </div>
                 <h3 class="msg-chat__placeholder-title">No conversation selected</h3>
                 <p class="msg-chat__placeholder-body">
-                    Pick a channel from the left to listen in, or hit
-                    <span class="msg-chat__placeholder-cta">+ New</span> to message a node directly.
+                    Choose a channel or direct message in the list on the left,
+                    or tap <span class="msg-chat__placeholder-cta">+ New</span>
+                    to start a DM with a specific node.
                 </p>
                 <p class="msg-chat__placeholder-hint">
-                    Messages travel over Meshtastic <span class="msg-chat__placeholder-tag msg-chat__placeholder-tag--mt">MT</span>
-                    or MeshCore <span class="msg-chat__placeholder-tag msg-chat__placeholder-tag--mc">MC</span>.
-                    Drag-select any payload — copy is on.
+                    Filter the list with
+                    <span class="msg-chat__placeholder-tag msg-chat__placeholder-tag--all">All</span>,
+                    <span class="msg-chat__placeholder-tag msg-chat__placeholder-tag--mt">MT</span>
+                    (Meshtastic), or
+                    <span class="msg-chat__placeholder-tag msg-chat__placeholder-tag--mc">MC</span>
+                    (MeshCore). Open a thread to read messages; highlight text
+                    to copy like any web page.
                 </p>
             </div>
         `;
@@ -164,7 +169,10 @@ class MessagingChat {
                               stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
                     </svg>
                 </div>
-                <p class="msg-chat__placeholder-body">No messages yet — say hello.</p>
+                <p class="msg-chat__placeholder-body">
+                    No messages in this thread yet. Type below and send
+                    when you are ready.
+                </p>
             </div>
         `;
     }

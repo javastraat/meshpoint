@@ -894,7 +894,12 @@ def _init_routes(
     signal_analyzer = SignalAnalyzer(coord.packet_repo)
     traffic_monitor = TrafficMonitor(coord.packet_repo)
 
-    nodes.init_routes(coord.node_repo, network_mapper)
+    nodes.init_routes(
+        coord.node_repo,
+        network_mapper,
+        packet_repo=coord.packet_repo,
+        telemetry_repo=coord.telemetry_repo,
+    )
     packets.init_routes(coord.packet_repo)
     analytics.init_routes(signal_analyzer, traffic_monitor, coord.packet_repo)
     device.init_routes(identity, ws_manager, coord.relay_manager)
