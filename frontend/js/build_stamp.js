@@ -1,10 +1,16 @@
 /**
  * Build/version stamp pinned to the bottom-right of the viewport.
  *
- * Reads the live firmware version from /api/system (already polled by
- * the dashboard) and renders a muted, non-interactive label that
- * stays out of the way until you look for it. Useful for support
- * triage: "what version are you running?" is always one glance away.
+ * Reads the live firmware version from /api/device/status (the same
+ * endpoint the dashboard's status hook already polls) and renders a
+ * muted, non-interactive label that stays out of the way until you
+ * look for it. Useful for support triage: "what version are you
+ * running?" is always one glance away.
+ *
+ * History: an earlier draft polled /api/system, an endpoint that
+ * never existed. The fetch silently 404'd every 60s and the label
+ * stayed at "--" forever. Fixed in v0.7.4 to point at the real
+ * route.
  *
  * Single responsibility: paint the version label and refresh it on
  * a slow cadence (60 s). No hover tooltips, no click handlers — keep
@@ -45,11 +51,10 @@ class BuildStamp {
 
     async _refresh() {
         try {
-            const res = await fetch('/api/system', { credentials: 'same-origin' });
+            const res = await fetch('/api/device/status', { credentials: 'same-origin' });
             if (!res.ok) return;
             const data = await res.json();
-            const device = data.device || {};
-            const version = device.firmware_version || '--';
+            const version = data.firmware_version || '--';
             this._labelEl.textContent = `v${version}`;
         } catch (_e) { /* swallow; next tick will retry */ }
     }

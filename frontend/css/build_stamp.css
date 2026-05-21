@@ -40,6 +40,12 @@
     letter-spacing: 0.04em;
 }
 
+/* Messages + Terminal keep primary actions at bottom-right; hide the stamp there */
+body:has(.section[data-section="messages"].section--active) .build-stamp,
+body:has(.section[data-section="terminal"].section--active) .build-stamp {
+    display: none;
+}
+
 @media (max-width: 600px) {
     .build-stamp { display: none; }
 }

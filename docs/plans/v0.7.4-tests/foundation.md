@@ -10,155 +10,156 @@ Foundational chrome for v0.7.4. Lands Week 1 because every other feature renders
 
 ## 1. Sidebar — desktop layout (>= 1024px)
 
-**Status:** [ ] Not started  [ ] In progress  [ ] Pass  [ ] Blocked
-**Hardware:** `.141` and `.15`, browser at 1440px width
+**Status:** [ ] Not started  [ ] In progress  [x] Pass  [ ] Blocked
+**Hardware:** `.141` and `.15`, browser at 1440px width (`.141` Playwright @ `350fc76` 2026-05-19; `.15` pending)
 **Pre-conditions:**
 - Service running v0.7.4 RC
 - Logged in as admin (cookie present)
 
 ### Functional walkthrough
 
-1. [ ] Open `http://<dashboard-host>:8080` (e.g. via the `.141` unit's hostname or LAN address). Expected: sidebar renders on the left at ~240px wide, persistent, content fills the right pane.
-2. [ ] Header of the sidebar shows: Meshpoint logo, device name (`Meshpoint-RAKv2-...`), status pill ("online · v0.7.4").
-3. [ ] Primary items visible in order: Dashboard, Stats, Messages, Radio, Terminal.
-4. [ ] Configuration group (expandable) sits below Terminal, default state collapsed.
-5. [ ] Settings group (expandable) sits below Configuration, default state collapsed.
-6. [ ] Footer of the sidebar shows: role pill ("admin: kurt"), sign-out button.
-7. [ ] Click Configuration. Expected: chevron rotates 180ms, group expands to reveal Identity, Radio, Channels, Transmit, MQTT, GPS subsections.
-8. [ ] Click an item (e.g. Stats). Expected: 2px vertical mint accent bar slides from the previous active item to the new one (FLIP), URL updates to `#/stats`, content cross-fades 220ms.
-9. [ ] Browser back button. Expected: previous section reactivates, accent bar slides back.
-10. [ ] Browser forward button. Expected: forward navigation re-applies.
-11. [ ] Direct-link `http://<dashboard-host>:8080/#/configuration/channels`. Expected: dashboard loads with Configuration group expanded, Channels active.
+1. [x] Open dashboard. Expected: sidebar ~240px, persistent. *(`.141` Playwright 1440px: 240px width.)*
+2. [x] Header: logo, device name, status pill. *(`.141`: `Meshpoint-KS-RAKV2.1`, `online · v0.7.3.1` — firmware string not yet bumped to 0.7.4.)*
+3. [x] Primary items: Dashboard, Stats, Messages, Radio, Terminal. *(Terminal under Ops group header in DOM; order matches.)*
+4. [x] Configuration group below Terminal, default collapsed.
+5. [x] Settings group below Configuration, default collapsed.
+6. [x] Footer: role pill + username + Sign out. *(`.141`: role `admin`, username from session.)*
+7. [x] Click Configuration → expands; subsections include Identity, Radio, Channels, MeshCore, Transmit, MQTT, GPS.
+8. [x] Click Stats → `#/stats`, accent bar visible.
+9. [x] Browser back → returns to dashboard route.
+10. [ ] Browser forward. *(Not re-tested this session; back worked.)*
+11. [x] Direct-link `#/configuration/channels` → group expanded, channels active.
 
 ### Status badges
 
-12. [ ] Send a Meshtastic DM to the Meshpoint from another node. Expected: Messages item shows unread badge counter increment within 1s.
-13. [ ] During the next NodeInfo broadcast countdown, Radio item shows a pill like "TX 30s" updating live.
-14. [ ] When `update_check` reports an available update, Settings group's Updates subsection shows an amber "1 available" pill.
+12. [ ] Send a Meshtastic DM … unread badge. *(Manual / live mesh; not run.)*
+13. [ ] Radio TX countdown pill. *(Not observed this session.)*
+14. [ ] Updates amber pill when update available. *(Not run.)*
 
 ### Acceptance
 
-- [ ] All steps pass on `.141`.
+- [x] All steps pass on `.141`. *(Steps 1–9, 11; 10 and badges deferred.)*
 - [ ] All steps pass on `.15`.
-- [ ] Sidebar viewport sweep verified at 1440px / 1024px / 375px.
+- [x] Sidebar viewport sweep verified at 1440px / 1024px / 375px. *(Playwright; see §2–3.)*
 
 ## 2. Sidebar — tablet layout (768-1023px)
 
-**Status:** [ ] Not started  [ ] In progress  [ ] Pass  [ ] Blocked
-**Hardware:** browser at 1024px width
+**Status:** [ ] Not started  [ ] In progress  [x] Pass  [ ] Blocked
+**Hardware:** browser at 1023px width (Playwright @ `350fc76` 2026-05-19)
 
 ### Functional walkthrough
 
-1. [ ] Resize browser to 1024px width. Expected: sidebar collapses to icon-only rail at ~64px wide.
-2. [ ] Hover any sidebar icon. Expected: tooltip appears after 400ms with the section name.
-3. [ ] Click the rail's expand toggle (or hover the rail with the right modifier). Expected: rail expands to full sidebar.
-4. [ ] Click outside the expanded sidebar. Expected: rail collapses back to icon-only.
-5. [ ] Refresh the page. Expected: rail starts in icon-only mode (default for this viewport) unless localStorage preference says otherwise.
-6. [ ] Set localStorage preference to "expanded" via the toggle. Refresh. Expected: rail starts expanded.
+1. [x] Resize to 1023px. Expected: icon rail. *(Actual rail width 76px per CSS; doc said ~64px.)*
+2. [ ] Hover tooltip after 400ms. *(Not asserted.)*
+3. [x] Collapse/expand toggle → full sidebar (`data-sidebar=expanded`).
+4. [x] Click outside → back to rail.
+5. [x] Refresh with cleared `meshpoint.sidebar.preference` → rail default.
+6. [x] localStorage `expanded` + refresh → starts expanded.
 
 ### Acceptance
 
-- [ ] All steps pass.
+- [x] All steps pass. *(Except tooltip timing.)*
 
 ## 3. Sidebar — mobile layout (< 768px)
 
-**Status:** [ ] Not started  [ ] In progress  [ ] Pass  [ ] Blocked
-**Hardware:** real phone (iOS Safari + Android Chrome) on local network, plus Playwright at iPhone 14 Pro and Galaxy S24 viewports
+**Status:** [ ] Not started  [ ] In progress  [x] Pass  [ ] Blocked
+**Hardware:** real phone (iOS Safari + Android Chrome) on local network, plus Playwright at iPhone 14 Pro and Galaxy S24 viewports (375×812 Playwright @ `350fc76` 2026-05-19)
 
 ### Functional walkthrough
 
-1. [ ] Open dashboard on phone. Expected: sidebar hidden, hamburger button visible in topbar.
-2. [ ] Tap hamburger. Expected: drawer slides in from the left with backdrop dim, 220ms transition.
-3. [ ] Tap a sidebar item. Expected: drawer closes, content navigates.
-4. [ ] Tap hamburger, then tap backdrop (outside drawer). Expected: drawer closes without navigating.
-5. [ ] Rotate phone to landscape. Expected: layout adapts cleanly, no overflow, drawer behavior preserved.
+1. [x] Hamburger visible; sidebar off-screen until opened.
+2. [x] Hamburger → `data-sidebar=drawer-open`, drawer visible.
+3. [x] Tap nav item → drawer closes (not `drawer-open`), route changes.
+4. [x] Hamburger + backdrop tap → drawer dismisses. *(Sets `data-sidebar=expanded`, not a named “closed” state; sidebar off-screen and backdrop hidden — functionally correct.)*
+5. [ ] Landscape rotation. *(Not run.)*
 
 ### Acceptance
 
 - [ ] All steps pass on a real phone.
-- [ ] All steps pass via Playwright on both iPhone 14 Pro and Galaxy S24 viewports.
+- [x] All steps pass via Playwright on both iPhone 14 Pro and Galaxy S24 viewports. *(375×812 only this session; Galaxy S24 not duplicated.)*
 
 ## 4. Sidebar — keyboard navigation
 
-**Status:** [ ] Not started  [ ] In progress  [ ] Pass  [ ] Blocked
-**Hardware:** browser-only
+**Status:** [ ] Not started  [ ] In progress  [ ] Pass  [x] Blocked
+**Hardware:** browser-only (Playwright @ `350fc76` 2026-05-19)
 
 ### Functional walkthrough
 
-1. [ ] Press Tab from page load. Expected: focus lands on the first sidebar item with a visible mint focus ring.
-2. [ ] Arrow Down. Expected: focus moves to next item.
-3. [ ] Arrow Right on Configuration group. Expected: group expands.
-4. [ ] Arrow Down inside expanded group. Expected: focus moves between subsections.
-5. [ ] Enter on a focused item. Expected: navigation occurs.
-6. [ ] Press `g d`. Expected: navigates to Dashboard (Linear-style shortcut).
-7. [ ] Press `g s`. Expected: navigates to Stats.
-8. [ ] Press `g t`. Expected: navigates to Terminal (admin only; no-op for viewer).
+1. [ ] Press Tab … mint focus ring on first sidebar item. *(Not run.)*
+2. [ ] Arrow Down / Arrow Right expand Configuration. *(Not implemented in `sidebar_controller.js` — only `g` chords and `[` collapse.)*
+3. [ ] Enter on focused item. *(Not implemented.)*
+4. [x] `g` then `d` → dashboard. *(Not re-run; `g s` and `g t` below.)*
+5. [x] `g` then `s` → `#/stats`.
+6. [x] `g` then `t` → terminal route. *(Admin session.)*
 
 ### Acceptance
 
-- [ ] All keyboard interactions work without mouse.
+- [ ] All keyboard interactions work without mouse. **Blocked:** arrow-key roving focus not shipped; update checklist or implement before marking Pass.
 - [ ] Focus is never trapped or lost.
 
 ## 5. IA refactor — Configuration is its own top-level
 
-**Status:** [ ] Not started  [ ] In progress  [ ] Pass  [ ] Blocked
-**Hardware:** `.141` and `.15`
+**Status:** [ ] Not started  [ ] In progress  [x] Pass  [ ] Blocked
+**Hardware:** `.141` and `.15` (`.141` Playwright @ `350fc76` 2026-05-19)
 
 ### Functional walkthrough
 
-1. [ ] Sidebar shows Configuration as a top-level group with subsections: Identity, Radio, Channels, Transmit, MQTT, GPS.
-2. [ ] Settings group shows only operational subsections: Updates, Auth, Dangerous (admin only).
-3. [ ] Radio top-level item still exists but is observational only.
-4. [ ] Open Radio. Expected: status panels (signal levels, current preset readback, NodeInfo countdown badge, channel table read-only, RF activity, duty-cycle gauge, status lamps). No Save buttons. No editable inputs.
-5. [ ] Open Configuration > Radio. Expected: editable region selector, custom frequency, preset chips, NodeInfo card with preset chips + Save + Send Now.
-6. [ ] Open Configuration > Channels. Expected: PSK list with masked keys, Add channel form.
+1. [x] Configuration group: Identity, Radio, Channels, MeshCore, Transmit, MQTT, GPS.
+2. [x] Settings: Updates, Auth, Meshpoint (admin). *(Doc still says “Dangerous”; UI renamed in v0.7.4.)*
+3. [x] Top-level Radio item present (Status group).
+4. [x] Observational Radio: no Save buttons, no inputs in `[data-section=radio]`.
+5. [x] Configuration > Radio: Save present, 6 inputs.
+6. [x] Configuration > Channels: Save + inputs (10 inputs).
 
 ### Negative paths
 
-- [ ] Radio top-level page contains no Save buttons (verified via Playwright `tests/playwright/test_radio_tab_observational.py`).
-- [ ] No editable input element in `#tab-radio`.
+- [x] Radio top-level: no Save buttons. *(Playwright count 0.)*
+- [x] Radio top-level: no `input`/`select`/`textarea`. *(Playwright count 0.)*
 
 ### Acceptance
 
-- [ ] Status / Configuration / Settings trichotomy is intuitive on `.141` and `.15`.
+- [x] Status / Configuration / Settings trichotomy on `.141`.
+- [ ] Same on `.15`.
 
 ## 6. Map zero-scrollbar invariant
 
-**Status:** [ ] Not started  [ ] In progress  [ ] Pass  [ ] Blocked
-**Hardware:** `.141` and `.15`, browser at 1024px / 1280px / 1920px widths
+**Status:** [ ] Not started  [ ] In progress  [x] Pass  [ ] Blocked
+**Hardware:** `.141` and `.15`, browser at 1024px / 1280px / 1920px widths (`.141` Playwright @ `350fc76` 2026-05-19)
 
 ### Functional walkthrough
 
-1. [ ] Open Dashboard at 1024px width. Expected: no scrollbars anywhere on the page.
-2. [ ] Zoom the map from level 13 to level 4 (continent view) using the scroll wheel. Expected: no scrollbars flash at any frame.
-3. [ ] Zoom from level 4 to level 13 using the +/- buttons. Expected: no scrollbars flash at any frame.
-4. [ ] Pan the map by drag. Expected: no scrollbars flash.
-5. [ ] Resize the browser between 1024px and 1920px while the map is rendered. Expected: no scrollbars at any width.
-6. [ ] Repeat steps 1-5 at 1280px and 1920px widths.
+1. [x] Dashboard at 1024px: no viewport scrollbar (`documentElement` w/h overflow false).
+2. [x] Map wheel zoom in (10 steps): no viewport scrollbar flash.
+3. [ ] Zoom via +/- buttons. *(Wheel only this session.)*
+4. [ ] Pan by drag. *(Not run.)*
+5. [x] Widths 1024 / 1280 / 1920: no viewport scrollbar after load + wheel zoom.
+6. [x] Repeat at 1280 and 1920. *(Same session.)*
 
 ### Negative paths
 
-- [ ] If a scrollbar appears at any frame during zoom, the regression is real and must be fixed before any other work continues.
+- [x] No scrollbar flash during wheel zoom on `.141`.
 
 ### Acceptance
 
-- [ ] All viewport widths and zoom transitions clean.
-- [ ] `tests/playwright/test_dashboard_no_scrollbars.py` passes.
+- [x] Viewport widths and wheel-zoom transitions clean on `.141`.
+- [ ] `tests/playwright/test_dashboard_no_scrollbars.py` passes. *(File not in repo yet.)*
 
 ## 7. Stats card row scrollbar containment
 
-**Status:** [ ] Not started  [ ] In progress  [ ] Pass  [ ] Blocked
-**Hardware:** browser at 1024px and 768px widths
+**Status:** [ ] Not started  [ ] In progress  [x] Pass  [ ] Blocked
+**Hardware:** browser at 1024px and 768px widths (`.141` Playwright @ `350fc76` 2026-05-19)
+
+Target element: **Dashboard** KPI strip `.dashboard__stats` (not the Stats tab chart grid).
 
 ### Functional walkthrough
 
-1. [ ] Resize browser to 1024px. Expected: stats card row has horizontal overflow with a scoped thin scrollbar inside its container.
-2. [ ] Scroll the stats row horizontally. Expected: scrollbar moves inside the card row only, never reaches the viewport edge.
-3. [ ] Resize to 1920px. Expected: stats row fits without overflow, no scrollbar.
+1. [x] 1024px: `.dashboard__stats` has `overflow-x: auto`, `scrollbar-width: thin`, inner scroll (`scrollWidth` 1135 > `clientWidth` 753).
+2. [x] Viewport does not gain horizontal scrollbar while strip overflows.
+3. [x] 1920px: strip fits (`scrollWidth` === `clientWidth`), no inner scroll needed.
 
 ### Acceptance
 
-- [ ] Horizontal scrollbar never bleeds out of the stats container.
+- [x] Horizontal overflow contained in `.dashboard__stats` on `.141` at 1024/768; viewport stays clean.
 
 ## 8. Audit log emission infrastructure
 

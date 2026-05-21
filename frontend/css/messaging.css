@@ -699,6 +699,9 @@
     padding: 12px 18px 14px;
     border-top: 1px solid var(--msg-border);
     background: var(--msg-bg-strip);
+    /* Above fixed .build-stamp (z-index 25) so Send is not ghosted by the pill */
+    position: relative;
+    z-index: 26;
 }
 
 .msg-compose__input {

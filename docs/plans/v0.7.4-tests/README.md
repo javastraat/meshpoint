@@ -6,21 +6,23 @@ This file is the master index. It carries the cross-cutting checks (audit log, r
 
 **Results log:** append every run to [RESULTS.md](RESULTS.md). Only tick a matrix `[x]` when the full per-feature checklist is green for that column. `partial` in the matrix means work started but ship gate not met.
 
+**Agent note:** "What's next" for v0.7.4 means the **testing queue** in [RESULTS.md § Testing queue](RESULTS.md#testing-queue-before-version-bump), not merging `fix/no-crc-phantom-leak` or other `active-work.mdc` backlog items (phantom NO_CRC is already on `main` via v0.7.3; MeshCore USB `adapt_event` is on `main`). Version bump only after this matrix is green.
+
 ## Sign-off matrix
 
 One row per feature, one column per hardware unit. Box gets checked when the per-feature file is fully green for that unit. Anything red blocks the release.
 
 | Feature                          | .141 (RAK V2) | .15 (SenseCap M1) | .49 (fresh SD) | Browser-only |
 |----------------------------------|---------------|-------------------|----------------|--------------|
-| Sidebar nav + IA refactor        | [ ]           | [ ]               | [ ]            | [ ]          |
-| Map zero-scrollbar invariant     | [ ]           | [ ]               | n/a            | [ ]          |
-| Audit log emission               | [ ]           | [ ]               | n/a            | n/a          |
-| Password change                  | [ ]           | [ ]               | [ ]            | [ ]          |
-| Sign-out-everywhere              | [ ]           | [ ]               | n/a            | [ ]          |
-| Configurable lockout             | [ ]           | [ ]               | n/a            | [ ]          |
-| Viewer role end-to-end           | [ ]           | [ ]               | n/a            | [ ]          |
-| Web terminal                     | [ ]           | [ ]               | n/a            | [ ]          |
-| Update apply + branch picker     | [ ]           | [ ]               | n/a            | n/a          |
+| Sidebar nav + IA refactor        | partial       | [ ]               | partial        | [ ]          |
+| Map zero-scrollbar invariant     | partial       | [ ]               | n/a            | partial      |
+| Audit log emission               | partial       | [ ]               | n/a            | n/a          |
+| Password change                  | partial       | [ ]               | [ ]            | [ ]          |
+| Sign-out-everywhere              | partial       | [ ]               | n/a            | [ ]          |
+| Configurable lockout             | partial       | [ ]               | n/a            | [ ]          |
+| Viewer role end-to-end           | partial       | [ ]               | n/a            | [ ]          |
+| Web terminal                     | partial       | [ ]               | n/a            | [ ]          |
+| Update apply + branch picker     | partial       | [ ]               | n/a            | n/a          |
 | Watchdog auto-rollback           | [ ]           | [ ]               | n/a            | n/a          |
 | Configuration > Identity         | [ ]           | [ ]               | n/a            | [ ]          |
 | Configuration > Radio            | [ ]           | [ ]               | n/a            | [ ]          |
@@ -28,7 +30,7 @@ One row per feature, one column per hardware unit. Box gets checked when the per
 | Configuration > Transmit         | partial       | [ ]               | n/a            | [ ]          |
 | Configuration > MQTT             | [ ]           | [ ]               | n/a            | [ ]          |
 | Configuration > GPS              | [ ]           | [ ]               | n/a            | [ ]          |
-| Dangerous actions                | partial       | [ ]               | n/a            | n/a          |
+| Dangerous actions                | partial       | [ ]               | n/a            | partial      |
 | Real radar blips on auth pages   | [ ]           | [ ]               | [ ]            | [ ]          |
 | Smart upgrade indicator          | [ ]           | [ ]               | n/a            | [ ]          |
 | MQTT hierarchical paths (PR #35) | [ ]           | [ ]               | n/a            | n/a          |
