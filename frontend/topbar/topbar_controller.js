@@ -64,6 +64,9 @@ class TopbarController {
                 radio: cfg.radio || null,
             });
             this._meshcore.setMeshcore(cfg.meshcore || null);
+            document.dispatchEvent(
+                new CustomEvent('meshpoint:configUpdated', { detail: cfg }),
+            );
         } catch (_e) { /* swallow; next tick will retry */ }
     }
 

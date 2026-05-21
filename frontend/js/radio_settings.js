@@ -24,6 +24,12 @@ class RadioSettings {
         this._config = null;
         this._cards = [];
         this._channels = null;
+        this._onConfigUpdated = (event) => {
+            if (!this._initialized || !event.detail) return;
+            this._config = event.detail;
+            this._renderAll();
+        };
+        document.addEventListener('meshpoint:configUpdated', this._onConfigUpdated);
     }
 
     async onActivated() {

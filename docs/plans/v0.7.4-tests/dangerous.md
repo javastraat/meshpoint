@@ -108,7 +108,7 @@ Settings > Meshpoint subsection (route `settings/dangerous`). Every action route
 - [ ] Wipe is reversible (real nodes re-broadcast).
 - [ ] Audit log entry includes count.
 
-## 6. Dangerous role gate
+## 6. Meshpoint actions role gate
 
 **Status:** [ ] Not started  [ ] In progress  [ ] Pass  [ ] Blocked
 **Hardware:** `.15` (viewer)
@@ -116,13 +116,13 @@ Settings > Meshpoint subsection (route `settings/dangerous`). Every action route
 ### Functional walkthrough
 
 1. [ ] Log in as viewer.
-2. [ ] Sidebar Settings group does not show Dangerous subsection at all.
+2. [ ] Sidebar Settings group does not show the Meshpoint subsection at all.
 3. [ ] DevTools: `fetch('/api/config/dangerous/restart_service', {method: 'POST'})` -> 403.
 4. [ ] DevTools: `fetch('/api/config/dangerous/clear_local_db', {method: 'POST'})` -> 403.
 
 ### Acceptance
 
-- [ ] Viewer cannot reach any dangerous action.
+- [ ] Viewer cannot reach any Meshpoint service action.
 
 ## Hardware-specific checks
 

@@ -351,6 +351,8 @@ async def update_radio(req: RadioUpdate):
         updates["frequency_mhz"] = REGION_DEFAULTS[req.region]["frequency_mhz"]
 
     if updates:
+        for key, val in updates.items():
+            setattr(radio, key, val)
         try:
             save_section_to_yaml("radio", updates)
         except PermissionError as exc:

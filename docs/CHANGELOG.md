@@ -14,6 +14,9 @@ Queued for the next version bump. Bullets in this section will be folded into th
 - **Top bar Meshtastic chip.** Replaces the separate ONLINE lamp, CALL badge, and radio pill with one cyan-grouped chip: `Meshtastic |` dashboard connection lamp, short name (no CALL label), region, frequency, and preset. Border glow is always on (not hover-only); MeshCore chip uses the same permanent glow treatment. Protocol chips show connection state with a colored dot only (no ONLINE/OFFLINE text).
 - **Messages empty-state copy.** Replaced jargon ("payload", "copy is on") with plain instructions: pick a conversation, use All/MT/MC filters, copy text by highlighting.
 - **Node drawer metrics charts.** New `GET /api/nodes/{id}/metrics_history` returns telemetry rows plus per-packet RSSI history. The node detail drawer plots battery, voltage, channel/air util, temperature, and RSSI over time (1H / 6H / 24H / All), similar to Meshtastic device metrics. Legend click toggles each series; RSSI stays hidden by default when dense so telemetry lines stay readable.
+- **Updates: Check for updates.** Settings > Updates adds a button that runs `git fetch` and reports how many commits the install is behind the selected channel (e.g. `12 commits behind origin/feat/v0.7.4. Last checked 2 minutes ago.`), so you can decide when to Apply. Compares against the channel picker (not only the branch currently checked out).
+- **Radio preset display after save.** Saving a modem preset now updates in-memory config immediately; the observational Radio tab and Configuration editor refresh when the top bar polls without requiring a full browser hard refresh.
+- **Settings copy.** Post-save restart toasts and terminal hints no longer reference the retired Dangerous label; use Settings > Meshpoint and plain "confirm" wording for high-impact actions.
 
 ### v0.7.4 (May 2026)
 

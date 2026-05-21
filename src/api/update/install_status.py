@@ -6,6 +6,7 @@ import logging
 import re
 import subprocess
 import urllib.request
+from datetime import datetime, timezone
 from typing import Callable, Optional
 
 from src.api.update.channels import ReleaseChannelRegistry, TIER_CUSTOM
@@ -129,14 +130,95 @@ def _parse_version(version_str: str) -> tuple[int, ...]:
     return tuple(int(x) for x in version_str.split("."))
 
 
+def resolve_compare_branch(
+    registry: ReleaseChannelRegistry,
+    *,
+    channel_id: Optional[str],
+    custom_branch: Optional[str],
+    install_branch: Optional[str],
+) -> Optional[str]:
+    """Branch used for ``origin/<branch>`` comparison (picker or install)."""
+    if channel_id:
+        channel = registry.find(channel_id)
+        if channel is None:
+            return None
+        if channel.tier == TIER_CUSTOM:
+            branch = (custom_branch or "").strip()
+            return branch or None
+        return channel.branch
+    return install_branch
+
+
+def git_fetch_origin_branch(
+    repo_path: str,
+    branch: str,
+    *,
+    runner: GitRunner = default_git_runner,
+    use_sudo: bool = True,
+    timeout_seconds: float = 120.0,
+) -> tuple[bool, Optional[str]]:
+    """Fetch ``origin/<branch>``. Returns ``(ok, error_message)``."""
+    git = ["sudo", "git"] if use_sudo else ["git"]
+    rc, _, stderr = runner(
+        [*git, "fetch", "origin", branch],
+        repo_path,
+        timeout_seconds,
+    )
+    if rc != 0:
+        detail = (stderr or "git fetch failed").strip().replace("\n", " ")
+        return False, detail[:500] if detail else "git fetch failed"
+    return True, None
+
+
+def count_commits_behind_ahead(
+    repo_path: str,
+    branch: str,
+    *,
+    runner: GitRunner = default_git_runner,
+    use_sudo: bool = True,
+) -> tuple[Optional[int], Optional[int], Optional[str]]:
+    """Compare HEAD to ``origin/<branch>``. Returns behind, ahead, remote short SHA."""
+    git = ["sudo", "git"] if use_sudo else ["git"]
+    upstream = f"origin/{branch}"
+
+    rc, behind_out, _ = runner(
+        [*git, "rev-list", "--count", f"HEAD..{upstream}"],
+        repo_path,
+        15.0,
+    )
+    behind: Optional[int] = None
+    if rc == 0 and behind_out.strip().isdigit():
+        behind = int(behind_out.strip())
+
+    rc, ahead_out, _ = runner(
+        [*git, "rev-list", "--count", f"{upstream}..HEAD"],
+        repo_path,
+        15.0,
+    )
+    ahead: Optional[int] = None
+    if rc == 0 and ahead_out.strip().isdigit():
+        ahead = int(ahead_out.strip())
+
+    rc, sha_out, _ = runner(
+        [*git, "rev-parse", "--short=8", upstream],
+        repo_path,
+        10.0,
+    )
+    remote_sha = sha_out.strip() if rc == 0 else None
+    return behind, ahead, remote_sha
+
+
 def build_install_status_payload(
     *,
     registry: ReleaseChannelRegistry,
     repo_path: str = "/opt/meshpoint",
     runner: GitRunner = default_git_runner,
     use_sudo: bool = True,
+    sync_remote: bool = False,
+    channel_id: Optional[str] = None,
+    custom_branch: Optional[str] = None,
 ) -> dict:
-    """Assemble the JSON body for ``GET /api/update/install_status``."""
+    """Assemble install/update status JSON for the dashboard."""
     branch, sha = read_install_git_ref(
         repo_path, runner=runner, use_sudo=use_sudo,
     )
@@ -148,23 +230,62 @@ def build_install_status_payload(
             "active_channel_label": None,
             "channel_tier": None,
         }
+
+    compare_branch = resolve_compare_branch(
+        registry,
+        channel_id=channel_id,
+        custom_branch=custom_branch,
+        install_branch=branch,
+    )
+
+    commits_behind: Optional[int] = None
+    commits_ahead: Optional[int] = None
+    remote_sha_short: Optional[str] = None
+    sync_error: Optional[str] = None
+    checked_at: Optional[str] = None
+
+    if sync_remote and compare_branch:
+        ok, err = git_fetch_origin_branch(
+            repo_path, compare_branch, runner=runner, use_sudo=use_sudo,
+        )
+        if ok:
+            behind, ahead, remote_sha = count_commits_behind_ahead(
+                repo_path, compare_branch, runner=runner, use_sudo=use_sudo,
+            )
+            commits_behind = behind
+            commits_ahead = ahead
+            remote_sha_short = remote_sha
+            checked_at = datetime.now(timezone.utc).isoformat()
+        else:
+            sync_error = err
+
     remote_version = None
     update_available = False
-    if branch:
-        remote_version = fetch_remote_version_sync(branch)
-        if remote_version:
-            try:
-                update_available = (
-                    _parse_version(remote_version) > _parse_version(__version__)
-                )
-            except ValueError:
-                update_available = False
+    version_branch = compare_branch or branch
+    if version_branch:
+        remote_version = fetch_remote_version_sync(version_branch)
+    if sync_remote and commits_behind is not None:
+        update_available = commits_behind > 0
+    elif remote_version:
+        try:
+            update_available = (
+                _parse_version(remote_version) > _parse_version(__version__)
+            )
+        except ValueError:
+            update_available = False
+
     return {
         "local_version": __version__,
         "install_branch": branch,
         "install_sha_short": sha,
         "remote_version": remote_version,
-        "remote_branch": branch,
+        "remote_branch": compare_branch or branch,
+        "compare_branch": compare_branch,
+        "commits_behind": commits_behind,
+        "commits_ahead": commits_ahead,
+        "remote_sha_short": remote_sha_short,
+        "sync_error": sync_error,
+        "checked_at": checked_at,
         "update_available": update_available,
         **channel_info,
     }

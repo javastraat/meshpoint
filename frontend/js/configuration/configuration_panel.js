@@ -28,7 +28,7 @@ class ConfigurationPanel {
     async onSectionEnter(route) {
         if (!route.startsWith('configuration/')) return;
         const section = route.slice('configuration/'.length);
-        if (!this._config) await this._loadConfig();
+        await this._loadConfig();
         this._mountSection(section);
         this._renderAll();
         if (section === 'radio') this._scrollToFocusTarget();
@@ -143,7 +143,9 @@ class ConfigurationPanel {
             post: (url, body) => self._request('POST', url, body),
             refresh: () => self._loadConfig().then(() => self._renderAll()),
             toast: (msg) => self._toast(msg),
-            signalRestart: (msg) => self._toast(msg + ' Restart service from Settings → Dangerous to apply.'),
+            signalRestart: (msg) => self._toast(
+                msg + ' Restart the service from Settings → Meshpoint to apply.',
+            ),
             escape: (str) => {
                 const el = document.createElement('span');
                 el.textContent = str || '';

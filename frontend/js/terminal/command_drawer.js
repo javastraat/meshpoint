@@ -4,7 +4,7 @@
  * Single responsibility: pull the curated command catalog from
  * ``GET /api/terminal/commands``, group by category, render a list
  * of buttons, and emit an ``insert`` callback when the operator picks
- * one. Dangerous entries route through ``DangerousModal`` for a
+ * one. High-impact entries route through ``DangerousModal`` for a
  * click-to-confirm dialog before the callback fires.
  */
 

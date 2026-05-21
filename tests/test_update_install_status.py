@@ -9,8 +9,11 @@ from unittest import mock
 from src.api.update.channels import ReleaseChannelRegistry
 from src.api.update.install_status import (
     build_install_status_payload,
+    count_commits_behind_ahead,
+    git_fetch_origin_branch,
     match_channel_for_branch,
     read_install_git_ref,
+    resolve_compare_branch,
 )
 
 
@@ -19,19 +22,37 @@ class _FakeGitRunner:
         self,
         branch: str = "feat/v0.7.4",
         sha: str = "ac6895a",
+        *,
+        behind: int = 12,
+        ahead: int = 0,
+        remote_sha: str = "f22d868a",
     ) -> None:
         self.branch = branch
         self.sha = sha
+        self.behind = behind
+        self.ahead = ahead
+        self.remote_sha = remote_sha
         self.calls: list[list[str]] = []
 
     def __call__(
         self, args: list[str], cwd: Optional[str], timeout_seconds: float,
     ) -> tuple[int, str, str]:
         self.calls.append(list(args))
+        if args[:3] == ["git", "fetch", "origin"]:
+            return 0, "", ""
         if "rev-parse" in args and any("--abbrev-ref" in a for a in args):
             return 0, f"{self.branch}\n", ""
         if "rev-parse" in args and any("short" in a for a in args):
+            ref = args[-1] if args else ""
+            if ref.startswith("origin/"):
+                return 0, f"{self.remote_sha}\n", ""
             return 0, f"{self.sha}\n", ""
+        if "rev-list" in args and "--count" in args:
+            spec = args[-1]
+            if spec.startswith("HEAD.."):
+                return 0, f"{self.behind}\n", ""
+            if spec.startswith("origin/") and spec.endswith("..HEAD"):
+                return 0, f"{self.ahead}\n", ""
         return 1, "", "err"
 
 
@@ -97,6 +118,45 @@ class TestBuildInstallStatusPayload(unittest.TestCase):
         self.assertEqual(payload["active_channel_id"], "rc-074")
         self.assertEqual(payload["remote_branch"], "feat/v0.7.4")
         self.assertFalse(payload["update_available"])
+
+    def test_sync_reports_commits_behind(self) -> None:
+        runner = _FakeGitRunner(behind=12)
+        with mock.patch(
+            "src.api.update.install_status.fetch_remote_version_sync",
+            return_value="0.7.4.0",
+        ):
+            with mock.patch(
+                "src.api.update.install_status.__version__",
+                "0.7.3.1",
+            ):
+                payload = build_install_status_payload(
+                    registry=ReleaseChannelRegistry(),
+                    repo_path="/opt/meshpoint",
+                    runner=runner,
+                    use_sudo=False,
+                    sync_remote=True,
+                    channel_id="rc-074",
+                )
+        self.assertEqual(payload["commits_behind"], 12)
+        self.assertEqual(payload["commits_ahead"], 0)
+        self.assertEqual(payload["compare_branch"], "feat/v0.7.4")
+        self.assertTrue(payload["update_available"])
+        self.assertIsNotNone(payload["checked_at"])
+        self.assertTrue(
+            any(len(c) >= 3 and c[:3] == ["git", "fetch", "origin"] for c in runner.calls),
+        )
+
+
+class TestResolveCompareBranch(unittest.TestCase):
+    def test_picker_overrides_install_branch(self) -> None:
+        reg = ReleaseChannelRegistry()
+        branch = resolve_compare_branch(
+            reg,
+            channel_id="stable",
+            custom_branch=None,
+            install_branch="feat/v0.7.4",
+        )
+        self.assertEqual(branch, "main")
 
 
 if __name__ == "__main__":

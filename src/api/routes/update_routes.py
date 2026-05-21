@@ -16,6 +16,7 @@ applier so the suite never shells out.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from collections.abc import AsyncIterator
@@ -86,6 +87,13 @@ class RollbackRequest(BaseModel):
     sha: str = Field(..., min_length=4, max_length=80)
 
 
+class CheckUpdatesRequest(BaseModel):
+    """Optional channel picker values; defaults to the live install branch."""
+
+    channel_id: str | None = Field(default=None, max_length=64)
+    custom_branch: str | None = Field(default=None, max_length=200)
+
+
 @router.get("/channels")
 async def list_channels(
     _claims: SessionClaims = Depends(require_admin),
@@ -101,6 +109,25 @@ async def install_status(
     """Live install branch, matched channel, and upstream version on that branch."""
     _applier_instance, registry = _require_initialized()
     return build_install_status_payload(registry=registry)
+
+
+@router.post("/check")
+async def check_for_updates(
+    req: CheckUpdatesRequest,
+    _claims: SessionClaims = Depends(require_admin),
+) -> dict:
+    """Fetch origin and report how many commits HEAD is behind the target branch."""
+    _applier_instance, registry = _require_initialized()
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(
+        None,
+        lambda: build_install_status_payload(
+            registry=registry,
+            sync_remote=True,
+            channel_id=req.channel_id,
+            custom_branch=req.custom_branch,
+        ),
+    )
 
 
 @router.get("/release_notes")

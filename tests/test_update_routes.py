@@ -89,6 +89,31 @@ class TestUpdateRoutes(unittest.TestCase):
         self.assertEqual(body["active_channel_id"], "rc-074")
         self.assertEqual(body["install_branch"], "feat/v0.7.4")
 
+    def test_check_for_updates_syncs_for_admin(self) -> None:
+        self.client.cookies.set("meshpoint_session", self.admin_token)
+        with mock.patch(
+            "src.api.routes.update_routes.build_install_status_payload",
+            return_value={
+                "local_version": "0.7.3.1",
+                "install_branch": "feat/v0.7.4",
+                "install_sha_short": "ac6895a",
+                "compare_branch": "feat/v0.7.4",
+                "commits_behind": 12,
+                "commits_ahead": 0,
+                "update_available": True,
+                "checked_at": "2026-05-21T12:00:00+00:00",
+            },
+        ) as build_mock:
+            response = self.client.post(
+                "/api/update/check",
+                json={"channel_id": "rc-074"},
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["commits_behind"], 12)
+        build_mock.assert_called_once()
+        _args, kwargs = build_mock.call_args
+        self.assertTrue(kwargs.get("sync_remote"))
+
     def test_channels_rejects_anonymous(self) -> None:
         client = TestClient(self.client.app)
         response = client.get("/api/update/channels")

@@ -63,7 +63,7 @@ class TopbarMeshtasticChip {
         const freq = r.frequency_mhz
             ? `${Number(r.frequency_mhz).toFixed(3)} MHz`
             : '--';
-        const preset = r.current_preset ? r.current_preset : 'CUSTOM';
+        const preset = this._formatPresetLabel(r.current_preset);
 
         this._regionEl.textContent = region;
         this._freqEl.textContent = freq;
@@ -72,6 +72,24 @@ class TopbarMeshtasticChip {
             'topbar-meshtastic--unknown',
             !radio || !radio.region,
         );
+    }
+
+    _formatPresetLabel(presetName) {
+        if (!presetName) return 'Custom';
+        const key = String(presetName);
+        const labels = {
+            LONG_FAST: 'LongFast',
+            LONG_TURBO: 'LongTurbo',
+            LONG_MODERATE: 'LongModerate',
+            LONG_SLOW: 'LongSlow',
+            VERY_LONG_SLOW: 'VeryLongSlow',
+            MEDIUM_FAST: 'MediumFast',
+            MEDIUM_SLOW: 'MediumSlow',
+            SHORT_FAST: 'ShortFast',
+            SHORT_SLOW: 'ShortSlow',
+            SHORT_TURBO: 'ShortTurbo',
+        };
+        return labels[key] || key;
     }
 }
 

@@ -22,8 +22,10 @@ class UpdatePanelController {
         this.channelSelect = rootEl.querySelector('[data-update-channel]');
         this.customRow = rootEl.querySelector('[data-update-custom-row]');
         this.customInput = rootEl.querySelector('[data-update-custom-branch]');
+        this.checkBtn = rootEl.querySelector('[data-update-check]');
         this.applyBtn = rootEl.querySelector('[data-update-apply]');
         this.rollbackBtn = rootEl.querySelector('[data-update-rollback]');
+        this.syncHintEl = rootEl.querySelector('[data-update-sync-hint]');
         this.statusEl = rootEl.querySelector('[data-update-status]');
         this.descriptionEl = rootEl.querySelector('[data-update-description]');
         this.localVersionEl = rootEl.querySelector('[data-update-local-version]');
@@ -47,6 +49,7 @@ class UpdatePanelController {
 
     bind() {
         this.channelSelect?.addEventListener('change', () => this._onChannelChanged());
+        this.checkBtn?.addEventListener('click', () => this._checkForUpdates());
         this.applyBtn?.addEventListener('click', () => this._apply());
         this.rollbackBtn?.addEventListener('click', () => this._rollback());
     }
@@ -82,7 +85,59 @@ class UpdatePanelController {
             if (!response.ok) return;
             this._installStatus = await response.json();
             this._renderVersionCards(this._installStatus);
+            if (!this._installStatus.checked_at) {
+                this._renderSyncHint(null);
+            }
         } catch (_e) { /* install status is best-effort */ }
+    }
+
+    async _checkForUpdates() {
+        const channel = this._currentChannel();
+        if (!channel) return;
+        const customBranch = channel.tier === 'custom'
+            ? (this.customInput?.value || '').trim()
+            : undefined;
+        if (channel.tier === 'custom' && !customBranch) {
+            this._setStatus('error', 'Enter a custom branch name first.');
+            return;
+        }
+        this._setStatus('pending', 'Fetching from GitHub…');
+        if (this.checkBtn) this.checkBtn.disabled = true;
+        try {
+            const response = await fetch('/api/update/check', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    channel_id: channel.id,
+                    custom_branch: customBranch,
+                }),
+            });
+            if (!response.ok) {
+                this._setStatus('error', `Check failed (HTTP ${response.status}).`);
+                this._renderSyncHint({ sync_error: 'request failed' });
+                return;
+            }
+            this._installStatus = await response.json();
+            this._renderVersionCards(this._installStatus);
+            this._renderSyncHint(this._installStatus);
+            const behind = this._installStatus.commits_behind;
+            if (this._installStatus.sync_error) {
+                this._setStatus('error', 'Could not reach GitHub.');
+            } else if (behind != null && behind > 0) {
+                this._setStatus(
+                    'success',
+                    `${behind} commit${behind === 1 ? '' : 's'} behind — use Apply when ready.`,
+                );
+            } else {
+                this._setStatus('success', 'Up to date with the selected channel.');
+            }
+        } catch (_e) {
+            this._setStatus('error', 'Network error while checking for updates.');
+            this._renderSyncHint({ sync_error: 'network error' });
+        } finally {
+            if (this.checkBtn) this.checkBtn.disabled = false;
+        }
     }
 
     _renderVersionCards(status) {
@@ -102,9 +157,87 @@ class UpdatePanelController {
             this.localBranchEl.textContent = parts.join(' ');
         }
         if (this.remoteBranchEl) {
-            const branch = status.remote_branch || status.install_branch || '';
-            this.remoteBranchEl.textContent = branch ? `origin/${branch}` : '';
+            const branch = status.compare_branch || status.remote_branch || status.install_branch || '';
+            const remoteSha = status.remote_sha_short || '';
+            let text = branch ? `origin/${branch}` : '';
+            if (remoteSha) text = text ? `${text} @ ${remoteSha}` : `@ ${remoteSha}`;
+            this.remoteBranchEl.textContent = text;
         }
+    }
+
+    _renderSyncHint(status) {
+        if (!this.syncHintEl) return;
+        if (!status) {
+            this.syncHintEl.dataset.kind = '';
+            this.syncHintEl.textContent =
+                'Select a channel, then check how far behind GitHub you are.';
+            return;
+        }
+        if (status.sync_error) {
+            this.syncHintEl.dataset.kind = 'error';
+            this.syncHintEl.textContent = this._withLastChecked(
+                `Could not fetch origin: ${status.sync_error}`,
+                status,
+            );
+            return;
+        }
+        const branch = status.compare_branch || status.remote_branch || '';
+        const behind = status.commits_behind;
+        const ahead = status.commits_ahead;
+        if (behind == null) {
+            this.syncHintEl.dataset.kind = '';
+            this.syncHintEl.textContent = 'Could not compare with GitHub.';
+            return;
+        }
+        if (behind === 0 && (!ahead || ahead === 0)) {
+            this.syncHintEl.dataset.kind = 'ok';
+            this.syncHintEl.textContent = this._withLastChecked(
+                branch
+                    ? `Up to date with origin/${branch}.`
+                    : 'Up to date with GitHub.',
+                status,
+            );
+            return;
+        }
+        const parts = [];
+        if (behind > 0) {
+            parts.push(
+                `${behind} commit${behind === 1 ? '' : 's'} behind origin/${branch}`,
+            );
+        }
+        if (ahead > 0) {
+            parts.push(
+                `${ahead} commit${ahead === 1 ? '' : 's'} ahead of origin/${branch}`,
+            );
+        }
+        this.syncHintEl.dataset.kind = behind > 0 ? 'behind' : '';
+        this.syncHintEl.textContent = this._withLastChecked(
+            parts.join(' · '),
+            status,
+        );
+    }
+
+    _withLastChecked(message, status) {
+        const stamp = this._formatLastChecked(status?.checked_at);
+        if (!stamp) return message;
+        return `${message} Last checked ${stamp}.`;
+    }
+
+    _formatLastChecked(iso) {
+        if (!iso) return '';
+        const ms = Date.parse(iso);
+        if (Number.isNaN(ms)) return '';
+        const sec = Math.max(0, Math.floor((Date.now() - ms) / 1000));
+        if (sec < 45) return 'just now';
+        if (sec < 3600) {
+            const m = Math.floor(sec / 60);
+            return `${m} minute${m === 1 ? '' : 's'} ago`;
+        }
+        if (sec < 86400) {
+            const h = Math.floor(sec / 3600);
+            return `${h} hour${h === 1 ? '' : 's'} ago`;
+        }
+        return new Date(ms).toLocaleString();
     }
 
     _renderChannelOptions() {
@@ -162,7 +295,19 @@ class UpdatePanelController {
         if (this.customRow) {
             this.customRow.style.display = channel.tier === 'custom' ? '' : 'none';
         }
+        if (!this._installStatus?.checked_at
+            || this._installStatus?.compare_branch !== this._compareBranchForChannel(channel)) {
+            this._renderSyncHint(null);
+        }
         this._loadReleaseNotes(channel);
+    }
+
+    _compareBranchForChannel(channel) {
+        if (!channel) return '';
+        if (channel.tier === 'custom') {
+            return (this.customInput?.value || '').trim();
+        }
+        return channel.branch || '';
     }
 
     async _loadReleaseNotes(channel) {

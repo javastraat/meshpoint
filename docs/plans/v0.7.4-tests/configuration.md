@@ -16,7 +16,7 @@ Read/write home for everything that lands in `local.yaml`. Six subsections, each
        - Topbar device name updates within 1s.
        - `local.yaml` `device.name: kmax-test-141`.
 3. [ ] Change latitude to `40.7128`, longitude to `-74.0060`. Save.
-4. [ ] Restart service via Settings > Dangerous > Restart Service. After restart, values persist.
+4. [ ] Restart service via Settings > Meshpoint > Restart service. After restart, values persist.
 5. [ ] Device ID field is read-only with a "Locked" pill or similar visual indicator.
 
 ### Negative paths

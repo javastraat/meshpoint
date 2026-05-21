@@ -425,7 +425,7 @@
                                 <h3 class="terminal-drawer__title">Quick commands</h3>
                                 <button class="terminal-drawer__close" type="button" data-term-close-drawer aria-label="Close commands">&times;</button>
                             </div>
-                            <p class="terminal-drawer__hint">Click to insert at the prompt. Buttons marked dangerous require typed confirmation.</p>
+                            <p class="terminal-drawer__hint">Click to insert at the prompt. High-impact commands ask for confirmation before they run.</p>
                             <div class="terminal-drawer__list" data-term-command-list></div>
                         </aside>
                     </div>
@@ -468,7 +468,11 @@
                             <span class="update-field__label">Custom branch</span>
                             <input class="update-field__input" type="text" placeholder="e.g. feat/v0.7.4" data-update-custom-branch>
                         </label>
+                        <p class="update-sync-status" data-update-sync-hint>
+                            Select a channel, then check how far behind GitHub you are.
+                        </p>
                         <div class="update-card__actions">
+                            <button class="terminal-button terminal-button--ghost" type="button" data-update-check>Check for updates</button>
                             <button class="terminal-button terminal-button--primary" type="button" data-update-apply>Apply update</button>
                             <button class="terminal-button terminal-button--ghost" type="button" data-update-rollback disabled>Roll back last apply</button>
                         </div>

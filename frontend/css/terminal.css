@@ -536,7 +536,7 @@
 }
 
 .terminal-drawer__button--danger .terminal-drawer__button-label::after {
-    content: 'dangerous';
+    content: 'confirm';
     font-size: 9px;
     text-transform: uppercase;
     letter-spacing: 0.6px;
@@ -566,7 +566,7 @@
     font-size: 13px;
 }
 
-/* ── Dangerous typed-confirmation modal (unchanged behaviour, retuned) */
+/* ── Confirm-before-run modal (terminal + Settings > Meshpoint) */
 .danger-modal {
     position: fixed;
     inset: 0;

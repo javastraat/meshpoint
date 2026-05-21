@@ -1,5 +1,5 @@
-/* Settings panel styles -- shared by Settings → Auth (and later
-   Updates / Dangerous). Single responsibility: layout + chrome for
+/* Settings panel styles -- shared by Settings → Auth, Updates, and
+   Meshpoint (service actions). Single responsibility: layout + chrome for
    the section's cards. Card behaviour (forms, validation) lives in
    the matching JS controllers under frontend/js/settings/. */
 
@@ -345,6 +345,25 @@
 }
 
 .update-card__description[data-tier="custom"] {
+    color: #ff6b6b;
+}
+
+.update-sync-status {
+    margin: 0;
+    font-size: 13px;
+    color: rgba(243, 244, 246, 0.75);
+    line-height: 1.45;
+}
+
+.update-sync-status[data-kind="behind"] {
+    color: var(--brand-amber, #ffb84d);
+}
+
+.update-sync-status[data-kind="ok"] {
+    color: var(--accent-green, #22c55e);
+}
+
+.update-sync-status[data-kind="error"] {
     color: #ff6b6b;
 }
 
@@ -836,7 +855,7 @@ select.update-field__input option:checked {
     .update-release-notes { animation: none; }
 }
 
-/* ---------- Dangerous panel ---------- */
+/* ---------- Settings > Meshpoint (service actions) ---------- */
 
 .dangerous-panel {
     color: #f3f4f6;

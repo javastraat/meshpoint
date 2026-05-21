@@ -1,5 +1,5 @@
 /**
- * Settings → Dangerous panel controller.
+ * Settings → Meshpoint panel controller (service actions).
  *
  * Single responsibility: load the action catalog from
  * ``GET /api/dangerous/actions``, render one card per action, and

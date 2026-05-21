@@ -1,8 +1,8 @@
 /**
- * Confirmation modal for dangerous terminal commands.
+ * Confirmation modal for high-impact terminal commands.
  *
- * Single responsibility: when the operator clicks a command flagged
- * ``dangerous``, render a modal showing the command and a description
+ * Single responsibility: when the operator clicks a command that needs
+ * extra confirmation, render a modal showing the command and a description
  * with a Confirm/Cancel pair. Enter confirms, Esc cancels.
  *
  * The class is self-contained: it injects its own DOM on first use,
