@@ -84,6 +84,11 @@
     letter-spacing: 0;
 }
 
+.cfg-field__hint--block {
+    display: block;
+    margin: 0 0 10px;
+}
+
 .cfg-field__hint code {
     font-family: 'JetBrains Mono', Menlo, monospace;
     font-size: 11px;

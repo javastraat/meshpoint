@@ -1,8 +1,8 @@
 /**
- * Configuration → GPS / device placement card.
+ * Configuration → GPS / placement card.
  *
- * Static map coordinates and device metadata for Meshradar and the
- * local dashboard. Live UART GPS uses the on-board module automatically.
+ * Static map coordinates and hardware description for Meshradar and the
+ * local map. Device name lives on Configuration → Identity.
  */
 
 class GpsConfigCard {
@@ -19,16 +19,10 @@ class GpsConfigCard {
                     <h3 class="cfg-card__title">GPS and placement</h3>
                     <p class="cfg-card__hint">
                         Coordinates used on the local map and Meshradar fleet view.
-                        For a fixed install, use static coordinates. The on-board GPS
-                        module is used when you run setup with a live fix.
+                        Edit the device name under Configuration → Identity.
                     </p>
                 </header>
                 <form class="cfg-form" data-gps-form>
-                    <label class="cfg-field">
-                        <span class="cfg-field__label">Device name</span>
-                        <input class="cfg-field__input" type="text" maxlength="64"
-                               data-gps-device-name>
-                    </label>
                     <label class="cfg-field">
                         <span class="cfg-field__label">Hardware description</span>
                         <input class="cfg-field__input" type="text" data-gps-hw-desc
@@ -65,7 +59,6 @@ class GpsConfigCard {
             </article>
         `;
         this._form = this._root.querySelector('[data-gps-form]');
-        this._deviceName = this._root.querySelector('[data-gps-device-name]');
         this._hwDesc = this._root.querySelector('[data-gps-hw-desc]');
         this._lat = this._root.querySelector('[data-gps-lat]');
         this._lng = this._root.querySelector('[data-gps-lng]');
@@ -76,7 +69,6 @@ class GpsConfigCard {
 
     render(config) {
         const device = (config && config.device) || {};
-        if (this._deviceName) this._deviceName.value = device.device_name || '';
         if (this._hwDesc) this._hwDesc.value = device.hardware_description || '';
         if (this._lat && device.latitude != null) this._lat.value = device.latitude;
         if (this._lng && device.longitude != null) this._lng.value = device.longitude;
@@ -91,21 +83,33 @@ class GpsConfigCard {
             this._setStatus('error', 'Latitude and longitude are required.');
             return;
         }
-        const payload = {
-            device_name: this._deviceName.value.trim(),
-            hardware_description: this._hwDesc.value.trim(),
+        const hwDesc = this._hwDesc.value.trim();
+        const altRaw = this._alt.value.trim();
+        const altitude = altRaw === '' ? null : Number(altRaw);
+
+        this._setStatus('pending', 'Saving…');
+
+        const gpsResult = await this._api.put('/api/config/gps', {
+            source: 'static',
             latitude: lat,
             longitude: lng,
-            altitude: Number(this._alt.value),
-        };
-        this._setStatus('pending', 'Saving…');
-        const result = await this._api.put('/api/config/device', payload);
-        if (result) {
-            this._setStatus('success', 'Saved.');
-            this._api.signalRestart('Device placement updated.');
-        } else {
-            this._setStatus('error', 'Save failed.');
+            altitude: Number.isFinite(altitude) ? altitude : null,
+        });
+        if (!gpsResult) {
+            this._setStatus('error', 'Coordinates save failed.');
+            return;
         }
+
+        const devResult = await this._api.put('/api/config/device', {
+            hardware_description: hwDesc,
+        });
+        if (!devResult) {
+            this._setStatus('error', 'Hardware description save failed.');
+            return;
+        }
+
+        this._setStatus('success', 'Saved.');
+        this._api.signalRestart('Placement updated.');
     }
 
     _setStatus(kind, message) {

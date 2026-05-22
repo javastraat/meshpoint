@@ -44,7 +44,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             'dashboard', 'stats', 'messages', 'radio', 'terminal',
             'configuration/identity', 'configuration/radio',
             'configuration/channels', 'configuration/transmit',
-            'configuration/mqtt', 'configuration/gps',
+            'configuration/mqtt', 'configuration/meshradar',
+            'configuration/gps', 'configuration/advanced',
             'configuration/meshcore',
             'settings/updates', 'settings/auth', 'settings/dangerous',
         ],
@@ -481,7 +482,7 @@ function _bootCommandPaletteAndKeymap(router) {
         ['configuration/meshcore', 'Go to Configuration · MeshCore', 'Configuration'],
         ['settings/auth', 'Go to Settings · Auth', 'Settings'],
         ['settings/updates', 'Go to Settings · Updates', 'Settings'],
-        ['settings/dangerous', 'Go to Settings · Meshpoint', 'Settings'],
+        ['settings/dangerous', 'Go to Settings · System', 'Settings'],
     ];
     routeCommands.forEach(([routeId, label, group]) => {
         palette.register({

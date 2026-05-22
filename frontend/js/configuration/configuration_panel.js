@@ -161,7 +161,7 @@ class ConfigurationPanel {
             refresh: () => self._loadConfig().then(() => self._renderAll()),
             toast: (msg) => self._toast(msg),
             signalRestart: (msg) => self._toast(
-                msg + ' Restart the service from Settings → Meshpoint to apply.',
+                msg + ' Restart the service from Settings → System to apply.',
             ),
             escape: (str) => {
                 const el = document.createElement('span');
