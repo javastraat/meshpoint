@@ -1001,15 +1001,7 @@ def _init_dangerous_registry(coord: PipelineCoordinator) -> None:
         return removed
 
     async def _wipe_phantoms_coro() -> int:
-        try:
-            row = await coord.node_repo._db.execute(
-                "DELETE FROM nodes WHERE last_seen IS NULL OR rssi IS NULL"
-            )
-            await coord.node_repo._db.commit()
-            return int(getattr(row, "rowcount", 0) or 0)
-        except Exception:
-            logger.exception("wipe_phantoms: failed")
-            return 0
+        return await coord.node_repo.delete_phantom_rows()
 
     async def _force_nodeinfo_coro() -> bool:
         if nodeinfo_broadcaster is None:

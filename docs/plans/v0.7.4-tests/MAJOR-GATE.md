@@ -4,7 +4,7 @@ Trimmed checklist for **ship decisions**. Polish, axe, design recording, keyboar
 
 **Full matrix:** [README.md](README.md) · **Evidence:** [RESULTS.md](RESULTS.md)
 
-**Pi target:** `feat/v0.7.4` at or after `2a458e5` (Channels PSK column fix).
+**Pi target:** `feat/v0.7.4` at or after **`7a0a863`** (Configuration IA: MeshCore USB card, slim Advanced). Prior baseline `2a458e5` / `7fa894c` is superseded for UI walks.
 
 ```bash
 cd /opt/meshpoint
@@ -33,7 +33,7 @@ $env:MESHPOINT_PASSWORD="<admin>"
 python scripts/smoke_v074_api.py
 ```
 
-Expect: suite green, smoke all OK (GPS PUT skipped by design).
+Expect: suite green, smoke all OK (includes `PUT /api/config/gps` static placement).
 
 ---
 
@@ -45,8 +45,8 @@ Tick boxes here, then copy one RESULTS row per block.
 
 | Step | Pass? |
 |------|-------|
-| Settings → Auth: change password (wrong current → error; good current + new ≥8 → success, kicked to `/login`, re-login works) | [ ] |
-| Two browsers/sessions: **Sign out everywhere** logs both out | [ ] |
+| Settings → Auth: change password (wrong current → error; good current + new ≥8 → success, kicked to `/login`, re-login works) | [x] |
+| Two browsers/sessions: **Sign out everywhere** logs both out | [x] |
 | Optional: create viewer (`setup_viewer` or UI), login viewer, confirm Configuration is read-only and Dangerous/Updates return 403 | [ ] |
 
 API negatives already smoke-passed; this block is **browser trust**.
@@ -55,12 +55,13 @@ API negatives already smoke-passed; this block is **browser trust**.
 
 | Step | Pass? |
 |------|-------|
-| **Identity:** change device name + lat/lon, Save, restart service, values persist | [ ] |
-| **Radio:** change preset (e.g. MediumSlow), Save; NodeInfo interval + **Send Now**; top bar preset label updates | [ ] |
-| **Channels:** table columns align (PSK under PSK); add or edit one channel, Save, refresh page, row persists | [ ] |
-| **MQTT:** enable, broker `mqtt.meshtastic.org`, topic preview `msh/US/...`, Save; journal shows MQTT connect + topic prefix (optional: confirm publish on LongFast) | [ ] |
-| **Transmit:** toggle relay or duty-related field you care about, Save, survives restart (already partial in RESULTS) | [ ] |
-| **GPS:** skip — mark `n/a` for v0.7.4 (no PUT route) | n/a |
+| **Identity:** change device name + lat/lon, Save, restart service, values persist | [x] |
+| **Radio:** change preset (e.g. MediumSlow), Save; NodeInfo interval + **Send Now**; top bar preset label updates | [x] |
+| **Channels:** table columns align (PSK under PSK); add or edit one channel, Save, refresh page, row persists | [x] |
+| **MQTT:** enable, broker `mqtt.meshtastic.org`, topic preview `msh/US/...`, Save; journal shows MQTT connect + topic prefix (optional: confirm publish on LongFast) | [x] |
+| **Transmit:** toggle relay or duty-related field you care about, Save, survives restart (already partial in RESULTS) | [x] |
+| **GPS:** static lat/lon save (UART toggle + baud fields); gpsd card still placeholder only | [x] |
+| **MeshCore:** USB source save (if companion attached); channel keys; **Send Advert**; **Refresh**; top bar MeshCore chip | [x] |
 
 ### C. In-dashboard updates (~20 min, destructive once)
 

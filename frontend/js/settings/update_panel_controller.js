@@ -426,7 +426,7 @@ class UpdatePanelController {
             await this._handleUpdateStreamError(err);
         } finally {
             this.applyBtn.disabled = false;
-            this.rollbackBtn.disabled = !(this._lastResult && this._lastResult.pre_update_sha);
+            this._syncRollbackButton();
         }
     }
 
@@ -485,6 +485,27 @@ class UpdatePanelController {
     _currentChannel() {
         const id = this.channelSelect?.value;
         return this._channels.find((c) => c.id === id) || null;
+    }
+
+    /** SHA captured before the last successful dashboard apply (in-memory or persisted). */
+    _rollbackSha() {
+        const fromResult = this._lastResult?.pre_update_sha;
+        if (fromResult) return fromResult;
+        const fromInstall = this._installStatus?.rollback_pre_sha;
+        if (fromInstall) return fromInstall;
+        return null;
+    }
+
+    _syncRollbackButton() {
+        if (!this.rollbackBtn) return;
+        const sha = this._rollbackSha();
+        this.rollbackBtn.disabled = !sha;
+        if (sha) {
+            this.rollbackBtn.title = `Restore commit ${sha.slice(0, 8)} from before the last apply`;
+        } else {
+            this.rollbackBtn.title =
+                'Available after a successful Apply (captures the current commit first)';
+        }
     }
 
     _setStatus(kind, message) {

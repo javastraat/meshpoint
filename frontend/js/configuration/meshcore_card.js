@@ -181,7 +181,7 @@ class MeshcoreConfigCard {
                     </tbody>
                 </table>
             </div>
-            <div class="cfg-card__actions">
+            <div class="cfg-card__actions cfg-mc-toolbar">
                 <button class="terminal-button terminal-button--danger"
                         type="button" data-mc-delete style="display:none">
                     Delete Channel
@@ -193,8 +193,6 @@ class MeshcoreConfigCard {
                         type="button" data-mc-save>
                     Save Channels
                 </button>
-            </div>
-            <div class="cfg-card__actions">
                 <button class="terminal-button" type="button" data-mc-advert>
                     Send Advert
                 </button>

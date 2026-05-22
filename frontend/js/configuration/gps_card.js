@@ -48,7 +48,7 @@ class GpsConfigCard {
                             </label>
                         </div>
                     </fieldset>
-                    <p class="cfg-note">Native gpsd integration is planned for a future release.</p>
+                    <p class="cfg-note">Native gpsd integration is planned for v0.7.5.</p>
                     <div class="cfg-card__actions">
                         <button class="terminal-button terminal-button--primary" type="submit">
                             Save placement

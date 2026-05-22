@@ -4,7 +4,7 @@ Auth completeness work. Builds on v0.7.3 auth foundation.
 
 ## 1. Password change UI
 
-**Status:** [ ] Not started  [x] In progress  [ ] Pass  [ ] Blocked
+**Status:** [ ] Not started  [ ] In progress  [x] Pass  [ ] Blocked
 **Hardware:** `.141` and `.15`, plus browser-only role gate verification
 **Pre-conditions:**
 - Logged in as admin
@@ -40,7 +40,7 @@ Auth completeness work. Builds on v0.7.3 auth foundation.
 
 ## 2. Sign out everywhere
 
-**Status:** [ ] Not started  [x] In progress  [ ] Pass  [ ] Blocked
+**Status:** [ ] Not started  [ ] In progress  [x] Pass  [ ] Blocked
 **Hardware:** `.141`, plus a second browser session for verification
 **Pre-conditions:**
 - Logged in as admin in two browsers (or two devices)

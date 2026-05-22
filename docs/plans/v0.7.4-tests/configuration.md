@@ -139,7 +139,7 @@ Read/write home for everything that lands in `local.yaml`. Six subsections, each
 
 ### Functional walkthrough
 
-1. [ ] Configuration > GPS. Expected: source toggle (UART vs Static), baud rate input, timeout input, gpsd integration card with "Coming in v0.7.5" placeholder.
+1. [ ] Configuration > GPS. Expected: source toggle (UART vs Static), baud rate input, timeout input, gpsd integration card with "Coming in v0.7.5" placeholder. See `docs/plans/v0.7.5-release.md`.
 2. [ ] Toggle source to Static. Latitude and Longitude fields surface (linked to Identity).
 3. [ ] Toggle source to UART. Baud rate and timeout fields surface, defaults preserved.
 4. [ ] Save. Expected: `gps.source` written to `local.yaml`, audit log entry.
@@ -150,7 +150,27 @@ Read/write home for everything that lands in `local.yaml`. Six subsections, each
 - [ ] GPS source toggle works.
 - [ ] gpsd placeholder is honest (does not claim functionality).
 
-## 7. Configuration role gate (cross-section)
+## 7. Configuration > MeshCore
+
+**Status:** [ ] Not started  [ ] In progress  [ ] Pass  [ ] Blocked
+**Hardware:** `.141` (USB companion required for online steps)
+
+### Functional walkthrough
+
+1. [ ] Configuration > MeshCore. Expected: **USB capture source** card (enable, auto-detect, pinned port, baud) and **MeshCore Companion** card when companion connected.
+2. [ ] With companion connected: readouts show name, frequency, SF, TX power (not all `?`).
+3. [ ] Edit or add one MeshCore channel key (hex), Save Channels. Refresh page; row persists.
+4. [ ] **Send Advert** → toast success; journal shows advert sent.
+5. [ ] **Refresh** → `GET /api/config` updates; contact roster enrichment within ~30s after boot (see RESULTS `0fb4f4f`).
+6. [ ] Save USB source toggle (e.g. auto-detect on). Expected: restart required toast if `restart_required`; service comes back with companion reattached.
+7. [ ] Top bar **MeshCore chip** matches companion name + channel after save.
+
+### Acceptance
+
+- [ ] Companion path works end-to-end on `.141`.
+- [ ] No Meshradar nav item in sidebar (upstream remains yaml/wizard only).
+
+## 8. Configuration role gate (cross-section)
 
 **Status:** [ ] Not started  [ ] In progress  [ ] Pass  [ ] Blocked
 **Hardware:** browser-only via `.15` (viewer)
@@ -197,7 +217,7 @@ Read/write home for everything that lands in `local.yaml`. Six subsections, each
 
 ## Acceptance summary
 
-- [ ] All six subsections pass on `.141`.
+- [ ] Identity, Radio, Channels, Transmit, MQTT, GPS, and MeshCore pass on `.141`.
 - [ ] Identity, Radio, MQTT, role gate verified on `.15`.
 - [ ] Audit log entries verified for every mutation; never contain secrets.
 - [ ] Sign-off matrix updated in README.md.

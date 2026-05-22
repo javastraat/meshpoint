@@ -93,6 +93,8 @@ After a **pass** for an entire feature on a unit, tick the matching README matri
 | 2026-05-20 | .141 | `7fa894c` | MeshCore contact startup sync | pass | human | After RC apply + restart: `0 peers` at boot, ~20s later 15 peers logged + 11 node rows enriched (`0fb4f4f`). |
 | 2026-05-20 | .141 | `7fa894c` | Settings > Updates Apply | partial | human | `git fetch/checkout/reset/install` OK; SEGV during `install.sh` then systemd restart recovered (pre-`7fa894c` behavior). Dashboard back; lifespan crash from `8a9b01d` fixed by `7fa894c`. |
 | 2026-05-20 | .141 | `7fa894c` | Service startup | pass | human | Post-`7fa894c` pull: no lifespan traceback; concentrator + MeshCore USB up. |
+| 2026-05-18 | .141 | `feat/v0.7.4` | Auth Tier 1 A (browser) | pass | human | Settings → Auth: set new password (re-login works). Sign out everywhere clears all sessions. |
+| 2026-05-18 | .141 | `feat/v0.7.4` | Configuration Tier 1 B (browser) | pass | human | Identity, Radio, Channels, MQTT, Transmit, GPS, MeshCore all exercised on `.141`. MeshCore action buttons misaligned (two separate `cfg-card__actions` rows); fix in `meshcore_card.js` + `.cfg-mc-toolbar` grid pending deploy. |
 
 ---
 
@@ -100,11 +102,10 @@ After a **pass** for an entire feature on a unit, tick the matching README matri
 
 | Feature | Unit | Blocker |
 |---------|------|---------|
-| Configuration > GPS | all | No `PUT /api/config/gps`; UI stub only. Mark `n/a` or accept stub for v0.7.4. |
+| Configuration > GPS | all | **Stale:** `PUT /api/config/gps` exists (`device_config_routes.py`); gpsd runtime still v0.7.5. Test static placement save in Tier 1 B. |
 | Foundation §4 keyboard | all | Arrow-key roving focus not implemented; `g` chords only. Pass requires implement or trim checklist. |
 | Foundation §1 badges | .141 | Steps 12–14 need live mesh / update-available state. |
 | Foundation §3 | .141 | Real iOS/Android device + landscape not exercised. |
-| Auth §1 UI | .141 | Password change happy-path in browser not run (API negatives OK). |
 | Terminal §1 | .141 | CONNECTED; `pwd`/`whoami` in xterm + per-command audit not run. |
 | Hardware parity | .15 / .49 | No full matrix rows this cycle. |
 | Watchdog rollback | .141 | `updates.md` §4+ not exercised (feature deferred). |
@@ -153,7 +154,7 @@ Scripts: `scripts/_session_v074_runner.py`, `_session_v074_playwright.py`, `_ses
 
 **Major gate first:** [MAJOR-GATE.md](MAJOR-GATE.md) — Tier 1 on `.141` only (~90–120 min). Defer polish/axe/GPS/keyboard roving to fleet feedback unless something fails Tier 1.
 
-Work full matrix from [README.md](README.md) when you need formal `[x]` cells. Current Pi target: **`feat/v0.7.4`** — pull latest after the **Configuration kitchen sink** push (full MQTT/Meshradar/Advanced/GPS APIs + UI). Prior baseline was **`2a458e5`** on `.141`.
+Work full matrix from [README.md](README.md) when you need formal `[x]` cells. Current Pi target: **`feat/v0.7.4` @ `7a0a863+`** (kitchen-sink MQTT/upstream/device/GPS APIs + IA cleanup `7a0a863`). Pull on `.141` before Tier 1; hard-refresh browser. Prior automated pass was **`2a458e5`** / **`7fa894c`** — re-run Configuration + MeshCore UI after pull.
 
 ### Priority A — finish `.141` matrix rows still `[ ]` or `partial`
 
@@ -161,7 +162,7 @@ Work full matrix from [README.md](README.md) when you need formal `[x]` cells. C
 |-------|----------|------------|---------|
 | 1 | [configuration.md](configuration.md) | Identity, Radio, Channels, MQTT | Largest `[ ]` block; MQTT API already smoke-pass at `511e841` |
 | 2 | [configuration.md](configuration.md) | MeshCore card (Send Advert, Refresh, channel sync) | PR #53 + #54/#55 territory |
-| 3 | [auth.md](auth.md) | Password change, sign-out-everywhere, lockout, viewer | API partial done; finish **browser** §1 |
+| 3 | [auth.md](auth.md) | Password change, sign-out-everywhere, lockout, viewer | Tier 1 A **pass** (human): change password + logout everywhere; optional viewer + lockout UI still `[ ]` |
 | 4 | [terminal.md](terminal.md) | Web terminal | CONNECTED; need xterm commands + audit tail |
 | 5 | [updates.md](updates.md) | Update apply + branch picker | Re-run Apply on `7fa894c`; confirm stream/recovery; log `install.sh` SEGV as known flake if repeats |
 | 6 | [cherry-picks.md](cherry-picks.md) | MQTT paths, MeshCore map (#51), channel config (#53) | All `[ ]` on matrix |

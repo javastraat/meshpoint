@@ -5,6 +5,12 @@ allows the operator to pin to. The catalog is intentionally tiny:
 ``main`` (stable), the active feature branch (RC), and a fallback
 ``custom`` slot the user fills in by typing a branch name.
 
+**Release housekeeping:** when bumping ``__version__`` on ``main``, replace
+the RC row here for the *next* sprint (``rc-075`` / ``feat/v0.7.5``, etc.)
+and branch ``feat/v0.7.N`` from updated ``main``. Full checklist:
+``Meshradar.io/.cursor/rules/operations-runbook.mdc`` (Dashboard release
+channel picker).
+
 The registry lives behind a class so future versions can hot-load
 extra tracks (``preview``, ``rake-back``, etc.) without touching the
 route signature or the frontend payload.

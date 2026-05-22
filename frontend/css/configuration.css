@@ -423,6 +423,19 @@ select.cfg-field__input option:checked {
     color: var(--brand-amber, #ffb84d);
 }
 
+/* MeshCore: channel save row + companion actions in a stable 2-column grid */
+.cfg-mc-toolbar {
+    display: grid;
+    grid-template-columns: repeat(2, max-content);
+    gap: 10px;
+    justify-content: start;
+    align-items: center;
+}
+
+.cfg-mc-toolbar [data-mc-delete] {
+    grid-column: 1 / -1;
+}
+
 .cfg-mc-channels {
     margin-bottom: 14px;
 }
