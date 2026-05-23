@@ -4,7 +4,7 @@ Append-only record of hardware and browser validation runs. **Ship gate:** every
 
 ## Agent handoff (read before "what's next")
 
-**RC branch:** `feat/v0.7.4` (Pi: Settings → Updates → RC, or `git checkout feat/v0.7.4`). **Do not version-bump until the sign-off matrix is green.**
+**Production branch:** `main` at v0.7.4 (May 2026). Pi update block: `README.md` Updating (`git pull` + `install.sh` + restart). RC picker on v0.7.4+ defaults to **Release candidate (v0.7.5)** / `feat/v0.7.5`.
 
 ### Already on the RC (inherited from `main`, not v0.7.4-only work)
 

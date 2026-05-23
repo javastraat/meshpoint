@@ -26,6 +26,18 @@ TIER_STABLE = "stable"
 TIER_RC = "rc"
 TIER_CUSTOM = "custom"
 
+# Remap retired picker ids (sessionStorage, docs, old bookmarks).
+CHANNEL_ID_ALIASES: dict[str, str] = {
+    "rc-074": "rc-075",
+}
+
+
+def normalize_channel_id(channel_id: str | None) -> str | None:
+    """Return the current catalog id for a stored or requested channel id."""
+    if not channel_id:
+        return channel_id
+    return CHANNEL_ID_ALIASES.get(channel_id, channel_id)
+
 
 @dataclass(frozen=True)
 class ReleaseChannel:
@@ -50,11 +62,11 @@ DEFAULT_CHANNELS: tuple[ReleaseChannel, ...] = (
         description="Latest tagged release. Recommended for production gateways.",
     ),
     ReleaseChannel(
-        id="rc-074",
-        label="Release candidate (v0.7.4)",
-        branch="feat/v0.7.4",
+        id="rc-075",
+        label="Release candidate (v0.7.5)",
+        branch="feat/v0.7.5",
         tier=TIER_RC,
-        description="Sprint branch for v0.7.4. Expect rough edges.",
+        description="Next sprint branch. Expect rough edges until the branch exists on GitHub.",
     ),
     ReleaseChannel(
         id="custom",
@@ -79,6 +91,7 @@ class ReleaseChannelRegistry:
         return [c.to_dict() for c in self._channels]
 
     def find(self, channel_id: str) -> ReleaseChannel | None:
+        channel_id = normalize_channel_id(channel_id) or ""
         for channel in self._channels:
             if channel.id == channel_id:
                 return channel
@@ -94,7 +107,7 @@ class ReleaseChannelRegistry:
         plausible branch name (no whitespace, no shell metachars) so
         the call site can simply trust the return value.
         """
-        channel = self.find(channel_id)
+        channel = self.find(normalize_channel_id(channel_id) or channel_id)
         if channel is None:
             return None
         if channel.tier == TIER_CUSTOM:

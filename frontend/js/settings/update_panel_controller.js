@@ -15,6 +15,8 @@
 
 const UPDATE_CHANNEL_STORAGE_KEY = 'meshpoint_update_channel_id';
 const UPDATE_CUSTOM_BRANCH_STORAGE_KEY = 'meshpoint_update_custom_branch';
+/** Retired picker ids remapped when the dashboard reloads after a release. */
+const UPDATE_CHANNEL_ALIASES = { 'rc-074': 'rc-075' };
 
 class UpdatePanelController {
     constructor(rootEl) {
@@ -255,11 +257,20 @@ class UpdatePanelController {
         const status = this._installStatus || {};
         let channelId = status.active_channel_id
             || sessionStorage.getItem(UPDATE_CHANNEL_STORAGE_KEY);
+        channelId = this._normalizeChannelId(channelId);
         if (!channelId && status.install_branch) {
             const byBranch = this._channels.find(
                 (c) => c.branch === status.install_branch,
             );
             if (byBranch) channelId = byBranch.id;
+        }
+        if (
+            !channelId
+            && status.install_branch === 'main'
+            && this._versionAtLeast(status.local_version, [0, 7, 4])
+        ) {
+            const rc = this._channels.find((c) => c.id === 'rc-075');
+            if (rc) channelId = rc.id;
         }
         if (channelId && !this._channels.some((c) => c.id === channelId)) {
             channelId = null;
@@ -487,8 +498,25 @@ class UpdatePanelController {
         this._setStatus('error', 'Connection lost during update. Check SSH or try again.');
     }
 
+    _normalizeChannelId(channelId) {
+        if (!channelId) return channelId;
+        return UPDATE_CHANNEL_ALIASES[channelId] || channelId;
+    }
+
+    _versionAtLeast(localVersion, parts) {
+        if (!localVersion) return false;
+        const nums = String(localVersion).split('.').map((n) => parseInt(n, 10));
+        for (let i = 0; i < parts.length; i += 1) {
+            const have = nums[i] || 0;
+            const need = parts[i] || 0;
+            if (have > need) return true;
+            if (have < need) return false;
+        }
+        return true;
+    }
+
     _currentChannel() {
-        const id = this.channelSelect?.value;
+        const id = this._normalizeChannelId(this.channelSelect?.value);
         return this._channels.find((c) => c.id === id) || null;
     }
 

@@ -10,7 +10,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Optional
 
-from src.api.update.channels import ReleaseChannelRegistry, TIER_CUSTOM
+from src.api.update.channels import (
+    ReleaseChannelRegistry,
+    TIER_CUSTOM,
+    normalize_channel_id,
+)
 from src.api.update.rollback_state import (
     DEFAULT_ROLLBACK_STATE_PATH,
     read_rollback_state,
@@ -137,6 +141,39 @@ def match_channel_for_branch(
     }
 
 
+def suggest_active_channel_for_install(
+    registry: ReleaseChannelRegistry,
+    branch: str | None,
+    *,
+    local_version: str,
+) -> dict[str, str]:
+    """Map install branch to picker channel, then apply release housekeeping.
+
+    Gateways on ``main`` at v0.7.4+ default to the next RC track so the
+    picker advances after a stable release without manual re-selection.
+    """
+    channel_info = match_channel_for_branch(registry, branch or "")
+    if branch != "main":
+        return channel_info
+    try:
+        on_074_or_newer = _parse_version(local_version) >= _parse_version("0.7.4")
+    except ValueError:
+        on_074_or_newer = False
+    if not on_074_or_newer:
+        return channel_info
+    rc = registry.find("rc-075")
+    if rc is None:
+        return channel_info
+    prior = normalize_channel_id(channel_info.get("active_channel_id"))
+    if prior in (None, "stable", "rc-074"):
+        return {
+            "active_channel_id": rc.id,
+            "active_channel_label": rc.label,
+            "channel_tier": rc.tier,
+        }
+    return channel_info
+
+
 def fetch_remote_version_sync(branch: str) -> Optional[str]:
     url = (
         "https://raw.githubusercontent.com/KMX415/meshpoint/"
@@ -168,7 +205,7 @@ def resolve_compare_branch(
 ) -> Optional[str]:
     """Branch used for ``origin/<branch>`` comparison (picker or install)."""
     if channel_id:
-        channel = registry.find(channel_id)
+        channel = registry.find(normalize_channel_id(channel_id) or channel_id)
         if channel is None:
             return None
         if channel.tier == TIER_CUSTOM:
@@ -286,7 +323,9 @@ def build_install_status_payload(
         repo_path, runner=runner, use_sudo=use_sudo,
     )
     if branch:
-        channel_info = match_channel_for_branch(registry, branch)
+        channel_info = suggest_active_channel_for_install(
+            registry, branch, local_version=__version__,
+        )
     else:
         channel_info = {
             "active_channel_id": None,

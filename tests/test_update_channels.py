@@ -6,9 +6,8 @@ import unittest
 
 from src.api.update.channels import (
     DEFAULT_CHANNELS,
-    ReleaseChannel,
     ReleaseChannelRegistry,
-    TIER_CUSTOM,
+    normalize_channel_id,
 )
 
 
@@ -49,10 +48,15 @@ class TestReleaseChannelRegistry(unittest.TestCase):
     def test_custom_channel_without_branch_returns_none(self) -> None:
         self.assertIsNone(ReleaseChannelRegistry().resolve_branch("custom"))
 
-    def test_find_returns_channel(self) -> None:
-        match = ReleaseChannelRegistry().find("rc-074")
+    def test_find_returns_rc_channel(self) -> None:
+        match = ReleaseChannelRegistry().find("rc-075")
         self.assertIsNotNone(match)
         self.assertEqual(match.tier, "rc")
+        self.assertEqual(match.branch, "feat/v0.7.5")
+
+    def test_normalize_channel_id_remaps_retired_rc(self) -> None:
+        self.assertEqual(normalize_channel_id("rc-074"), "rc-075")
+        self.assertEqual(normalize_channel_id("stable"), "stable")
 
 
 if __name__ == "__main__":

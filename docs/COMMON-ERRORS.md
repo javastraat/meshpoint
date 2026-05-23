@@ -58,6 +58,23 @@ will include an automatic first-boot re-provision step to prevent this.
 
 ## Upgrades
 
+### Recommended upgrade command (any version)
+
+Use this on Discord, in release notes, and on the Pi when you are not sure which version is installed. It is safe for v0.6.x through current: `install.sh` refreshes the venv, strips stale pre-v0.7.0 `.so` files if present, and updates sudoers/systemd without requiring a reboot on upgrade.
+
+```bash
+cd /opt/meshpoint
+sudo git fetch origin
+sudo git checkout main
+sudo git pull origin main
+sudo bash scripts/install.sh
+sudo systemctl restart meshpoint
+```
+
+Hard-refresh the dashboard (Ctrl+Shift+R). First time on v0.7.3+, complete `/setup` for the admin password.
+
+**Faster path (v0.7.3+ only, when release notes say no new deps):** `sudo git pull origin main` and `sudo systemctl restart meshpoint`. If the service fails to start, use the full block above.
+
 ### Startup WARN: "Stale compiled core modules detected"
 
 **Cause:** Releases before v0.7.0 shipped eleven
@@ -135,9 +152,10 @@ ModuleNotFoundError: No module named 'bcrypt'
 ModuleNotFoundError: No module named 'jwt'
 ```
 
-Future updates inside the v0.7.3+ series go back to plain `git pull +
-systemctl restart` unless a release explicitly notes new dependencies
-in its CHANGELOG entry.
+For routine updates when you are already on v0.7.3+, plain `git pull +
+systemctl restart` is often enough. If you are unsure of the installed
+version, or the service fails after a pull-only upgrade, use the
+**Recommended upgrade command** block at the top of this section.
 
 ### `install.sh` told me to reboot after an upgrade. Do I have to?
 
@@ -169,12 +187,14 @@ OS Python.
 sudo /opt/meshpoint/venv/bin/pip install -r /opt/meshpoint/requirements.txt
 ```
 
-The full update one-liner is:
+The full update path (recommended for mixed-version fleets) is:
 
 ```bash
 cd /opt/meshpoint
+sudo git fetch origin
+sudo git checkout main
 sudo git pull origin main
-sudo /opt/meshpoint/venv/bin/pip install -r requirements.txt
+sudo bash scripts/install.sh
 sudo systemctl restart meshpoint
 ```
 

@@ -15,7 +15,6 @@ from __future__ import annotations
 import os
 import time
 import unittest
-from typing import Optional
 from unittest import mock
 
 from src.api.terminal.pty_session import PtySession, PtyUnavailable

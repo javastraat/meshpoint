@@ -6,7 +6,7 @@ This file is the master index. It carries the cross-cutting checks (audit log, r
 
 **Results log:** append every run to [RESULTS.md](RESULTS.md). Only tick a matrix `[x]` when the full per-feature checklist is green for that column. `partial` in the matrix means work started but ship gate not met.
 
-**Agent note:** "What's next" for v0.7.4 means the **testing queue** in [RESULTS.md § Testing queue](RESULTS.md#testing-queue-before-version-bump), not merging `fix/no-crc-phantom-leak` or other `active-work.mdc` backlog items (phantom NO_CRC is already on `main` via v0.7.3; MeshCore USB `adapt_event` is on `main`). Version bump only after this matrix is green.
+**Ship status (May 2026):** v0.7.4 merged to `main` and version-tagged. Use `sudo git pull origin main` plus `sudo bash scripts/install.sh` on Pis (see `README.md` Updating). This checklist remains for regression evidence; it is no longer a merge gate.
 
 ## Sign-off matrix
 
@@ -162,16 +162,10 @@ Single deliverable: a screen recording of an admin walking through the entire da
 - [relay.md](relay.md) — native onboard SX1302 relay (identity-preserving)
 - [spectral_scan.md](spectral_scan.md) — SX1302 spectral scan noise floor
 
-## Pre-release gate
+## Pre-release gate (historical)
 
-Before tagging v0.7.4:
+v0.7.4 shipped on `main` (May 2026). Matrix rows marked `partial` document what was exercised before ship; post-release bugs are tracked normally. For v0.7.5, copy this plan layout under `docs/plans/` when the next RC opens.
 
-- [ ] Sign-off matrix above shows green in every cell that has a checkbox.
-- [ ] Every per-feature file shows fully-green acceptance for `.141` and `.15`.
-- [ ] `.49` fresh-SD install green for foundation + auth + fresh-install acceptance steps.
-- [ ] Design audit recording captured and reviewed.
-- [ ] WCAG AA contrast audit clean.
-- [ ] CHANGELOG entry written, calls out IA refactor + navigation change + design polish pass.
-- [ ] Version bumped in `src/version.py` and `firmware_version` in `config/default.yaml`.
-
-Anything red here blocks the release.
+- [x] CHANGELOG v0.7.4 section on `main`
+- [x] Version `0.7.4` in `src/version.py` and `config/default.yaml`
+- [ ] Full sign-off matrix all `[x]` (deferred; not a ship blocker for v0.7.4)

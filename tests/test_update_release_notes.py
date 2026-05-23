@@ -102,14 +102,17 @@ class TestSelectPreviewSection(unittest.TestCase):
     def setUp(self) -> None:
         self.sections = ChangelogParser.parse_text(_FIXTURE)
 
-    def test_rc_tier_returns_target_version_block(self) -> None:
+    def test_rc_tier_does_not_surface_older_release_when_075_missing(self) -> None:
+        section = select_preview_section(
+            self.sections, tier="rc", channel_id="rc-075",
+        )
+        self.assertIsNone(section)
+
+    def test_rc_tier_accepts_retired_channel_id(self) -> None:
         section = select_preview_section(
             self.sections, tier="rc", channel_id="rc-074",
         )
-        self.assertIsNotNone(section)
-        assert section is not None
-        self.assertEqual(section.version, "0.7.4")
-        self.assertFalse(section.is_unreleased)
+        self.assertIsNone(section)
 
     def test_rc_tier_prefers_unreleased_over_older_shipped_release(self) -> None:
         """Pi-shaped CHANGELOG: Unreleased holds RC bullets, no v0.7.4 header yet."""

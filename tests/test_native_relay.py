@@ -11,7 +11,7 @@ the Meshpoint.
 from __future__ import annotations
 
 import unittest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 from src.config import RadioConfig, TransmitConfig
 from src.models.packet import Packet, PacketType, Protocol

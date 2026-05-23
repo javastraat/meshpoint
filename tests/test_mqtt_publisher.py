@@ -5,7 +5,7 @@ from __future__ import annotations
 import unittest
 
 from src.config import MqttConfig
-from src.relay.mqtt_publisher import MqttPublisher, _generate_gateway_id, _resolve_gateway_id
+from src.relay.mqtt_publisher import MqttPublisher, _generate_gateway_id
 
 
 class TestGatewayId(unittest.TestCase):

@@ -13,7 +13,7 @@
 [![GitHub stars](https://img.shields.io/github/stars/KMX415/meshpoint?style=flat&color=yellow)](https://github.com/KMX415/meshpoint/stargazers)
 [![GitHub issues](https://img.shields.io/github/issues/KMX415/meshpoint)](https://github.com/KMX415/meshpoint/issues)
 [![Last commit](https://img.shields.io/github/last-commit/KMX415/meshpoint)](https://github.com/KMX415/meshpoint/commits/main)
-[![Version](https://img.shields.io/badge/version-0.7.3.1-orange.svg)](docs/CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.7.4-orange.svg)](docs/CHANGELOG.md)
 
 ### Meshradar Cloud Dashboard
 ![Meshradar Cloud Dashboard](Meshradar414.png)
@@ -206,39 +206,26 @@ FastAPI server on port 8080:
 
 ## Updating
 
-```bash
-cd /opt/meshpoint
-sudo git pull origin main
-sudo systemctl restart meshpoint
-```
-
-The local dashboard shows an orange update indicator when a new version is available. After every update, hard-refresh the dashboard tab (Ctrl+Shift+R / Cmd+Shift+R) so the browser pulls the new frontend JS instead of a cached copy.
-
-### Upgrading from v0.7.2 or earlier to v0.7.3 (one-time)
-
-v0.7.3 adds local dashboard authentication and pulls in two new Python dependencies (`bcrypt`, `PyJWT`). `git pull` alone is not sufficient: the service will fail to start with `ModuleNotFoundError: No module named 'bcrypt'` (or `'jwt'`) until the venv is refreshed. Re-run `install.sh`:
+Use this block whether you are on v0.6.x, v0.7.3, or already current. `install.sh` is idempotent on existing installs: it refreshes the venv (`pip install -r requirements.txt`), removes stale pre-v0.7.0 `.so` binaries if any remain, updates sudoers and the systemd unit, and does **not** require a reboot on upgrade.
 
 ```bash
 cd /opt/meshpoint
+sudo git fetch origin
+sudo git checkout main
 sudo git pull origin main
 sudo bash scripts/install.sh
 sudo systemctl restart meshpoint
 ```
 
-After restart, open `http://<pi-ip>:8080` and you'll be redirected to `/setup` to set an admin password (8-character minimum). All subsequent dashboard access requires sign-in. Forgot the password? `sudo meshpoint reset-password` from SSH.
+The local dashboard shows an orange update indicator when a new version is available on GitHub. After every update, hard-refresh each open dashboard tab (Ctrl+Shift+R / Cmd+Shift+R) so the browser loads the new frontend.
 
-### Upgrading from v0.6.x or earlier (one-time)
+**First time crossing v0.7.3:** after restart, open `http://<pi-ip>:8080` and complete `/setup` to set an admin password (8 characters minimum). Forgot it later? `sudo meshpoint reset-password` from SSH.
 
-v0.7.0 ships the core modules as Python source instead of pre-compiled `.so` binaries. If your install predates v0.7.0, `git pull` alone is not sufficient: Python's import machinery would prefer the stale `.cpython-*.so` files over the new source and you'd silently keep running v0.6.x code. Re-run `install.sh` after pulling to clean them up:
+**Already on v0.7.3+ and update often?** `sudo git pull origin main` plus `sudo systemctl restart meshpoint` is usually enough unless the release notes call out new dependencies. When in doubt, run the full block above.
 
-```bash
-cd /opt/meshpoint
-sudo git pull origin main
-sudo bash scripts/install.sh
-sudo systemctl restart meshpoint
-```
+**From the dashboard (v0.7.4+):** sign in as admin, open Settings → Updates, pick **Stable (main)**, then **Check for updates** and **Apply** (same end state as the SSH block).
 
-`install.sh` is idempotent and also subsumes the older v0.6.0-era one-time steps (HAL TX sync word patch, sudoers rule, systemd service install) in the same pass, so this single command covers any path from v0.5.x or v0.6.x up to current. Future updates from v0.7.0 onward go back to plain `git pull` + `restart`.
+See [docs/COMMON-ERRORS.md](docs/COMMON-ERRORS.md#upgrades) if the service fails to start after pulling (missing `bcrypt`, stale `.so` files, spurious reboot prompt).
 
 ---
 

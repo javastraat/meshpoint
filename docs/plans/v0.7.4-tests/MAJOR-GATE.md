@@ -4,12 +4,15 @@ Trimmed checklist for **ship decisions**. Polish, axe, design recording, keyboar
 
 **Full matrix:** [README.md](README.md) · **Evidence:** [RESULTS.md](RESULTS.md)
 
-**Pi target:** `feat/v0.7.4` at or after **`7a0a863`** (Configuration IA: MeshCore USB card, slim Advanced). Prior baseline `2a458e5` / `7fa894c` is superseded for UI walks.
+**Pi target:** `main` at v0.7.4 or later.
 
 ```bash
 cd /opt/meshpoint
 sudo git fetch origin
-sudo git pull origin feat/v0.7.4
+sudo git checkout main
+sudo git pull origin main
+sudo bash scripts/install.sh
+sudo systemctl restart meshpoint
 git log -1 --oneline
 ```
 

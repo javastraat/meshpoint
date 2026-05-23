@@ -5,7 +5,7 @@ keep the existing sidebar badge ticking. v0.7.4 adds a more powerful
 flow:
 
 * ``Channels`` enumerate the release tracks an operator can pin to
-  (``main``, ``feat/v0.7.4``, custom branch). Each carries a label,
+  (``main``, ``feat/v0.7.5``, custom branch). Each carries a label,
   description, and stability tier so the UI can warn when the user
   picks something risky.
 * ``UpdateApplier`` performs ``git fetch`` + ``git checkout -f`` +

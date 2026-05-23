@@ -12,7 +12,7 @@ from __future__ import annotations
 import base64
 import binascii
 import unittest
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient

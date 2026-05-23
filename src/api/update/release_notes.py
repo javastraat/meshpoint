@@ -22,6 +22,8 @@ import re
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
+from src.api.update.channels import normalize_channel_id
+
 _HEADER_RE = re.compile(r"^###\s+(?P<body>.+?)\s*$")
 _VERSION_RE = re.compile(
     r"^v(?P<version>\d+(?:\.\d+){1,3})(?:\s+\((?P<date>[^)]+)\))?$"
@@ -34,7 +36,7 @@ _LINK_RE = re.compile(r"\[([^\]]+)\]\([^)]+\)")
 # Dashboard preview: full CHANGELOG detail is for maintainers, not operators.
 _PREVIEW_DETAIL_MAX = 140
 _RC_CHANNEL_VERSION: dict[str, str] = {
-    "rc-074": "0.7.4",
+    "rc-075": "0.7.5",
 }
 
 
@@ -176,7 +178,7 @@ def select_preview_section(
     """Pick the right section for the ``release_notes`` endpoint.
 
     * ``rc``     -> the version block for this RC channel (e.g.
-                    ``rc-074`` -> ``v0.7.4``), else the first
+                    ``rc-075`` -> ``v0.7.5``), else the first
                     versioned section that still has bullets.
                     Skips an empty ``Unreleased`` header.
     * ``stable`` -> the changelog section for ``installed_version``
@@ -188,13 +190,18 @@ def select_preview_section(
                     renders a generic "no preview available" notice.
     """
     if tier == "rc":
-        target = _RC_CHANNEL_VERSION.get(channel_id or "")
+        target = _RC_CHANNEL_VERSION.get(normalize_channel_id(channel_id) or "")
         if target:
             for section in sections:
                 if section.version == target and section.bullets:
                     return section
-        # RC content often lives under ``Unreleased`` until the version
-        # header is cut; prefer that over an older shipped release.
+            # RC content lives under ``Unreleased`` until the version header
+            # is cut; never fall back to an older shipped release (e.g. v0.7.4
+            # bullets when the picker already advanced to rc-075).
+            for section in sections:
+                if section.is_unreleased and section.bullets:
+                    return section
+            return None
         for section in sections:
             if section.is_unreleased and section.bullets:
                 return section
