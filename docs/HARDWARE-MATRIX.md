@@ -8,25 +8,27 @@ For build-from-parts assembly see [Onboarding > Step 2](ONBOARDING.md#step-2-ass
 
 ## Concentrator Boards
 
-The host is always a **Raspberry Pi 4** (1 GB minimum, 2 GB recommended)
-running 64-bit Raspberry Pi OS Lite. Pi 3 and Pi 5 are not currently
-supported: the compiled core modules are aarch64 binaries built and tested
-on Pi 4. Pi 5 may work but is not validated.
+The host is a **Raspberry Pi 4** or **Compute Module 4 (CM4)** (1 GB minimum,
+2 GB recommended) running **64-bit** Raspberry Pi OS or Raspbian Lite.
+Pi 3 and Pi 5 are not currently supported. Pi 5 may work but is not validated.
+Application code is plain Python (v0.7.0+); **aarch64** is required.
 
-| | RAK Hotspot V2 (RAK7248) | SenseCap M1 | DIY (Pi + RAK2287 + HAT) |
-|---|---|---|---|
-| **Concentrator** | RAK2287 (SX1302) | WM1303 (SX1303) | RAK2287 (SX1302) |
-| **TX support** | Yes (native, with HAL patch) | Yes (native, with HAL patch) | Yes (native, with HAL patch) |
-| **RX channels** | 8 simultaneous | 8 simultaneous | 8 simultaneous |
-| **Spreading factors** | SF7-SF12 simultaneous | SF7-SF12 simultaneous | SF7-SF12 simultaneous |
-| **Form factor** | Pre-assembled metal case | Pre-assembled metal case | Bare or 3D-printed enclosure |
-| **Carrier crypto chip** | None | ATECC608 (auto-detected) | None |
-| **SD card included** | Usually 32 GB | Sometimes 64 GB | Buy separately |
-| **Antenna included** | Yes | Yes | Buy separately |
-| **PSU included** | Yes (USB-C) | Yes (USB-C, into carrier) | Buy separately |
-| **SPI bus latch on hard power loss** | Yes | No | Yes |
-| **Typical price (eBay, used)** | $40-70 | $30-60 | $50-90 (parts) |
-| **Plug-and-play with `install.sh`** | Yes | Yes | Yes |
+| | RAK Hotspot V2 (RAK7248) | SenseCap M1 | Syncrobit Chameleon | DIY (Pi + RAK2287 + HAT) |
+|---|---|---|---|---|
+| **Host** | Pi 4 (SD) | Pi 4 (SD) | CM4 (eMMC) | Pi 4 (SD) |
+| **Concentrator** | RAK2287 (SX1302) | WM1303 (SX1303) | SX1302 (onboard) | RAK2287 (SX1302) |
+| **TX support** | Yes (native, with HAL patch) | Yes (native, with HAL patch) | Yes (native, with HAL patch) | Yes (native, with HAL patch) |
+| **RX channels** | 8 simultaneous | 8 simultaneous | 8 simultaneous | 8 simultaneous |
+| **Spreading factors** | SF7-SF12 simultaneous | SF7-SF12 simultaneous | SF7-SF12 simultaneous | SF7-SF12 simultaneous |
+| **Form factor** | Pre-assembled metal case | Pre-assembled metal case | Pre-assembled (PoE-capable) | Bare or 3D-printed enclosure |
+| **Carrier crypto chip** | None | ATECC608 (auto-detected) | None (wizard shows generic SX1302/Pi) | None |
+| **Boot storage** | microSD (usually 32 GB) | microSD (sometimes 64 GB) | Onboard eMMC (~8-32 GB) | Buy microSD separately |
+| **Antenna included** | Yes | Yes | Yes | Buy separately |
+| **PSU included** | Yes (USB-C) | Yes (USB-C, into carrier) | Often PoE (injector/switch separate) | Buy separately |
+| **SPI bus latch on hard power loss** | Yes | No | Yes (SX1302 class) | Yes |
+| **Typical price (used)** | $40-70 | $30-60 | Varies (retired LoRa miner) | $50-90 (parts) |
+| **Reflash difficulty** | Easy (SD card access) | Easy (back panel + SD) | Moderate (USB boot via CM4 carrier) | Easy (SD card) |
+| **Plug-and-play with `install.sh`** | Yes | Yes | Yes (after OS flash) | Yes |
 
 ### What "SPI bus latch" means
 
@@ -52,6 +54,26 @@ If your deployment cannot guarantee clean shutdowns, either:
 | Power is occasionally unreliable and you have no UPS | SenseCap M1 |
 | You already own a Pi 4 | DIY: RAK2287 + RAK Pi HAT |
 | You want easiest reflash (back panel access) | RAK Hotspot V2 (4 bottom screws) |
+| You want PoE and a sealed outdoor-style enclosure | Syncrobit Chameleon (after eMMC reflash) |
+| You already have a Chameleon and a CM4 USB carrier | Repurpose with [Syncrobit Chameleon guide](SYNCROBIT-CHAMELEON.md) |
+
+### Syncrobit Chameleon notes
+
+The Chameleon ships a **Compute Module 4 with onboard eMMC**, not a removable
+microSD card. First-time Meshpoint install requires flashing new OS over USB
+using a CM4 carrier board (for example the Waveshare CM4-IO-BASE-B) and the
+Raspberry Pi `usbboot` tools. After that, the module stays in the Chameleon
+carrier: same `install.sh` and `meshpoint setup` flow as other SX1302 units.
+
+Validated stack (community, May 2026): CM4 eMMC, **aarch64** Raspbian 13
+(Trixie) Lite, Meshpoint v0.7.4+, live Meshtastic RX/TX via onboard SX1302.
+Original Chameleon miner firmware is replaced; keep a backup image if you need
+to restore vendor software.
+
+**PoE:** Many units power from Ethernet. Ensure your injector or switch can
+supply enough current for CM4 + concentrator (plan for up to ~2-3 A at 5 V
+equivalent). Prefer `sudo poweroff` before removing PoE to avoid SPI latch
+(see below).
 
 ---
 
@@ -59,13 +81,14 @@ If your deployment cannot guarantee clean shutdowns, either:
 
 | Hardware | Status | Reason |
 |---|---|---|
-| Raspberry Pi 3 | Not supported | Compiled core modules are aarch64 only; not enough RAM headroom for future growth |
+| Raspberry Pi 3 | Not supported | Not enough RAM headroom; aarch64 userspace required |
 | Raspberry Pi 5 | Not validated | May work but not regularly tested |
 | Raspberry Pi Zero 2 W | Not supported | Insufficient memory and IO for concentrator + dashboard |
-| 32-bit Raspberry Pi OS | Not supported | Core binaries are aarch64 |
-| x86 / x86_64 host | Not supported | Same reason |
+| 32-bit Raspberry Pi OS | Not supported | Meshpoint targets aarch64 userspace |
+| x86 / x86_64 host | Not supported | aarch64 Raspberry Pi family only |
 | RAK7268 / RAK7268V2 (commercial gateway) | Not supported | These are LoRaWAN gateways with different firmware path; SX1302 is similar but the platform stack does not match |
 | Helium WHIP / Linxdot Indoor | Not validated | Same chip family as RAK V2 but the carrier varies; community testing welcome |
+| Nebra Indoor (Rock Pi 4 + SX1301) | Not supported | Daughter board uses SX1301, not SX1302/SX1303; different HAL |
 | Single-channel SX1276/SX1262 boards | Not for concentrator role | These are single-channel radios. They can run as a [MeshCore USB companion](#meshcore-usb-companion-radios), not as the main concentrator. |
 
 ---
@@ -85,7 +108,7 @@ frequency to match your region.
 
 MeshCore on most regions uses a **62.5 kHz LoRa bandwidth**. The SX1302
 concentrator inside every supported Meshpoint (RAK V2, SenseCap M1,
-RAK2287 DIY) cannot tune below **125 kHz**. That is a hardware limitation
+Chameleon, RAK2287 DIY) cannot tune below **125 kHz**. That is a hardware limitation
 of the SX1302 baseband, not a software gap, so MeshCore packets at
 62.5 kHz are physically invisible to the concentrator no matter how it is
 configured.
@@ -138,7 +161,7 @@ capture:
 
 ## Antennas
 
-Bundled antennas with RAK V2 and SenseCap M1 work fine for basic indoor or
+Bundled antennas with RAK V2, SenseCap M1, and Chameleon units work fine for basic indoor or
 window-mounted deployments. For better coverage:
 
 | Use case | Recommended | Notes |
@@ -164,9 +187,10 @@ positioning during the setup wizard. Otherwise enter coordinates manually
 | Component | Recommended |
 |---|---|
 | PSU | Official Raspberry Pi 4 USB-C PSU (5V 3A). Cheap PSUs cause SD card corruption. |
-| SD card | 32 GB minimum, Class 10 or better. SanDisk High Endurance or Samsung Pro Endurance for 24/7 deployments. |
-| UPS (optional) | PiSugar 3, USB battery with passthrough. Strongly recommended for RAK V2 deployments without reliable mains. |
-| PoE (optional) | Pi 4 PoE+ HAT, or PoE injector + USB-C PD. Useful for rooftop installs. |
+| SD card | 32 GB minimum, Class 10 or better (Pi 4 / SD-based miners). SanDisk High Endurance or Samsung Pro Endurance for 24/7 deployments. |
+| eMMC (CM4) | Chameleon and other CM4 carriers: ensure several GB free before `install.sh` (HAL build + venv). |
+| UPS (optional) | PiSugar 3, USB battery with passthrough. Strongly recommended for RAK V2 and Chameleon (SX1302 latch risk) without reliable mains. |
+| PoE (optional) | Pi 4 PoE+ HAT, Chameleon built-in PoE, or PoE injector + USB-C PD. Useful for rooftop installs. |
 
 Bad PSUs and cheap SD cards are the most common silent failure mode. If
 you see `SyntaxError: source code string cannot contain null bytes` or
