@@ -16,7 +16,11 @@ A **Meshpoint** is an edge device that:
 
 ## Hardware Requirements
 
-You need a Raspberry Pi 4 with an SX1302 or SX1303 LoRa concentrator. The easiest paths are buying a pre-built unit (RAK Hotspot V2 or SenseCap M1) and reflashing the SD card.
+You need a Raspberry Pi 4 or Compute Module 4 host with an SX1302 or SX1303 LoRa
+concentrator. The easiest paths are buying a pre-built unit (RAK Hotspot V2,
+SenseCap M1, or Syncrobit Chameleon) and installing Meshpoint. SD-based miners
+use Raspberry Pi Imager; the Chameleon uses onboard eMMC and a one-time USB
+flash (see [Syncrobit Chameleon guide](SYNCROBIT-CHAMELEON.md)).
 
 | Component | Purpose | Notes |
 |-----------|---------|-------|
@@ -35,16 +39,27 @@ You need a Raspberry Pi 4 with an SX1302 or SX1303 LoRa concentrator. The easies
 |------|-------------|-------------|-------|
 | **RAK Hotspot V2** (RAK7248) | RAK2287 (SX1302) | $30-70 on eBay | Pi 4 + metal enclosure + antenna, usually 32GB SD card (more than enough for our usage) |
 | **SenseCap M1** | WM1303 (SX1303) | $30-60 on eBay | Pi 4 + metal enclosure + antenna, may include 64GB SD card |
+| **Syncrobit Chameleon** | SX1302 (onboard) | Varies | CM4 eMMC + enclosure; often PoE. [USB eMMC flash guide](SYNCROBIT-CHAMELEON.md) |
 
 > **RAK2287 vs SenseCap M1:** The RAK2287's SPI bus can latch if power is cut while the concentrator is active. The Meshpoint service includes a GPIO reset script that holds the concentrator in reset during shutdown, making `sudo reboot` and `sudo systemctl restart meshpoint` safe. However, hard power loss (yanked cable, power outage) can still latch the SPI bus — requiring a full power unplug (10+ seconds) to clear. Repeated hard power loss can permanently damage the SX1250 radio. The SenseCap M1 does not have this issue. For deployments with unreliable power, the **SenseCap M1 is recommended**, or add a small UPS (PiSugar, USB battery with passthrough).
 
-RAK Hotspot V2: remove 4 bottom screws to access the SD card. SenseCap M1: remove 2 screws on the back panel (opposite the Ethernet/antenna ports) -- the SD card may be held down with kapton tape.
+RAK Hotspot V2: remove 4 bottom screws to access the SD card. SenseCap M1: remove 2 screws on the back panel (opposite the Ethernet/antenna ports) -- the SD card may be held down with kapton tape. Chameleon: no SD slot; see [Syncrobit Chameleon guide](SYNCROBIT-CHAMELEON.md).
 
 ## Prerequisites
 
-- A computer with an SD card reader (for flashing)
+- A computer with an SD card reader (for Pi 4 / SD-based miners) **or** a Linux PC with USB for CM4 eMMC recovery (Chameleon)
 - SSH client (PuTTY on Windows, or built-in terminal on Mac/Linux)
 - A [Meshradar](https://meshradar.io) account (free: create one before starting)
+
+---
+
+## Syncrobit Chameleon (CM4 eMMC)
+
+The Chameleon has **no microSD slot**. Use the dedicated
+[Syncrobit Chameleon guide](SYNCROBIT-CHAMELEON.md) for USB eMMC recovery,
+`install.sh`, and moving the CM4 into the miner enclosure. After Meshpoint is
+running, continue below at [Step 7: Get Your API Key](#step-7-get-your-api-key)
+if you still need the wizard and cloud steps.
 
 ---
 
@@ -75,6 +90,8 @@ RAK Hotspot V2: remove 4 bottom screws to access the SD card. SenseCap M1: remov
 ### Step 2: Assemble Hardware
 
 **If using a pre-built unit (RAK Hotspot V2 or SenseCap M1):** The concentrator is already seated. Just connect the LoRa antenna to the SMA connector and insert the flashed SD card. For SenseCap M1, USB-C power plugs into the carrier board (not the Pi's own USB-C port).
+
+**If using a Syncrobit Chameleon:** Follow [Syncrobit Chameleon guide](SYNCROBIT-CHAMELEON.md) first. The concentrator is already on the board; antenna and PoE only after OS + Meshpoint are installed.
 
 **If building from parts:**
 

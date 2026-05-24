@@ -74,13 +74,13 @@ Everything is managed from a browser dashboard: full chat with channels and DMs,
 
 **Dual-protocol MQTT gateway.** Publish captured packets to community MQTT brokers and Home Assistant. Dual-protocol: Meshtastic (protobuf) and MeshCore (JSON) from a single device. Two-gate privacy model ensures private channel data never leaks. Optional JSON publishing, HA auto-discovery, and configurable location precision.
 
-**Auto-detect hardware.** RAK Hotspot V2 and SenseCap M1 identified automatically during setup. MeshCore USB companions auto-detected on `/dev/ttyUSB*` and `/dev/ttyACM*`.
+**Auto-detect hardware.** RAK Hotspot V2, SenseCap M1, and Syncrobit Chameleon (SX1302) supported; carrier board may show as generic SX1302/Pi during setup. MeshCore USB companions auto-detected on `/dev/ttyUSB*` and `/dev/ttyACM*`.
 
 ---
 
 ## Hardware
 
-> **Requirements:** Raspberry Pi 4, 64-bit Raspberry Pi OS, Python 3.13. The compiled core modules are aarch64 binaries: other platforms (Pi 3, x86, 32-bit OS) are not currently supported.
+> **Requirements:** Raspberry Pi 4 or Compute Module 4, **64-bit** Raspberry Pi OS or Raspbian Lite, Python 3.12+. Pi 3, Pi 5 (unvalidated), x86, and 32-bit OS are not supported.
 
 ### Option A: RAK Hotspot V2 (~$60, recommended)
 
@@ -102,7 +102,21 @@ Another Helium-era miner with identical compatibility. The SenseCap M1 includes 
 
 Remove the 2 screws on the back panel (the side without the Ethernet/antenna ports) to access the SD card: it may be held in place by kapton tape. Flash with Raspberry Pi OS 64-bit and run the install script. USB-C power connects to the carrier board, not the Pi directly.
 
-### Option C: Build Your Own (~$85)
+### Option C: Syncrobit Chameleon (CM4 eMMC, SX1302)
+
+Retired **Syncrobit Chameleon** LoRa miners bundle a **Compute Module 4** (onboard
+eMMC), an **SX1302** concentrator, enclosure, and antenna. Many units support
+**PoE**. There is no microSD slot: you flash **64-bit** Raspberry Pi OS or
+Raspbian Lite to eMMC once over USB using a CM4 carrier board (for example
+Waveshare CM4-IO-BASE-B) and Raspberry Pi `usbboot`, then run the same
+`install.sh` + `meshpoint setup` flow as a RAK V2.
+
+Meshpoint replaces the original Chameleon firmware. Community-validated on
+aarch64 Raspbian 13 (Trixie) with live Meshtastic RX/TX.
+
+> **Step-by-step:** [Syncrobit Chameleon guide](docs/SYNCROBIT-CHAMELEON.md) and [Hardware Matrix](docs/HARDWARE-MATRIX.md).
+
+### Option D: Build Your Own (~$85)
 
 | Component | Price |
 |-----------|-------|
@@ -120,7 +134,7 @@ Remove the 2 screws on the back panel (the side without the Ethernet/antenna por
 
 Add a Heltec V3/V4 or T-Beam running [MeshCore USB companion firmware](https://flasher.meshcore.co.uk/) to monitor MeshCore traffic alongside Meshtastic. Plug it into any USB port on the Pi -- the setup wizard auto-detects the device and configures its radio frequency for your region.
 
-> **Full step-by-step guide:** See the [Onboarding Guide](docs/ONBOARDING.md) for detailed instructions covering flashing, assembly, installation, MeshCore setup, and troubleshooting for all hardware options.
+> **Full step-by-step guide:** See the [Onboarding Guide](docs/ONBOARDING.md) for detailed instructions covering SD flashing, Chameleon eMMC recovery, assembly, installation, MeshCore setup, and troubleshooting for all hardware options.
 
 ---
 
