@@ -185,6 +185,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     }, 15_000);
 
     setInterval(_checkForUpdate, 300_000);
+
+    if (window.MeshpointDisplayUnits?.onChange) {
+        window.MeshpointDisplayUnits.onChange(_renderCpuTemp);
+    }
 });
 
 function _bootDangerousPanel(router) {
@@ -380,7 +384,8 @@ async function _updateStats() {
             _setText('stat-ram-sub', `${metrics.memory_used_mb} / ${metrics.memory_total_mb} MB`);
             _setText('stat-disk-val', `${metrics.disk_percent}%`);
             _setText('stat-disk-sub', `${metrics.disk_used_gb} / ${metrics.disk_total_gb} GB`);
-            _setText('stat-temp-val', metrics.cpu_temp_c != null ? `${metrics.cpu_temp_c}°C` : 'N/A');
+            _lastCpuTempC = metrics.cpu_temp_c;
+            _renderCpuTemp();
         }
     } catch (e) {
         console.error('Failed to update stats:', e);
@@ -394,6 +399,21 @@ function _incrementPacketCount() {
 }
 
 window.getTotalPackets = () => _totalPackets;
+
+let _lastCpuTempC = null;
+
+function _renderCpuTemp() {
+    const formatter = window.MeshpointDisplayUnits?.formatTemperature;
+    let text;
+    if (_lastCpuTempC == null) {
+        text = 'N/A';
+    } else if (typeof formatter === 'function') {
+        text = formatter(_lastCpuTempC) ?? 'N/A';
+    } else {
+        text = `${_lastCpuTempC}\u00B0C`;
+    }
+    _setText('stat-temp-val', text);
+}
 
 function _formatUptime(totalSeconds) {
     const days = Math.floor(totalSeconds / 86400);
