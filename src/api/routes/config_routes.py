@@ -416,13 +416,38 @@ async def update_channels(req: ChannelsUpdate):
     }
 
 
+MESHCORE_CHANNEL_KEY_BYTES = 16
+MESHCORE_ZERO_KEY_HEX = "00" * (MESHCORE_CHANNEL_KEY_BYTES * 2)
+
+
 class McChannelEntry(BaseModel):
     name: str
-    key_hex: str
+    key_hex: str = ""
 
 
 class McChannelsUpdate(BaseModel):
     channels: list[McChannelEntry]
+
+
+def _normalize_meshcore_channel_entry(name: str, key_hex: str) -> tuple[str, str] | None:
+    """Return (name, normalized_hex) or None if the row has no name."""
+    name = (name or "").strip()
+    if not name:
+        return None
+    raw_hex = (key_hex or "").strip()
+    if not raw_hex:
+        return name, MESHCORE_ZERO_KEY_HEX
+    try:
+        raw = binascii.unhexlify(raw_hex)
+    except (ValueError, binascii.Error):
+        raise HTTPException(400, f"Invalid hex key for channel '{name}'")
+    if len(raw) != MESHCORE_CHANNEL_KEY_BYTES:
+        raise HTTPException(
+            400,
+            f"MeshCore key for '{name}' must be {MESHCORE_CHANNEL_KEY_BYTES} bytes "
+            f"({MESHCORE_CHANNEL_KEY_BYTES * 2} hex characters)",
+        )
+    return name, binascii.hexlify(raw).decode()
 
 
 @router.put("/meshcore/channels")
@@ -433,13 +458,11 @@ async def update_meshcore_channels(req: McChannelsUpdate):
 
     channel_keys: dict[str, str] = {}
     for ch in req.channels:
-        if not ch.name or not ch.key_hex:
+        normalized = _normalize_meshcore_channel_entry(ch.name, ch.key_hex)
+        if normalized is None:
             continue
-        try:
-            binascii.unhexlify(ch.key_hex)
-        except (ValueError, binascii.Error):
-            raise HTTPException(400, f"Invalid hex key for channel '{ch.name}'")
-        channel_keys[ch.name] = ch.key_hex
+        name, key_hex = normalized
+        channel_keys[name] = key_hex
 
     _config.meshcore.channel_keys = channel_keys
     try:

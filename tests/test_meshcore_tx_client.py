@@ -3,8 +3,12 @@
 from __future__ import annotations
 
 import unittest
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from src.transmit.meshcore_tx_client import MeshCoreTxClient
+from src.transmit.meshcore_tx_client import (
+    MESHCORE_MAX_USER_CHANNELS,
+    MeshCoreTxClient,
+)
 
 
 class TestNormalizeContactPayload(unittest.TestCase):
@@ -141,6 +145,66 @@ class TestLiveSourceBinding(unittest.TestCase):
         client.set_source(source)
         self.assertIsNone(client._mc)
         self.assertFalse(client.connected)
+
+
+class TestSyncChannelSlots(unittest.IsolatedAsyncioTestCase):
+    """User channel keys must land in device slots 1..N (slot 0 = Public)."""
+
+    async def asyncSetUp(self):
+        self.client = MeshCoreTxClient()
+        self.mc = MagicMock()
+        self.client.set_connection(self.mc)
+        self.set_calls: list[tuple[int, str, bytes]] = []
+
+        async def get_channel(slot: int):
+            result = MagicMock()
+            result.type = "OK"
+            result.payload = {
+                "channel_name": "",
+                "channel_secret": b"\x00" * 16,
+            }
+            return result
+
+        async def set_channel(slot: int, name: str, secret: bytes):
+            self.set_calls.append((slot, name, secret))
+            return MagicMock()
+
+        self.mc.commands.get_channel = get_channel
+        self.mc.commands.set_channel = set_channel
+        self.client._run_post_command = AsyncMock()
+
+        self._event_type = MagicMock()
+        self._event_type.ERROR = "ERROR"
+        self._meshcore_mod = MagicMock(EventType=self._event_type)
+
+    async def _run_sync(self, channel_keys: dict[str, str]) -> None:
+        async def immediate_wait_for(coro, timeout):
+            return await coro
+
+        with patch.dict("sys.modules", {"meshcore": self._meshcore_mod}):
+            with patch(
+                "src.transmit.meshcore_tx_client.asyncio.wait_for",
+                side_effect=immediate_wait_for,
+            ):
+                await self.client.sync_channels(channel_keys)
+
+    async def test_first_user_channel_uses_slot_one(self):
+        key_hex = "f708715569f4ee34c273f8f32d32e0e8"
+        await self._run_sync({"orangecounty": key_hex})
+        written = [(s, n) for s, n, _ in self.set_calls if n]
+        self.assertEqual(written, [(1, "orangecounty")])
+
+    async def test_slot_zero_never_written(self):
+        key_hex = "f708715569f4ee34c273f8f32d32e0e8"
+        await self._run_sync({"orangecounty": key_hex})
+        slots = [slot for slot, _, _ in self.set_calls]
+        self.assertNotIn(0, slots)
+
+    async def test_excess_channels_truncated_to_seven(self):
+        keys = {f"ch{i}": "aa" * 16 for i in range(MESHCORE_MAX_USER_CHANNELS + 3)}
+        await self._run_sync(keys)
+        named_writes = [n for _, n, _ in self.set_calls if n]
+        self.assertEqual(len(named_writes), MESHCORE_MAX_USER_CHANNELS)
 
 
 if __name__ == "__main__":

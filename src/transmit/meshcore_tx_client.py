@@ -14,6 +14,12 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+# Companion channel slots: 0 = Public (firmware default). User-configured keys
+# use slots 1..N so they match Messages UI channel indices and RX channel_idx.
+MESHCORE_PUBLIC_SLOT_INDEX = 0
+MESHCORE_MAX_DEVICE_SLOTS = 8
+MESHCORE_MAX_USER_CHANNELS = MESHCORE_MAX_DEVICE_SLOTS - 1
+
 
 @dataclass
 class SendResult:
@@ -259,9 +265,10 @@ class MeshCoreTxClient:
     async def sync_channels(self, channel_keys: dict) -> None:
         """Sync configured channels to the companion device.
 
-        Writes each channel from channel_keys to a numbered slot (0, 1, …),
-        then clears any slots beyond that count that still hold a name on the
-        device. channel_keys maps channel name → hex-encoded 16-byte secret.
+        Slot 0 is reserved for Public. Each entry in channel_keys is written
+        to slots 1, 2, … so device channel_idx matches the Messages tab. Extra
+        user slots are cleared. channel_keys maps channel name → hex-encoded
+        16-byte secret (use 32 zero digits for hashtag / no-PSK channels).
         """
         if not self.connected:
             logger.debug("sync_channels: not connected, skipping")
@@ -272,7 +279,7 @@ class MeshCoreTxClient:
             logger.warning("sync_channels: meshcore library unavailable")
             return
 
-        _MAX_SLOTS = 8
+        _MAX_SLOTS = MESHCORE_MAX_DEVICE_SLOTS
 
         # Read current device slots.
         device_slots: dict[int, tuple[str, bytes]] = {}
@@ -296,31 +303,41 @@ class MeshCoreTxClient:
             )
 
         desired = list(channel_keys.items())  # [(name, key_hex), …]
+        if len(desired) > MESHCORE_MAX_USER_CHANNELS:
+            logger.warning(
+                "sync_channels: more than %d user channels configured, ignoring extras",
+                MESHCORE_MAX_USER_CHANNELS,
+            )
+            desired = desired[:MESHCORE_MAX_USER_CHANNELS]
 
-        # Write desired channels.
-        for idx, (name, key_hex) in enumerate(desired):
-            if idx >= _MAX_SLOTS:
-                logger.warning("sync_channels: more than %d channels configured, ignoring extras", _MAX_SLOTS)
-                break
+        # Write desired channels to slots 1..N (slot 0 = Public, untouched).
+        for user_idx, (name, key_hex) in enumerate(desired):
+            slot = user_idx + 1
             try:
                 secret = bytes.fromhex(key_hex)
             except ValueError:
                 logger.warning("sync_channels: invalid hex key for '%s', skipping", name)
                 continue
-            dev_name, dev_secret = device_slots.get(idx, ("", b""))
+            if len(secret) != 16:
+                logger.warning(
+                    "sync_channels: key for '%s' must be 16 bytes, skipping", name
+                )
+                continue
+            dev_name, dev_secret = device_slots.get(slot, ("", b""))
             if dev_name == name and dev_secret == secret:
-                logger.debug("sync_channels: slot %d already correct (%s)", idx, name)
+                logger.debug("sync_channels: slot %d already correct (%s)", slot, name)
                 continue
             try:
                 await asyncio.wait_for(
-                    self._mc.commands.set_channel(idx, name, secret), timeout=5.0
+                    self._mc.commands.set_channel(slot, name, secret), timeout=5.0
                 )
-                logger.info("sync_channels: set slot %d → %s", idx, name)
+                logger.info("sync_channels: set slot %d → %s", slot, name)
             except Exception:
-                logger.exception("sync_channels: failed to set slot %d (%s)", idx, name)
+                logger.exception("sync_channels: failed to set slot %d (%s)", slot, name)
 
-        # Clear any extra populated slots on the device.
-        for idx in range(len(desired), _MAX_SLOTS):
+        # Clear extra user slots (never clear Public slot 0).
+        first_clear = 1 + len(desired)
+        for idx in range(first_clear, _MAX_SLOTS):
             dev = device_slots.get(idx)
             if dev is None:
                 break

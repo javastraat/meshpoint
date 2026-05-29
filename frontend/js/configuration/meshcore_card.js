@@ -221,7 +221,7 @@ class MeshcoreConfigCard {
                     <td class="ch-table__psk-cell">
                         <input class="ch-table__name-input" data-field="key_hex"
                                type="password" value="${keyHex}"
-                               placeholder="32-char hex key" />
+                               placeholder="32-char hex (empty = hashtag)" />
                         <button class="ch-table__reveal" type="button"
                                 title="Show/hide key">&#128065;</button>
                     </td>
@@ -282,7 +282,8 @@ class MeshcoreConfigCard {
         if (btn) btn.style.display = this._focusedRow ? '' : 'none';
     }
 
-    _MC_MAX_CHANNELS = 8;
+    // Device has 8 slots: 0 = Public (locked row), 1–7 = user channels.
+    _MC_MAX_USER_CHANNELS = 7;
 
     _updateAddBtn() {
         const btn = this._body.querySelector('[data-mc-add]');
@@ -291,9 +292,11 @@ class MeshcoreConfigCard {
         const count = tbody
             ? tbody.querySelectorAll('tr:not(.ch-table__row--locked)').length
             : 0;
-        const atLimit = count >= this._MC_MAX_CHANNELS;
+        const atLimit = count >= this._MC_MAX_USER_CHANNELS;
         btn.disabled = atLimit;
-        btn.title = atLimit ? `Only ${this._MC_MAX_CHANNELS} channels allowed` : '';
+        btn.title = atLimit
+            ? `Only ${this._MC_MAX_USER_CHANNELS} user channels (slots 1–7)`
+            : '';
     }
 
     _addEmptyRow() {
@@ -311,7 +314,7 @@ class MeshcoreConfigCard {
             </td>
             <td class="ch-table__psk-cell">
                 <input class="ch-table__name-input" data-field="key_hex"
-                       type="password" value="" placeholder="32-char hex key" />
+                       type="password" value="" placeholder="32-char hex (empty = hashtag)" />
                 <button class="ch-table__reveal" type="button"
                         title="Show/hide key">&#128065;</button>
             </td>

@@ -205,20 +205,40 @@ class TestUpdateMeshcoreChannels(unittest.TestCase):
         self.assertFalse(body["restart_required"])
         self.assertEqual(body["channel_count"], 1)
 
-    def test_entries_with_empty_name_or_key_are_skipped(self):
+    def test_empty_name_skipped(self):
         config_module._config = _fake_config()
         with patch("src.api.routes.config_routes.save_section_to_yaml") as mock_save:
             res = self.client.put(
                 "/api/config/meshcore/channels",
                 json={"channels": [
-                    {"name": "",             "key_hex": "aabbccdd"},
-                    {"name": "nokey",        "key_hex": ""},
+                    {"name": "", "key_hex": "f708715569f4ee34c273f8f32d32e0e8"},
                     {"name": "orangecounty", "key_hex": "f708715569f4ee34c273f8f32d32e0e8"},
                 ]},
             )
         self.assertEqual(res.status_code, 200)
         saved_keys = mock_save.call_args.args[1]["channel_keys"]
         self.assertEqual(list(saved_keys.keys()), ["orangecounty"])
+
+    def test_hashtag_channel_empty_key_stores_zero_secret(self):
+        config_module._config = _fake_config()
+        zero_key = "00" * 32
+        with patch("src.api.routes.config_routes.save_section_to_yaml") as mock_save:
+            res = self.client.put(
+                "/api/config/meshcore/channels",
+                json={"channels": [{"name": "hashtag", "key_hex": ""}]},
+            )
+        self.assertEqual(res.status_code, 200)
+        saved_keys = mock_save.call_args.args[1]["channel_keys"]
+        self.assertEqual(saved_keys, {"hashtag": zero_key})
+
+    def test_400_when_key_is_wrong_length(self):
+        config_module._config = _fake_config()
+        res = self.client.put(
+            "/api/config/meshcore/channels",
+            json={"channels": [{"name": "short", "key_hex": "aabb"}]},
+        )
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("short", res.json()["detail"])
 
     def test_empty_channel_list_clears_all(self):
         config_module._config = _fake_config(
