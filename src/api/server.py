@@ -144,6 +144,17 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
         pipeline.on_packet(lambda pkt: print_packet(pkt))
         pipeline.on_packet(public_radar_routes.public_radar_packet_callback)
 
+        # Mirror live GPS fixes from the location source into DeviceIdentity
+        # so /api/device (the local map) and the upstream registration
+        # payload (Meshradar fleet view) both see fresh coordinates.
+        def _sync_identity_position(lat, lon, alt):
+            identity.latitude = lat
+            identity.longitude = lon
+            if alt is not None:
+                identity.altitude = alt
+
+        pipeline.on_location_update(_sync_identity_position)
+
         if config.transmit.enabled:
             _inject_tx_gain_into_source(pipeline)
 

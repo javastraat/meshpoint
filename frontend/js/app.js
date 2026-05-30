@@ -326,10 +326,14 @@ async function _loadInitial(nodeMap, nodeList, packetFeed) {
 
 async function _refreshData(nodeMap, nodeList, packetFeed) {
     try {
-        const res = await fetch('/api/nodes?enrich=true');
-        const data = await res.json();
+        const [nodesRes, deviceRes] = await Promise.all([
+            fetch('/api/nodes?enrich=true'),
+            fetch('/api/device'),
+        ]);
+        const data = await nodesRes.json();
         const nodes = data.nodes || data || [];
-        nodeMap.loadNodes(nodes);
+        const device = deviceRes.ok ? await deviceRes.json() : undefined;
+        nodeMap.loadNodes(nodes, device);
         nodeList.loadNodes(nodes);
         packetFeed.loadNodes(nodes);
     } catch (e) {

@@ -63,6 +63,9 @@ class PipelineCoordinator:
 
         self._last_node_update: dict[str, Any] = {}
         self._on_packet_callbacks: list[Callable[[Packet], None]] = []
+        self._on_location_callbacks: list[
+            Callable[[Optional[float], Optional[float], Optional[float]], None]
+        ] = []
         self._running = False
         self._pipeline_task: Optional[asyncio.Task] = None
         self._cleanup_task: Optional[asyncio.Task] = None
@@ -110,6 +113,20 @@ class PipelineCoordinator:
     def on_packet(self, callback: Callable[[Packet], None]) -> None:
         """Register a callback invoked for each decoded packet."""
         self._on_packet_callbacks.append(callback)
+
+    def on_location_update(
+        self,
+        callback: Callable[[Optional[float], Optional[float], Optional[float]], None],
+    ) -> None:
+        """Register a callback fired when the live location source publishes
+        a fresh position fix.
+
+        Called with ``(latitude, longitude, altitude_m)``. Fires only when
+        the new fix actually differs from the cached device position, so
+        listeners can rely on it as a real change signal instead of
+        polling.
+        """
+        self._on_location_callbacks.append(callback)
 
     async def start(self) -> None:
         await self._db.connect()
@@ -225,6 +242,12 @@ class PipelineCoordinator:
         device.longitude = status.fix.longitude
         if status.fix.altitude_m is not None:
             device.altitude = status.fix.altitude_m
+
+        for cb in self._on_location_callbacks:
+            try:
+                cb(device.latitude, device.longitude, device.altitude)
+            except Exception:
+                logger.exception("Location update callback failed")
 
     async def _run_pipeline(self) -> None:
         try:

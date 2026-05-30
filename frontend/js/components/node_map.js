@@ -167,6 +167,13 @@ class NodeMap {
 
     _addDeviceMarker(device) {
         if (this._deviceMarker) {
+            const cur = this._deviceMarker.getLatLng();
+            if (
+                Math.abs(cur.lat - device.latitude) < 1e-6
+                && Math.abs(cur.lng - device.longitude) < 1e-6
+            ) {
+                return;  // position unchanged; preserve existing marker + open popup
+            }
             this._map.removeLayer(this._deviceMarker);
         }
 
