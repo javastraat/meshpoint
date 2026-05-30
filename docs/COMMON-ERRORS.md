@@ -740,6 +740,60 @@ passes a proper command timeout, skips the active probe when inbound
 events have arrived recently, and tolerates a single transient miss
 before reconnecting.
 
+### "Companion rejected name" / oversize name on rename (v0.7.5+)
+
+**Symptom:** Saving a new name on **Configuration → MeshCore → Companion
+name** fails with a toast like `Error: Name is 36 bytes (UTF-8);
+companion accepts at most 32.` or
+`Error: Companion rejected name: <reason>`.
+
+**Cause and fix:**
+
+- **`Name must not be empty`** -- whitespace-only or empty input. The
+  Meshpoint short-circuits before the companion is touched. Type a
+  real name.
+- **`Name is N bytes (UTF-8); companion accepts at most 32`** -- the
+  trimmed name exceeds the 32-byte cap. Note that 4-byte unicode
+  codepoints (some emoji) count as 4 bytes each: 9 of them blow
+  through the limit before the visible character count looks
+  unreasonable. Shorten the name or drop the emoji.
+- **`Companion rejected name: <detail>`** -- the rename actually
+  reached the device and the firmware refused it. Most often this is
+  a stricter local cap (some firmware variants enforce 28 bytes for
+  certain regions) or a transient flash-write failure. Try a shorter
+  name; if the same name was accepted on a different unit, retry
+  after a power cycle of the companion.
+
+The rename is atomic: a rejection means the on-device name is
+unchanged, and `local.yaml` is **not** updated. Your dashboard
+readout will still show the old name on the next refresh.
+
+### Companion reverts to its old name on reboot
+
+**Symptom:** You renamed the companion from the dashboard, the rename
+worked (toast confirmed, neighbors saw the new advert), but a reboot
+or unplug/replug brings the old name back.
+
+**Cause:** Either you're on an older Meshpoint (pre-v0.7.5) where the
+rename only updated runtime state, or `local.yaml` is owned by a user
+the service can't write to (look for the WARN: `Renamed companion to
+'X' but failed to persist to local.yaml`).
+
+**Fix:**
+
+1. Confirm `meshcore.companion_name` shows up in `local.yaml`. If it
+   doesn't, the persistence write failed. Run
+   `sudo chown meshpoint:meshpoint /opt/meshpoint/config/local.yaml`
+   (or whichever user the systemd unit runs as) and re-save from the
+   dashboard.
+2. After saving, the next USB connect (whether from a service
+   restart, a Pi reboot, an unplug/replug, or even a swap to a fresh
+   companion) re-applies the configured name. You should see
+   `Re-applied companion_name='X' on connect` in the journal.
+3. If the WARN persists with `Failed to re-apply companion_name on
+   connect: <error>`, treat the error message the same way as the
+   in-dashboard rename failures above (shorter name, retry, etc.).
+
 ### Heltec V4 v4.2/v4.3 fails to handshake even after a fresh flash
 
 **Cause:** The stock web flasher at

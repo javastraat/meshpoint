@@ -211,6 +211,41 @@ meshcore:
 ```
 Any Channels listed in the YAML will show in the UI. Changes made in the UI will be written to the YAML config file and pushed to the USB Companion device. Additionally, all channels will be pushed to the USB Companion device upon Meshpoint startup. Maximum of 8 Channels can by configured at this time. THis limit may be adjusted at a later date. 
 
+### MeshCore Companion Identity (v0.7.5+)
+
+The USB companion's advert name is what neighbors see in their
+contact list and on the mesh. As of v0.7.5 the dashboard owns the
+rename path:
+
+- **Configuration → MeshCore → Companion name** edits the input,
+  ticks "Send advert after save" (default on), and clicks
+  **Save Name**. The Meshpoint sends `CMD_SET_ADVERT_NAME` to the
+  companion (via `meshcore.commands.set_name`), persists the
+  cleaned name to `local.yaml` under `meshcore.companion_name`, and
+  optionally fires an advert so neighbors pick up the new name
+  immediately.
+- The configured name is **re-applied on every USB reconnect**.
+  Hot-swapping a freshly-flashed companion, or replacing a
+  failed unit, lands the new device on your configured name
+  without a manual re-save.
+
+```yaml
+meshcore:
+  companion_name: "Mesh Lab East"    # optional. When set, re-applied on every USB reconnect.
+```
+
+Leaving `companion_name` unset (the default) keeps the v0.7.4
+behavior: the Meshpoint trusts whatever name is on the
+companion's flash. Set it once from the dashboard; further
+reboots / unplug / replug events re-apply automatically.
+
+Validation (shared between the dashboard and the on-connect
+re-apply path): the name is stripped of leading/trailing
+whitespace, must not be empty, and must fit in **32 UTF-8 bytes**
+(conservative cap matching the companion firmware's accepted
+range). 4-byte unicode codepoints (some emoji) count toward that
+limit.
+
 ---
 
 ## Smart Relay
@@ -525,6 +560,7 @@ meshtastic:            # Meshtastic protocol settings
 meshcore:              # MeshCore protocol settings
   default_key_b64: null
   channel_keys: {}
+  companion_name: null  # Optional. When set, re-applied on every USB reconnect.
 
 capture:               # what packet sources to read from
   sources:

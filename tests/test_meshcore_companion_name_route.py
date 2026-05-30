@@ -2,22 +2,23 @@
 
 Validates the route's contract: 503 when the companion is not
 reachable, 400 when the rename was rejected (validation locally or
-ERROR from the companion), and 200 with the cleaned name on success.
-The actual rename / validation logic lives on MeshCoreTxClient and
-is covered separately in test_meshcore_tx_client.py; here we just
-exercise the HTTP surface.
+ERROR from the companion), 200 with the cleaned name on success,
+and the yaml-persistence side effect that drives the
+on-USB-connect re-apply path. The actual rename / validation logic
+lives on MeshCoreTxClient and is covered separately in
+test_meshcore_tx_client.py; here we just exercise the HTTP surface.
 """
 
 from __future__ import annotations
 
 import unittest
-from unittest.mock import AsyncMock, MagicMock
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from src.api.routes import meshcore_config_routes as mc_routes
-
 
 class _RenameResult:
     def __init__(
@@ -48,7 +49,12 @@ class TestCompanionNameEndpoint(unittest.TestCase):
         _reset_module_state()
         self.app = _build_app()
         self.client = TestClient(self.app)
-        self._fake_config = MagicMock()
+        # Real-shape stub: routes mutate _config.meshcore.companion_name
+        # on success, so the test config needs to look enough like a
+        # real AppConfig for that attribute path to exist.
+        self._fake_config = SimpleNamespace(
+            meshcore=SimpleNamespace(companion_name=None)
+        )
 
     def tearDown(self) -> None:
         _reset_module_state()
@@ -99,10 +105,11 @@ class TestCompanionNameEndpoint(unittest.TestCase):
             return_value=_RenameResult(success=True, event_type="OK")
         )
         self._wire(mc)
-        res = self.client.put(
-            "/api/config/meshcore/companion-name",
-            json={"name": "  Mesh Lab East  "},
-        )
+        with patch.object(mc_routes, "save_section_to_yaml") as save:
+            res = self.client.put(
+                "/api/config/meshcore/companion-name",
+                json={"name": "  Mesh Lab East  "},
+            )
         self.assertEqual(res.status_code, 200)
         body = res.json()
         self.assertTrue(body["saved"])
@@ -111,6 +118,38 @@ class TestCompanionNameEndpoint(unittest.TestCase):
         self.assertEqual(body["name"], "Mesh Lab East")
         self.assertEqual(body["event_type"], "OK")
         mc.set_companion_name.assert_awaited_once_with("  Mesh Lab East  ")
+        # Cleaned (stripped) name lands in both the in-memory config
+        # and the persisted yaml so the on-connect re-apply has the
+        # right value next time the companion comes back online.
+        self.assertEqual(self._fake_config.meshcore.companion_name, "Mesh Lab East")
+        save.assert_called_once_with("meshcore", {"companion_name": "Mesh Lab East"})
+
+    def test_yaml_permission_error_does_not_fail_request(self):
+        # If local.yaml is not writable, the rename already stuck on
+        # the device's flash for the current session. Failing the
+        # HTTP request would mislead the UI into rolling back the
+        # name in its readout while the device actually has the new
+        # name. We log a WARNING and return success.
+        mc = MagicMock()
+        mc.connected = True
+        mc.set_companion_name = AsyncMock(
+            return_value=_RenameResult(success=True, event_type="OK")
+        )
+        self._wire(mc)
+        with patch.object(
+            mc_routes,
+            "save_section_to_yaml",
+            side_effect=PermissionError("config/local.yaml"),
+        ):
+            res = self.client.put(
+                "/api/config/meshcore/companion-name",
+                json={"name": "Mesh Lab East"},
+            )
+        self.assertEqual(res.status_code, 200)
+        self.assertTrue(res.json()["saved"])
+        # In-memory copy still updates -- the yaml write is the only
+        # thing that failed.
+        self.assertEqual(self._fake_config.meshcore.companion_name, "Mesh Lab East")
 
     def test_400_when_companion_rejects(self):
         mc = MagicMock()

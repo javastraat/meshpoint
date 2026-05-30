@@ -19,7 +19,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from src.config import AppConfig
+from src.config import AppConfig, save_section_to_yaml
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +92,30 @@ async def update_companion_name(req: CompanionNameUpdate) -> dict:
 
     cleaned = (req.name or "").strip()
     logger.info("MeshCore companion renamed to %r via dashboard", cleaned)
+
+    # Persist the desired name so the USB capture source re-applies it
+    # on the next connect (mirrors how channel_keys are re-synced).
+    # Failure here is a soft error: the rename already stuck on the
+    # companion's flash for the current session; only the on-reconnect
+    # re-apply path is degraded until the user retries the save (or
+    # edits local.yaml directly). Don't turn a successful rename into
+    # an error response just because we couldn't write yaml.
+    _config.meshcore.companion_name = cleaned
+    try:
+        save_section_to_yaml("meshcore", {"companion_name": cleaned})
+    except PermissionError as exc:
+        logger.warning(
+            "Renamed companion to %r but failed to persist to "
+            "local.yaml: %s. Reconnects will revert until saved.",
+            cleaned,
+            exc,
+        )
+    except Exception:
+        logger.exception(
+            "Renamed companion to %r but yaml persistence failed; "
+            "reconnects will revert until saved.",
+            cleaned,
+        )
 
     event_type: Optional[str] = getattr(result, "event_type", None)
     return {

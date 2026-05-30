@@ -395,6 +395,7 @@ def _build_tx_service(
 
         async def _sync_channels_on_connect():
             await meshcore_tx.sync_channels(config.meshcore.channel_keys)
+            await _reapply_companion_name(meshcore_tx, config)
 
         mc_source.set_connected_callback(_sync_channels_on_connect)
 
@@ -561,6 +562,43 @@ def _find_meshcore_source(coord: PipelineCoordinator):
         if src.name == "meshcore_usb":
             return src
     return None
+
+
+async def _reapply_companion_name(meshcore_tx, config: AppConfig) -> None:
+    """Re-apply the configured companion name on every USB connect.
+
+    Mirrors how ``sync_channels`` keeps user-configured channel keys in
+    sync across reconnects: when a user has set
+    ``meshcore.companion_name`` (via the Configuration -> MeshCore
+    card or hand-edited local.yaml), we want a freshly-flashed
+    companion or a hot-swap to land on that name without a manual
+    re-save.
+
+    Failure is logged but never raises -- the channel sync that ran
+    first is more important to the user than the rename, and
+    sync_channels has already restored the runtime state we need.
+    """
+    desired = (config.meshcore.companion_name or "").strip()
+    if not desired:
+        return
+
+    if not meshcore_tx.connected:
+        return
+
+    try:
+        result = await meshcore_tx.set_companion_name(desired)
+    except Exception:
+        logger.exception("companion_name re-apply on connect raised")
+        return
+
+    if result.success:
+        logger.info("Re-applied companion_name=%r on connect", desired)
+    else:
+        logger.warning(
+            "Failed to re-apply companion_name=%r on connect: %s",
+            desired,
+            result.error,
+        )
 
 
 def _find_concentrator_source(coord: PipelineCoordinator):

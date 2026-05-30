@@ -78,6 +78,12 @@ class MeshtasticConfig:
 class MeshcoreConfig:
     default_key_b64: str = ""
     channel_keys: dict[str, str] = field(default_factory=dict)
+    # Desired companion advert name. When set, the dashboard rename
+    # path writes here, and the USB capture source re-applies it on
+    # every connect via MeshCoreTxClient.set_companion_name. Leaving
+    # this empty means "trust whatever name is on the companion's
+    # flash" -- the v0.7.4 behavior.
+    companion_name: Optional[str] = None
 
 
 @dataclass
