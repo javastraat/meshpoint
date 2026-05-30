@@ -14,6 +14,12 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+# Companion firmware caps the advert name at roughly 32 ASCII bytes; the
+# exact ceiling varies with location/unicode payload per MeshCore docs.
+# We enforce 32 UTF-8 bytes as a conservative upper bound that fits every
+# documented variant.
+MAX_COMPANION_NAME_BYTES = 32
+
 # Companion channel slots: 0 = Public (firmware default). User-configured keys
 # use slots 1..N so they match Messages UI channel indices and RX channel_idx.
 MESHCORE_PUBLIC_SLOT_INDEX = 0
@@ -217,6 +223,86 @@ class MeshCoreTxClient:
             logger.exception("MeshCore advert send failed")
             await self._run_post_command()
             return SendResult(success=False, error=str(exc))
+
+    async def set_companion_name(self, name: str) -> SendResult:
+        """Rename the USB companion via CMD_SET_ADVERT_NAME (0x08).
+
+        On OK we follow up with ``send_appstart()`` so the cached
+        ``self_info`` (which feeds get_radio_info -> Configuration card,
+        top-bar chip, and packet attribution) reflects the new name
+        without waiting for the next reconnect. ``set_name`` itself
+        only returns OK/ERROR; it does not emit a fresh SELF_INFO.
+
+        Validation lives here so route handlers, future CLI callers,
+        and the eventual ``meshcore.companion_name`` yaml-on-connect
+        path all use the same ceiling.
+        """
+        if not self.connected:
+            return SendResult(success=False, error="Not connected")
+
+        cleaned = (name or "").strip()
+        if not cleaned:
+            return SendResult(success=False, error="Name must not be empty")
+        encoded_len = len(cleaned.encode("utf-8"))
+        if encoded_len > MAX_COMPANION_NAME_BYTES:
+            return SendResult(
+                success=False,
+                error=(
+                    f"Name is {encoded_len} bytes (UTF-8); "
+                    f"companion accepts at most {MAX_COMPANION_NAME_BYTES}."
+                ),
+            )
+
+        try:
+            from meshcore import EventType
+        except Exception:
+            return SendResult(success=False, error="meshcore library unavailable")
+
+        try:
+            result = await asyncio.wait_for(
+                self._mc.commands.set_name(cleaned),
+                timeout=10.0,
+            )
+        except asyncio.TimeoutError:
+            await self._run_post_command()
+            return SendResult(success=False, error="set_name timed out")
+        except Exception as exc:
+            logger.exception("MeshCore set_name failed")
+            await self._run_post_command()
+            return SendResult(success=False, error=str(exc))
+
+        if result.type == EventType.ERROR:
+            payload = getattr(result, "payload", None)
+            detail = ""
+            if isinstance(payload, dict):
+                detail = str(payload.get("reason") or payload.get("error") or payload)
+            elif payload is not None:
+                detail = str(payload)
+            error = f"Companion rejected name: {detail}" if detail else "Companion rejected name"
+            await self._run_post_command()
+            return SendResult(success=False, error=error)
+
+        # OK path: refresh self_info so callers see the new name immediately.
+        # send_appstart failure should not turn a successful set_name into an
+        # error -- the rename already stuck on the device; only the local
+        # cache lags. Worst case the next reconnect reseeds it.
+        try:
+            await asyncio.wait_for(self._mc.send_appstart(), timeout=5.0)
+        except Exception:
+            logger.warning(
+                "set_companion_name: send_appstart refresh failed; "
+                "self_info cache may lag until reconnect",
+                exc_info=True,
+            )
+
+        event_type = (
+            result.type.value
+            if hasattr(result.type, "value")
+            else str(result.type)
+        )
+        logger.info("MeshCore companion renamed to %r (%s)", cleaned, event_type)
+        await self._run_post_command()
+        return SendResult(success=True, event_type=event_type)
 
     @staticmethod
     def _normalize_contact_payload(payload) -> list[dict]:

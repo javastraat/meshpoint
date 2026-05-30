@@ -207,5 +207,143 @@ class TestSyncChannelSlots(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(named_writes), MESHCORE_MAX_USER_CHANNELS)
 
 
+class _FakeEventType:
+    """Stand-in for meshcore.EventType so set_companion_name can compare
+    result.type against EventType.ERROR without a real meshcore install."""
+
+    OK = "OK"
+    ERROR = "ERROR"
+
+
+class TestSetCompanionName(unittest.IsolatedAsyncioTestCase):
+    """Cover the rename path end-to-end: validation, timeout, ERROR, OK."""
+
+    async def asyncSetUp(self):
+        self.client = MeshCoreTxClient()
+        self.mc = MagicMock()
+        self.set_name_mock = AsyncMock()
+        self.send_appstart_mock = AsyncMock()
+        self.mc.commands.set_name = self.set_name_mock
+        self.mc.send_appstart = self.send_appstart_mock
+        self.client.set_connection(self.mc)
+        self.client._run_post_command = AsyncMock()
+        self._meshcore_mod = MagicMock(EventType=_FakeEventType)
+
+    def _ok_result(self):
+        result = MagicMock()
+        result.type = _FakeEventType.OK
+        return result
+
+    def _error_result(self, payload=None):
+        result = MagicMock()
+        result.type = _FakeEventType.ERROR
+        result.payload = payload
+        return result
+
+    async def _run(self, name: str):
+        async def immediate_wait_for(coro, timeout):
+            return await coro
+
+        with patch.dict("sys.modules", {"meshcore": self._meshcore_mod}):
+            with patch(
+                "src.transmit.meshcore_tx_client.asyncio.wait_for",
+                side_effect=immediate_wait_for,
+            ):
+                return await self.client.set_companion_name(name)
+
+    async def test_not_connected_short_circuits(self):
+        client = MeshCoreTxClient()
+        result = await client.set_companion_name("Anything")
+        self.assertFalse(result.success)
+        self.assertEqual(result.error, "Not connected")
+
+    async def test_empty_name_rejected_locally(self):
+        result = await self._run("")
+        self.assertFalse(result.success)
+        self.assertIn("empty", result.error.lower())
+        self.set_name_mock.assert_not_called()
+
+    async def test_whitespace_only_rejected_locally(self):
+        result = await self._run("   \t\n  ")
+        self.assertFalse(result.success)
+        self.assertIn("empty", result.error.lower())
+        self.set_name_mock.assert_not_called()
+
+    async def test_too_long_rejected_locally(self):
+        result = await self._run("x" * 33)
+        self.assertFalse(result.success)
+        self.assertIn("33 bytes", result.error)
+        self.assertIn("32", result.error)
+        self.set_name_mock.assert_not_called()
+
+    async def test_unicode_byte_count_enforced(self):
+        # Each emoji here is 4 bytes UTF-8; 9 emojis = 36 bytes > 32.
+        result = await self._run("🛰" * 9)
+        self.assertFalse(result.success)
+        self.assertIn("36 bytes", result.error)
+        self.set_name_mock.assert_not_called()
+
+    async def test_ok_path_calls_set_name_and_send_appstart(self):
+        self.set_name_mock.return_value = self._ok_result()
+        result = await self._run("Mesh Lab East")
+        self.assertTrue(result.success)
+        self.set_name_mock.assert_awaited_once_with("Mesh Lab East")
+        self.send_appstart_mock.assert_awaited_once()
+
+    async def test_ok_path_strips_whitespace_before_sending(self):
+        self.set_name_mock.return_value = self._ok_result()
+        result = await self._run("   Mesh Lab East   ")
+        self.assertTrue(result.success)
+        self.set_name_mock.assert_awaited_once_with("Mesh Lab East")
+
+    async def test_error_result_returns_failure_with_payload_detail(self):
+        self.set_name_mock.return_value = self._error_result({"reason": "name in use"})
+        result = await self._run("Mesh Lab East")
+        self.assertFalse(result.success)
+        self.assertIn("name in use", result.error)
+        # send_appstart must NOT run if the rename was rejected.
+        self.send_appstart_mock.assert_not_called()
+
+    async def test_error_with_string_payload(self):
+        self.set_name_mock.return_value = self._error_result("rejected")
+        result = await self._run("Mesh Lab East")
+        self.assertFalse(result.success)
+        self.assertIn("rejected", result.error)
+
+    async def test_error_with_no_payload(self):
+        self.set_name_mock.return_value = self._error_result(None)
+        result = await self._run("Mesh Lab East")
+        self.assertFalse(result.success)
+        self.assertIn("rejected", result.error.lower())
+
+    async def test_set_name_timeout_returns_error(self):
+        import asyncio as _asyncio
+
+        async def raise_timeout(coro, *_args, **_kwargs):
+            # Close the coroutine the production code created so we don't
+            # leak a "coroutine was never awaited" warning.
+            if hasattr(coro, "close"):
+                coro.close()
+            raise _asyncio.TimeoutError()
+
+        with patch.dict("sys.modules", {"meshcore": self._meshcore_mod}):
+            with patch(
+                "src.transmit.meshcore_tx_client.asyncio.wait_for",
+                side_effect=raise_timeout,
+            ):
+                result = await self.client.set_companion_name("Mesh Lab East")
+
+        self.assertFalse(result.success)
+        self.assertIn("timed out", result.error)
+        self.send_appstart_mock.assert_not_called()
+
+    async def test_send_appstart_failure_does_not_break_ok(self):
+        self.set_name_mock.return_value = self._ok_result()
+        self.send_appstart_mock.side_effect = RuntimeError("appstart blew up")
+        result = await self._run("Mesh Lab East")
+        # Rename already stuck on the device; cache lag is acceptable.
+        self.assertTrue(result.success)
+
+
 if __name__ == "__main__":
     unittest.main()
