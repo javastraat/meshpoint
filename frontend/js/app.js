@@ -390,6 +390,14 @@ async function _updateStats() {
             _setText('stat-disk-sub', `${metrics.disk_used_gb} / ${metrics.disk_total_gb} GB`);
             _lastCpuTempC = metrics.cpu_temp_c;
             _renderCpuTemp();
+            if (Array.isArray(metrics.load_avg)) {
+                const [m1, m5, m15] = metrics.load_avg;
+                _setText('stat-load-val', m1.toFixed(2));
+                _setText('stat-load-sub', `5m ${m5.toFixed(2)} · 15m ${m15.toFixed(2)}`);
+            } else {
+                _setText('stat-load-val', 'N/A');
+                _setText('stat-load-sub', '');
+            }
         }
     } catch (e) {
         console.error('Failed to update stats:', e);
