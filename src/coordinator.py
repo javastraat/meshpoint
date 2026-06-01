@@ -303,10 +303,15 @@ class PipelineCoordinator:
             self._stats_reporter.record_node(node_update.to_dict())
             if node_update.public_key:
                 try:
-                    self._crypto.register_public_key(
-                        int(node_update.node_id, 16),
-                        bytes.fromhex(node_update.public_key),
-                    )
+                    node_int = int(node_update.node_id, 16)
+                    new_key = bytes.fromhex(node_update.public_key)
+                    prior = self._crypto.lookup_public_key(node_int)
+                    self._crypto.register_public_key(node_int, new_key)
+                    if prior != new_key:
+                        logger.info(
+                            "Updated peer PKI public_key for %s",
+                            node_update.node_id,
+                        )
                 except ValueError:
                     logger.debug(
                         "Ignoring invalid public_key for node %s",

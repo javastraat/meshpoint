@@ -76,9 +76,19 @@ class MeshtasticDecoder:
                     sender_key,
                 )
                 if decrypted_bytes is None:
+                    refreshed_key = self._crypto.refresh_public_key_from_db(sender_id)
+                    if refreshed_key is not None and refreshed_key != sender_key:
+                        decrypted_bytes = self._crypto.decrypt_meshtastic_pki(
+                            encrypted_payload,
+                            header["packet_id"],
+                            sender_id,
+                            refreshed_key,
+                        )
+                if decrypted_bytes is None:
                     logger.warning(
-                        "PKI DM from %08x: decrypt failed "
-                        "(stale sender public_key? need fresh NodeInfo)",
+                        "PKI DM from %08x: decrypt failed. Keys may be out of sync: "
+                        "have the sender restart Meshtastic (fresh NodeInfo), tap "
+                        "Send Now on this Meshpoint's NodeInfo card, then retry.",
                         sender_id,
                     )
                 else:

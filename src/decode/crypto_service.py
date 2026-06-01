@@ -76,6 +76,11 @@ class CryptoService:
             self._public_keys[node_id] = loaded
         return loaded
 
+    def refresh_public_key_from_db(self, node_id: int) -> bytes | None:
+        """Drop cached peer key and reload from SQLite if configured."""
+        self._public_keys.pop(node_id, None)
+        return self.lookup_public_key(node_id)
+
     def _load_public_key_from_db(self, node_id: int) -> bytes | None:
         if not self._node_db_path:
             return None

@@ -70,7 +70,11 @@ def _decode_nodeinfo(payload: bytes) -> _Result:
             "hw_model": str(user.hw_model) if user.hw_model else None,
             "id": user.id or None,
             "role": str(user.role) if user.role else None,
-            "public_key": user.public_key.hex() if user.public_key else None,
+            "public_key": (
+                user.public_key.hex()
+                if user.public_key and len(user.public_key) == 32
+                else None
+            ),
         }, PacketType.NODEINFO
     except Exception:
         return None, PacketType.NODEINFO
