@@ -165,9 +165,9 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
             _inject_tx_gain_into_source(pipeline)
 
         _bootstrap_pki(config, pipeline)
-        await _hydrate_public_keys(pipeline)
 
         await pipeline.start()
+        await _hydrate_public_keys(pipeline)
 
         message_repo = MessageRepository(pipeline.database)
         tx_service = _build_tx_service(config, pipeline)
