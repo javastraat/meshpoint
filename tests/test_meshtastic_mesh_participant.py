@@ -54,15 +54,42 @@ class TestMeshtasticMeshParticipantBuilder(unittest.TestCase):
             source_id=self.source_id,
             dest=self.dest_id,
             packet_id=5,
-            route_nodes=[self.dest_id, self.source_id],
+            route_nodes=[],
             request_id=request_id,
-            snr_towards=[20],
+            snr_towards=[30],
+            route_back=[self.dest_id],
+            snr_back=[30],
         )
         self.assertIsNotNone(packet)
         decoded = self.decoder.decode(packet)
         assert decoded is not None
         self.assertEqual(decoded.packet_type.value, "traceroute")
         self.assertEqual(decoded.decoded_payload.get("request_id"), request_id)
+        self.assertEqual(decoded.decoded_payload.get("snr_back"), [30])
+
+    def test_traceroute_reply_preserves_inbound_hops(self):
+        from src.models.packet import Packet, PacketType, Protocol
+        from src.transmit.tx_service import TxService
+
+        original = Packet(
+            packet_id="66d7046c",
+            source_id="7d8b98a9",
+            destination_id="c0ffee42",
+            protocol=Protocol.MESHTASTIC,
+            packet_type=PacketType.TRACEROUTE,
+            decrypted=True,
+            decoded_payload={
+                "route": ["11223344", "55667788"],
+                "snr_towards": [16, 20],
+            },
+        )
+        route, snr_t, route_back, snr_b = TxService._build_traceroute_reply_data(
+            original, 7.5
+        )
+        self.assertEqual(route, [0x11223344, 0x55667788])
+        self.assertEqual(snr_t, [16, 20, 30])
+        self.assertEqual(route_back, [0x7D8B98A9])
+        self.assertEqual(snr_b, [30])
 
     def test_pki_traceroute_reply_round_trip(self):
         peer = MeshpointKeypair.generate()
@@ -72,8 +99,11 @@ class TestMeshtasticMeshParticipantBuilder(unittest.TestCase):
             source_id=self.source_id,
             dest=self.dest_id,
             packet_id=6,
-            route_nodes=[self.dest_id, self.source_id],
+            route_nodes=[],
             request_id=request_id,
+            snr_towards=[28],
+            route_back=[self.dest_id],
+            snr_back=[28],
             recipient_public_key=peer.public_key,
         )
         assert packet is not None
@@ -87,7 +117,7 @@ class TestMeshtasticMeshParticipantBuilder(unittest.TestCase):
         assert decoded is not None
         self.assertTrue(decoded.decrypted)
         self.assertEqual(decoded.decoded_payload.get("request_id"), request_id)
-        self.assertIn(format(self.source_id, "08x"), decoded.decoded_payload.get("route", []))
+        self.assertEqual(decoded.decoded_payload.get("snr_back"), [28])
 
     def test_pki_text_round_trip(self):
         peer = MeshpointKeypair.generate()

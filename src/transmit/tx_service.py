@@ -390,12 +390,14 @@ class TxService:
         except ValueError:
             return SendResult(success=False, protocol="meshtastic", error="Invalid source id")
 
-        route_nodes = self._merge_traceroute_route(
-            original, requester, self._source_node_id
+        rx_snr = (
+            float(original.signal.snr)
+            if original.signal and original.signal.snr is not None
+            else None
         )
-        snr_values: list[int] = []
-        if original.signal and original.signal.snr is not None:
-            snr_values = [int(round(float(original.signal.snr) * 4))]
+        route_nodes, snr_towards, route_back, snr_back = (
+            self._build_traceroute_reply_data(original, rx_snr)
+        )
 
         packet_id = self._next_packet_id()
         channel_hash = original.channel_hash
@@ -411,7 +413,9 @@ class TxService:
             packet_id=packet_id,
             route_nodes=route_nodes,
             request_id=request_id,
-            snr_towards=snr_values or None,
+            snr_towards=snr_towards or None,
+            route_back=route_back or None,
+            snr_back=snr_back or None,
             channel_key=channel_key,
             channel_hash=channel_hash,
             hop_limit=hop_limit,
@@ -837,10 +841,15 @@ class TxService:
             return 0x08, None
 
     @staticmethod
-    def _merge_traceroute_route(
-        original, requester: int, our_node_id: int
-    ) -> list[int]:
-        """Extend the inbound RouteDiscovery with this node for the reply."""
+    def _build_traceroute_reply_data(
+        original, rx_snr: float | None
+    ) -> tuple[list[int], list[int], list[int], list[int]]:
+        """Build RouteDiscovery fields like Meshtastic firmware at the destination.
+
+        Relays append node ids plus SNR on the way in. The target only appends the
+        final-hop SNR (SNRonly) and does not add itself to ``route``. Meshtastic 2.5+
+        also expects ``route_back`` / ``snr_back`` on the response.
+        """
         payload = original.decoded_payload or {}
         route_nodes: list[int] = []
         for node_hex in payload.get("route") or []:
@@ -848,13 +857,26 @@ class TxService:
                 route_nodes.append(int(node_hex, 16))
             except (TypeError, ValueError):
                 continue
-        if our_node_id not in route_nodes:
-            route_nodes.append(our_node_id)
-        if not route_nodes:
-            route_nodes = [requester, our_node_id]
-        elif requester not in route_nodes:
-            route_nodes.insert(0, requester)
-        return route_nodes
+
+        snr_towards: list[int] = []
+        for val in payload.get("snr_towards") or []:
+            try:
+                snr_towards.append(int(val))
+            except (TypeError, ValueError):
+                continue
+
+        encoded_snr: int | None = None
+        if rx_snr is not None:
+            encoded_snr = int(round(float(rx_snr) * 4))
+
+        if encoded_snr is not None:
+            snr_towards.append(encoded_snr)
+
+        requester = int(original.source_id, 16)
+        route_back = [requester]
+        snr_back = [encoded_snr] if encoded_snr is not None else []
+
+        return route_nodes, snr_towards, route_back, snr_back
 
     def _resolve_channel_by_hash(self, channel_hash: int) -> tuple[int, bytes | None]:
         """Resolve encryption key from a captured on-air channel hash."""

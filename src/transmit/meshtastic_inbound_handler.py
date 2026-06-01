@@ -36,10 +36,13 @@ class MeshtasticInboundHandler:
             )
             result = await self._tx.send_traceroute_reply(packet)
             if result.success:
+                payload = packet.decoded_payload or {}
                 logger.info(
-                    "Traceroute reply TX OK to %s (reply id=%s)",
+                    "Traceroute reply TX OK to %s (reply id=%s, inbound route=%d snr=%d)",
                     packet.source_id,
                     result.packet_id,
+                    len(payload.get("route") or []),
+                    len(payload.get("snr_towards") or []),
                 )
             else:
                 logger.warning(

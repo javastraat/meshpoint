@@ -246,6 +246,8 @@ class MeshtasticPacketBuilder:
         *,
         request_id: int = 0,
         snr_towards: Sequence[int] | None = None,
+        route_back: Sequence[int] | None = None,
+        snr_back: Sequence[int] | None = None,
         channel_key: bytes | None = None,
         channel_hash: int = 0x08,
         hop_limit: int = 3,
@@ -261,6 +263,10 @@ class MeshtasticPacketBuilder:
                 rd.route.append(node)
             if snr_towards:
                 rd.snr_towards.extend(snr_towards)
+            if route_back:
+                rd.route_back.extend(route_back)
+            if snr_back:
+                rd.snr_back.extend(snr_back)
             payload = rd.SerializeToString()
         except Exception:
             logger.exception("Traceroute protobuf build failed")
