@@ -19,7 +19,7 @@
 ![Meshradar Cloud Dashboard](Meshradar414.png)
 
 ### Local Dashboard
-![Local Dashboard](Meshpoint414.png)
+![Local Dashboard](Meshpoint61.png)
 
 ### Messaging
 ![Messaging](MessagingUI.png)
