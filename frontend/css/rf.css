@@ -92,26 +92,26 @@
 }
 
 .rf-badge--live {
-    background: rgba(34, 197, 94, 0.15);
-    color: #4ade80;
-    border: 1px solid rgba(34, 197, 94, 0.35);
+    background: rgba(0, 229, 160, 0.15);
+    color: var(--accent-green);
+    border: 1px solid rgba(0, 229, 160, 0.35);
 }
 
 .rf-badge--fallback {
     background: rgba(245, 158, 11, 0.12);
-    color: #fbbf24;
+    color: var(--accent-amber);
     border: 1px solid rgba(245, 158, 11, 0.35);
 }
 
 .rf-badge--calibrating {
     background: rgba(100, 116, 139, 0.2);
-    color: #cbd5e1;
+    color: var(--text-secondary);
     border: 1px solid rgba(100, 116, 139, 0.4);
 }
 
 .rf-badge--off {
     background: rgba(71, 85, 105, 0.25);
-    color: #94a3b8;
+    color: var(--text-secondary);
     border: 1px solid rgba(71, 85, 105, 0.5);
 }
 

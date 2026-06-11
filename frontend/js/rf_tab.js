@@ -221,6 +221,10 @@ class RfTab {
         const counts = hist.counts || [];
 
         if (!this._histogramChart) {
+            const root = getComputedStyle(document.documentElement);
+            const token = (name, fallback) => root.getPropertyValue(name).trim() || fallback;
+            const textSecondary = token('--text-secondary', '#94a3b8');
+            const textMuted = token('--text-muted', '#64748b');
             this._histogramChart = new Chart(canvas, {
                 type: 'bar',
                 data: {
@@ -241,19 +245,19 @@ class RfTab {
                         title: {
                             display: true,
                             text: `Floor ${hist.floor_dbm ?? '--'} dBm · Median ${hist.median_dbm ?? '--'} dBm`,
-                            color: '#94a3b8',
+                            color: textSecondary,
                             font: { size: 11 },
                         },
                     },
                     scales: {
                         x: {
-                            title: { display: true, text: 'RSSI level (dBm)', color: '#64748b' },
-                            ticks: { color: '#94a3b8', maxTicksLimit: 12 },
+                            title: { display: true, text: 'RSSI level (dBm)', color: textMuted },
+                            ticks: { color: textSecondary, maxTicksLimit: 12 },
                             grid: { color: 'rgba(51, 65, 85, 0.35)' },
                         },
                         y: {
-                            title: { display: true, text: 'Sample count', color: '#64748b' },
-                            ticks: { color: '#94a3b8' },
+                            title: { display: true, text: 'Sample count', color: textMuted },
+                            ticks: { color: textSecondary },
                             grid: { color: 'rgba(51, 65, 85, 0.35)' },
                             beginAtZero: true,
                         },
