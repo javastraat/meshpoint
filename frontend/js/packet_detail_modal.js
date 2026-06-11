@@ -158,33 +158,33 @@ class PacketDetailModal {
         if (cr) modemParts.push(`CR ${cr}`);
 
         return [
-            { key: 'Frequency', val: freq != null ? `${Number(freq).toFixed(3)} MHz` : '—' },
-            { key: 'Modem', val: modemParts.length ? modemParts.join(' · ') : '—' },
+            { key: 'Frequency', val: freq != null ? `${Number(freq).toFixed(3)} MHz` : 'n/a' },
+            { key: 'Modem', val: modemParts.length ? modemParts.join(' · ') : 'n/a' },
             {
                 key: 'RSSI',
-                val: rssi != null ? `${Number(rssi).toFixed(0)} dBm` : '—',
+                val: rssi != null ? `${Number(rssi).toFixed(0)} dBm` : 'n/a',
             },
             {
                 key: 'SNR',
-                val: snr != null ? `${Number(snr).toFixed(1)} dB` : '—',
+                val: snr != null ? `${Number(snr).toFixed(1)} dB` : 'n/a',
             },
         ];
     }
 
     _meshRows(packet, formatNodeId) {
-        const fmt = typeof formatNodeId === 'function' ? formatNodeId : (id) => id || '—';
+        const fmt = typeof formatNodeId === 'function' ? formatNodeId : (id) => id || 'n/a';
         const hopsTaken = packet.hop_count != null
             ? packet.hop_count
             : (packet.hop_start > 0 ? packet.hop_start - packet.hop_limit : null);
         const hopLabel = packet.hop_start > 0
             ? `${hopsTaken != null ? hopsTaken : '?' } hop${hopsTaken === 1 ? '' : 's'} taken (${packet.hop_limit} left of ${packet.hop_start})`
-            : '—';
+            : 'n/a';
 
         const rows = [
-            { key: 'From', val: `${fmt(packet.source_id)} (${packet.source_id || '—'})` },
-            { key: 'To', val: `${fmt(packet.destination_id)} (${packet.destination_id || '—'})` },
-            { key: 'Type', val: packet.packet_type || '—' },
-            { key: 'Protocol', val: packet.protocol || '—' },
+            { key: 'From', val: `${fmt(packet.source_id)} (${packet.source_id || 'n/a'})` },
+            { key: 'To', val: `${fmt(packet.destination_id)} (${packet.destination_id || 'n/a'})` },
+            { key: 'Type', val: packet.packet_type || 'n/a' },
+            { key: 'Protocol', val: packet.protocol || 'n/a' },
             { key: 'Hops', val: hopLabel },
             { key: 'Want ACK', val: packet.want_ack ? 'Yes' : 'No' },
         ];
@@ -255,7 +255,7 @@ class PacketDetailModal {
                 previewLen: 480,
             });
         } else {
-            rows.push({ key: 'Content', val: '—' });
+            rows.push({ key: 'Content', val: 'n/a' });
         }
 
         return rows;
@@ -263,9 +263,9 @@ class PacketDetailModal {
 
     _captureRows(packet) {
         return [
-            { key: 'Packet ID', val: packet.packet_id || '—' },
-            { key: 'Source', val: packet.capture_source || '—' },
-            { key: 'Timestamp', val: packet.timestamp || '—' },
+            { key: 'Packet ID', val: packet.packet_id || 'n/a' },
+            { key: 'Source', val: packet.capture_source || 'n/a' },
+            { key: 'Timestamp', val: packet.timestamp || 'n/a' },
         ];
     }
 

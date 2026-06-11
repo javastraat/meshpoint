@@ -118,11 +118,11 @@
 }
 
 .pdm-row__val--good {
-    color: #44d39a;
+    color: var(--accent-green);
 }
 
 .pdm-row__val--bad {
-    color: #f87171;
+    color: var(--accent-red);
 }
 
 .pdm-payload-text {
