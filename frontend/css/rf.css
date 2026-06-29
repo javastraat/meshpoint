@@ -25,6 +25,16 @@
     max-width: 40rem;
 }
 
+.rf-panel__error {
+    margin: 0.65rem 0 0;
+    padding: 0.55rem 0.65rem;
+    border-radius: var(--radius-sm, 6px);
+    font-size: 0.75rem;
+    color: #fecaca;
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
 .rf-grid {
     display: grid;
     grid-template-columns: 1fr;

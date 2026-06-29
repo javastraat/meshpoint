@@ -4,7 +4,8 @@
  */
 class RfTab {
     constructor(containerId) {
-        this._container = document.getElementById(containerId);
+        this._containerId = containerId;
+        this._container = null;
         this._rendered = false;
         this._refreshInterval = null;
         this._histogramChart = null;
@@ -14,22 +15,34 @@ class RfTab {
         this._fetchedAt = null;
     }
 
+    _mount() {
+        if (!this._container) {
+            this._container = document.getElementById(this._containerId);
+        }
+        return this._container;
+    }
+
     async refresh() {
-        if (!this._container) return;
+        const container = this._mount();
+        if (!container) {
+            console.error('RF panel mount #%s not found', this._containerId);
+            return;
+        }
+
+        this._ensureShell();
 
         try {
-            const res = await fetch('/api/rf/status');
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const res = await fetch('/api/rf/status', { credentials: 'same-origin' });
+            if (!res.ok) {
+                throw new Error(`HTTP ${res.status}`);
+            }
             const data = await res.json();
             this._fetchedAt = Date.now();
-            if (!this._rendered) {
-                this._buildLayout();
-                this._rendered = true;
-                this._bindWebSocket();
-            }
+            this._clearFetchError();
             this._update(data);
         } catch (e) {
             console.error('RF status refresh failed:', e);
+            this._showFetchError(e);
         }
 
         if (!this._refreshInterval) {
@@ -45,8 +58,33 @@ class RfTab {
         }
     }
 
+    _ensureShell() {
+        if (this._rendered) return;
+        this._buildLayout();
+        this._rendered = true;
+        this._bindWebSocket();
+    }
+
+    _showFetchError(err) {
+        const host = document.getElementById('rf-fetch-error');
+        if (!host) return;
+        const detail = err && err.message ? err.message : 'request failed';
+        host.hidden = false;
+        host.textContent = (
+            `Could not load RF status (${detail}). `
+            + 'If you just updated, restart meshpoint so the API is available, then try again.'
+        );
+    }
+
+    _clearFetchError() {
+        const host = document.getElementById('rf-fetch-error');
+        if (host) host.hidden = true;
+    }
+
     _buildLayout() {
-        this._container.innerHTML = `
+        const container = this._mount();
+        if (!container) return;
+        container.innerHTML = `
             <div class="rf-panel">
                 <header class="rf-panel__header">
                     <h2 class="rf-panel__title">RF Environment</h2>
@@ -55,6 +93,7 @@ class RfTab {
                         Values marked <span class="rf-badge rf-badge--live">Live scan</span> come from hardware;
                         <span class="rf-badge rf-badge--fallback">Packet fallback</span> is an upper bound from decoded packets.
                     </p>
+                    <p id="rf-fetch-error" class="rf-panel__error" hidden role="alert"></p>
                 </header>
                 <div class="rf-grid">
                     <article class="rf-card">
@@ -332,4 +371,12 @@ class RfTab {
     }
 }
 
-window.rfTab = new RfTab('rf-panel');
+function _bootRfTab() {
+    window.rfTab = new RfTab('rf-panel');
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', _bootRfTab);
+} else {
+    _bootRfTab();
+}

@@ -121,3 +121,77 @@
     0%, 100% { opacity: 0.6; }
     50%      { opacity: 1; }
 }
+
+/* RF Environment — sits under the noise-floor sparkline */
+
+.telemetry-rail__rf-wrap {
+    margin-top: 0.15rem;
+}
+
+.telemetry-rail__rf-link {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    width: 100%;
+    padding: 0.42rem 0.55rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    background: rgba(255, 255, 255, 0.02);
+    color: var(--sidebar-text-muted);
+    text-decoration: none;
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.06em;
+    transition:
+        background var(--motion-fast) var(--ease-out-expo),
+        border-color var(--motion-fast) var(--ease-out-expo),
+        color var(--motion-fast) var(--ease-out-expo);
+}
+
+.telemetry-rail__rf-link:hover,
+.telemetry-rail__rf-link:focus-visible {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(0, 229, 255, 0.22);
+    color: var(--sidebar-text);
+    outline: none;
+}
+
+.telemetry-rail__rf-wrap[data-active="true"] .telemetry-rail__rf-link,
+.telemetry-rail__rf-link[aria-current="page"] {
+    background: rgba(0, 229, 255, 0.08);
+    border-color: rgba(0, 229, 255, 0.28);
+    color: var(--accent-cyan);
+}
+
+.telemetry-rail__rf-icon {
+    display: flex;
+    flex: 0 0 auto;
+    width: 0.95rem;
+    height: 0.95rem;
+    opacity: 0.85;
+}
+
+.telemetry-rail__rf-icon svg {
+    width: 100%;
+    height: 100%;
+}
+
+.telemetry-rail__rf-label {
+    flex: 1 1 auto;
+    text-transform: uppercase;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    font-size: 0.55rem;
+}
+
+.telemetry-rail__rf-chevron {
+    flex: 0 0 auto;
+    width: 0.75rem;
+    height: 0.75rem;
+    opacity: 0.45;
+}
+
+.telemetry-rail__rf-wrap[data-active="true"] .telemetry-rail__rf-chevron,
+.telemetry-rail__rf-link[aria-current="page"] .telemetry-rail__rf-chevron {
+    opacity: 0.85;
+}

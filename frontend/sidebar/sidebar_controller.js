@@ -80,6 +80,10 @@ class SidebarController {
         const backdrop = document.getElementById('sidebar-backdrop');
         if (backdrop) backdrop.addEventListener('click', this._handleBackdrop);
 
+        // Re-query so links outside .sidebar__nav (e.g. telemetry RF) are wired.
+        this._allLinks = Array.from(document.querySelectorAll(
+            '.sidebar__link[data-route], .sidebar__group-toggle[data-group]',
+        ));
         this._allLinks.forEach((el) => {
             if (el.classList.contains('sidebar__group-toggle')) {
                 el.addEventListener('click', this._handleGroupToggle);
