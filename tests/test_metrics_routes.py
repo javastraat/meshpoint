@@ -135,7 +135,6 @@ class TestMetricsRoute(unittest.TestCase):
         self.assertNotIn("1PG7OiAp", body)
 
     def test_render_metrics_async(self) -> None:
-        client = self._client(enabled=True, require_auth=False)
         body = _run(metrics_routes._render_metrics())
         self.assertIn("meshpoint_uptime_seconds", body)
 
