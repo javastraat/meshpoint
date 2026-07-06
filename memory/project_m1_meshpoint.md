@@ -696,7 +696,7 @@ docstring even warned commands must match sudoers.)
 | `src/version.py` | 0.7.6 → **0.7.7** |
 | `src/api/update/channels.py` | Catalog trimmed to **Stable (main) + Custom** only (user request: "we only have main or custom"); upstream `rc-077`/`feat/v0.7.7` + `wismesh-node`/`feat/wismesh-hat` rows deleted (branches don't exist on the fork); `CHANNEL_ID_ALIASES` maps ALL retired ids (rc-074..077, wismesh-node) → `"stable"` |
 | `frontend/js/settings/update_panel_controller.js` | `UPDATE_CHANNEL_ALIASES` same remap → 'stable' |
-| `docs/CHANGELOG.md` | New **v0.7.7 section = full fork feature list** (LoRaWAN sniffing, multi-radio, RTL-SDR listener, UI, scripts, self-update fixes — 23 bullets across 6 subsections) + manual-upgrade note; verified with the real ChangelogParser: stable preview picks v0.7.7 with all 23 bullets |
+| `docs/CHANGELOG.md` | New **v0.7.7 section = full fork feature list** (LoRaWAN sniffing, multi-radio, RTL-SDR listener, UI, scripts, self-update fixes — 23 bullets across 6 subsections) + manual-upgrade note; verified with the real ChangelogParser: stable preview picks v0.7.7 (2026-07-06 late: grew to 31 bullets / 7 subsections — added "Roles and access" + sidebar regroup/modals/date bullets) |
 | `tests/` (3 files) | See below |
 
 **Sudoers self-installs — no manual copy needed:** `meshpoint.service`
@@ -792,6 +792,19 @@ buttons stay visible and 403 with a clean toast on click — ACCEPTED as-is,
 hiding them is NOT a wanted task.
 `_ADMIN_SECTIONS`/`_VIEWER_SECTIONS` in identity_routes.py still stale vs real
 tabs (works because ungated nav items aren't checked) — offered sync, not done.
+
+#### Viewer 403 toast + README table fix (2026-07-06 late, committed as `ca41dbf` "message protection")
+- **README 5-Network table corrected** (rows 1-2): ch0-ch4 LoRaWAN 0x34 /
+  ch8-only Meshtastic 0x2B (was the never-true ch0-ch2/ch3-ch4 plan).
+- **Viewer message-send → toast** (user-tested the failed-bubble UX and asked
+  for a toast): in `messaging.js` `_onSendMessage`, a **403** now removes the
+  optimistic bubble (`MessagingChat.removeMessage(tempId)`, new) and shows
+  "Not sent: <detail>" via a `_showToast` helper reusing the global `r-toast`
+  element/styles from radio.css (loaded on every page). Non-403 failures keep
+  the in-thread `failed:` bubble (real delivery errors are useful history).
+- **Bottom-right "meshpoint · vX.Y.Z" build stamp STAYS.** A removal was tried
+  (overlaps the scrollbar) but the user reverted it before committing — final
+  call: leave the stamp as-is. Don't propose removing it again.
 
 ---
 

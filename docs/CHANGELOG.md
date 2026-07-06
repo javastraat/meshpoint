@@ -31,8 +31,19 @@ First tagged release of the javastraat/meshpoint fork: LoRaWAN sniffing, multi-r
 - **Real-time VU meter.** Client-side Web Audio analyser (instantaneous RMS at ~60 fps with peak hold) instead of server-side loudness polling.
 - **Clean retunes.** Stop → settle → start pipeline with retry fixes the "Failed to open rtlsdr device #0" race on fast channel switches.
 
+#### Roles and access
+
+- **Viewer role fully locked down server-side.** Every write endpoint now requires the admin role: configuration saves (transmit, identity, radio, channels, MeshCore channels), application restart, NodeInfo edit/send, companion rename, and message send/advert/delete. Viewers get a clean 403 instead of silent acceptance.
+- **Channel secrets hidden from viewers.** `GET /api/config` no longer returns the Meshtastic channel PSK or MeshCore channel key to viewer sessions; only admins see key material.
+- **"Admin access required" page.** Viewers who open an admin route (Configuration, Terminal, Settings) — via the sidebar or a deep link — get a friendly lock card with a back-to-dashboard link instead of a broken page.
+- **Blocked sends show a toast.** A viewer using the Messages compose box gets a "Not sent: admin role required" toast instead of a failed message bubble left in the thread.
+- **Login page no longer prefills the username.** Both fields start empty on every visit.
+
 #### Dashboard and UI
 
+- **Sidebar regrouped.** Dashboard on top, then **Networks** (LoRaWAN, Meshtastic, MeshCore, Messages, Stats), **Radio** (Hardware, RTL-SDR), and **Ops** (Terminal, Configuration, Settings). The former "Radio" page is now called **Hardware** and the listener appears as **RTL-SDR**.
+- **Inline modals instead of browser popups.** Confirmation dialogs in the update panel, channel and MeshCore configuration cards, sign-out-all, viewer-role form, and dangerous actions now use the dashboard's own modal styling instead of native `confirm()` popups.
+- **Dates on packet feeds.** LoRaWAN, Meshtastic, and MeshCore panels show a date for packets from previous days ("Jul 5, 16:19"); today's packets keep the compact time-only form.
 - **Theme toggle in the topbar.** Cycles the three dark themes (default, high-contrast, sunlight) with per-theme icon, in sync with the command palette.
 - **24-hour clock everywhere.** Packet feeds, panels, node drawer, charts, messaging, and update pages all render `hour12: false`.
 - **Metric defaults.** Display units default to Celsius and kilometers for new browsers; explicit imperial choices are kept.
