@@ -674,10 +674,9 @@ repo even before the system config is set; (2) `scripts/install.sh` adds the
 Different in This Fork" section (grouped list of all fork additions), an
 "Optional: RTL-SDR Radio Listener" hardware section (dongle, coverage,
 rtl-sdr/ffmpeg/redsea deps, DVB-driver blacklist, power/no-hot-plug, antenna),
-the RTL-SDR listener feature paragraph, and 4 `/api/listener/*` API rows. NOTE:
-README still shows the STALE 5-network channel table (`ch0-ch2 LoRaWAN, ch3-ch4
-Meshtastic`) — that's the old plan; real plan is ch0-ch4 LoRaWAN + only ch8
-Meshtastic (left untouched, flag if fixing).
+the RTL-SDR listener feature paragraph, and 4 `/api/listener/*` API rows. The
+formerly stale 5-network channel table (`ch0-ch2 LoRaWAN, ch3-ch4 Meshtastic`)
+was corrected 2026-07-06 to the real plan: ch0-ch4 LoRaWAN + only ch8 Meshtastic.
 
 #### v0.7.7: dashboard self-update REGRESSION + repair (2026-07-06 afternoon)
 
@@ -762,7 +761,7 @@ session: lorawan/meshcore/meshtastic panels' `_fmtTime` shows `Jul 5, 16:19`
 for non-today (today stays `HH:MM:SS`); messaging_contacts.js:200 still
 time-only (offered, not requested).
 
-#### Viewer-role security lockdown (2026-07-06 evening, local only — not pushed)
+#### Viewer-role security lockdown (2026-07-06, committed as `0c1cd41` — verified working, viewers get 403 + toast)
 User tested as viewer and found writes NOT blocked (only sidebar hiding was).
 Fixed on three layers:
 1. **require_admin gates added** (per-route `_claims: SessionClaims =
@@ -787,9 +786,10 @@ Fixed on three layers:
 Also fixed: **Transmit card stuck "Saving…"** — `_onSubmit` crashed on
 `null._relayBurst` (burst/RSSI inputs don't exist in the template) after PUT
 transmit succeeded, and PUT `/api/config/relay` doesn't even exist in the
-backend; dead call + null lookups removed. NOTE: viewer-visible pages still
-SHOW admin buttons (Messages send box, Hardware "Send NodeInfo now") — they
-now 403 with a toast; hiding them for viewers = possible polish.
+backend; dead call + null lookups removed. Viewer UX verified live by user (2026-07-06): guarded routes show the
+"Admin access required" card; on viewer-open pages (Hardware, Messages) admin
+buttons stay visible and 403 with a clean toast on click — ACCEPTED as-is,
+hiding them is NOT a wanted task.
 `_ADMIN_SECTIONS`/`_VIEWER_SECTIONS` in identity_routes.py still stale vs real
 tabs (works because ungated nav items aren't checked) — offered sync, not done.
 

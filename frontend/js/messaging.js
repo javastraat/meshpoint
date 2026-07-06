@@ -145,7 +145,14 @@ class MessagingPanel {
             if (!res.ok) {
                 const errBody = await res.json().catch(() => ({}));
                 const reason = errBody.detail || errBody.error || `HTTP ${res.status}`;
-                this._chat.updateMessageStatus(tempMsg.id, `failed: ${reason}`, '');
+                if (res.status === 403) {
+                    // Permission problem, not a delivery problem: no
+                    // failed bubble in the thread, just a toast.
+                    this._chat.removeMessage(tempMsg.id);
+                    this._showToast(`Not sent: ${reason}`);
+                } else {
+                    this._chat.updateMessageStatus(tempMsg.id, `failed: ${reason}`, '');
+                }
                 return;
             }
 
@@ -168,6 +175,19 @@ class MessagingPanel {
             console.error('Send failed:', e);
             this._chat.updateMessageStatus(tempMsg.id, 'network error', '');
         }
+    }
+
+    _showToast(text) {
+        let toast = document.getElementById('r-toast');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'r-toast';
+            toast.className = 'r-toast';
+            document.body.appendChild(toast);
+        }
+        toast.textContent = text;
+        toast.classList.add('r-toast--visible');
+        setTimeout(() => toast.classList.remove('r-toast--visible'), 2500);
     }
 
     _setupWebSocket() {

@@ -86,6 +86,16 @@ class MessagingChat {
         return msg;
     }
 
+    removeMessage(tempId) {
+        const bubble = this._messagesEl.querySelector(`[data-msg-id="${tempId}"]`);
+        if (bubble) bubble.remove();
+        this._messages = this._messages.filter((m) => m.id !== tempId);
+        if (this._messages.length === 0) {
+            this._lastDayKey = null;
+            this._renderConversationEmptyState();
+        }
+    }
+
     updateMessageStatus(tempId, status, packetId) {
         const bubble = this._messagesEl.querySelector(`[data-msg-id="${tempId}"]`);
         if (bubble) {

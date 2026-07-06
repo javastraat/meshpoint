@@ -213,8 +213,8 @@ A fully-equipped Meshpoint captures all of these simultaneously from one device:
 
 | # | Protocol | Band | Source |
 |---|---|---|---|
-| 1 | LoRaWAN | 868 MHz | SX1302 concentrator (ch0–ch2, syncword 0x34) |
-| 2 | Meshtastic | 868 MHz | SX1302 concentrator (ch3–ch4 + ch8, syncword 0x2B) |
+| 1 | LoRaWAN | 868 MHz | SX1302 concentrator (ch0–ch4, syncword 0x34) |
+| 2 | Meshtastic | 868 MHz | SX1302 concentrator (ch8 service channel, syncword 0x2B) |
 | 3 | MeshCore | 868 MHz | Heltec V3 USB companion (`/dev/ttyACM0`) |
 | 4 | MeshCore | 433 MHz | Heltec V3 USB companion (`/dev/ttyACM1`) |
 | 5 | Meshtastic | 433 MHz | Heltec V3 USB serial (`/dev/ttyUSB0`) |
