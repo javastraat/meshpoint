@@ -48,6 +48,38 @@ Everything is managed from a browser dashboard: full chat with channels and DMs,
 
 ---
 
+## What's Different in This Fork
+
+This is a customized fork of upstream [KMX415/meshpoint](https://github.com/KMX415/meshpoint), tuned for a SenseCap M1 "mega-sniffer" **and** a browser radio receiver. On top of everything upstream provides, this version adds:
+
+**RTL-SDR broadcast & utility radio listener** (entirely new)
+- Browser radio receiver on a cheap RTL-SDR dongle — FM broadcast, airband (AM), marine VHF/UHF, PMR446, 2 m / 70 cm ham, SSB (~24–1766 MHz), independent of the SX1302 so LoRa capture keeps running.
+- Modes **WFM / NFM / AM / USB / LSB**, with squelch, gain, and pre-encoder level controls.
+- Two switchable radio faces — **Digital** (VFD readout + segmented VU) and **Analogue** (slide-rule dial + swinging-needle VU gauge under glass), persisted per browser.
+- Real-time **Web Audio VU meter** that follows the audio.
+- **RDS** on FM (via `redsea`): station name, scrolling RadioText / now-playing, program type (PTY), and a block-error-rate signal-quality meter.
+- **Phonebook preset picker** — category tabs, search across all presets, ★ favorites, and green "now playing" dots on the tuned channel and its category.
+- New `/api/listener/*` endpoints.
+
+**Expanded multi-protocol capture**
+- **LoRaWAN passive sniffing** — full MAC decoder (Join / Data / Rejoin), a dedicated LoRaWAN dashboard panel, and `/api/lorawan/*` endpoints, using the SX1302 "dual sync-word" trick (ch0–ch7 on LoRaWAN 0x34, ch8 on Meshtastic 0x2B).
+- **EU868 5-channel LoRaWAN plan** (867.9 / 868.1 / 868.3 / 868.5 / 868.7 MHz) across RF0's full IF window — the 3 mandatory uplinks plus 2 extra TTN channels.
+- **Up to 4 MeshCore USB companions** plus a Meshtastic-433 serial source → 5 networks captured at once.
+- **MeshCore per-packet metadata** — frequency/SF read from the companion's radio config, hop count decoded from the MeshCore `path_len`, and each companion's packets labeled by source.
+
+**Contacts / neighbours tooling**
+- `import_contacts.py` imports a MeshCore contacts/neighbours list into the node DB, with clock-skew-immune timestamps (`now − secs_ago`) and freq/SF stamping.
+- `scripts/repair_neighbour_timestamps.py` + `scripts/backfill_meshcore_signal.py` fix bad past/future timestamps and backfill freq/SF on old rows.
+
+**UI / UX**
+- **Topbar theme toggle** (cycles the dark / high-contrast / sunlight themes with a per-theme icon).
+- **24-hour time** across the whole dashboard.
+- **Metric defaults** (Celsius + kilometers) for a fresh browser.
+
+> Because this is a fork, a dashboard **Update** (which runs `git reset --hard origin/main`) will overwrite these changes unless your `origin` remote points at this fork rather than upstream.
+
+---
+
 ## Features
 
 **5 networks simultaneously.** A single Meshpoint captures LoRaWAN (868 MHz), Meshtastic (868 MHz), MeshCore (868 MHz), MeshCore (433 MHz), and Meshtastic (433 MHz) at the same time — all from one device. The onboard SX1302 handles LoRaWAN and Meshtastic 868; USB companion radios extend coverage to MeshCore and 433 MHz bands.
