@@ -558,7 +558,7 @@ S-meter via pyrtlsdr (time-shared). Evaluated & rejected: rtl_fm_streamer
 (FM-only, loses AM), PLSDR / rtlsdr-waterfall (desktop GUI, waterfall CPU).
 rtlsdr-radio validated our arch + suggested ICY metadata / DAB idea.
 
-#### Listener two-skin radio + phonebook presets + theme toggle (2026-07-06 → live)
+#### Listener two-skin radio + station presets + theme toggle (2026-07-06 → live)
 Big polish pass. All frontend unless noted. The "analog tuning dial" from the
 open list got built (as the Analogue skin).
 
@@ -602,7 +602,8 @@ flickering half-text and restarting the marquee. Marquee only rebuilds when the
 text CHANGES (`_stationTextCache` guard). Native `title=` tooltips on
 WFM/ON AIR/TUNING/RDS/BLER/PTY.
 
-**Presets = phonebook** (was one long scroll). `PRESET_GROUPS` unchanged; new
+**Station presets** (call them that, not "phonebook" — user's naming; was one
+long scroll). `PRESET_GROUPS` unchanged; new
 rendering: **★ Favorites tab** (first; pin via ☆ star on each chip, stored
 localStorage `meshpoint.presetFavs` as `freq|mode` keys) + **category tabs**
 (one visible at a time, persists `meshpoint.presetCat`, `'fav'` = favorites) +

@@ -358,7 +358,7 @@ class ListenerPanel {
             catch (_e) { return 'digital'; }
         })();
         this._skin = null;
-        // Presets: active category tab (phonebook-style). 'fav' = Favorites.
+        // Station presets: active category tab. 'fav' = Favorites.
         this._activeCat = (() => {
             try {
                 const v = localStorage.getItem('meshpoint.presetCat');
@@ -878,7 +878,7 @@ class ListenerPanel {
     }
 
     // No filter -> the active category (or Favorites). With a filter -> matching
-    // presets across every category, grouped for context (phonebook search).
+    // station presets across every category, grouped for context.
     _renderPresetChannels(filter) {
         const groups = ListenerPanel.PRESET_GROUPS;
         const favs = this._loadFavs();

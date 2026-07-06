@@ -616,7 +616,7 @@
 .lsn-ana__display .lsn-station__text { font-size: 17px; }
 .lsn-ana__display .lsn-ana__freq { font-size: clamp(24px, 5vw, 34px); }
 
-/* ── Presets: search + category tabs (phonebook) ──────── */
+/* ── Station presets: search + category tabs ──────────── */
 
 .lsn-preset-bar { margin-bottom: 12px; }
 

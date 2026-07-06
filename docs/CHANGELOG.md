@@ -27,7 +27,7 @@ First tagged release of the javastraat/meshpoint fork: LoRaWAN sniffing, multi-r
 - **Browser radio via RTL-SDR dongle.** `rtl_fm` → ffmpeg MP3 streaming with WFM/NFM/AM/USB/LSB modes, tune-anywhere, squelch/gain/level controls, 10-minute idle auto-stop; `GET/POST /api/listener/*` endpoints behind the session cookie.
 - **RDS on broadcast FM.** Wideband MPX pipeline teed to redsea: station name, RadioText, programme type, and a BLER signal-quality pill; EU 50 µs de-emphasis reconstruction.
 - **Two radio faces.** Digital skin (VFD-style frequency readout, segmented VU) and Analogue skin (slide-rule dial with band scales, preset flags, swinging-needle VU); choice persists per browser.
-- **Preset phonebook.** Favorites with pinning, category tabs, and search across Amsterdam FM, PMR446, marine VHF/UHF, Schiphol airband (true 8.33 kHz carriers), and ham presets; now-playing markers on tab and chip.
+- **Preset stations.** Favorites with pinning, category tabs, and search across Amsterdam FM, PMR446, marine VHF/UHF, Schiphol airband (true 8.33 kHz carriers), and ham presets; now-playing markers on tab and chip.
 - **Real-time VU meter.** Client-side Web Audio analyser (instantaneous RMS at ~60 fps with peak hold) instead of server-side loudness polling.
 - **Clean retunes.** Stop → settle → start pipeline with retry fixes the "Failed to open rtlsdr device #0" race on fast channel switches.
 
