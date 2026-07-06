@@ -553,11 +553,130 @@ as fallback (`_vuFromWebAudio` gate). Dances with the music, drops on quiet.
 smoothing `0.4/0.6`, marquee speed `/22`, de-emphasis type, `_LUFS_*`. Verify
 redsea JSON key is `bler` (`-E`) if the quality pill stays hidden.
 
-**Still open (radio):** analog tuning dial (needle on band scale), DAB+ via
-welle-cli (NPO Radio 5 is DAB-only), true-RF S-meter via pyrtlsdr (time-shared).
-Evaluated & rejected: rtl_fm_streamer (FM-only, loses AM), PLSDR / rtlsdr-
-waterfall (desktop GUI, waterfall CPU). rtlsdr-radio validated our arch +
-suggested ICY metadata / DAB idea.
+**Still open (radio):** DAB+ via welle-cli (NPO Radio 5 is DAB-only), true-RF
+S-meter via pyrtlsdr (time-shared). Evaluated & rejected: rtl_fm_streamer
+(FM-only, loses AM), PLSDR / rtlsdr-waterfall (desktop GUI, waterfall CPU).
+rtlsdr-radio validated our arch + suggested ICY metadata / DAB idea.
+
+#### Listener two-skin radio + phonebook presets + theme toggle (2026-07-06 → live)
+Big polish pass. All frontend unless noted. The "analog tuning dial" from the
+open list got built (as the Analogue skin).
+
+**Two swappable SKINS, one shared controller.** `listener_panel.js` split into a
+CONTROLLER (state, tune/stop, status poll, RDS, Web Audio VU, presets) and a
+pluggable DISPLAY SKIN implementing { mount, setFreq, setMode, setLeds,
+setStation, setRdsQual, setVu, reset }. `DigitalSkin` (VFD readout + segmented
+VU) and `AnalogueSkin` (slide-rule dial + swinging-needle VU). A
+**Digital | Analogue toggle** in the panel header switches them; choice persists
+(localStorage `meshpoint.listenerSkin`). CRITICAL: the `<audio>` element lives in
+the SHELL, not a skin — `createMediaElementSource` is one-per-element, so the
+Web Audio graph survives skin switches and the VU keeps feeding whichever skin.
+Skins query their own elements via `data-*` attrs (no global IDs → no collisions).
+
+**Analogue skin:** full-width slide-rule dial (band scale auto-adapts: FM
+87.5-108.5, AIR, 2m, MARINE, 70cm, PMR — `AnalogueSkin.BANDS`), red needle
+glides to freq (green when RDS locks, BLER>=80), **cyan preset-flag dots** on the
+scale for every preset freq in-band. SVG **VU gauge**: green/yellow/red arc +
+ticks + white needle + round-glass dome overlay. Amber "dial-light" theme
+(`--accent-amber`). Layout (final): dial on top → row of [VU gauge left | RDS
+block right], RDS block stacks tags(RDS/BLER%/PTY) → station text → freq readout.
+Whole analogue block capped `max-width:720px` to match the digital skin.
+
+**Web Audio VU (real-time), the key VU fix.** Server ebur128 audio_level (400ms
+integrated loudness) barely moved on compressed broadcast FM. Replaced with a
+client-side `AnalyserNode` on the `<audio>` element: `_ensureAudioGraph()`
+(element→analyser→destination, created ONCE), `_startVuLoop()` computes
+instantaneous RMS→dBFS→0-100 at ~60fps (`(db+50)/47*100`, EMA smoothing). Time-
+based peak-hold (~14 seg/s) works at 60fps or the 2Hz poll fallback. Server
+audio_level kept only as fallback (`_vuFromWebAudio` gate). NOTE: this routes
+playback through the AudioContext → causes a macOS Bluetooth "silent until you
+re-select the output" quirk. A "Direct audio" bypass toggle was tried and
+REVERTED (didn't fix BT; user wanted the nice VU back). Real fix would need
+HTTPS for a `setSinkId` output picker — deferred (meshpoint is http on LAN).
+
+**RDS quality + text refinements.** BLER meter: redsea `-E` adds a `bler` field
+(block error rate); pill shows `100-bler`% green>=90/amber>=70/red, placed right
+after the RDS tag. PTY tag from `prog_type`. RadioText fix: dropped redsea `-p`
+(partial) and only read fully-received `ps`/`radiotext` — partial fragments were
+flickering half-text and restarting the marquee. Marquee only rebuilds when the
+text CHANGES (`_stationTextCache` guard). Native `title=` tooltips on
+WFM/ON AIR/TUNING/RDS/BLER/PTY.
+
+**Presets = phonebook** (was one long scroll). `PRESET_GROUPS` unchanged; new
+rendering: **★ Favorites tab** (first; pin via ☆ star on each chip, stored
+localStorage `meshpoint.presetFavs` as `freq|mode` keys) + **category tabs**
+(one visible at a time, persists `meshpoint.presetCat`, `'fav'` = favorites) +
+**search box** (filters across all categories, grouped for context; tabs dim).
+`_repaintPresets()` re-renders tabs+view. **Green "now playing" dot** on both the
+tuned category tab (`_tunedCat`) AND the tuned channel chip (`_tunedKey`, marked
+in `_btn`, persists across tab/search). Default tuner freq **98.000 + WFM** so a
+fresh visitor can hit Tune & Listen and get SLAM! immediately.
+
+**Other:** 24-hour time everywhere (`hour12:false` across ~10 files); 3-decimal
+freq readout; frequency default 98/WFM.
+
+#### Topbar theme toggle (2026-07-06)
+meshpoint has **3 themes, all dark**: `dark` (default), `high-contrast`,
+`sunlight` — `ThemeController` sets `data-theme` on `<html>`, persists, and
+themes are CSS-variable overrides in `css/theme_high_contrast.css`. Added a
+**theme button in the topbar** (`_registerThemeToggle` in app.js via
+`topbar.registerAction`) that cycles them with a per-theme icon (moon/contrast/
+sun) + tooltip; in sync with the existing `theme:cycle` command-palette entry.
+A 4th **LIGHT** theme is NOT done — it's a medium-large job because the CSS is
+dark-first with many hardcoded colors (surfaces, glows, gradients) + dark map
+tiles; would need tokenizing colors, a glow/contrast pass, and per-page testing.
+The toggle is ready to accept a `light` entry when that work happens.
+
+#### Fork = javastraat/meshpoint; update mechanism repointed (2026-07-06)
+This whole tree (`meshpoint_lorawan/`) is a **fork of upstream KMX415/meshpoint**,
+substantially diverged. User's fork: **`https://github.com/javastraat/meshpoint`**.
+Confirmed against upstream README (WebFetch): upstream has NONE of the RTL-SDR
+listener, RDS, radio skins, LoRaWAN sniffing/`/api/lorawan/*`, multi-companion,
+theme toggle, or 24h/metric defaults — all of that is this fork's work.
+
+**How the dashboard "Update" works** (Settings → Updates):
+- Operates on the git repo at **`/opt/meshpoint`** (NOT /opt/meshcore).
+- Apply chain (`src/api/update/apply.py`, all `sudo`): `git fetch origin <branch>`
+  → `git checkout -f <branch>` → `git reset --hard origin/<branch>` →
+  `sudo bash scripts/apply_finish.sh` (detached; `systemctl restart`).
+- **`git reset --hard` WIPES uncommitted local changes in /opt/meshpoint.** So all
+  our fork work must live in `origin` (javastraat), or a dashboard Update deletes
+  it. Check before Apply: `git -C /opt/meshpoint status --short` (empty = safe).
+- "Update available?" = version check reading `version.py` from GitHub raw.
+- Watchdog stores pre-update SHA; Rollback = `git reset --hard <sha>` (unlocks
+  only after one Apply runs from that page).
+
+**Repointed the 4 hardcoded KMX415 URLs → javastraat** (so update pulls from AND
+version-checks against the fork):
+| File | What |
+|---|---|
+| `src/api/update/install_status.py` (`fetch_remote_version_sync`) | version-check raw URL |
+| `src/api/routes/update_check.py` | version-check raw URL |
+| `src/remote/executors.py` (`GITHUB_REPO`) | remote-executor clone URL |
+| `scripts/meshpoint.service` | `Documentation=` link (cosmetic) |
+The `origin` remote in `/opt/meshpoint/.git/config` was ALREADY javastraat (set by
+install-time clone) — that governs the actual `fetch`/`reset`, not any hardcoded
+URL. GOTCHA: origin AND the 2 version-check URLs must both be javastraat or the
+"1 commit behind" comparison is wrong. README still has KMX415 badges/clone/links
+(cosmetic, left as-is unless asked).
+
+**Git "dubious ownership" error — FIXED two ways.** `/opt/meshpoint` is root-owned
+(sudo clone) but the service runs as `meshpoint`, so newer git refused updates:
+`fatal: detected dubious ownership`. Manual one-liner that fixes a box:
+`sudo git config --system --add safe.directory /opt/meshpoint`. Baked in so it
+never recurs: (1) every git invocation in `apply.py` (4) + `install_status.py`
+(5 builders) now passes `-c safe.directory=<repo_path>` → the app self-trusts the
+repo even before the system config is set; (2) `scripts/install.sh` adds the
+`git config --system` line after the chowns (idempotent, guarded on `.git`).
+
+**README additions this session** (`meshpoint_lorawan/README.md`): a "What's
+Different in This Fork" section (grouped list of all fork additions), an
+"Optional: RTL-SDR Radio Listener" hardware section (dongle, coverage,
+rtl-sdr/ffmpeg/redsea deps, DVB-driver blacklist, power/no-hot-plug, antenna),
+the RTL-SDR listener feature paragraph, and 4 `/api/listener/*` API rows. NOTE:
+README still shows the STALE 5-network channel table (`ch0-ch2 LoRaWAN, ch3-ch4
+Meshtastic`) — that's the old plan; real plan is ch0-ch4 LoRaWAN + only ch8
+Meshtastic (left untouched, flag if fixing).
 
 ---
 

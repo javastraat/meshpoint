@@ -493,6 +493,15 @@ usermod -a -G systemd-journal,adm meshpoint 2>/dev/null || true
 chown -R meshpoint:meshpoint "${MESHPOINT_DIR}/data"
 chown -R meshpoint:meshpoint "${MESHPOINT_DIR}/config"
 
+# The repo is root-owned but the service runs as `meshpoint`, so git would
+# refuse dashboard updates with "detected dubious ownership". Trust the repo
+# for every user (root, meshpoint, pi). Idempotent — no duplicate entries.
+if [ -d "${MESHPOINT_DIR}/.git" ]; then
+    git config --system --get-all safe.directory 2>/dev/null \
+        | grep -qx "${MESHPOINT_DIR}" \
+        || git config --system --add safe.directory "${MESHPOINT_DIR}"
+fi
+
 # Espressif USB serial devices (Heltec V3/V4, T-Beam ESP32-S3) may not
 # default to dialout group on all Pi OS versions. Add a udev rule so
 # the meshpoint service user can access them for relay and MeshCore.

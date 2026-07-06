@@ -53,7 +53,10 @@ def read_install_git_ref(
     passwordless sudoers entries granted to the ``meshpoint`` service
     user. The apply chain already uses the same pattern.
     """
-    git = ["sudo", "git"] if use_sudo else ["git"]
+    # Trust the repo regardless of ownership (dashboard runs git as the
+    # meshpoint service user on a root-owned tree).
+    sd = ["-c", f"safe.directory={repo_path}"]
+    git = ["sudo", "git", *sd] if use_sudo else ["git", *sd]
 
     rc, branch_out, _ = runner(
         [*git, "rev-parse", "--abbrev-ref", "HEAD"], repo_path, 10.0,
@@ -82,7 +85,10 @@ def read_head_full_sha(
     timeout_seconds: float = 30.0,
 ) -> Optional[str]:
     """Return the full 40-char (or longer) SHA for HEAD in the install tree."""
-    git = ["sudo", "git"] if use_sudo else ["git"]
+    # Trust the repo regardless of ownership (dashboard runs git as the
+    # meshpoint service user on a root-owned tree).
+    sd = ["-c", f"safe.directory={repo_path}"]
+    git = ["sudo", "git", *sd] if use_sudo else ["git", *sd]
     rc, out, stderr = runner(
         [*git, "rev-parse", "HEAD"], repo_path, timeout_seconds,
     )
@@ -224,7 +230,10 @@ def git_fetch_origin_branch(
     timeout_seconds: float = 120.0,
 ) -> tuple[bool, Optional[str]]:
     """Fetch ``origin/<branch>``. Returns ``(ok, error_message)``."""
-    git = ["sudo", "git"] if use_sudo else ["git"]
+    # Trust the repo regardless of ownership (dashboard runs git as the
+    # meshpoint service user on a root-owned tree).
+    sd = ["-c", f"safe.directory={repo_path}"]
+    git = ["sudo", "git", *sd] if use_sudo else ["git", *sd]
     rc, _, stderr = runner(
         [*git, "fetch", "origin", branch],
         repo_path,
@@ -250,7 +259,10 @@ def _revision_count(
     ``git log --oneline`` (already whitelisted on older installs) when
     ``rev-list`` is denied.
     """
-    git = ["sudo", "git"] if use_sudo else ["git"]
+    # Trust the repo regardless of ownership (dashboard runs git as the
+    # meshpoint service user on a root-owned tree).
+    sd = ["-c", f"safe.directory={repo_path}"]
+    git = ["sudo", "git", *sd] if use_sudo else ["git", *sd]
     rc, out, _ = runner(
         [*git, "rev-list", "--count", revision_range],
         repo_path,
@@ -282,7 +294,10 @@ def count_commits_behind_ahead(
     use_sudo: bool = True,
 ) -> tuple[Optional[int], Optional[int], Optional[str]]:
     """Compare HEAD to ``origin/<branch>``. Returns behind, ahead, remote short SHA."""
-    git = ["sudo", "git"] if use_sudo else ["git"]
+    # Trust the repo regardless of ownership (dashboard runs git as the
+    # meshpoint service user on a root-owned tree).
+    sd = ["-c", f"safe.directory={repo_path}"]
+    git = ["sudo", "git", *sd] if use_sudo else ["git", *sd]
     upstream = f"origin/{branch}"
 
     behind = _revision_count(

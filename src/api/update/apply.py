@@ -176,7 +176,8 @@ class UpdateApplier:
         steps = [
             ApplyAttempt(
                 label="git reset",
-                args=["sudo", "git", "reset", "--hard", sha],
+                args=["sudo", "git", "-c", f"safe.directory={self._repo_path}",
+                      "reset", "--hard", sha],
                 cwd=self._repo_path,
             ),
             ApplyAttempt(
@@ -211,19 +212,22 @@ class UpdateApplier:
         return (
             ApplyAttempt(
                 label="git fetch",
-                args=["sudo", "git", "fetch", "origin", branch],
+                args=["sudo", "git", "-c", f"safe.directory={self._repo_path}",
+                      "fetch", "origin", branch],
                 cwd=self._repo_path,
                 timeout_seconds=180,
             ),
             ApplyAttempt(
                 label="git checkout",
-                args=["sudo", "git", "checkout", "-f", branch],
+                args=["sudo", "git", "-c", f"safe.directory={self._repo_path}",
+                      "checkout", "-f", branch],
                 cwd=self._repo_path,
                 timeout_seconds=60,
             ),
             ApplyAttempt(
                 label="git reset",
-                args=["sudo", "git", "reset", "--hard", f"origin/{branch}"],
+                args=["sudo", "git", "-c", f"safe.directory={self._repo_path}",
+                      "reset", "--hard", f"origin/{branch}"],
                 cwd=self._repo_path,
                 timeout_seconds=60,
             ),
