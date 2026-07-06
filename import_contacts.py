@@ -21,13 +21,12 @@ from pathlib import Path
 DEFAULT_CONTACTS = Path(__file__).parent.parent / "contacts.json"
 DEFAULT_DB       = Path(__file__).parent / "data" / "concentrator.db"
 
-# MeshCore node type → role string (matches OTA ADVERT bits[3:0])
+# MeshCore node type → role string
 _TYPE_ROLE = {
-    0: None,
     1: "CLIENT",
-    2: "REPEATER",
-    3: "ROOMSERVER",
-    4: "SENSOR",
+    2: "ROUTER",
+    3: "CLIENT_MUTE",
+    4: "REPEATER",
 }
 
 
@@ -119,17 +118,10 @@ def import_contacts(contacts_path: Path, db_path: Path, dry_run: bool = False) -
         node_id, adv_name, role, lat, lon, last_heard, first_seen = row
         cur.execute(
             """
-            INSERT INTO nodes
+            INSERT OR IGNORE INTO nodes
                 (node_id, long_name, protocol, role, latitude, longitude,
                  last_heard, first_seen, packet_count)
             VALUES (?, ?, 'meshcore', ?, ?, ?, ?, ?, 0)
-            ON CONFLICT(node_id) DO UPDATE SET
-                long_name  = COALESCE(excluded.long_name, nodes.long_name),
-                role       = excluded.role,
-                latitude   = COALESCE(excluded.latitude,  nodes.latitude),
-                longitude  = COALESCE(excluded.longitude, nodes.longitude),
-                last_heard = CASE WHEN excluded.last_heard > nodes.last_heard
-                             THEN excluded.last_heard ELSE nodes.last_heard END
             """,
             (node_id, adv_name, role, lat, lon, last_heard, first_seen),
         )
@@ -142,7 +134,7 @@ def import_contacts(contacts_path: Path, db_path: Path, dry_run: bool = False) -
     conn.close()
 
     print(f"Inserted (new)   : {inserted}")
-    print(f"Updated (existed): {skipped}")
+    print(f"Skipped (existed): {skipped}")
     print()
     print("Done. Restart meshpoint_lorawan (or just refresh the dashboard) to see the nodes.")
 

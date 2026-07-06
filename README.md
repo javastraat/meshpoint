@@ -68,6 +68,8 @@ Everything is managed from a browser dashboard: full chat with channels and DMs,
 
 **Meshtastic 433 via serial.** A Heltec V3 or any Meshtastic-flashed node on `/dev/ttyUSB0` adds a fifth capture stream. Packets are decoded and displayed in the dashboard the same as 868 MHz Meshtastic packets.
 
+**RTL-SDR broadcast & utility radio listener.** Plug in a cheap RTL-SDR dongle and listen to real radio from the browser — FM broadcast, airband (AM), marine VHF/UHF, PMR446, 2 m / 70 cm ham, and anything else in ~24–1766 MHz. Server-side `rtl_fm` demodulates (a **Mode** selector for WFM / NFM / AM / USB / LSB, plus squelch, gain, and pre-encoder level) and streams MP3 to a browser `<audio>` player, while the SX1302 keeps sniffing LoRa uninterrupted (separate hardware). Two selectable radio faces — a **Digital** VFD-style readout with a segmented VU meter, and an **Analogue** slide-rule tuner with a swinging-needle VU gauge — and a real-time Web Audio level meter that dances with the audio. **RDS** on FM (via [`redsea`](https://github.com/windytan/redsea)): station name, scrolling RadioText / now-playing, program type (PTY), and a block-error-rate signal-quality meter. A phonebook-style preset picker with category tabs, search, and ★ favorites (Amsterdam FM, PMR446, marine, Schiphol airband, ham). See [RTL-SDR Radio Listener](#optional-rtl-sdr-radio-listener) for setup.
+
 **Full packet decoding.** 14 Meshtastic portnums decoded: TEXT, POSITION, NODEINFO, TELEMETRY, ROUTING, ADMIN, WAYPOINT, DETECTION_SENSOR, PAXCOUNTER, STORE_FORWARD, RANGE_TEST, TRACEROUTE, NEIGHBORINFO, and MAP_REPORT. 6 MeshCore message types decoded. Device roles (CLIENT, ROUTER, REPEATER, TRACKER, SENSOR) extracted from NodeInfo.
 
 **Multi-channel decryption.** Configure private channel PSKs from the dashboard or `local.yaml`. The Meshpoint decodes traffic on those channels alongside the default key and routes messages to the correct conversation. Supports any number of channels with AES-128 or AES-256 keys.
@@ -151,6 +153,23 @@ Add one or more Heltec V3/V4 or T-Beam nodes running [MeshCore USB companion fir
 ### Optional: Meshtastic 433 MHz via USB Serial
 
 A Heltec V3 (or any Meshtastic node) flashed with **Meshtastic EU_433** firmware and connected via USB adds a fifth capture stream at 433 MHz. Use the `serial` source in `local.yaml` — not `meshcore_usb`. These two sources speak different protocols and are not interchangeable.
+
+### Optional: RTL-SDR Radio Listener
+
+Add an **RTL-SDR dongle** (RTL2832U + R820T/R860 — e.g. RTL-SDR Blog V3/V4, ~€25) to turn Meshpoint into a browser-based broadcast/utility radio receiver. It is completely independent of the SX1302, so LoRa capture continues uninterrupted.
+
+- **Coverage:** ~24–1766 MHz — FM broadcast (WFM), airband and AM, marine VHF/UHF, PMR446, 2 m / 70 cm ham (NFM), and SSB (USB/LSB).
+- **Requirements:** the `rtl-sdr` package (provides `rtl_fm` / `rtl_test`) and `ffmpeg`. For **RDS** on FM (station name, RadioText, program type, signal-quality meter), also install [`redsea`](https://github.com/windytan/redsea). RDS is decoded from the wide FM multiplex, so `rtl_fm` runs at 171 kHz and the stream is `tee`'d to both `redsea` and `ffmpeg` — no second dongle needed.
+- **Blacklist the DVB-T driver** so the kernel doesn't claim the dongle as a TV tuner (the #1 "device not found" gotcha):
+  ```bash
+  echo 'blacklist dvb_usb_rtl28xxu' | sudo tee /etc/modprobe.d/rtl-sdr-blacklist.conf
+  sudo modprobe -r dvb_usb_rtl28xxu   # or reboot
+  ```
+  Confirm with `rtl_test` (0 samples lost = healthy).
+- **Power:** the dongle draws ~300 mA. On a Pi already running the concentrator and USB companions, use a solid supply (or a powered hub) and **avoid hot-plugging** — inrush current can brown out the internal USB hub and drop your MeshCore/serial companions. Leave it permanently connected.
+- **Antenna:** give it its own wideband antenna (don't share the tuned LoRa antennas). A broadcast-FM band-pass/notch filter helps if strong local stations cause overload.
+
+Open the **Listener** tab in the dashboard, pick a preset (or type a frequency + mode) and hit **Tune & Listen**. Switch between the Digital and Analogue faces with the toggle in the panel header.
 
 > **Full step-by-step guide:** See the [Onboarding Guide](docs/ONBOARDING.md) for detailed instructions covering SD flashing, Chameleon eMMC recovery, assembly, installation, MeshCore setup, and troubleshooting for all hardware options.
 
@@ -288,6 +307,10 @@ FastAPI server on port 8080:
 | `GET /api/lorawan/devices` | LoRaWAN device list (frame count, RSSI, SF, first/last seen) |
 | `GET /api/lorawan/packets` | Recent LoRaWAN packet log (max 1000) |
 | `GET /api/lorawan/stats` | LoRaWAN totals: packets, unique devices, by frame type |
+| `GET /api/listener/status` | RTL-SDR listener state: frequency, mode, RDS (PS/RadioText/PTY/BLER), audio level |
+| `POST /api/listener/tune` | Tune the RTL-SDR: frequency, mode, squelch, gain, level |
+| `POST /api/listener/stop` | Stop the RTL-SDR listener |
+| `GET /api/listener/stream` | Live MP3 audio stream for the browser player |
 | `WS /ws` | Real-time packet + message stream |
 
 ---
