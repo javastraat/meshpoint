@@ -479,7 +479,9 @@ async function _updateStats() {
         const device = await deviceRes.json();
 
         _setText('stat-nodes-val', `${nodeCount.active} / ${nodeCount.count}`);
-        _setText('stat-packets-val', traffic.total_packets);
+        _setText('stat-packets-val', traffic.packets_last_24h != null
+            ? `${traffic.packets_last_24h} / ${traffic.total_packets}`
+            : traffic.total_packets);
         _setText('stat-rate-val', traffic.packets_per_minute);
         _setText('stat-rssi-val', signal.avg_rssi != null ? `${signal.avg_rssi} dBm` : '--');
 

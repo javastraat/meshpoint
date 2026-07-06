@@ -20,6 +20,9 @@ class TrafficMonitor:
         last_hour = await self._packet_repo.get_count_since(
             now - timedelta(hours=1)
         )
+        last_24h = await self._packet_repo.get_count_since(
+            now - timedelta(hours=24)
+        )
         last_minute = await self._packet_repo.get_count_since(
             now - timedelta(minutes=1)
         )
@@ -28,6 +31,7 @@ class TrafficMonitor:
 
         return {
             "total_packets": total,
+            "packets_last_24h": last_24h,
             "packets_last_hour": last_hour,
             "packets_last_minute": last_minute,
             "packets_per_minute": round(last_hour / 60.0, 1) if last_hour else 0,
