@@ -176,7 +176,7 @@ def suggest_active_channel_for_install(
 
 def fetch_remote_version_sync(branch: str) -> Optional[str]:
     url = (
-        "https://raw.githubusercontent.com/KMX415/meshpoint/"
+        "https://raw.githubusercontent.com/javastraat/meshpoint/"
         f"{branch}/src/version.py"
     )
     try:

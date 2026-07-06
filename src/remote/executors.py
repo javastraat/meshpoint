@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 MESHPOINT_SERVICE = "meshpoint"
 MESHPOINT_DIR = "/opt/meshpoint"
-GITHUB_REPO = "https://github.com/KMX415/meshpoint.git"
+GITHUB_REPO = "https://github.com/javastraat/meshpoint.git"
 
 
 def execute_ping(_params: dict[str, Any]) -> dict[str, Any]:

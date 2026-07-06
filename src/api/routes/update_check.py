@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/device", tags=["device"])
 
 _VERSION_URL = (
-    "https://raw.githubusercontent.com/KMX415/meshpoint/main/src/version.py"
+    "https://raw.githubusercontent.com/javastraat/meshpoint/main/src/version.py"
 )
 _VERSION_RE = re.compile(r'__version__\s*=\s*["\']([^"\']+)["\']')
 _CACHE_TTL_SECONDS = 300

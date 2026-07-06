@@ -1,6 +1,6 @@
 [Unit]
 Description=Meshpoint
-Documentation=https://github.com/KMX415/meshpoint
+Documentation=https://github.com/javastraat/meshpoint
 After=network-online.target
 Wants=network-online.target
 
