@@ -21,10 +21,11 @@ class SignOutAllForm {
     }
 
     async _invoke() {
-        const confirmed = window.confirm(
-            'Sign out every browser session for this Meshpoint? '
-            + "You'll be redirected to /login."
-        );
+        const confirmed = await window.confirmModal({
+            label: 'Sign out everywhere',
+            description: 'Sign out every browser session for this Meshpoint? '
+                + "You'll be redirected to /login.",
+        });
         if (!confirmed) return;
         this.button.disabled = true;
         this._setStatus('pending', 'Invalidating all sessions…');

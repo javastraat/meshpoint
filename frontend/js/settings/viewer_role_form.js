@@ -70,11 +70,12 @@ class ViewerRoleForm {
     }
 
     async _disable() {
-        const confirmed = window.confirm(
-            'Disable the viewer role? Existing viewer sessions remain '
-            + 'valid until they expire -- use Sign out everywhere to '
-            + 'kick them immediately.'
-        );
+        const confirmed = await window.confirmModal({
+            label: 'Disable viewer role',
+            description: 'Disable the viewer role? Existing viewer sessions '
+                + 'remain valid until they expire -- use Sign out everywhere '
+                + 'to kick them immediately.',
+        });
         if (!confirmed) return;
         this.disableBtn.disabled = true;
         this._setStatus('pending', 'Disabling viewer role…');

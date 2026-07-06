@@ -54,18 +54,16 @@ class UpdatePanelController {
         this._installStatus = null;
         this._lastResult = null;
         this._releaseNotesToken = 0;
-        this._modal = null;
     }
 
     /**
      * In-app confirmation dialog (replaces the browser's native
-     * ``window.confirm`` popup). Reuses the terminal's DangerousModal;
+     * ``window.confirm`` popup). Uses the shared confirmModal helper;
      * falls back to native confirm if that script failed to load.
      */
     _confirm({ label, description, command }) {
-        if (window.DangerousModal) {
-            if (!this._modal) this._modal = new window.DangerousModal();
-            return this._modal.confirm({ label, description, command });
+        if (window.confirmModal) {
+            return window.confirmModal({ label, description, command });
         }
         return Promise.resolve(window.confirm(`${label}\n\n${description}`));
     }

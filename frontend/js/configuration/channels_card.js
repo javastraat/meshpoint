@@ -247,9 +247,14 @@ class ChannelsConfigCard {
         this._updateAddBtn();
     }
 
-    _deleteRow() {
+    async _deleteRow() {
         if (!this._focusedRow) return;
-        if (!confirm('Delete this channel?')) return;
+        const ok = await window.confirmModal({
+            label: 'Delete channel',
+            description: 'Remove this channel from the list? '
+                + 'Nothing is deleted until you press Save Channels.',
+        });
+        if (!ok || !this._focusedRow) return;
         this._focusedRow.remove();
         this._focusedRow = null;
         this._reindexRows();

@@ -95,3 +95,23 @@ class DangerousModal {
 }
 
 window.DangerousModal = DangerousModal;
+
+/**
+ * App-wide confirm helper: one shared DangerousModal instance for any
+ * code that used to call the native ``window.confirm``. Returns a
+ * Promise<boolean>; falls back to the native dialog if the modal
+ * cannot mount for any reason.
+ */
+window.confirmModal = (opts) => {
+    try {
+        if (!window.confirmModal._instance) {
+            window.confirmModal._instance = new DangerousModal();
+        }
+        return window.confirmModal._instance.confirm(opts || {});
+    } catch (_e) {
+        const { label, description } = opts || {};
+        return Promise.resolve(
+            window.confirm([label, description].filter(Boolean).join('\n\n'))
+        );
+    }
+};
