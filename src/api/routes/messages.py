@@ -12,7 +12,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from src.api.auth.dependencies import optional_auth
+from src.api.auth.dependencies import optional_auth, require_admin
 from src.api.auth.jwt_session import ROLE_VIEWER, SessionClaims
 
 from src.api.message_name_resolver import MessageNameResolver
@@ -64,7 +64,10 @@ class SendRequest(BaseModel):
 
 
 @router.post("/send")
-async def send_message(req: SendRequest):
+async def send_message(
+    req: SendRequest,
+    _claims: SessionClaims = Depends(require_admin),
+):
     if _tx_service is None:
         raise HTTPException(503, "Transmit service not available")
     if _message_repo is None:
@@ -108,7 +111,10 @@ async def send_message(req: SendRequest):
 
 
 @router.post("/advert")
-async def send_meshcore_advert(flood: bool = False):
+async def send_meshcore_advert(
+    flood: bool = False,
+    _claims: SessionClaims = Depends(require_admin),
+):
     """Broadcast a MeshCore advertisement from the USB companion.
 
     Independent of /send so it bypasses the empty-text validation
@@ -154,7 +160,10 @@ async def mark_conversation_read(node_id: str):
 
 
 @router.delete("/conversation/{node_id:path}")
-async def delete_conversation(node_id: str):
+async def delete_conversation(
+    node_id: str,
+    _claims: SessionClaims = Depends(require_admin),
+):
     if _message_repo is None:
         raise HTTPException(503, "Message storage not available")
     deleted = await _message_repo.delete_conversation(node_id)
@@ -162,7 +171,9 @@ async def delete_conversation(node_id: str):
 
 
 @router.delete("/all")
-async def delete_all_messages():
+async def delete_all_messages(
+    _claims: SessionClaims = Depends(require_admin),
+):
     if _message_repo is None:
         raise HTTPException(503, "Message storage not available")
     deleted = await _message_repo.delete_all_messages()

@@ -49,6 +49,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             'configuration/meshcore',
             'settings/updates', 'settings/auth', 'settings/dangerous',
         ],
+        guard: _buildRouteGuard(identity),
     });
     const sidebar = new SidebarController({ router, identity });
     sidebar.bind();
@@ -363,6 +364,32 @@ async function _loadIdentity() {
     } catch (_) {
         return null;
     }
+}
+
+/**
+ * Role guard for the router: viewers who deep-link to an admin page
+ * (#/configuration/*, #/terminal, #/settings/*) get the "forbidden"
+ * section instead of the page. Belt-and-braces with the server-side
+ * require_admin gates -- this only shapes the UI.
+ */
+function _buildRouteGuard(identity) {
+    const sections = new Set((identity && identity.available_sections) || []);
+    if (!sections.size) return null; // no auth info -> fail open (setup/dev)
+
+    const requiredSection = (route) => {
+        if (route.startsWith('configuration/')) {
+            return `configuration.${route.split('/')[1]}`;
+        }
+        if (route === 'terminal') return 'terminal';
+        if (route === 'settings/dangerous') return 'settings.dangerous';
+        if (route.startsWith('settings/')) return 'settings';
+        return null; // everything else is open to any signed-in role
+    };
+
+    return (route) => {
+        const need = requiredSection(route);
+        return !need || sections.has(need);
+    };
 }
 
 function _openMessagingForNode(node) {

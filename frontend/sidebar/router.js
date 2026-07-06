@@ -25,6 +25,9 @@ class Router {
     constructor(options = {}) {
         this._defaultRoute = options.defaultRoute || 'dashboard';
         this._allowedRoutes = new Set(options.allowedRoutes || []);
+        // Optional role guard: (route) => bool. A rejected route renders
+        // the "forbidden" section instead of the requested page.
+        this._guard = options.guard || null;
         this._listeners = new Set();
         this._currentRoute = null;
         this._onHashChange = this._onHashChange.bind(this);
@@ -74,6 +77,7 @@ class Router {
         if (this._allowedRoutes.size && !this._allowedRoutes.has(raw)) {
             return this._defaultRoute;
         }
+        if (this._guard && !this._guard(raw)) return 'forbidden';
         return raw;
     }
 

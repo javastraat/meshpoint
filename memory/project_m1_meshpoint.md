@@ -762,6 +762,37 @@ session: lorawan/meshcore/meshtastic panels' `_fmtTime` shows `Jul 5, 16:19`
 for non-today (today stays `HH:MM:SS`); messaging_contacts.js:200 still
 time-only (offered, not requested).
 
+#### Viewer-role security lockdown (2026-07-06 evening, local only — not pushed)
+User tested as viewer and found writes NOT blocked (only sidebar hiding was).
+Fixed on three layers:
+1. **require_admin gates added** (per-route `_claims: SessionClaims =
+   Depends(require_admin)`, matching system_config_routes house style):
+   `config_routes.py` (PUT transmit/identity/radio/channels/meshcore-channels +
+   POST **restart** — was viewer-callable!), `nodeinfo_routes.py` (PUT + POST
+   send), `meshcore_config_routes.py` (PUT companion-name), `messages.py`
+   (POST send + advert, DELETE conversation + all; **mark-read left open** for
+   the unread badge). Already-gated before: mqtt/upstream/device/system_config.
+   Listener tune/stop left viewer-accessible by design.
+2. **Channel-key redaction:** `GET /api/config` leaked Meshtastic `psk_b64`
+   and MeshCore `key_hex` to viewers. `get_config` now takes require_auth
+   claims; `_redact_channel_secrets()` blanks both for non-admins (per-request
+   dicts, safe to mutate). messages `GET /channels` never leaked (names only).
+3. **Frontend route guard:** `Router` gained a `guard` option → disallowed
+   route renders new `forbidden` section ("Admin access required" lock card,
+   `.forbidden-card` in dashboard.css). `_buildRouteGuard(identity)` in app.js
+   maps `configuration/x`→`configuration.x`, `terminal`, `settings/*`→
+   `settings`, `settings/dangerous`; everything else (incl. radio/Hardware +
+   listener) open to viewers per user. Fails open when no available_sections
+   (setup/dev).
+Also fixed: **Transmit card stuck "Saving…"** — `_onSubmit` crashed on
+`null._relayBurst` (burst/RSSI inputs don't exist in the template) after PUT
+transmit succeeded, and PUT `/api/config/relay` doesn't even exist in the
+backend; dead call + null lookups removed. NOTE: viewer-visible pages still
+SHOW admin buttons (Messages send box, Hardware "Send NodeInfo now") — they
+now 403 with a toast; hiding them for viewers = possible polish.
+`_ADMIN_SECTIONS`/`_VIEWER_SECTIONS` in identity_routes.py still stale vs real
+tabs (works because ungated nav items aren't checked) — offered sync, not done.
+
 ---
 
 ## What it does NOT do (intentional)
