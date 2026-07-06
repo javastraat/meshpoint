@@ -311,7 +311,17 @@ class MeshtasticPanel {
         if (!ts) return '--';
         try {
             const d = new Date(ts);
-            return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+            const now = new Date();
+            const sameDay = d.getFullYear() === now.getFullYear()
+                && d.getMonth() === now.getMonth()
+                && d.getDate() === now.getDate();
+            if (sameDay) {
+                return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+            }
+            return d.toLocaleString([], {
+                month: 'short', day: 'numeric',
+                hour: '2-digit', minute: '2-digit', hour12: false,
+            });
         } catch (_) { return ts; }
     }
 
