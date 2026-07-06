@@ -78,14 +78,36 @@ async def stats_summary():
     best_signal = await _get_best_signal()
     direct_relayed = await _get_direct_relayed_counts()
     farthest_mesh = await _get_farthest_via_mesh()
+    farthest_meshcore = await _get_farthest_meshcore_contact()
+    farthest_neighbour = await _get_farthest_neighbour_direct()
 
     device_ctx = _get_device_context()
     first_pkt = await _get_first_packet_time()
 
+    live_report = dict(report)
+    # farthest_direct: use neighbour_advert as fallback when live reporter has nothing
+    if not live_report.get("farthest_direct") and farthest_neighbour:
+        live_report["farthest_direct"] = farthest_neighbour
+    # Expose all-time DB totals alongside session (live reporter) counts so the
+    # frontend can toggle between them. Session data stays in live.protocols /
+    # live.packet_types; all-time goes in separate keys.
+    live_report["protocols_alltime"] = traffic.get("protocol_distribution", {})
+    live_report["packet_types_alltime"] = traffic.get("type_distribution", {})
+
+    # Derived session signal stats from accumulators
+    rssi_count = live_report.get("rssi_count", 0)
+    snr_count = live_report.get("snr_count", 0)
+    live_report["avg_rssi_session"] = (
+        round(live_report["rssi_sum"] / rssi_count, 1) if rssi_count > 0 else None
+    )
+    live_report["avg_snr_session"] = (
+        round(live_report["snr_sum"] / snr_count, 1) if snr_count > 0 else None
+    )
+
     return {
         "device": device_ctx,
         "first_packet_time": first_pkt,
-        "live": report,
+        "live": live_report,
         "signal": {
             **signal,
             "best_rssi": best_signal.get("best_rssi"),
@@ -105,6 +127,7 @@ async def stats_summary():
         "relay": relay,
         "direct_relayed": direct_relayed,
         "farthest_mesh": farthest_mesh,
+        "farthest_meshcore": farthest_meshcore,
     }
 
 
@@ -204,7 +227,7 @@ async def _get_farthest_via_mesh() -> dict | None:
         return None
     rows = await _packet_repo._db.fetch_all(
         """
-        SELECT DISTINCT p.source_id, n.long_name, n.latitude, n.longitude
+        SELECT DISTINCT p.source_id, n.long_name, n.short_name, n.latitude, n.longitude
         FROM packets p
         JOIN nodes n ON p.source_id = n.node_id
         WHERE p.hop_start > 0 AND (p.hop_start - p.hop_limit) > 0
@@ -236,6 +259,103 @@ async def _get_farthest_via_mesh() -> dict | None:
             best = {
                 "miles": round(dist, 1),
                 "node_id": r["source_id"],
-                "node_name": r["long_name"] or r["source_id"],
+                "node_name": r["long_name"] or r["short_name"] or r["source_id"],
+            }
+    return best
+
+
+async def _get_farthest_meshcore_contact() -> dict | None:
+    """Find the farthest MeshCore contact with a known position."""
+    if not _node_repo:
+        return None
+    rows = await _node_repo._db.fetch_all(
+        """
+        SELECT node_id, long_name, latitude, longitude
+        FROM nodes
+        WHERE protocol = 'meshcore'
+          AND latitude IS NOT NULL AND longitude IS NOT NULL
+        """
+    )
+    if not rows:
+        return None
+
+    from src.analytics.stats_reporter import _haversine_mi
+    from src.config import load_config
+
+    try:
+        config = load_config()
+        dev_lat = config.device.latitude
+        dev_lon = config.device.longitude
+    except Exception:
+        return None
+
+    if dev_lat is None or dev_lon is None:
+        return None
+
+    MAX_MI = 3600 / 1.60934  # 3600 km sanity cap
+
+    best = None
+    for r in rows:
+        dist = _haversine_mi(dev_lat, dev_lon, r["latitude"], r["longitude"])
+        if dist < 0.1 or dist > MAX_MI:
+            continue
+        if best is None or dist > best["miles"]:
+            best = {
+                "miles": round(dist, 1),
+                "node_id": r["node_id"],
+                "node_name": r["long_name"] or r["node_id"],
+            }
+    return best
+
+
+async def _get_farthest_neighbour_direct() -> dict | None:
+    """Farthest node heard directly via MeshCore neighbour advertisements."""
+    if not _packet_repo or not _node_repo:
+        return None
+
+    rows = await _packet_repo._db.fetch_all(
+        """
+        SELECT p.source_id, p.snr, n.long_name, n.latitude, n.longitude
+        FROM packets p
+        JOIN nodes n ON p.source_id = n.node_id
+        WHERE p.packet_type = 'neighbour_advert'
+          AND n.latitude IS NOT NULL AND n.longitude IS NOT NULL
+        ORDER BY p.timestamp DESC
+        """
+    )
+    if not rows:
+        return None
+
+    from src.analytics.stats_reporter import _haversine_mi
+    from src.config import load_config
+
+    try:
+        config = load_config()
+        dev_lat = config.device.latitude
+        dev_lon = config.device.longitude
+    except Exception:
+        return None
+
+    if dev_lat is None or dev_lon is None:
+        return None
+
+    MAX_MI = 3600 / 1.60934
+    seen: set[str] = set()
+    best = None
+
+    for r in rows:
+        node_id = r["source_id"]
+        if node_id in seen:
+            continue
+        seen.add(node_id)
+        dist = _haversine_mi(dev_lat, dev_lon, r["latitude"], r["longitude"])
+        if dist < 0.1 or dist > MAX_MI:
+            continue
+        if best is None or dist > best["miles"]:
+            best = {
+                "miles": round(dist, 1),
+                "node_id": node_id,
+                "node_name": r["long_name"] or node_id,
+                "snr": round(r["snr"], 1) if r["snr"] is not None else None,
             }
     return best

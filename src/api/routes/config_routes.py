@@ -97,6 +97,7 @@ async def get_config():
         {"name": name, "key_hex": _meshcore_key_hex_for_response(key)}
         for name, key in (_config.meshcore.channel_keys.items() if _config else [])
     ]
+    mc_status["private_channels"] = list(_config.meshcore.private_channels) if _config else []
 
     duty_info = {"used_percent": 0.0, "remaining_ms": 0}
     if _tx_service and hasattr(_tx_service, "_duty"):
@@ -433,6 +434,7 @@ class McChannelEntry(BaseModel):
 
 class McChannelsUpdate(BaseModel):
     channels: list[McChannelEntry]
+    private_channels: list[str] = []
 
 
 def _meshcore_key_hex_for_response(key_hex: str) -> str:
@@ -491,9 +493,11 @@ async def update_meshcore_channels(req: McChannelsUpdate):
         name, key_hex = normalized
         channel_keys[name] = key_hex
 
+    private_channels = [n for n in req.private_channels if n]
     _config.meshcore.channel_keys = channel_keys
+    _config.meshcore.private_channels = private_channels
     try:
-        save_section_to_yaml("meshcore", {"channel_keys": channel_keys})
+        save_section_to_yaml("meshcore", {"channel_keys": channel_keys, "private_channels": private_channels})
     except PermissionError as exc:
         raise HTTPException(403, str(exc))
     logger.info(

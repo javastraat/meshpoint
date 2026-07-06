@@ -11,6 +11,7 @@ from src.models.signal import SignalMetrics
 class Protocol(str, Enum):
     MESHTASTIC = "meshtastic"
     MESHCORE = "meshcore"
+    LORAWAN = "lorawan"
     UNKNOWN = "unknown"
 
 
@@ -30,6 +31,10 @@ class PacketType(str, Enum):
     PAXCOUNTER = "paxcounter"
     MAP_REPORT = "map_report"
     ENCRYPTED = "encrypted"
+    LORAWAN_JOIN = "lorawan_join"
+    LORAWAN_DATA = "lorawan_data"
+    LORAWAN_REJOIN = "lorawan_rejoin"
+    NEIGHBOUR_ADVERT = "neighbour_advert"
     UNKNOWN = "unknown"
 
 

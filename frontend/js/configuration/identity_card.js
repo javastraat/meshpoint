@@ -177,9 +177,14 @@ class IdentityConfigCard {
         }
 
         this._setStatus('success', 'Saved.');
-        const restartNeeded = deviceChanged
-            || (identityResult && identityResult.restart_required)
-            || nodeIdChanged;
+
+        // Update sidebar immediately — device name is a UI label, no restart needed
+        if (deviceChanged) {
+            const el = document.getElementById('sidebar-device-name');
+            if (el) el.textContent = deviceName;
+        }
+
+        const restartNeeded = (identityResult && identityResult.restart_required) || nodeIdChanged;
         if (restartNeeded) {
             this._api.signalRestart('Identity updated.');
         } else {

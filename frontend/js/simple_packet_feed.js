@@ -17,11 +17,15 @@ class SimplePacketFeed {
 
     loadNodes(nodes) {
         this._nodeByLastByte.clear();
+        this._nodeNames = new Map();
         for (const node of nodes) {
             const id = node.node_id;
-            if (id && id.length >= 2) {
+            if (!id) continue;
+            if (id.length >= 2) {
                 this._nodeByLastByte.set(id.slice(-2).toLowerCase(), id);
             }
+            const name = (node.long_name || node.short_name || '').trim();
+            if (name) this._nodeNames.set(id.toLowerCase(), name);
         }
     }
 
@@ -31,12 +35,12 @@ class SimplePacketFeed {
         tr.addEventListener('animationend', () => tr.classList.remove('packet-row--new'));
 
         const time = packet.rx_time
-            ? new Date(packet.rx_time * 1000).toLocaleTimeString()
+            ? new Date(packet.rx_time * 1000).toLocaleTimeString([], { hour12: false })
             : packet.timestamp
-                ? new Date(packet.timestamp).toLocaleTimeString()
-                : new Date().toLocaleTimeString();
+                ? new Date(packet.timestamp).toLocaleTimeString([], { hour12: false })
+                : new Date().toLocaleTimeString([], { hour12: false });
 
-        const srcShort = this._shortId(packet.source_id);
+        const srcShort = this._fmtId(packet.source_id);
         const relayByte = packet.relay_node || 0;
         const srcCell = relayByte
             ? `${srcShort} <span class="relay-hop">↝ ${this._resolveRelay(relayByte)}</span>`
@@ -52,7 +56,7 @@ class SimplePacketFeed {
         const protocol = packet.protocol || 'meshtastic';
         const details = this._summarize(packet);
 
-        const destShort = this._shortId(packet.destination_id);
+        const destShort = this._fmtId(packet.destination_id);
         const hops = packet.hop_start > 0
             ? `${packet.hop_start - packet.hop_limit}/${packet.hop_start}`
             : '--';
@@ -165,13 +169,27 @@ class SimplePacketFeed {
     _resolveRelay(relayByte) {
         const key = relayByte.toString(16).padStart(2, '0');
         const fullId = this._nodeByLastByte.get(key);
-        return fullId ? this._shortId(fullId) : `!${key}`;
+        const short = fullId ? `!${fullId.slice(-4)}` : `!${key}`;
+        return `<span class="td-node-short">${short}</span>`;
     }
 
     _shortId(id) {
         if (!id) return '--';
-        if (id === 'ffffffff' || id === 'ffff') return 'BCAST';
-        return id.length > 6 ? `!${id.slice(-4)}` : id;
+        if (id === 'ffffffff' || id === 'ffff' || id === 'broadcast') return '!cast';
+        return id.length > 6 ? `!${id.slice(-4)}` : `!${id}`;
+    }
+
+    _fmtId(id) {
+        if (!id) return '--';
+        if (id === 'ffffffff' || id === 'ffff' || id === 'broadcast') {
+            return '<span class="td-bcast">!cast</span>';
+        }
+        const short = id.length > 6 ? `!${id.slice(-4)}` : `!${id}`;
+        const name = this._nodeNames && this._nodeNames.get(id.toLowerCase());
+        if (name) {
+            return `<span class="td-node-name">${this._esc(name)}</span> <span class="td-node-short">${short}</span>`;
+        }
+        return `<span class="td-node-short">${short}</span>`;
     }
 
     _esc(str) {

@@ -91,7 +91,7 @@ class MessagingChat {
         if (bubble) {
             const meta = bubble.querySelector('.msg-bubble__meta');
             if (meta) {
-                const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
                 meta.textContent = `${time} · ${status}`;
             }
         }
@@ -198,7 +198,7 @@ class MessagingChat {
         if (msg.packet_id) bubble.dataset.pktId = msg.packet_id;
 
         const time = msg.timestamp
-            ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
             : '';
         const statusText = msg.status && msg.status !== 'delivered' && msg.status !== 'read'
             ? ` · ${msg.status}` : '';
@@ -335,7 +335,7 @@ class MessagingChat {
         bubble.dataset.msgId = msg.id;
         if (msg.packet_id) bubble.dataset.pktId = msg.packet_id;
         const time = msg.timestamp
-            ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
             : '';
         const signalHtml = this._buildSignalHtml(msg);
 

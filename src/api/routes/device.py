@@ -43,6 +43,8 @@ async def device_status():
         "uptime_seconds": int(uptime),
         "websocket_clients": _ws_manager.client_count,
         "device_id": _identity.device_id,
+        "device_name": _identity.device_name,
+        "long_name": _identity.long_name,
         "firmware_version": __version__,
         "relay": relay_stats,
     }

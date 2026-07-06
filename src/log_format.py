@@ -264,7 +264,7 @@ def _describe_sources(config: AppConfig) -> str:
     ]
     if (
         "meshcore_usb" not in config.capture.sources
-        and config.capture.meshcore_usb.auto_detect
+        and any(c.auto_detect for c in config.capture.meshcore_usb)
     ):
         parts.append("MeshCore USB (auto-detect)")
     return ", ".join(parts) or "none"

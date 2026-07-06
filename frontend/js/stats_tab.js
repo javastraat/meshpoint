@@ -107,6 +107,10 @@ class StatsTab {
                     <span id="ss-total" class="stats-hero__number">0</span>
                     <span class="stats-hero__label">packets captured</span>
                 </div>
+                <div id="ss-session-hero" class="stats-hero__session" style="display:none">
+                    <span id="ss-session-count" class="stats-hero__session-num">0</span>
+                    <span class="stats-hero__session-label">this session</span>
+                </div>
             </div>
 
             <div class="stats-strip">
@@ -116,11 +120,11 @@ class StatsTab {
                 </div>
                 <div class="stats-strip__card">
                     <span id="ss-days" class="stats-strip__value">0</span>
-                    <span class="stats-strip__label">Days Online</span>
+                    <span class="stats-strip__label">Days Since First Pkt</span>
                 </div>
                 <div class="stats-strip__card">
-                    <span id="ss-region" class="stats-strip__value">--</span>
-                    <span class="stats-strip__label">Region</span>
+                    <span id="ss-uptime" class="stats-strip__value">--</span>
+                    <span class="stats-strip__label">Uptime</span>
                 </div>
                 <div class="stats-strip__card">
                     <span id="ss-firmware" class="stats-strip__value">--</span>
@@ -129,7 +133,13 @@ class StatsTab {
             </div>
 
             <section class="stats-section">
-                <h2 class="stats-section__title">Protocols</h2>
+                <div class="stats-section__head">
+                    <h2 class="stats-section__title">Protocols</h2>
+                    <div class="stats-toggle" id="proto-toggle">
+                        <button class="stats-toggle__btn stats-toggle__btn--active" data-view="alltime">All-time</button>
+                        <button class="stats-toggle__btn" data-view="session">Session</button>
+                    </div>
+                </div>
                 <div class="stats-row">
                     <div class="stats-card">
                         <div class="stats-card__label">Protocol Split</div>
@@ -183,23 +193,33 @@ class StatsTab {
                 <div class="stats-range-grid">
                     <div class="stats-range-card">
                         <div class="stats-range-card__header">Farthest Direct Signal</div>
-                        <div class="stats-range-card__desc">Received directly by this Meshpoint (0 hops)</div>
+                        <div class="stats-range-card__desc">Received directly without relaying (0 hops)</div>
                         <div class="stats-range-card__value">
                             <span id="ss-direct-mi" class="stats-range-card__miles">--</span>
-                            <span class="stats-range-card__unit">mi</span>
+                            <span id="ss-direct-unit" class="stats-range-card__unit">mi</span>
                         </div>
                         <div id="ss-direct-detail" class="stats-range-card__detail"></div>
                         <div class="stats-range-bar"><div id="ss-direct-bar" class="stats-range-bar__fill"></div></div>
                     </div>
                     <div class="stats-range-card">
-                        <div class="stats-range-card__header">Farthest Node Via Mesh</div>
-                        <div class="stats-range-card__desc">Relayed through other nodes across the mesh</div>
+                        <div class="stats-range-card__header">Farthest Via Meshtastic</div>
+                        <div class="stats-range-card__desc">Farthest Meshtastic node relayed through other nodes (1+ hops)</div>
                         <div class="stats-range-card__value">
                             <span id="ss-mesh-mi" class="stats-range-card__miles">--</span>
-                            <span class="stats-range-card__unit">mi</span>
+                            <span id="ss-mesh-unit" class="stats-range-card__unit"></span>
                         </div>
                         <div id="ss-mesh-detail" class="stats-range-card__detail"></div>
                         <div class="stats-range-bar"><div id="ss-mesh-bar" class="stats-range-bar__fill stats-range-bar__fill--mesh"></div></div>
+                    </div>
+                    <div class="stats-range-card">
+                        <div class="stats-range-card__header">Farthest MeshCore Contact</div>
+                        <div class="stats-range-card__desc">Farthest contact with known position in MeshCore network</div>
+                        <div class="stats-range-card__value">
+                            <span id="ss-mc-mi" class="stats-range-card__miles">--</span>
+                            <span id="ss-mc-unit" class="stats-range-card__unit"></span>
+                        </div>
+                        <div id="ss-mc-detail" class="stats-range-card__detail"></div>
+                        <div class="stats-range-bar"><div id="ss-mc-bar" class="stats-range-bar__fill stats-range-bar__fill--meshcore"></div></div>
                     </div>
                 </div>
             </section>
@@ -241,7 +261,7 @@ class StatsTab {
                 <div id="ss-proto-bars" class="stats-proto-bars"></div>
             </section>
 
-            <section class="stats-section">
+            <section class="stats-section" id="ss-relay-section">
                 <h2 class="stats-section__title">Relay</h2>
                 <div class="stats-row">
                     <div class="stats-card">
@@ -271,6 +291,32 @@ class StatsTab {
         </div>`;
     }
 
+    _initProtoToggle() {
+        const toggle = document.getElementById('proto-toggle');
+        if (!toggle || toggle.dataset.bound) return;
+        toggle.dataset.bound = '1';
+        toggle.addEventListener('click', e => {
+            const btn = e.target.closest('[data-view]');
+            if (!btn) return;
+            toggle.querySelectorAll('.stats-toggle__btn').forEach(b => b.classList.remove('stats-toggle__btn--active'));
+            btn.classList.add('stats-toggle__btn--active');
+            const view = btn.dataset.view;
+            const p = view === 'session' ? (this._protoSession || {}) : (this._protoAlltime || {});
+            const t = view === 'session' ? (this._typesSession || {}) : (this._typesAlltime || {});
+            const totalOverride = view === 'alltime' ? this._totalPackets : undefined;
+            const sig = view === 'session' ? (this._signalSession || {}) : (this._signalAlltime || {});
+            const rssiDist = view === 'session' ? (this._rssiDistSession || {}) : (this._rssiDistAlltime || {});
+            const dr = view === 'session' ? (this._directRelayedSession || {}) : (this._directRelayedAlltime || {});
+            this._updateProtocol(p, totalOverride);
+            this._updateTypes(t);
+            this._updateProtoBars(p);
+            this._updateSignalNums(sig);
+            this._updateRssiHist(rssiDist);
+            this._updateQuality(sig);
+            this._updateDirectRelayed(dr);
+        });
+    }
+
     _update(data) {
         const live = data.live || {};
         const traffic = data.traffic || {};
@@ -279,27 +325,74 @@ class StatsTab {
         const device = data.device || {};
         const directRelayed = data.direct_relayed || {};
 
-        this._setText('ss-total', (traffic.total_packets || 0).toLocaleString());
+        this._totalPackets = traffic.total_packets || 0;
+        this._setText('ss-total', this._totalPackets.toLocaleString());
         this._setText('ss-nodes', network.total_nodes || 0);
         this._setText('ss-days', this._calcDays(data.first_packet_time, device.days_online));
-        this._setText('ss-region', device.region || '--');
         this._setText('ss-firmware', device.firmware || '--');
 
-        this._setText('ss-best-rssi', signal.best_rssi != null ? `${signal.best_rssi} dBm` : '--');
-        this._setText('ss-avg-rssi', signal.avg_rssi != null ? `${signal.avg_rssi} dBm` : '--');
-        this._setText('ss-best-snr', signal.best_snr != null ? `${signal.best_snr} dB` : '--');
-        this._setText('ss-avg-snr', signal.avg_snr != null ? `${signal.avg_snr} dB` : '--');
+        this._setText('ss-uptime', this._formatUptime(device.uptime_seconds || 0));
+
+        // Store both views for the toggle
+        this._protoAlltime = live.protocols_alltime || traffic.protocol_distribution || {};
+        this._typesAlltime = live.packet_types_alltime || traffic.type_distribution || {};
+        this._protoSession = live.protocols || {};
+        this._typesSession = live.packet_types || {};
+
+        const h = live.rssi_histogram || {};
+        this._signalAlltime = signal;
+        this._signalSession = {
+            best_rssi: live.best_rssi,
+            avg_rssi: live.avg_rssi_session,
+            best_snr: live.best_snr,
+            avg_snr: live.avg_snr_session,
+        };
+        this._rssiDistAlltime = data.rssi_distribution || {};
+        this._rssiDistSession = {
+            buckets: ['Excellent', 'Good', 'Fair', 'Weak'],
+            counts: [h.excellent || 0, h.good || 0, h.fair || 0, h.weak || 0],
+        };
+        this._directRelayedAlltime = directRelayed;
+        this._directRelayedSession = {
+            direct: live.direct_count || 0,
+            relayed: live.relayed_count || 0,
+        };
+
+        const sessionTotal = Object.values(this._protoSession).reduce((a, b) => a + b, 0);
+        const sessionHero = document.getElementById('ss-session-hero');
+        if (sessionHero) {
+            if (sessionTotal > 0) {
+                sessionHero.style.display = '';
+                this._setText('ss-session-count', sessionTotal.toLocaleString());
+            } else {
+                sessionHero.style.display = 'none';
+            }
+        }
+
+        this._initProtoToggle();
+
+        // Default display: whichever view the toggle is on
+        const activeView = document.querySelector('#proto-toggle .stats-toggle__btn--active')?.dataset.view || 'alltime';
+        const protoData = activeView === 'session' ? this._protoSession : this._protoAlltime;
+        const typesData = activeView === 'session' ? this._typesSession : this._typesAlltime;
+        const totalOverride = activeView === 'alltime' ? this._totalPackets : undefined;
+
+        const sigData = activeView === 'session' ? this._signalSession : this._signalAlltime;
+        const rssiDistData = activeView === 'session' ? this._rssiDistSession : this._rssiDistAlltime;
+        const drData = activeView === 'session' ? this._directRelayedSession : this._directRelayedAlltime;
 
         this._updateRange(live, data.farthest_mesh);
-        this._updateProtocol(live.protocols || traffic.protocol_distribution || {});
-        this._updateTypes(live.packet_types || traffic.type_distribution || {});
-        this._updateRssiHist(data.rssi_distribution || {});
-        this._updateQuality(signal);
-        this._updateDirectRelayed(directRelayed, traffic);
+        this._updateMeshCoreRange(data.farthest_meshcore);
+        this._updateProtocol(protoData, totalOverride);
+        this._updateTypes(typesData);
+        this._updateSignalNums(sigData);
+        this._updateRssiHist(rssiDistData);
+        this._updateQuality(sigData);
+        this._updateDirectRelayed(drData);
         this._updateActiveNodes(network);
         this._updateRoles(network.roles || {});
         this._updateHwModels(network.hw_models || {});
-        this._updateProtoBars(live.protocols || traffic.protocol_distribution || {});
+        this._updateProtoBars(protoData);
         this._updateTimeline(data.traffic_timeline || {});
         this._updateRelay(data.relay || {});
         this._updateRejectReasons(data.relay || {});
@@ -308,6 +401,17 @@ class StatsTab {
     _setText(id, value) {
         const el = document.getElementById(id);
         if (el) el.textContent = value;
+    }
+
+    _formatUptime(seconds) {
+        if (seconds < 60) return `${seconds}s`;
+        if (seconds < 3600) {
+            return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+        }
+        if (seconds < 86400) {
+            return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
+        }
+        return `${Math.floor(seconds / 86400)}d ${Math.floor((seconds % 86400) / 3600)}h`;
     }
 
     _calcDays(firstPacketTime, fallback) {
@@ -319,30 +423,60 @@ class StatsTab {
         return fallback || 0;
     }
 
+    _updateSignalNums(signal) {
+        const s = signal || {};
+        this._setText('ss-best-rssi', s.best_rssi != null ? `${s.best_rssi} dBm` : '--');
+        this._setText('ss-avg-rssi',  s.avg_rssi  != null ? `${s.avg_rssi} dBm`  : '--');
+        this._setText('ss-best-snr',  s.best_snr  != null ? `${s.best_snr} dB`   : '--');
+        this._setText('ss-avg-snr',   s.avg_snr   != null ? `${s.avg_snr} dB`    : '--');
+    }
+
     _updateRange(live, farthestMesh) {
         const fd = live.farthest_direct;
         if (fd && fd.miles > 0) {
-            this._setText('ss-direct-mi', fd.miles.toFixed(1));
+            const formatted = MeshpointDisplayUnits.formatDistanceKm(fd.miles * 1.60934) || `${fd.miles.toFixed(1)} mi`;
+            this._setText('ss-direct-mi', formatted);
+            this._setText('ss-direct-unit', '');
             const detail = [];
-            if (fd.rssi) detail.push(`${fd.rssi} dBm`);
-            if (fd.node_id) detail.push(fd.node_id);
+            if (fd.snr != null) detail.push(`SNR ${fd.snr} dB`);
+            else if (fd.rssi) detail.push(`${fd.rssi} dBm`);
+            if (fd.node_name || fd.node_id) detail.push(fd.node_name || fd.node_id);
             this._setText('ss-direct-detail', detail.join('  ·  '));
             const bar = document.getElementById('ss-direct-bar');
             if (bar) bar.style.width = `${Math.min(100, (fd.miles / 200) * 100)}%`;
+        } else {
+            this._setText('ss-direct-unit', '');
         }
 
         if (farthestMesh && farthestMesh.miles > 0) {
-            this._setText('ss-mesh-mi', farthestMesh.miles.toFixed(1));
+            const formatted = MeshpointDisplayUnits.formatDistanceKm(farthestMesh.miles * 1.60934) || `${farthestMesh.miles.toFixed(1)} mi`;
+            this._setText('ss-mesh-mi', formatted);
+            this._setText('ss-mesh-unit', '');
             this._setText('ss-mesh-detail', farthestMesh.node_name || farthestMesh.node_id || '');
             const bar = document.getElementById('ss-mesh-bar');
             if (bar) bar.style.width = `${Math.min(100, (farthestMesh.miles / 300) * 100)}%`;
+        } else {
+            this._setText('ss-mesh-unit', '');
         }
     }
 
-    _updateProtocol(protocols) {
+    _updateMeshCoreRange(farthest) {
+        if (farthest && farthest.miles > 0) {
+            const formatted = MeshpointDisplayUnits.formatDistanceKm(farthest.miles * 1.60934) || `${farthest.miles.toFixed(1)} mi`;
+            this._setText('ss-mc-mi', formatted);
+            this._setText('ss-mc-unit', '');
+            this._setText('ss-mc-detail', farthest.node_name || farthest.node_id || '');
+            const bar = document.getElementById('ss-mc-bar');
+            if (bar) bar.style.width = `${Math.min(100, (farthest.miles / 300) * 100)}%`;
+        } else {
+            this._setText('ss-mc-unit', '');
+        }
+    }
+
+    _updateProtocol(protocols, overrideTotal) {
         const labels = Object.keys(protocols);
         const values = Object.values(protocols);
-        const total = values.reduce((a, b) => a + b, 0);
+        const total = overrideTotal != null ? overrideTotal : values.reduce((a, b) => a + b, 0);
         this._renderDoughnut('sc-protocol', labels, values, CHART_COLORS, total);
     }
 
@@ -389,7 +523,7 @@ class StatsTab {
         }, `${avgRssi} dBm`);
     }
 
-    _updateDirectRelayed(dr, traffic) {
+    _updateDirectRelayed(dr) {
         const direct = dr.direct || 0;
         const relayed = dr.relayed || 0;
         const total = direct + relayed;
@@ -483,8 +617,14 @@ class StatsTab {
     }
 
     _updateRelay(relay) {
+        const section = document.getElementById('ss-relay-section');
         const relayed = relay.relayed || 0;
         const rejected = relay.rejected || 0;
+        if (!relay.enabled || (relayed === 0 && rejected === 0)) {
+            if (section) section.style.display = 'none';
+            return;
+        }
+        if (section) section.style.display = '';
         this._renderDoughnut('sc-relay',
             ['Relayed', 'Rejected'],
             [relayed, rejected],
@@ -501,10 +641,35 @@ class StatsTab {
     }
 
     _renderDoughnut(canvasId, labels, values, colors, centerText) {
-        const centerPlugin = centerText != null ? {
+        const data = {
+            labels,
+            datasets: [{
+                data: values,
+                backgroundColor: colors.slice(0, labels.length),
+                borderWidth: 0,
+            }],
+        };
+
+        // If chart already exists, update data and center text in place.
+        // Center text is stored on the chart instance so the plugin can always
+        // read the latest value — avoids the stale-closure problem.
+        if (this._charts[canvasId]) {
+            const chart = this._charts[canvasId];
+            if (centerText != null) chart._meshCenterText = centerText;
+            chart.data = data;
+            chart.update('none');
+            return;
+        }
+
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) return;
+
+        const centerPlugin = {
             id: `center-${canvasId}`,
             afterDraw(chart) {
+                if (chart._meshCenterText == null) return;
                 const { ctx, chartArea } = chart;
+                if (!chartArea) return;
                 const cx = (chartArea.left + chartArea.right) / 2;
                 const cy = (chartArea.top + chartArea.bottom) / 2;
                 ctx.save();
@@ -512,21 +677,14 @@ class StatsTab {
                 ctx.fillStyle = '#f1f5f9';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
-                ctx.fillText(String(centerText), cx, cy);
+                ctx.fillText(String(chart._meshCenterText), cx, cy);
                 ctx.restore();
             },
-        } : null;
+        };
 
-        const plugins = [centerPlugin].filter(Boolean);
-
-        this._renderChart(canvasId, 'doughnut', {
-            labels,
-            datasets: [{
-                data: values,
-                backgroundColor: colors.slice(0, labels.length),
-                borderWidth: 0,
-            }],
-        }, {
+        const opts = {
+            responsive: true,
+            maintainAspectRatio: false,
             cutout: '65%',
             plugins: {
                 legend: {
@@ -540,7 +698,11 @@ class StatsTab {
                     },
                 },
             },
-        }, null, plugins);
+        };
+
+        const chart = new Chart(canvas, { type: 'doughnut', data, options: opts, plugins: [centerPlugin] });
+        chart._meshCenterText = centerText;
+        this._charts[canvasId] = chart;
     }
 
     _renderHorizontalBar(canvasId, labels, values, color) {
@@ -557,7 +719,7 @@ class StatsTab {
             indexAxis: 'y',
             plugins: { legend: { display: false } },
             scales: {
-                x: { ticks: { color: '#64748b' }, grid: { color: 'rgba(30,41,59,0.5)' } },
+                x: { ticks: { color: '#64748b', precision: 0 }, grid: { color: 'rgba(30,41,59,0.5)' } },
                 y: { ticks: { color: '#94a3b8', font: { size: 11 } }, grid: { display: false } },
             },
         });

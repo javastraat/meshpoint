@@ -43,6 +43,10 @@ from src.api.routes import (
     device_config_routes,
     gps_status,
     identity_routes,
+    listener_routes,
+    lorawan_routes,
+    meshtastic_routes,
+    meshcore_routes,
     messages,
     meshcore_config_routes,
     mqtt_config_routes,
@@ -63,6 +67,7 @@ from src.api.terminal import CommandCatalog, SessionManager
 from src.api.update import ReleaseChannelRegistry, UpdateApplier
 from src.api.update.rollback_state import resolve_rollback_state_path
 from src.api.upstream_client import UpstreamClient
+from src.audio.rtl_listener import RtlListener
 from src.api.websocket_manager import WebSocketManager
 from src.config import AppConfig, load_config, validate_activation
 from src.coordinator import PipelineCoordinator
@@ -94,6 +99,7 @@ position_broadcaster: PositionBroadcaster | None = None
 noise_floor_tracker = NoiseFloorTracker()
 _noise_floor_emitter_task = None
 _spectral_scan_service: SpectralScanService | None = None
+_rtl_listener: RtlListener | None = None
 
 
 def create_app(config: AppConfig | None = None) -> FastAPI:
@@ -226,9 +232,14 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
             pipeline, config, identity, auth_subsystem, tx_service, message_repo
         )
         _init_dangerous_registry(pipeline)
+        global _rtl_listener
+        _rtl_listener = RtlListener()
+        listener_routes.init_routes(_rtl_listener)
         print_banner(config)
         logger.info("Meshpoint started -- listening for packets")
         yield
+        if _rtl_listener is not None:
+            await _rtl_listener.stop()
         if _spectral_scan_service is not None:
             await _spectral_scan_service.stop()
         if _noise_floor_emitter_task is not None:
@@ -280,6 +291,10 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     app.include_router(meshcore_config_routes.router, dependencies=protected)
     app.include_router(config_routes.router, dependencies=protected)
     app.include_router(stats_routes.router, dependencies=protected)
+    app.include_router(lorawan_routes.router, dependencies=protected)
+    app.include_router(listener_routes.router, dependencies=protected)
+    app.include_router(meshtastic_routes.router, dependencies=protected)
+    app.include_router(meshcore_routes.router, dependencies=protected)
 
     @app.websocket("/ws")
     async def websocket_endpoint(websocket: WebSocket):
@@ -338,7 +353,7 @@ def _build_pipeline(config: AppConfig) -> PipelineCoordinator:
 
     if (
         "meshcore_usb" not in config.capture.sources
-        and config.capture.meshcore_usb.auto_detect
+        and any(c.auto_detect for c in config.capture.meshcore_usb)
     ):
         _add_meshcore_usb_source(coordinator, config)
 
@@ -380,14 +395,15 @@ def _add_meshcore_usb_source(
 ):
     try:
         from src.capture.meshcore_usb_source import MeshcoreUsbCaptureSource
-        usb_cfg = config.capture.meshcore_usb
-        coordinator.capture_coordinator.add_source(
-            MeshcoreUsbCaptureSource(
-                serial_port=usb_cfg.serial_port,
-                baud_rate=usb_cfg.baud_rate,
-                auto_detect=usb_cfg.auto_detect,
+        for usb_cfg in config.capture.meshcore_usb:
+            coordinator.capture_coordinator.add_source(
+                MeshcoreUsbCaptureSource(
+                    serial_port=usb_cfg.serial_port,
+                    baud_rate=usb_cfg.baud_rate,
+                    auto_detect=usb_cfg.auto_detect,
+                    label=usb_cfg.label,
+                )
             )
-        )
     except ImportError:
         logger.warning(
             "MeshCore USB unavailable -- meshcore package not installed"
@@ -1267,6 +1283,9 @@ def _init_routes(
     gps_status.init_routes(location_source=coord.location_source)
     system_config_routes.init_routes(config=config)
     meshcore_config_routes.init_routes(config=config, tx_service=tx_service)
+    lorawan_routes.init_routes(coord.packet_repo)
+    meshtastic_routes.init_routes(coord.packet_repo, coord.node_repo)
+    meshcore_routes.init_routes(coord.packet_repo, coord.node_repo)
 
 
 def _init_dangerous_registry(coord: PipelineCoordinator) -> None:

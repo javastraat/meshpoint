@@ -21,6 +21,21 @@ MSG_NODEINFO = 0x04
 MSG_ROUTING = 0x05
 MSG_ACK = 0x06
 
+# ADVERT app_data flags (byte 0 of nodeinfo payload)
+_ADV_LATLON_MASK = 0x10
+_ADV_FEAT1_MASK  = 0x20
+_ADV_FEAT2_MASK  = 0x40
+_ADV_NAME_MASK   = 0x80
+
+# OTA node type (bits[3:0] of flags byte) → role string
+_ADV_TYPE_ROLE = {
+    0: None,
+    1: "CLIENT",
+    2: "REPEATER",
+    3: "ROOMSERVER",
+    4: "SENSOR",
+}
+
 
 class MeshcoreDecoder:
     """Decodes raw Meshcore LoRa frames into structured Packet objects.
@@ -158,11 +173,37 @@ class MeshcoreDecoder:
 
     @staticmethod
     def _decode_nodeinfo(payload: bytes) -> Optional[dict[str, Any]]:
-        """Decode node advertisement (name + key)."""
+        """Decode MeshCore node advertisement (PAYLOAD_TYPE_ADVERT 0x04).
+
+        Byte 0 = flags: bits[3:0]=node_type, bit[4]=latlon, bit[5]=feat1,
+                        bit[6]=feat2, bit[7]=name (null-terminated UTF-8).
+        Lat/lon are float32 LE (unlike POSITION packets which use int32*1e-7).
+        """
         try:
-            name_end = payload.index(0x00) if 0x00 in payload else len(payload)
-            name = payload[:name_end].decode("utf-8", errors="replace")
-            return {"long_name": name}
+            if not payload:
+                return None
+            flags = payload[0]
+            offset = 1
+            result: dict[str, Any] = {"node_type": flags & 0x0F}
+
+            if flags & _ADV_LATLON_MASK:
+                if offset + 8 <= len(payload):
+                    lat, lon = struct.unpack_from("<ff", payload, offset)
+                    result["latitude"]  = float(lat)
+                    result["longitude"] = float(lon)
+                offset += 8
+
+            if flags & _ADV_FEAT1_MASK:
+                offset += 2
+            if flags & _ADV_FEAT2_MASK:
+                offset += 2
+
+            if flags & _ADV_NAME_MASK:
+                name_bytes = payload[offset:]
+                name_end = name_bytes.index(0x00) if 0x00 in name_bytes else len(name_bytes)
+                result["long_name"] = name_bytes[:name_end].decode("utf-8", errors="replace")
+
+            return result
         except Exception:
             return {"raw_hex": payload.hex()}
 
@@ -186,6 +227,7 @@ class MeshcoreDecoder:
 
         if packet.packet_type == PacketType.NODEINFO:
             node.long_name = packet.decoded_payload.get("long_name")
+            node.role = _ADV_TYPE_ROLE.get(packet.decoded_payload.get("node_type"))
             self._apply_position(node, packet.decoded_payload)
 
         if packet.packet_type == PacketType.POSITION:

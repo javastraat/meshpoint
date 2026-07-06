@@ -311,6 +311,10 @@ class NodeMap {
         if (this._map) this._map.flyTo([lat, lng], zoom);
     }
 
+    invalidateSize() {
+        if (this._map) this._map.invalidateSize();
+    }
+
     _wireResizeRecalc() {
         if (!this._map) return;
 

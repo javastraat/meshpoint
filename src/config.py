@@ -81,6 +81,7 @@ class MeshtasticConfig:
 class MeshcoreConfig:
     default_key_b64: str = ""
     channel_keys: dict[str, str] = field(default_factory=dict)
+    private_channels: list = field(default_factory=list)
     # Desired companion advert name. When set, the dashboard rename
     # path writes here, and the USB capture source re-applies it on
     # every connect via MeshCoreTxClient.set_companion_name. Leaving
@@ -91,11 +92,44 @@ class MeshcoreConfig:
 
 @dataclass
 class MeshcoreUsbConfig:
-    """MeshCore USB node monitoring -- auto-detected at startup when enabled."""
+    """MeshCore USB companion radio -- one entry per physical device."""
 
     serial_port: Optional[str] = None
     baud_rate: int = 115200
     auto_detect: bool = True
+    label: str = ""   # e.g. "868" or "433" — shown in logs and capture_source tag
+
+
+_MESHCORE_USB_FIELDS: frozenset[str] = frozenset({"serial_port", "baud_rate", "auto_detect", "label"})
+
+
+def _coerce_meshcore_usb(value) -> list[MeshcoreUsbConfig]:
+    """Accept legacy single-dict or new list-of-dicts and return a list.
+
+    Legacy local.yaml::
+
+        capture:
+          meshcore_usb:
+            serial_port: /dev/ttyACM0
+            auto_detect: true
+
+    New multi-companion format::
+
+        capture:
+          meshcore_usb:
+            - serial_port: /dev/ttyACM0
+              label: "868"
+            - serial_port: /dev/ttyACM1
+              label: "433"
+    """
+    def _from_dict(d: dict) -> MeshcoreUsbConfig:
+        return MeshcoreUsbConfig(**{k: v for k, v in d.items() if k in _MESHCORE_USB_FIELDS})
+
+    if isinstance(value, dict):
+        return [_from_dict(value)]
+    if isinstance(value, list):
+        return [_from_dict(d) for d in value if isinstance(d, dict)]
+    return [MeshcoreUsbConfig()]
 
 
 @dataclass
@@ -104,7 +138,9 @@ class CaptureConfig:
     serial_port: Optional[str] = None
     serial_baud: int = 115200
     concentrator_spi_device: str = "/dev/spidev0.0"
-    meshcore_usb: MeshcoreUsbConfig = field(default_factory=MeshcoreUsbConfig)
+    meshcore_usb: list[MeshcoreUsbConfig] = field(
+        default_factory=lambda: [MeshcoreUsbConfig()]
+    )
 
 
 @dataclass
@@ -387,6 +423,12 @@ def _apply_yaml(cfg: AppConfig, path: Path) -> None:
         logger.warning("Ignoring %s: top-level YAML is not a mapping.", path)
         return
 
+    # meshcore_usb supports both a legacy single-dict and a new list-of-dicts.
+    # Pop it before the generic merge so _merge_dataclass doesn't store raw dicts.
+    cap_raw = raw.get("capture")
+    if isinstance(cap_raw, dict) and "meshcore_usb" in cap_raw:
+        cfg.capture.meshcore_usb = _coerce_meshcore_usb(cap_raw.pop("meshcore_usb"))
+
     section_map = {
         "radio": cfg.radio,
         "meshtastic": cfg.meshtastic,
@@ -492,11 +534,14 @@ def save_section_to_yaml(section: str, values: dict) -> None:
 
 
 def validate_activation(config: AppConfig) -> None:
-    """Require a valid signed API key before the concentrator pipeline starts."""
+    """Require a valid signed API key only when upstream (Meshradar) is enabled."""
+    if not config.upstream.enabled:
+        return
+
     token = config.upstream.auth_token
     if not token:
         print("\n  Meshpoint is not activated.\n")
-        print("  An API key is required to run the concentrator.")
+        print("  An API key is required to use Meshradar upstream.")
         print("  Get a free key at https://meshradar.io\n")
         print("  Then run:  meshpoint setup\n")
         sys.exit(1)

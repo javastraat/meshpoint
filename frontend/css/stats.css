@@ -26,6 +26,10 @@
 /* --- Hero --- */
 .stats-hero {
     margin-bottom: 28px;
+    display: flex;
+    align-items: baseline;
+    gap: 1.5rem;
+    flex-wrap: wrap;
 }
 
 .stats-hero__number {
@@ -41,6 +45,25 @@
     font-size: 15px;
     color: var(--text-secondary, #94a3b8);
     margin-left: 10px;
+}
+
+.stats-hero__session {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+}
+
+.stats-hero__session-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 24px;
+    font-weight: 700;
+    color: #06b6d4;
+    text-shadow: 0 0 40px rgba(6, 182, 212, 0.2);
+}
+
+.stats-hero__session-label {
+    font-size: 15px;
+    color: var(--text-secondary, #94a3b8);
 }
 
 /* --- Top stat strip --- */
@@ -80,6 +103,17 @@
     margin-bottom: 32px;
 }
 
+.stats-section__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.stats-section__head .stats-section__title {
+    margin-bottom: 0;
+}
+
 .stats-section__title {
     font-family: 'JetBrains Mono', monospace;
     font-size: 11px;
@@ -88,6 +122,36 @@
     text-transform: uppercase;
     letter-spacing: 0.1em;
     margin-bottom: 12px;
+}
+
+.stats-toggle {
+    display: inline-flex;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.stats-toggle__btn {
+    background: transparent;
+    border: none;
+    padding: 3px 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-muted);
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    transition: background 0.15s, color 0.15s;
+}
+
+.stats-toggle__btn + .stats-toggle__btn {
+    border-left: 1px solid var(--border);
+}
+
+.stats-toggle__btn--active {
+    background: rgba(6, 182, 212, 0.12);
+    color: var(--accent-cyan);
 }
 
 /* --- Signal number cards (4-across) --- */
@@ -163,7 +227,7 @@
 /* --- Range cards --- */
 .stats-range-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr 1fr 1fr;
     gap: 10px;
 }
 
@@ -232,6 +296,10 @@
 
 .stats-range-bar__fill--mesh {
     background: linear-gradient(90deg, #a855f7, #f59e0b);
+}
+
+.stats-range-bar__fill--meshcore {
+    background: linear-gradient(90deg, #10b981, #06b6d4);
 }
 
 /* --- Protocol detail bar --- */

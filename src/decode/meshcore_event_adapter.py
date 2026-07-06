@@ -73,6 +73,7 @@ def _build_contact_message(
         protocol=Protocol.MESHCORE,
         packet_type=PacketType.TEXT,
         decoded_payload=decoded,
+        hop_start=_hop_start_from_payload(payload),
         signal=_rf_signal_from_payload(payload, signal),
         timestamp=_parse_timestamp(payload.get("timestamp")),
         decrypted=True,
@@ -113,6 +114,7 @@ def _build_channel_message(
         packet_type=PacketType.TEXT,
         decoded_payload=decoded,
         channel_hash=channel_idx,
+        hop_start=_hop_start_from_payload(payload),
         signal=_rf_signal_from_payload(payload, signal),
         timestamp=_parse_timestamp(payload.get("timestamp")),
         decrypted=True,
@@ -149,6 +151,9 @@ def _build_advertisement(
         "public_key": pubkey,
         "advertisement": payload,
     }
+    node_type = _find_payload_type(payload)
+    if node_type is not None:
+        decoded["node_type"] = node_type
     if name and not _looks_like_identifier(name, source_id, pubkey):
         decoded["long_name"] = name
         decoded["short_name"] = name[:4]
@@ -202,6 +207,28 @@ def _find_payload_name(payload: dict, *keys: str) -> str:
         elif isinstance(value, list):
             stack.extend(value)
     return ""
+
+
+def _find_payload_type(payload: dict) -> Optional[int]:
+    """Extract the MeshCore node type (0=None, 1=Client, 2=Repeater,
+    3=Roomserver, 4=Sensor) from an advertisement/new_contact event.
+
+    ``new_contact`` payloads carry the companion contact dict with a
+    top-level ``type``; some library versions nest the advert data one
+    level deeper (e.g. under ``contact``).
+    """
+    for candidate in (payload, *(v for v in payload.values() if isinstance(v, dict))):
+        for key in ("type", "adv_type", "node_type"):
+            value = candidate.get(key)
+            if value is None:
+                continue
+            try:
+                value = int(value)
+            except (TypeError, ValueError):
+                continue
+            if 0 <= value <= 15:
+                return value
+    return None
 
 
 def _looks_like_identifier(name: str, source_id: str, pubkey: str) -> bool:
@@ -259,19 +286,45 @@ def _build_rx_log_data(
 def _rf_signal_from_payload(
     payload: dict, fallback: Optional[SignalMetrics]
 ) -> Optional[SignalMetrics]:
-    """Extract signal metrics from a payload, checking both lower and upper case keys."""
+    """Extract signal metrics from a payload, checking both lower and upper case keys.
+
+    Frequency/bandwidth/SF aren't part of the per-event payload -- they're
+    carried on `fallback` (the RawCapture signal built upstream in
+    meshcore_usb_source.py from the companion's cached radio info), so they
+    must be preserved here rather than re-zeroed.
+    """
     rssi = payload.get("rssi", payload.get("RSSI"))
     snr = payload.get("snr", payload.get("SNR"))
     if rssi is None and snr is None:
         return fallback
+    frequency_mhz = fallback.frequency_mhz if fallback else 0.0
+    bandwidth_khz = fallback.bandwidth_khz if fallback else 0.0
+    spreading_factor = fallback.spreading_factor if fallback else 0
     return SignalMetrics(
         rssi=float(rssi) if rssi is not None else -120.0,
         snr=float(snr) if snr is not None else 0.0,
-        frequency_mhz=0.0,
-        spreading_factor=0,
-        bandwidth_khz=0.0,
+        frequency_mhz=frequency_mhz,
+        spreading_factor=spreading_factor,
+        bandwidth_khz=bandwidth_khz,
         coding_rate="N/A",
     )
+
+
+def _hop_start_from_payload(payload: dict) -> int:
+    """Convert MeshCore's raw path_len into a hop count.
+
+    CONTACT_MSG_RECV/CHANNEL_MSG_RECV events carry path_len -- the actual
+    number of hops the packet traversed (not a remaining-TTL scheme like
+    Meshtastic). The companion library uses path_len == 255 as a sentinel
+    for "direct message" (0 hops), not a literal 255-hop path -- see
+    meshcore/reader.py in the meshcore PyPI package. hop_limit is left at
+    its Packet default (0) so the existing hop_count property
+    (hop_start - hop_limit) yields path_len unchanged.
+    """
+    path_len = payload.get("path_len")
+    if path_len is None or path_len == 255:
+        return 0
+    return int(path_len)
 
 
 _BUILDERS = {

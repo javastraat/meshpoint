@@ -33,7 +33,7 @@
 
 A Raspberry Pi-based Meshtastic base station that sends and receives messages through an SX1302/SX1303 concentrator. The concentrator receives on 8 channels simultaneously (SF7-SF12) and transmits natively with up to 27 dBm output. Phones and nodes see it as a regular participant on the mesh.
 
-Everything is managed from a browser dashboard: full chat with channels and DMs, node discovery, radio configuration, and live packet feed. Also supports MeshCore traffic through a USB companion. Optionally syncs upstream to [Meshradar](https://meshradar.io) for aggregated multi-site mesh intelligence.
+Everything is managed from a browser dashboard: full chat with channels and DMs, node discovery, radio configuration, and live packet feed. Also supports MeshCore traffic through USB companions and passively sniffs LoRaWAN traffic. Optionally syncs upstream to [Meshradar](https://meshradar.io) for aggregated multi-site mesh intelligence.
 
 ### Standard Node vs Meshpoint
 
@@ -50,9 +50,13 @@ Everything is managed from a browser dashboard: full chat with channels and DMs,
 
 ## Features
 
+**5 networks simultaneously.** A single Meshpoint captures LoRaWAN (868 MHz), Meshtastic (868 MHz), MeshCore (868 MHz), MeshCore (433 MHz), and Meshtastic (433 MHz) at the same time — all from one device. The onboard SX1302 handles LoRaWAN and Meshtastic 868; USB companion radios extend coverage to MeshCore and 433 MHz bands.
+
 **Native mesh messaging.** Send and receive Meshtastic messages directly from the dashboard. Broadcast to channels, DM individual nodes, or reply in conversations. MeshCore messaging supported through the USB companion. The SX1302 handles TX using the same sync word and encryption as the mesh network: phones and nodes see your Meshpoint as a regular participant.
 
-**Smart relay (experimental).** Re-broadcast captured Meshtastic packets through the same onboard SX1302, identity-preserving — original sender attribution and packet IDs survive, only the hop counter decrements. No second radio required. Filter by signal strength, packet type, and rate limit; share duty-cycle budget with messaging so relay traffic can never crowd out user TX. Enable via `relay.enabled: true` in `local.yaml`. See [Configuration > Smart Relay](docs/CONFIGURATION.md#smart-relay) for details and the v0.7.4 test checklist for validation steps.
+**LoRaWAN passive sniffing.** Captures LoRaWAN traffic on EU868 channels (867.9 / 868.1 / 868.3 / 868.5 / 868.7 MHz) alongside Meshtastic without interfering. MAC layer fully decoded: Join-Request (JoinEUI, DevEUI, DevNonce), Data Up/Down (DevAddr, FCnt, FPort, payload length), and Rejoin frames. Payload is not decrypted (no session keys). All LoRaWAN traffic is strictly listen-only — never relayed. Accessible from its own dashboard panel with per-device stats.
+
+**Smart relay (experimental).** Re-broadcast captured Meshtastic packets through the same onboard SX1302, identity-preserving — original sender attribution and packet IDs survive, only the hop counter decrements. No second radio required. Filter by signal strength, packet type, and rate limit; share duty-cycle budget with messaging so relay traffic can never crowd out user TX. Enable via `relay.enabled: true` in `local.yaml`. See [Configuration > Smart Relay](docs/CONFIGURATION.md#smart-relay) for details.
 
 **Full chat UI.** Conversations organized by channel and contact. Signal info (SNR, RSSI) on every received bubble. Duplicate badge shows how many times a relayed message was heard. Channel sidebar with LongFast, custom channels, and DM contacts. Message history persisted in SQLite.
 
@@ -60,7 +64,9 @@ Everything is managed from a browser dashboard: full chat with channels and DMs,
 
 **Node discovery.** Live node cards showing every node your Meshpoint has heard: name, ID, protocol, hardware model, signal strength, battery, and last seen. Click any node to open a detail drawer with signal history and direct message.
 
-**Dual-protocol capture.** Meshtastic and MeshCore traffic captured simultaneously. The SX1302 concentrator handles Meshtastic, while a USB MeshCore companion covers MeshCore on its own frequency.
+**Multi-companion MeshCore capture.** Up to 4 Heltec/T-Beam USB companions running MeshCore firmware can be attached simultaneously, each labeled by band. The dashboard shows a dynamic companion card per device. Companions are auto-detected on `/dev/ttyACM*`.
+
+**Meshtastic 433 via serial.** A Heltec V3 or any Meshtastic-flashed node on `/dev/ttyUSB0` adds a fifth capture stream. Packets are decoded and displayed in the dashboard the same as 868 MHz Meshtastic packets.
 
 **Full packet decoding.** 14 Meshtastic portnums decoded: TEXT, POSITION, NODEINFO, TELEMETRY, ROUTING, ADMIN, WAYPOINT, DETECTION_SENSOR, PAXCOUNTER, STORE_FORWARD, RANGE_TEST, TRACEROUTE, NEIGHBORINFO, and MAP_REPORT. 6 MeshCore message types decoded. Device roles (CLIENT, ROUTER, REPEATER, TRACKER, SENSOR) extracted from NodeInfo.
 
@@ -68,15 +74,15 @@ Everything is managed from a browser dashboard: full chat with channels and DMs,
 
 **6 frequency regions.** US, EU_868, ANZ, IN, KR, and SG_923. Select during setup or change from the Radio settings page. MeshCore companion radios configure to match automatically.
 
-**Real-time dashboard.** Live map with node positions, color-coded packet feed with frequency and spreading factor columns, traffic charts, signal analytics, and node cards. Accessible from any device on your network.
+**Real-time dashboard.** Live map with node positions, color-coded packet feed with frequency and spreading factor columns, traffic charts, signal analytics, node cards, and a dedicated LoRaWAN devices panel. Accessible from any device on your network.
 
-**GPS and split placement.** USB GPS via `gpsd` drives the Configuration → GPS skyplot. Registered coordinates (wizard pin) always feed [Meshradar](https://meshradar.io) fleet view. Meshtastic POSITION broadcasts on the LoRa mesh are separately configurable: registered pin or live GPS, with approximate (~1.1 km), precise, or hidden privacy on live. See [Configuration > Location](docs/CONFIGURATION.md#location-gps-source).
+**GPS and split placement.** USB GPS via `gpsd` drives the Configuration → GPS skyplot. Registered coordinates (wizard pin) always feed [Meshradar](https://meshradar.io) fleet view. Meshtastic POSITION broadcasts are separately configurable: registered pin or live GPS, with approximate (~1.1 km), precise, or hidden privacy. See [Configuration > Location](docs/CONFIGURATION.md#location-gps-source).
 
 **Cloud integration.** Optional WebSocket uplink to [Meshradar](https://meshradar.io) for aggregated multi-site mesh intelligence. Fleet management, city-wide maps, and packet history across all your Meshpoints.
 
 **Dual-protocol MQTT gateway.** Publish captured packets to community MQTT brokers and Home Assistant. Dual-protocol: Meshtastic (protobuf) and MeshCore (JSON) from a single device. Two-gate privacy model ensures private channel data never leaks. Optional JSON publishing, HA auto-discovery, and configurable location precision.
 
-**Auto-detect hardware.** RAK Hotspot V2, SenseCap M1, and Syncrobit Chameleon (SX1302) supported; carrier board may show as generic SX1302/Pi during setup. **WisMesh Node** (RAK6421 Pi HAT + WisBlock SX1262, experimental) is documented on `main` and installs from branch `feat/wismesh-hat` until v0.7.6 merges. MeshCore USB companions auto-detected on `/dev/ttyUSB*` and `/dev/ttyACM*`.
+**Auto-detect hardware.** RAK Hotspot V2, SenseCap M1, and Syncrobit Chameleon (SX1302) supported. MeshCore USB companions auto-detected on `/dev/ttyUSB*` and `/dev/ttyACM*`.
 
 ---
 
@@ -109,12 +115,8 @@ Remove the 2 screws on the back panel (the side without the Ethernet/antenna por
 Retired **Syncrobit Chameleon** LoRa miners bundle a **Compute Module 4** (onboard
 eMMC), an **SX1302** concentrator, enclosure, and antenna. Many units support
 **PoE**. There is no microSD slot: you flash **64-bit** Raspberry Pi OS or
-Raspbian Lite to eMMC once over USB using a CM4 carrier board (for example
-Waveshare CM4-IO-BASE-B) and Raspberry Pi `usbboot`, then run the same
+Raspbian Lite to eMMC once over USB using a CM4 carrier board and Raspberry Pi `usbboot`, then run the same
 `install.sh` + `meshpoint setup` flow as a RAK V2.
-
-Meshpoint replaces the original Chameleon firmware. Community-validated on
-aarch64 Raspbian 13 (Trixie) with live Meshtastic RX/TX.
 
 > **Step-by-step:** [Syncrobit Chameleon guide](docs/SYNCROBIT-CHAMELEON.md) and [Hardware Matrix](docs/HARDWARE-MATRIX.md).
 
@@ -134,26 +136,39 @@ aarch64 Raspbian 13 (Trixie) with live Meshtastic RX/TX.
 
 ### Option E: WisMesh Node (RAK6421 HAT, experimental)
 
-The [RAK WisMesh Pi Node](https://store.rakwireless.com/products/wismesh-pi-node) is a Pi HAT with a **WisBlock SX1262** LoRa module (RAK13300 standard or **RAK13302 1W** with PA). Meshpoint drives RF through **meshtasticd** (Portduino), not the SX1302 concentrator path used by Options A–D.
+The [RAK WisMesh Pi Node](https://store.rakwireless.com/products/wismesh-pi-node) is a Pi HAT with a **WisBlock SX1262** LoRa module. Meshpoint drives RF through **meshtasticd** (Portduino), not the SX1302 concentrator path used by Options A–D.
 
-**Status:** User-facing docs are on **`main`** now. The installer, dashboard, and capture bridge are on branch **`feat/wismesh-hat`** until they ship in **v0.7.6**. Gateway users should stay on **`main`**.
-
-```bash
-cd /opt/meshpoint
-sudo git fetch origin
-sudo git checkout feat/wismesh-hat
-sudo git pull
-sudo ./scripts/install.sh --platform node
-sudo meshpoint setup
-```
+**Status:** User-facing docs are on **`main`** now. The installer, dashboard, and capture bridge are on branch **`feat/wismesh-hat`** until they ship in **v0.7.6**.
 
 > **Guides:** [WisMesh branch overview](docs/plans/WISMESH-BRANCH.md), [Gateway ↔ Node migration](docs/MIGRATE-GATEWAY-TO-NODE.md), [Hardware Matrix](docs/HARDWARE-MATRIX.md#wismesh-node-rak6421-hat-experimental).
 
-### Optional: MeshCore USB Companion
+### Optional: MeshCore USB Companions
 
-Add a Heltec V3/V4 or T-Beam running [MeshCore USB companion firmware](https://flasher.meshcore.co.uk/) to monitor MeshCore traffic alongside Meshtastic. Plug it into any USB port on the Pi -- the setup wizard auto-detects the device and configures its radio frequency for your region.
+Add one or more Heltec V3/V4 or T-Beam nodes running [MeshCore USB companion firmware](https://flasher.meshcore.co.uk/) to monitor MeshCore traffic alongside Meshtastic. Up to 4 companions can be attached simultaneously, each labeled by band. The setup wizard auto-detects each device.
+
+**Flashing note:** Heltec V4 USB enumerates as `303a:0002` under MeshCore firmware and `303a:1001` under Meshtastic — the opposite of what you might expect.
+
+### Optional: Meshtastic 433 MHz via USB Serial
+
+A Heltec V3 (or any Meshtastic node) flashed with **Meshtastic EU_433** firmware and connected via USB adds a fifth capture stream at 433 MHz. Use the `serial` source in `local.yaml` — not `meshcore_usb`. These two sources speak different protocols and are not interchangeable.
 
 > **Full step-by-step guide:** See the [Onboarding Guide](docs/ONBOARDING.md) for detailed instructions covering SD flashing, Chameleon eMMC recovery, assembly, installation, MeshCore setup, and troubleshooting for all hardware options.
+
+---
+
+## 5-Network Capture
+
+A fully-equipped Meshpoint captures all of these simultaneously from one device:
+
+| # | Protocol | Band | Source |
+|---|---|---|---|
+| 1 | LoRaWAN | 868 MHz | SX1302 concentrator (ch0–ch2, syncword 0x34) |
+| 2 | Meshtastic | 868 MHz | SX1302 concentrator (ch3–ch4 + ch8, syncword 0x2B) |
+| 3 | MeshCore | 868 MHz | Heltec V3 USB companion (`/dev/ttyACM0`) |
+| 4 | MeshCore | 433 MHz | Heltec V3 USB companion (`/dev/ttyACM1`) |
+| 5 | Meshtastic | 433 MHz | Heltec V3 USB serial (`/dev/ttyUSB0`) |
+
+LoRaWAN and MeshCore are **listen-only** and are never relayed. Only Meshtastic traffic is eligible for relay and messaging.
 
 ---
 
@@ -172,7 +187,7 @@ sudo meshpoint setup    # interactive config wizard
 meshpoint status        # verify everything is running
 ```
 
-Open `http://<pi-ip>:8080` for the local dashboard. On first visit (and after upgrading from v0.7.2 or earlier) you'll be prompted to set an admin password at `/setup` (8-character minimum). After that, all dashboard access requires sign-in. If you forget the password, recover via SSH with `sudo meshpoint reset-password` -- the command prompts interactively, rotates the JWT secret, and invalidates any open browser sessions.
+Open `http://<pi-ip>:8080` for the local dashboard. On first visit you'll be prompted to set an admin password at `/setup` (8-character minimum). If you forget the password, recover via SSH with `sudo meshpoint reset-password`.
 
 > **First time?** The [Onboarding Guide](docs/ONBOARDING.md) walks through everything from flashing the SD card to verifying your first captured packets.
 
@@ -188,17 +203,52 @@ Open `http://<pi-ip>:8080` for the local dashboard. On first visit (and after up
                                              │ WebSocket
                                              │
 ┌──────────┐    ┌──────────┐    ┌────────────┴────────────┐
-│Meshtastic│    │ SX1302/  │    │    Meshpoint (Pi 4)      │
-│ packets  │◀──▶│ SX1303   │◀──▶│                          │
-│ (OTA)    │    │ RX + TX  │    │  Capture → Decode → API  │
-└──────────┘    └──────────┘    │      ▲           │       │
-                                │      │       Dashboard   │
-┌──────────┐    ┌──────────┐    │   Messages    (port 8080)│
-│ MeshCore │    │  Heltec  │    │   + Chat UI              │
-│ packets  │◀──▶│  USB     │◀──▶│                          │
-│ (OTA)    │    │companion │    │                          │
-└──────────┘    └──────────┘    └─────────────────────────┘
+│LoRaWAN + │    │ SX1302/  │    │    Meshpoint (Pi 4)      │
+│Meshtastic│◀──▶│ SX1303   │◀──▶│                          │
+│ 868 MHz  │    │ ch0–ch8  │    │  CaptureCoordinator      │
+└──────────┘    └──────────┘    │    ├── PacketRouter       │
+                                │    │     ├── LoRaWAN      │
+┌──────────┐    ┌──────────┐    │    │     ├── Meshtastic   │
+│MeshCore  │    │ Heltec   │    │    │     └── MeshCore     │
+│ 868 MHz  │◀──▶│ USB ×1-4 │◀──▶│    ├── DatabaseManager   │
+│ 433 MHz  │    │(ACM0-3)  │    │    ├── RelayManager      │
+└──────────┘    └──────────┘    │    └── WebSocket / API   │
+                                │                           │
+┌──────────┐    ┌──────────┐    │         Dashboard        │
+│Meshtastic│    │ Heltec   │    │         (port 8080)       │
+│ 433 MHz  │◀──▶│   V3     │◀──▶│                          │
+│ (serial) │    │ /ttyUSB0 │    └─────────────────────────┘
+└──────────┘    └──────────┘
 ```
+
+---
+
+## Configuration
+
+All configuration lives in `config/local.yaml`. Below is the full 5-network example:
+
+```yaml
+capture:
+  sources:
+    - concentrator      # SX1302: LoRaWAN + Meshtastic 868
+    - meshcore_usb      # Heltec companions: MeshCore 868 + 433
+    - serial            # Heltec V3: Meshtastic 433
+
+  # Meshtastic 433 — Heltec V3 running Meshtastic EU_433 firmware
+  serial_port: "/dev/ttyUSB0"
+  serial_baud: 115200
+
+  # MeshCore companions — up to 4, each with a label
+  meshcore_usb:
+    - serial_port: "/dev/ttyACM0"
+      label: "868"
+    - serial_port: "/dev/ttyACM1"
+      label: "433"
+```
+
+> **Important:** `meshcore_usb` and `serial` speak different protocols. A Meshtastic device must use `serial`; a MeshCore device must use `meshcore_usb`. Mixing them produces garbage reads.
+
+See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for all options: relay, MQTT, upstream, GPS, channels, and radio tuning.
 
 ---
 
@@ -211,6 +261,7 @@ meshpoint report         # full operational report (traffic, signal, system)
 meshpoint restart        # restart the service
 meshpoint meshcore-radio # configure MeshCore companion radio frequency
 sudo meshpoint setup     # re-run config wizard
+sudo meshpoint reset-password  # recover forgotten admin password
 ```
 
 ---
@@ -227,19 +278,21 @@ FastAPI server on port 8080:
 | `GET /api/analytics/traffic` | Traffic rates and counts |
 | `GET /api/analytics/signal/rssi` | RSSI distribution |
 | `GET /api/device/status` | Device health and uptime |
-| `GET /api/config` | Radio, TX, and channel configuration |
+| `GET /api/config` | Radio, TX, channel, and companion configuration |
 | `PUT /api/config/transmit` | Update TX settings |
 | `PUT /api/config/identity` | Update node ID, long/short name |
 | `PUT /api/config/radio` | Change region, preset, frequency |
+| `PUT /api/config/capture/meshcore-companions` | Replace full MeshCore companion list (max 4) |
 | `POST /api/messages/send` | Send a Meshtastic or MeshCore message |
 | `GET /api/messages/conversations` | Message history by conversation |
+| `GET /api/lorawan/devices` | LoRaWAN device list (frame count, RSSI, SF, first/last seen) |
+| `GET /api/lorawan/packets` | Recent LoRaWAN packet log (max 1000) |
+| `GET /api/lorawan/stats` | LoRaWAN totals: packets, unique devices, by frame type |
 | `WS /ws` | Real-time packet + message stream |
 
 ---
 
 ## Updating
-
-Use this block whether you are on v0.6.x, v0.7.3, or already current. `install.sh` is idempotent on existing installs: it refreshes the venv (`pip install -r requirements.txt`), removes stale pre-v0.7.0 `.so` binaries if any remain, updates sudoers and the systemd unit, and does **not** require a reboot on upgrade.
 
 ```bash
 cd /opt/meshpoint
@@ -250,15 +303,11 @@ sudo bash scripts/install.sh
 sudo systemctl restart meshpoint
 ```
 
-The local dashboard shows an orange update indicator when a new version is available on GitHub. After every update, hard-refresh each open dashboard tab (Ctrl+Shift+R / Cmd+Shift+R) so the browser loads the new frontend.
+`install.sh` is idempotent on existing installs. After every update, hard-refresh each open dashboard tab (Ctrl+Shift+R / Cmd+Shift+R) so the browser loads the new frontend.
 
-**First time crossing v0.7.3:** after restart, open `http://<pi-ip>:8080` and complete `/setup` to set an admin password (8 characters minimum). Forgot it later? `sudo meshpoint reset-password` from SSH.
+**From the dashboard (v0.7.4+):** sign in as admin, open Settings → Updates, pick **Stable (main)**, then **Check for updates** and **Apply**.
 
-**Already on v0.7.3+ and update often?** `sudo git pull origin main` plus `sudo systemctl restart meshpoint` is usually enough unless the release notes call out new dependencies. When in doubt, run the full block above.
-
-**From the dashboard (v0.7.4+):** sign in as admin, open Settings → Updates, pick **Stable (main)**, then **Check for updates** and **Apply** (same end state as the SSH block).
-
-See [docs/COMMON-ERRORS.md](docs/COMMON-ERRORS.md#upgrades) if the service fails to start after pulling (missing `bcrypt`, stale `.so` files, spurious reboot prompt).
+See [docs/COMMON-ERRORS.md](docs/COMMON-ERRORS.md#upgrades) if the service fails to start after pulling.
 
 ---
 
@@ -268,23 +317,23 @@ See [docs/COMMON-ERRORS.md](docs/COMMON-ERRORS.md#upgrades) if the service fails
 
 **No packets:** Verify antenna is connected and frequency matches your region. Check `meshpoint logs` for `lgw_receive returned N packet(s)`.
 
+**MeshCore companion not detected:** Verify the device is flashed with `companion_radio_usb` MeshCore firmware (not Meshtastic). Check `dmesg | grep tty` to confirm the port. Heltec V4 enumerates as `303a:0002` under MeshCore firmware.
+
+**Heltec V3 433 showing garbage:** Make sure it is flashed with Meshtastic EU_433 firmware and that the config uses `serial` source — not `meshcore_usb`.
+
 **Upstream 401:** Bad API key. Get a free one at [meshradar.io](https://meshradar.io) and re-run `sudo meshpoint setup`.
 
 ---
 
 ## Support and documentation
 
-Start with the doc that matches what you are trying to do.
-
 **Setup and configuration**
 - **[Onboarding Guide](docs/ONBOARDING.md):** step-by-step from empty Pi to running Meshpoint
-- **[Hardware Matrix](docs/HARDWARE-MATRIX.md):** RAK V2 vs SenseCap M1 vs DIY, WisMesh Node (experimental), MeshCore companion radios, antennas, what's not supported
-- **[WisMesh Node (experimental)](docs/plans/WISMESH-BRANCH.md):** RAK6421 HAT, meshtasticd, branch install until v0.7.6
-- **[Gateway ↔ Node migration](docs/MIGRATE-GATEWAY-TO-NODE.md):** switch between concentrator Gateway and WisMesh Node platforms
+- **[Hardware Matrix](docs/HARDWARE-MATRIX.md):** all supported hardware, companion radios, antennas, what's not supported
 - **[Configuration Guide](docs/CONFIGURATION.md):** all config options, private channels, relay, upstream, MQTT, radio tuning
-- **[Radio Config Explained](docs/RADIO-CONFIG-EXPLAINED.md):** the "why" behind region, spreading factor, bandwidth, custom slots, Part 15 awareness
+- **[Radio Config Explained](docs/RADIO-CONFIG-EXPLAINED.md):** the "why" behind region, spreading factor, bandwidth, custom slots
 - **[MQTT and Meshradar](docs/MQTT-AND-MESHRADAR.md):** the two cloud paths side-by-side, what data flows where, privacy posture
-- **[Network Watchdog](docs/NETWORK-WATCHDOG.md):** how the WiFi auto-recovery service works, default thresholds, re-enabling auto-reboot
+- **[Network Watchdog](docs/NETWORK-WATCHDOG.md):** how the WiFi auto-recovery service works, default thresholds
 
 **When something goes wrong**
 - **[FAQ](docs/FAQ.md):** quick answers to common questions

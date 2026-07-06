@@ -24,11 +24,6 @@ from src.models.signal import SignalMetrics
 
 logger = logging.getLogger(__name__)
 
-_EMPTY_SIGNAL = SignalMetrics(
-    rssi=-120.0, snr=0.0, frequency_mhz=0.0,
-    spreading_factor=0, bandwidth_khz=0.0, coding_rate="N/A",
-)
-
 _HEALTH_CHECK_INTERVAL_SECONDS = 180
 _HEALTH_CHECK_RETRY_DELAY_SECONDS = 20
 _HEALTH_CHECK_MAX_FAILURES = 2
@@ -48,10 +43,12 @@ class MeshcoreUsbCaptureSource(CaptureSource):
         serial_port: Optional[str] = None,
         baud_rate: int = 115200,
         auto_detect: bool = True,
+        label: str = "",
     ):
         self._configured_port = serial_port
         self._baud_rate = baud_rate
         self._auto_detect = auto_detect
+        self._label = label
         self._meshcore = None
         self._queue: asyncio.Queue = asyncio.Queue(maxsize=500)
         self._running = False
@@ -66,7 +63,7 @@ class MeshcoreUsbCaptureSource(CaptureSource):
 
     @property
     def name(self) -> str:
-        return "meshcore_usb"
+        return f"meshcore_usb_{self._label}" if self._label else "meshcore_usb"
 
     @property
     def is_running(self) -> bool:
@@ -386,7 +383,8 @@ class MeshcoreUsbCaptureSource(CaptureSource):
             else str(event.type)
         )
 
-        signal = _extract_signal(payload_dict)
+        radio_info = self._meshcore.self_info if self._meshcore else None
+        signal = _extract_signal(payload_dict, radio_info)
 
         if etype == "rx_log_data":
             if signal.rssi > -119.0:
@@ -435,17 +433,37 @@ class MeshcoreUsbCaptureSource(CaptureSource):
         return await detect_meshcore_port(baud=self._baud_rate)
 
 
-def _extract_signal(payload: dict) -> SignalMetrics:
+def _extract_signal(
+    payload: dict, radio_info: Optional[dict] = None
+) -> SignalMetrics:
+    """Build signal metrics for a MeshCore event.
+
+    RSSI/SNR come per-packet from the event payload. Frequency/bandwidth/SF
+    are not part of the event stream (the companion firmware doesn't report
+    them per-packet) but are static for the session, cached on the meshcore
+    client's self_info from the connect-time handshake -- the same values
+    the Configuration > MeshCore page displays.
+    """
     rssi = payload.get("rssi", payload.get("RSSI"))
     snr = payload.get("snr", payload.get("SNR"))
+    frequency_mhz = float(radio_info.get("radio_freq", 0.0)) if radio_info else 0.0
+    bandwidth_khz = float(radio_info.get("radio_bw", 0.0)) if radio_info else 0.0
+    spreading_factor = int(radio_info.get("radio_sf", 0)) if radio_info else 0
     if rssi is None and snr is None:
-        return _EMPTY_SIGNAL
+        return SignalMetrics(
+            rssi=-120.0,
+            snr=0.0,
+            frequency_mhz=frequency_mhz,
+            spreading_factor=spreading_factor,
+            bandwidth_khz=bandwidth_khz,
+            coding_rate="N/A",
+        )
     return SignalMetrics(
         rssi=float(rssi) if rssi is not None else -120.0,
         snr=float(snr) if snr is not None else 0.0,
-        frequency_mhz=0.0,
-        spreading_factor=0,
-        bandwidth_khz=0.0,
+        frequency_mhz=frequency_mhz,
+        spreading_factor=spreading_factor,
+        bandwidth_khz=bandwidth_khz,
         coding_rate="N/A",
     )
 

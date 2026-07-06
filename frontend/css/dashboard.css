@@ -236,6 +236,26 @@ html, body {
     position: relative;
 }
 
+/* ---- Map expand button ---- */
+.map-expand-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 15px;
+    padding: 2px 5px;
+    border-radius: 4px;
+    line-height: 1;
+    transition: color 0.15s, background 0.15s;
+}
+.map-expand-btn:hover { color: var(--text); background: rgba(255,255,255,0.06); }
+
+/* ---- Expanded map mode ---- */
+.dashboard--map-expanded .dashboard__stats { display: none; }
+.dashboard--map-expanded .dashboard__side  { display: none; }
+.dashboard--map-expanded .dashboard__main  { grid-template-columns: 1fr; }
+.dashboard--map-expanded .dashboard__feed  { height: 260px; }
+
 /* ---- Map ---- */
 /*
  * Map zero-scrollbar invariant: Leaflet's zoom transitions briefly
@@ -457,6 +477,20 @@ html, body {
     color: var(--accent-amber);
     font-size: 0.85em;
     opacity: 0.85;
+}
+
+.td-node-name {
+    color: var(--accent-cyan);
+    font-weight: 500;
+}
+
+.td-node-short {
+    color: #64748b;
+    font-size: 0.82em;
+}
+
+.td-bcast {
+    color: #475569;
 }
 
 .packet-details-cell {

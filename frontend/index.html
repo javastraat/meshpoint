@@ -14,7 +14,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/dashboard.css" />
     <link rel="stylesheet" href="sidebar/sidebar.css" />
-    <link rel="stylesheet" href="topbar/topbar.css" />
+    <link rel="stylesheet" href="topbar/topbar.css?v=2" />
     <link rel="stylesheet" href="css/build_stamp.css" />
     <link rel="stylesheet" href="sidebar/telemetry_rail.css" />
     <link rel="stylesheet" href="css/reconnect_pill.css" />
@@ -35,6 +35,8 @@
     <link rel="stylesheet" href="css/stats.css" />
     <link rel="stylesheet" href="css/settings.css" />
     <link rel="stylesheet" href="css/configuration.css" />
+    <link rel="stylesheet" href="css/lorawan.css" />
+    <link rel="stylesheet" href="css/listener.css" />
     <link rel="stylesheet" href="css/gps.css" />
     <link rel="stylesheet" href="css/terminal_theme.css" />
     <link rel="stylesheet" href="css/terminal.css" />
@@ -91,6 +93,46 @@
                         </a>
                     </li>
                     <li class="sidebar__item">
+                        <a href="#/lorawan" class="sidebar__link" data-route="lorawan">
+                            <span class="sidebar__icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M2 12C2 12 5 5 12 5s10 7 10 7-3 7-10 7S2 12 2 12z"/>
+                                    <circle cx="12" cy="12" r="2"/>
+                                </svg>
+                            </span>
+                            <span class="sidebar__label">LoRaWAN</span>
+                        </a>
+                    </li>
+                    <li class="sidebar__item">
+                        <a href="#/meshtastic" class="sidebar__link" data-route="meshtastic">
+                            <span class="sidebar__icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M4.93 19.07a10 10 0 0 1 0-14.14"/>
+                                    <path d="M7.76 16.24a6 6 0 0 1 0-8.48"/>
+                                    <circle cx="12" cy="12" r="2"/>
+                                    <path d="M16.24 7.76a6 6 0 0 1 0 8.48"/>
+                                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+                                </svg>
+                            </span>
+                            <span class="sidebar__label">Meshtastic</span>
+                        </a>
+                    </li>
+                    <li class="sidebar__item">
+                        <a href="#/meshcore" class="sidebar__link" data-route="meshcore">
+                            <span class="sidebar__icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <circle cx="12" cy="5" r="2"/>
+                                    <circle cx="5" cy="19" r="2"/>
+                                    <circle cx="19" cy="19" r="2"/>
+                                    <line x1="12" y1="7" x2="5" y2="17"/>
+                                    <line x1="12" y1="7" x2="19" y2="17"/>
+                                    <line x1="5" y1="19" x2="19" y2="19"/>
+                                </svg>
+                            </span>
+                            <span class="sidebar__label">MeshCore</span>
+                        </a>
+                    </li>
+                    <li class="sidebar__item">
                         <a href="#/stats" class="sidebar__link" data-route="stats">
                             <span class="sidebar__icon">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -128,7 +170,18 @@
                             <span class="sidebar__badge" data-badge-for="radio" style="display:none"></span>
                         </a>
                     </li>
-                    <li class="sidebar__group-header" aria-hidden="true">
+                    <li class="sidebar__item">
+                        <a href="#/listener" class="sidebar__link" data-route="listener">
+                            <span class="sidebar__icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M3 18v-6a9 9 0 0 1 18 0v6"/>
+                                    <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
+                                </svg>
+                            </span>
+                            <span class="sidebar__label">Listener</span>
+                        </a>
+                    </li>
+                    <li class="sidebar__group-header" aria-hidden="true" data-requires-section="terminal">
                         <span class="sidebar__group-header-label">Ops</span>
                     </li>
                     <li class="sidebar__item" data-requires-section="terminal">
@@ -143,10 +196,10 @@
                         </a>
                     </li>
 
-                    <li class="sidebar__group-header" aria-hidden="true">
+                    <li class="sidebar__group-header" aria-hidden="true" data-requires-section="configuration.identity">
                         <span class="sidebar__group-header-label">Config</span>
                     </li>
-                    <li class="sidebar__group" data-group="configuration" data-expanded="false">
+                    <li class="sidebar__group" data-group="configuration" data-expanded="false" data-requires-section="configuration.identity">
                         <button class="sidebar__group-toggle" type="button" data-group="configuration" aria-expanded="false">
                             <span class="sidebar__icon">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -321,7 +374,10 @@
                     <div class="dashboard__main">
                         <section class="dashboard__map">
                             <div class="panel">
-                                <div class="panel__header">Node Map</div>
+                                <div class="panel__header">
+                                    Node Map
+                                    <button id="map-expand-btn" class="map-expand-btn" title="Expand map">⤢</button>
+                                </div>
                                 <div id="map" class="panel__body map-container"></div>
                             </div>
                         </section>
@@ -383,6 +439,22 @@
                         </div>
                     </section>
                 </main>
+            </section>
+
+            <section class="section" data-section="meshtastic" style="display:none">
+                <div id="meshtastic-panel"></div>
+            </section>
+
+            <section class="section" data-section="meshcore" style="display:none">
+                <div id="meshcore-panel"></div>
+            </section>
+
+            <section class="section" data-section="lorawan" style="display:none">
+                <div id="lorawan-panel"></div>
+            </section>
+
+            <section class="section" data-section="listener" style="display:none">
+                <div id="listener-panel"></div>
             </section>
 
             <section class="section" data-section="stats" style="display:none">
@@ -754,6 +826,10 @@
     <script src="js/keymap_overlay.js"></script>
     <script src="js/sound_engine.js"></script>
     <script src="js/theme_controller.js"></script>
+    <script src="js/lorawan_panel.js"></script>
+    <script src="js/listener_panel.js"></script>
+    <script src="js/meshtastic_panel.js"></script>
+    <script src="js/meshcore_panel.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>

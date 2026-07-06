@@ -477,3 +477,63 @@ select.cfg-field__input option:checked {
 .cfg-mc-channels {
     margin-bottom: 14px;
 }
+
+/* Multi-companion list inside "USB capture sources" card. */
+.cfg-companions {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin: 12px 0 4px;
+}
+
+.cfg-companions__add-row {
+    margin: 8px 0 12px;
+}
+
+.cfg-companion {
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 10px;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.cfg-companion__header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.cfg-companion__num {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: rgba(243, 244, 246, 0.55);
+    white-space: nowrap;
+    min-width: 90px;
+}
+
+.cfg-companion__label-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+}
+
+.cfg-companion__label-input {
+    width: 120px;
+    padding: 6px 10px;
+    font-size: 13px;
+}
+
+.cfg-companion__remove {
+    margin-left: auto;
+    padding: 4px 10px;
+    font-size: 12px;
+    line-height: 1;
+    flex-shrink: 0;
+}

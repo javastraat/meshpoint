@@ -41,6 +41,11 @@ LGW_MULTI_NB = 8
 LGW_COM_SPI = 0
 LGW_RADIO_TYPE_SX1250 = 5
 
+# SX1302 service-channel LoRa sync word peak-position registers.
+# See loragw_reg.h: SX1302_REG_RX_TOP_LORA_SERVICE_FSK_FRAME_SYNCH0/1_PEAK*
+_REG_SERVICE_PEAK1 = 932
+_REG_SERVICE_PEAK2 = 933
+
 BW_125KHZ = 0x04
 BW_250KHZ = 0x05
 BW_500KHZ = 0x06
@@ -301,14 +306,37 @@ class SX1302Wrapper:
         return self._unknown_status_count
 
     def set_syncword(self, syncword: int) -> None:
-        """Configure custom sync word (requires patched HAL)."""
+        """Set the service-channel (ch8) sync word via direct register writes.
+
+        With lorawan_public=True in board config, lgw_start() already programs
+        ch0-ch7 (multi-SF) to LoRaWAN 0x34 (PEAK1=6, PEAK2=8).  This method
+        overrides ONLY the service channel registers so ch8 uses the requested
+        syncword — typically 0x2B for Meshtastic LongFast — leaving ch0-ch7
+        untouched for LoRaWAN reception.
+
+        PEAK values derived from the syncword byte nibbles:
+          PEAK1 = 2 * (syncword >> 4)
+          PEAK2 = 2 * (syncword & 0x0F)
+        e.g. 0x2B → PEAK1=4, PEAK2=22   (Meshtastic)
+             0x34 → PEAK1=6, PEAK2=8    (LoRaWAN public)
+        """
         if self._lib is None:
             self.load()
-        result = self._lib.sx1302_lora_syncword(False, syncword)
-        if result != LGW_HAL_SUCCESS:
-            logger.warning("Failed to set sync word 0x%02X", syncword)
+        peak1 = ((syncword >> 4) & 0x0F) * 2
+        peak2 = (syncword & 0x0F) * 2
+        r1 = self._lib.lgw_reg_w(_REG_SERVICE_PEAK1, peak1)
+        r2 = self._lib.lgw_reg_w(_REG_SERVICE_PEAK2, peak2)
+        if r1 != LGW_HAL_SUCCESS or r2 != LGW_HAL_SUCCESS:
+            logger.warning(
+                "Failed to set service channel sync word 0x%02X (PEAK1=%d, PEAK2=%d)",
+                syncword, peak1, peak2,
+            )
         else:
-            logger.info("Sync word set to 0x%02X", syncword)
+            logger.info(
+                "Service channel (ch8) sync word 0x%02X (PEAK1=%d, PEAK2=%d); "
+                "ch0-ch7 remain on LoRaWAN 0x34",
+                syncword, peak1, peak2,
+            )
 
     # ── TX operations ───────────────────────────────────────────────
 
@@ -420,7 +448,7 @@ class SX1302Wrapper:
 
     def _configure_board(self) -> None:
         conf = LgwConfBoardS()
-        conf.lorawan_public = False
+        conf.lorawan_public = True   # programs ch0-ch7 multi-SF to LoRaWAN 0x34 at lgw_start()
         conf.clksrc = 0
         conf.full_duplex = False
         conf.com_type = LGW_COM_SPI
@@ -467,8 +495,9 @@ class SX1302Wrapper:
             ch = plan.single_sf_channel
             conf = LgwConfRxifS()
             conf.enable = ch.enabled
-            conf.rf_chain = 0
-            conf.freq_hz = ch.frequency_hz - radio_0_freq
+            conf.rf_chain = 0 if ch.frequency_hz <= radio_0_freq + 500_000 else 1
+            center = radio_0_freq if conf.rf_chain == 0 else plan.radio_1_freq_hz
+            conf.freq_hz = ch.frequency_hz - center
             conf.bandwidth = BW_KHZ_TO_HAL.get(ch.bandwidth_khz, BW_250KHZ)
             conf.datarate = ch.spreading_factor
 

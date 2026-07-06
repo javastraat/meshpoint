@@ -57,15 +57,12 @@ _ADMIN_SECTIONS: tuple[str, ...] = (
 
 _VIEWER_SECTIONS: tuple[str, ...] = (
     "dashboard",
+    "lorawan",
+    "meshtastic",
+    "meshcore",
     "stats",
     "messages",
     "radio",
-    "configuration.identity",
-    "configuration.radio",
-    "configuration.channels",
-    "configuration.transmit",
-    "configuration.mqtt",
-    "configuration.gps",
 )
 
 

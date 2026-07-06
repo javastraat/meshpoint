@@ -18,42 +18,37 @@ class MeshcoreConfigCard {
         this._focusedRow = null;
     }
 
+    _MAX_COMPANIONS = 4;
+
     mount(root) {
         this._root = root;
         this._root.innerHTML = `
             <div class="cfg-section" data-mc-root>
                 <article class="cfg-card">
                     <header class="cfg-card__head">
-                        <h3 class="cfg-card__title">USB capture source</h3>
+                        <h3 class="cfg-card__title">USB capture sources</h3>
                         <p class="cfg-card__hint">
-                            Enable the MeshCore USB companion serial source (Heltec, T-Beam, etc.).
-                            Requires a service restart after changes.
+                            One entry per MeshCore companion (Heltec V3/V4, T-Beam, etc.).
+                            Up to ${this._MAX_COMPANIONS}. Requires a service restart after changes.
                         </p>
                     </header>
-                    <form class="cfg-form" data-mc-usb-form>
-                        <label class="cfg-field cfg-field--toggle">
-                            <input type="checkbox" data-mc-usb-enable>
-                            <span class="cfg-field__label">Include meshcore_usb capture source</span>
-                        </label>
-                        <label class="cfg-field cfg-field--toggle">
-                            <input type="checkbox" data-mc-usb-autodetect checked>
-                            <span class="cfg-field__label">Auto-detect serial port</span>
-                        </label>
-                        <label class="cfg-field">
-                            <span class="cfg-field__label">Pinned serial port</span>
-                            <input class="cfg-field__input" type="text"
-                                   placeholder="/dev/ttyACM0" data-mc-usb-port>
-                        </label>
-                        <label class="cfg-field cfg-field--narrow">
-                            <span class="cfg-field__label">Baud rate</span>
-                            <input class="cfg-field__input" type="number" data-mc-usb-baud>
-                        </label>
-                        <div class="cfg-card__actions">
-                            <button class="terminal-button terminal-button--primary"
-                                    type="submit">Save USB source</button>
-                        </div>
-                        <p class="cfg-status" data-mc-usb-status aria-live="polite"></p>
-                    </form>
+                    <label class="cfg-field cfg-field--toggle">
+                        <input type="checkbox" data-mc-usb-enable>
+                        <span class="cfg-field__label">Include meshcore_usb capture source</span>
+                    </label>
+                    <div class="cfg-companions" data-mc-companions></div>
+                    <div class="cfg-companions__add-row">
+                        <button class="terminal-button" type="button" data-mc-add-companion>
+                            + Add companion
+                        </button>
+                    </div>
+                    <div class="cfg-card__actions">
+                        <button class="terminal-button terminal-button--primary"
+                                type="button" data-mc-usb-save>
+                            Save USB sources
+                        </button>
+                    </div>
+                    <p class="cfg-status" data-mc-usb-status aria-live="polite"></p>
                 </article>
                 <article class="cfg-card" data-mc-card>
                     <header class="cfg-card__head">
@@ -70,22 +65,27 @@ class MeshcoreConfigCard {
         `;
         this._body = this._root.querySelector('[data-mc-body]');
         this._statusEl = this._root.querySelector('[data-mc-status]');
-        this._usbForm = this._root.querySelector('[data-mc-usb-form]');
-        this._usbForm.addEventListener('submit', (e) => this._saveUsbSource(e));
+        this._companionsEl = this._root.querySelector('[data-mc-companions]');
+
+        this._root.querySelector('[data-mc-add-companion]')
+            .addEventListener('click', () => this._addCompanionRow());
+        this._root.querySelector('[data-mc-usb-save]')
+            .addEventListener('click', () => this._saveCompanions());
     }
 
     render(config) {
         const cap = config.capture || {};
-        const mcUsb = cap.meshcore_usb || {};
+        const companions = Array.isArray(cap.meshcore_usb) ? cap.meshcore_usb : [];
         const sources = cap.sources || [];
+
         const enableEl = this._root.querySelector('[data-mc-usb-enable]');
-        const autodetectEl = this._root.querySelector('[data-mc-usb-autodetect]');
-        const portEl = this._root.querySelector('[data-mc-usb-port]');
-        const baudEl = this._root.querySelector('[data-mc-usb-baud]');
         if (enableEl) enableEl.checked = sources.includes('meshcore_usb');
-        if (autodetectEl) autodetectEl.checked = mcUsb.auto_detect !== false;
-        if (portEl) portEl.value = mcUsb.serial_port || '';
-        if (baudEl && mcUsb.baud_rate != null) baudEl.value = mcUsb.baud_rate;
+
+        // Render companion rows from config
+        this._companionsEl.innerHTML = '';
+        const list = companions.length > 0 ? companions : [{ label: '', serial_port: '', baud_rate: 115200, auto_detect: true }];
+        list.forEach((c) => this._addCompanionRow(c));
+        this._syncAddBtn();
 
         const mc = (config && config.meshcore) || {};
         if (!mc.connected) {
@@ -95,25 +95,100 @@ class MeshcoreConfigCard {
         this._renderOnline(mc);
     }
 
-    async _saveUsbSource(event) {
-        event.preventDefault();
+    _addCompanionRow(data = {}) {
+        const idx = this._companionsEl.children.length;
+        if (idx >= this._MAX_COMPANIONS) return;
+
+        const label    = this._esc(data.label || '');
+        const port     = this._esc(data.serial_port || '');
+        const baud     = data.baud_rate != null ? data.baud_rate : 115200;
+        const autodet  = data.auto_detect !== false;
+
+        const div = document.createElement('div');
+        div.className = 'cfg-companion';
+        div.dataset.companionIdx = idx;
+        div.innerHTML = `
+            <div class="cfg-companion__header">
+                <span class="cfg-companion__num">Companion ${idx + 1}</span>
+                <label class="cfg-companion__label-wrap">
+                    <span class="cfg-field__label">Label</span>
+                    <input class="cfg-field__input cfg-companion__label-input"
+                           type="text" maxlength="16"
+                           placeholder="e.g. 868 or 433"
+                           value="${label}" data-companion-label>
+                </label>
+                <button class="cfg-companion__remove terminal-button terminal-button--danger"
+                        type="button" title="Remove companion">✕</button>
+            </div>
+            <label class="cfg-field cfg-field--toggle">
+                <input type="checkbox" data-companion-autodetect ${autodet ? 'checked' : ''}>
+                <span class="cfg-field__label">Auto-detect serial port</span>
+            </label>
+            <label class="cfg-field">
+                <span class="cfg-field__label">Pinned serial port</span>
+                <input class="cfg-field__input" type="text"
+                       placeholder="/dev/ttyACM0" value="${port}"
+                       data-companion-port>
+            </label>
+            <label class="cfg-field cfg-field--narrow">
+                <span class="cfg-field__label">Baud rate</span>
+                <input class="cfg-field__input" type="number"
+                       value="${baud}" data-companion-baud>
+            </label>
+        `;
+
+        div.querySelector('.cfg-companion__remove').addEventListener('click', () => {
+            div.remove();
+            this._reindexCompanions();
+            this._syncAddBtn();
+        });
+
+        this._companionsEl.appendChild(div);
+        this._syncAddBtn();
+    }
+
+    _reindexCompanions() {
+        this._companionsEl.querySelectorAll('.cfg-companion').forEach((el, i) => {
+            el.dataset.companionIdx = i;
+            const num = el.querySelector('.cfg-companion__num');
+            if (num) num.textContent = `Companion ${i + 1}`;
+        });
+    }
+
+    _syncAddBtn() {
+        const btn = this._root.querySelector('[data-mc-add-companion]');
+        if (!btn) return;
+        const count = this._companionsEl.children.length;
+        btn.disabled = count >= this._MAX_COMPANIONS;
+        btn.title = count >= this._MAX_COMPANIONS
+            ? `Maximum ${this._MAX_COMPANIONS} companions`
+            : '';
+    }
+
+    async _saveCompanions() {
         const status = this._root.querySelector('[data-mc-usb-status]');
         status.dataset.kind = 'pending';
         status.textContent = 'Saving…';
-        const result = await this._api.put('/api/config/capture/meshcore-usb', {
-            enable_source: this._root.querySelector('[data-mc-usb-enable]').checked,
-            auto_detect: this._root.querySelector('[data-mc-usb-autodetect]').checked,
-            serial_port: this._root.querySelector('[data-mc-usb-port]').value.trim(),
-            baud_rate: Number(this._root.querySelector('[data-mc-usb-baud]').value),
+
+        const companions = [];
+        this._companionsEl.querySelectorAll('.cfg-companion').forEach((div) => {
+            companions.push({
+                label:       (div.querySelector('[data-companion-label]')?.value || '').trim(),
+                serial_port: (div.querySelector('[data-companion-port]')?.value || '').trim() || null,
+                baud_rate:   Number(div.querySelector('[data-companion-baud]')?.value) || 115200,
+                auto_detect: div.querySelector('[data-companion-autodetect]')?.checked ?? true,
+            });
         });
+
+        const result = await this._api.put('/api/config/capture/meshcore-companions', {
+            enable_source: this._root.querySelector('[data-mc-usb-enable]').checked,
+            companions,
+        });
+
         if (result) {
             status.dataset.kind = 'success';
             status.textContent = 'Saved.';
-            if (result.restart_required) {
-                this._api.signalRestart('MeshCore USB source updated.');
-            } else {
-                this._api.toast('MeshCore USB source updated');
-            }
+            this._api.signalRestart('MeshCore USB companions updated.');
             await this._api.refresh();
         } else {
             status.dataset.kind = 'error';
@@ -151,7 +226,9 @@ class MeshcoreConfigCard {
         const radio = mc.radio || {};
         const name = this._esc(mc.companion_name || 'Connected');
         const nameValue = this._esc(mc.companion_name || '');
-        const channelRows = this._buildChannelRows(mc.channel_keys || []);
+        const publicKeyHex = this._esc(mc.public_key_hex || '8b3387e9c5cdea6ac9e5edbaa115cd72');
+        const privateSet = new Set(mc.private_channels || []);
+        const channelRows = this._buildChannelRows(mc.channel_keys || [], privateSet);
 
         this._body.innerHTML = `
             <div class="cfg-mc-status">
@@ -211,13 +288,21 @@ class MeshcoreConfigCard {
                             <th>#</th>
                             <th>Name</th>
                             <th>Key (Hex)</th>
+                            <th title="Hide from viewer role">Admin only</th>
                         </tr>
                     </thead>
                     <tbody data-mc-channels-body>
-                        <tr class="ch-table__row ch-table__row--locked" data-index="0">
+                        <tr class="ch-table__row ch-table__row--public" data-index="0">
                             <td class="ch-table__idx">0</td>
                             <td>Public</td>
-                            <td class="ch-table__psk-cell">&mdash;</td>
+                            <td class="ch-table__psk-cell">
+                                <input class="ch-table__name-input" data-field="public_key_hex"
+                                       type="password" value="${publicKeyHex}"
+                                       placeholder="32-char hex default public key" />
+                                <button class="ch-table__reveal" type="button"
+                                        title="Show/hide key">&#128065;</button>
+                            </td>
+                            <td></td>
                         </tr>
                         ${channelRows}
                     </tbody>
@@ -248,11 +333,12 @@ class MeshcoreConfigCard {
         this._updateAddBtn();
     }
 
-    _buildChannelRows(channelKeys) {
+    _buildChannelRows(channelKeys, privateSet = new Set()) {
         return channelKeys.map((ch, i) => {
             const idx = i + 1;
             const name = this._esc(ch.name || '');
             const keyHex = this._esc(ch.key_hex || '');
+            const isPrivate = privateSet.has(ch.name || '');
             return `
                 <tr class="ch-table__row" data-index="${idx}">
                     <td class="ch-table__idx">${idx}</td>
@@ -266,6 +352,9 @@ class MeshcoreConfigCard {
                                placeholder="32-char hex (empty = hashtag)" />
                         <button class="ch-table__reveal" type="button"
                                 title="Show/hide key">&#128065;</button>
+                    </td>
+                    <td class="ch-table__admin-cell">
+                        <input type="checkbox" data-field="admin_only" title="Hide from viewer role" ${isPrivate ? 'checked' : ''} />
                     </td>
                 </tr>
             `;
@@ -302,7 +391,7 @@ class MeshcoreConfigCard {
     _wireChannelHandlers(scope) {
         scope.querySelectorAll('.ch-table__reveal').forEach((btn) => {
             btn.addEventListener('click', () => {
-                const input = btn.closest('tr').querySelector('[data-field="key_hex"]');
+                const input = btn.closest('tr').querySelector('[data-field="key_hex"], [data-field="public_key_hex"]');
                 if (input) input.type = input.type === 'password' ? 'text' : 'password';
             });
         });
@@ -365,6 +454,9 @@ class MeshcoreConfigCard {
                 <button class="ch-table__reveal" type="button"
                         title="Show/hide key">&#128065;</button>
             </td>
+            <td class="ch-table__admin-cell">
+                <input type="checkbox" data-field="admin_only" title="Hide from viewer role" />
+            </td>
         `;
         this._wireChannelHandlers(tr);
         tbody.appendChild(tr);
@@ -381,18 +473,26 @@ class MeshcoreConfigCard {
     }
 
     async _saveChannels() {
+        const publicKeyHex = (this._body.querySelector('[data-field="public_key_hex"]')?.value || '').trim();
+
         const rows = this._body.querySelectorAll(
-            '[data-mc-channels-body] tr:not(.ch-table__row--locked)',
+            '[data-mc-channels-body] tr:not(.ch-table__row--public)',
         );
         const channels = [];
+        const private_channels = [];
         rows.forEach((row) => {
             const name = (row.querySelector('[data-field="name"]')?.value || '').trim();
             const keyHex = (row.querySelector('[data-field="key_hex"]')?.value || '').trim();
-            if (name || keyHex) channels.push({ name, key_hex: keyHex });
+            if (name || keyHex) {
+                channels.push({ name, key_hex: keyHex });
+                if (row.querySelector('[data-field="admin_only"]')?.checked && name) {
+                    private_channels.push(name);
+                }
+            }
         });
 
         this._setStatus('pending', 'Saving…');
-        const res = await this._api.put('/api/config/meshcore/channels', { channels });
+        const res = await this._api.put('/api/config/meshcore/channels', { channels, public_key_hex: publicKeyHex, private_channels });
         if (res) {
             this._setStatus('success', 'Channels saved.');
             this._api.toast('MeshCore channels saved');

@@ -117,10 +117,15 @@ class ConcentratorChannelPlan:
 
     @classmethod
     def for_region(cls, region: str) -> ConcentratorChannelPlan:
-        """Return the default LongFast channel plan for a Meshtastic region."""
+        """Return the default channel plan for a region.
+
+        EU_868 returns the LoRaWAN+Meshtastic combined plan so this fork
+        captures both protocols simultaneously.  Other regions fall back to
+        the Meshtastic-only LongFast preset.
+        """
         factories = {
             "US": cls.meshtastic_us915_default,
-            "EU_868": cls.meshtastic_eu868_default,
+            "EU_868": cls.eu868_lorawan,
             "ANZ": cls.meshtastic_anz_default,
             "IN": cls.meshtastic_in865_default,
             "KR": cls.meshtastic_kr920_default,
@@ -143,6 +148,56 @@ class ConcentratorChannelPlan:
             radio_1_freq_hz=907_400_000,
             multi_sf_base_hz=906_200_000,
         )
+
+    @staticmethod
+    def eu868_lorawan() -> ConcentratorChannelPlan:
+        """EU868 plan for simultaneous LoRaWAN + Meshtastic capture.
+
+        RF0 at 868.3 MHz covers 5 EU868 LoRaWAN channels spanning its full
+        +/-400 kHz IF window (867.9 / 868.1 / 868.3 / 868.5 / 868.7 MHz,
+        125 kHz BW, SF7-SF12) -- the 3 mandatory uplinks plus 2 extra TTN
+        channels reachable from this center.
+        RF1 stays centered at 869.525 MHz purely to keep the ch8 service
+        channel at zero IF offset for the Meshtastic LongFast channel
+        (869.525 MHz, 250 kHz BW, SF11).
+
+        ch0-ch7 multi-SF share a single board-wide sync word (LoRaWAN 0x34,
+        set by lorawan_public=True at start; see sx1302_wrapper.py) -- there
+        is no per-channel override, so a multi-SF channel can never decode
+        Meshtastic (sync 0x2B) regardless of which frequency it's tuned to.
+        Only ch8 gets its own sync word via a direct register write, which
+        is why it's the sole Meshtastic capture path. That also means RF1's
+        multi-SF slots would be dead weight for both protocols -- nothing
+        LoRaWAN-relevant sits within +/-400 kHz of 869.525 MHz -- so they're
+        left disabled instead of pointed at 869.4625/869.5875 as before.
+
+        Sync word assignment (see sx1302_wrapper.py):
+          ch0-ch7 multi-SF: LoRaWAN 0x34  (set by lorawan_public=True at start)
+          ch8   service:    Meshtastic 0x2B (set via direct register writes)
+        """
+        plan = ConcentratorChannelPlan(
+            radio_0_freq_hz=868_300_000,
+            radio_1_freq_hz=869_525_000,
+        )
+        plan.single_sf_channel = ChannelConfig(
+            frequency_hz=869_525_000,
+            bandwidth_khz=250,
+            spreading_factor=11,
+        )
+        plan.multi_sf_channels = [
+            # EU868 LoRaWAN uplinks on RF0 -- full +/-400 kHz IF window (125 kHz, SF7-SF12)
+            ChannelConfig(frequency_hz=867_900_000),
+            ChannelConfig(frequency_hz=868_100_000),
+            ChannelConfig(frequency_hz=868_300_000),
+            ChannelConfig(frequency_hz=868_500_000),
+            ChannelConfig(frequency_hz=868_700_000),
+            # Unused slots -- disabled (see docstring: RF1 multi-SF can't help
+            # either protocol without breaking the ch8 Meshtastic channel)
+            ChannelConfig(frequency_hz=869_525_000, enabled=False),
+            ChannelConfig(frequency_hz=869_525_000, enabled=False),
+            ChannelConfig(frequency_hz=869_525_000, enabled=False),
+        ]
+        return plan
 
     @staticmethod
     def meshtastic_eu868_default() -> ConcentratorChannelPlan:

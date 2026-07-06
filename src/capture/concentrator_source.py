@@ -23,6 +23,16 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Frequency (Hz) used by Meshtastic on EU868.  Packets on this frequency
+# are routed to the Meshtastic decoder; everything else is treated as LoRaWAN.
+# Only the ch8 service channel (869.525 MHz) can decode Meshtastic -- ch0-ch7
+# multi-SF channels share a single board-wide LoRaWAN sync word, so no other
+# frequency will ever carry a Meshtastic-decoded packet (see eu868_lorawan()
+# in concentrator_config.py).
+_MESHTASTIC_EU868_FREQS_HZ: frozenset[int] = frozenset({
+    869_525_000,
+})
+
 
 class ConcentratorCaptureSource(CaptureSource):
     """Captures LoRa packets via the RAK2287 SX1302 concentrator."""
@@ -133,12 +143,18 @@ class ConcentratorCaptureSource(CaptureSource):
                     timestamp=datetime.now(timezone.utc),
                 )
 
+                protocol_hint = (
+                    Protocol.MESHTASTIC
+                    if pkt.frequency_hz in _MESHTASTIC_EU868_FREQS_HZ
+                    else Protocol.LORAWAN
+                )
+
                 yield RawCapture(
                     payload=pkt.payload,
                     signal=signal,
                     capture_source="concentrator",
                     timestamp=datetime.now(timezone.utc),
-                    protocol_hint=Protocol.MESHTASTIC,
+                    protocol_hint=protocol_hint,
                 )
 
             await asyncio.sleep(self._poll_interval)

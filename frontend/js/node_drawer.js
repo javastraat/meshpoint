@@ -441,7 +441,7 @@ class NodeDrawer {
         const d = new Date(ts);
         return d.toLocaleString([], {
             month: 'short', day: 'numeric',
-            hour: '2-digit', minute: '2-digit',
+            hour: '2-digit', minute: '2-digit', hour12: false,
         });
     }
 

@@ -197,7 +197,7 @@ class MessagingContacts {
         const protoBadge = convo.protocol === 'meshcore' ? 'MC' : 'MT';
 
         const timeStr = convo.last_timestamp
-            ? new Date(convo.last_timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            ? new Date(convo.last_timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
             : '';
 
         el.innerHTML = `

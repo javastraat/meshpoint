@@ -259,7 +259,7 @@ class PipelineCoordinator:
             logger.exception("Pipeline error")
 
     async def _process_capture(self, raw: RawCapture) -> None:
-        if raw.capture_source == "meshcore_usb":
+        if raw.capture_source.startswith("meshcore_usb"):
             packet = self._adapt_meshcore_usb(raw)
         else:
             packet = self._router.decode(
@@ -289,6 +289,11 @@ class PipelineCoordinator:
             logger.exception("Failed to store packet %s", packet.packet_id)
 
     async def _update_node(self, packet: Packet) -> None:
+        if packet.protocol == Protocol.LORAWAN:
+            # LoRaWAN devices have no Meshtastic node profile; just bump the counter.
+            if packet.source_id:
+                await self._node_repo.increment_packet_count(packet.source_id)
+            return
         decoder = (
             self._router.meshtastic_decoder
             if packet.protocol == Protocol.MESHTASTIC
@@ -319,6 +324,8 @@ class PipelineCoordinator:
             await self._node_repo.increment_packet_count(packet.source_id)
 
     async def _store_telemetry(self, packet: Packet) -> None:
+        if packet.protocol == Protocol.LORAWAN:
+            return
         decoder = (
             self._router.meshtastic_decoder
             if packet.protocol == Protocol.MESHTASTIC

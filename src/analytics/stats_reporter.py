@@ -31,8 +31,10 @@ class StatsReporter:
         self._rssi_weak = 0
         self._rssi_sum = 0.0
         self._rssi_count = 0
+        self._best_rssi: Optional[float] = None
         self._snr_sum = 0.0
         self._snr_count = 0
+        self._best_snr: Optional[float] = None
 
         self._direct_count = 0
         self._relayed_count = 0
@@ -64,10 +66,14 @@ class StatsReporter:
             self._classify_rssi(rssi)
             self._rssi_sum += rssi
             self._rssi_count += 1
+            if self._best_rssi is None or rssi > self._best_rssi:
+                self._best_rssi = rssi
 
         if snr is not None:
             self._snr_sum += snr
             self._snr_count += 1
+            if self._best_snr is None or snr > self._best_snr:
+                self._best_snr = snr
 
         hops_consumed = (hop_start - hop_limit) if hop_start > 0 else 0
         if hops_consumed == 0:
@@ -135,8 +141,10 @@ class StatsReporter:
             "relayed_count": self._relayed_count,
             "rssi_sum": round(self._rssi_sum, 1),
             "rssi_count": self._rssi_count,
+            "best_rssi": round(self._best_rssi, 1) if self._best_rssi is not None else None,
             "snr_sum": round(self._snr_sum, 1),
             "snr_count": self._snr_count,
+            "best_snr": round(self._best_snr, 1) if self._best_snr is not None else None,
         }
 
         if self._farthest_direct_miles > 0:
@@ -164,8 +172,10 @@ class StatsReporter:
         self._rssi_weak = 0
         self._rssi_sum = 0.0
         self._rssi_count = 0
+        self._best_rssi = None
         self._snr_sum = 0.0
         self._snr_count = 0
+        self._best_snr = None
         self._direct_count = 0
         self._relayed_count = 0
         self._farthest_direct_miles = 0.0

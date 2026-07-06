@@ -41,7 +41,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const router = new Router({
         defaultRoute: 'dashboard',
         allowedRoutes: [
-            'dashboard', 'stats', 'messages', 'radio', 'terminal',
+            'dashboard', 'meshtastic', 'meshcore', 'lorawan', 'listener', 'stats', 'messages', 'radio', 'terminal',
             'configuration/identity', 'configuration/radio',
             'configuration/channels', 'configuration/transmit',
             'configuration/mqtt',
@@ -88,6 +88,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const topbar = new TopbarController(topbarRoot, window.concentratorWS);
         topbar.init();
         window.topbar = topbar;
+        _registerThemeToggle(topbar);
     }
 
     if (window.BuildStamp) {
@@ -127,6 +128,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     _bootUpdatePanel(router);
     _bootConfigurationPanel(router);
     _bootDangerousPanel(router);
+    _bootLoRaWANPanel(router);
+    _bootListenerPanel(router);
+    _bootMeshtasticPanel(router);
+    _bootMeshCorePanel(router);
 
     const nodeMap = new NodeMap('map');
     const packetFeed = new SimplePacketFeed('packet-tbody');
@@ -161,10 +166,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         origClose();
     };
 
+    window.nodeDrawer = nodeDrawer;
+
     packetFeed.setOnFocus(sourceId => {
         if (sourceId) nodeMap.drawFocusLine(sourceId);
         else nodeMap.clearFocusLine();
     });
+
+    const mapExpandBtn = document.getElementById('map-expand-btn');
+    const dashboard = document.querySelector('.dashboard');
+    if (mapExpandBtn && dashboard) {
+        mapExpandBtn.addEventListener('click', () => {
+            const expanded = dashboard.classList.toggle('dashboard--map-expanded');
+            mapExpandBtn.textContent = expanded ? '⤡' : '⤢';
+            mapExpandBtn.title = expanded ? 'Collapse map' : 'Expand map';
+            setTimeout(() => nodeMap.invalidateSize(), 50);
+        });
+    }
 
     await _loadInitial(nodeMap, nodeCards, packetFeed);
     await _updateStats();
@@ -191,6 +209,43 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
+// Topbar theme toggle: cycles dark -> high-contrast -> sunlight, with an
+// icon + tooltip that reflect the current theme. Reuses window.themeController.
+function _registerThemeToggle(topbar) {
+    const tc = window.themeController;
+    if (!tc || typeof topbar.registerAction !== 'function') return;
+
+    const SVG = (inner, extra = '') => `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" width="16" height="16"
+             aria-hidden="true" ${extra}>${inner}</svg>`;
+    const ICONS = {
+        'dark': SVG('<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>'),
+        'high-contrast': SVG('<circle cx="12" cy="12" r="9"/>'
+            + '<path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" stroke="none"/>'),
+        'sunlight': SVG('<circle cx="12" cy="12" r="4"/>'
+            + '<path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4'
+            + 'M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'),
+    };
+    const LABELS = { 'dark': 'Dark', 'high-contrast': 'High contrast', 'sunlight': 'Sunlight' };
+
+    const btn = topbar.registerAction({
+        id: 'theme',
+        label: 'Theme',
+        icon: ICONS[tc.current()] || ICONS.dark,
+        onClick: () => update(tc.cycle()),
+    });
+
+    function update(theme) {
+        if (!btn) return;
+        btn.innerHTML = ICONS[theme] || ICONS.dark;
+        const name = LABELS[theme] || theme;
+        btn.setAttribute('title', `Theme: ${name} · click to cycle`);
+        btn.setAttribute('aria-label', `Theme: ${name}`);
+    }
+    update(tc.current());
+}
+
 function _bootDangerousPanel(router) {
     const root = document.getElementById('settings-dangerous-panel');
     if (!root || !window.DangerousPanelController) return;
@@ -206,6 +261,42 @@ function _bootDangerousPanel(router) {
         if (primed) return;
         primed = true;
         controller.refresh();
+    });
+}
+
+function _bootLoRaWANPanel(router) {
+    if (!window.LoRaWANPanel) return;
+    const panel = new window.LoRaWANPanel();
+    router.onRouteChange((route) => {
+        if (route === 'lorawan') panel.show();
+        else panel.hide();
+    });
+}
+
+function _bootListenerPanel(router) {
+    if (!window.ListenerPanel) return;
+    const panel = new window.ListenerPanel();
+    router.onRouteChange((route) => {
+        if (route === 'listener') panel.show();
+        else panel.hide();
+    });
+}
+
+function _bootMeshCorePanel(router) {
+    if (!window.MeshCorePanel) return;
+    const panel = new window.MeshCorePanel();
+    router.onRouteChange((route) => {
+        if (route === 'meshcore') panel.show();
+        else panel.hide();
+    });
+}
+
+function _bootMeshtasticPanel(router) {
+    if (!window.MeshtasticPanel) return;
+    const panel = new window.MeshtasticPanel();
+    router.onRouteChange((route) => {
+        if (route === 'meshtastic') panel.show();
+        else panel.hide();
     });
 }
 
@@ -307,7 +398,10 @@ async function _loadInitial(nodeMap, nodeList, packetFeed) {
         _setText('sidebar-device-name', _resolveDeviceLabel(device));
 
         const nodes = nodesData.nodes || nodesData || [];
+        window._meshpointHomeLat = device.latitude ?? null;
+        window._meshpointHomeLon = device.longitude ?? null;
         nodeMap.loadNodes(nodes, device);
+        nodeList.setHomePosition(device.latitude, device.longitude);
         nodeList.loadNodes(nodes);
         packetFeed.loadNodes(nodes);
 
@@ -334,6 +428,7 @@ async function _refreshData(nodeMap, nodeList, packetFeed) {
         const nodes = data.nodes || data || [];
         const device = deviceRes.ok ? await deviceRes.json() : undefined;
         nodeMap.loadNodes(nodes, device);
+        if (device) nodeList.setHomePosition(device.latitude, device.longitude);
         nodeList.loadNodes(nodes);
         packetFeed.loadNodes(nodes);
     } catch (e) {
@@ -459,18 +554,22 @@ function _setText(id, value) {
  * Pick the most user-meaningful name for the device label.
  *
  * Order:
- *  1. transmit.long_name -- this is what the device broadcasts in
- *     NodeInfo and what shows up on meshradar / meshmap / other
- *     people's dashboards. Most users customise this and never
- *     touch device_name, so it's the right primary label.
- *  2. device.device_name -- internal fallback, defaults to "Meshpoint".
- *  3. The literal string "Meshpoint" if neither is populated.
+ *  1. device_name -- explicitly set by the user for the sidebar/dashboard.
+ *  2. long_name   -- mesh broadcast name, fallback if device_name not set.
+ *  3. "Meshpoint" -- last resort default.
+ *
+ * device_name takes priority because the user set it specifically for the
+ * dashboard. long_name defaults to "Meshpoint" in the config so it must
+ * not override an explicitly chosen device_name.
  */
 function _resolveDeviceLabel(device) {
     if (!device) return 'Meshpoint';
-    const long = (device.long_name || '').trim();
-    const fallback = (device.device_name || '').trim();
-    return long || fallback || 'Meshpoint';
+    const name    = (device.device_name || '').trim();
+    const long    = (device.long_name   || '').trim();
+    const neither = name === 'Meshpoint' && long === 'Meshpoint';
+    if (name && name !== 'Meshpoint') return name;
+    if (long && long !== 'Meshpoint') return long;
+    return neither ? 'Meshpoint' : (name || long || 'Meshpoint');
 }
 
 async function _redirectIfSetupRequired() {

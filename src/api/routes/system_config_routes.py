@@ -43,6 +43,18 @@ class MeshcoreUsbUpdate(BaseModel):
     enable_source: Optional[bool] = None
 
 
+class CompanionEntry(BaseModel):
+    label: str = ""
+    serial_port: Optional[str] = None
+    baud_rate: int = Field(115200, ge=9600, le=921600)
+    auto_detect: bool = True
+
+
+class MeshcoreCompanionsUpdate(BaseModel):
+    companions: list[CompanionEntry] = Field(..., min_length=0, max_length=4)
+    enable_source: Optional[bool] = None
+
+
 class RelayUpdate(BaseModel):
     enabled: Optional[bool] = None
     serial_port: Optional[str] = None
@@ -101,7 +113,12 @@ async def update_meshcore_usb(
     if _config is None:
         raise HTTPException(503, "Config not loaded")
 
-    mc_usb = _config.capture.meshcore_usb
+    # The UI manages the primary (first) companion; extras are edited via local.yaml.
+    companions = _config.capture.meshcore_usb
+    mc_usb = companions[0] if companions else None
+    if mc_usb is None:
+        raise HTTPException(500, "No MeshCore USB companion configured")
+
     usb_updates: dict = {}
     capture_updates: dict = {}
     restart_needed = False
@@ -144,16 +161,71 @@ async def update_meshcore_usb(
     ):
         try:
             if usb_updates:
-                save_section_to_yaml(
-                    "capture",
-                    {"meshcore_usb": {**_meshcore_usb_dict(mc_usb), **usb_updates}},
-                )
+                # Persist the full list so extra companions are not lost.
+                all_companions = [
+                    {**_meshcore_usb_dict(c), **(usb_updates if c is mc_usb else {})}
+                    for c in companions
+                ]
+                save_section_to_yaml("capture", {"meshcore_usb": all_companions})
             if capture_updates:
                 save_section_to_yaml("capture", capture_updates)
         except PermissionError as exc:
             raise HTTPException(403, str(exc)) from exc
 
     return {"saved": True, "restart_required": restart_needed}
+
+
+@router.put("/capture/meshcore-companions")
+async def update_meshcore_companions(
+    req: MeshcoreCompanionsUpdate,
+    _claims: SessionClaims = Depends(require_admin),
+    audit: AuditLogWriter = Depends(get_audit_writer),
+):
+    """Replace the full MeshCore USB companion list (up to 4 entries)."""
+    from src.config import MeshcoreUsbConfig
+    if _config is None:
+        raise HTTPException(503, "Config not loaded")
+
+    new_companions = [
+        MeshcoreUsbConfig(
+            label=c.label,
+            serial_port=c.serial_port.strip() if c.serial_port else None,
+            baud_rate=c.baud_rate,
+            auto_detect=c.auto_detect,
+        )
+        for c in req.companions
+    ]
+    _config.capture.meshcore_usb = new_companions
+
+    yaml_updates: dict = {}
+    capture_updates: dict = {}
+
+    companions_list = [_meshcore_usb_dict(c) for c in new_companions]
+    yaml_updates["meshcore_usb"] = companions_list
+
+    sources = list(_config.capture.sources or [])
+    if req.enable_source is not None:
+        has_usb = "meshcore_usb" in sources
+        if req.enable_source and not has_usb:
+            sources.append("meshcore_usb")
+            capture_updates["sources"] = sources
+            _config.capture.sources = sources
+        elif not req.enable_source and has_usb:
+            sources = [s for s in sources if s != "meshcore_usb"]
+            capture_updates["sources"] = sources
+            _config.capture.sources = sources
+
+    with audit.timed_action(
+        user=_claims.subject,
+        action="config.meshcore_companions_update",
+        params={"companions": companions_list},
+    ):
+        try:
+            save_section_to_yaml("capture", {**yaml_updates, **capture_updates})
+        except PermissionError as exc:
+            raise HTTPException(403, str(exc)) from exc
+
+    return {"saved": True, "restart_required": True}
 
 
 @router.put("/relay")
@@ -251,4 +323,5 @@ def _meshcore_usb_dict(mc_usb) -> dict:
         "serial_port": mc_usb.serial_port,
         "baud_rate": mc_usb.baud_rate,
         "auto_detect": mc_usb.auto_detect,
+        "label": mc_usb.label,
     }

@@ -4,6 +4,7 @@ import logging
 from typing import Optional
 
 from src.decode.crypto_service import CryptoService
+from src.decode.lorawan_decoder import LoRaWANDecoder
 from src.decode.meshtastic_decoder import MeshtasticDecoder
 from src.decode.meshcore_decoder import MeshcoreDecoder
 from src.models.packet import Packet, Protocol
@@ -26,6 +27,7 @@ class PacketRouter:
     def __init__(self, crypto: CryptoService):
         self._meshtastic = MeshtasticDecoder(crypto)
         self._meshcore = MeshcoreDecoder(crypto)
+        self._lorawan = LoRaWANDecoder()
 
     @property
     def meshtastic_decoder(self) -> MeshtasticDecoder:
@@ -35,12 +37,25 @@ class PacketRouter:
     def meshcore_decoder(self) -> MeshcoreDecoder:
         return self._meshcore
 
+    @property
+    def lorawan_decoder(self) -> LoRaWANDecoder:
+        return self._lorawan
+
     def decode(
         self,
         raw_bytes: bytes,
         signal: Optional[SignalMetrics] = None,
         protocol_hint: Optional[Protocol] = None,
     ) -> Optional[Packet]:
+        if protocol_hint == Protocol.LORAWAN:
+            packet = self._lorawan.decode(raw_bytes, signal)
+            if packet:
+                logger.info(
+                    "LoRaWAN packet (hint) type=%s src=%s",
+                    packet.packet_type.value, packet.source_id,
+                )
+            return packet
+
         if protocol_hint == Protocol.MESHTASTIC:
             packet = self._meshtastic.decode(raw_bytes, signal)
             if packet:

@@ -20,6 +20,8 @@ class NodeCards {
         this._sortBy = this._loadSavedSort();
         this._filter = this._loadSavedFilter();
         this._favoritesOnly = this._loadSavedFavoritesOnly();
+        this._homeLat = null;
+        this._homeLon = null;
 
         const searchEl = document.getElementById('node-search');
         if (searchEl) {
@@ -130,6 +132,11 @@ class NodeCards {
         btn.setAttribute('aria-pressed', on ? 'true' : 'false');
         btn.innerHTML = on ? '\u2605' : '\u2606';
         btn.title = on ? 'Showing favorites only (click to clear)' : 'Show only favorited nodes';
+    }
+
+    setHomePosition(lat, lon) {
+        this._homeLat = (lat != null && isFinite(lat)) ? lat : null;
+        this._homeLon = (lon != null && isFinite(lon)) ? lon : null;
     }
 
     loadNodes(nodes) {
@@ -266,6 +273,16 @@ class NodeCards {
         </div>`;
     }
 
+    _haversineKm(lat1, lon1, lat2, lon2) {
+        const R = 6371;
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) ** 2 +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon / 2) ** 2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
     _buildSignal(n) {
         const parts = [];
         const rssi = n.latest_rssi ?? n.rssi;
@@ -283,6 +300,17 @@ class NodeCards {
 
         if (n.latest_hops != null && n.latest_hops > 0) {
             parts.push(`<span class="nc-chip">${n.latest_hops} hop${n.latest_hops > 1 ? 's' : ''}</span>`);
+        }
+
+        if (this._homeLat != null && this._homeLon != null &&
+            n.latitude != null && n.longitude != null) {
+            const km = this._haversineKm(this._homeLat, this._homeLon, n.latitude, n.longitude);
+            if (km >= 0.05) {
+                const label = window.MeshpointDisplayUnits
+                    ? window.MeshpointDisplayUnits.formatDistanceKm(km)
+                    : `${km.toFixed(1)} km`;
+                parts.push(`<span class="nc-chip nc-chip--dist">&#x25CE; ${label}</span>`);
+            }
         }
 
         return parts.length

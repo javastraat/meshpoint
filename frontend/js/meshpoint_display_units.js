@@ -9,8 +9,8 @@ const STORAGE_KEY = 'meshpoint.displayUnits';
 const CHANGE_EVENT = 'meshpoint:display-units';
 
 const DEFAULTS = {
-    temperature: 'fahrenheit',
-    distance: 'imperial',
+    temperature: 'celsius',
+    distance: 'metric',
 };
 
 function _load() {
@@ -19,8 +19,8 @@ function _load() {
         if (!raw) return { ...DEFAULTS };
         const parsed = JSON.parse(raw);
         return {
-            temperature: parsed.temperature === 'celsius' ? 'celsius' : 'fahrenheit',
-            distance: parsed.distance === 'metric' ? 'metric' : 'imperial',
+            temperature: parsed.temperature === 'fahrenheit' ? 'fahrenheit' : 'celsius',
+            distance: parsed.distance === 'imperial' ? 'imperial' : 'metric',
         };
     } catch (_e) {
         return { ...DEFAULTS };
@@ -36,8 +36,8 @@ class MeshpointDisplayUnits {
 
     static savePrefs(next) {
         _prefs = {
-            temperature: next.temperature === 'celsius' ? 'celsius' : 'fahrenheit',
-            distance: next.distance === 'metric' ? 'metric' : 'imperial',
+            temperature: next.temperature === 'fahrenheit' ? 'fahrenheit' : 'celsius',
+            distance: next.distance === 'imperial' ? 'imperial' : 'metric',
         };
         try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(_prefs));

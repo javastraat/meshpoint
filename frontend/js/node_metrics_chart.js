@@ -79,6 +79,7 @@ class NodeMetricsChart {
                                     day: 'numeric',
                                     hour: '2-digit',
                                     minute: '2-digit',
+                                    hour12: false,
                                 });
                             },
                             label: (ctx) => this._tooltipLabel(ctx),
@@ -276,9 +277,10 @@ class NodeMetricsChart {
                 day: 'numeric',
                 hour: '2-digit',
                 minute: '2-digit',
+                hour12: false,
             });
         }
-        return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
     }
 
     _tooltipLabel(ctx) {

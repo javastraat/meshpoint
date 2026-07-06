@@ -246,7 +246,7 @@ class UpdatePanelController {
             const h = Math.floor(sec / 3600);
             return `${h} hour${h === 1 ? '' : 's'} ago`;
         }
-        return new Date(ms).toLocaleString();
+        return new Date(ms).toLocaleString([], { hour12: false });
     }
 
     _renderChannelOptions() {

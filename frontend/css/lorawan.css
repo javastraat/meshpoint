@@ -1,0 +1,331 @@
+/* LoRaWAN monitoring panel */
+
+/* Both lorawan and meshtastic sections need their own scroll context.
+ * The parent .section has overflow:hidden — promote them to scroll containers. */
+.section[data-section="lorawan"],
+.section[data-section="meshtastic"],
+.section[data-section="meshcore"] {
+    overflow-y: auto;
+}
+
+
+.lw-panel__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px clamp(16px, 3vw, 32px) 12px;
+}
+
+.lw-panel__title {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 600;
+}
+
+.lw-panel__actions {
+    display: flex;
+    gap: 8px;
+}
+
+.lw-panel__limit {
+    font-size: 11px;
+    color: rgba(243, 244, 246, 0.35);
+    font-weight: 400;
+    margin-left: 8px;
+}
+
+/* ── Stat cards ─────────────────────────────────────── */
+
+.lw-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 4px clamp(16px, 3vw, 32px) 16px;
+}
+
+.lw-stats .stat-card {
+    min-width: 130px;
+    flex: 1;
+}
+
+/* ── Section wrapper ─────────────────────────────────── */
+
+.lw-section {
+    padding: 0 clamp(16px, 3vw, 32px) 20px;
+}
+
+/* ── Table shared ────────────────────────────────────── */
+
+.lw-table-wrap {
+    overflow-x: auto;
+}
+
+.lw-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    table-layout: fixed;
+}
+
+.lw-table th {
+    padding: 9px 12px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: rgba(243, 244, 246, 0.4);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    white-space: nowrap;
+    text-align: left;
+}
+
+.lw-table th.lw-r { text-align: right; }
+
+.lw-table td {
+    padding: 9px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    vertical-align: middle;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.lw-table tbody tr:last-child td { border-bottom: none; }
+
+.lw-table tbody tr:hover {
+    background: rgba(255, 255, 255, 0.035);
+}
+
+/* ── Column widths — devices table ──────────────────── */
+
+.lw-table--devices col.col-id     { width: 140px; }
+.lw-table--devices col.col-type   { width: 76px;  }
+.lw-table--devices col.col-frames { width: 64px;  }
+.lw-table--devices col.col-time   { width: 88px;  }
+.lw-table--devices col.col-rssi   { width: 92px;  }
+.lw-table--devices col.col-snr    { width: 80px;  }
+.lw-table--devices col.col-freq   { width: 84px;  }
+.lw-table--devices col.col-sf     { width: 52px;  }
+
+/* ── Column widths — packets table ──────────────────── */
+
+.lw-table--packets col.col-time   { width: 80px;  }
+.lw-table--packets col.col-type   { width: 76px;  }
+.lw-table--packets col.col-dev    { width: 130px; }
+.lw-table--packets col.col-rssi   { width: 92px;  }
+.lw-table--packets col.col-snr    { width: 80px;  }
+.lw-table--packets col.col-freq   { width: 84px;  }
+.lw-table--packets col.col-sf     { width: 52px;  }
+.lw-table--packets col.col-fport  { width: 60px;  }
+.lw-table--packets col.col-fcnt   { width: 60px;  }
+
+/* ── Cell types ─────────────────────────────────────── */
+
+.lw-id {
+    font-family: 'JetBrains Mono', Menlo, monospace;
+    font-size: 12px;
+    color: var(--brand-amber, #ffb84d);
+    letter-spacing: 0.3px;
+}
+
+.lw-time {
+    font-family: 'JetBrains Mono', Menlo, monospace;
+    font-size: 12px;
+    color: rgba(243, 244, 246, 0.55);
+}
+
+.lw-num {
+    font-family: 'JetBrains Mono', Menlo, monospace;
+    font-size: 12px;
+    text-align: right;
+    color: rgba(243, 244, 246, 0.85);
+}
+
+.lw-signal {
+    font-family: 'JetBrains Mono', Menlo, monospace;
+    font-size: 12px;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.lw-signal--good { color: #44d39a; }
+.lw-signal--ok   { color: var(--brand-amber, #ffb84d); }
+.lw-signal--weak { color: #ff6b6b; }
+
+/* ── Type badges ─────────────────────────────────────── */
+
+.lw-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(243, 244, 246, 0.6);
+}
+
+.lw-badge--join   { background: rgba(68, 211, 154, 0.15); color: #44d39a; }
+.lw-badge--data   { background: rgba(34, 211, 238, 0.15); color: #22d3ee; }
+.lw-badge--rejoin { background: rgba(255, 184, 77, 0.15);  color: var(--brand-amber, #ffb84d); }
+
+/* ── Column widths — MeshCore nodes table ───────────── */
+
+.lw-table--mc-nodes col.col-id   { width: 110px; }
+.lw-table--mc-nodes col.col-name { width: 200px; }
+.lw-table--mc-nodes col.col-role { width: 100px; }
+.lw-table--mc-nodes col.col-rssi { width: 92px;  }
+.lw-table--mc-nodes col.col-snr  { width: 80px;  }
+.lw-table--mc-nodes col.col-dist { width: 80px;  }
+.lw-table--mc-nodes col.col-pkts { width: 72px;  }
+.lw-table--mc-nodes col.col-time { width: 88px;  }
+
+/* ── Column widths — MeshCore packets table ──────────── */
+
+.lw-table--mc-packets col.col-time { width: 80px;  }
+.lw-table--mc-packets col.col-type { width: 90px;  }
+.lw-table--mc-packets col.col-src  { width: 120px; }
+.lw-table--mc-packets col.col-dst  { width: 120px; }
+.lw-table--mc-packets col.col-rssi { width: 92px;  }
+.lw-table--mc-packets col.col-snr  { width: 80px;  }
+.lw-table--mc-packets col.col-sf   { width: 52px;  }
+.lw-table--mc-packets col.col-hops { width: 56px;  }
+
+/* ── Column widths — Meshtastic nodes table ─────────── */
+
+.lw-table--mt-nodes col.col-id   { width: 110px; }
+.lw-table--mt-nodes col.col-name { width: 160px; }
+.lw-table--mt-nodes col.col-hw   { width: 130px; }
+.lw-table--mt-nodes col.col-role { width: 100px; }
+.lw-table--mt-nodes col.col-rssi { width: 92px;  }
+.lw-table--mt-nodes col.col-snr  { width: 80px;  }
+.lw-table--mt-nodes col.col-hops { width: 56px;  }
+.lw-table--mt-nodes col.col-dist { width: 80px;  }
+.lw-table--mt-nodes col.col-pkts { width: 72px;  }
+.lw-table--mt-nodes col.col-time { width: 88px;  }
+
+/* ── Column widths — Meshtastic packets table ────────── */
+
+.lw-table--mt-packets col.col-time { width: 80px;  }
+.lw-table--mt-packets col.col-type { width: 90px;  }
+.lw-table--mt-packets col.col-src  { width: 110px; }
+.lw-table--mt-packets col.col-dst  { width: 110px; }
+.lw-table--mt-packets col.col-rssi { width: 92px;  }
+.lw-table--mt-packets col.col-snr  { width: 80px;  }
+.lw-table--mt-packets col.col-sf   { width: 52px;  }
+.lw-table--mt-packets col.col-hops { width: 56px;  }
+
+/* ── Meshtastic-specific cell styles ─────────────────── */
+
+.mt-name {
+    font-size: 13px;
+    color: rgba(243, 244, 246, 0.9);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mt-hw {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mt-hw-tag {
+    font-family: 'JetBrains Mono', Menlo, monospace;
+    font-size: 11px;
+    color: rgba(243, 244, 246, 0.55);
+}
+
+.mt-role-tag {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.4px;
+    background: rgba(255, 255, 255, 0.07);
+    color: rgba(243, 244, 246, 0.55);
+}
+
+/* ── Meshtastic type badges ───────────────────────────── */
+
+.mt-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(243, 244, 246, 0.6);
+}
+
+.mt-badge--text        { background: rgba(34, 211, 238, 0.15); color: #22d3ee; }
+.mt-badge--position    { background: rgba(68, 211, 154, 0.15); color: #44d39a; }
+.mt-badge--telemetry   { background: rgba(139, 92, 246, 0.15); color: #a78bfa; }
+.mt-badge--nodeinfo    { background: rgba(255, 184, 77, 0.15);  color: var(--brand-amber, #ffb84d); }
+.mt-badge--encrypted   { background: rgba(239, 68, 68, 0.12);  color: #f87171; }
+.mt-badge--routing     { background: rgba(99, 102, 241, 0.15); color: #818cf8; }
+.mt-badge--traceroute  { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
+.mt-badge--neighborinfo { background: rgba(16, 185, 129, 0.12); color: #34d399; }
+
+/* ── Empty state ─────────────────────────────────────── */
+
+.lw-empty {
+    text-align: center;
+    padding: 32px 24px;
+    color: rgba(243, 244, 246, 0.35);
+    font-size: 13px;
+}
+
+/* ── Pagination ──────────────────────────────────────── */
+
+.lw-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-top: 1px solid var(--border, #1e293b);
+}
+
+.lw-page-btn {
+    background: var(--card-bg, #111827);
+    border: 1px solid var(--border, #1e293b);
+    color: var(--text-secondary, #94a3b8);
+    padding: 4px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: color 0.15s, border-color 0.15s;
+}
+
+.lw-page-btn:hover:not(:disabled) {
+    color: #f1f5f9;
+    border-color: #94a3b8;
+}
+
+.lw-page-btn:disabled {
+    opacity: 0.3;
+    cursor: default;
+}
+
+.lw-page-info {
+    font-size: 12px;
+    color: var(--text-secondary, #94a3b8);
+    min-width: 90px;
+    text-align: center;
+}
+
+.mc-contact-row,
+.mt-node-row,
+.lw-device-row {
+    cursor: pointer;
+}
+
+.mc-contact-row:hover,
+.mt-node-row:hover,
+.lw-device-row:hover {
+    background: rgba(255, 255, 255, 0.05);
+}

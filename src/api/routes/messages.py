@@ -9,8 +9,11 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+
+from src.api.auth.dependencies import optional_auth
+from src.api.auth.jwt_session import ROLE_VIEWER, SessionClaims
 
 from src.api.message_name_resolver import MessageNameResolver
 from src.config import AppConfig
@@ -167,7 +170,10 @@ async def delete_all_messages():
 
 
 @router.get("/channels")
-async def get_channels():
+async def get_channels(claims: Optional[SessionClaims] = Depends(optional_auth)):
+    is_viewer = claims is not None and claims.role == ROLE_VIEWER
+    private = set(_config.meshcore.private_channels) if _config else set()
+
     default_name = "LongFast"
     if _config:
         default_name = _config.meshtastic.primary_channel_name
@@ -207,6 +213,8 @@ async def get_channels():
             for i, (name, _key) in enumerate(
                 _config.meshcore.channel_keys.items(), start=1
             ):
+                if is_viewer and name in private:
+                    continue
                 channels.append({
                     "protocol": "meshcore",
                     "channel": i,

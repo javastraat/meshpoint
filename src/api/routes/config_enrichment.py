@@ -14,7 +14,8 @@ def enrich_config_payload(cfg: AppConfig, base: dict) -> dict:
     relay = cfg.relay
     radio = cfg.radio
     location = cfg.location
-    mc_usb = capture.meshcore_usb
+    companions = capture.meshcore_usb  # list[MeshcoreUsbConfig]
+    mc_usb = companions[0] if companions else None
 
     token = (upstream.auth_token or "").strip()
     base["device"] = {
@@ -38,10 +39,20 @@ def enrich_config_payload(cfg: AppConfig, base: dict) -> dict:
     base["capture"] = {
         "sources": list(capture.sources or []),
         "concentrator_spi_device": capture.concentrator_spi_device,
-        "meshcore_usb": {
-            "serial_port": mc_usb.serial_port,
-            "baud_rate": mc_usb.baud_rate,
-            "auto_detect": mc_usb.auto_detect,
+        "meshcore_usb": [
+            {
+                "serial_port": c.serial_port,
+                "baud_rate": c.baud_rate,
+                "auto_detect": c.auto_detect,
+                "label": c.label,
+            }
+            for c in companions
+        ],
+        "meshcore_usb_primary": {
+            "serial_port": mc_usb.serial_port if mc_usb else None,
+            "baud_rate": mc_usb.baud_rate if mc_usb else 115200,
+            "auto_detect": mc_usb.auto_detect if mc_usb else True,
+            "label": mc_usb.label if mc_usb else "",
         },
     }
     base["relay"] = {
