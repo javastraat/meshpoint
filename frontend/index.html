@@ -76,9 +76,6 @@
 
             <nav class="sidebar__nav" aria-label="Sections">
                 <ul class="sidebar__list">
-                    <li class="sidebar__group-header" aria-hidden="true">
-                        <span class="sidebar__group-header-label">Status</span>
-                    </li>
                     <li class="sidebar__item">
                         <a href="#/dashboard" class="sidebar__link" data-route="dashboard">
                             <span class="sidebar__icon">
@@ -91,6 +88,9 @@
                             </span>
                             <span class="sidebar__label">Dashboard</span>
                         </a>
+                    </li>
+                    <li class="sidebar__group-header" aria-hidden="true">
+                        <span class="sidebar__group-header-label">Networks</span>
                     </li>
                     <li class="sidebar__item">
                         <a href="#/lorawan" class="sidebar__link" data-route="lorawan">
@@ -133,6 +133,17 @@
                         </a>
                     </li>
                     <li class="sidebar__item">
+                        <a href="#/messages" class="sidebar__link" data-route="messages">
+                            <span class="sidebar__icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                                </svg>
+                            </span>
+                            <span class="sidebar__label">Messages</span>
+                            <span id="msg-unread-badge" class="sidebar__badge sidebar__badge--unread" data-badge-for="messages" style="display:none">0</span>
+                        </a>
+                    </li>
+                    <li class="sidebar__item">
                         <a href="#/stats" class="sidebar__link" data-route="stats">
                             <span class="sidebar__icon">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -144,16 +155,8 @@
                             <span class="sidebar__label">Stats</span>
                         </a>
                     </li>
-                    <li class="sidebar__item">
-                        <a href="#/messages" class="sidebar__link" data-route="messages">
-                            <span class="sidebar__icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                                </svg>
-                            </span>
-                            <span class="sidebar__label">Messages</span>
-                            <span id="msg-unread-badge" class="sidebar__badge sidebar__badge--unread" data-badge-for="messages" style="display:none">0</span>
-                        </a>
+                    <li class="sidebar__group-header" aria-hidden="true">
+                        <span class="sidebar__group-header-label">Radio</span>
                     </li>
                     <li class="sidebar__item">
                         <a href="#/radio" class="sidebar__link" data-route="radio">
@@ -166,7 +169,7 @@
                                     <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
                                 </svg>
                             </span>
-                            <span class="sidebar__label">Radio</span>
+                            <span class="sidebar__label">Hardware</span>
                             <span class="sidebar__badge" data-badge-for="radio" style="display:none"></span>
                         </a>
                     </li>
@@ -178,10 +181,10 @@
                                     <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
                                 </svg>
                             </span>
-                            <span class="sidebar__label">Listener</span>
+                            <span class="sidebar__label">RTL-SDR</span>
                         </a>
                     </li>
-                    <li class="sidebar__group-header" aria-hidden="true" data-requires-section="terminal">
+                    <li class="sidebar__group-header" aria-hidden="true" data-requires-section="terminal configuration.identity settings">
                         <span class="sidebar__group-header-label">Ops</span>
                     </li>
                     <li class="sidebar__item" data-requires-section="terminal">
@@ -196,9 +199,6 @@
                         </a>
                     </li>
 
-                    <li class="sidebar__group-header" aria-hidden="true" data-requires-section="configuration.identity">
-                        <span class="sidebar__group-header-label">Config</span>
-                    </li>
                     <li class="sidebar__group" data-group="configuration" data-expanded="false" data-requires-section="configuration.identity">
                         <button class="sidebar__group-toggle" type="button" data-group="configuration" aria-expanded="false">
                             <span class="sidebar__icon">

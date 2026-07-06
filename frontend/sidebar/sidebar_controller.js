@@ -347,8 +347,9 @@ class SidebarController {
         const allowed = new Set(this._identity.available_sections || []);
         if (!allowed.size) return;
         document.querySelectorAll('[data-requires-section]').forEach((el) => {
-            const need = el.dataset.requiresSection;
-            const visible = allowed.has(need);
+            // Space-separated list = visible when ANY listed section is allowed.
+            const needs = el.dataset.requiresSection.split(/\s+/).filter(Boolean);
+            const visible = needs.some((need) => allowed.has(need));
             el.style.display = visible ? '' : 'none';
         });
     }

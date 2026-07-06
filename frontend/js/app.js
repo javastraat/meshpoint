@@ -602,7 +602,7 @@ function _bootCommandPaletteAndKeymap(router) {
         ['dashboard', 'Go to Dashboard', 'Pages'],
         ['stats', 'Go to Stats', 'Pages'],
         ['messages', 'Go to Messages', 'Pages'],
-        ['radio', 'Go to Radio', 'Pages'],
+        ['radio', 'Go to Hardware', 'Pages'],
         ['terminal', 'Go to Terminal', 'Pages'],
         ['configuration/identity', 'Go to Configuration · Identity', 'Configuration'],
         ['configuration/radio', 'Go to Configuration · Radio', 'Configuration'],

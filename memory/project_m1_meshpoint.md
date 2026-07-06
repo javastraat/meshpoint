@@ -745,6 +745,23 @@ release tag `v0.7.7` "Dashboard self-update repair".
 - User repeatedly stressed "we are on the Mac, not the Pi": all edits/tests are
   local; never SSH or deploy to the Pi unprompted.
 
+#### Sidebar regroup (2026-07-06, local only — not yet pushed)
+New nav shape (user-approved): **Dashboard** ungrouped on top → **Networks**
+(LoRaWAN, Meshtastic, MeshCore, Messages, Stats) → **Radio** (Hardware ← renamed
+from "Radio" page, route/badge id still `radio`; Listener = the RTL-SDR) →
+**Ops** (Terminal, Configuration ▸, Settings ▸). Listener's menu label renamed
+**"RTL-SDR"** (route/ids/API stay `listener` — internal name OK per user).
+"Status" and "Config" group
+headers removed (Config→Configuration stutter). Command palette entry now "Go to
+Hardware". `sidebar_controller.js` `_applyIdentity`: `data-requires-section` now
+accepts a SPACE-SEPARATED any-of list; Ops header uses
+`"terminal configuration.identity settings"` so it survives Terminal being
+feature-hidden. Radio page itself keeps its console-style `radio status` strip
+(no visible title to rename). Same-day timestamp formatters also fixed this
+session: lorawan/meshcore/meshtastic panels' `_fmtTime` shows `Jul 5, 16:19`
+for non-today (today stays `HH:MM:SS`); messaging_contacts.js:200 still
+time-only (offered, not requested).
+
 ---
 
 ## What it does NOT do (intentional)
