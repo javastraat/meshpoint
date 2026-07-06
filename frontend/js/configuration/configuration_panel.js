@@ -65,6 +65,8 @@ class ConfigurationPanel {
                         <div data-cfg-radio></div>
                         <div data-cfg-nodeinfo-edit></div>
                         <div data-cfg-nodeinfo-status></div>
+                        <div data-cfg-telemetry-edit></div>
+                        <div data-cfg-telemetry-status></div>
                     </div>
                 `;
                 const radio = new window.RadioConfigEditCard(api);
@@ -79,6 +81,21 @@ class ConfigurationPanel {
                     const status = new window.RadioNodeInfoCard(api);
                     status.mount(host.querySelector('[data-cfg-nodeinfo-status]'));
                     this._cards.set('nodeinfo-status', status);
+                }
+                if (window.TelemetryBroadcastCard) {
+                    const telem = new window.TelemetryBroadcastCard(api);
+                    telem.mount(host.querySelector('[data-cfg-telemetry-edit]'));
+                    this._cards.set('telemetry-edit', telem);
+                }
+                if (window.BroadcastStatusCard) {
+                    const telemStatus = new window.BroadcastStatusCard(api, {
+                        title: 'Telemetry Broadcast',
+                        configKey: 'telemetry',
+                        editRoute: '#/configuration/radio',
+                        scrollTarget: 'cfg-telemetry-interval',
+                    });
+                    telemStatus.mount(host.querySelector('[data-cfg-telemetry-status]'));
+                    this._cards.set('telemetry-status', telemStatus);
                 }
             }
         } else if (section === 'channels') {
@@ -130,10 +147,31 @@ class ConfigurationPanel {
         } else if (section === 'gps' && window.GpsConfigCard) {
             const host = document.getElementById('cfg-gps-panel');
             if (host) {
-                host.innerHTML = '';
+                host.innerHTML = `
+                    <div class="cfg-section">
+                        <div data-cfg-gps-main></div>
+                        <div data-cfg-position-edit></div>
+                        <div data-cfg-position-status></div>
+                    </div>
+                `;
                 const card = new window.GpsConfigCard(api);
-                card.mount(host);
+                card.mount(host.querySelector('[data-cfg-gps-main]'));
                 this._cards.set('gps', card);
+                if (window.PositionBroadcastCard) {
+                    const pos = new window.PositionBroadcastCard(api);
+                    pos.mount(host.querySelector('[data-cfg-position-edit]'));
+                    this._cards.set('position-edit', pos);
+                }
+                if (window.BroadcastStatusCard) {
+                    const posStatus = new window.BroadcastStatusCard(api, {
+                        title: 'Position Broadcast',
+                        configKey: 'position',
+                        editRoute: '#/configuration/gps',
+                        scrollTarget: 'cfg-position-interval',
+                    });
+                    posStatus.mount(host.querySelector('[data-cfg-position-status]'));
+                    this._cards.set('position-status', posStatus);
+                }
             }
         } else if (section === 'advanced' && window.AdvancedConfigCard) {
             const host = document.getElementById('cfg-advanced-panel');

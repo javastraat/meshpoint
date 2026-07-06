@@ -2,10 +2,16 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
-from typing import Callable, Optional
+from collections.abc import Callable
+from datetime import datetime
+from typing import Optional
 
-from src.transmit.nodeinfo_broadcaster import clamp_interval_minutes
+from src.transmit.broadcast_interval import (
+    BroadcastIntervalController,
+    clamp_interval_minutes,
+)
 from src.transmit.tx_service import TxService
 
 logger = logging.getLogger(__name__)
@@ -23,28 +29,55 @@ class PositionBroadcaster:
         coords_provider: Callable[[], tuple[float, float, float | None] | None],
     ):
         self._tx = tx_service
-        self._interval = clamp_interval_minutes(interval_minutes) * 60
-        self._startup_delay = max(0, startup_delay_seconds)
         self._coords_provider = coords_provider
-        self._task: Optional[object] = None
+        self._task: Optional[asyncio.Task] = None
         self._running = False
+        interval_seconds = clamp_interval_minutes(
+            interval_minutes,
+            field_name="transmit.position.interval_minutes",
+        ) * 60
+        self._schedule = BroadcastIntervalController(
+            startup_delay_seconds=startup_delay_seconds,
+            interval_seconds=interval_seconds,
+            field_name="transmit.position.interval_minutes",
+        )
+
+    @property
+    def is_running(self) -> bool:
+        return self._running and self._task is not None and not self._task.done()
+
+    @property
+    def interval_seconds(self) -> int:
+        return self._schedule.interval_seconds
+
+    @property
+    def startup_delay_seconds(self) -> int:
+        return self._schedule.startup_delay_seconds
+
+    @property
+    def last_sent_at(self) -> Optional[datetime]:
+        return self._schedule.last_sent_at
+
+    @property
+    def next_due_at(self) -> Optional[datetime]:
+        return self._schedule.next_due_at(running=self._running)
+
+    def set_interval(self, minutes: int) -> int:
+        return self._schedule.set_interval(minutes)
 
     async def start(self) -> None:
-        if self._interval == 0 or self._running:
+        if self.is_running:
             return
-        import asyncio
-
         self._running = True
+        self._schedule.begin()
         self._task = asyncio.create_task(self._loop(), name="position-broadcaster")
         logger.info(
             "Position broadcaster scheduled: first TX in %ds, interval %ds",
-            self._startup_delay,
-            self._interval,
+            self._schedule.startup_delay_seconds,
+            self._schedule.interval_seconds,
         )
 
     async def stop(self, timeout: float = 5.0) -> None:
-        import asyncio
-
         self._running = False
         task = self._task
         if task is None:
@@ -58,24 +91,28 @@ class PositionBroadcaster:
             self._task = None
 
     async def _loop(self) -> None:
-        import asyncio
-
         try:
-            if self._startup_delay > 0:
-                await asyncio.sleep(self._startup_delay)
-            while self._running:
-                coords = self._coords_provider()
-                if coords is None:
-                    logger.debug("Position broadcast skipped: no coordinates")
-                else:
-                    lat, lon, alt = coords
-                    result = await self._tx.send_position(lat, lon, alt)
-                    if not result.success:
-                        logger.warning("Position broadcast skipped: %s", result.error)
-                if self._interval <= 0:
-                    break
-                await asyncio.sleep(self._interval)
-        except asyncio.CancelledError:
-            raise
+            await self._schedule.run_loop(
+                is_running=lambda: self._running,
+                on_due=self._broadcast_once,
+                loop_name="Position broadcaster",
+            )
         except Exception:
             logger.exception("Position broadcaster loop crashed")
+
+    async def _broadcast_once(self) -> None:
+        coords = self._coords_provider()
+        if coords is None:
+            logger.debug("Position broadcast skipped: no coordinates")
+            return
+        lat, lon, alt = coords
+        result = await self._tx.send_position(lat, lon, alt)
+        if result.success:
+            self._schedule.mark_sent()
+            logger.info(
+                "Position broadcast OK: id=%s airtime=%dms",
+                result.packet_id,
+                result.airtime_ms,
+            )
+        else:
+            logger.warning("Position broadcast skipped: %s", result.error)

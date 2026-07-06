@@ -47,6 +47,8 @@ from src.api.routes import (
     meshcore_config_routes,
     mqtt_config_routes,
     nodeinfo_routes,
+    position_broadcast_routes,
+    telemetry_broadcast_routes,
     nodes,
     packets,
     public_radar_routes,
@@ -74,10 +76,8 @@ from src.models.packet import Packet
 from src.storage.message_repository import MessageRepository
 from src.api.telemetry.noise_floor import NoiseFloorTracker
 from src.api.telemetry.spectral_scan_service import SpectralScanService
-from src.transmit.nodeinfo_broadcaster import (
-    NodeInfoBroadcaster,
-    clamp_interval_minutes,
-)
+from src.transmit.broadcast_interval import clamp_interval_minutes
+from src.transmit.nodeinfo_broadcaster import NodeInfoBroadcaster
 from src.transmit.position_broadcaster import PositionBroadcaster
 from src.transmit.telemetry_broadcaster import TelemetryBroadcaster
 from src.transmit.meshtastic_inbound_handler import MeshtasticInboundHandler
@@ -281,6 +281,8 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     app.include_router(update_check.router, dependencies=protected)
     app.include_router(messages.router, dependencies=protected)
     app.include_router(nodeinfo_routes.router, dependencies=protected)
+    app.include_router(position_broadcast_routes.router, dependencies=protected)
+    app.include_router(telemetry_broadcast_routes.router, dependencies=protected)
     app.include_router(mqtt_config_routes.router, dependencies=protected)
     app.include_router(upstream_config_routes.router, dependencies=protected)
     app.include_router(device_config_routes.router, dependencies=protected)
@@ -564,11 +566,20 @@ def _build_telemetry_broadcaster(
 ) -> TelemetryBroadcaster | None:
     if tx_service is None or not tx_service.meshtastic_enabled:
         return None
-    telem = config.transmit.telemetry
-    if clamp_interval_minutes(telem.interval_minutes) == 0:
-        return None
 
     import time
+
+    telem = config.transmit.telemetry
+    interval_minutes = clamp_interval_minutes(
+        telem.interval_minutes,
+        field_name="transmit.telemetry.interval_minutes",
+    )
+    if interval_minutes == 0:
+        logger.info(
+            "Telemetry broadcaster starting paused "
+            "(transmit.telemetry.interval_minutes=0); save a non-zero "
+            "interval on the Configuration tab to resume."
+        )
 
     service_started = time.monotonic()
     device_fn, _local_fn = _telemetry_metrics_providers(
@@ -594,11 +605,20 @@ def _build_position_broadcaster(
 ) -> PositionBroadcaster | None:
     if tx_service is None or not tx_service.meshtastic_enabled:
         return None
-    pos_cfg = config.transmit.position
-    if clamp_interval_minutes(pos_cfg.interval_minutes) == 0:
-        return None
 
     from src.transmit.mesh_position_resolver import MeshPositionResolver
+
+    pos_cfg = config.transmit.position
+    interval_minutes = clamp_interval_minutes(
+        pos_cfg.interval_minutes,
+        field_name="transmit.position.interval_minutes",
+    )
+    if interval_minutes == 0:
+        logger.info(
+            "Position broadcaster starting paused "
+            "(transmit.position.interval_minutes=0); save a non-zero "
+            "interval on the Configuration tab to resume."
+        )
 
     resolver = MeshPositionResolver(config, coord.location_source)
 
@@ -732,7 +752,10 @@ def _build_nodeinfo_broadcaster(
         return None
 
     ni = config.transmit.nodeinfo
-    interval_minutes = clamp_interval_minutes(ni.interval_minutes)
+    interval_minutes = clamp_interval_minutes(
+        ni.interval_minutes,
+        field_name="transmit.nodeinfo.interval_minutes",
+    )
     startup_delay = max(0, ni.startup_delay_seconds)
     if interval_minutes == 0:
         logger.info(
@@ -1277,6 +1300,14 @@ def _init_routes(
     nodeinfo_routes.init_routes(
         config=config,
         nodeinfo_broadcaster=nodeinfo_broadcaster,
+    )
+    position_broadcast_routes.init_routes(
+        config=config,
+        position_broadcaster=position_broadcaster,
+    )
+    telemetry_broadcast_routes.init_routes(
+        config=config,
+        telemetry_broadcaster=telemetry_broadcaster,
     )
     config_routes.init_routes(
         config=config,

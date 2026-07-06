@@ -2,6 +2,7 @@
 
 ### Unreleased
 
+- **Mesh broadcast cadence UI.** Configuration → Radio adds a telemetry broadcast interval editor with live countdown. Configuration → GPS adds a position broadcast interval editor. Each is independent from NodeInfo: set `interval_minutes` to `0` to pause, or pick 5 min to 24 hr with hot-reload (no restart). Closes [#92](https://github.com/KMX415/meshpoint/issues/92).
 - **MQTT broker TLS.** Transport TLS (`mqtts`, CA bundle, cert validation) is not implemented on `mqtt_publisher.py` (plain TCP only). Until then use plain port 1883 or a LAN broker without TLS.
 
 ### v0.7.6 (June 2026)

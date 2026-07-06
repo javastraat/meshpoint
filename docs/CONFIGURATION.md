@@ -194,7 +194,9 @@ send periodic Meshtastic POSITION packets. That is **separate** from
 the Meshradar fleet pin in `device.*`.
 
 Configure on **Configuration → GPS → Mesh position broadcasts**, or in
-yaml:
+yaml. Set **Position broadcast interval** on the same GPS page (or
+`transmit.position.interval_minutes` in yaml). Default is **15 minutes**.
+Use **0** to pause POSITION packets without disabling TX.
 
 ```yaml
 transmit:
@@ -215,6 +217,24 @@ transmit:
 
 When `coordinate_source: static`, coordinates are sent at full wizard
 precision regardless of `location_precision`.
+
+### Mesh telemetry broadcasts (LoRa / device health)
+
+When native TX is enabled, the Meshpoint can send periodic Meshtastic
+`device_metrics` telemetry (`TELEMETRY_APP`). That is **separate** from
+NodeInfo and POSITION.
+
+Configure on **Configuration → Radio → Telemetry broadcast interval**, or in
+yaml:
+
+```yaml
+transmit:
+  telemetry:
+    interval_minutes: 30
+    startup_delay_seconds: 120
+```
+
+Default is **30 minutes**. Use **0** to pause telemetry broadcasts.
 
 ### Using gpsd (USB GPS receivers)
 
@@ -756,6 +776,9 @@ transmit:              # native messaging TX (Meshtastic via SX1302, MeshCore vi
     interval_minutes: 15
     coordinate_source: "static"      # static | live
     location_precision: "approximate"  # exact | approximate | none (live only)
+  telemetry:
+    interval_minutes: 30
+    startup_delay_seconds: 120
 
 relay:                 # experimental: re-broadcast captured packets via USB radio
   enabled: false

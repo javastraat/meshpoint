@@ -80,6 +80,9 @@ transmit:
   nodeinfo:
     interval_minutes: 180      # 5..1440 min, default 180 (3 hr); 0 = disabled
     startup_delay_seconds: 60  # delay before first broadcast on boot
+  telemetry:
+    interval_minutes: 30
+    startup_delay_seconds: 120
   position:
     interval_minutes: 15
     startup_delay_seconds: 180

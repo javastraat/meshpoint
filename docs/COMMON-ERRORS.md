@@ -11,6 +11,25 @@ If your error is not listed, capture it from `meshpoint logs` and open a
 
 ---
 
+## Mesh broadcasts
+
+### POSITION or TELEMETRY still firing after I set NodeInfo to 24 hours
+
+**Cause:** NodeInfo, POSITION, and TELEMETRY are three independent periodic
+broadcast loops. Changing the NodeInfo interval on **Configuration → Radio**
+does not change position or telemetry cadence.
+
+**Fix:** Open **Configuration → GPS** and set **Position broadcast interval**
+to **Off** (0) or your desired cadence. Open **Configuration → Radio** and
+set **Telemetry broadcast interval** the same way. Changes hot-reload without
+a restart when TX is already running.
+
+**Workaround (yaml):** set `transmit.position.interval_minutes: 0` and
+`transmit.telemetry.interval_minutes: 0` in `config/local.yaml`, then
+`sudo systemctl restart meshpoint`.
+
+---
+
 ## Messaging
 
 ### Meshtastic DM shows "Sent" but recipient never gets it
