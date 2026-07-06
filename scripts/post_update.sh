@@ -22,6 +22,19 @@ if [ -f "$SUDOERS_SRC" ]; then
     fi
 fi
 
+# ── 1a. Git safe.directory (system-wide) ────────────────────────────
+# /opt/meshpoint ownership differs from the users running git (root via
+# sudo, meshpoint service user), so git's dubious-ownership check blocks
+# them unless the tree is trusted system-wide. install.sh does this on
+# fresh installs; upgraded boxes need it here.
+if [ -d "${MESHPOINT_DIR}/.git" ]; then
+    git config --system --get-all safe.directory 2>/dev/null \
+        | grep -qx "${MESHPOINT_DIR}" \
+        || { git config --system --add safe.directory "${MESHPOINT_DIR}"; \
+             info "Added ${MESHPOINT_DIR} to system git safe.directory"; \
+             CHANGED=1; }
+fi
+
 # ── 2. Service file ─────────────────────────────────────────────────
 SERVICE_SRC="${MESHPOINT_DIR}/scripts/meshpoint.service"
 SERVICE_DST="/etc/systemd/system/meshpoint.service"

@@ -20,19 +20,31 @@ meshpoint ALL=(ALL) NOPASSWD: /usr/bin/systemctl daemon-reload
 # /opt/meshpoint is owned by root, so all repo mutations need sudo.
 # Branch arg is wildcarded so any release channel (main, rc-074,
 # custom branch) can be checked out.
+# Each rule has a second form with the literal
+# `-c safe.directory=/opt/meshpoint` prefix: the dashboard passes it on
+# every git call to survive the dubious-ownership check, and sudo
+# matches argv exactly, so the prefixed form must be enumerated too.
 meshpoint ALL=(ALL) NOPASSWD: /usr/bin/git fetch origin *
+meshpoint ALL=(ALL) NOPASSWD: /usr/bin/git -c safe.directory=/opt/meshpoint fetch origin *
 meshpoint ALL=(ALL) NOPASSWD: /usr/bin/git checkout *
+meshpoint ALL=(ALL) NOPASSWD: /usr/bin/git -c safe.directory=/opt/meshpoint checkout *
 meshpoint ALL=(ALL) NOPASSWD: /usr/bin/git pull origin *
+meshpoint ALL=(ALL) NOPASSWD: /usr/bin/git -c safe.directory=/opt/meshpoint pull origin *
 meshpoint ALL=(ALL) NOPASSWD: /usr/bin/git reset --hard *
+meshpoint ALL=(ALL) NOPASSWD: /usr/bin/git -c safe.directory=/opt/meshpoint reset --hard *
 
 # Read-only git ops that hit the dubious-ownership check on the
 # root-owned tree; the terminal catalog surfaces these as buttons.
 meshpoint ALL=(ALL) NOPASSWD: /usr/bin/git status
+meshpoint ALL=(ALL) NOPASSWD: /usr/bin/git -c safe.directory=/opt/meshpoint status
 meshpoint ALL=(ALL) NOPASSWD: /usr/bin/git log *
+meshpoint ALL=(ALL) NOPASSWD: /usr/bin/git -c safe.directory=/opt/meshpoint log *
 meshpoint ALL=(ALL) NOPASSWD: /usr/bin/git rev-list *
+meshpoint ALL=(ALL) NOPASSWD: /usr/bin/git -c safe.directory=/opt/meshpoint rev-list *
 meshpoint ALL=(ALL) NOPASSWD: /usr/bin/git rev-parse HEAD
 # Settings → Updates install_status (read branch + SHA from root-owned tree)
 meshpoint ALL=(ALL) NOPASSWD: /usr/bin/git rev-parse *
+meshpoint ALL=(ALL) NOPASSWD: /usr/bin/git -c safe.directory=/opt/meshpoint rev-parse *
 
 # ── Post-update hooks ─────────────────────────────────────────────────
 meshpoint ALL=(ALL) NOPASSWD: /opt/meshpoint/venv/bin/pip install *
