@@ -678,6 +678,72 @@ README still shows the STALE 5-network channel table (`ch0-ch2 LoRaWAN, ch3-ch4
 Meshtastic`) — that's the old plan; real plan is ch0-ch4 LoRaWAN + only ch8
 Meshtastic (left untouched, flag if fixing).
 
+#### v0.7.7: dashboard self-update REGRESSION + repair (2026-07-06 afternoon)
+
+**The last update broke Check for updates.** Dashboard showed: `Could not fetch
+origin: sudo: a terminal is required to read the password`. ROOT CAUSE = our own
+v0.7.6 dubious-ownership fix: adding `-c safe.directory=/opt/meshpoint` to every
+`sudo git` call changed the argv, and `/etc/sudoers.d/meshpoint` grants NOPASSWD
+on EXACT argv (`/usr/bin/git fetch origin *` etc.) — the leading `-c` matches no
+rule → sudo wants a password → no terminal → error. (install_status.py's own
+docstring even warned commands must match sudoers.)
+
+**Fixes (all on the Mac working copy, core ones pushed by user):**
+| File | Change |
+|---|---|
+| `config/sudoers-meshpoint` | Added a literal-pinned `-c safe.directory=/opt/meshpoint` variant next to EVERY git rule (fetch/checkout/pull/reset/status/log/rev-list/rev-parse); old lines kept; `visudo -cf` parsed OK |
+| `scripts/post_update.sh` | New step 1a: idempotent `git config --system --add safe.directory /opt/meshpoint` (was only in install.sh → upgraded boxes never got it) |
+| `src/version.py` | 0.7.6 → **0.7.7** |
+| `src/api/update/channels.py` | Catalog trimmed to **Stable (main) + Custom** only (user request: "we only have main or custom"); upstream `rc-077`/`feat/v0.7.7` + `wismesh-node`/`feat/wismesh-hat` rows deleted (branches don't exist on the fork); `CHANNEL_ID_ALIASES` maps ALL retired ids (rc-074..077, wismesh-node) → `"stable"` |
+| `frontend/js/settings/update_panel_controller.js` | `UPDATE_CHANNEL_ALIASES` same remap → 'stable' |
+| `docs/CHANGELOG.md` | New **v0.7.7 section = full fork feature list** (LoRaWAN sniffing, multi-radio, RTL-SDR listener, UI, scripts, self-update fixes — 23 bullets across 6 subsections) + manual-upgrade note; verified with the real ChangelogParser: stable preview picks v0.7.7 with all 23 bullets |
+| `tests/` (3 files) | See below |
+
+**Sudoers self-installs — no manual copy needed:** `meshpoint.service`
+ExecStartPre copies `config/sudoers-meshpoint` → `/etc/sudoers.d/meshpoint` on
+EVERY service start, and post_update.sh step 1 does the same on every apply.
+
+**BOOTSTRAP CATCH:** a v0.7.6 box cannot fetch this fix through the dashboard
+(the fetch is what's broken). One manual round on the Pi required:
+`cd /opt/meshpoint && sudo git fetch origin main && sudo git reset --hard
+origin/main && sudo systemctl restart meshpoint` — the restart installs the new
+sudoers, then dashboard Check/Apply works again.
+
+**Channel-removal ripple effects (verified):** `rc_channel()` returns None →
+`suggest_active_channel_for_install` no longer auto-advances main boxes to an RC
+picker entry (stays stable). `match_channel_for_branch("feat/v0.7.7")` → custom.
+Release-notes route: retired ids resolve to the stable channel/preview.
+`_RC_CHANNEL_VERSION` + the `tier == "rc"` path in release_notes.py left as
+dead-but-harmless legacy.
+
+**Tests (44 pass locally):** upstream-channel expectations rewritten
+(rc→custom/stable renames); deleted `test_rc_tier_accepts_retired_channel_id`;
+route test `test_retired_rc_ids_normalize_to_stable` loops rc-074/rc-077/
+wismesh-node → stable. IMPORTANT FIND: `_FakeGitRunner` in
+test_update_install_status.py matched `args[:3] == ["git","fetch","origin"]` —
+the v0.7.6 `-c` change had ALREADY silently broken these tests (they were never
+run last session). Added `_FakeGitRunner._strip_prefix()` (drops `sudo` + `-c
+<val>` pairs) used by the runner and the fetch assertion.
+`tests/test_update_routes.py` can't run on the Mac (no fastapi installed) —
+fixed statically, runs on Pi/CI only.
+
+**Git state:** user committed+pushed the core fixes themselves: `83e6e85`
+"update fix" (sudoers, post_update.sh, version.py) and `05fef20` "update fixes"
+(channels.py, update_panel_controller.js). Still uncommitted at session end:
+docs/CHANGELOG.md + 3 test files. Suggested commit msg: `fix(update): repair
+dashboard self-update broken by safe.directory prefix (v0.7.7)`; suggested
+release tag `v0.7.7` "Dashboard self-update repair".
+
+**Open / noted:**
+- `use_sudo=True` is hardcoded on every update-code path → a dev instance ON THE
+  MAC always fails Check for updates (macOS has no meshpoint sudoers). Offered
+  auto-detect (skip sudo when current user owns the repo — also correct on the
+  Pi where root owns /opt/meshpoint); NOT implemented yet.
+- The Mac working copy is now `/Users/einstein/Software/meshpoint` with the tree
+  at repo ROOT (older notes said `meshpoint_lorawan/` — that layout is gone).
+- User repeatedly stressed "we are on the Mac, not the Pi": all edits/tests are
+  local; never SSH or deploy to the Pi unprompted.
+
 ---
 
 ## What it does NOT do (intentional)

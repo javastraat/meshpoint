@@ -34,10 +34,23 @@ class _FakeGitRunner:
         self.remote_sha = remote_sha
         self.calls: list[list[str]] = []
 
+    @staticmethod
+    def _strip_prefix(args: list[str]) -> list[str]:
+        """Drop ``sudo`` and ``-c <opt>`` pairs so matching sees plain git argv."""
+        core = list(args)
+        if core and core[0] == "sudo":
+            core.pop(0)
+        if core and core[0] == "git":
+            core.pop(0)
+        while core[:1] == ["-c"]:
+            core = core[2:]
+        return ["git", *core]
+
     def __call__(
         self, args: list[str], cwd: Optional[str], timeout_seconds: float,
     ) -> tuple[int, str, str]:
         self.calls.append(list(args))
+        args = self._strip_prefix(args)
         if args[:3] == ["git", "fetch", "origin"]:
             return 0, "", ""
         if "rev-parse" in args and any("--abbrev-ref" in a for a in args):
@@ -63,20 +76,22 @@ class TestMatchChannelForBranch(unittest.TestCase):
         info = match_channel_for_branch(ReleaseChannelRegistry(), "main")
         self.assertEqual(info["active_channel_id"], "stable")
 
-    def test_rc_branch_maps_to_rc_channel(self) -> None:
+    def test_retired_upstream_rc_branch_maps_to_custom(self) -> None:
+        # Upstream sprint branches are not in this fork's catalog.
         info = match_channel_for_branch(ReleaseChannelRegistry(), "feat/v0.7.7")
-        self.assertEqual(info["active_channel_id"], "rc-077")
+        self.assertEqual(info["active_channel_id"], "custom")
 
-    def test_wismesh_branch_maps_to_experimental_channel(self) -> None:
+    def test_retired_wismesh_branch_maps_to_custom(self) -> None:
         info = match_channel_for_branch(ReleaseChannelRegistry(), "feat/wismesh-hat")
-        self.assertEqual(info["active_channel_id"], "wismesh-node")
-        self.assertEqual(info["channel_tier"], "experimental")
+        self.assertEqual(info["active_channel_id"], "custom")
+        self.assertEqual(info["channel_tier"], "custom")
 
-    def test_main_on_074_suggests_next_rc(self) -> None:
+    def test_main_stays_stable_without_rc_channel(self) -> None:
+        # Fork catalog has no RC tier, so the picker never auto-advances.
         info = suggest_active_channel_for_install(
             ReleaseChannelRegistry(), "main", local_version="0.7.5",
         )
-        self.assertEqual(info["active_channel_id"], "rc-077")
+        self.assertEqual(info["active_channel_id"], "stable")
 
     def test_unknown_branch_maps_to_custom(self) -> None:
         info = match_channel_for_branch(ReleaseChannelRegistry(), "feat/other")
@@ -128,11 +143,11 @@ class TestBuildInstallStatusPayload(unittest.TestCase):
                     use_sudo=False,
                 )
         self.assertEqual(payload["install_branch"], "feat/v0.7.7")
-        self.assertEqual(payload["active_channel_id"], "rc-077")
+        self.assertEqual(payload["active_channel_id"], "custom")
         self.assertEqual(payload["remote_branch"], "feat/v0.7.7")
         self.assertFalse(payload["update_available"])
 
-    def test_main_on_074_payload_defaults_picker_to_next_rc(self) -> None:
+    def test_main_on_075_payload_keeps_picker_on_stable(self) -> None:
         runner = _FakeGitRunner(branch="main", sha="56d4f7c")
         with mock.patch(
             "src.api.update.install_status.fetch_remote_version_sync",
@@ -149,7 +164,7 @@ class TestBuildInstallStatusPayload(unittest.TestCase):
                     use_sudo=False,
                 )
         self.assertEqual(payload["install_branch"], "main")
-        self.assertEqual(payload["active_channel_id"], "rc-077")
+        self.assertEqual(payload["active_channel_id"], "stable")
 
     def test_sync_reports_commits_behind(self) -> None:
         runner = _FakeGitRunner(behind=12)
@@ -167,15 +182,18 @@ class TestBuildInstallStatusPayload(unittest.TestCase):
                     runner=runner,
                     use_sudo=False,
                     sync_remote=True,
-                    channel_id="rc-077",
+                    channel_id="rc-077",  # retired id, aliases to stable
                 )
         self.assertEqual(payload["commits_behind"], 12)
         self.assertEqual(payload["commits_ahead"], 0)
-        self.assertEqual(payload["compare_branch"], "feat/v0.7.7")
+        self.assertEqual(payload["compare_branch"], "main")
         self.assertTrue(payload["update_available"])
         self.assertIsNotNone(payload["checked_at"])
         self.assertTrue(
-            any(len(c) >= 3 and c[:3] == ["git", "fetch", "origin"] for c in runner.calls),
+            any(
+                _FakeGitRunner._strip_prefix(c)[:3] == ["git", "fetch", "origin"]
+                for c in runner.calls
+            ),
         )
 
 

@@ -121,12 +121,6 @@ class TestSelectPreviewSection(unittest.TestCase):
         assert section is not None
         self.assertEqual(section.version, "0.7.5")
 
-    def test_rc_tier_accepts_retired_channel_id(self) -> None:
-        section = select_preview_section(
-            self.sections, tier="rc", channel_id="rc-074",
-        )
-        self.assertIsNone(section)
-
     def test_rc_tier_prefers_unreleased_over_older_shipped_release(self) -> None:
         """Pi-shaped CHANGELOG: Unreleased holds RC bullets, no v0.7.4 header yet."""
         from src.api.update.release_notes import ChangelogBullet

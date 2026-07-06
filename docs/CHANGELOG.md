@@ -4,6 +4,51 @@
 
 - **MQTT broker TLS.** Transport TLS (`mqtts`, CA bundle, cert validation) is not implemented on `mqtt_publisher.py` (plain TCP only). Until then use plain port 1883 or a LAN broker without TLS.
 
+### v0.7.7 (July 2026)
+
+First tagged release of the javastraat/meshpoint fork: LoRaWAN sniffing, multi-radio capture, the RTL-SDR web listener, and a dashboard self-update repair. **Upgrade note:** boxes on v0.7.6 cannot fetch this release from the dashboard (that is the bug being fixed); one manual round on the gateway is required: `cd /opt/meshpoint && sudo git fetch origin main && sudo git reset --hard origin/main && sudo systemctl restart meshpoint`. The restart installs the corrected sudoers rules; Check/Apply works from the dashboard again afterwards.
+
+#### LoRaWAN sniffing (SX1302)
+
+- **Passive LoRaWAN capture on EU868.** Five real 125 kHz LoRaWAN channels (867.9–868.7 MHz, sync word 0x34) on SX1302 ch0–ch4 while Meshtastic stays on the 250 kHz service channel (869.525 MHz, 0x2B) — dual sync word via direct service-channel register writes after `lgw_start()`.
+- **LoRaWAN MAC decoder.** Join-Request, Data Up, and Rejoin frames parsed (DevEUI/AppEUI, DevAddr, FCnt, FPort, MIC); payloads stay encrypted (no session keys), listen-only.
+- **LoRaWAN dashboard page.** Devices, recent packets, and stats views backed by `GET /api/lorawan/devices`, `/api/lorawan/packets`, `/api/lorawan/stats`.
+- **Strict isolation.** LoRaWAN traffic is never relayed and never enters the mesh node roster or telemetry store; router checks LoRaWAN before Meshtastic to avoid false positives.
+- **Service channel RF chain fix.** ch8 now picks the correct radio chain from its frequency instead of hardcoded RF0.
+
+#### Multi-radio capture (5 networks at once)
+
+- **Multiple MeshCore USB companions.** `capture.meshcore_usb` accepts a list (up to 4) with per-stick labels; packets carry `meshcore_usb_<label>` as capture source. New `PUT /api/config/capture/meshcore-companions` replaces the list atomically; the Configuration page grew a dynamic companion section.
+- **MeshCore signal metadata.** Frequency/bandwidth/SF stamped from each companion's connect-time radio handshake (per stick, so 868 and 433 report their real channel), and hop count derived from `path_len` on contact/channel messages.
+- **Simultaneous LoRaWAN + Meshtastic 868 + MeshCore 868/433 + Meshtastic 433.** Concentrator, two labelled MeshCore sticks, and a Meshtastic serial node run side by side; only Meshtastic is ever relayed.
+
+#### RTL-SDR web listener (Radio tab)
+
+- **Browser radio via RTL-SDR dongle.** `rtl_fm` → ffmpeg MP3 streaming with WFM/NFM/AM/USB/LSB modes, tune-anywhere, squelch/gain/level controls, 10-minute idle auto-stop; `GET/POST /api/listener/*` endpoints behind the session cookie.
+- **RDS on broadcast FM.** Wideband MPX pipeline teed to redsea: station name, RadioText, programme type, and a BLER signal-quality pill; EU 50 µs de-emphasis reconstruction.
+- **Two radio faces.** Digital skin (VFD-style frequency readout, segmented VU) and Analogue skin (slide-rule dial with band scales, preset flags, swinging-needle VU); choice persists per browser.
+- **Preset phonebook.** Favorites with pinning, category tabs, and search across Amsterdam FM, PMR446, marine VHF/UHF, Schiphol airband (true 8.33 kHz carriers), and ham presets; now-playing markers on tab and chip.
+- **Real-time VU meter.** Client-side Web Audio analyser (instantaneous RMS at ~60 fps with peak hold) instead of server-side loudness polling.
+- **Clean retunes.** Stop → settle → start pipeline with retry fixes the "Failed to open rtlsdr device #0" race on fast channel switches.
+
+#### Dashboard and UI
+
+- **Theme toggle in the topbar.** Cycles the three dark themes (default, high-contrast, sunlight) with per-theme icon, in sync with the command palette.
+- **24-hour clock everywhere.** Packet feeds, panels, node drawer, charts, messaging, and update pages all render `hour12: false`.
+- **Metric defaults.** Display units default to Celsius and kilometers for new browsers; explicit imperial choices are kept.
+
+#### Import and maintenance scripts
+
+- **Contacts + neighbours import.** Root `import_contacts.py` imports MeshCore contacts and neighbours with synthetic neighbour-advert rows (SNR surfaced in panels), skew-immune `last_heard` anchored to the local clock, and authoritative timestamp upserts floored at real captures.
+- **Repair and backfill tools.** `scripts/repair_neighbour_timestamps.py` fixes past/future neighbour timestamps; `scripts/backfill_meshcore_signal.py` stamps frequency/SF on older MeshCore rows.
+
+#### Self-update system
+
+- **Dashboard update fetch fix.** v0.7.6 added `-c safe.directory` to every sudo git call, which no longer matched the exact-argv NOPASSWD sudoers rules — Check for updates failed with "sudo: a terminal is required". The sudoers file now enumerates the prefixed forms as well.
+- **safe.directory migration.** `post_update.sh` registers `/opt/meshpoint` in the system git `safe.directory` on upgraded boxes (previously only fresh installs got it).
+- **Channel picker trimmed to this fork.** Release channels are now Stable (main) and Custom branch; upstream's RC and WisMesh entries (branches that do not exist on javastraat/meshpoint) are gone, and previously stored picker ids fall back to Stable.
+- **Fork update source.** Version checks and the apply chain point at `javastraat/meshpoint`; git dubious-ownership on the root-owned tree is handled both in-app and at install time.
+
 ### v0.7.6 (June 2026)
 
 Meshtastic mesh participant release on `main` (merge `feat/v0.7.6`). Edge-only, pure Python, no concentrator recompile. **Upgrade:** Settings → Updates → **Stable**, or the full SSH block in `docs/COMMON-ERRORS.md` (`git fetch`, `checkout main`, `pull`, `scripts/install.sh`, `restart`). Required this release: new `cryptography` dependency for PKI and an updated `meshpoint.service` unit (RAK V2 reset fix). Pull-only upgrades can miss both. Witness-tested on RAK V2. Settings → Updates RC picker now points at **v0.7.7** on `feat/v0.7.7`.

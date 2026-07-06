@@ -211,20 +211,17 @@ class TestReleaseNotesRoute(unittest.TestCase):
         audit_deps.reset_audit()
         self.tmp.cleanup()
 
-    def test_rc_channel_without_076_header_has_no_stale_preview(self) -> None:
+    def test_retired_rc_ids_normalize_to_stable(self) -> None:
+        # Fork catalog has no RC channels; retired picker ids alias to stable.
         self.client.cookies.set("meshpoint_session", self.admin_token)
-        response = self.client.get("/api/update/release_notes?channel_id=rc-077")
-        self.assertEqual(response.status_code, 200)
-        body = response.json()
-        self.assertEqual(body["channel_id"], "rc-077")
-        self.assertEqual(body["channel_tier"], "rc")
-        self.assertIsNone(body["preview_section"])
-
-    def test_rc_channel_legacy_id_normalizes_to_076(self) -> None:
-        self.client.cookies.set("meshpoint_session", self.admin_token)
-        response = self.client.get("/api/update/release_notes?channel_id=rc-074")
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["channel_id"], "rc-077")
+        for retired_id in ("rc-074", "rc-077", "wismesh-node"):
+            response = self.client.get(
+                f"/api/update/release_notes?channel_id={retired_id}",
+            )
+            self.assertEqual(response.status_code, 200)
+            body = response.json()
+            self.assertEqual(body["channel_id"], "stable")
+            self.assertEqual(body["channel_tier"], "stable")
 
     def test_stable_channel_returns_first_released(self) -> None:
         self.client.cookies.set("meshpoint_session", self.admin_token)
