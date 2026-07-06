@@ -1,15 +1,11 @@
 """Release channels exposed to the dashboard update picker.
 
 A ``ReleaseChannel`` is a logical pointer to a git ref the dashboard
-allows the operator to pin to. The catalog is intentionally tiny:
-``main`` (stable), the active feature branch (RC), and a fallback
-``custom`` slot the user fills in by typing a branch name.
-
-**Release housekeeping:** when bumping ``__version__`` on ``main``, replace
-the RC row here for the *next* sprint (``rc-076`` / ``feat/v0.7.6``, etc.)
-and branch ``feat/v0.7.N`` from updated ``main``. Full checklist:
-``Meshradar.io/.cursor/rules/operations-runbook.mdc`` (Dashboard release
-channel picker).
+allows the operator to pin to. This fork (javastraat/meshpoint) tracks
+only ``main``, so the catalog is just ``stable`` plus a ``custom`` slot
+the user fills in by typing a branch name. Upstream's RC/experimental
+rows were removed — their retired ids are remapped to ``stable`` via
+``CHANNEL_ID_ALIASES``.
 
 The registry lives behind a class so future versions can hot-load
 extra tracks (``preview``, ``rake-back``, etc.) without touching the
@@ -28,10 +24,14 @@ TIER_EXPERIMENTAL = "experimental"
 TIER_CUSTOM = "custom"
 
 # Remap retired picker ids (sessionStorage, docs, old bookmarks).
+# This fork tracks only main; upstream's RC/experimental branches do
+# not exist on javastraat/meshpoint, so all retired ids land on stable.
 CHANNEL_ID_ALIASES: dict[str, str] = {
-    "rc-074": "rc-075",
-    "rc-075": "rc-076",
-    "rc-076": "rc-077",
+    "rc-074": "stable",
+    "rc-075": "stable",
+    "rc-076": "stable",
+    "rc-077": "stable",
+    "wismesh-node": "stable",
 }
 
 
@@ -68,24 +68,6 @@ DEFAULT_CHANNELS: tuple[ReleaseChannel, ...] = (
         branch="main",
         tier=TIER_STABLE,
         description="Latest tagged release. Recommended for production gateways.",
-    ),
-    ReleaseChannel(
-        id="rc-077",
-        label="Release candidate (v0.7.7)",
-        branch="feat/v0.7.7",
-        tier=TIER_RC,
-        description="Sprint branch for v0.7.7. Expect rough edges.",
-    ),
-    ReleaseChannel(
-        id="wismesh-node",
-        label="Experimental: WisMesh Node (RAK6421 HAT)",
-        branch="feat/wismesh-hat",
-        tier=TIER_EXPERIMENTAL,
-        description=(
-            "meshtasticd Node platform for the RAK6421 WisMesh Pi HAT. "
-            "Not for RAK V2, SenseCap M1, Chameleon, or other SX1302 gateways. "
-            "See docs/WISMESH-NODE.md."
-        ),
     ),
     ReleaseChannel(
         id="custom",
