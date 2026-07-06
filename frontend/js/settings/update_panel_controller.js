@@ -54,6 +54,20 @@ class UpdatePanelController {
         this._installStatus = null;
         this._lastResult = null;
         this._releaseNotesToken = 0;
+        this._modal = null;
+    }
+
+    /**
+     * In-app confirmation dialog (replaces the browser's native
+     * ``window.confirm`` popup). Reuses the terminal's DangerousModal;
+     * falls back to native confirm if that script failed to load.
+     */
+    _confirm({ label, description, command }) {
+        if (window.DangerousModal) {
+            if (!this._modal) this._modal = new window.DangerousModal();
+            return this._modal.confirm({ label, description, command });
+        }
+        return Promise.resolve(window.confirm(`${label}\n\n${description}`));
     }
 
     bind() {
@@ -369,21 +383,28 @@ class UpdatePanelController {
             this._setStatus('error', 'Custom channel requires a branch name.');
             return;
         }
-        let confirmText = (
-            `Apply update from "${channel.label}"? `
-            + 'The service will restart at the end of the chain.'
-        );
+        let confirmOpts = {
+            label: 'Apply update',
+            description: (
+                `Apply update from "${channel.label}"? `
+                + 'The service will restart at the end of the chain.'
+            ),
+        };
         if (channel.tier === 'experimental') {
-            confirmText = (
-                `EXPERIMENTAL: "${channel.label}"\n\n`
-                + 'This switches to the meshtasticd Node platform (RAK6421 WisMesh HAT).\n\n'
-                + 'Do NOT use on RAK V2, SenseCap M1, Chameleon, or any SX1302 gateway.\n\n'
-                + 'After Apply, run: sudo ./scripts/install.sh --platform node\n'
-                + 'See docs/WISMESH-NODE.md on the Pi.\n\n'
-                + 'Continue anyway?'
-            );
+            confirmOpts = {
+                label: `EXPERIMENTAL: ${channel.label}`,
+                description: (
+                    'This switches to the meshtasticd Node platform (RAK6421 '
+                    + 'WisMesh HAT). Do NOT use on RAK V2, SenseCap M1, '
+                    + 'Chameleon, or any SX1302 gateway. Continue anyway?'
+                ),
+                command: (
+                    'After Apply, run: sudo ./scripts/install.sh --platform node\n'
+                    + 'See docs/WISMESH-NODE.md on the Pi.'
+                ),
+            };
         }
-        const confirmed = window.confirm(confirmText);
+        const confirmed = await this._confirm(confirmOpts);
         if (!confirmed) return;
         this._rememberChannelForReload(channel, customBranch);
         const branch = channel.tier === 'custom' ? customBranch : (channel.branch || '');
@@ -425,9 +446,10 @@ class UpdatePanelController {
     async _rollback() {
         const sha = this._rollbackSha();
         if (!sha) return;
-        const confirmed = window.confirm(
-            `Roll back to ${sha.slice(0, 8)}? The service will restart.`
-        );
+        const confirmed = await this._confirm({
+            label: 'Roll back',
+            description: `Roll back to ${sha.slice(0, 8)}? The service will restart.`,
+        });
         if (!confirmed) return;
         this.progressView?.start({ mode: 'rollback', channelLabel: `commit ${sha.slice(0, 8)}` });
         this._setStatus('pending', 'Rolling back on the Meshpoint…');
