@@ -50,6 +50,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             'settings/updates', 'settings/auth', 'settings/dangerous',
         ],
         guard: _buildRouteGuard(identity),
+        onDenied: _toastAdminRequired,
     });
     const sidebar = new SidebarController({ router, identity });
     sidebar.bind();
@@ -364,6 +365,22 @@ async function _loadIdentity() {
     } catch (_) {
         return null;
     }
+}
+
+// Denied in-app navigation (viewer clicked an admin link): stay on the
+// current page and explain via the shared r-toast pill. Deep links and
+// fresh loads still render the "forbidden" section (see router.js).
+function _toastAdminRequired() {
+    let toast = document.getElementById('r-toast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'r-toast';
+        toast.className = 'r-toast';
+        document.body.appendChild(toast);
+    }
+    toast.textContent = 'Admin access required — the viewer role is read-only';
+    toast.classList.add('r-toast--visible');
+    setTimeout(() => toast.classList.remove('r-toast--visible'), 2500);
 }
 
 /**

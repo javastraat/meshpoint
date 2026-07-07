@@ -35,7 +35,7 @@ First tagged release of the javastraat/meshpoint fork: LoRaWAN sniffing, multi-r
 
 - **Viewer role fully locked down server-side.** Every write endpoint now requires the admin role: configuration saves (transmit, identity, radio, channels, MeshCore channels), application restart, NodeInfo edit/send, companion rename, and message send/advert/delete. Viewers get a clean 403 instead of silent acceptance.
 - **Channel secrets hidden from viewers.** `GET /api/config` no longer returns the Meshtastic channel PSK or MeshCore channel key to viewer sessions; only admins see key material.
-- **"Admin access required" page.** Viewers who open an admin route (Configuration, Terminal, Settings) — via the sidebar or a deep link — get a friendly lock card with a back-to-dashboard link instead of a broken page.
+- **Admin links stay in place for viewers.** Clicking an admin link inside the app (for example a Hardware-page "Edit …" link into Configuration) no longer navigates away: the viewer stays on the current page and a toast explains that admin access is required. Deep links and fresh loads to admin routes still get the "Admin access required" lock card with a back-to-dashboard link.
 - **Blocked sends show a toast.** A viewer using the Messages compose box gets a "Not sent: admin role required" toast instead of a failed message bubble left in the thread.
 - **Login page no longer prefills the username.** Both fields start empty on every visit.
 

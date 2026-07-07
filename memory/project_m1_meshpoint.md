@@ -815,6 +815,17 @@ tabs (works because ungated nav items aren't checked) — offered sync, not done
   no-prefill) + Dashboard/UI bullets (sidebar regroup, inline modals, feed
   dates, packets tile). All verified through ChangelogParser.
 
+#### Viewer denied-nav → in-place toast (2026-07-07)
+User request: don't bounce viewers to the forbidden page on in-app admin-link
+clicks (page → Back to Dashboard → re-navigate was annoying). `router.js`
+`_onHashChange`: guard-rejected route while `_currentRoute` exists →
+`history.replaceState` back to the current hash + fire new `onDenied` callback
+(no dispatch, no history junk; replaceState doesn't re-fire hashchange so no
+loop). app.js passes `onDenied: _toastAdminRequired` (r-toast pill: "Admin
+access required — the viewer role is read-only"). Fresh loads / deep links
+(no current route) still render the forbidden lock card. Changelog bullet
+rewritten accordingly.
+
 ---
 
 ## What it does NOT do (intentional)

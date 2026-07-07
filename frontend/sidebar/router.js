@@ -26,8 +26,11 @@ class Router {
         this._defaultRoute = options.defaultRoute || 'dashboard';
         this._allowedRoutes = new Set(options.allowedRoutes || []);
         // Optional role guard: (route) => bool. A rejected route renders
-        // the "forbidden" section instead of the requested page.
+        // the "forbidden" section on a fresh load; when the user is
+        // already on a page, navigation is cancelled in place and
+        // onDenied fires instead (so a toast can explain why).
         this._guard = options.guard || null;
+        this._onDenied = options.onDenied || null;
         this._listeners = new Set();
         this._currentRoute = null;
         this._onHashChange = this._onHashChange.bind(this);
@@ -68,6 +71,16 @@ class Router {
 
     _onHashChange() {
         const route = this._readRouteFromHash();
+        if (route === 'forbidden'
+            && this._currentRoute
+            && this._currentRoute !== 'forbidden') {
+            // In-app click on an admin route: stay where we are and
+            // let the shell surface the denial (toast) instead of
+            // yanking the user off to the forbidden page.
+            history.replaceState(null, '', `#/${this._currentRoute}`);
+            if (this._onDenied) this._onDenied();
+            return;
+        }
         if (route !== this._currentRoute) this._dispatch(route);
     }
 
