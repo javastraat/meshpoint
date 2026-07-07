@@ -744,6 +744,24 @@ print('nodes', c.execute('SELECT COUNT(*) FROM nodes').fetchone()[0])
 
 Compare to node count inside your saved `.tar.gz` on a PC (see earlier diagnostic commands).
 
+**Restore says success but the service never stops (no `meshpoint-restore-finish` log lines).**
+Older builds reused one systemd unit name (`meshpoint-restore-finish`) with
+`--remain-after-exit`, so only the **first** dashboard restore after boot could
+run. Later attempts were ignored while the API still returned success.
+
+**Fix:** Pull the latest `feat/v0.7.7` (unique unit per restore + `--collect`).
+
+**Immediate recovery from SSH** (works even before pull):
+
+```bash
+ARCHIVE=$(sudo ls -t /opt/meshpoint/data/restore-incoming/meshpoint-restore-*.tar.gz | head -1)
+sudo bash /opt/meshpoint/scripts/restore_finish.sh "$ARCHIVE"
+```
+
+```bash
+sudo systemctl reset-failed 'meshpoint-restore-finish*' 2>/dev/null || true
+```
+
 ### Setup wizard says "Existing config/local.yaml found" on a fresh SD
 
 **Cause:** Pre-v0.7.3 RC builds eagerly persisted the auto-generated

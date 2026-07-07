@@ -13,8 +13,23 @@ if [[ -z "$ARCHIVE_PATH" || ! -f "$ARCHIVE_PATH" ]]; then
     exit 1
 fi
 
-exec /usr/bin/systemd-run \
-    --unit=meshpoint-restore-finish \
-    --description="Meshpoint backup restore" \
-    --remain-after-exit \
-    /bin/bash /opt/meshpoint/scripts/restore_finish.sh "$ARCHIVE_PATH"
+STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
+UNIT="meshpoint-restore-finish-${STAMP}"
+
+log() {
+    echo "[launch_restore_finish] $*"
+    logger -t meshpoint-restore-finish "$*" 2>/dev/null || true
+}
+
+log "scheduling unit=${UNIT} archive=${ARCHIVE_PATH}"
+
+if ! /usr/bin/systemd-run \
+    --unit="$UNIT" \
+    --description="Meshpoint backup restore ${STAMP}" \
+    --collect \
+    /bin/bash /opt/meshpoint/scripts/restore_finish.sh "$ARCHIVE_PATH"; then
+    log "systemd-run failed for unit=${UNIT}"
+    exit 1
+fi
+
+log "queued unit=${UNIT}"
