@@ -44,6 +44,7 @@ First tagged release of the javastraat/meshpoint fork: LoRaWAN sniffing, multi-r
 - **Sidebar regrouped.** Dashboard on top, then **Networks** (LoRaWAN, Meshtastic, MeshCore, Messages, Stats), **Radio** (Hardware, RTL-SDR), and **Ops** (Terminal, Configuration, Settings). The former "Radio" page is now called **Hardware** and the listener appears as **RTL-SDR**.
 - **Inline modals instead of browser popups.** Confirmation dialogs in the update panel, channel and MeshCore configuration cards, sign-out-all, viewer-role form, and dangerous actions now use the dashboard's own modal styling instead of native `confirm()` popups.
 - **Dates on packet feeds.** LoRaWAN, Meshtastic, and MeshCore panels show a date for packets from previous days ("Jul 5, 16:19"); today's packets keep the compact time-only form.
+- **Total Packets tile shows 24h / total.** The dashboard stat card now reads like the Nodes Discovered tile ("339 / 935"), pairing the last 24 hours with the all-time count.
 - **Theme toggle in the topbar.** Cycles the three dark themes (default, high-contrast, sunlight) with per-theme icon, in sync with the command palette.
 - **24-hour clock everywhere.** Packet feeds, panels, node drawer, charts, messaging, and update pages all render `hour12: false`.
 - **Metric defaults.** Display units default to Celsius and kilometers for new browsers; explicit imperial choices are kept.

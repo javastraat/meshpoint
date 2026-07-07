@@ -805,6 +805,15 @@ tabs (works because ungated nav items aren't checked) — offered sync, not done
 - **Bottom-right "meshpoint · vX.Y.Z" build stamp STAYS.** A removal was tried
   (overlaps the scrollbar) but the user reverted it before committing — final
   call: leave the stamp as-is. Don't propose removing it again.
+- **Total Packets tile → "24h / total"** (deployed, verified live): user asked
+  for total+session; 24h chosen over since-boot (matches Nodes tile grammar,
+  survives restarts). `packets_last_24h` added to `get_traffic_summary()` in
+  `traffic_monitor.py`; app.js renders `${24h} / ${total}` with a null-guard
+  fallback to plain total (mixed-deploy safe); subtitle div added in index.html.
+- **CHANGELOG v0.7.7 grew to 32 bullets**: new "Roles and access" subsection
+  (viewer lockdown, secret redaction, forbidden page, send toast, login
+  no-prefill) + Dashboard/UI bullets (sidebar regroup, inline modals, feed
+  dates, packets tile). All verified through ChangelogParser.
 
 ---
 
