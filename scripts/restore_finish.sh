@@ -74,8 +74,16 @@ if [[ -d "${BUNDLE_DIR}/data" ]]; then
     for entry in "${BUNDLE_DIR}/data"/*; do
         [[ -e "$entry" ]] || continue
         base="$(basename "$entry")"
-        rm -rf "${MESHPOINT_DIR}/data/${base}"
-        cp -a "$entry" "${MESHPOINT_DIR}/data/"
+        target="${MESHPOINT_DIR}/data/${base}"
+        if [[ "$base" == *.db ]]; then
+            rm -f "${target}" "${target}-wal" "${target}-shm" "${target}-journal"
+        else
+            rm -rf "${target}"
+        fi
+        cp -a "$entry" "${target}"
+        if [[ "$base" == *.db ]]; then
+            rm -f "${target}-wal" "${target}-shm" "${target}-journal"
+        fi
     done
 fi
 

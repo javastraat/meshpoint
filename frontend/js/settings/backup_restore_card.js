@@ -138,7 +138,7 @@ class BackupRestoreCard {
             );
             const recovered = await this._waitForServiceRecovery();
             if (recovered) {
-                window.setTimeout(() => window.location.reload(), 800);
+                window.setTimeout(() => this._reloadDashboard(), 800);
             }
         } catch (_e) {
             this._setStatus(
@@ -146,7 +146,7 @@ class BackupRestoreCard {
                 'Connection dropped while restore runs. Refresh in about a minute or check journalctl -u meshpoint.',
             );
             await this._waitForServiceRecovery();
-            window.setTimeout(() => window.location.reload(), 800);
+            window.setTimeout(() => this._reloadDashboard(), 800);
         } finally {
             if (this.restoreBtn) this.restoreBtn.disabled = false;
         }
@@ -172,6 +172,13 @@ class BackupRestoreCard {
             'Still waiting for the dashboard. Refresh the page or check journalctl -u meshpoint over SSH.',
         );
         return false;
+    }
+
+    _reloadDashboard() {
+        const stamp = Date.now();
+        const { pathname, search, hash } = window.location;
+        const joiner = search && search.length > 1 ? '&' : '?';
+        window.location.replace(`${pathname}${search}${joiner}restored=${stamp}${hash}`);
     }
 
     _setStatus(kind, message) {
