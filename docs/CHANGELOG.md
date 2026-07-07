@@ -2,6 +2,7 @@
 
 ### Unreleased
 
+- **Backup and restore.** Settings → System downloads a timestamped `.tar.gz` of `config/local.yaml` and the full `data/` directory (SQLite hot snapshot, PKI keys, rollback state). Restore uploads a prior backup, stashes the current state on the Pi, and restarts the service. Archive is not encrypted: store offline and keep it private.
 - **Mesh broadcast cadence UI.** Configuration → Radio adds a telemetry broadcast interval editor with live countdown. Configuration → GPS adds a position broadcast interval editor. Each is independent from NodeInfo: set `interval_minutes` to `0` to pause, or pick 5 min to 24 hr with hot-reload (no restart). Closes [#92](https://github.com/KMX415/meshpoint/issues/92).
 - **MQTT broker TLS.** Transport TLS (`mqtts`, CA bundle, cert validation) is not implemented on `mqtt_publisher.py` (plain TCP only). Until then use plain port 1883 or a LAN broker without TLS.
 

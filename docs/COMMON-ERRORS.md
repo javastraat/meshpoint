@@ -289,7 +289,7 @@ running from the wrong working directory.
 ls /opt/meshpoint/src/main.py
 ```
 
-If missing, re-clone (preserve your config and database first):
+If missing, re-clone (preserve your config and database first). Prefer **Settings → System → Download backup** on a healthy Pi before disaster strikes. If you already have a `.tar.gz` backup, install Meshpoint on the fresh SD card and use **Restore backup** on the System page instead of manual `cp` steps below.
 
 ```bash
 sudo cp -r /opt/meshpoint/data /tmp/meshpoint-data-backup

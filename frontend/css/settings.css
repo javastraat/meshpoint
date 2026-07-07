@@ -923,6 +923,32 @@ select.update-field__input option:checked {
     max-width: 520px;
 }
 
+.backup-restore-card {
+    margin-bottom: 8px;
+    max-width: 640px;
+}
+
+.backup-card__warning {
+    margin: 0 0 10px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    background: rgba(245, 158, 11, 0.08);
+    color: var(--accent-amber, #f59e0b);
+    font-size: 13px;
+}
+
+.backup-card__summary {
+    margin: 0 0 12px;
+    color: rgba(243, 244, 246, 0.72);
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.backup-card__actions {
+    flex-wrap: wrap;
+}
+
 .dangerous-panel__title {
     margin: 0 0 4px;
     font-size: 22px;

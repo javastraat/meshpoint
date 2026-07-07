@@ -682,6 +682,18 @@
                         </fieldset>
                         <p class="auth-status" data-display-units-status aria-live="polite"></p>
                     </article>
+                    <article class="auth-card backup-restore-card" id="meshpoint-backup-restore">
+                        <h3 class="auth-card__title">Backup and restore</h3>
+                        <p class="auth-card__hint">Download a timestamped archive of <code>config/local.yaml</code> and the full <code>data/</code> directory (SQLite snapshot, PKI keys, rollback state). The file contains all secrets. Store it offline. Do not commit it to git or email it.</p>
+                        <p class="backup-card__warning" data-backup-warning hidden aria-live="polite"></p>
+                        <p class="backup-card__summary" data-backup-summary aria-live="polite"></p>
+                        <div class="auth-card__actions backup-card__actions">
+                            <button class="terminal-button" type="button" data-backup-download>Download backup</button>
+                            <button class="terminal-button terminal-button--danger" type="button" data-backup-restore>Restore backup</button>
+                            <input type="file" accept=".tar.gz,application/gzip" data-backup-file hidden>
+                        </div>
+                        <p class="auth-status" data-backup-status aria-live="polite"></p>
+                    </article>
                     <header class="dangerous-panel__head dangerous-panel__head--secondary">
                         <h3 class="dangerous-panel__title">Service actions</h3>
                         <p class="dangerous-panel__subtitle">Each requires confirmation and is recorded in the audit log.</p>
@@ -733,6 +745,7 @@
     <script src="js/settings/release_notes_view.js"></script>
     <script src="js/settings/update_panel_controller.js"></script>
     <script src="js/settings/meshpoint_display_form.js"></script>
+    <script src="js/settings/backup_restore_card.js"></script>
     <script src="js/settings/dangerous_panel_controller.js"></script>
     <script src="js/configuration/identity_card.js"></script>
     <script src="js/configuration/radio_card.js"></script>

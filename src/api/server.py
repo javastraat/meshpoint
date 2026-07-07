@@ -62,6 +62,7 @@ from src.api.routes import (
     upstream_config_routes,
     update_check,
     update_routes,
+    backup_routes,
 )
 from src.api.terminal import CommandCatalog, SessionManager
 from src.api.update import ReleaseChannelRegistry, UpdateApplier
@@ -127,6 +128,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
             config.storage.database_path,
         ),
     )
+    backup_routes.init_routes(config)
     # Dangerous registry is wired in lifespan so clear-db / wipe-phantoms /
     # force-nodeinfo can close over the live pipeline objects.
 
@@ -269,6 +271,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     app.include_router(public_radar_routes.router)
     app.include_router(terminal_routes.router)
     app.include_router(update_routes.router)
+    app.include_router(backup_routes.router)
     app.include_router(dangerous_routes.router)
 
     protected = [Depends(require_auth)]

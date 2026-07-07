@@ -198,6 +198,12 @@ function _bootDangerousPanel(router) {
     if (prefsRoot && window.MeshpointDisplayForm) {
         new window.MeshpointDisplayForm(prefsRoot);
     }
+    const backupRoot = document.getElementById('meshpoint-backup-restore');
+    let backupCard = null;
+    if (backupRoot && window.BackupRestoreCard) {
+        backupCard = new window.BackupRestoreCard(backupRoot);
+        backupCard.bind();
+    }
     const controller = new window.DangerousPanelController(root);
     controller.bind();
     let primed = false;
@@ -206,6 +212,7 @@ function _bootDangerousPanel(router) {
         if (primed) return;
         primed = true;
         controller.refresh();
+        backupCard?.refresh();
     });
 }
 

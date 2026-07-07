@@ -127,7 +127,11 @@ The SX1250's digital SPI interface can recover while the RF receive path remains
 
 ### Recovering from a corrupted install
 
-If `meshpoint logs` shows `SyntaxError: source code string cannot contain null bytes` or `git pull` fails with `error: inflate` / `fatal: loose object is corrupt`, the SD card took a bad write (usually from a hard power cut). Fix with a clean re-clone:
+If `meshpoint logs` shows `SyntaxError: source code string cannot contain null bytes` or `git pull` fails with `error: inflate` / `fatal: loose object is corrupt`, the SD card took a bad write (usually from a hard power cut).
+
+**Preferred (dashboard):** If you saved a backup while the Pi was healthy, flash a fresh SD card, install Meshpoint (`scripts/install.sh`), complete web auth setup, then **Settings → System → Restore backup** and upload your `.tar.gz`. The service restarts with your prior `device_id`, channel keys, PKI keys, and local database.
+
+**SSH fallback** when the dashboard is unavailable or you have no backup file:
 
 ```bash
 cd /opt/meshpoint
@@ -146,6 +150,10 @@ sudo systemctl restart meshpoint
 ```
 
 This preserves your packet database and device config. The venv must be recreated since it is not tracked by git.
+
+### Backup before SD card trouble
+
+On a healthy Meshpoint, open **Settings → System → Download backup** and save the file to your PC or NAS. The archive contains API keys, channel PSKs, and PKI private material. It is not encrypted. If root disk use climbs above 90%, the System page suggests downloading a backup.
 
 ### Using pip on Raspberry Pi OS
 
