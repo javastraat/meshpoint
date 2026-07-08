@@ -1031,8 +1031,9 @@ index.html; `_renderIncoming()` in update_panel_controller.js (DOM-built,
 subjects textContent-escaped, "… and N more" row past limit, hidden when
 up-to-date/no data); `.update-incoming` styles in settings.css. Verified:
 13 unittests pass, parse/limit/failure unit-tested with fake runner, live
-payload key present (empty at behind=0). Pi-verify: Check for updates while
-behind → list appears under the orange drift line.
+payload key present (empty at behind=0). LIVE-VERIFIED on Pi 2026-07-08
+~17:20 (recursively: the first listed incoming commit was the feature's own
+commit 610b3cb). README self-update bullet also mentions it.
 
 ## OLD LIST (superseded, kept for the DONE details)
 
