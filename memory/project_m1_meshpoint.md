@@ -877,7 +877,7 @@ terminal WS admin check + shlex-quoted listener pipeline). Backlog:
 | 2 | ~~P1~~ DONE 2026-07-08 | S | `_ADMIN_SECTIONS`/`_VIEWER_SECTIONS` synced (identity_routes.py): both now include lorawan/meshtastic/meshcore/listener in sidebar order. No behavior change (only terminal/configuration.*/settings* are checked); tests only assert membership |
 | 3 | ~~P2~~ DONE 2026-07-08 | M | Relay burst + RSSI window exposed on Transmit card. GET /api/config relay dicts (both `transmit.relay` and top-level `relay` in config_routes.py) now include burst_size/min_relay_rssi/max_relay_rssi; transmit_card.js adds 3 inputs + `_collectRelayFilters()` (client-validates numbers + max>min), saves via PUT /api/config/transmit (enable/rate, unchanged) THEN PUT /api/config/relay (filters only, skipped when all blank); backend 400 detail surfaces via panel toast. relay serial_port/baud intentionally NOT exposed (SX1262 legacy, confusing on Transmit). Values apply on restart (existing signalRestart toast). User confirmed the card renders live with correct values (screenshot 2026-07-08); Save path not explicitly exercised yet |
 | 4 | ~~P2~~ DONE 2026-07-08 | S | Dead frontend/js/simple_node_list.js DELETED (nothing referenced it; superseded by node_cards.js) |
-| 5 | ~~P2~~ DONE 2026-07-08 | M | Of the 8 unused endpoints only 2 carried NEW data (verified: /api/stats/summary already embeds rssi_distribution + protocol/type dists — the old "wire 5" plan would have re-plotted duplicates). WIRED: `/api/analytics/signal/snr` → SNR histogram card on Stats next to RSSI (purple #a855f7, clone of _updateRssiHist, fetched via Promise.all in refresh(), NOT part of session/all-time toggle — last-500-packets only); `/api/packets/by-source/{id}` → "Recent Packets" collapsible section in node drawer (last 15: time · type · RSSI/SNR; source_id==node_id, both 8-hex no `!`). KEPT for later inspection per user (NOT pruned): /api/packets/count+protocols+types, /api/nodes/map+summary, /api/telemetry/{id}(+history) — all duplicate data already on screen via other endpoints. Not yet browser-verified |
+| 5 | ~~P2~~ DONE 2026-07-08 | M | Of the 8 unused endpoints only 2 carried NEW data (verified: /api/stats/summary already embeds rssi_distribution + protocol/type dists — the old "wire 5" plan would have re-plotted duplicates). WIRED: `/api/analytics/signal/snr` → SNR histogram card on Stats next to RSSI (purple #a855f7, clone of _updateRssiHist, fetched via Promise.all in refresh(), NOT part of session/all-time toggle — last-500-packets only); `/api/packets/by-source/{id}` → "Recent Packets" collapsible section in node drawer (last 15: time · type · RSSI/SNR; source_id==node_id, both 8-hex no `!`). KEPT for later inspection per user (NOT pruned): /api/packets/count+protocols+types, /api/nodes/map+summary, /api/telemetry/{id}(+history) — all duplicate data already on screen via other endpoints. SNR chart browser-verified (screenshot 2026-07-08: renders next to RSSI, bimodal far/near clusters; drawer packets not yet checked). NOTE spotted in screenshot: "Best RSSI −4 dBm" is implausible — likely one synthetic/self-report outlier; candidate small fix: filter RSSI > −20 dBm from best/avg tiles |
 | 6 | P3 | L | Spectrum view: SpectralScanService already scans periodically but discards the histogram (only floor/median → noise pill). Endpoint + canvas = the wishlist "spectral scan overlay" |
 | 7 | P3 | M | Meshtastic `serial` source single-instance — needs the list-field treatment meshcore_usb got |
 | 8 | P3 | S | `nb:` synthetic rows blank RSSI/FREQ/SF in feed (cosmetic, SNR-only) |
@@ -913,10 +913,25 @@ USB, #8 nb: blank RSSI cosmetic, #9 concentrator-channels card.
 
 ---
 
-## Possible next steps
+## CURRENT TO-DO LIST (consolidated 2026-07-08 — supersedes the finding numbers above)
 
-- Export LoRaWAN captures to CSV / TTN-compatible format
-- Add EU433 LoRaWAN channel plan (`eu433_lorawan()`) — needs a 433 concentrator, not the M1
-- Spectral scan overlay
-- LoRaWAN MIC verification (cosmetic — tells you if a packet is malformed)
-- Show 433 Meshtastic nodes separately in the UI (protocol + frequency tag)
+User has been committing incrementally with the suggested one-liners (verified
+in git log: 6825153 webport, 3181804 fallback, 0118767 fixes 1/2/4, 1d700a9
+relay card, 8c8893c SNR+drawer). Tree clean apart from this memory file.
+
+| # | Prio | Effort | Task |
+|---|------|--------|------|
+| T1 | P3 | S | Blank RSSI/FREQ/SF on synthetic `nb:` rows in packet feed (rows only carry SNR) |
+| T2 | P3 | S | Filter implausible RSSI (>-20 dBm outliers, e.g. "Best RSSI -4 dBm") from Stats best/avg tiles |
+| T3 | P3 | check | Browser-verify node drawer "Recent Packets" section (only unverified piece of #5) |
+| T4 | P3 | M | Concentrator-channels card on Hardware page (ch0-ch4 LoRaWAN + ch8 Meshtastic plan; needs small new endpoint) |
+| T5 | P3 | M | Multiple Meshtastic USB sticks — list-field treatment for `serial` source |
+| T6 | P3 | L | Spectrum view from running spectral scans (histogram endpoint + canvas) |
+| T7 | P3 | — | Later inspection: 6 kept duplicate endpoints (packets/count+protocols+types, nodes/map+summary, telemetry/*) |
+
+Older wishlist (idea-level): LoRaWAN CSV/TTN export; LoRaWAN MIC verification;
+tag 433 Meshtastic nodes in UI; light theme (medium-large, dark-first CSS);
+DAB+ via welle-cli (NPO Radio 5); true-RF S-meter via pyrtlsdr; EU433 LoRaWAN
+plan (needs 433 concentrator, not the M1).
+
+Suggested order: T3 → T2 → T1 → T4, then by mood.
