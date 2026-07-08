@@ -13,7 +13,8 @@ ExecStartPre=+/bin/bash -c "cp /opt/meshpoint/config/sudoers-meshpoint /etc/sudo
 ExecStartPre=+/bin/chown -R meshpoint:meshpoint /opt/meshpoint/config
 ExecStartPre=+/bin/chown -R meshpoint:meshpoint /opt/meshpoint/data
 ExecStartPre=+/bin/bash /opt/meshpoint/scripts/reset_concentrator.sh
-ExecStart=/opt/meshpoint/venv/bin/python -m uvicorn src.api.server:create_app --factory --host 0.0.0.0 --port 8080
+# Bind host/port come from dashboard.host/dashboard.port in the YAML config
+ExecStart=/opt/meshpoint/venv/bin/python -m src.serve
 ExecStopPost=+/bin/bash /opt/meshpoint/scripts/reset_concentrator.sh --hold
 TimeoutStopSec=10
 Restart=always

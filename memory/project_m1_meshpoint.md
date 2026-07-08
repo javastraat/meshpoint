@@ -826,6 +826,30 @@ access required — the viewer role is read-only"). Fresh loads / deep links
 (no current route) still render the forbidden lock card. Changelog bullet
 rewritten accordingly.
 
+#### Web server port now config-driven via src/serve.py launcher (2026-07-08)
+The port was set in TWO places and only the systemd unit mattered:
+`meshpoint.service` ExecStart hardcoded `uvicorn ... --host 0.0.0.0 --port 8080`,
+while `dashboard.host/port` in the YAML (`DashboardConfig`, config.py) was ONLY
+used for the startup-banner URL in log_format.py — changing the YAML did nothing.
+
+Fix — YAML is now the single source of truth:
+- **`src/serve.py` (NEW)** — launcher: `_bind_address()` reads
+  `load_config().dashboard` host/port; on ANY config error falls back to
+  `0.0.0.0:8080` with a loud log (a broken local.yaml must never crash-loop the
+  server, since the dashboard is also the update/rollback UI). `main()` calls
+  `uvicorn.run("src.api.server:create_app", factory=True, host, port)`.
+  uvicorn import is INSIDE main() so the module imports on the Mac (no uvicorn
+  in the system python; `_bind_address()` unit-testable without it).
+- **`scripts/meshpoint.service`** — ExecStart is now
+  `/opt/meshpoint/venv/bin/python -m src.serve` (no --host/--port args).
+- **`config/default.yaml`** — comment on the `dashboard:` block: bind address
+  read by src/serve.py, override in local.yaml, takes effect on restart.
+- Pi rollout needs NO manual step: `post_update.sh` step 2 already copies
+  scripts/meshpoint.service → /etc/systemd/system + `systemctl daemon-reload`
+  when it differs.
+- To change the port: set `dashboard: port:` in local.yaml, restart service.
+  Verified on Mac: `_bind_address()` returns `('0.0.0.0', 8080)` from YAML.
+
 ---
 
 ## What it does NOT do (intentional)

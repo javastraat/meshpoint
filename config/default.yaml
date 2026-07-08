@@ -40,6 +40,8 @@ storage:
   cleanup_interval_seconds: 3600
 
 dashboard:
+  # Web server bind address, read by src/serve.py (the systemd ExecStart).
+  # Override in local.yaml; takes effect on service restart.
   host: "0.0.0.0"
   port: 8080
   static_dir: "frontend"
