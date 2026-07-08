@@ -926,6 +926,19 @@ Wishlist: W1 LoRaWAN CSV/TTN export (S-M, best value) · W2 LoRaWAN MIC verify (
 
 Watch: RFID plateau 865.6-867.6 (identified, only interesting if it changes); noise pill should read a few dB lower post-percentile-fix.
 
+**CLI report/status auth fix (2026-07-08 ~16:00, found via N2):** `meshpoint report`
+had been broken since API auth landed — unauthenticated `_get` swallowed 401s
+into "service is not running" (user hit it right after N2 restored the CLI's
+endpoints). NEW `src/cli/api_client.py` (CliApiClient: cookie jar session,
+`get()` raising ServiceDown vs AuthRequired vs ApiError, `login_interactive()`
+→ POST /api/auth/login). report_command: tries status → ServiceDown = real
+"not running"; AuthRequired = prompt admin login, retry; per-section fetches
+degrade to {}. status_command: 401/403 → "running (admin login required for
+details — use 'meshpoint report')", stays non-interactive; explicit
+`import urllib.error` added. Rejected alternative: localhost auth bypass
+(would gut the viewer-role model). Changelog bullet (46). Compile-verified on
+Mac; interactive flow needs a Pi run of `meshpoint report` to confirm.
+
 ## OLD LIST (superseded, kept for the DONE details)
 
 User has been committing incrementally with the suggested one-liners (verified

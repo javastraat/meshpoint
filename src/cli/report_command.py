@@ -2,17 +2,16 @@
 
 Queries the running Meshpoint service via its local HTTP API and
 renders a consolidated terminal dashboard. Requires the service to
-be running on localhost:8080.
+be running on localhost:8080 and prompts for dashboard admin
+credentials (the API sits behind the session-cookie auth).
 """
 
 from __future__ import annotations
 
-import json
-import urllib.request
 from dataclasses import dataclass, field
 from datetime import timedelta
 
-BASE_URL = "http://localhost:8080"
+from src.cli.api_client import ApiError, AuthRequired, CliApiClient, ServiceDown
 
 _RESET = "\033[0m"
 _BOLD = "\033[1m"
@@ -47,21 +46,34 @@ def run_report() -> None:
 def _fetch_all() -> ReportData | None:
     """Query all relevant API endpoints."""
     data = ReportData()
+    client = CliApiClient()
 
-    data.status = _get("/api/device/status")
-    if not data.status:
+    try:
+        data.status = client.get("/api/device/status")
+    except ServiceDown:
         print(f"\n  {_RED}Meshpoint service is not running or unreachable.{_RESET}")
         print("  Start it with: sudo systemctl start meshpoint\n")
         return None
+    except AuthRequired:
+        print("\n  Service is running; the report needs a dashboard admin login.")
+        try:
+            client.login_interactive()
+            data.status = client.get("/api/device/status")
+        except AuthRequired:
+            print(f"\n  {_RED}Login failed (wrong credentials?).{_RESET}\n")
+            return None
+        except (ServiceDown, ApiError) as exc:
+            print(f"\n  {_RED}Login failed: {exc}{_RESET}\n")
+            return None
 
-    data.device = _get("/api/device") or {}
-    data.metrics = _get("/api/device/metrics") or {}
-    data.traffic = _get("/api/analytics/traffic") or {}
-    data.signal = _get("/api/analytics/signal/summary") or {}
-    data.nodes = _get("/api/nodes/count") or {}
-    data.node_summary = _get("/api/nodes/summary") or {}
-    data.packet_count = _get("/api/packets/count") or {}
-    data.config = _get("/api/config") or {}
+    data.device = _get(client, "/api/device")
+    data.metrics = _get(client, "/api/device/metrics")
+    data.traffic = _get(client, "/api/analytics/traffic")
+    data.signal = _get(client, "/api/analytics/signal/summary")
+    data.nodes = _get(client, "/api/nodes/count")
+    data.node_summary = _get(client, "/api/nodes/summary")
+    data.packet_count = _get(client, "/api/packets/count")
+    data.config = _get(client, "/api/config")
 
     return data
 
@@ -327,11 +339,10 @@ def _fmt_temp(val) -> str:
     return f"{val}°C"
 
 
-def _get(path: str) -> dict | None:
-    """GET a JSON endpoint from the local Meshpoint API."""
+def _get(client: CliApiClient, path: str) -> dict:
+    """GET one endpoint; missing/failed sections render as empty."""
     try:
-        req = urllib.request.Request(f"{BASE_URL}{path}", method="GET")
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            return json.loads(resp.read().decode())
-    except Exception:
-        return None
+        result = client.get(path)
+        return result if isinstance(result, dict) else {"items": result}
+    except ApiError:
+        return {}

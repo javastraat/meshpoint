@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import urllib.error
 import urllib.request
 from datetime import timedelta
 from pathlib import Path
@@ -65,6 +66,13 @@ def _show_api_status() -> None:
         req = urllib.request.Request(STATUS_ENDPOINT, method="GET")
         with urllib.request.urlopen(req, timeout=3) as resp:
             data = json.loads(resp.read().decode())
+    except urllib.error.HTTPError as exc:
+        if exc.code in (401, 403):
+            print("  API:             running (admin login required for "
+                  "details — use 'meshpoint report')")
+        else:
+            print(f"  API:             error (HTTP {exc.code})")
+        return
     except Exception:
         print("  API:             unreachable")
         return
