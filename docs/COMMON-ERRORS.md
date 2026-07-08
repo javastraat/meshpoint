@@ -6,7 +6,7 @@ Cmd+F to find your message. For longer diagnostic flows see
 [Configuration](CONFIGURATION.md).
 
 If your error is not listed, capture it from `meshpoint logs` and open a
-[GitHub Issue](https://github.com/KMX415/meshpoint/issues) or ask in
+[GitHub Issue](https://github.com/javastraat/meshpoint/issues) or ask in
 [Discord](https://discord.gg/BnhSeFXVY8).
 
 ---
@@ -74,6 +74,27 @@ sudo systemctl restart meshpoint
 Hard-refresh the dashboard (Ctrl+Shift+R). First time on v0.7.3+, complete `/setup` for the admin password.
 
 **Faster path (v0.7.3+ only, when release notes say no new deps):** `sudo git pull origin main` and `sudo systemctl restart meshpoint`. If the service fails to start, use the full block above.
+
+### Check for updates fails: `Could not fetch origin: sudo: a terminal is required to read the password`
+
+**Cause:** v0.7.6 added `-c safe.directory=/opt/meshpoint` to the `sudo git`
+calls behind Settings → Updates, but the NOPASSWD sudoers rules match exact
+argv — the new flag matched no rule, so sudo asked for a password no service
+can type. v0.7.7 fixes both the sudoers rules and the git invocations, but a
+box stuck on v0.7.6 cannot pull that fix through the dashboard, because the
+fetch itself is what is broken.
+
+**Fix:** One manual round over SSH, then the dashboard works again:
+
+```bash
+cd /opt/meshpoint
+sudo git fetch origin main
+sudo git reset --hard origin/main
+sudo systemctl restart meshpoint
+```
+
+The restart installs the corrected sudoers rules; Check for updates and Apply
+work from Settings → Updates afterwards.
 
 ### Startup WARN: "Stale compiled core modules detected"
 
@@ -276,7 +297,7 @@ If missing, re-clone (preserve your config and database first):
 sudo cp -r /opt/meshpoint/data /tmp/meshpoint-data-backup
 sudo cp /opt/meshpoint/config/local.yaml /tmp/local-yaml-backup
 sudo rm -rf /opt/meshpoint
-sudo git clone https://github.com/KMX415/meshpoint.git /opt/meshpoint
+sudo git clone https://github.com/javastraat/meshpoint.git /opt/meshpoint
 sudo cp -r /tmp/meshpoint-data-backup /opt/meshpoint/data/
 sudo cp /tmp/local-yaml-backup /opt/meshpoint/config/local.yaml
 sudo bash /opt/meshpoint/scripts/install.sh

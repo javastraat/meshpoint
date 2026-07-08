@@ -1035,6 +1035,56 @@ payload key present (empty at behind=0). LIVE-VERIFIED on Pi 2026-07-08
 ~17:20 (recursively: the first listed incoming commit was the feature's own
 commit 610b3cb). README self-update bullet also mentions it.
 
+**Docs completeness sweep (2026-07-08 evening, user request "is everything documented"):**
+- MeshCore 7→40 channel raise (commit 1785f5e) had NO changelog bullet and no
+  README mention — added both (changelog under "Configuration and server",
+  49 bullets, parser-verified; README under "Expanded multi-protocol capture").
+- EU868 plan commit 89a6ba7 + revert 273cca3 net out to docstring/comment
+  improvements only — plan byte-identical, nothing to document.
+- **Updates page "What's new" shows a FLAT list by design:** it's the
+  release-notes preview rendered from docs/CHANGELOG.md by ChangelogParser
+  (src/api/update/release_notes.py). Parser only matches `### vX.Y.Z` section
+  headers (`_HEADER_RE` = exactly 3 hashes) and `- **headline.** detail`
+  bullets; our `#### Category` subsection lines are silently skipped, so the
+  dashboard preview loses the categories. Candidate feature: carry a
+  `category` field per bullet + group headers in update_panel_controller.js
+  — offered, not built.
+- README gaps fixed: rtl-sdr/ffmpeg apt install + redsea build-from-source
+  commands added to the RTL-SDR section (previously named as requirements
+  with no install steps anywhere in the repo); Features grew "Web terminal"
+  (upstream KMX415 feature, was totally undocumented) and "Dashboard
+  authentication" (admin+viewer) bullets.
+- COMMON-ERRORS.md: new Upgrades entry for the v0.7.6 "sudo: a terminal is
+  required" Check-for-updates failure + manual bootstrap fix.
+- HARDWARE-MATRIX.md: new RTL-SDR dongle section (software/driver/power/
+  antenna table, links to README setup).
+- Verified clean: CONFIGURATION.md covers all fork config keys (dashboard
+  host/port, sx1261_spi_path, spectrum_sweep_interval_seconds, relay
+  burst/RSSI, meshcore_usb list); no docs reference the 4 removed endpoints
+  or stale channel plans; FAQ has no stale info.
+- RESOLVED (user approved): all functional clone URLs repointed to
+  javastraat/meshpoint (README install + ONBOARDING + TROUBLESHOOTING +
+  SYNCROBIT-CHAMELEON + COMMON-ERRORS recovery), issue links → fork issues,
+  Discussions links stay upstream (forks have no Discussions), version badge
+  0.7.6→0.7.7. **Badges (stars/issues/last-commit) deliberately stay on
+  KMX415 per user ("show the badges from the forked repository not ours") —
+  don't repoint them again.** README line 53 fork-intro upstream link stays.
+
+**Release-notes preview grouped by category (2026-07-08 evening, user request):**
+The Updates "What's new" panel showed a flat list because ChangelogParser
+ignored `#### Category` lines. Built: `_CATEGORY_RE` + `category: str | None`
+field on ChangelogBullet (parse_text tracks current #### per section, resets
+on each ###); `format_bullet_for_preview` emits it; frontend
+release_notes_view.js `_renderBullets()` interleaves
+`<li class="update-release-notes__category">` header rows when the category
+changes (sections without categories render flat as before, None-safe);
+`.update-release-notes__category` style in settings.css (eyebrow-cyan,
+uppercase, underline). 3 new parser tests (attach/reset/preview-dict) — 23
+pass on Mac; JS node --check OK; real CHANGELOG yields all 11 v0.7.7
+categories in order. Changelog bullet under "Self-update system" (50 total,
+parser-verified); README self-update fork bullet mentions grouping.
+Pi-verify after deploy: Updates page shows category headers.
+
 ## OLD LIST (superseded, kept for the DONE details)
 
 User has been committing incrementally with the suggested one-liners (verified

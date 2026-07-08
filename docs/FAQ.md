@@ -210,8 +210,8 @@ and the systemd service in one idempotent pass). See
 
 1. Search this `docs/` folder.
 2. Check the [Common Errors catalog](COMMON-ERRORS.md).
-3. Search [GitHub Issues](https://github.com/KMX415/meshpoint/issues).
-4. Open a [GitHub Discussion](https://github.com/KMX415/meshpoint/discussions).
+3. Search [GitHub Issues](https://github.com/javastraat/meshpoint/issues).
+4. Open a [GitHub Discussion](https://github.com/KMX415/meshpoint/discussions) (upstream).
 5. Hop into the [Discord](https://discord.gg/BnhSeFXVY8).
 
 When asking for help, please include:

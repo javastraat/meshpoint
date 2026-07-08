@@ -76,7 +76,7 @@ CM4 to the Chameleon:
 
 ```bash
 sudo apt update && sudo apt install -y git
-sudo git clone https://github.com/KMX415/meshpoint.git /opt/meshpoint
+sudo git clone https://github.com/javastraat/meshpoint.git /opt/meshpoint
 sudo bash /opt/meshpoint/scripts/install.sh
 sudo reboot
 ```

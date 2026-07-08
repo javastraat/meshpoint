@@ -13,7 +13,7 @@
 [![GitHub stars](https://img.shields.io/github/stars/KMX415/meshpoint?style=flat&color=yellow)](https://github.com/KMX415/meshpoint/stargazers)
 [![GitHub issues](https://img.shields.io/github/issues/KMX415/meshpoint)](https://github.com/KMX415/meshpoint/issues)
 [![Last commit](https://img.shields.io/github/last-commit/KMX415/meshpoint)](https://github.com/KMX415/meshpoint/commits/main)
-[![Version](https://img.shields.io/badge/version-0.7.6-orange.svg)](docs/CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.7.7-orange.svg)](docs/CHANGELOG.md)
 
 ### Meshradar Cloud Dashboard
 ![Meshradar Cloud Dashboard](Meshradar414.png)
@@ -66,6 +66,7 @@ This is a customized fork of upstream [KMX415/meshpoint](https://github.com/KMX4
 - **EU868 5-channel LoRaWAN plan** (867.9 / 868.1 / 868.3 / 868.5 / 868.7 MHz) across RF0's full IF window — the 3 mandatory uplinks plus 2 extra TTN channels.
 - **Up to 4 MeshCore USB companions** plus a Meshtastic-433 serial source → 5 networks captured at once.
 - **MeshCore per-packet metadata** — frequency/SF read from the companion's radio config, hop count decoded from the MeshCore `path_len`, and each companion's packets labeled by source.
+- **Up to 40 MeshCore user channels** (slots 1–40, slot 0 stays Public) — raised from 7.
 
 **Hardware page & spectrum**
 - **Band spectrum card** — the concentrator module's onboard SX1261 companion chip (not a USB radio) sweeps the whole region band (100 kHz steps, EU868: 863–870 MHz) and draws a live spectrum chart with median + peak level and the LoRaWAN / Meshtastic / MeshCore channel positions overlaid; "Sweep now" button, hover readout, `GET /api/device/spectrum`. Requires `radio.sx1261_spi_path` (e.g. `/dev/spidev0.1`) in `local.yaml`; cadence via `radio.spectrum_sweep_interval_seconds`.
@@ -78,7 +79,7 @@ This is a customized fork of upstream [KMX415/meshpoint](https://github.com/KMX4
 **Roles, config & self-update**
 - **Viewer role locked down server-side** — all write endpoints require admin; channel PSKs/keys are redacted for viewers; admin-only links show a toast instead of navigating away.
 - **Web server port from config** — `dashboard.host`/`dashboard.port` in `local.yaml` via a launcher that falls back to `0.0.0.0:8080` if the config is broken or the port unbindable.
-- **Self-update against this fork** — version checks and the apply chain point at `javastraat/meshpoint`, sudoers/safe.directory repairs are self-installing, update checks work on dev checkouts (sudo only when the repo is root-owned), and "Check for updates" lists the incoming commit messages so you can see what an Apply brings.
+- **Self-update against this fork** — version checks and the apply chain point at `javastraat/meshpoint`, sudoers/safe.directory repairs are self-installing, update checks work on dev checkouts (sudo only when the repo is root-owned), "Check for updates" lists the incoming commit messages so you can see what an Apply brings, and the release-notes preview groups its bullets under the changelog's category headings.
 
 **Contacts / neighbours tooling**
 - `import_contacts.py` imports a MeshCore contacts/neighbours list into the node DB, with clock-skew-immune timestamps (`now − secs_ago`) and freq/SF stamping.
@@ -106,6 +107,10 @@ This is a customized fork of upstream [KMX415/meshpoint](https://github.com/KMX4
 **Full chat UI.** Conversations organized by channel and contact. Signal info (SNR, RSSI) on every received bubble. Duplicate badge shows how many times a relayed message was heard. Channel sidebar with LongFast, custom channels, and DM contacts. Message history persisted in SQLite.
 
 **Radio configuration from the dashboard.** Change region, modem preset, frequency, TX power, and duty cycle without SSH. Add and remove channels with custom PSKs. Toggle TX enable/disable. All settings saved to `local.yaml` and survive restarts.
+
+**Web terminal.** A full shell in the browser (Ops → Terminal, admin only): a real PTY streamed over WebSocket with search, clipboard support, and a one-click catalog of common maintenance commands. Quick fixes without reaching for an SSH client.
+
+**Dashboard authentication.** First visit prompts you to set an admin password; sessions are HttpOnly cookies with failed-login lockout. An optional read-only **viewer** role shares the dashboard without exposing configuration, channel keys, or any write access.
 
 **Node discovery.** Live node cards showing every node your Meshpoint has heard: name, ID, protocol, hardware model, signal strength, battery, and last seen. Click any node to open a detail drawer with metrics history, its most recent packets, and direct message.
 
@@ -206,7 +211,18 @@ A Heltec V3 (or any Meshtastic node) flashed with **Meshtastic EU_433** firmware
 Add an **RTL-SDR dongle** (RTL2832U + R820T/R860 — e.g. RTL-SDR Blog V3/V4, ~€25) to turn Meshpoint into a browser-based broadcast/utility radio receiver. It is completely independent of the SX1302, so LoRa capture continues uninterrupted.
 
 - **Coverage:** ~24–1766 MHz — FM broadcast (WFM), airband and AM, marine VHF/UHF, PMR446, 2 m / 70 cm ham (NFM), and SSB (USB/LSB).
-- **Requirements:** the `rtl-sdr` package (provides `rtl_fm` / `rtl_test`) and `ffmpeg`. For **RDS** on FM (station name, RadioText, program type, signal-quality meter), also install [`redsea`](https://github.com/windytan/redsea). RDS is decoded from the wide FM multiplex, so `rtl_fm` runs at 171 kHz and the stream is `tee`'d to both `redsea` and `ffmpeg` — no second dongle needed.
+- **Requirements:** the `rtl-sdr` package (provides `rtl_fm` / `rtl_test`) and `ffmpeg`:
+  ```bash
+  sudo apt update && sudo apt install -y rtl-sdr ffmpeg
+  ```
+- **RDS (optional):** for station name, RadioText, program type, and the signal-quality meter on FM, also install [`redsea`](https://github.com/windytan/redsea). It is not packaged in Debian/Raspberry Pi OS, so build it from source (a couple of minutes on a Pi 4):
+  ```bash
+  sudo apt install -y git build-essential meson ninja-build libliquid-dev libsndfile1-dev
+  git clone https://github.com/windytan/redsea.git
+  cd redsea && meson setup build && cd build && ninja
+  sudo ninja install    # puts `redsea` on PATH
+  ```
+  RDS is decoded from the wide FM multiplex, so `rtl_fm` runs at 171 kHz and the stream is `tee`'d to both `redsea` and `ffmpeg` — no second dongle needed. Without `redsea` installed, everything else works; the RDS pills simply stay hidden.
 - **Blacklist the DVB-T driver** so the kernel doesn't claim the dongle as a TV tuner (the #1 "device not found" gotcha):
   ```bash
   echo 'blacklist dvb_usb_rtl28xxu' | sudo tee /etc/modprobe.d/rtl-sdr-blacklist.conf
@@ -242,7 +258,7 @@ LoRaWAN and MeshCore are **listen-only** and are never relayed. Only Meshtastic 
 
 ```bash
 sudo apt update && sudo apt install -y git
-sudo git clone https://github.com/KMX415/meshpoint.git /opt/meshpoint
+sudo git clone https://github.com/javastraat/meshpoint.git /opt/meshpoint
 cd /opt/meshpoint && sudo bash scripts/install.sh
 ```
 
@@ -414,7 +430,7 @@ See [docs/COMMON-ERRORS.md](docs/COMMON-ERRORS.md#upgrades) if the service fails
 
 **Project**
 - **[Changelog](docs/CHANGELOG.md):** version history and release notes
-- **[GitHub Issues](https://github.com/KMX415/meshpoint/issues)** and **[Discussions](https://github.com/KMX415/meshpoint/discussions)** for bugs and questions
+- **[GitHub Issues](https://github.com/javastraat/meshpoint/issues)** for bugs in this fork; **[upstream Discussions](https://github.com/KMX415/meshpoint/discussions)** for general Meshpoint questions
 - **[Discord](https://discord.gg/BnhSeFXVY8)** for real-time community support
 
 ---
@@ -423,7 +439,7 @@ See [docs/COMMON-ERRORS.md](docs/COMMON-ERRORS.md#upgrades) if the service fails
 
 - **Discord:** [discord.gg/BnhSeFXVY8](https://discord.gg/BnhSeFXVY8)
 - **Website:** [meshradar.io](https://meshradar.io)
-- **Issues:** [GitHub Issues](https://github.com/KMX415/meshpoint/issues)
+- **Issues:** [GitHub Issues](https://github.com/javastraat/meshpoint/issues)
 
 ---
 

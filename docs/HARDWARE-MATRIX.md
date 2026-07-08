@@ -217,6 +217,24 @@ positioning during the setup wizard. Otherwise enter coordinates manually
 
 ---
 
+## RTL-SDR Dongle (optional, broadcast/utility listener)
+
+An RTL2832U + R820T/R860 dongle (RTL-SDR Blog V3/V4, ~€25) adds the
+browser-based radio listener (FM broadcast with RDS, airband AM, marine
+VHF/UHF, PMR446, 2 m / 70 cm ham, SSB). It is fully independent of the
+SX1302, so LoRa capture is unaffected.
+
+| Aspect | Notes |
+|---|---|
+| Software | `rtl-sdr` + `ffmpeg` (apt); optional [`redsea`](https://github.com/windytan/redsea) built from source for RDS |
+| Driver | Blacklist `dvb_usb_rtl28xxu` or the kernel claims the dongle as a TV tuner |
+| Power | ~300 mA — do **not** hot-plug on a loaded Pi; inrush can brown out the internal USB hub and drop serial companions. Leave it permanently connected or use a powered hub |
+| Antenna | Own wideband antenna; don't share the tuned LoRa antennas |
+
+Setup commands and the full walkthrough: [README > Optional: RTL-SDR Radio Listener](../README.md#optional-rtl-sdr-radio-listener).
+
+---
+
 ## Power and SD Cards
 
 | Component | Recommended |

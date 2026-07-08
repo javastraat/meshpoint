@@ -135,7 +135,7 @@ sudo cp -r data/ /tmp/meshpoint-data-backup
 sudo cp config/local.yaml /tmp/local-yaml-backup
 cd /home/pi
 sudo rm -rf /opt/meshpoint
-sudo git clone https://github.com/KMX415/meshpoint.git /opt/meshpoint
+sudo git clone https://github.com/javastraat/meshpoint.git /opt/meshpoint
 sudo cp -r /tmp/meshpoint-data-backup /opt/meshpoint/data/
 sudo cp /tmp/local-yaml-backup /opt/meshpoint/config/local.yaml
 sudo chmod 777 /opt/meshpoint/data

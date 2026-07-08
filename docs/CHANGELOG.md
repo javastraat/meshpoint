@@ -59,6 +59,7 @@ First tagged release of the javastraat/meshpoint fork: LoRaWAN sniffing, multi-r
 
 - **Web server port is now set in the config.** The dashboard bind address comes from `dashboard.host` / `dashboard.port` in the YAML config (override in `local.yaml`, applied on service restart) via the new `src/serve.py` launcher; previously the port was hardcoded in the systemd unit and the config value only affected the startup banner. If the config fails to load, or the configured address cannot be bound (port in use, privileged port, bad host), the server falls back to `0.0.0.0:8080` so the dashboard (and its update/rollback page) stays reachable.
 - **Relay burst and RSSI filters editable in Configuration → Transmit.** Burst size and the min/max RSSI relay window (only packets heard inside the window are rebroadcast) can now be set from the dashboard; previously these existed in `local.yaml` and the relay API but had no UI.
+- **MeshCore channel limit raised from 7 to 40 user channels.** The configuration card, YAML `meshcore.channel_keys`, and companion slot sync now accept up to 40 user channels (slots 1–40; slot 0 stays Public), up from 7.
 - **Unused API endpoints removed.** `GET /api/packets/protocols`, `/api/packets/types`, `/api/nodes/map`, and `/api/telemetry/{id}` (+`/history`) served data already available through `/api/stats/summary`, `/api/nodes`, and `/api/nodes/{id}/metrics_history`; nothing in the dashboard or CLI used them.
 
 #### CLI
@@ -87,6 +88,7 @@ First tagged release of the javastraat/meshpoint fork: LoRaWAN sniffing, multi-r
 - **Channel picker trimmed to this fork.** Release channels are now Stable (main) and Custom branch; upstream's RC and WisMesh entries (branches that do not exist on javastraat/meshpoint) are gone, and previously stored picker ids fall back to Stable.
 - **Fork update source.** Version checks and the apply chain point at `javastraat/meshpoint`; git dubious-ownership on the root-owned tree is handled both in-app and at install time.
 - **Check for updates shows what's coming.** When the install is behind, the Updates page now lists the incoming commit messages (short SHA + subject, up to 10, "… and N more" beyond that) so you can see what an Apply would bring before pressing it.
+- **Release notes grouped by category.** The "What's new" preview on the Updates page now shows the changelog's category headings (LoRaWAN sniffing, Roles and access, …) between the bullets instead of one flat list.
 - **Update check works on dev checkouts.** Git commands for Check for updates only use sudo when the install tree is owned by another user (the Pi's root-owned `/opt/meshpoint`); a checkout owned by the current user runs plain git, so development instances no longer fail with "sudo: a terminal is required to read the password".
 
 ### v0.7.6 (June 2026)
