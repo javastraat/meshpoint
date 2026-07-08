@@ -38,6 +38,7 @@ First tagged release of the javastraat/meshpoint fork: LoRaWAN sniffing, multi-r
 - **Admin links stay in place for viewers.** Clicking an admin link inside the app (for example a Hardware-page "Edit …" link into Configuration) no longer navigates away: the viewer stays on the current page and a toast explains that admin access is required. Deep links and fresh loads to admin routes still get the "Admin access required" lock card with a back-to-dashboard link.
 - **Blocked sends show a toast.** A viewer using the Messages compose box gets a "Not sent: admin role required" toast instead of a failed message bubble left in the thread.
 - **Login page no longer prefills the username.** Both fields start empty on every visit.
+- **Role section lists match the real navigation.** The per-role section lists behind `/api/identity` now include the LoRaWAN, Meshtastic, MeshCore, and RTL-SDR listener sections for both roles, so future UI gating on those sections behaves correctly.
 
 #### Dashboard and UI
 
@@ -61,6 +62,7 @@ First tagged release of the javastraat/meshpoint fork: LoRaWAN sniffing, multi-r
 - **safe.directory migration.** `post_update.sh` registers `/opt/meshpoint` in the system git `safe.directory` on upgraded boxes (previously only fresh installs got it).
 - **Channel picker trimmed to this fork.** Release channels are now Stable (main) and Custom branch; upstream's RC and WisMesh entries (branches that do not exist on javastraat/meshpoint) are gone, and previously stored picker ids fall back to Stable.
 - **Fork update source.** Version checks and the apply chain point at `javastraat/meshpoint`; git dubious-ownership on the root-owned tree is handled both in-app and at install time.
+- **Update check works on dev checkouts.** Git commands for Check for updates only use sudo when the install tree is owned by another user (the Pi's root-owned `/opt/meshpoint`); a checkout owned by the current user runs plain git, so development instances no longer fail with "sudo: a terminal is required to read the password".
 
 ### v0.7.6 (June 2026)
 
