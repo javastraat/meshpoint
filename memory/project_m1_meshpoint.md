@@ -936,8 +936,14 @@ endpoints). NEW `src/cli/api_client.py` (CliApiClient: cookie jar session,
 degrade to {}. status_command: 401/403 → "running (admin login required for
 details — use 'meshpoint report')", stays non-interactive; explicit
 `import urllib.error` added. Rejected alternative: localhost auth bypass
-(would gut the viewer-role model). Changelog bullet (46). Compile-verified on
-Mac; interactive flow needs a Pi run of `meshpoint report` to confirm.
+(would gut the viewer-role model). Changelog bullet (46). LIVE-VERIFIED on Pi
+2026-07-08 16:03: report login flow + full render OK; status shows the new
+"running (admin login required)" line. Full CLI smoke test (read-only script:
+version/status/logs executed, all 9 --help parsed, all cli module imports) —
+ALL PASS. Report data also live-confirmed the N2 uncap (Total nodes 1449, was
+capped 500) AND the near-field ceiling (RSSI range max -21.0, was -4).
+setup/restart/stop/meshcore-radio/reset-password intentionally untested
+beyond parse+import (state-changing).
 
 ## OLD LIST (superseded, kept for the DONE details)
 
