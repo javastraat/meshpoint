@@ -20,6 +20,7 @@ const UPDATE_CHANNEL_ALIASES = {
     'rc-074': 'rc-075',
     'rc-075': 'rc-076',
     'rc-076': 'rc-077',
+    'rc-077': 'rc-078',
 };
 
 class UpdatePanelController {

@@ -73,21 +73,21 @@ class TestUpdateRoutes(unittest.TestCase):
             "src.api.routes.update_routes.build_install_status_payload",
             return_value={
                 "local_version": "0.7.3.1",
-                "install_branch": "feat/v0.7.7",
+                "install_branch": "feat/v0.7.8",
                 "install_sha_short": "ac6895a",
-                "active_channel_id": "rc-077",
-                "active_channel_label": "Release candidate (v0.7.7)",
+                "active_channel_id": "rc-078",
+                "active_channel_label": "Release candidate (v0.7.8)",
                 "channel_tier": "rc",
                 "remote_version": "0.7.3.1",
-                "remote_branch": "feat/v0.7.7",
+                "remote_branch": "feat/v0.7.8",
                 "update_available": False,
             },
         ):
             response = self.client.get("/api/update/install_status")
         self.assertEqual(response.status_code, 200)
         body = response.json()
-        self.assertEqual(body["active_channel_id"], "rc-077")
-        self.assertEqual(body["install_branch"], "feat/v0.7.7")
+        self.assertEqual(body["active_channel_id"], "rc-078")
+        self.assertEqual(body["install_branch"], "feat/v0.7.8")
 
     def test_check_for_updates_syncs_for_admin(self) -> None:
         self.client.cookies.set("meshpoint_session", self.admin_token)
@@ -95,9 +95,9 @@ class TestUpdateRoutes(unittest.TestCase):
             "src.api.routes.update_routes.build_install_status_payload",
             return_value={
                 "local_version": "0.7.3.1",
-                "install_branch": "feat/v0.7.7",
+                "install_branch": "feat/v0.7.8",
                 "install_sha_short": "ac6895a",
-                "compare_branch": "feat/v0.7.7",
+                "compare_branch": "feat/v0.7.8",
                 "commits_behind": 12,
                 "commits_ahead": 0,
                 "update_available": True,
@@ -106,7 +106,7 @@ class TestUpdateRoutes(unittest.TestCase):
         ) as build_mock:
             response = self.client.post(
                 "/api/update/check",
-                json={"channel_id": "rc-077"},
+                json={"channel_id": "rc-078"},
             )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["commits_behind"], 12)
@@ -213,10 +213,10 @@ class TestReleaseNotesRoute(unittest.TestCase):
 
     def test_rc_channel_without_076_header_has_no_stale_preview(self) -> None:
         self.client.cookies.set("meshpoint_session", self.admin_token)
-        response = self.client.get("/api/update/release_notes?channel_id=rc-077")
+        response = self.client.get("/api/update/release_notes?channel_id=rc-078")
         self.assertEqual(response.status_code, 200)
         body = response.json()
-        self.assertEqual(body["channel_id"], "rc-077")
+        self.assertEqual(body["channel_id"], "rc-078")
         self.assertEqual(body["channel_tier"], "rc")
         self.assertIsNone(body["preview_section"])
 
@@ -224,7 +224,7 @@ class TestReleaseNotesRoute(unittest.TestCase):
         self.client.cookies.set("meshpoint_session", self.admin_token)
         response = self.client.get("/api/update/release_notes?channel_id=rc-074")
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["channel_id"], "rc-077")
+        self.assertEqual(response.json()["channel_id"], "rc-078")
 
     def test_stable_channel_returns_first_released(self) -> None:
         self.client.cookies.set("meshpoint_session", self.admin_token)

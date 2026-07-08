@@ -2,9 +2,33 @@
 
 ### Unreleased
 
-- **Backup and restore.** Settings → System downloads a timestamped `.tar.gz` of `config/local.yaml` and the full `data/` directory (SQLite hot snapshot, PKI keys, rollback state). Restore uploads a prior backup, stashes the current state on the Pi, clears the live `data/` tree, and copies the archive so you return to the backup snapshot even after **Clear database** or other changes. Each restore runs in its own transient systemd unit so repeat restores work. Archive is not encrypted: store offline and keep it private. Disaster recovery: save the backup off the Pi; on a fresh install run `meshpoint setup` once before the dashboard loads, then restore from System. Do not delete the Meshradar API key in the backup until upstream reconnects. Docs: `TROUBLESHOOTING.md`, `CONFIGURATION.md`, `COMMON-ERRORS.md`.
-- **Mesh broadcast cadence UI.** Configuration → Radio adds a telemetry broadcast interval editor with live countdown. Configuration → GPS adds a position broadcast interval editor. Each is independent from NodeInfo: set `interval_minutes` to `0` to pause, or pick 5 min to 24 hr with hot-reload (no restart). Closes [#92](https://github.com/KMX415/meshpoint/issues/92).
 - **MQTT broker TLS.** Transport TLS (`mqtts`, CA bundle, cert validation) is not implemented on `mqtt_publisher.py` (plain TCP only). Until then use plain port 1883 or a LAN broker without TLS.
+
+### v0.7.7 (July 2026)
+
+Operator polish and disaster recovery on `main` (merge `feat/v0.7.7`). Edge-only, pure Python, no concentrator recompile. **Upgrade:** Settings → Updates → **Stable**, or the full SSH block in `docs/COMMON-ERRORS.md` (`git fetch`, `checkout main`, `pull`, `scripts/install.sh`, `restart`). Run `install.sh` on this release: new sudoers rules for backup restore. Witness-tested on RAK V2 (backup/restore UI and disaster-recovery path). Settings → Updates RC picker now points at **v0.7.8** on `feat/v0.7.8`.
+
+#### Backup and restore
+
+- **Settings → System backup and restore.** Download a timestamped `.tar.gz` of `config/local.yaml` and the full `data/` directory (SQLite hot snapshot, PKI keys, rollback state). Restore uploads a prior archive, stashes current state, clears the live `data/` tree, and copies the backup so you return to the snapshot even after **Clear database** or other changes. Each restore runs in its own transient systemd unit so repeat restores work. Archive is not encrypted: store offline and keep it private.
+- **Disaster recovery docs.** `TROUBLESHOOTING.md`, `CONFIGURATION.md`, and `COMMON-ERRORS.md` document the fresh-install path (`meshpoint setup` before the dashboard loads), off-Pi backup storage, SSH `restore_finish.sh` fallback, and upstream `HTTP 403` when a revoked API key is restored from backup.
+
+#### Mesh broadcast cadence
+
+- **Position and telemetry interval controls.** Configuration → Radio adds telemetry broadcast interval editor with live countdown. Configuration → GPS adds position broadcast interval editor. Each is independent from NodeInfo: set `interval_minutes` to `0` to pause, or pick 5 min to 24 hr with hot-reload (no restart). Closes [#92](https://github.com/KMX415/meshpoint/issues/92).
+
+#### Dashboard and operator tools
+
+- **RF Environment tab.** Spectral scan and noise-floor telemetry for concentrators with SX1261 spectral-scan support; clear unavailable state on RAK V2 and SenseCap M1.
+- **Packet detail modal.** Click a row in the live packet feed for full decode metadata without leaving the dashboard.
+- **Operator status strips.** KPI-style strips on Dashboard and RF tabs; MQTT broker health on Configuration → MQTT.
+- **Quick Deploy QR.** Configuration → Channels exports public channel parameters as a scannable QR for field provisioning.
+- **Prometheus `/metrics`.** Optional scrape endpoint with packet, node, relay, and system counters.
+- **Channel hash map refresh.** Rebuild Meshtastic channel hashes after dashboard channel save so MQTT topics and decoders stay aligned. Fixes [#89](https://github.com/KMX415/meshpoint/issues/89).
+
+#### Docs
+
+- **Home Assistant cookbook.** `docs/HOME-ASSISTANT-COOKBOOK.md` for MQTT discovery and sensor wiring.
 
 ### v0.7.6 (June 2026)
 
