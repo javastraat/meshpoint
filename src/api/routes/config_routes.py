@@ -153,11 +153,17 @@ async def get_config(claims: SessionClaims = Depends(require_auth)):
             "relay": {
                 "enabled": relay.enabled,
                 "max_relay_per_minute": relay.max_relay_per_minute,
+                "burst_size": relay.burst_size,
+                "min_relay_rssi": relay.min_relay_rssi,
+                "max_relay_rssi": relay.max_relay_rssi,
             },
         },
         "relay": {
             "enabled": relay.enabled,
             "max_relay_per_minute": relay.max_relay_per_minute,
+            "burst_size": relay.burst_size,
+            "min_relay_rssi": relay.min_relay_rssi,
+            "max_relay_rssi": relay.max_relay_rssi,
         },
         "nodeinfo": nodeinfo_routes.build_nodeinfo_status(tx.nodeinfo),
         "mqtt": mqtt_config_routes.build_mqtt_status(
