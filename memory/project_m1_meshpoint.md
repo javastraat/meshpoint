@@ -922,7 +922,7 @@ relay card, 8c8893c SNR+drawer). Tree clean apart from this memory file.
 | # | Prio | Effort | Task |
 |---|------|--------|------|
 | T1 | P3 | S | Blank RSSI/FREQ/SF on synthetic `nb:` rows in packet feed (rows only carry SNR) |
-| T2 | P3 | S | Filter implausible RSSI (>-20 dBm outliers, e.g. "Best RSSI -4 dBm") from Stats best/avg tiles |
+| T2 | DONE 2026-07-08 | S | ROOT CAUSE FOUND via read-only DB query on Pi: all 16 outliers (RSSI -4..-18) were REAL near-field readings — meshcore nodeinfo adverts from 2 desk nodes (3dbda079a456, b9c1b47f8ab6) during Jul 5-6 flashing sessions, not a decoder bug. FIX: `RSSI_NEAR_FIELD_CEILING_DBM = -20.0` in signal_analyzer.py filters rssi >= -20 from get_signal_summary + get_rssi_distribution (also kills 0.0 placeholders); stats_routes.py `_get_best_signal` SQL now `rssi < -20`. SNR untouched. Unit-tested with stubbed aiosqlite (Mac has no aiosqlite — stub `sys.modules['aiosqlite']` trick). Changelog bullet under Dashboard and UI (39 total) |
 | T3 | DONE 2026-07-08 | check | Drawer "Recent Packets" browser-verified on BOTH protocols (Meshtastic Kalmma HQ 15 rows + MeshCore ORDVRP2 6 rows, 12-hex id match confirmed). Caught+fixed: RSSI showed raw float (-94.39999389648438) — now toFixed(1) on RSSI+SNR matching drawer Signal style. Changelog: folded into the existing recent-packets bullet (no separate bullet — fix to an unreleased feature) |
 | T4 | P3 | M | Concentrator-channels card on Hardware page (ch0-ch4 LoRaWAN + ch8 Meshtastic plan; needs small new endpoint) |
 | T5 | P3 | M | Multiple Meshtastic USB sticks — list-field treatment for `serial` source |

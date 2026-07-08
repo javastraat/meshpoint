@@ -6,6 +6,11 @@ from src.storage.packet_repository import PacketRepository
 
 logger = logging.getLogger(__name__)
 
+# RSSI above this is a near-field reading (a node centimetres from the
+# antenna reads -4..-18 dBm) or a 0-dBm placeholder — not real reach.
+# Excluded from stats so one desk-test packet can't skew best/avg/buckets.
+RSSI_NEAR_FIELD_CEILING_DBM = -20.0
+
 
 class SignalAnalyzer:
     """Analyzes RSSI/SNR distributions and signal quality trends."""
@@ -19,7 +24,9 @@ class SignalAnalyzer:
         """Return RSSI values bucketed for histogram display."""
         packets = await self._packet_repo.get_recent(limit)
         values = [
-            p.signal.rssi for p in packets if p.signal is not None
+            p.signal.rssi for p in packets
+            if p.signal is not None
+            and p.signal.rssi < RSSI_NEAR_FIELD_CEILING_DBM
         ]
         if not values:
             return {"buckets": [], "counts": []}
@@ -70,7 +77,10 @@ class SignalAnalyzer:
 
     async def get_signal_summary(self) -> dict:
         packets = await self._packet_repo.get_recent(200)
-        rssi_vals = [p.signal.rssi for p in packets if p.signal]
+        rssi_vals = [
+            p.signal.rssi for p in packets
+            if p.signal and p.signal.rssi < RSSI_NEAR_FIELD_CEILING_DBM
+        ]
         snr_vals = [p.signal.snr for p in packets if p.signal]
 
         if not rssi_vals:

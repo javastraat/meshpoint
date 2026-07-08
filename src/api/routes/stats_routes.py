@@ -188,9 +188,11 @@ async def _get_hw_model_distribution() -> dict[str, int]:
 async def _get_best_signal() -> dict:
     if not _packet_repo:
         return {}
+    # rssi < -20: exclude near-field readings (a node centimetres from the
+    # antenna reads -4..-18 dBm) so "best" reflects actual reach.
     row = await _packet_repo._db.fetch_one(
         "SELECT MAX(rssi) as best_rssi, MAX(snr) as best_snr "
-        "FROM packets WHERE rssi IS NOT NULL AND rssi < 0"
+        "FROM packets WHERE rssi IS NOT NULL AND rssi < -20"
     )
     if not row:
         return {}
