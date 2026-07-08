@@ -156,33 +156,33 @@ class ConcentratorChannelPlan:
 
     @staticmethod
     def eu868_lorawan() -> ConcentratorChannelPlan:
-        """EU868 plan for simultaneous LoRaWAN + Meshtastic capture.
+        """EU868 plan: all 8 TTN LoRaWAN uplinks + Meshtastic on ch8.
 
-        RF0 at 868.3 MHz covers 5 EU868 LoRaWAN channels spanning its full
-        +/-400 kHz IF window (867.9 / 868.1 / 868.3 / 868.5 / 868.7 MHz,
-        125 kHz BW, SF7-SF12) -- the 3 mandatory uplinks plus 2 extra TTN
-        channels reachable from this center.
-        RF1 stays centered at 869.525 MHz purely to keep the ch8 service
-        channel at zero IF offset for the Meshtastic LongFast channel
-        (869.525 MHz, 250 kHz BW, SF11).
+        RF chain assignment uses the HAL rule:
+          rf_chain = 0 if freq_hz <= radio_0_freq + 500_000 else 1
+        With RF0=867.5 MHz the cutoff is 868.0 MHz, so:
+          ch0–ch4 (867.1–867.9 MHz) → RF0, IF –400 to +400 kHz
+          ch5–ch7 (868.1–868.5 MHz) → RF1, IF –800 to –400 kHz
+          ch8     (869.525 MHz)      → RF1, IF +625 kHz  (single-SF Meshtastic)
 
-        ch0-ch7 multi-SF share a single board-wide sync word (LoRaWAN 0x34,
-        set by lorawan_public=True at start; see sx1302_wrapper.py) -- there
-        is no per-channel override, so a multi-SF channel can never decode
-        Meshtastic (sync 0x2B) regardless of which frequency it's tuned to.
-        Only ch8 gets its own sync word via a direct register write, which
-        is why it's the sole Meshtastic capture path. That also means RF1's
-        multi-SF slots would be dead weight for both protocols -- nothing
-        LoRaWAN-relevant sits within +/-400 kHz of 869.525 MHz -- so they're
-        left disabled instead of pointed at 869.4625/869.5875 as before.
+        Channel map:
+          ch0  867.100 MHz  125 kHz  SF7–12  LoRaWAN  RF0  IF –400 000
+          ch1  867.300 MHz  125 kHz  SF7–12  LoRaWAN  RF0  IF –200 000
+          ch2  867.500 MHz  125 kHz  SF7–12  LoRaWAN  RF0  IF       0
+          ch3  867.700 MHz  125 kHz  SF7–12  LoRaWAN  RF0  IF +200 000
+          ch4  867.900 MHz  125 kHz  SF7–12  LoRaWAN  RF0  IF +400 000
+          ch5  868.100 MHz  125 kHz  SF7–12  LoRaWAN  RF1  IF –800 000
+          ch6  868.300 MHz  125 kHz  SF7–12  LoRaWAN  RF1  IF –600 000
+          ch7  868.500 MHz  125 kHz  SF7–12  LoRaWAN  RF1  IF –400 000
+          ch8  869.525 MHz  250 kHz  SF11    Meshtastic RF1 IF +625 000
 
         Sync word assignment (see sx1302_wrapper.py):
-          ch0-ch7 multi-SF: LoRaWAN 0x34  (set by lorawan_public=True at start)
+          ch0–ch7 multi-SF: LoRaWAN 0x34  (set by lorawan_public=True at start)
           ch8   service:    Meshtastic 0x2B (set via direct register writes)
         """
         plan = ConcentratorChannelPlan(
-            radio_0_freq_hz=868_300_000,
-            radio_1_freq_hz=869_525_000,
+            radio_0_freq_hz=867_500_000,
+            radio_1_freq_hz=868_900_000,
         )
         plan.single_sf_channel = ChannelConfig(
             frequency_hz=869_525_000,
@@ -190,17 +190,16 @@ class ConcentratorChannelPlan:
             spreading_factor=11,
         )
         plan.multi_sf_channels = [
-            # EU868 LoRaWAN uplinks on RF0 -- full +/-400 kHz IF window (125 kHz, SF7-SF12)
+            # ch0–ch4: RF0 (IF –400 to +400 kHz)
+            ChannelConfig(frequency_hz=867_100_000),
+            ChannelConfig(frequency_hz=867_300_000),
+            ChannelConfig(frequency_hz=867_500_000),
+            ChannelConfig(frequency_hz=867_700_000),
             ChannelConfig(frequency_hz=867_900_000),
+            # ch5–ch7: RF1 (IF –800 to –400 kHz)
             ChannelConfig(frequency_hz=868_100_000),
             ChannelConfig(frequency_hz=868_300_000),
             ChannelConfig(frequency_hz=868_500_000),
-            ChannelConfig(frequency_hz=868_700_000),
-            # Unused slots -- disabled (see docstring: RF1 multi-SF can't help
-            # either protocol without breaking the ch8 Meshtastic channel)
-            ChannelConfig(frequency_hz=869_525_000, enabled=False),
-            ChannelConfig(frequency_hz=869_525_000, enabled=False),
-            ChannelConfig(frequency_hz=869_525_000, enabled=False),
         ]
         return plan
 
