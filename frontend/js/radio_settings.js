@@ -77,8 +77,8 @@ class RadioSettings {
                     </div>
                     <div id="r-card-config"></div>
                     <div id="r-card-concentrator"></div>
-                    <div id="r-card-nodeinfo"></div>
                     <div id="r-card-companion"></div>
+                    <div id="r-card-nodeinfo"></div>
 
                     <div class="r-console-foot">
                         <span class="r-console-foot__hint">

@@ -114,16 +114,10 @@ class RadioConfigCard {
             const name = ch.name && ch.name.trim()
                 ? this._esc(ch.name)
                 : '<span class="ch-table__name--empty">(unnamed)</span>';
-            const enabledClass = ch.enabled
-                ? 'ch-table__pill ch-table__pill--on'
-                : 'ch-table__pill ch-table__pill--off';
             return `
-                <tr class="ch-table__row">
+                <tr class="ch-table__row ch-table__row--locked">
                     <td class="ch-table__idx">${ch.index}</td>
-                    <td class="ch-table__name">${name}</td>
-                    <td class="ch-table__psk">${this._maskPsk(ch.psk_b64)}</td>
-                    <td class="ch-table__hash">${ch.hash || '--'}</td>
-                    <td><span class="${enabledClass}">${ch.enabled ? 'On' : 'Off'}</span></td>
+                    <td>${name}${ch.enabled ? '' : ' <span class="ch-table__name--empty">(off)</span>'}</td>
                 </tr>
             `;
         }).join('');
@@ -133,31 +127,20 @@ class RadioConfigCard {
             <div class="readout-strip__label">
                 Channels · ${channels.length} configured · ${enabledCount} on
             </div>
-            <table class="ch-table ch-table--readout">
+            <table class="ch-table">
                 <thead>
                     <tr>
                         <th>#</th>
                         <th>Name</th>
-                        <th>PSK</th>
-                        <th>Hash</th>
-                        <th>State</th>
                     </tr>
                 </thead>
-                <tbody>${rows || '<tr><td colspan="5" class="ch-table__empty">No channels configured</td></tr>'}</tbody>
+                <tbody>${rows || '<tr><td colspan="2" class="ch-table__empty">No channels configured</td></tr>'}</tbody>
             </table>
             <a class="r-config-link" href="#/configuration/channels">
                 <span>Edit channels &amp; PSKs</span>
                 <span aria-hidden="true">→</span>
             </a>
         `;
-    }
-
-    _maskPsk(b64) {
-        if (!b64) return '<span class="ch-table__psk--empty">none</span>';
-        // Show length only; never reveal a stored key in an
-        // observational view. The Configuration screen handles reveal.
-        const len = b64.length;
-        return `<span class="ch-table__psk--masked">•••••• <span>${len} chars</span></span>`;
     }
 
     _esc(str) {

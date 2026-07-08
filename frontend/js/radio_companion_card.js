@@ -65,28 +65,28 @@ class RadioCompanionCard {
                     <span class="status-lamp__label">${name}</span>
                 </span>
             </div>
-            <div class="companion-grid">
-                <div class="r-readout">
-                    <span class="r-readout__label">Frequency</span>
-                    <span class="r-readout__value">
+            <div class="r-readout-grid r-readout-grid--two-col">
+                <div class="r-readout-row">
+                    <span class="r-readout-row__label">Frequency</span>
+                    <span class="r-readout-row__value r-readout-row__value--mono">
                         ${this._fmtFreq(radio.frequency_mhz)}
                     </span>
                 </div>
-                <div class="r-readout">
-                    <span class="r-readout__label">Bandwidth</span>
-                    <span class="r-readout__value">
+                <div class="r-readout-row">
+                    <span class="r-readout-row__label">Bandwidth</span>
+                    <span class="r-readout-row__value r-readout-row__value--mono">
                         ${this._fmtBw(radio.bandwidth_khz)}
                     </span>
                 </div>
-                <div class="r-readout">
-                    <span class="r-readout__label">SF</span>
-                    <span class="r-readout__value">
+                <div class="r-readout-row">
+                    <span class="r-readout-row__label">SF</span>
+                    <span class="r-readout-row__value r-readout-row__value--mono">
                         ${this._fmtSf(radio.spreading_factor)}
                     </span>
                 </div>
-                <div class="r-readout">
-                    <span class="r-readout__label">TX Power</span>
-                    <span class="r-readout__value">
+                <div class="r-readout-row">
+                    <span class="r-readout-row__label">TX power</span>
+                    <span class="r-readout-row__value r-readout-row__value--mono">
                         ${this._fmtTxPower(radio.tx_power)}
                     </span>
                 </div>
