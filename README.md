@@ -107,7 +107,7 @@ This is a customized fork of upstream [KMX415/meshpoint](https://github.com/KMX4
 
 **Radio configuration from the dashboard.** Change region, modem preset, frequency, TX power, and duty cycle without SSH. Add and remove channels with custom PSKs. Toggle TX enable/disable. All settings saved to `local.yaml` and survive restarts.
 
-**Node discovery.** Live node cards showing every node your Meshpoint has heard: name, ID, protocol, hardware model, signal strength, battery, and last seen. Click any node to open a detail drawer with signal history and direct message.
+**Node discovery.** Live node cards showing every node your Meshpoint has heard: name, ID, protocol, hardware model, signal strength, battery, and last seen. Click any node to open a detail drawer with metrics history, its most recent packets, and direct message.
 
 **Multi-companion MeshCore capture.** Up to 4 Heltec/T-Beam USB companions running MeshCore firmware can be attached simultaneously, each labeled by band. The dashboard shows a dynamic companion card per device. Companions are auto-detected on `/dev/ttyACM*`.
 
@@ -115,11 +115,13 @@ This is a customized fork of upstream [KMX415/meshpoint](https://github.com/KMX4
 
 **RTL-SDR broadcast & utility radio listener.** Plug in a cheap RTL-SDR dongle and listen to real radio from the browser — FM broadcast, airband (AM), marine VHF/UHF, PMR446, 2 m / 70 cm ham, and anything else in ~24–1766 MHz. Server-side `rtl_fm` demodulates (a **Mode** selector for WFM / NFM / AM / USB / LSB, plus squelch, gain, and pre-encoder level) and streams MP3 to a browser `<audio>` player, while the SX1302 keeps sniffing LoRa uninterrupted (separate hardware). Two selectable radio faces — a **Digital** VFD-style readout with a segmented VU meter, and an **Analogue** slide-rule tuner with a swinging-needle VU gauge — and a real-time Web Audio level meter that dances with the audio. **RDS** on FM (via [`redsea`](https://github.com/windytan/redsea)): station name, scrolling RadioText / now-playing, program type (PTY), and a block-error-rate signal-quality meter. A preset stations picker with category tabs, search, and ★ favorites (Amsterdam FM, PMR446, marine, Schiphol airband, ham). See [RTL-SDR Radio Listener](#optional-rtl-sdr-radio-listener) for setup.
 
+**Band spectrum view.** The concentrator module's onboard SX1261 sweeps the entire region band (EU868: 863–870 MHz in 100 kHz steps) every few minutes — without interrupting packet capture — and the Hardware page draws the result as a live spectrum chart with every LoRaWAN, Meshtastic, and MeshCore channel position overlaid. See interferers (RFID readers, alarms) sharing your band at a glance, next to a read-only table of the full 9-slot SX1302 channel plan.
+
 **Full packet decoding.** 14 Meshtastic portnums decoded: TEXT, POSITION, NODEINFO, TELEMETRY, ROUTING, ADMIN, WAYPOINT, DETECTION_SENSOR, PAXCOUNTER, STORE_FORWARD, RANGE_TEST, TRACEROUTE, NEIGHBORINFO, and MAP_REPORT. 6 MeshCore message types decoded. Device roles (CLIENT, ROUTER, REPEATER, TRACKER, SENSOR) extracted from NodeInfo.
 
 **Multi-channel decryption.** Configure private channel PSKs from the dashboard or `local.yaml`. The Meshpoint decodes traffic on those channels alongside the default key and routes messages to the correct conversation. Supports any number of channels with AES-128 or AES-256 keys.
 
-**6 frequency regions.** US, EU_868, ANZ, IN, KR, and SG_923. Select during setup or change from the Radio settings page. MeshCore companion radios configure to match automatically.
+**6 frequency regions.** US, EU_868, ANZ, IN, KR, and SG_923. Select during setup or change from Configuration → Radio. MeshCore companion radios configure to match automatically.
 
 **Real-time dashboard.** Live map with node positions, color-coded packet feed with frequency and spreading factor columns, traffic charts, signal analytics, node cards, and a dedicated LoRaWAN devices panel. Accessible from any device on your network.
 
@@ -332,7 +334,7 @@ sudo meshpoint reset-password  # recover forgotten admin password
 
 ## Local API
 
-FastAPI server on port 8080:
+FastAPI server on port 8080 (configurable via `dashboard.port` in `local.yaml`):
 
 | Endpoint | Description |
 |----------|-------------|
