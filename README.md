@@ -67,6 +67,19 @@ This is a customized fork of upstream [KMX415/meshpoint](https://github.com/KMX4
 - **Up to 4 MeshCore USB companions** plus a Meshtastic-433 serial source → 5 networks captured at once.
 - **MeshCore per-packet metadata** — frequency/SF read from the companion's radio config, hop count decoded from the MeshCore `path_len`, and each companion's packets labeled by source.
 
+**Hardware page & spectrum**
+- **Band spectrum card** — the SX1302's SX1261 companion sweeps the whole region band (100 kHz steps, EU868: 863–870 MHz) and draws a live spectrum chart with median + peak level and the LoRaWAN / Meshtastic / MeshCore channel positions overlaid; "Sweep now" button, hover readout, `GET /api/device/spectrum`. Requires `radio.sx1261_spi_path` (e.g. `/dev/spidev0.1`) in `local.yaml`; cadence via `radio.spectrum_sweep_interval_seconds`.
+- **Concentrator channels card** — read-only table of all 9 SX1302 slots (frequency, BW, SF, sync word, protocol, RF chain, state), derived from the same channel-plan code the radio runs.
+- **Unified protocol cards** — "Meshtastic Configuration" (radio settings + channel list in one card) and a matching MeshCore Companion layout.
+- **Node drawer recent packets** — every node shows its last 15 packets (time, type, RSSI/SNR).
+- **SNR distribution chart** on Stats next to the RSSI histogram; signal stats ignore implausible near-field readings (> −20 dBm).
+- **Relay tuning from the dashboard** — burst size and the min/max RSSI relay window are editable on Configuration → Transmit.
+
+**Roles, config & self-update**
+- **Viewer role locked down server-side** — all write endpoints require admin; channel PSKs/keys are redacted for viewers; admin-only links show a toast instead of navigating away.
+- **Web server port from config** — `dashboard.host`/`dashboard.port` in `local.yaml` via a launcher that falls back to `0.0.0.0:8080` if the config is broken or the port unbindable.
+- **Self-update against this fork** — version checks and the apply chain point at `javastraat/meshpoint`, sudoers/safe.directory repairs are self-installing, and update checks work on dev checkouts (sudo only when the repo is root-owned).
+
 **Contacts / neighbours tooling**
 - `import_contacts.py` imports a MeshCore contacts/neighbours list into the node DB, with clock-skew-immune timestamps (`now − secs_ago`) and freq/SF stamping.
 - `scripts/repair_neighbour_timestamps.py` + `scripts/backfill_meshcore_signal.py` fix bad past/future timestamps and backfill freq/SF on old rows.
@@ -343,6 +356,8 @@ FastAPI server on port 8080:
 | `POST /api/listener/tune` | Tune the RTL-SDR: frequency, mode, squelch, gain, level |
 | `POST /api/listener/stop` | Stop the RTL-SDR listener |
 | `GET /api/listener/stream` | Live MP3 audio stream for the browser player |
+| `GET /api/device/spectrum` | Latest band sweep from the SX1302 spectral scanner (median/peak per 100 kHz step) |
+| `POST /api/device/spectrum/sweep` | Trigger an on-demand band sweep (admin) |
 | `WS /ws` | Real-time packet + message stream |
 
 ---
