@@ -418,8 +418,8 @@ class MeshcoreConfigCard {
         if (btn) btn.style.display = this._focusedRow ? '' : 'none';
     }
 
-    // Device has 8 slots: 0 = Public (locked row), 1–7 = user channels.
-    _MC_MAX_USER_CHANNELS = 7;
+    // Device has 41 slots: 0 = Public (locked row), 1–40 = user channels.
+    _MC_MAX_USER_CHANNELS = 40;
 
     _updateAddBtn() {
         const btn = this._body.querySelector('[data-mc-add]');
@@ -431,7 +431,7 @@ class MeshcoreConfigCard {
         const atLimit = count >= this._MC_MAX_USER_CHANNELS;
         btn.disabled = atLimit;
         btn.title = atLimit
-            ? `Only ${this._MC_MAX_USER_CHANNELS} user channels (slots 1–7)`
+            ? `Only ${this._MC_MAX_USER_CHANNELS} user channels (slots 1–40)`
             : '';
     }
 

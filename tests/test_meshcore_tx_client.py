@@ -200,7 +200,7 @@ class TestSyncChannelSlots(unittest.IsolatedAsyncioTestCase):
         slots = [slot for slot, _, _ in self.set_calls]
         self.assertNotIn(0, slots)
 
-    async def test_excess_channels_truncated_to_seven(self):
+    async def test_excess_channels_truncated_to_max(self):
         keys = {f"ch{i}": "aa" * 16 for i in range(MESHCORE_MAX_USER_CHANNELS + 3)}
         await self._run_sync(keys)
         named_writes = [n for _, n, _ in self.set_calls if n]

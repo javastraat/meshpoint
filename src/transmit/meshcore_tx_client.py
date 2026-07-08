@@ -23,7 +23,7 @@ MAX_COMPANION_NAME_BYTES = 32
 # Companion channel slots: 0 = Public (firmware default). User-configured keys
 # use slots 1..N so they match Messages UI channel indices and RX channel_idx.
 MESHCORE_PUBLIC_SLOT_INDEX = 0
-MESHCORE_MAX_DEVICE_SLOTS = 8
+MESHCORE_MAX_DEVICE_SLOTS = 41
 MESHCORE_MAX_USER_CHANNELS = MESHCORE_MAX_DEVICE_SLOTS - 1
 
 
