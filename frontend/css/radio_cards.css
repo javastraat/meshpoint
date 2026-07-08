@@ -473,3 +473,96 @@
     .r-ident__row { flex-direction: column; align-items: stretch; gap: 0.25rem; }
     .r-ident__label { min-width: 0; }
 }
+
+/* ── Band Spectrum card ────────────────────────────────────── */
+.spectrum-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.spectrum-btn {
+    background: transparent;
+    border: 1px solid var(--border, #1e293b);
+    border-radius: var(--radius-sm, 4px);
+    color: var(--text-secondary, #94a3b8);
+    font-family: var(--font-mono, monospace);
+    font-size: 0.72rem;
+    padding: 3px 10px;
+    cursor: pointer;
+}
+
+.spectrum-btn:hover:not(:disabled) {
+    border-color: var(--accent-cyan, #06b6d4);
+    color: var(--accent-cyan, #06b6d4);
+}
+
+.spectrum-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.spectrum-btn--icon {
+    padding: 3px 8px;
+    font-size: 0.85rem;
+    line-height: 1;
+}
+
+.spectrum-body {
+    position: relative;
+}
+
+.spectrum-canvas {
+    display: block;
+    width: 100%;
+    height: 240px;
+}
+
+.spectrum-tooltip {
+    position: absolute;
+    pointer-events: none;
+    background: rgba(8, 15, 26, 0.92);
+    border: 1px solid var(--border, #1e293b);
+    border-radius: var(--radius-sm, 4px);
+    color: var(--text-primary, #e2e8f0);
+    font-family: var(--font-mono, monospace);
+    font-size: 0.72rem;
+    padding: 4px 8px;
+    white-space: nowrap;
+    z-index: 5;
+}
+
+.spectrum-empty {
+    padding: 40px 16px;
+    text-align: center;
+    color: var(--text-muted, #64748b);
+    font-size: 0.85rem;
+}
+
+.spectrum-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-top: 8px;
+    color: var(--text-muted, #64748b);
+    font-size: 0.72rem;
+}
+
+.spectrum-legend i {
+    display: inline-block;
+    width: 10px;
+    height: 3px;
+    border-radius: 2px;
+    margin-right: 5px;
+    vertical-align: middle;
+}
+
+.r-card:fullscreen {
+    padding: 28px;
+    overflow: auto;
+    background: #0b1220;
+}
+
+.r-card:fullscreen .spectrum-canvas {
+    height: calc(100vh - 220px);
+}

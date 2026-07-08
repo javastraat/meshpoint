@@ -115,6 +115,11 @@ class ConcentratorChannelPlan:
         """Return the default primary frequency in Hz for a region."""
         return _REGION_DEFAULTS_HZ.get(region)
 
+    @staticmethod
+    def band_limits_hz(region: str) -> tuple[int, int] | None:
+        """Return (min_hz, max_hz) of a region's band, or None."""
+        return _REGION_BAND_LIMITS_HZ.get(region or "")
+
     @classmethod
     def for_region(cls, region: str) -> ConcentratorChannelPlan:
         """Return the default channel plan for a region.

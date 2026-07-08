@@ -34,6 +34,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
+from datetime import datetime, timezone
 from typing import Optional, Protocol
 
 from src.api.telemetry.noise_floor import NoiseFloorTracker
@@ -44,6 +46,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_INTERVAL_SECONDS: float = 60.0
 DEFAULT_STARTUP_DELAY_SECONDS: float = 10.0
 DEFAULT_NB_SCAN: int = 1024
+DEFAULT_SWEEP_INTERVAL_SECONDS: float = 300.0
 
 
 class _SupportsSpectralScan(Protocol):
@@ -74,6 +77,8 @@ class SpectralScanService:
         interval_seconds: float = DEFAULT_INTERVAL_SECONDS,
         startup_delay_seconds: float = DEFAULT_STARTUP_DELAY_SECONDS,
         nb_scan: int = DEFAULT_NB_SCAN,
+        sweep_frequencies_hz: Optional[list[int]] = None,
+        sweep_interval_seconds: float = DEFAULT_SWEEP_INTERVAL_SECONDS,
     ) -> None:
         self._wrapper = wrapper
         self._tracker = tracker
@@ -82,6 +87,13 @@ class SpectralScanService:
         self._interval_seconds = max(5.0, interval_seconds)
         self._startup_delay_seconds = max(0.0, startup_delay_seconds)
         self._nb_scan = nb_scan
+        self._sweep_frequencies_hz = list(sweep_frequencies_hz or [])
+        # 0 = no automatic sweeps; on-demand request_sweep() still works.
+        self._sweep_interval_seconds = max(0.0, sweep_interval_seconds)
+        self._sweep_requested = asyncio.Event()
+        self._last_sweep_monotonic: Optional[float] = None
+        self._latest_sweep: Optional[dict] = None
+        self._sweeps_run = 0
         self._task: Optional[asyncio.Task] = None
         self._stopped = asyncio.Event()
         self._scans_run = 0
@@ -94,6 +106,23 @@ class SpectralScanService:
     @property
     def scans_failed(self) -> int:
         return self._scans_failed
+
+    @property
+    def sweep_supported(self) -> bool:
+        """True when a sweep frequency list is configured."""
+        return bool(self._sweep_frequencies_hz)
+
+    @property
+    def latest_sweep(self) -> Optional[dict]:
+        """Most recent band sweep, or None before the first one."""
+        return self._latest_sweep
+
+    def request_sweep(self) -> bool:
+        """Ask the loop to run a sweep on its next wake-up (~immediately)."""
+        if not self.sweep_supported or self._task is None:
+            return False
+        self._sweep_requested.set()
+        return True
 
     async def start(self) -> None:
         """Begin the periodic-scan loop.
@@ -139,9 +168,84 @@ class SpectralScanService:
             await asyncio.sleep(self._startup_delay_seconds)
             while not self._stopped.is_set():
                 await self._scan_once()
-                await asyncio.sleep(self._interval_seconds)
+                if self._sweep_due():
+                    await self._run_sweep()
+                await self._sleep_until_next()
         except asyncio.CancelledError:
             raise
+
+    async def _sleep_until_next(self) -> None:
+        """Sleep one noise-scan interval, waking early for sweep requests."""
+        try:
+            await asyncio.wait_for(
+                self._sweep_requested.wait(), timeout=self._interval_seconds,
+            )
+        except asyncio.TimeoutError:
+            pass
+
+    def _sweep_due(self) -> bool:
+        if not self.sweep_supported:
+            return False
+        if self._sweep_requested.is_set():
+            return True
+        if self._sweep_interval_seconds <= 0:
+            return False
+        if self._last_sweep_monotonic is None:
+            return True
+        elapsed = time.monotonic() - self._last_sweep_monotonic
+        return elapsed >= self._sweep_interval_seconds
+
+    async def _run_sweep(self) -> None:
+        """Scan every sweep frequency once and store the envelope.
+
+        Scans run sequentially through the same one-at-a-time HAL path
+        as the noise scan (~50 ms each), so a 71-point EU868 sweep takes
+        a few seconds and never overlaps another scan.
+        """
+        self._sweep_requested.clear()
+        started = time.monotonic()
+        points: list[dict] = []
+        for freq_hz in self._sweep_frequencies_hz:
+            if self._stopped.is_set():
+                return
+            try:
+                result = await asyncio.to_thread(
+                    self._wrapper.run_spectral_scan, freq_hz, self._nb_scan,
+                )
+            except Exception as exc:
+                logger.warning("Sweep scan at %d Hz threw: %s", freq_hz, exc)
+                result = None
+            if result is None:
+                continue
+            median = result.median_dbm
+            if median is None:
+                continue
+            points.append({
+                "frequency_mhz": round(freq_hz / 1e6, 4),
+                "floor_dbm": result.floor_dbm,
+                "median_dbm": median,
+                "p95_dbm": result.percentile(95.0),
+            })
+
+        self._last_sweep_monotonic = time.monotonic()
+        if not points:
+            logger.warning(
+                "Band sweep produced no points (%d frequencies tried)",
+                len(self._sweep_frequencies_hz),
+            )
+            return
+        self._sweeps_run += 1
+        self._latest_sweep = {
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "duration_seconds": round(time.monotonic() - started, 2),
+            "point_count": len(points),
+            "points": points,
+        }
+        logger.info(
+            "Band sweep #%d: %d points in %.1fs",
+            self._sweeps_run, len(points),
+            self._latest_sweep["duration_seconds"],
+        )
 
     async def _scan_once(self) -> None:
         try:

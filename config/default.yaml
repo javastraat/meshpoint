@@ -11,6 +11,10 @@ radio:
   sync_word: 0x2B
   preamble_length: 16
   tx_power_dbm: 22
+  # Full-band spectrum sweep for the Hardware page spectrum card
+  # (one ~50 ms scan per 100 kHz step; a few seconds per sweep).
+  # 0 disables automatic sweeps ("Sweep now" button still works).
+  spectrum_sweep_interval_seconds: 300
 
 meshtastic:
   default_key_b64: "AQ=="

@@ -54,6 +54,7 @@ from src.api.routes import (
     nodes,
     packets,
     public_radar_routes,
+    spectrum_routes,
     stats_routes,
     system_config_routes,
     system_metrics,
@@ -227,6 +228,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
         )
         if _spectral_scan_service is not None:
             await _spectral_scan_service.start()
+        spectrum_routes.init_routes(_spectral_scan_service)
 
         _init_routes(
             pipeline, config, identity, auth_subsystem, tx_service, message_repo
@@ -293,6 +295,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     app.include_router(stats_routes.router, dependencies=protected)
     app.include_router(lorawan_routes.router, dependencies=protected)
     app.include_router(listener_routes.router, dependencies=protected)
+    app.include_router(spectrum_routes.router, dependencies=protected)
     app.include_router(meshtastic_routes.router, dependencies=protected)
     app.include_router(meshcore_routes.router, dependencies=protected)
 
@@ -899,7 +902,22 @@ def _build_spectral_scan_service(
         frequency_hz=int(freq_mhz * 1_000_000),
         bandwidth_khz=config.radio.bandwidth_khz,
         interval_seconds=float(interval),
+        sweep_frequencies_hz=_sweep_frequencies_hz(config),
+        sweep_interval_seconds=float(
+            config.radio.spectrum_sweep_interval_seconds
+        ),
     )
+
+
+def _sweep_frequencies_hz(config: AppConfig, step_hz: int = 100_000) -> list[int]:
+    """Frequency steps covering the region band for the spectrum sweep."""
+    from src.hal.concentrator_config import ConcentratorChannelPlan
+
+    band = ConcentratorChannelPlan.band_limits_hz(config.radio.region)
+    if band is None:
+        return []
+    start_hz, end_hz = band
+    return list(range(start_hz, end_hz + 1, step_hz))
 
 
 def _get_channel_plan(config: AppConfig):

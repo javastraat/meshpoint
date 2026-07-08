@@ -55,6 +55,11 @@ class RadioConfig:
     # (~50 ms). Default 60 s gives ~0.08% downtime; raise for less.
     # Set to 0 to disable (falls back to packet-derived noise floor).
     spectral_scan_interval_seconds: float = 60.0
+    # Periodic full-band sweep for the Hardware page spectrum card
+    # (one spectral scan per 100 kHz step across the region band,
+    # a few seconds per sweep). 0 disables automatic sweeps; the
+    # dashboard "Sweep now" button still works.
+    spectrum_sweep_interval_seconds: float = 300.0
     # SPI device for the SX1261 companion radio used by spectral
     # scan. Empty string disables the SX1261 init step entirely
     # (default; spectral scan stays unavailable, packet-derived
