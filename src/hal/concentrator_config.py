@@ -156,33 +156,34 @@ class ConcentratorChannelPlan:
 
     @staticmethod
     def eu868_lorawan() -> ConcentratorChannelPlan:
-        """EU868 plan: all 8 TTN LoRaWAN uplinks + Meshtastic on ch8.
+        """EU868 plan: 5 TTN LoRaWAN uplinks on RF0 + Meshtastic on ch8.
 
-        RF chain assignment uses the HAL rule:
-          rf_chain = 0 if freq_hz <= radio_0_freq + 500_000 else 1
-        With RF0=867.5 MHz the cutoff is 868.0 MHz, so:
-          ch0–ch4 (867.1–867.9 MHz) → RF0, IF –400 to +400 kHz
-          ch5–ch7 (868.1–868.5 MHz) → RF1, IF –800 to –400 kHz
-          ch8     (869.525 MHz)      → RF1, IF +625 kHz  (single-SF Meshtastic)
+        The SX1302 IF engine limits multi-SF channels to ±490 kHz from their
+        radio anchor.  The Meshtastic LongFast channel (869.525 MHz) sits
+        1.025–1.625 MHz above the LoRaWAN uplink band, so it is physically
+        impossible to cover it and the LoRaWAN channels from the same anchor.
+        RF1 is therefore dedicated to Meshtastic at zero IF offset; RF0 at
+        868.3 MHz covers 5 TTN channels within ±400 kHz:
 
         Channel map:
-          ch0  867.100 MHz  125 kHz  SF7–12  LoRaWAN  RF0  IF –400 000
-          ch1  867.300 MHz  125 kHz  SF7–12  LoRaWAN  RF0  IF –200 000
-          ch2  867.500 MHz  125 kHz  SF7–12  LoRaWAN  RF0  IF       0
-          ch3  867.700 MHz  125 kHz  SF7–12  LoRaWAN  RF0  IF +200 000
-          ch4  867.900 MHz  125 kHz  SF7–12  LoRaWAN  RF0  IF +400 000
-          ch5  868.100 MHz  125 kHz  SF7–12  LoRaWAN  RF1  IF –800 000
-          ch6  868.300 MHz  125 kHz  SF7–12  LoRaWAN  RF1  IF –600 000
-          ch7  868.500 MHz  125 kHz  SF7–12  LoRaWAN  RF1  IF –400 000
-          ch8  869.525 MHz  250 kHz  SF11    Meshtastic RF1 IF +625 000
+          ch0  867.900 MHz  125 kHz  SF7–12  LoRaWAN  RF0  IF –400 000
+          ch1  868.100 MHz  125 kHz  SF7–12  LoRaWAN  RF0  IF –200 000
+          ch2  868.300 MHz  125 kHz  SF7–12  LoRaWAN  RF0  IF       0
+          ch3  868.500 MHz  125 kHz  SF7–12  LoRaWAN  RF0  IF +200 000
+          ch4  868.700 MHz  125 kHz  SF7–12  LoRaWAN  RF0  IF +400 000
+          ch5–ch7  (disabled — RF1 multi-SF can't reach anything useful)
+          ch8  869.525 MHz  250 kHz  SF11    Meshtastic RF1 IF       0
+
+        TTN channels covered: 868.1, 868.3, 868.5 (3 mandatory) + 867.9, 868.7.
+        TTN channels out of reach: 867.1, 867.3, 867.5, 867.7 (too far from RF0).
 
         Sync word assignment (see sx1302_wrapper.py):
           ch0–ch7 multi-SF: LoRaWAN 0x34  (set by lorawan_public=True at start)
           ch8   service:    Meshtastic 0x2B (set via direct register writes)
         """
         plan = ConcentratorChannelPlan(
-            radio_0_freq_hz=867_500_000,
-            radio_1_freq_hz=868_900_000,
+            radio_0_freq_hz=868_300_000,
+            radio_1_freq_hz=869_525_000,
         )
         plan.single_sf_channel = ChannelConfig(
             frequency_hz=869_525_000,
@@ -190,16 +191,16 @@ class ConcentratorChannelPlan:
             spreading_factor=11,
         )
         plan.multi_sf_channels = [
-            # ch0–ch4: RF0 (IF –400 to +400 kHz)
-            ChannelConfig(frequency_hz=867_100_000),
-            ChannelConfig(frequency_hz=867_300_000),
-            ChannelConfig(frequency_hz=867_500_000),
-            ChannelConfig(frequency_hz=867_700_000),
+            # ch0–ch4: RF0 within ±400 kHz (3 mandatory TTN + 867.9 + 868.7)
             ChannelConfig(frequency_hz=867_900_000),
-            # ch5–ch7: RF1 (IF –800 to –400 kHz)
             ChannelConfig(frequency_hz=868_100_000),
             ChannelConfig(frequency_hz=868_300_000),
             ChannelConfig(frequency_hz=868_500_000),
+            ChannelConfig(frequency_hz=868_700_000),
+            # ch5–ch7: disabled — nothing LoRaWAN-useful within ±490 kHz of RF1
+            ChannelConfig(frequency_hz=869_525_000, enabled=False),
+            ChannelConfig(frequency_hz=869_525_000, enabled=False),
+            ChannelConfig(frequency_hz=869_525_000, enabled=False),
         ]
         return plan
 
