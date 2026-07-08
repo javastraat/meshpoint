@@ -407,8 +407,8 @@ class NodeDrawer {
             const type = (p.packet_type || 'unknown').replace(/_/g, ' ');
             const parts = [type];
             const sig = p.signal || {};
-            if (sig.rssi != null) parts.push(`${sig.rssi} dBm`);
-            if (sig.snr != null) parts.push(`${sig.snr} dB`);
+            if (sig.rssi != null) parts.push(`${Number(sig.rssi).toFixed(1)} dBm`);
+            if (sig.snr != null) parts.push(`${Number(sig.snr).toFixed(1)} dB`);
             return [this._formatDate(p.timestamp), parts.join(' · ')];
         });
         return this._buildSection('Recent Packets', rows, false);

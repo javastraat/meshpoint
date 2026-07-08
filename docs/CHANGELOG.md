@@ -47,7 +47,7 @@ First tagged release of the javastraat/meshpoint fork: LoRaWAN sniffing, multi-r
 - **Inline modals instead of browser popups.** Confirmation dialogs in the update panel, channel and MeshCore configuration cards, sign-out-all, viewer-role form, and dangerous actions now use the dashboard's own modal styling instead of native `confirm()` popups.
 - **Dates on packet feeds.** LoRaWAN, Meshtastic, and MeshCore panels show a date for packets from previous days ("Jul 5, 16:19"); today's packets keep the compact time-only form.
 - **SNR distribution chart on Stats.** The Signal Intelligence section pairs the RSSI histogram with an SNR histogram (2 dB buckets over the last 500 packets), so noise-margin health is visible at a glance.
-- **Recent packets in the node drawer.** Opening a node now shows its last 15 packets (time, type, RSSI/SNR) in a collapsible section, next to the existing metrics history.
+- **Recent packets in the node drawer.** Opening a node now shows its last 15 packets (time, type, RSSI/SNR to one decimal) in a collapsible section, next to the existing metrics history; works for Meshtastic and MeshCore nodes alike.
 - **Relay burst and RSSI filters editable in Configuration → Transmit.** Burst size and the min/max RSSI relay window (only packets heard inside the window are rebroadcast) can now be set from the dashboard; previously these existed in `local.yaml` and the relay API but had no UI.
 - **Total Packets tile shows 24h / total.** The dashboard stat card now reads like the Nodes Discovered tile ("339 / 935"), pairing the last 24 hours with the all-time count.
 - **Theme toggle in the topbar.** Cycles the three dark themes (default, high-contrast, sunlight) with per-theme icon, in sync with the command palette.

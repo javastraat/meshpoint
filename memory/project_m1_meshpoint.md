@@ -923,7 +923,7 @@ relay card, 8c8893c SNR+drawer). Tree clean apart from this memory file.
 |---|------|--------|------|
 | T1 | P3 | S | Blank RSSI/FREQ/SF on synthetic `nb:` rows in packet feed (rows only carry SNR) |
 | T2 | P3 | S | Filter implausible RSSI (>-20 dBm outliers, e.g. "Best RSSI -4 dBm") from Stats best/avg tiles |
-| T3 | P3 | check | Browser-verify node drawer "Recent Packets" section (only unverified piece of #5) |
+| T3 | DONE 2026-07-08 | check | Drawer "Recent Packets" browser-verified on BOTH protocols (Meshtastic Kalmma HQ 15 rows + MeshCore ORDVRP2 6 rows, 12-hex id match confirmed). Caught+fixed: RSSI showed raw float (-94.39999389648438) — now toFixed(1) on RSSI+SNR matching drawer Signal style. Changelog: folded into the existing recent-packets bullet (no separate bullet — fix to an unreleased feature) |
 | T4 | P3 | M | Concentrator-channels card on Hardware page (ch0-ch4 LoRaWAN + ch8 Meshtastic plan; needs small new endpoint) |
 | T5 | P3 | M | Multiple Meshtastic USB sticks — list-field treatment for `serial` source |
 | T6 | P3 | L | Spectrum view from running spectral scans (histogram endpoint + canvas) |
