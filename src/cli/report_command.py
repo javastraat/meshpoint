@@ -33,6 +33,8 @@ class ReportData:
     node_summary: dict = field(default_factory=dict)
     packet_count: dict = field(default_factory=dict)
     config: dict = field(default_factory=dict)
+    lorawan_stats: dict = field(default_factory=dict)
+    spectrum: dict = field(default_factory=dict)
 
 
 def run_report() -> None:
@@ -82,6 +84,8 @@ def _fetch_all() -> ReportData | None:
     data.node_summary = _get(client, "/api/nodes/summary")
     data.packet_count = _get(client, "/api/packets/count")
     data.config = _get(client, "/api/config")
+    data.lorawan_stats = _get(client, "/api/lorawan/stats")
+    data.spectrum = _get(client, "/api/device/spectrum")
 
     return data
 
@@ -93,6 +97,8 @@ def _render_report(d: ReportData) -> None:
     _print_traffic_section(d)
     _print_signal_section(d)
     _print_network_section(d)
+    _print_protocols_section(d)
+    _print_sources_section(d)
     _print_relay_section(d)
     _print_radio_section(d)
     _print_health_summary(d)
@@ -231,41 +237,137 @@ def _print_relay_section(d: ReportData) -> None:
     _sep()
 
 
+def _print_protocols_section(d: ReportData) -> None:
+    """One line per captured network: packets, nodes/devices, radio."""
+    cfg = d.config
+    proto_pkts = d.traffic.get("protocol_distribution", {})
+    proto_nodes = d.node_summary.get("protocols", {})
+    if not cfg and not proto_pkts:
+        return
+
+    _section("PROTOCOLS")
+
+    lw_devices = d.lorawan_stats.get("unique_devices")
+    lw_chans = [
+        ch for ch in (cfg.get("concentrator", {}).get("channels") or [])
+        if ch.get("enabled") and ch.get("protocol") == "lorawan"
+    ]
+    lw_parts = [f"{proto_pkts.get('lorawan', 0):,} pkts"]
+    if lw_devices is not None:
+        lw_parts.append(f"{lw_devices} devices")
+    if lw_chans:
+        freqs = [c["frequency_mhz"] for c in lw_chans]
+        lw_parts.append(
+            f"{min(freqs):.1f}-{max(freqs):.1f} MHz x{len(lw_chans)} ch"
+        )
+    lw_parts.append("sniff-only")
+    _kv("LoRaWAN", " · ".join(lw_parts))
+
+    radio = cfg.get("radio", {})
+    tx_on = cfg.get("transmit", {}).get("enabled", False)
+    mt_parts = [
+        f"{proto_pkts.get('meshtastic', 0):,} pkts",
+        f"{proto_nodes.get('meshtastic', 0):,} nodes",
+    ]
+    if radio.get("frequency_mhz"):
+        mt_parts.append(
+            f"{radio['frequency_mhz']} MHz SF{radio.get('spreading_factor', '?')}"
+        )
+    mt_parts.append("TX on" if tx_on else "TX off")
+    _kv("Meshtastic", " · ".join(mt_parts))
+
+    mc_radio = (cfg.get("meshcore") or {}).get("radio") or {}
+    mc_parts = [
+        f"{proto_pkts.get('meshcore', 0):,} pkts",
+        f"{proto_nodes.get('meshcore', 0):,} nodes",
+    ]
+    if mc_radio.get("frequency_mhz"):
+        mc_parts.append(
+            f"{mc_radio['frequency_mhz']} MHz SF{mc_radio.get('spreading_factor', '?')}"
+        )
+    mc_parts.append("via companion")
+    _kv("MeshCore", " · ".join(mc_parts))
+
+    _sep()
+
+
+def _print_sources_section(d: ReportData) -> None:
+    """Capture hardware: concentrator plan, companions, last band sweep."""
+    cfg = d.config
+    if not cfg:
+        return
+
+    _section("CAPTURE SOURCES")
+
+    conc = cfg.get("concentrator", {})
+    channels = conc.get("channels") or []
+    if conc.get("active") and channels:
+        on = [c for c in channels if c.get("enabled")]
+        lw = sum(1 for c in on if c.get("protocol") == "lorawan")
+        mt = sum(1 for c in on if c.get("protocol") == "meshtastic")
+        _kv(
+            "Concentrator",
+            f"SX1302 · {len(on)}/{len(channels)} channels on "
+            f"({lw}x LoRaWAN + {mt}x Meshtastic)",
+        )
+
+    mc = cfg.get("meshcore", {})
+    capture = cfg.get("capture", {})
+    companions = capture.get("meshcore_usb") or []
+    for comp in companions:
+        port = comp.get("serial_port") or "auto"
+        label = comp.get("label") or ""
+        name = f"meshcore_usb{f'_{label}' if label else ''}"
+        state = (
+            f"{_GREEN}connected{_RESET}" if mc.get("connected") else f"{_DIM}--{_RESET}"
+        )
+        detail = mc.get("companion_name") or ""
+        _kv(name, " · ".join(x for x in (port, state, detail) if x))
+    if not companions and mc:
+        state = "connected" if mc.get("connected") else "disconnected"
+        _kv("meshcore_usb", state)
+
+    sweep = (d.spectrum or {}).get("sweep") or {}
+    if sweep.get("generated_at"):
+        when = sweep["generated_at"][11:19]  # HH:MM:SS from ISO timestamp (UTC)
+        _kv(
+            "Band sweep",
+            f"last {when} UTC · {sweep.get('point_count', '?')} pts "
+            f"in {sweep.get('duration_seconds', '?')}s",
+        )
+
+    _sep()
+
+
 def _print_radio_section(d: ReportData) -> None:
     cfg = d.config
     if not cfg:
         return
 
-    _section("RADIO CONFIG")
+    _section("MESHTASTIC TX")
     radio = cfg.get("radio", {})
     if radio:
         _kv("Region", radio.get("region", "--"))
-        _kv("Frequency", f"{radio.get('frequency_mhz', '--')} MHz")
-        _kv("Preset", radio.get("current_preset", "--"))
-        _kv("SF/BW/CR", (
-            f"SF{radio.get('spreading_factor', '--')} / "
-            f"BW{radio.get('bandwidth_khz', '--')} / "
-            f"CR{radio.get('coding_rate', '--')}"
-        ))
+        _kv(
+            "Preset",
+            f"{radio.get('current_preset', '--')} · "
+            f"CR{radio.get('coding_rate', '--')} · "
+            f"BW{radio.get('bandwidth_khz', '--')}",
+        )
 
     tx = cfg.get("transmit", {})
     if tx:
         tx_enabled = tx.get("enabled", False)
         _kv("TX", f"{_GREEN}enabled{_RESET}" if tx_enabled else f"{_DIM}disabled{_RESET}")
         _kv("TX power", f"{tx.get('tx_power_dbm', '--')} dBm")
+        if tx.get("hop_limit") is not None:
+            _kv("Hop limit", str(tx.get("hop_limit")))
 
     duty = cfg.get("duty_cycle", {})
     if duty:
         usage = duty.get("current_usage_percent", 0)
         budget = duty.get("remaining_budget_ms", 0)
         _kv("Duty cycle", f"{usage:.1f}%", f"({budget:.0f} ms remaining)")
-
-    mc = cfg.get("meshcore", {})
-    if mc:
-        mc_connected = mc.get("connected", False)
-        mc_label = "connected" if mc_connected else "disconnected"
-        color = _GREEN if mc_connected else _DIM
-        _kv("MeshCore", f"{color}{mc_label}{_RESET}")
 
     _sep()
 

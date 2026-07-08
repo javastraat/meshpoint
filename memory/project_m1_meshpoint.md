@@ -957,6 +957,21 @@ graceful False → interactive fallback when secret unreadable/absent.
 Pi-verify: `sudo meshpoint report` (no prompt) AND plain `meshpoint report`
 as pi (prompt appears — local.yaml is meshpoint-owned; if it turns out
 world-readable, plain also skips, which is equivalent-security).
+LIVE RESULT: plain `pi` run skipped the prompt → local.yaml IS pi-readable
+(user theorized "because sudo ran before" — corrected: CLI stores NOTHING
+between runs, token is per-invocation in-memory; `chmod 640 local.yaml`
+restores the prompt for non-root if ever wanted).
+REPORT ENRICHMENT (same session, user asked for more info): new PROTOCOLS
+section (LoRaWAN pkts+unique devices from /api/lorawan/stats + 867.9-868.7
+x5ch from config.concentrator; Meshtastic pkts/nodes/freq/SF/TX; MeshCore
+pkts/nodes/freq/SF via companion) + CAPTURE SOURCES section (SX1302 n/9
+channels on, companions from capture.meshcore_usb [key is meshcore_usb NOT
+meshcore_companions] with port+connected+name, last band sweep from
+/api/device/spectrum). RADIO CONFIG renamed MESHTASTIC TX, slimmed (region/
+preset/CR/BW + TX/power/hop/duty; freq+SF moved to PROTOCOLS, meshcore line
+moved to SOURCES). Noise floor line SKIPPED — no REST endpoint exists (WS
+emitter only); candidate tiny future task if wanted. Render path fully
+Mac-tested with fake ReportData (pure functions — nice testability trick).
 
 ## SESSION BOOTSTRAP — check this every time you read this file
 
