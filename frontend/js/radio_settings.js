@@ -75,8 +75,8 @@ class RadioSettings {
                         <div id="r-card-status"></div>
                         <div id="r-card-identity"></div>
                     </div>
-                    <div id="r-card-config"></div>
                     <div id="r-card-concentrator"></div>
+                    <div id="r-card-config"></div>
                     <div id="r-card-companion"></div>
                     <div id="r-card-nodeinfo"></div>
 
