@@ -849,6 +849,18 @@ Fix — YAML is now the single source of truth:
   when it differs.
 - To change the port: set `dashboard: port:` in local.yaml, restart service.
   Verified on Mac: `_bind_address()` returns `('0.0.0.0', 8080)` from YAML.
+- **Bind-failure fallback** (added same day): `_can_bind()` pre-probes the
+  configured address (SO_REUSEADDR, matching uvicorn, so TIME_WAIT after a
+  restart isn't a false conflict); unbindable (port taken / privileged port
+  as non-root on Linux / bad host) → loud log + fall back to 0.0.0.0:8080.
+  Skipped when config already equals the fallback (let uvicorn error
+  normally). NOTE: macOS lets non-root bind <1024, Linux doesn't — probe
+  reflects each OS's real rules. Verified: occupied port + bad host → False.
+- **Web editor for the port: DECIDED NOT TO BUILD** (2026-07-08, user call —
+  low value, port changes are ~once ever, YAML+restart suffices). If ever
+  revisited: Settings card (not Configuration), port-only (never host),
+  `PUT /api/config/dashboard` via `save_section_to_yaml`, reject <1024,
+  countdown-redirect UX to the new port. Don't re-propose unprompted.
 - Changelog bullet added under **v0.7.7 → "Dashboard and UI"** (33 bullets now).
   CONVENTION (user-confirmed): ALL ongoing work goes into the v0.7.7 section,
   NOT "Unreleased" — stable tracks main, version.py stays 0.7.7, and the
