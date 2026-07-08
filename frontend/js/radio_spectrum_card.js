@@ -6,9 +6,8 @@
  * median level (filled line) and p95 "peak activity" (thin line)
  * per 100 kHz step, with the concentrator/MeshCore channel positions
  * overlaid as dashed markers. Admin "Sweep now" triggers
- * ``POST /api/device/spectrum/sweep``; the ⛶ button toggles browser
- * fullscreen on the card for small screens. Card hides itself when
- * the box has no spectral-scan support (no SX1261 path).
+ * ``POST /api/device/spectrum/sweep``. Card hides itself when the
+ * box has no spectral-scan support (no SX1261 path).
  */
 class RadioSpectrumCard {
     static MEDIAN_COLOR = '#06b6d4';
@@ -37,11 +36,8 @@ class RadioSpectrumCard {
             <div class="r-card__header">
                 <h3 class="r-card__title">Band Spectrum</h3>
                 <span class="spectrum-actions">
-                    <span class="r-card__subtitle" data-sp-subtitle>--</span>
                     <button class="spectrum-btn" type="button" data-sp-sweep
                             title="Run a sweep now">Sweep now</button>
-                    <button class="spectrum-btn spectrum-btn--icon" type="button"
-                            data-sp-fullscreen title="Toggle fullscreen">⛶</button>
                 </span>
             </div>
             <div class="spectrum-body" data-sp-body>
@@ -65,9 +61,6 @@ class RadioSpectrumCard {
 
         rootEl.querySelector('[data-sp-sweep]')
             .addEventListener('click', () => this._sweepNow());
-        rootEl.querySelector('[data-sp-fullscreen]')
-            .addEventListener('click', () => this._toggleFullscreen());
-        document.addEventListener('fullscreenchange', this._redraw);
         window.addEventListener('resize', this._redraw);
         this._canvas.addEventListener('mousemove', (e) => this._onHover(e));
         this._canvas.addEventListener('mouseleave', () => {
@@ -152,32 +145,21 @@ class RadioSpectrumCard {
         }, 2000);
     }
 
-    _toggleFullscreen() {
-        if (document.fullscreenElement === this._root) {
-            document.exitFullscreen();
-        } else if (this._root.requestFullscreen) {
-            this._root.requestFullscreen();
-        }
-    }
-
     // ── drawing ──────────────────────────────────────────────────
 
     _draw() {
         const canvas = this._canvas;
         if (!canvas || this._root.style.display === 'none') return;
         const empty = this._root.querySelector('[data-sp-empty]');
-        const subtitle = this._root.querySelector('[data-sp-subtitle]');
         const points = (this._sweep && this._sweep.points) || [];
 
         if (!points.length) {
             empty.hidden = false;
             canvas.style.visibility = 'hidden';
-            subtitle.textContent = 'no sweep yet';
             return;
         }
         empty.hidden = true;
         canvas.style.visibility = '';
-        subtitle.textContent = this._subtitleFor(this._sweep);
 
         const dpr = window.devicePixelRatio || 1;
         const cssW = canvas.clientWidth || canvas.parentElement.clientWidth;
@@ -269,15 +251,6 @@ class RadioSpectrumCard {
         ctx.closePath();
         ctx.fillStyle = 'rgba(6, 182, 212, 0.12)';
         ctx.fill();
-    }
-
-    _subtitleFor(sweep) {
-        const when = new Date(sweep.generated_at);
-        const time = when.toLocaleTimeString([], {
-            hour: '2-digit', minute: '2-digit', second: '2-digit',
-            hour12: false,
-        });
-        return `${sweep.point_count} pts · ${sweep.duration_seconds}s · ${time}`;
     }
 
     _onHover(event) {

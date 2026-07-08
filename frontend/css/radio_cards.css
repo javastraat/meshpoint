@@ -502,12 +502,6 @@
     cursor: default;
 }
 
-.spectrum-btn--icon {
-    padding: 3px 8px;
-    font-size: 0.85rem;
-    line-height: 1;
-}
-
 .spectrum-body {
     position: relative;
 }
@@ -555,14 +549,4 @@
     border-radius: 2px;
     margin-right: 5px;
     vertical-align: middle;
-}
-
-.r-card:fullscreen {
-    padding: 28px;
-    overflow: auto;
-    background: #0b1220;
-}
-
-.r-card:fullscreen .spectrum-canvas {
-    height: calc(100vh - 220px);
 }

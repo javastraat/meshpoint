@@ -89,11 +89,14 @@ class SpectralScanResult:
             return None
         target = total * (p / 100.0)
         cumulative = 0
-        for level, count in zip(self.levels_dbm, self.counts):
+        # Sort by level: some HAL builds return the histogram with
+        # levels descending, which would otherwise flip the percentile
+        # walk (observed as p95 < median on the M1's build).
+        for level, count in sorted(zip(self.levels_dbm, self.counts)):
             cumulative += count
             if cumulative >= target:
                 return float(level)
-        return float(self.levels_dbm[-1])
+        return float(max(self.levels_dbm))
 
     @property
     def median_dbm(self) -> Optional[float]:
