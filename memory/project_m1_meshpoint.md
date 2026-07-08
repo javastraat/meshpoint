@@ -972,6 +972,18 @@ preset/CR/BW + TX/power/hop/duty; freq+SF moved to PROTOCOLS, meshcore line
 moved to SOURCES). Noise floor line SKIPPED — no REST endpoint exists (WS
 emitter only); candidate tiny future task if wanted. Render path fully
 Mac-tested with fake ReportData (pure functions — nice testability trick).
+LIVE-VERIFIED on Pi 2026-07-08 ~16:50: all three sections render with real
+data (23 LoRaWAN devices, companions by name, sweep timestamp correct UTC).
+FOLLOW-UP (user: "meshtastic has a TX section, meshcore doesn't"): new
+MESHCORE section after MESHTASTIC TX — companion state+name, radio
+freq/BW/SF from cfg.meshcore.radio, TX power, channel list ("5: Public,
+TechInc, ..." — Public prepended, names from mc.channel_keys). Mac
+render-tested. ALSO answered why MeshCore nodes lack per-node device stats:
+protocol asymmetry — MeshCore adverts carry identity only (no broadcast
+battery/telemetry like Meshtastic); metrics are request/response and mostly
+encrypted. Our meshcore _decode_telemetry is a raw-hex stub too. Candidate
+wishlist W7: active repeater status polling via companion (like the phone
+app does) → would give MeshCore nodes drawer metrics; not yet added/sized.
 
 ## SESSION BOOTSTRAP — check this every time you read this file
 

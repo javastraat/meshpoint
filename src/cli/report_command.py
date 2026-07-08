@@ -101,6 +101,7 @@ def _render_report(d: ReportData) -> None:
     _print_sources_section(d)
     _print_relay_section(d)
     _print_radio_section(d)
+    _print_meshcore_section(d)
     _print_health_summary(d)
     print()
 
@@ -368,6 +369,36 @@ def _print_radio_section(d: ReportData) -> None:
         usage = duty.get("current_usage_percent", 0)
         budget = duty.get("remaining_budget_ms", 0)
         _kv("Duty cycle", f"{usage:.1f}%", f"({budget:.0f} ms remaining)")
+
+    _sep()
+
+
+def _print_meshcore_section(d: ReportData) -> None:
+    mc = d.config.get("meshcore") or {}
+    if not mc:
+        return
+
+    _section("MESHCORE")
+    connected = mc.get("connected", False)
+    state = f"{_GREEN}connected{_RESET}" if connected else f"{_DIM}disconnected{_RESET}"
+    name = mc.get("companion_name") or ""
+    _kv("Companion", " · ".join(x for x in (state, name) if x))
+
+    radio = mc.get("radio") or {}
+    if radio.get("frequency_mhz"):
+        _kv("Radio", (
+            f"{radio['frequency_mhz']} MHz · "
+            f"BW{radio.get('bandwidth_khz', '--')} · "
+            f"SF{radio.get('spreading_factor', '--')}"
+        ))
+    if radio.get("tx_power") is not None:
+        _kv("TX power", f"{radio['tx_power']} dBm")
+
+    channels = mc.get("channel_keys") or []
+    names = ["Public"] + [
+        (ch.get("name") or "").strip() or "(unnamed)" for ch in channels
+    ]
+    _kv("Channels", f"{len(names)}: {', '.join(names)}")
 
     _sep()
 
