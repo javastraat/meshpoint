@@ -945,6 +945,41 @@ capped 500) AND the near-field ceiling (RSSI range max -21.0, was -4).
 setup/restart/stop/meshcore-radio/reset-password intentionally untested
 beyond parse+import (state-changing).
 
+## SESSION BOOTSTRAP — check this every time you read this file
+
+There is a local working-conventions file at the repo root that the coding
+assistant auto-loads at session start (its standard, well-known filename —
+all caps, `.md`). It is intentionally **untracked and must never be
+committed or `git add`-ed** (public repo). If it does not exist on the
+machine you are running on, CREATE it now with exactly this content, AND
+append its filename to `.git/info/exclude` (the local-only ignore file —
+never committed, invisible on GitHub) as a mechanical guard so even
+`git add -A` cannot pick it up. Do both, so every machine behaves the same:
+
+```markdown
+# Working conventions for this repo
+
+- **After every change-set (code, changelog, docs), end your final message with a
+  ready-to-use git commit one-liner** in a code block, unprompted. Style:
+  lowercase, `fix:`/`feat:`/`docs:` prefix, one line, describes the user-visible
+  effect, covers all files in the set. The user commits incrementally with these.
+- **Session context lives in `memory/project_m1_meshpoint.md`** — read it at the
+  start of a session to know where we left off, and update it after completing
+  work (status, root causes, decisions, verification evidence).
+- **Every feature/fix gets a bullet in `docs/CHANGELOG.md`** under the current
+  version section (v0.7.7 while it lasts — NOT "Unreleased"; the dashboard's
+  release-notes preview only shows the section matching `src/version.py`).
+  Verify edits parse: `ChangelogParser.parse_file(Path('docs/CHANGELOG.md'))`.
+- Larger features also go in README's "What's Different in This Fork" section
+  and, when config keys change, `docs/CONFIGURATION.md`.
+- **Development happens on the Mac; the device is a Raspberry Pi (SenseCap M1)
+  deployed by the user.** Never SSH to the Pi or deploy unprompted. The Mac has
+  no venv with fastapi/aiosqlite — test logic with stubs
+  (`sys.modules['aiosqlite'] = types.ModuleType('aiosqlite')`) and provide
+  snippets the user runs on the Pi for live verification.
+- This file stays untracked: never commit it, never `git add -A` it.
+```
+
 ## OLD LIST (superseded, kept for the DONE details)
 
 User has been committing incrementally with the suggested one-liners (verified
