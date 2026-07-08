@@ -78,7 +78,7 @@ This is a customized fork of upstream [KMX415/meshpoint](https://github.com/KMX4
 **Roles, config & self-update**
 - **Viewer role locked down server-side** — all write endpoints require admin; channel PSKs/keys are redacted for viewers; admin-only links show a toast instead of navigating away.
 - **Web server port from config** — `dashboard.host`/`dashboard.port` in `local.yaml` via a launcher that falls back to `0.0.0.0:8080` if the config is broken or the port unbindable.
-- **Self-update against this fork** — version checks and the apply chain point at `javastraat/meshpoint`, sudoers/safe.directory repairs are self-installing, and update checks work on dev checkouts (sudo only when the repo is root-owned).
+- **Self-update against this fork** — version checks and the apply chain point at `javastraat/meshpoint`, sudoers/safe.directory repairs are self-installing, update checks work on dev checkouts (sudo only when the repo is root-owned), and "Check for updates" lists the incoming commit messages so you can see what an Apply brings.
 
 **Contacts / neighbours tooling**
 - `import_contacts.py` imports a MeshCore contacts/neighbours list into the node DB, with clock-skew-immune timestamps (`now − secs_ago`) and freq/SF stamping.
