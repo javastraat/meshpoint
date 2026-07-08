@@ -1093,8 +1093,9 @@ gutter + `position: relative`, but left the `::before` chevron as a flex
 item → it became the first stacked row. FIX (settings.css): `::before` now
 `position: absolute; left: 2px; top: 0` inside the gutter. Changelog: folded
 into the existing "Release notes grouped by category" bullet (same page, no
-separate bullet); still 50 bullets, parser-verified. Pi-verify after deploy:
-chevron sits inline left of each headline.
+separate bullet); still 50 bullets, parser-verified. Chevron fix
+LIVE-VERIFIED on Pi 2026-07-08 evening (second user screenshot: marker
+inline left of every headline, all categories + stacked detail correct).
 
 ## OLD LIST (superseded, kept for the DONE details)
 
