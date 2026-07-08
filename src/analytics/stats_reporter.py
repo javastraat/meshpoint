@@ -14,6 +14,8 @@ import math
 import time
 from typing import Optional
 
+from src.analytics.signal_analyzer import RSSI_NEAR_FIELD_CEILING_DBM
+
 
 class StatsReporter:
     """In-memory accumulator for heartbeat stats reporting."""
@@ -62,7 +64,7 @@ class StatsReporter:
             self._packet_types.get(packet_type, 0) + 1
         )
 
-        if rssi is not None and rssi < 0:
+        if rssi is not None and rssi < RSSI_NEAR_FIELD_CEILING_DBM:
             self._classify_rssi(rssi)
             self._rssi_sum += rssi
             self._rssi_count += 1
