@@ -849,6 +849,11 @@ Fix — YAML is now the single source of truth:
   when it differs.
 - To change the port: set `dashboard: port:` in local.yaml, restart service.
   Verified on Mac: `_bind_address()` returns `('0.0.0.0', 8080)` from YAML.
+- Changelog bullet added under **v0.7.7 → "Dashboard and UI"** (33 bullets now).
+  CONVENTION (user-confirmed): ALL ongoing work goes into the v0.7.7 section,
+  NOT "Unreleased" — stable tracks main, version.py stays 0.7.7, and the
+  dashboard release-notes preview only shows the section matching the version
+  (an Unreleased/None section is never displayed). Verified via ChangelogParser.
 
 ---
 
