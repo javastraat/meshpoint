@@ -79,10 +79,6 @@ class RadioConcentratorCard {
                 </thead>
                 <tbody>${rows}</tbody>
             </table>
-            <a class="r-config-link" href="#/configuration/radio">
-                <span>Region &amp; frequency settings</span>
-                <span aria-hidden="true">→</span>
-            </a>
         `;
     }
 

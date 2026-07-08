@@ -11,7 +11,6 @@
  *   - RadioIdentityCard    (long/short name, node ID)
  *   - RadioConfigCard      (region/preset/freq/power readouts)
  *   - RadioNodeInfoCard    (countdown + last-sent + interval)
- *   - RadioChannels        (read-only channel table)
  *   - RadioCompanionCard   (MeshCore companion: operational, kept)
  *
  * Each card receives a shared ``api`` helper (put / post / refresh /
@@ -23,7 +22,6 @@ class RadioSettings {
         this._initialized = false;
         this._config = null;
         this._cards = [];
-        this._channels = null;
         this._onConfigUpdated = (event) => {
             if (!this._initialized || !event.detail) return;
             this._config = event.detail;
@@ -80,7 +78,6 @@ class RadioSettings {
                     <div id="r-card-config"></div>
                     <div id="r-card-concentrator"></div>
                     <div id="r-card-nodeinfo"></div>
-                    <div id="r-card-channels"></div>
                     <div id="r-card-companion"></div>
 
                     <div class="r-console-foot">
@@ -115,10 +112,6 @@ class RadioSettings {
         const nodeinfo = new RadioNodeInfoCard(api);
         nodeinfo.mount(document.getElementById('r-card-nodeinfo'));
         this._cards.push(nodeinfo);
-
-        this._channels = new RadioChannels(
-            document.getElementById('r-card-channels'),
-        );
 
         const companion = new RadioCompanionCard(api);
         companion.mount(document.getElementById('r-card-companion'));
@@ -157,7 +150,6 @@ class RadioSettings {
                 console.error('Card render failed:', e);
             }
         });
-        if (this._channels) this._channels.render(this._config.channels);
         this._renderShellMeta();
     }
 

@@ -24,7 +24,7 @@ class RadioConfigCard {
         rootEl.classList.add('r-card', 'r-card--readout');
         rootEl.innerHTML = `
             <div class="r-card__header">
-                <h3 class="r-card__title">Radio Configuration</h3>
+                <h3 class="r-card__title">Meshtastic Configuration</h3>
                 <span class="r-card__subtitle" id="r-config-subtitle">--</span>
             </div>
             <div class="r-readout-grid r-readout-grid--two-col">
@@ -80,6 +80,7 @@ class RadioConfigCard {
                     <span class="r-readout__value" id="r-preamble">--</span>
                 </div>
             </div>
+            <div id="r-mt-channels"></div>
             <a class="r-config-link" href="#/configuration/radio">
                 <span>Edit radio settings</span>
                 <span aria-hidden="true">→</span>
@@ -92,6 +93,7 @@ class RadioConfigCard {
         this._regions = config.regions || [];
         const radio = config.radio || {};
         const tx = config.transmit || {};
+        this._renderChannels(config.channels || []);
 
         this._renderRow('#r-rd-region', this._regionDisplay(radio.region));
         this._renderRow('#r-rd-preset', this._presetDisplay(radio.current_preset));
@@ -102,6 +104,66 @@ class RadioConfigCard {
 
         this._renderReadouts(radio);
         this._renderSubtitle(radio);
+    }
+
+    _renderChannels(channels) {
+        const box = this._root.querySelector('#r-mt-channels');
+        if (!box) return;
+
+        const rows = channels.map((ch) => {
+            const name = ch.name && ch.name.trim()
+                ? this._esc(ch.name)
+                : '<span class="ch-table__name--empty">(unnamed)</span>';
+            const enabledClass = ch.enabled
+                ? 'ch-table__pill ch-table__pill--on'
+                : 'ch-table__pill ch-table__pill--off';
+            return `
+                <tr class="ch-table__row">
+                    <td class="ch-table__idx">${ch.index}</td>
+                    <td class="ch-table__name">${name}</td>
+                    <td class="ch-table__psk">${this._maskPsk(ch.psk_b64)}</td>
+                    <td class="ch-table__hash">${ch.hash || '--'}</td>
+                    <td><span class="${enabledClass}">${ch.enabled ? 'On' : 'Off'}</span></td>
+                </tr>
+            `;
+        }).join('');
+
+        const enabledCount = channels.filter((c) => c.enabled).length;
+        box.innerHTML = `
+            <div class="readout-strip__label">
+                Channels · ${channels.length} configured · ${enabledCount} on
+            </div>
+            <table class="ch-table ch-table--readout">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Name</th>
+                        <th>PSK</th>
+                        <th>Hash</th>
+                        <th>State</th>
+                    </tr>
+                </thead>
+                <tbody>${rows || '<tr><td colspan="5" class="ch-table__empty">No channels configured</td></tr>'}</tbody>
+            </table>
+            <a class="r-config-link" href="#/configuration/channels">
+                <span>Edit channels &amp; PSKs</span>
+                <span aria-hidden="true">→</span>
+            </a>
+        `;
+    }
+
+    _maskPsk(b64) {
+        if (!b64) return '<span class="ch-table__psk--empty">none</span>';
+        // Show length only; never reveal a stored key in an
+        // observational view. The Configuration screen handles reveal.
+        const len = b64.length;
+        return `<span class="ch-table__psk--masked">•••••• <span>${len} chars</span></span>`;
+    }
+
+    _esc(str) {
+        const el = document.createElement('span');
+        el.textContent = str || '';
+        return el.innerHTML;
     }
 
     _renderRow(selector, value) {
