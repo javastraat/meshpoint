@@ -321,7 +321,7 @@ See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for all options: relay, MQTT,
 ```bash
 meshpoint status         # service status + config summary
 meshpoint logs           # tail the service journal
-meshpoint report         # full operational report (asks for the dashboard admin login)
+meshpoint report         # full operational report (asks for admin login; sudo skips the prompt)
 meshpoint restart        # restart the service
 meshpoint meshcore-radio # configure MeshCore companion radio frequency
 sudo meshpoint setup     # re-run config wizard

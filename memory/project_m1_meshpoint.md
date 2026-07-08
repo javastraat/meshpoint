@@ -944,6 +944,19 @@ ALL PASS. Report data also live-confirmed the N2 uncap (Total nodes 1449, was
 capped 500) AND the near-field ceiling (RSSI range max -21.0, was -4).
 setup/restart/stop/meshcore-radio/reset-password intentionally untested
 beyond parse+import (state-changing).
+FOLLOW-UP (~16:45, user challenged "shell = admin anyway"): **sudo fast-path**
+— `CliApiClient.login_local_root()` reads `web_auth.jwt_secret` +
+`session_version` from local.yaml (path from CONCENTRATOR_CONFIG, cwd is
+/opt/meshpoint via the bash wrapper) and mints a 10-min admin Bearer token
+(sub=cli-local-root; dependencies.py accepts `Authorization: Bearer`).
+report tries it silently before the interactive prompt; prompt now tips
+"sudo meshpoint report". Trust model = reset-password (read the key ⇒ own
+the dashboard anyway); NO server-side change/bypass. Mac-tested with a
+stubbed HS256 signer (claims match verify()'s required set incl. sv);
+graceful False → interactive fallback when secret unreadable/absent.
+Pi-verify: `sudo meshpoint report` (no prompt) AND plain `meshpoint report`
+as pi (prompt appears — local.yaml is meshpoint-owned; if it turns out
+world-readable, plain also skips, which is equivalent-security).
 
 ## SESSION BOOTSTRAP — check this every time you read this file
 

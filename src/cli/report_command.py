@@ -55,16 +55,24 @@ def _fetch_all() -> ReportData | None:
         print("  Start it with: sudo systemctl start meshpoint\n")
         return None
     except AuthRequired:
-        print("\n  Service is running; the report needs a dashboard admin login.")
-        try:
-            client.login_interactive()
-            data.status = client.get("/api/device/status")
-        except AuthRequired:
-            print(f"\n  {_RED}Login failed (wrong credentials?).{_RESET}\n")
-            return None
-        except (ServiceDown, ApiError) as exc:
-            print(f"\n  {_RED}Login failed: {exc}{_RESET}\n")
-            return None
+        # Root / service user can read the signing key: no prompt needed.
+        if client.login_local_root():
+            try:
+                data.status = client.get("/api/device/status")
+            except ApiError:
+                data.status = {}
+        if not data.status:
+            print("\n  Service is running; the report needs a dashboard admin login.")
+            print("  (Tip: 'sudo meshpoint report' skips this prompt.)")
+            try:
+                client.login_interactive()
+                data.status = client.get("/api/device/status")
+            except AuthRequired:
+                print(f"\n  {_RED}Login failed (wrong credentials?).{_RESET}\n")
+                return None
+            except (ServiceDown, ApiError) as exc:
+                print(f"\n  {_RED}Login failed: {exc}{_RESET}\n")
+                return None
 
     data.device = _get(client, "/api/device")
     data.metrics = _get(client, "/api/device/metrics")
