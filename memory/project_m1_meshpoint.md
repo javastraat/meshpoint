@@ -978,7 +978,7 @@ FOLLOW-UP (user: "meshtastic has a TX section, meshcore doesn't"): new
 MESHCORE section after MESHTASTIC TX — companion state+name, radio
 freq/BW/SF from cfg.meshcore.radio, TX power, channel list ("5: Public,
 TechInc, ..." — Public prepended, names from mc.channel_keys). Mac
-render-tested. ALSO answered why MeshCore nodes lack per-node device stats:
+render-tested; LIVE-VERIFIED on Pi ~17:00 (exact match with test render). ALSO answered why MeshCore nodes lack per-node device stats:
 protocol asymmetry — MeshCore adverts carry identity only (no broadcast
 battery/telemetry like Meshtastic); metrics are request/response and mostly
 encrypted. Our meshcore _decode_telemetry is a raw-hex stub too. Candidate
