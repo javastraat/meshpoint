@@ -53,6 +53,69 @@ def init_routes(
     _identity = identity
 
 
+def _concentrator_status(config: AppConfig) -> dict:
+    """Serialize the SX1302 channel plan the concentrator source would run.
+
+    Rebuilt with the same ``from_radio_config`` call the capture source
+    makes, so the table reflects the live plan without touching hardware.
+    Sync words mirror sx1302_wrapper.py: ch0-ch7 share the board-wide
+    LoRaWAN 0x34 (``lorawan_public=True``), only ch8 (service channel)
+    is overridden to Meshtastic 0x2B via direct register writes.
+    """
+    from src.hal.concentrator_config import ConcentratorChannelPlan
+
+    radio = config.radio
+    active = "concentrator" in (config.capture.sources or [])
+    try:
+        plan = ConcentratorChannelPlan.from_radio_config(
+            region=radio.region,
+            frequency_mhz=radio.frequency_mhz,
+            spreading_factor=radio.spreading_factor,
+            bandwidth_khz=radio.bandwidth_khz,
+        )
+    except (ValueError, TypeError) as exc:
+        logger.warning("concentrator plan unavailable: %s", exc)
+        return {"active": active, "channels": []}
+
+    radio_0 = plan.radio_0_freq_hz
+
+    def _rf_chain(freq_hz: int) -> int:
+        # Same rule as sx1302_wrapper._configure_if_channels()
+        return 0 if freq_hz <= radio_0 + 500_000 else 1
+
+    channels = []
+    for idx, ch in enumerate(plan.multi_sf_channels):
+        channels.append({
+            "ch": idx,
+            "frequency_mhz": round(ch.frequency_hz / 1e6, 4),
+            "bandwidth_khz": ch.bandwidth_khz,
+            "spreading_factor": ch.spreading_factor,  # 0 = multi-SF
+            "syncword": "0x34",
+            "protocol": "lorawan",
+            "rf_chain": _rf_chain(ch.frequency_hz),
+            "enabled": ch.enabled,
+        })
+    single = plan.single_sf_channel
+    if single is not None:
+        channels.append({
+            "ch": 8,
+            "frequency_mhz": round(single.frequency_hz / 1e6, 4),
+            "bandwidth_khz": single.bandwidth_khz,
+            "spreading_factor": single.spreading_factor,
+            "syncword": "0x2B",
+            "protocol": "meshtastic",
+            "rf_chain": _rf_chain(single.frequency_hz),
+            "enabled": single.enabled,
+        })
+
+    return {
+        "active": active,
+        "radio_0_mhz": round(plan.radio_0_freq_hz / 1e6, 4),
+        "radio_1_mhz": round(plan.radio_1_freq_hz / 1e6, 4),
+        "channels": channels,
+    }
+
+
 @router.get("")
 async def get_config(claims: SessionClaims = Depends(require_auth)):
     """Full configuration summary for the Radio tab.
@@ -165,6 +228,7 @@ async def get_config(claims: SessionClaims = Depends(require_auth)):
             "min_relay_rssi": relay.min_relay_rssi,
             "max_relay_rssi": relay.max_relay_rssi,
         },
+        "concentrator": _concentrator_status(_config),
         "nodeinfo": nodeinfo_routes.build_nodeinfo_status(tx.nodeinfo),
         "mqtt": mqtt_config_routes.build_mqtt_status(
             _config.mqtt, _config.device.device_name or "meshpoint"

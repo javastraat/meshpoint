@@ -78,6 +78,7 @@ class RadioSettings {
                         <div id="r-card-identity"></div>
                     </div>
                     <div id="r-card-config"></div>
+                    <div id="r-card-concentrator"></div>
                     <div id="r-card-nodeinfo"></div>
                     <div id="r-card-channels"></div>
                     <div id="r-card-companion"></div>
@@ -106,6 +107,10 @@ class RadioSettings {
         const radioConfig = new RadioConfigCard(api);
         radioConfig.mount(document.getElementById('r-card-config'));
         this._cards.push(radioConfig);
+
+        const concentrator = new RadioConcentratorCard(api);
+        concentrator.mount(document.getElementById('r-card-concentrator'));
+        this._cards.push(concentrator);
 
         const nodeinfo = new RadioNodeInfoCard(api);
         nodeinfo.mount(document.getElementById('r-card-nodeinfo'));
