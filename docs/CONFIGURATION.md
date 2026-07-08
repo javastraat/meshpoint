@@ -48,12 +48,15 @@ If `frequency_mhz` falls outside the region's band limits, the service will reje
 
 The dashboard's sidebar shows a live noise-floor reading. There are two ways the service can produce that number; which one applies depends on your concentrator hardware.
 
+**Which radio does the scanning:** the SX1261 is a small companion chip **on the concentrator module itself** (e.g. inside the WM1302 on the SenseCap M1), sitting next to the SX1302 on a second SPI chip-select. It only measures RF power — it decodes nothing — which is why spectral scans and band sweeps run while the SX1302 keeps capturing packets. External radios (MeshCore USB companions, the RTL-SDR) are not involved in scanning at all.
+
 **Hardware capability matrix:**
 
 | Carrier board | SX1261 reachable from Pi? | Spectral scan supported? |
 |---|---|---|
 | Semtech SX1302CXXXGW1 reference kit | yes (own SPI line) | yes |
-| RAK2287 / RAK5146 / SenseCap M1 / most off-the-shelf concentrators | no (SX1261 is wired behind the SX1302's SPI router, not directly to the Pi) | no — packet-derived fallback only |
+| SenseCap M1 | yes — `/dev/spidev0.1` (verified in the field) | yes |
+| RAK2287 / RAK5146 / some off-the-shelf concentrators | often no (SX1261 wired behind the SX1302's SPI router, not directly to the Pi) | try `/dev/spidev0.1`; fall back if the SX1261 status errors below appear |
 | Custom carriers with SX1261 on a dedicated CE line | yes | yes, after configuring `sx1261_spi_path` |
 
 **Default behaviour (works everywhere):** `sx1261_spi_path` is empty, so the service skips the SX1261 init entirely and derives the noise floor from packet metadata — specifically a rolling minimum of `RSSI − SNR` across recently-decoded frames. This is a *loose upper bound* on the true noise floor (it tracks the quietest signal we managed to demodulate), but on a normally-operating link it converges to within a few dB of the real ambient floor and is good enough to spot RF interference, broken antennas, or unusually noisy bands.

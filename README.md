@@ -68,7 +68,7 @@ This is a customized fork of upstream [KMX415/meshpoint](https://github.com/KMX4
 - **MeshCore per-packet metadata** — frequency/SF read from the companion's radio config, hop count decoded from the MeshCore `path_len`, and each companion's packets labeled by source.
 
 **Hardware page & spectrum**
-- **Band spectrum card** — the SX1302's SX1261 companion sweeps the whole region band (100 kHz steps, EU868: 863–870 MHz) and draws a live spectrum chart with median + peak level and the LoRaWAN / Meshtastic / MeshCore channel positions overlaid; "Sweep now" button, hover readout, `GET /api/device/spectrum`. Requires `radio.sx1261_spi_path` (e.g. `/dev/spidev0.1`) in `local.yaml`; cadence via `radio.spectrum_sweep_interval_seconds`.
+- **Band spectrum card** — the concentrator module's onboard SX1261 companion chip (not a USB radio) sweeps the whole region band (100 kHz steps, EU868: 863–870 MHz) and draws a live spectrum chart with median + peak level and the LoRaWAN / Meshtastic / MeshCore channel positions overlaid; "Sweep now" button, hover readout, `GET /api/device/spectrum`. Requires `radio.sx1261_spi_path` (e.g. `/dev/spidev0.1`) in `local.yaml`; cadence via `radio.spectrum_sweep_interval_seconds`.
 - **Concentrator channels card** — read-only table of all 9 SX1302 slots (frequency, BW, SF, sync word, protocol, RF chain, state), derived from the same channel-plan code the radio runs.
 - **Unified protocol cards** — "Meshtastic Configuration" (radio settings + channel list in one card) and a matching MeshCore Companion layout.
 - **Node drawer recent packets** — every node shows its last 15 packets (time, type, RSSI/SNR).
