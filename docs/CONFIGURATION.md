@@ -26,6 +26,7 @@ radio:
   tx_power_dbm: 22             # SX1302 concentrator output power
   spectral_scan_interval_seconds: 60   # noise floor sampler cadence (0 disables)
   sx1261_spi_path: ""          # SX1261 SPI device for spectral scan (empty = disabled)
+  spectrum_sweep_interval_seconds: 300 # band-sweep cadence for the spectrum card (0 = on-demand only)
 ```
 
 The region sets the base frequency, spreading factor, and bandwidth automatically. You only need `region` in most cases. Override `frequency_mhz`, `spreading_factor`, or `bandwidth_khz` individually to tune for non-default presets (MediumFast, ShortFast, etc.) or custom frequency slots.
@@ -77,6 +78,8 @@ ERROR: failed to patch sx1261 radio for LBT/Spectral Scan
 …and `lgw_start()` may then refuse to bring up the concentrator. If you see that, revert `sx1261_spi_path` to `""`, restart the service, and stay on the packet-derived fallback.
 
 If your `libloragw` build does not expose the spectral scan symbols at all (older HAL revisions), the service logs a single info line at startup and falls back automatically.
+
+**Band spectrum sweep.** With spectral scan enabled, the service also sweeps the whole region band (one scan per 100 kHz step; EU868 = 71 points in a few seconds) every `spectrum_sweep_interval_seconds` (default 300) and draws the result as the **Band Spectrum** card on the Hardware page — median and peak level per step with the channel positions overlaid. Set it to `0` to disable automatic sweeps; the card's "Sweep now" button (admin) still works. A full sweep costs roughly 4 s of scan time per interval (~1% of receive time at the default cadence).
 
 ### Standard Meshtastic Presets
 
@@ -489,6 +492,8 @@ dashboard:
 ```
 
 Access at `http://<pi-ip>:8080`. Bind to `127.0.0.1` to restrict to local access only.
+
+Changes take effect on service restart. If the configured address can't be used (config typo, port already taken, privileged port), the server logs the problem and falls back to `0.0.0.0:8080` so the dashboard stays reachable.
 
 ---
 
