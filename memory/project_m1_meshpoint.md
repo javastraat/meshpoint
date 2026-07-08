@@ -913,7 +913,20 @@ USB, #8 nb: blank RSSI cosmetic, #9 concentrator-channels card.
 
 ---
 
-## CURRENT TO-DO LIST (consolidated 2026-07-08 — supersedes the finding numbers above)
+## CURRENT TO-DO LIST v2 (2026-07-08 15:22 — supersedes T-list below)
+
+All of T1-T4, T6 DONE (see entries below). Fresh numbering:
+
+| # | Prio | Effort | Task |
+|---|------|--------|------|
+| N1 | P3 | M | Multiple Meshtastic USB sticks — list-field treatment for `serial` source (config list + labels + meshtastic_usb_<label>), like meshcore_usb. Do when 2nd stick wanted (spare Heltec V3 433 "TBD/play" is candidate) |
+| N2 | P3 | S-M | Endpoint housekeeping (was T7) — decide the 6 kept duplicates: packets/count+protocols+types, nodes/map+summary, telemetry/* |
+
+Wishlist: W1 LoRaWAN CSV/TTN export (S-M, best value) · W2 LoRaWAN MIC verify (S) · W3 433-node UI tags (S-M) · W4 light theme (L) · W5 DAB+ welle-cli (M-L) · W6 pyrtlsdr true-RF S-meter (M-L).
+
+Watch: RFID plateau 865.6-867.6 (identified, only interesting if it changes); noise pill should read a few dB lower post-percentile-fix.
+
+## OLD LIST (superseded, kept for the DONE details)
 
 User has been committing incrementally with the suggested one-liners (verified
 in git log: 6825153 webport, 3181804 fallback, 0118767 fixes 1/2/4, 1d700a9
