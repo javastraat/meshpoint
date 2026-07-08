@@ -34,15 +34,6 @@ class TelemetryRepository:
         )
         await self._db.commit()
 
-    async def get_latest_for_node(self, node_id: str) -> Telemetry | None:
-        row = await self._db.fetch_one(
-            "SELECT * FROM telemetry WHERE node_id = ? ORDER BY timestamp DESC LIMIT 1",
-            (node_id,),
-        )
-        if not row:
-            return None
-        return self._row_to_telemetry(row)
-
     async def get_history(
         self,
         node_id: str,

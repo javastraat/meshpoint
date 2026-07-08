@@ -22,18 +22,9 @@ async def list_packets(limit: int = 100):
 
 @router.get("/count")
 async def packet_count():
+    """Total packets in the DB. Used by the ``meshpoint report`` CLI."""
     count = await _packet_repo.get_count()
     return {"count": count}
-
-
-@router.get("/protocols")
-async def protocol_distribution():
-    return await _packet_repo.get_protocol_distribution()
-
-
-@router.get("/types")
-async def type_distribution():
-    return await _packet_repo.get_type_distribution()
 
 
 @router.get("/by-source/{source_id}")

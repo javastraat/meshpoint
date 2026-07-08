@@ -337,7 +337,7 @@ FastAPI server on port 8080:
 | Endpoint | Description |
 |----------|-------------|
 | `GET /api/nodes` | All discovered nodes |
-| `GET /api/nodes/map` | Nodes with GPS for map display |
+| `GET /api/nodes/summary` | Whole-network totals (nodes, positions, packets per protocol) |
 | `GET /api/packets` | Recent packets (paginated) |
 | `GET /api/analytics/traffic` | Traffic rates and counts |
 | `GET /api/analytics/signal/rssi` | RSSI distribution |

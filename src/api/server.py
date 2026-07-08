@@ -58,7 +58,6 @@ from src.api.routes import (
     stats_routes,
     system_config_routes,
     system_metrics,
-    telemetry,
     terminal_routes,
     upstream_config_routes,
     update_check,
@@ -281,7 +280,6 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     app.include_router(analytics.router, dependencies=protected)
     app.include_router(device.router, dependencies=protected)
     app.include_router(system_metrics.router, dependencies=protected)
-    app.include_router(telemetry.router, dependencies=protected)
     app.include_router(update_check.router, dependencies=protected)
     app.include_router(messages.router, dependencies=protected)
     app.include_router(nodeinfo_routes.router, dependencies=protected)
@@ -1253,14 +1251,12 @@ def _init_routes(
 
     nodes.init_routes(
         coord.node_repo,
-        network_mapper,
         packet_repo=coord.packet_repo,
         telemetry_repo=coord.telemetry_repo,
     )
     packets.init_routes(coord.packet_repo)
     analytics.init_routes(signal_analyzer, traffic_monitor, coord.packet_repo)
     device.init_routes(identity, ws_manager, coord.relay_manager)
-    telemetry.init_routes(coord.telemetry_repo)
     stats_routes.init_routes(
         stats_reporter=coord.stats_reporter,
         signal_analyzer=signal_analyzer,

@@ -93,11 +93,28 @@ class NodeRepository:
         )
         return row["cnt"] if row else 0
 
-    async def get_with_position(self) -> list[Node]:
-        rows = await self._db.fetch_all(
-            "SELECT * FROM nodes WHERE latitude IS NOT NULL AND longitude IS NOT NULL"
+    async def get_network_totals(self) -> dict:
+        """Whole-table aggregates for the stats summary's network block.
+
+        SQL-side so no LIMIT applies (summing over ``get_all()`` capped
+        every figure at its default 500 rows).
+        """
+        row = await self._db.fetch_one(
+            "SELECT COUNT(*) AS total_nodes, "
+            "SUM(CASE WHEN latitude IS NOT NULL AND longitude IS NOT NULL "
+            "    THEN 1 ELSE 0 END) AS nodes_with_position, "
+            "COALESCE(SUM(packet_count), 0) AS total_packets_seen "
+            "FROM nodes"
         )
-        return [self._row_to_node(r) for r in rows]
+        protocol_rows = await self._db.fetch_all(
+            "SELECT protocol, COUNT(*) AS cnt FROM nodes GROUP BY protocol"
+        )
+        return {
+            "total_nodes": row["total_nodes"] if row else 0,
+            "nodes_with_position": (row["nodes_with_position"] or 0) if row else 0,
+            "total_packets_seen": (row["total_packets_seen"] or 0) if row else 0,
+            "protocols": {r["protocol"]: r["cnt"] for r in protocol_rows},
+        }
 
     async def get_all_with_signal(self, limit: int = 500) -> list[dict]:
         """Return nodes with latest signal and telemetry from joined tables."""
