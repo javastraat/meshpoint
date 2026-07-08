@@ -867,6 +867,27 @@ Fix — YAML is now the single source of truth:
   dashboard release-notes preview only shows the section matching the version
   (an Unreleased/None section is never displayed). Verified via ChangelogParser.
 
+#### Whole-code inspection findings backlog (2026-07-08, user-requested, prioritized)
+Full sweep done: all py compiles, all js parses, auth solid everywhere (incl.
+terminal WS admin check + shlex-quoted listener pipeline). Backlog:
+
+| # | Prio | Effort | Finding |
+|---|------|--------|---------|
+| 1 | P1 | S | `use_sudo=True` hardcoded in update paths (install_status.py:48, apply.py:303) → Check-for-updates always fails on Mac dev. Fix: auto-detect (skip sudo when current user owns repo) |
+| 2 | P1 | S | `_ADMIN_SECTIONS` stale (identity_routes.py:38): admin list LACKS lorawan/meshtastic/meshcore/listener while viewer list HAS the networks. Sync both |
+| 3 | P2 | M | HIDDEN FEATURE: `PUT /api/config/relay` (system_config_routes.py:231) fully supports min/max_relay_rssi (RSSI-gated relaying), burst_size, serial port/baud — no UI calls it. Expose on Transmit card. (Old note "PUT /relay doesn't exist" was WRONG — it exists; only the frontend call was broken) |
+| 4 | P2 | S | Dead file: frontend/js/simple_node_list.js (nothing references it; superseded by node_cards.js) |
+| 5 | P2 | M | 8 unused endpoints — wire or prune: /api/analytics/signal/rssi+snr, /api/packets/by-source+count+protocols+types, /api/nodes/map+summary, /api/telemetry/{id}(+history) |
+| 6 | P3 | L | Spectrum view: SpectralScanService already scans periodically but discards the histogram (only floor/median → noise pill). Endpoint + canvas = the wishlist "spectral scan overlay" |
+| 7 | P3 | M | Meshtastic `serial` source single-instance — needs the list-field treatment meshcore_usb got |
+| 8 | P3 | S | `nb:` synthetic rows blank RSSI/FREQ/SF in feed (cosmetic, SNR-only) |
+| 9 | P3 | M | Concentrator-channels card on Hardware page (no UI/API shows ch0-ch4 LoRaWAN + ch8 Meshtastic plan) |
+
+Intentional / leave alone: sx1262_spi_source.py (parked per ROADMAP, RAK HAT
+coexistence), /api/public/recent_rx unauth (login-page radar blips),
+no CORS middleware (same-origin), messages mark-read viewer-open (badge).
+Suggested order: 1 → 2 → 4 (one small PR), then 3, then decide 5.
+
 ---
 
 ## What it does NOT do (intentional)

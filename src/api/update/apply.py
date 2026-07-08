@@ -300,7 +300,6 @@ class UpdateApplier:
             return read_head_full_sha(
                 self._repo_path,
                 runner=self._runner,
-                use_sudo=True,
             )
         except Exception:
             logger.warning(

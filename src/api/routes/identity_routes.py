@@ -37,9 +37,13 @@ _auth_service: AuthService | None = None
 
 _ADMIN_SECTIONS: tuple[str, ...] = (
     "dashboard",
-    "stats",
+    "lorawan",
+    "meshtastic",
+    "meshcore",
     "messages",
+    "stats",
     "radio",
+    "listener",
     "terminal",
     "configuration.identity",
     "configuration.radio",
@@ -60,9 +64,10 @@ _VIEWER_SECTIONS: tuple[str, ...] = (
     "lorawan",
     "meshtastic",
     "meshcore",
-    "stats",
     "messages",
+    "stats",
     "radio",
+    "listener",
 )
 
 
