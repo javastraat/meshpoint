@@ -23,13 +23,15 @@ class NodeDrawer {
         this._renderSkeleton(node);
         this._drawer.classList.add('nd-drawer--open');
 
-        const [detail, metrics] = await Promise.all([
+        const [detail, metrics, recentPackets] = await Promise.all([
             this._fetchDetail(node.node_id),
             this._fetchMetricsHistory(node.node_id, this._metricsHours),
+            this._fetchRecentPackets(node.node_id),
         ]);
 
         const merged = { ...node, ...detail };
         merged._metricsHistory = metrics;
+        merged._recentPackets = recentPackets;
         if (metrics.telemetry && metrics.telemetry.length > 0) {
             merged._telemetryHistory = metrics.telemetry.slice().reverse();
         }
@@ -113,6 +115,7 @@ class NodeDrawer {
         body.appendChild(this._buildMetricsChartSection(n));
         body.appendChild(this._buildInfoSection(n));
         body.appendChild(this._buildSignalSection(n));
+        body.appendChild(this._buildRecentPackets(n));
         body.appendChild(this._buildDeviceMetrics(n));
         body.appendChild(this._buildEnvironmentMetrics(n));
         body.appendChild(this._buildPositionSection(n));
@@ -388,6 +391,27 @@ class NodeDrawer {
         section.appendChild(header);
         section.appendChild(content);
         return section;
+    }
+
+    async _fetchRecentPackets(nodeId) {
+        try {
+            const url = `/api/packets/by-source/${encodeURIComponent(nodeId)}?limit=15`;
+            const res = await fetch(url);
+            if (!res.ok) return [];
+            return await res.json();
+        } catch { return []; }
+    }
+
+    _buildRecentPackets(n) {
+        const rows = (n._recentPackets || []).map((p) => {
+            const type = (p.packet_type || 'unknown').replace(/_/g, ' ');
+            const parts = [type];
+            const sig = p.signal || {};
+            if (sig.rssi != null) parts.push(`${sig.rssi} dBm`);
+            if (sig.snr != null) parts.push(`${sig.snr} dB`);
+            return [this._formatDate(p.timestamp), parts.join(' · ')];
+        });
+        return this._buildSection('Recent Packets', rows, false);
     }
 
     async _fetchDetail(nodeId) {

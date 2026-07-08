@@ -74,8 +74,12 @@ class StatsTab {
 
     async refresh() {
         try {
-            const res = await fetch('/api/stats/summary');
+            const [res, snrRes] = await Promise.all([
+                fetch('/api/stats/summary'),
+                fetch('/api/analytics/signal/snr'),
+            ]);
             const data = await res.json();
+            data.snr_distribution = snrRes.ok ? await snrRes.json() : {};
             if (!this._rendered) {
                 this._buildLayout();
                 this._rendered = true;
@@ -179,6 +183,11 @@ class StatsTab {
                         <div class="stats-card__label">RSSI Distribution</div>
                         <div class="stats-card__desc">Packet count by signal strength bucket (dBm)</div>
                         <canvas id="sc-rssi"></canvas>
+                    </div>
+                    <div class="stats-card">
+                        <div class="stats-card__label">SNR Distribution</div>
+                        <div class="stats-card__desc">Packet count by signal-to-noise bucket (dB), last 500 packets</div>
+                        <canvas id="sc-snr"></canvas>
                     </div>
                     <div class="stats-card">
                         <div class="stats-card__label">Avg Signal Quality</div>
@@ -387,6 +396,7 @@ class StatsTab {
         this._updateTypes(typesData);
         this._updateSignalNums(sigData);
         this._updateRssiHist(rssiDistData);
+        this._updateSnrHist(data.snr_distribution || {});
         this._updateQuality(sigData);
         this._updateDirectRelayed(drData);
         this._updateActiveNodes(network);
@@ -496,6 +506,20 @@ class StatsTab {
                 data: counts,
                 backgroundColor: 'rgba(6, 182, 212, 0.6)',
                 borderColor: '#06b6d4',
+                borderWidth: 1,
+            }],
+        }, { plugins: { legend: { display: false } } });
+    }
+
+    _updateSnrHist(dist) {
+        const buckets = dist.buckets || [];
+        const counts = dist.counts || [];
+        this._renderChart('sc-snr', 'bar', {
+            labels: buckets,
+            datasets: [{
+                data: counts,
+                backgroundColor: 'rgba(168, 85, 247, 0.6)',
+                borderColor: '#a855f7',
                 borderWidth: 1,
             }],
         }, { plugins: { legend: { display: false } } });
