@@ -1083,7 +1083,18 @@ uppercase, underline). 3 new parser tests (attach/reset/preview-dict) — 23
 pass on Mac; JS node --check OK; real CHANGELOG yields all 11 v0.7.7
 categories in order. Changelog bullet under "Self-update system" (50 total,
 parser-verified); README self-update fork bullet mentions grouping.
-Pi-verify after deploy: Updates page shows category headers.
+LIVE-VERIFIED on Pi 2026-07-08 evening (user screenshot): category headers
+render (LORAWAN SNIFFING / MULTI-RADIO CAPTURE / RTL-SDR WEB LISTENER, eyebrow
+style). Screenshot ALSO exposed a pre-existing upstream CSS bug: the `›`
+bullet marker rendered on its own line above each headline. Root cause:
+upstream commit 2e3c7cf made `.update-release-notes__bullet`
+`flex-direction: column` (headline stacked over detail) and added the 14px
+gutter + `position: relative`, but left the `::before` chevron as a flex
+item → it became the first stacked row. FIX (settings.css): `::before` now
+`position: absolute; left: 2px; top: 0` inside the gutter. Changelog: folded
+into the existing "Release notes grouped by category" bullet (same page, no
+separate bullet); still 50 bullets, parser-verified. Pi-verify after deploy:
+chevron sits inline left of each headline.
 
 ## OLD LIST (superseded, kept for the DONE details)
 

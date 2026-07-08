@@ -878,9 +878,11 @@ select.update-field__input option:checked {
 
 .update-release-notes__bullet::before {
     content: "›";
+    position: absolute;
+    left: 2px;
+    top: 0;
     color: rgba(0, 209, 255, 0.6);
     font-weight: 700;
-    flex-shrink: 0;
     line-height: 1.45;
 }
 
