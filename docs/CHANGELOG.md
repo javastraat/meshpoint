@@ -74,6 +74,7 @@ First tagged release of the javastraat/meshpoint fork: LoRaWAN sniffing, multi-r
 - **safe.directory migration.** `post_update.sh` registers `/opt/meshpoint` in the system git `safe.directory` on upgraded boxes (previously only fresh installs got it).
 - **Channel picker trimmed to this fork.** Release channels are now Stable (main) and Custom branch; upstream's RC and WisMesh entries (branches that do not exist on javastraat/meshpoint) are gone, and previously stored picker ids fall back to Stable.
 - **Fork update source.** Version checks and the apply chain point at `javastraat/meshpoint`; git dubious-ownership on the root-owned tree is handled both in-app and at install time.
+- **Check for updates shows what's coming.** When the install is behind, the Updates page now lists the incoming commit messages (short SHA + subject, up to 10, "… and N more" beyond that) so you can see what an Apply would bring before pressing it.
 - **Update check works on dev checkouts.** Git commands for Check for updates only use sudo when the install tree is owned by another user (the Pi's root-owned `/opt/meshpoint`); a checkout owned by the current user runs plain git, so development instances no longer fail with "sudo: a terminal is required to read the password".
 
 ### v0.7.6 (June 2026)

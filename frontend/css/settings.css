@@ -1018,3 +1018,29 @@ select.update-field__input option:checked {
 }
 
 .dangerous-panel__status[data-kind="error"] { color: #ff6b6b; }
+
+/* Incoming commits shown after "Check for updates" finds drift */
+.update-incoming {
+    list-style: none;
+    margin: 6px 0 10px;
+    padding: 8px 12px;
+    border: 1px solid var(--border, #1e293b);
+    border-radius: var(--radius-sm, 4px);
+    font-size: 0.8rem;
+    color: var(--text-secondary, #94a3b8);
+}
+
+.update-incoming li {
+    padding: 2px 0;
+}
+
+.update-incoming code {
+    font-family: var(--font-mono, monospace);
+    color: var(--accent-cyan, #06b6d4);
+    margin-right: 6px;
+}
+
+.update-incoming__more {
+    color: var(--text-muted, #64748b);
+    font-style: italic;
+}

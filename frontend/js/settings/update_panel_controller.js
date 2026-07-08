@@ -35,6 +35,7 @@ class UpdatePanelController {
         this.rollbackBtn = rootEl.querySelector('[data-update-rollback]');
         this.rollbackHintEl = rootEl.querySelector('[data-update-rollback-hint]');
         this.syncHintEl = rootEl.querySelector('[data-update-sync-hint]');
+        this.incomingEl = rootEl.querySelector('[data-update-incoming]');
         this.statusEl = rootEl.querySelector('[data-update-status]');
         this.descriptionEl = rootEl.querySelector('[data-update-description]');
         this.localVersionEl = rootEl.querySelector('[data-update-local-version]');
@@ -188,8 +189,37 @@ class UpdatePanelController {
         }
     }
 
+    _renderIncoming(status) {
+        if (!this.incomingEl) return;
+        const commits = (status && status.incoming_commits) || [];
+        const behind = status && status.commits_behind;
+        this.incomingEl.textContent = '';
+        if (!behind || !commits.length) {
+            this.incomingEl.hidden = true;
+            return;
+        }
+        commits.forEach((c) => {
+            const li = document.createElement('li');
+            const sha = document.createElement('code');
+            sha.textContent = c.sha || '';
+            li.appendChild(sha);
+            li.appendChild(
+                document.createTextNode(` ${c.subject || ''}`),
+            );
+            this.incomingEl.appendChild(li);
+        });
+        if (behind > commits.length) {
+            const li = document.createElement('li');
+            li.className = 'update-incoming__more';
+            li.textContent = `… and ${behind - commits.length} more`;
+            this.incomingEl.appendChild(li);
+        }
+        this.incomingEl.hidden = false;
+    }
+
     _renderSyncHint(status) {
         if (!this.syncHintEl) return;
+        this._renderIncoming(status);
         if (!status) {
             this.syncHintEl.dataset.kind = '';
             this.syncHintEl.textContent =

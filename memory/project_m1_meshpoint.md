@@ -1020,6 +1020,20 @@ never committed, invisible on GitHub) as a mechanical guard so even
 - This file stays untracked: never commit it, never `git add -A` it.
 ```
 
+**Updates page: incoming commits (2026-07-08 ~17:15, user request):** when
+Check finds drift, the panel now lists the incoming commit subjects. Backend:
+`list_incoming_commits()` in install_status.py (`git log --oneline
+HEAD..origin/<branch>`, limit 10, same argv shape as _revision_count fallback
+→ already sudoers-whitelisted; auto use_sudo); wired into
+build_install_status_payload as `incoming_commits` (only fetched when
+behind>0). Frontend: `<ul data-update-incoming>` after sync hint in
+index.html; `_renderIncoming()` in update_panel_controller.js (DOM-built,
+subjects textContent-escaped, "… and N more" row past limit, hidden when
+up-to-date/no data); `.update-incoming` styles in settings.css. Verified:
+13 unittests pass, parse/limit/failure unit-tested with fake runner, live
+payload key present (empty at behind=0). Pi-verify: Check for updates while
+behind → list appears under the orange drift line.
+
 ## OLD LIST (superseded, kept for the DONE details)
 
 User has been committing incrementally with the suggested one-liners (verified
