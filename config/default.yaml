@@ -152,3 +152,24 @@ location:
   update_interval_seconds: 5
   # Minimum acceptable fix mode: 0=any (incl. no-fix), 1=2D, 2=3D.
   min_fix_quality: 1
+
+fan:
+  # SenseCap M1 onboard fan (opt-in -- this hardware doesn't exist on
+  # RAK V2/Chameleon/DIY builds). PWM-driven from CPU temperature; pin
+  # confirmed via scripts/test_gpio_hardware.py fan-scan.
+  enabled: false
+  # BCM GPIO number. 13 is a hardware-PWM channel on the Pi 4 (BCM2711
+  # PWM1) -- confirmed as this board's fan pin.
+  gpio_pin: 13
+  # Duty starts ramping up once CPU temp reaches this (Celsius).
+  min_temp_c: 45.0
+  # Duty reaches 100% at/above this (Celsius).
+  max_temp_c: 65.0
+  # Floor once ramping starts (0.0-1.0) -- most small fans stall below
+  # some duty rather than actually spinning slower.
+  min_duty: 0.35
+  # Fan stays on until temp drops this many degrees below min_temp_c,
+  # so it doesn't rapidly cycle on/off right at the threshold.
+  hysteresis_c: 5.0
+  # How often (seconds) to re-read CPU temp and adjust duty.
+  poll_interval_s: 10.0

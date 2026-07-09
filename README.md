@@ -77,6 +77,7 @@ This is a customized fork of upstream [KMX415/meshpoint](https://github.com/KMX4
 - **Node drawer recent packets** — every node shows its last 15 packets (time, type, RSSI/SNR).
 - **SNR distribution chart** on Stats next to the RSSI histogram; signal stats ignore implausible near-field readings (> −20 dBm).
 - **Relay tuning from the dashboard** — burst size and the min/max RSSI relay window are editable on Configuration → Transmit.
+- **Temperature-driven PWM fan control** (opt-in, SenseCap M1 only) — the onboard fan ramps speed with CPU temperature instead of running flat-out or not at all; `fan:` in `local.yaml`.
 
 **Roles, config & self-update**
 - **Viewer role locked down server-side** — all write endpoints require admin; channel PSKs/keys are redacted for viewers; admin-only links show a toast instead of navigating away.

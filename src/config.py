@@ -395,6 +395,26 @@ class WebAuthConfig:
 
 
 @dataclass
+class FanConfig:
+    """SenseCap M1 onboard fan: temperature-driven PWM control.
+
+    Disabled by default -- opt-in via local.yaml, since this board's
+    fan/button/LED GPIOs (see scripts/test_gpio_hardware.py) don't exist
+    on other supported carriers (RAK V2, Chameleon, DIY). GPIO 13 is a
+    hardware-PWM-capable pin on the Pi 4 (BCM2711 PWM1), confirmed live
+    as this board's fan pin.
+    """
+
+    enabled: bool = False
+    gpio_pin: int = 13
+    min_temp_c: float = 45.0
+    max_temp_c: float = 65.0
+    min_duty: float = 0.35
+    hysteresis_c: float = 5.0
+    poll_interval_s: float = 10.0
+
+
+@dataclass
 class AppConfig:
     radio: RadioConfig = field(default_factory=RadioConfig)
     meshtastic: MeshtasticConfig = field(default_factory=MeshtasticConfig)
@@ -410,6 +430,7 @@ class AppConfig:
     web_auth: WebAuthConfig = field(default_factory=WebAuthConfig)
     location: LocationConfig = field(default_factory=LocationConfig)
     metrics: MetricsConfig = field(default_factory=MetricsConfig)
+    fan: FanConfig = field(default_factory=FanConfig)
 
 
 def _resolve_radio_frequency(radio: "RadioConfig") -> None:
@@ -503,6 +524,7 @@ def _apply_yaml(cfg: AppConfig, path: Path) -> None:
         "web_auth": cfg.web_auth,
         "location": cfg.location,
         "metrics": cfg.metrics,
+        "fan": cfg.fan,
     }
 
     unknown_keys: list[str] = []

@@ -103,6 +103,7 @@ noise_floor_tracker = NoiseFloorTracker()
 _noise_floor_emitter_task = None
 _spectral_scan_service: SpectralScanService | None = None
 _rtl_listener: RtlListener | None = None
+_fan_controller_task = None
 
 
 def create_app(config: AppConfig | None = None) -> FastAPI:
@@ -233,6 +234,24 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
             await _spectral_scan_service.start()
         spectrum_routes.init_routes(_spectral_scan_service)
 
+        global _fan_controller_task
+        if config.fan.enabled:
+            from src.hardware.fan_control import FanController, FanCurve
+
+            fan_controller = FanController(
+                pin=config.fan.gpio_pin,
+                curve=FanCurve(
+                    min_temp_c=config.fan.min_temp_c,
+                    max_temp_c=config.fan.max_temp_c,
+                    min_duty=config.fan.min_duty,
+                    hysteresis_c=config.fan.hysteresis_c,
+                ),
+                poll_interval_s=config.fan.poll_interval_s,
+            )
+            _fan_controller_task = asyncio.get_running_loop().create_task(
+                fan_controller.run()
+            )
+
         _init_routes(
             pipeline,
             config,
@@ -257,6 +276,12 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
             _noise_floor_emitter_task.cancel()
             try:
                 await _noise_floor_emitter_task
+            except BaseException:
+                pass
+        if _fan_controller_task is not None:
+            _fan_controller_task.cancel()
+            try:
+                await _fan_controller_task
             except BaseException:
                 pass
         if nodeinfo_broadcaster is not None:

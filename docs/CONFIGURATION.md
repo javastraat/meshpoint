@@ -610,6 +610,25 @@ Open **RF Environment** in the sidebar for a full-page noise-floor sparkline, ca
 
 ---
 
+## Fan Control (SenseCap M1)
+
+```yaml
+fan:
+  enabled: false        # opt-in -- this hardware doesn't exist on RAK V2/Chameleon/DIY
+  gpio_pin: 13           # confirmed via scripts/test_gpio_hardware.py fan-scan
+  min_temp_c: 45.0        # ramp starts here
+  max_temp_c: 65.0        # 100% duty at/above this
+  min_duty: 0.35          # floor once ramping -- most small fans stall below this
+  hysteresis_c: 5.0       # fan stays on until temp drops this far below min_temp_c
+  poll_interval_s: 10.0
+```
+
+Temperature-driven PWM control for the SenseCap M1's onboard fan, reading CPU temperature from the Pi's thermal zone. GPIO 13 is a hardware-PWM-capable pin on the Pi 4 (BCM2711 PWM1), confirmed live as this board's fan pin with `scripts/test_gpio_hardware.py`; the onboard LED (GPIO 22) and user button (GPIO 27) were confirmed the same way.
+
+Disabled by default: this fan/GPIO wiring is specific to the SenseCap M1 carrier board, not other supported hardware. Duty ramps linearly between `min_temp_c` and `max_temp_c`; below `min_temp_c - hysteresis_c` the fan turns fully off. Requires `gpiozero` (preinstalled on Raspberry Pi OS); if unavailable, a clear error is logged at startup and the fan is simply not driven rather than the app failing to start.
+
+---
+
 ## Device Identity
 
 ```yaml

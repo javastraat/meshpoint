@@ -221,6 +221,33 @@ class LoadConfigIntegrationTest(unittest.TestCase):
         self.assertEqual(cfg.transmit.hop_limit, 7)
         self.assertIn("transmit.hoplimit", "\n".join(captured.output))
 
+    def test_fan_section_is_applied_without_warning(self):
+        # Regression: "fan" was added as an AppConfig field but omitted
+        # from _apply_yaml's section_map, so fan: {...} in local.yaml
+        # was silently ignored -- enabled: true never actually took
+        # effect. section_map must list every AppConfig section field.
+        tmp = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", delete=False, encoding="utf-8"
+        )
+        tmp.write("fan:\n  enabled: true\n  min_temp_c: 50.0\n")
+        tmp.close()
+        path = Path(tmp.name)
+        self.addCleanup(lambda: path.unlink(missing_ok=True))
+
+        old = os.environ.get("CONCENTRATOR_CONFIG")
+        os.environ["CONCENTRATOR_CONFIG"] = str(path)
+        try:
+            cfg = load_config()
+        finally:
+            if old is None:
+                os.environ.pop("CONCENTRATOR_CONFIG", None)
+            else:
+                os.environ["CONCENTRATOR_CONFIG"] = old
+
+        self.assertTrue(cfg.fan.enabled)
+        self.assertEqual(cfg.fan.min_temp_c, 50.0)
+        self.assertEqual(cfg.fan.gpio_pin, 13)  # untouched default
+
 
 if __name__ == "__main__":
     unittest.main()
