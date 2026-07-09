@@ -56,31 +56,33 @@ class RadioConfigCard {
                     <span class="r-readout-row__value r-readout-row__value--mono"
                           id="r-rd-hop">--</span>
                 </div>
+                <div class="r-readout-row">
+                    <span class="r-readout-row__label">SF</span>
+                    <span class="r-readout-row__value r-readout-row__value--mono"
+                          id="r-sf">--</span>
+                </div>
+                <div class="r-readout-row">
+                    <span class="r-readout-row__label">BW</span>
+                    <span class="r-readout-row__value r-readout-row__value--mono"
+                          id="r-bw">--</span>
+                </div>
+                <div class="r-readout-row">
+                    <span class="r-readout-row__label">CR</span>
+                    <span class="r-readout-row__value r-readout-row__value--mono"
+                          id="r-cr">--</span>
+                </div>
+                <div class="r-readout-row">
+                    <span class="r-readout-row__label">Sync</span>
+                    <span class="r-readout-row__value r-readout-row__value--mono"
+                          id="r-sync">--</span>
+                </div>
+                <div class="r-readout-row">
+                    <span class="r-readout-row__label">Preamble</span>
+                    <span class="r-readout-row__value r-readout-row__value--mono"
+                          id="r-preamble">--</span>
+                </div>
             </div>
-            <div class="readout-strip">
-                <div class="readout-strip__label">Computed</div>
-                <div class="r-readout">
-                    <span class="r-readout__label">SF</span>
-                    <span class="r-readout__value" id="r-sf">--</span>
-                </div>
-                <div class="r-readout">
-                    <span class="r-readout__label">BW</span>
-                    <span class="r-readout__value" id="r-bw">--</span>
-                </div>
-                <div class="r-readout">
-                    <span class="r-readout__label">CR</span>
-                    <span class="r-readout__value" id="r-cr">--</span>
-                </div>
-                <div class="r-readout">
-                    <span class="r-readout__label">Sync</span>
-                    <span class="r-readout__value" id="r-sync">--</span>
-                </div>
-                <div class="r-readout">
-                    <span class="r-readout__label">Preamble</span>
-                    <span class="r-readout__value" id="r-preamble">--</span>
-                </div>
-            </div>
-            <div id="r-mt-channels"></div>
+            <div id="r-mt-channels" class="r-mt-channels"></div>
             <a class="r-config-link" href="#/configuration/radio">
                 <span>Edit radio settings</span>
                 <span aria-hidden="true">→</span>
