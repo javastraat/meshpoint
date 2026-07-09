@@ -1,3 +1,7 @@
+#
+# Configuration file for Meshpoint concentrator service.
+#
+
 radio:
   region: "US"
   # Frequency: set frequency_mhz (explicit MHz) OR slot (Meshtastic 1-indexed
