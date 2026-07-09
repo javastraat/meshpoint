@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import logging
 from datetime import datetime, timezone
 from typing import AsyncIterator, Optional
@@ -117,8 +118,24 @@ class SerialCaptureSource(CaptureSource):
         raw_bytes = packet.get("raw", b"")
         if isinstance(raw_bytes, str):
             raw_bytes = bytes.fromhex(raw_bytes)
+        elif not isinstance(raw_bytes, (bytes, bytearray)):
+            # meshtastic-python always sets packet["raw"] to the decoded
+            # MeshPacket protobuf object (mesh_interface.py explicitly
+            # does `asDict["raw"] = meshPacket`), never actual bytes.
+            # Treat anything that isn't bytes as absent so the
+            # reconstruction fallback below actually runs instead of
+            # passing a protobuf object downstream as if it were bytes.
+            raw_bytes = b""
 
-        if not raw_bytes and "decoded" in packet:
+        if not raw_bytes:
+            # Reconstruct regardless of whether "decoded" is present.
+            # "decoded" and "encrypted" share one protobuf oneof: a
+            # packet the connected radio's own key COULDN'T decrypt
+            # (e.g. traffic on a channel it isn't configured for) has
+            # "encrypted" set and NO "decoded" key at all -- gating on
+            # "decoded" here silently dropped exactly that case, the
+            # one a passive multi-channel sniffer most needs (its own
+            # channel_keys config may decrypt what the stick couldn't).
             raw_bytes = self._reconstruct_raw(packet)
 
         if not raw_bytes:
@@ -167,8 +184,16 @@ class SerialCaptureSource(CaptureSource):
         header = struct.pack("<III", dest, source, pkt_id)
         header += bytes([flags, channel, 0, 0])
 
-        encoded = packet.get("encoded", b"")
+        # google.protobuf.json_format.MessageToDict base64-encodes bytes
+        # fields, and the MeshPacket field is named "encrypted" (verified
+        # against the installed meshtastic.protobuf.mesh_pb2.MeshPacket
+        # descriptor) -- not "encoded"/hex, which never matched any real
+        # key from this library. "encrypted" and "decoded" share one
+        # protobuf oneof, so it's empty whenever the connected radio's
+        # own key already decrypted the packet locally -- that's the
+        # "payload portion will be empty" case above, not a bug here.
+        encoded = packet.get("encrypted", b"")
         if isinstance(encoded, str):
-            encoded = bytes.fromhex(encoded)
+            encoded = base64.b64decode(encoded)
 
         return header + encoded

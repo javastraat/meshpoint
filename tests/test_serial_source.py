@@ -3,15 +3,33 @@
 Covers the T5 multi-stick support: per-device ``label`` -> ``name`` /
 ``capture_source`` tagging, and the pypubsub cross-talk guard needed
 because meshtastic-python publishes every open SerialInterface's
-packets on one process-wide topic ("meshtastic.receive").
+packets on one process-wide topic ("meshtastic.receive"). Also covers
+two pre-existing bugs caught live the first time a `serial` source ran
+for real (2026-07-09): meshtastic-python always sets packet["raw"] to
+the actual MeshPacket protobuf object, never bytes, so the old
+truthiness check never triggered the reconstruction fallback -- and
+that fallback itself read the wrong dict key/encoding for the
+encrypted payload.
 """
 
 from __future__ import annotations
 
 import asyncio
+import base64
+import struct
 import unittest
 
 from src.capture.serial_source import SerialCaptureSource
+
+
+class _FakeMeshPacket:
+    """Stand-in for the real meshtastic.protobuf.mesh_pb2.MeshPacket.
+
+    Not bytes, not str -- exactly what packet["raw"] always actually is
+    (mesh_interface.py explicitly does asDict["raw"] = meshPacket), so
+    the old `if not raw_bytes` check saw a truthy non-bytes object and
+    let it flow downstream, crashing the pipeline decoder's len() call.
+    """
 
 
 class SerialCaptureSourceNamingTest(unittest.TestCase):
@@ -28,6 +46,100 @@ class SerialCaptureSourceNamingTest(unittest.TestCase):
         raw = source._packet_to_raw_capture({"raw": "aabbccddeeff"})
         self.assertIsNotNone(raw)
         self.assertEqual(raw.capture_source, "serial_868")
+
+
+class SerialCaptureSourceProtobufRawFieldTest(unittest.TestCase):
+    """packet["raw"] is always a MeshPacket protobuf object, never bytes."""
+
+    def test_non_bytes_raw_falls_back_to_reconstruction_instead_of_crashing(self):
+        source = SerialCaptureSource(port="/dev/ttyUSB1", label="433")
+        payload = base64.b64encode(b"\x01\x02\x03").decode()
+        packet = {
+            "raw": _FakeMeshPacket(),
+            "decoded": {"portnum": "TEXT_MESSAGE_APP"},
+            "to": 0xFFFFFFFF,
+            "from": 12345,
+            "id": 999,
+            "hopLimit": 3,
+            "hopStart": 3,
+            "channel": 0,
+            "encrypted": payload,
+            "rxRssi": -90,
+            "rxSnr": 5.5,
+        }
+
+        raw = source._packet_to_raw_capture(packet)
+
+        self.assertIsNotNone(raw)
+        self.assertEqual(raw.payload[-3:], b"\x01\x02\x03")
+
+    def test_encrypted_only_packet_without_decoded_key_is_still_captured(self):
+        # "decoded" and "encrypted" share one protobuf oneof: a packet
+        # the connected stick's OWN key couldn't decrypt (e.g. traffic
+        # on a channel it isn't configured for) has "encrypted" set and
+        # NO "decoded" key at all. Gating reconstruction on "decoded"
+        # being present silently dropped exactly this case -- the one a
+        # passive multi-channel sniffer most needs, since MeshPoint's
+        # own channel_keys config may decrypt what the stick couldn't.
+        source = SerialCaptureSource(port="/dev/ttyUSB1", label="433")
+        payload = base64.b64encode(b"\xaa\xbb").decode()
+        packet = {
+            "raw": _FakeMeshPacket(),
+            "to": 0xFFFFFFFF, "from": 1, "id": 2,
+            "encrypted": payload,
+        }
+
+        raw = source._packet_to_raw_capture(packet)
+
+        self.assertIsNotNone(raw)
+        self.assertEqual(raw.payload[-2:], b"\xaa\xbb")
+
+    def test_packet_with_no_recognizable_fields_still_yields_header_only_frame(self):
+        # _reconstruct_raw defaults every field it reads, so it never
+        # actually returns empty bytes -- even a near-empty packet dict
+        # yields a minimal (all-default) header, never None.
+        source = SerialCaptureSource(port="/dev/ttyUSB1")
+        raw = source._packet_to_raw_capture({"raw": _FakeMeshPacket()})
+        self.assertIsNotNone(raw)
+        self.assertEqual(len(raw.payload), 16)
+
+
+class ReconstructRawTest(unittest.TestCase):
+    """_reconstruct_raw must read the real MessageToDict key/encoding.
+
+    google.protobuf.json_format.MessageToDict base64-encodes bytes
+    fields and names the payload field "encrypted" (verified against
+    the installed meshtastic.protobuf.mesh_pb2.MeshPacket descriptor)
+    -- not "encoded"/hex, which never matched any real key.
+    """
+
+    def test_encrypted_field_is_base64_decoded_into_payload_tail(self):
+        payload_bytes = b"\xde\xad\xbe\xef"
+        packet = {
+            "to": 0xFFFFFFFF,
+            "from": 42,
+            "id": 7,
+            "hopLimit": 3,
+            "hopStart": 3,
+            "channel": 1,
+            "encrypted": base64.b64encode(payload_bytes).decode(),
+        }
+
+        frame = SerialCaptureSource._reconstruct_raw(packet)
+
+        header = struct.unpack("<III", frame[:12])
+        self.assertEqual(header, (0xFFFFFFFF, 42, 7))
+        # flags = hop_limit(3) | hop_start(3) << 5 = 0x63; channel = 1.
+        self.assertEqual(frame[12:16], bytes([0x63, 1, 0, 0]))
+        self.assertEqual(frame[16:], payload_bytes)
+
+    def test_missing_encrypted_key_yields_header_only_frame(self):
+        # The locally-decrypted case: encrypted/decoded share one
+        # protobuf oneof, so a packet the stick's own key already
+        # decrypted has no ciphertext left -- header-only is expected,
+        # not a bug (matches the method's own docstring).
+        frame = SerialCaptureSource._reconstruct_raw({"to": 1, "from": 2, "id": 3})
+        self.assertEqual(len(frame), 16)
 
 
 class _FakeInterface:
