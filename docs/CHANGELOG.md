@@ -6,7 +6,7 @@
 
 ### v0.7.7 (July 2026)
 
-First tagged release of the javastraat/meshpoint fork: LoRaWAN sniffing, multi-radio capture, the RTL-SDR web listener, and a dashboard self-update repair. **Upgrade note:** boxes on v0.7.6 cannot fetch this release from the dashboard (that is the bug being fixed); one manual round on the gateway is required: `cd /opt/meshpoint && sudo git fetch origin main && sudo git reset --hard origin/main && sudo systemctl restart meshpoint`. The restart installs the corrected sudoers rules; Check/Apply works from the dashboard again afterwards.
+First tagged release of the javastraat/meshpoint fork: LoRaWAN sniffing, multi-radio capture, the RTL-SDR web listener, and a dashboard self-update repair -- plus everything from upstream's own v0.7.7 (backup/restore, RF Environment tab, mesh broadcast cadence, operator tools; merged, bullets below). Run `install.sh` when upgrading: new sudoers rules for backup restore. **Upgrade note:** boxes on v0.7.6 cannot fetch this release from the dashboard (that is the bug being fixed); one manual round on the gateway is required: `cd /opt/meshpoint && sudo git fetch origin main && sudo git reset --hard origin/main && sudo systemctl restart meshpoint`. The restart installs the corrected sudoers rules; Check/Apply works from the dashboard again afterwards.
 
 #### LoRaWAN sniffing (SX1302)
 
@@ -90,6 +90,27 @@ First tagged release of the javastraat/meshpoint fork: LoRaWAN sniffing, multi-r
 - **Check for updates shows what's coming.** When the install is behind, the Updates page now lists the incoming commit messages (short SHA + subject, up to 10, "… and N more" beyond that) so you can see what an Apply would bring before pressing it.
 - **Release notes grouped by category.** The "What's new" preview on the Updates page now shows the changelog's category headings (LoRaWAN sniffing, Roles and access, …) between the bullets instead of one flat list; the `›` bullet marker no longer renders on its own line above each headline.
 - **Update check works on dev checkouts.** Git commands for Check for updates only use sudo when the install tree is owned by another user (the Pi's root-owned `/opt/meshpoint`); a checkout owned by the current user runs plain git, so development instances no longer fail with "sudo: a terminal is required to read the password".
+#### Backup and restore
+
+- **Settings → System backup and restore.** Download a timestamped `.tar.gz` of `config/local.yaml` and the full `data/` directory (SQLite hot snapshot, PKI keys, rollback state). Restore uploads a prior archive, stashes current state, clears the live `data/` tree, and copies the backup so you return to the snapshot even after **Clear database** or other changes. Each restore runs in its own transient systemd unit so repeat restores work. Archive is not encrypted: store offline and keep it private.
+- **Disaster recovery docs.** `TROUBLESHOOTING.md`, `CONFIGURATION.md`, and `COMMON-ERRORS.md` document the fresh-install path (`meshpoint setup` before the dashboard loads), off-Pi backup storage, SSH `restore_finish.sh` fallback, and upstream `HTTP 403` when a revoked API key is restored from backup.
+
+#### Mesh broadcast cadence
+
+- **Position and telemetry interval controls.** Configuration → Radio adds telemetry broadcast interval editor with live countdown. Configuration → GPS adds position broadcast interval editor. Each is independent from NodeInfo: set `interval_minutes` to `0` to pause, or pick 5 min to 24 hr with hot-reload (no restart). Closes [#92](https://github.com/KMX415/meshpoint/issues/92).
+
+#### Dashboard and operator tools
+
+- **RF Environment tab.** Spectral scan and noise-floor telemetry for concentrators with SX1261 spectral-scan support. (On this fork the SenseCap M1 *does* support scan -- set `radio.sx1261_spi_path: "/dev/spidev0.1"`; the tab shares the same scan service as the Band Spectrum card.)
+- **Packet detail modal.** Click a row in the live packet feed for full decode metadata without leaving the dashboard.
+- **Operator status strips.** KPI-style strips on Dashboard and RF tabs; MQTT broker health on Configuration → MQTT.
+- **Quick Deploy QR.** Configuration → Channels exports public channel parameters as a scannable QR for field provisioning.
+- **Prometheus `/metrics`.** Optional scrape endpoint with packet, node, relay, and system counters.
+- **Channel hash map refresh.** Rebuild Meshtastic channel hashes after dashboard channel save so MQTT topics and decoders stay aligned. Fixes [#89](https://github.com/KMX415/meshpoint/issues/89).
+
+#### Docs
+
+- **Home Assistant cookbook.** `docs/HOME-ASSISTANT-COOKBOOK.md` for MQTT discovery and sensor wiring.
 
 ### v0.7.6 (June 2026)
 

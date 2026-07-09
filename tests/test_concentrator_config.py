@@ -42,7 +42,10 @@ class TestFromRadioConfigLongFast(unittest.TestCase):
         sf = plan.single_sf_channel.spreading_factor
         self.assertEqual(sf, 11)
         self.assertEqual(plan.single_sf_channel.bandwidth_khz, 250)
-        self.assertEqual(plan.radio_0_freq_hz, 869_525_000)
+        self.assertEqual(plan.single_sf_channel.frequency_hz, 869_525_000)
+        # Fork plan: RF0 anchors the 5-channel LoRaWAN sniff window,
+        # RF1 holds the Meshtastic service channel at zero IF offset.
+        self.assertEqual(plan.radio_0_freq_hz, 868_300_000)
         self.assertEqual(plan.radio_1_freq_hz, 869_525_000)
 
     def test_anz_longfast_uses_preset(self):

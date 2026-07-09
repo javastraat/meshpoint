@@ -10,6 +10,24 @@ sudo nano /opt/meshpoint/config/local.yaml
 
 Restart after any config change: `sudo systemctl restart meshpoint`
 
+### Backup and restore
+
+**Download backup (healthy Pi):** **Settings → System → Download backup** writes a timestamped `.tar.gz` to your browser. Save it on your PC or NAS, not only on the Pi. The archive is not encrypted and contains API keys, channel PSKs, PKI private material, and your full local database.
+
+**Restore** replaces `config/local.yaml` and resets the live `data/` tree to match the archive. Anything that happened on the Pi after that backup (including **Clear database**) is discarded. Upload staging folders (`data/restore-incoming/`) and prior `data/pre-restore-stash-*` folders are left untouched.
+
+**Fresh SD or wiped install (typical user flow):**
+
+1. Install Meshpoint (`git clone` + `scripts/install.sh` on the new card).
+2. Run **`sudo meshpoint setup`** once and paste a valid Meshradar API key so the service can start (the dashboard does not load on a blank install without this step).
+3. Open the dashboard, complete **`/setup`** for the admin password.
+4. **Settings → System → Restore backup** and upload your saved `.tar.gz`.
+5. After restart, sign in with your **pre-disaster** dashboard password. Confirm nodes and packets, then check upstream logs for `connected to wss://api.meshradar.io`.
+
+**Important:** Restore puts back the API key from the backup. If you deleted that key on [meshradar.io](https://meshradar.io) after taking the backup, local data will still restore but upstream will log `HTTP 403` until you generate a new key for the same `device_id` and update it via `sudo meshpoint setup` or `upstream.auth_token` in `config/local.yaml` (there is no dashboard field for the API key yet).
+
+Full walkthrough: [TROUBLESHOOTING.md](TROUBLESHOOTING.md#disaster-recovery-with-a-saved-backup-recommended). SSH-only restore: `sudo bash /opt/meshpoint/scripts/restore_finish.sh /path/to/backup.tar.gz`.
+
 ---
 
 ## Radio
@@ -98,6 +116,13 @@ To match a Meshtastic preset, set `spreading_factor` and `bandwidth_khz` togethe
 | LongFast (default) | 11 | 250 |
 | LongModerate | 11 | 125 |
 | LongSlow | 12 | 125 |
+
+**One preset per Meshpoint.** The dashboard preset (LongFast, MediumFast, etc.)
+sets a single frequency, bandwidth, and default spreading factor for TX. The
+concentrator still demodulates **SF7-SF12 in parallel on that frequency**, so
+you can hear nodes using different spreading factors on the same channel plan.
+You cannot listen to multiple modem presets or multiple frequencies at once on
+one concentrator (multi-preset IF chains are backlog).
 
 ### Custom presets (Configuration → Radio)
 
@@ -200,7 +225,9 @@ send periodic Meshtastic POSITION packets. That is **separate** from
 the Meshradar fleet pin in `device.*`.
 
 Configure on **Configuration → GPS → Mesh position broadcasts**, or in
-yaml:
+yaml. Set **Position broadcast interval** on the same GPS page (or
+`transmit.position.interval_minutes` in yaml). Default is **15 minutes**.
+Use **0** to pause POSITION packets without disabling TX.
 
 ```yaml
 transmit:
@@ -221,6 +248,24 @@ transmit:
 
 When `coordinate_source: static`, coordinates are sent at full wizard
 precision regardless of `location_precision`.
+
+### Mesh telemetry broadcasts (LoRa / device health)
+
+When native TX is enabled, the Meshpoint can send periodic Meshtastic
+`device_metrics` telemetry (`TELEMETRY_APP`). That is **separate** from
+NodeInfo and POSITION.
+
+Configure on **Configuration → Radio → Telemetry broadcast interval**, or in
+yaml:
+
+```yaml
+transmit:
+  telemetry:
+    interval_minutes: 30
+    startup_delay_seconds: 120
+```
+
+Default is **30 minutes**. Use **0** to pause telemetry broadcasts.
 
 ### Using gpsd (USB GPS receivers)
 
@@ -294,6 +339,15 @@ meshtastic:
 ```
 
 The default is `LongFast` (Meshtastic's standard public channel). Change it only if your mesh uses a custom primary channel name. You can also edit this from the dashboard: open the **Radio** tab, edit **Channel 0**, and save. The Radio and Messages tabs reflect the same value.
+
+### Quick Deploy (QR export)
+
+**Configuration → Channels → Quick Deploy** exports public channel parameters for field radios:
+
+- QR code and `https://meshtastic.org/e/#…` URL (Meshtastic app compatible)
+- Downloadable JSON via `GET /api/config/export`
+
+**Private channel keys are never exported.** The QR uses the standard Meshtastic default PSK only (`AQ==`), matching a public primary channel deployment. Scan with the Meshtastic mobile app (Android in-app scanner; iOS camera).
 
 ---
 
@@ -483,6 +537,37 @@ storage:
 
 Packets are stored in a local SQLite database. Old packets are pruned automatically based on `max_packets_retained`.
 
+### Prometheus metrics (`/metrics`)
+
+Optional Prometheus text scrape endpoint for LAN monitoring. **Off by default** — enabling does not change packet capture, relay, or dashboard behaviour.
+
+```yaml
+metrics:
+  enabled: false
+  require_auth: true    # when false, /metrics is open on the LAN (use firewall rules)
+```
+
+When `metrics.enabled: true`, Prometheus (or any scraper) can poll:
+
+```text
+http://<pi-ip>:8080/metrics
+```
+
+Exposed series include packet counts, node totals, RSSI/SNR averages, noise floor, relay stats, per-channel duty estimates (ToA), SX1302 CRC counters, and process uptime. Labels use protocol/channel/reason only — never PSKs, tokens, or node secrets.
+
+**Example `prometheus.yml` scrape job (auth disabled):**
+
+```yaml
+scrape_configs:
+  - job_name: meshpoint
+    scrape_interval: 30s
+    static_configs:
+      - targets: ["192.168.1.50:8080"]
+    metrics_path: /metrics
+```
+
+When `require_auth: true`, configure your scraper to send the dashboard session cookie or Bearer JWT (same as other protected API routes).
+
 ---
 
 ## Dashboard
@@ -497,6 +582,14 @@ dashboard:
 Access at `http://<pi-ip>:8080`. Bind to `127.0.0.1` to restrict to local access only.
 
 Changes take effect on service restart. If the configured address can't be used (config typo, port already taken, privileged port), the server logs the problem and falls back to `0.0.0.0:8080` so the dashboard stays reachable.
+
+### RF Environment tab
+
+Open **RF Environment** in the sidebar for a full-page noise-floor sparkline, calibration state, and the latest SX1302 spectral-scan histogram. Data comes from `GET /api/rf/status` (same sources as the sidebar telemetry rail).
+
+- **Live scan** — hardware spectral scan on the tuned channel (`radio.spectral_scan_interval_seconds` > 0 and SX1261/HAL support present)
+- **Packet fallback** — rolling minimum of `RSSI − SNR` when scan is disabled or unavailable
+- Set `radio.spectral_scan_interval_seconds: 0` in **Configuration → Advanced** to disable hardware scan; the tab shows a clear message and uses packet fallback only
 
 ---
 
@@ -716,6 +809,9 @@ transmit:              # native messaging TX (Meshtastic via SX1302, MeshCore vi
     interval_minutes: 15
     coordinate_source: "static"      # static | live
     location_precision: "approximate"  # exact | approximate | none (live only)
+  telemetry:
+    interval_minutes: 30
+    startup_delay_seconds: 120
 
 relay:                 # experimental: re-broadcast captured packets via USB radio
   enabled: false
@@ -751,6 +847,10 @@ storage:               # local SQLite packet store
   database_path: "data/concentrator.db"
   max_packets_retained: 100000
   cleanup_interval_seconds: 3600
+
+metrics:               # Prometheus /metrics scrape (off by default)
+  enabled: false
+  require_auth: true
 
 dashboard:             # local web UI
   host: "0.0.0.0"

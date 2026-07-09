@@ -207,7 +207,7 @@ class TestNodeInfoBroadcasterTelemetry(unittest.IsolatedAsyncioTestCase):
         await b.start()
         self.assertIsNotNone(b.next_due_at)
         self.assertIsNone(b.last_sent_at)
-        delta = (b.next_due_at - b._started_at).total_seconds()
+        delta = (b.next_due_at - b._schedule._started_at).total_seconds()
         self.assertAlmostEqual(delta, 10_000, delta=1)
         await b.stop()
 
@@ -410,8 +410,8 @@ class TestNodeInfoBroadcasterHotReload(unittest.IsolatedAsyncioTestCase):
             self.assertGreaterEqual(initial_calls, 1)
             # Bump interval to 1ms so last_sent + new_interval is in the past.
             b.set_interval(0)
-            b._interval = 0.001
-            b._interval_changed.set()
+            b._schedule._interval = 0.001
+            b._schedule._interval_changed.set()
             await asyncio.sleep(0.05)
             self.assertGreater(len(tx.calls), initial_calls)
         finally:

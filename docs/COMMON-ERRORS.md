@@ -11,6 +11,25 @@ If your error is not listed, capture it from `meshpoint logs` and open a
 
 ---
 
+## Mesh broadcasts
+
+### POSITION or TELEMETRY still firing after I set NodeInfo to 24 hours
+
+**Cause:** NodeInfo, POSITION, and TELEMETRY are three independent periodic
+broadcast loops. Changing the NodeInfo interval on **Configuration → Radio**
+does not change position or telemetry cadence.
+
+**Fix:** Open **Configuration → GPS** and set **Position broadcast interval**
+to **Off** (0) or your desired cadence. Open **Configuration → Radio** and
+set **Telemetry broadcast interval** the same way. Changes hot-reload without
+a restart when TX is already running.
+
+**Workaround (yaml):** set `transmit.position.interval_minutes: 0` and
+`transmit.telemetry.interval_minutes: 0` in `config/local.yaml`, then
+`sudo systemctl restart meshpoint`.
+
+---
+
 ## Messaging
 
 ### Meshtastic DM shows "Sent" but recipient never gets it
@@ -291,7 +310,7 @@ running from the wrong working directory.
 ls /opt/meshpoint/src/main.py
 ```
 
-If missing, re-clone (preserve your config and database first):
+If missing, re-clone (preserve your config and database first). Prefer **Settings → System → Download backup** on a healthy Pi before disaster strikes. If you already have a `.tar.gz` backup, install Meshpoint on the fresh SD card and use **Restore backup** on the System page instead of manual `cp` steps below.
 
 ```bash
 sudo cp -r /opt/meshpoint/data /tmp/meshpoint-data-backup
@@ -364,6 +383,28 @@ sudo chmod 777 /opt/meshpoint/data
 sudo chmod 666 /opt/meshpoint/data/*.db
 sudo systemctl restart meshpoint
 ```
+
+### `Meshpoint is not activated` (service exits, dashboard unreachable)
+
+**Cause:** On a fresh install there is no `config/local.yaml` with a Meshradar
+API key. Startup calls `validate_activation()` and exits with
+`SystemExit: 1` before the dashboard can serve `/setup` or **Restore backup**.
+
+**Fix (disaster recovery with a saved backup):** Run the setup wizard once over
+SSH, then use the dashboard restore UI:
+
+```bash
+sudo meshpoint setup
+```
+
+Paste any valid API key from [meshradar.io](https://meshradar.io). Defaults
+for the rest are fine if you will restore immediately. Restart the service,
+complete `/setup` in the browser, then **Settings → System → Restore backup**.
+
+Full steps: [TROUBLESHOOTING.md](TROUBLESHOOTING.md#disaster-recovery-with-a-saved-backup-recommended).
+
+**Fix (no backup, new Meshpoint):** Complete `sudo meshpoint setup` with your
+permanent API key and settings. There is nothing to restore.
 
 ---
 
@@ -689,6 +730,87 @@ restart required. Open `/login` and sign in with the new password.
 If you also lost SSH access, the only path forward is to re-image the
 SD card and re-run `meshpoint setup`. There is no way to recover an
 admin password without host-level access by design.
+
+### Restore backup stopped the service and it never came back
+
+**Cause:** Two different failures look similar in `journalctl`:
+
+1. **Sudoers (fixed in 21819a6+):** `command not allowed` when launching
+   `restore_finish.sh` with the archive path.
+2. **Cgroup kill (fixed after 21819a6):** `restore_finish` was spawned from
+   the meshpoint service, then called `systemctl stop meshpoint`. Systemd
+   stopped the unit cgroup and killed the restore script before it could
+   extract the backup and run `systemctl start`. Logs show stop succeeding
+   but no `[restore_finish] Stashing` or `Starting meshpoint` lines.
+
+**Fix (get the Pi online again):**
+
+```bash
+sudo systemctl start meshpoint
+```
+
+**Finish the restore from SSH** (safe outside the service cgroup):
+
+```bash
+sudo bash /opt/meshpoint/scripts/restore_finish.sh \
+  /opt/meshpoint/data/restore-incoming/meshpoint-restore-*.tar.gz
+```
+
+Use the exact archive name from `data/restore-incoming/` if you have several.
+
+**Fix (dashboard path):** Pull the latest `feat/v0.7.7` and restart so sudoers
+and `launch_restore_finish.sh` (uses `systemd-run`) are in place:
+
+```bash
+cd /opt/meshpoint
+sudo git pull
+sudo systemctl restart meshpoint
+```
+
+Then upload the backup again from **Settings → System → Restore backup**.
+Your prior state may still be in `data/pre-restore-stash-<timestamp>/` if
+the script stashed before failing.
+
+**Restore after Clear database still shows empty nodes.** Restore must return you to the backup snapshot no matter what happened on the Pi since that backup (including **Clear database**). Older builds only overwrote files listed in the archive and left SQLite `-wal` / `-shm` sidecars on disk, so a wiped database could reappear after restore.
+
+**Fix:** Pull the latest `feat/v0.7.7` and restart. Restore now clears the live `data/` tree (except upload and stash folders) before copying the archive.
+
+**Verify after restore:**
+
+```bash
+sudo /opt/meshpoint/venv/bin/python -c "
+import sqlite3
+c=sqlite3.connect('/opt/meshpoint/data/concentrator.db')
+print('nodes', c.execute('SELECT COUNT(*) FROM nodes').fetchone()[0])
+"
+```
+
+Compare to node count inside your saved `.tar.gz` on a PC (see earlier diagnostic commands).
+
+**Do not delete the old Meshradar API key during recovery.** Restore puts back
+the `upstream.auth_token` from the backup. If you ran `meshpoint setup` with a
+new key and then deleted the **old** key on [meshradar.io](https://meshradar.io),
+local nodes and packets will still come back but upstream will fail with
+`HTTP 403` until you issue a new key for the restored `device_id`. See
+[Upstream HTTP 403 after restore](#upstream-http-403-after-restore).
+
+**Restore says success but the service never stops (no `meshpoint-restore-finish` log lines).**
+Older builds reused one systemd unit name (`meshpoint-restore-finish`) with
+`--remain-after-exit`, so only the **first** dashboard restore after boot could
+run. Later attempts were ignored while the API still returned success.
+
+**Fix:** Pull the latest `feat/v0.7.7` (unique unit per restore + `--collect`).
+
+**Immediate recovery from SSH** (works even before pull):
+
+```bash
+ARCHIVE=$(sudo ls -t /opt/meshpoint/data/restore-incoming/meshpoint-restore-*.tar.gz | head -1)
+sudo bash /opt/meshpoint/scripts/restore_finish.sh "$ARCHIVE"
+```
+
+```bash
+sudo systemctl reset-failed 'meshpoint-restore-finish*' 2>/dev/null || true
+```
 
 ### Setup wizard says "Existing config/local.yaml found" on a fresh SD
 
@@ -1124,13 +1246,52 @@ of the resolved channel name.
    meshpoint logs | grep -i upstream
    ```
 
-### `Upstream 401`
+### `Upstream 401` or `HTTP 403` on WebSocket connect
 
-**Cause:** Invalid API key.
+**Cause:** Invalid or revoked Meshradar API key. Logs show
+`server rejected WebSocket connection: HTTP 403` (authorizer deny) or a 401
+class failure. `auth=present` only means a token is in `local.yaml`, not that
+the cloud still accepts it.
 
 **Fix:** Generate a new key at [meshradar.io](https://meshradar.io) under
-**Account > API Keys** (the key is only shown once: copy it immediately).
-Then re-run `sudo meshpoint setup` and paste the new key.
+**Account → API Keys** (shown once: copy immediately). Assign it to the
+`device_id` in your config, then either:
+
+- Re-run `sudo meshpoint setup` and paste the new key at the API key prompt, or
+- Edit `upstream.auth_token` in `config/local.yaml`, then restart:
+
+```bash
+sudo nano /opt/meshpoint/config/local.yaml
+sudo systemctl restart meshpoint
+meshpoint logs | grep -i upstream
+```
+
+There is no dashboard editor for the API key today (the Meshradar configuration
+card is not wired into the Configuration tab yet).
+
+### Upstream HTTP 403 after restore
+
+**Cause:** Restore succeeded locally (nodes, packets, `device_id` back) but the
+API key inside the backup was **deleted or rotated on Meshradar** after the
+backup was taken. Common during disaster-recovery testing: run `meshpoint setup`
+with a new key, delete the old key in the account panel, then restore the
+archive that still contains the old token.
+
+**Fix:**
+
+1. Confirm restore identity:
+   ```bash
+   sudo grep device_id /opt/meshpoint/config/local.yaml
+   ```
+2. On [meshradar.io](https://meshradar.io), create a new API key for that
+   `device_id` (or re-claim the device if it shows orphaned).
+3. Run `sudo meshpoint setup` and paste the new key, or set `upstream.auth_token`
+   in `config/local.yaml`, then restart.
+4. Confirm `connected to wss://api.meshradar.io` in logs.
+
+**Prevention:** Keep the backup file off the Pi. After restore, wait for upstream
+to connect before deleting any API keys. If you must rotate keys, update upstream
+on the Pi first, take a **new** backup, then retire the old key.
 
 ### Map dot turns red when the Pi is online
 

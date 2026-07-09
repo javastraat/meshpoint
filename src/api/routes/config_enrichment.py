@@ -76,11 +76,16 @@ def enrich_config_payload(cfg: AppConfig, base: dict) -> dict:
         "min_fix_quality": location.min_fix_quality,
     }
     pos = cfg.transmit.position
+    telem = cfg.transmit.telemetry
     if "transmit" in base:
         base["transmit"]["position"] = {
             "interval_minutes": pos.interval_minutes,
             "startup_delay_seconds": pos.startup_delay_seconds,
             "coordinate_source": pos.coordinate_source,
             "location_precision": pos.location_precision,
+        }
+        base["transmit"]["telemetry"] = {
+            "interval_minutes": telem.interval_minutes,
+            "startup_delay_seconds": telem.startup_delay_seconds,
         }
     return base

@@ -10,6 +10,7 @@
  *   - Active sessions (same poll, websocket_clients count)
  *   - Noise floor     (live from `noise_floor` WS frame; sparkline
  *                      drawn by NoiseFloorSparkline)
+ *   - RF Environment  (link to full RF tab, below noise floor)
  *
  * Hidden when the sidebar is in icon-only "rail" mode.
  */

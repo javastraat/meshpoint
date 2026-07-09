@@ -48,26 +48,22 @@ class TestReleaseChannelRegistry(unittest.TestCase):
     def test_custom_channel_without_branch_returns_none(self) -> None:
         self.assertIsNone(ReleaseChannelRegistry().resolve_branch("custom"))
 
-    def test_find_returns_rc_channel(self) -> None:
-        match = ReleaseChannelRegistry().find("rc-077")
+    def test_find_retired_rc_id_lands_on_stable(self) -> None:
+        # Fork catalog has no RC tier; upstream's rc ids alias to stable.
+        match = ReleaseChannelRegistry().find("rc-078")
         self.assertIsNotNone(match)
-        self.assertEqual(match.tier, "rc")
-        self.assertEqual(match.branch, "feat/v0.7.7")
+        self.assertEqual(match.tier, "stable")
+        self.assertEqual(match.branch, "main")
 
-    def test_find_returns_wismesh_experimental_channel(self) -> None:
+    def test_find_retired_wismesh_id_lands_on_stable(self) -> None:
         match = ReleaseChannelRegistry().find("wismesh-node")
         self.assertIsNotNone(match)
-        self.assertEqual(match.tier, "experimental")
-        self.assertEqual(match.branch, "feat/wismesh-hat")
-
-    def test_resolve_branch_for_wismesh_experimental(self) -> None:
-        registry = ReleaseChannelRegistry()
-        self.assertEqual(registry.resolve_branch("wismesh-node"), "feat/wismesh-hat")
+        self.assertEqual(match.tier, "stable")
+        self.assertEqual(match.branch, "main")
 
     def test_normalize_channel_id_remaps_retired_rc(self) -> None:
-        self.assertEqual(normalize_channel_id("rc-074"), "rc-077")
-        self.assertEqual(normalize_channel_id("rc-075"), "rc-077")
-        self.assertEqual(normalize_channel_id("rc-076"), "rc-077")
+        for retired in ("rc-074", "rc-075", "rc-076", "rc-077", "rc-078"):
+            self.assertEqual(normalize_channel_id(retired), "stable")
         self.assertEqual(normalize_channel_id("stable"), "stable")
 
 

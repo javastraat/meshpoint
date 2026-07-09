@@ -13,6 +13,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/dashboard.css" />
+    <link rel="stylesheet" href="css/rf.css" />
     <link rel="stylesheet" href="sidebar/sidebar.css" />
     <link rel="stylesheet" href="topbar/topbar.css?v=2" />
     <link rel="stylesheet" href="css/build_stamp.css" />
@@ -21,6 +22,7 @@
     <link rel="stylesheet" href="css/init_checklist.css" />
     <link rel="stylesheet" href="css/route_motion.css" />
     <link rel="stylesheet" href="css/since_line.css" />
+    <link rel="stylesheet" href="css/status_strip.css" />
     <link rel="stylesheet" href="css/command_palette.css" />
     <link rel="stylesheet" href="css/keymap_overlay.css" />
     <link rel="stylesheet" href="css/theme_high_contrast.css" />
@@ -38,6 +40,7 @@
     <link rel="stylesheet" href="css/lorawan.css" />
     <link rel="stylesheet" href="css/listener.css" />
     <link rel="stylesheet" href="css/gps.css" />
+    <link rel="stylesheet" href="css/packet_detail_modal.css" />
     <link rel="stylesheet" href="css/terminal_theme.css" />
     <link rel="stylesheet" href="css/terminal.css" />
     <link rel="stylesheet" href="/vendor/xterm/xterm.css" />
@@ -265,6 +268,23 @@
                     </div>
                     <canvas class="telemetry-rail__noise-canvas" id="telemetry-noise-canvas" aria-hidden="true"></canvas>
                 </div>
+                <div class="telemetry-rail__rf-wrap">
+                    <a href="#/rf" class="telemetry-rail__rf-link sidebar__link" data-route="rf">
+                        <span class="telemetry-rail__rf-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M4 18v-4"/>
+                                <path d="M8 18V8"/>
+                                <path d="M12 18v-6"/>
+                                <path d="M16 18V4"/>
+                                <path d="M20 18v-9"/>
+                            </svg>
+                        </span>
+                        <span class="telemetry-rail__rf-label">RF Environment</span>
+                        <svg class="telemetry-rail__rf-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <polyline points="9 18 15 12 9 6"/>
+                        </svg>
+                    </a>
+                </div>
             </section>
 
             <footer class="sidebar__footer">
@@ -478,6 +498,12 @@
             <section class="section" data-section="stats" style="display:none">
                 <div id="stats-panel" class="stats-panel">
                     <div class="stats-panel__loading">Loading stats...</div>
+                </div>
+            </section>
+
+            <section class="section" data-section="rf" style="display:none">
+                <div id="rf-panel" class="rf-panel">
+                    <div class="stats-panel__loading">Loading RF environment...</div>
                 </div>
             </section>
 
@@ -747,6 +773,18 @@
                         </fieldset>
                         <p class="auth-status" data-display-units-status aria-live="polite"></p>
                     </article>
+                    <article class="auth-card backup-restore-card" id="meshpoint-backup-restore">
+                        <h3 class="auth-card__title">Backup and restore</h3>
+                        <p class="auth-card__hint">Download a timestamped archive of <code>config/local.yaml</code> and the full <code>data/</code> directory (SQLite snapshot, PKI keys, rollback state). The file contains all secrets. Store it offline. Do not commit it to git or email it.</p>
+                        <p class="backup-card__warning" data-backup-warning hidden aria-live="polite"></p>
+                        <p class="backup-card__summary" data-backup-summary aria-live="polite"></p>
+                        <div class="auth-card__actions backup-card__actions">
+                            <button class="terminal-button" type="button" data-backup-download>Download backup</button>
+                            <button class="terminal-button terminal-button--danger" type="button" data-backup-restore>Restore backup</button>
+                            <input type="file" accept=".tar.gz,application/gzip" data-backup-file hidden>
+                        </div>
+                        <p class="auth-status" data-backup-status aria-live="polite"></p>
+                    </article>
                     <header class="dangerous-panel__head dangerous-panel__head--secondary">
                         <h3 class="dangerous-panel__title">Service actions</h3>
                         <p class="dangerous-panel__subtitle">Each requires confirmation and is recorded in the audit log.</p>
@@ -772,6 +810,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
     <script src="js/node_metrics_chart.js"></script>
     <script src="js/node_drawer.js"></script>
+    <script src="js/packet_detail_modal.js"></script>
     <script src="js/simple_packet_feed.js"></script>
     <script src="js/messaging_contacts.js"></script>
     <script src="js/messaging_chat.js"></script>
@@ -798,10 +837,17 @@
     <script src="js/settings/release_notes_view.js"></script>
     <script src="js/settings/update_panel_controller.js"></script>
     <script src="js/settings/meshpoint_display_form.js"></script>
+    <script src="js/settings/backup_restore_card.js"></script>
     <script src="js/settings/dangerous_panel_controller.js"></script>
     <script src="js/configuration/identity_card.js"></script>
     <script src="js/configuration/radio_card.js"></script>
     <script src="js/configuration/nodeinfo_config_card.js"></script>
+    <script src="js/configuration/broadcast_interval_card.js"></script>
+    <script src="js/configuration/broadcast_status_card.js"></script>
+    <script src="js/configuration/position_broadcast_card.js"></script>
+    <script src="js/configuration/telemetry_broadcast_card.js"></script>
+    <script src="vendor/qrcode/qrcode.min.js"></script>
+    <script src="js/configuration/quick_deploy_card.js"></script>
     <script src="js/configuration/channels_card.js"></script>
     <script src="js/configuration/meshcore_card.js"></script>
     <script src="js/configuration/transmit_card.js"></script>
@@ -839,6 +885,8 @@
     <script src="topbar/topbar_controller.js"></script>
     <script src="js/build_stamp.js"></script>
     <script src="js/last_visit_tracker.js"></script>
+    <script src="js/status_strip.js"></script>
+    <script src="js/rf_tab.js"></script>
     <script src="js/since_line.js"></script>
     <script src="js/since_line_controller.js"></script>
     <script src="js/init_checklist.js"></script>

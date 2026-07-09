@@ -41,7 +41,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const router = new Router({
         defaultRoute: 'dashboard',
         allowedRoutes: [
-            'dashboard', 'meshtastic', 'meshcore', 'lorawan', 'listener', 'stats', 'messages', 'radio', 'terminal',
+            'dashboard', 'meshtastic', 'meshcore', 'lorawan', 'listener', 'stats', 'rf', 'messages', 'radio', 'terminal',
             'configuration/identity', 'configuration/radio',
             'configuration/channels', 'configuration/transmit',
             'configuration/mqtt',
@@ -255,6 +255,12 @@ function _bootDangerousPanel(router) {
     if (prefsRoot && window.MeshpointDisplayForm) {
         new window.MeshpointDisplayForm(prefsRoot);
     }
+    const backupRoot = document.getElementById('meshpoint-backup-restore');
+    let backupCard = null;
+    if (backupRoot && window.BackupRestoreCard) {
+        backupCard = new window.BackupRestoreCard(backupRoot);
+        backupCard.bind();
+    }
     const controller = new window.DangerousPanelController(root);
     controller.bind();
     let primed = false;
@@ -263,6 +269,7 @@ function _bootDangerousPanel(router) {
         if (primed) return;
         primed = true;
         controller.refresh();
+        backupCard?.refresh();
     });
 }
 

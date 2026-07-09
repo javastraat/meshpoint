@@ -42,6 +42,7 @@ _ADMIN_SECTIONS: tuple[str, ...] = (
     "meshcore",
     "messages",
     "stats",
+    "rf",
     "radio",
     "listener",
     "terminal",
@@ -66,6 +67,7 @@ _VIEWER_SECTIONS: tuple[str, ...] = (
     "meshcore",
     "messages",
     "stats",
+    "rf",
     "radio",
     "listener",
 )

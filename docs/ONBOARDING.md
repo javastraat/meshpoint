@@ -8,7 +8,9 @@ Step-by-step instructions for building and deploying a Meshpoint: from an empty 
 
 A **Meshpoint** is an edge device that:
 
-- Listens to **Meshtastic** traffic on 8 LoRa channels simultaneously via an SX1302/SX1303 concentrator
+- Listens to **Meshtastic** traffic on one tuned frequency with **SF7-SF12
+  decoded in parallel** (eight SX1302 demod chains) via an SX1302/SX1303
+  concentrator
 - **Sends and receives Meshtastic messages** directly from the browser dashboard (native TX via the concentrator)
 - Optionally monitors **MeshCore** traffic via a USB companion radio
 - Decodes, stores, and visualizes packets on a real-time dashboard with full chat UI, node discovery, and radio configuration
@@ -286,7 +288,7 @@ The command auto-detects the USB port, stops the service, configures the radio, 
 |---|---|---|
 | **Protocol** | Meshtastic | MeshCore |
 | **Direction** | RX + TX (native) | RX + TX (via companion) |
-| **Channels** | 8 simultaneous | 1 |
+| **Channels** | SF7-SF12 parallel (one RF plan) | 1 |
 | **Spreading factors** | SF7-SF12 all at once | Fixed (SF7 default) |
 | **Connection** | SPI (internal HAT) | USB serial |
 | **Configuration** | Dashboard Radio settings | Region preset via wizard |
@@ -407,6 +409,10 @@ sudo poweroff
 Wait for the green LED to stop blinking, then unplug for 10+ seconds and plug back in.
 
 **Important:** Always shut down gracefully with `sudo poweroff` before unplugging. Hard power cuts (yanked cable, power outage) can corrupt the SD card and latch the RAK2287's SPI bus. Repeated hard power loss can permanently damage the SX1250 radio.
+
+### Back up your Meshpoint
+
+On a healthy install, use **Settings → System → Download backup** and store the `.tar.gz` on your PC or NAS (not only on the SD card). If the card fails, reinstall Meshpoint, run `sudo meshpoint setup` once so the dashboard loads, then **Restore backup** from the System page. See [TROUBLESHOOTING.md](TROUBLESHOOTING.md#backup-before-sd-card-trouble).
 
 For troubleshooting, corrupted install recovery, and pip issues, see [Troubleshooting](TROUBLESHOOTING.md).
 

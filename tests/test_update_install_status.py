@@ -127,7 +127,7 @@ class TestBuildInstallStatusPayload(unittest.TestCase):
         self.assertIsNone(payload["active_channel_id"])
 
     def test_payload_includes_branch_and_channel(self) -> None:
-        runner = _FakeGitRunner(branch="feat/v0.7.7")
+        runner = _FakeGitRunner(branch="feat/v0.7.8")
         with mock.patch(
             "src.api.update.install_status.fetch_remote_version_sync",
             return_value="0.7.3.1",
@@ -142,9 +142,9 @@ class TestBuildInstallStatusPayload(unittest.TestCase):
                     runner=runner,
                     use_sudo=False,
                 )
-        self.assertEqual(payload["install_branch"], "feat/v0.7.7")
+        self.assertEqual(payload["install_branch"], "feat/v0.7.8")
         self.assertEqual(payload["active_channel_id"], "custom")
-        self.assertEqual(payload["remote_branch"], "feat/v0.7.7")
+        self.assertEqual(payload["remote_branch"], "feat/v0.7.8")
         self.assertFalse(payload["update_available"])
 
     def test_main_on_075_payload_keeps_picker_on_stable(self) -> None:

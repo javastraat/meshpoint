@@ -65,13 +65,12 @@ class RadioConfig:
     # (default; spectral scan stays unavailable, packet-derived
     # noise floor remains in use).
     #
-    # On RAK2287 / RAK5146 / SenseCap M1 this is typically
-    # ``/dev/spidev0.1`` (separate from the SX1302's
-    # ``/dev/spidev0.0``). Some carriers daisy-chain the SX1261
-    # behind the SX1302's SPI router and want this set to the same
-    # path as the SX1302 SPI device. Wrong path = HAL refuses to
-    # ``lgw_start`` after our config attempt, so we ship empty by
-    # default and ask interested users to opt in explicitly.
+    # On RAK2287 / RAK5146 / SenseCap M1 the SX1261 sits behind the
+    # SX1302 SPI router, not on a Pi-visible bus. Setting
+    # ``/dev/spidev0.1`` there usually fails ``lgw_sx1261_setconf``
+    # and can block ``lgw_start``. Leave empty on fleet hardware;
+    # only set on carriers that expose SX1261 on a dedicated CE line
+    # (Semtech reference kit, custom boards). See CONFIGURATION.md.
     sx1261_spi_path: str = ""
 
 
@@ -153,6 +152,14 @@ class StorageConfig:
     database_path: str = "data/concentrator.db"
     max_packets_retained: int = 100_000
     cleanup_interval_seconds: int = 3600
+
+
+@dataclass
+class MetricsConfig:
+    """Prometheus-compatible /metrics scrape endpoint (PR 09)."""
+
+    enabled: bool = False
+    require_auth: bool = True
 
 
 @dataclass
@@ -360,6 +367,7 @@ class AppConfig:
     transmit: TransmitConfig = field(default_factory=TransmitConfig)
     web_auth: WebAuthConfig = field(default_factory=WebAuthConfig)
     location: LocationConfig = field(default_factory=LocationConfig)
+    metrics: MetricsConfig = field(default_factory=MetricsConfig)
 
 
 def _resolve_radio_frequency(radio: "RadioConfig") -> None:
@@ -448,6 +456,7 @@ def _apply_yaml(cfg: AppConfig, path: Path) -> None:
         "transmit": cfg.transmit,
         "web_auth": cfg.web_auth,
         "location": cfg.location,
+        "metrics": cfg.metrics,
     }
 
     unknown_keys: list[str] = []

@@ -31,7 +31,7 @@
 
 ## What Is This?
 
-A Raspberry Pi-based Meshtastic base station that sends and receives messages through an SX1302/SX1303 concentrator. The concentrator receives on 8 channels simultaneously (SF7-SF12) and transmits natively with up to 27 dBm output. Phones and nodes see it as a regular participant on the mesh.
+A Raspberry Pi-based Meshtastic base station that sends and receives messages through an SX1302/SX1303 concentrator. The concentrator decodes SF7 through SF12 in parallel on one tuned frequency (eight demod chains). It transmits natively with up to 27 dBm output. Phones and nodes see it as a regular participant on the mesh.
 
 Everything is managed from a browser dashboard: full chat with channels and DMs, node discovery, radio configuration, and live packet feed. Also supports MeshCore traffic through USB companions and passively sniffs LoRaWAN traffic. Optionally syncs upstream to [Meshradar](https://meshradar.io) for aggregated multi-site mesh intelligence.
 
@@ -136,13 +136,13 @@ This is a customized fork of upstream [KMX415/meshpoint](https://github.com/KMX4
 
 **Dual-protocol MQTT gateway.** Publish captured packets to community MQTT brokers and Home Assistant. Dual-protocol: Meshtastic (protobuf) and MeshCore (JSON) from a single device. Two-gate privacy model ensures private channel data never leaks. Optional JSON publishing, HA auto-discovery, and configurable location precision.
 
-**Auto-detect hardware.** RAK Hotspot V2, SenseCap M1, and Syncrobit Chameleon (SX1302) supported. MeshCore USB companions auto-detected on `/dev/ttyUSB*` and `/dev/ttyACM*`.
+**Auto-detect hardware.** RAK Hotspot V2, SenseCap M1, and Syncrobit Chameleon (SX1302) supported; carrier board may show as generic SX1302/Pi during setup. **Bobcat Miner 300** (Rockchip RK3566 + SX1302 on Armbian) is community-validated with manual SPI/GPIO setup. **WisMesh Node** (RAK6421 Pi HAT + WisBlock SX1262, experimental) is documented on `main` and installs from branch `feat/wismesh-hat` until v0.7.6 merges. MeshCore USB companions auto-detected on `/dev/ttyUSB*` and `/dev/ttyACM*`.
 
 ---
 
 ## Hardware
 
-> **Requirements:** Raspberry Pi 4 or Compute Module 4, **64-bit** Raspberry Pi OS or Raspbian Lite, Python 3.12+. Pi 3, Pi 5 (unvalidated), x86, and 32-bit OS are not supported.
+> **Requirements:** Raspberry Pi 4 or Compute Module 4, **64-bit** Raspberry Pi OS or Raspbian Lite, Python 3.12+. **Bobcat Miner 300** uses Rockchip RK3566 + community Armbian (see below). Pi 3, Pi 5 (unvalidated), x86, and 32-bit OS are not supported.
 
 ### Option A: RAK Hotspot V2 (~$60, recommended)
 
@@ -196,7 +196,23 @@ The [RAK WisMesh Pi Node](https://store.rakwireless.com/products/wismesh-pi-node
 
 > **Guides:** [WisMesh branch overview](docs/plans/WISMESH-BRANCH.md), [Gateway ↔ Node migration](docs/MIGRATE-GATEWAY-TO-NODE.md), [Hardware Matrix](docs/HARDWARE-MATRIX.md#wismesh-node-rak6421-hat-experimental).
 
-### Optional: MeshCore USB Companions
+### Option F: Bobcat Miner 300 (~$15-40 used, community path)
+
+Retired **Bobcat Miner 300** units (models **G290** / **G295** reported) bundle a
+**Rockchip RK3566** host, **64 GB eMMC**, and an onboard **SX1302** concentrator.
+They are not Raspberry Pis: you flash **[Bobcat-Armbian](https://github.com/sicXnull/Bobcat-Armbian)**,
+pin the vendor kernel (do not run a generic `apt upgrade`), enable the `spi5-m1`
+overlay, then install Meshpoint with concentrator SPI on `/dev/spidev5.0` and a
+small systemd drop-in for GPIO reset and SPI symlinks.
+
+Community-validated (July 2026): Meshtastic TX/RX on G295; upgrade from v0.7.3.x
+to v0.7.4+ reported smooth when `install.sh` skips `apt-get upgrade`. MeshCore
+USB companion may need a **powered hub** (onboard micro-USB is for flashing;
+OTG not confirmed on G295).
+
+> **Step-by-step:** [Bobcat Miner 300 guide](docs/BOBCAT-300.md) and [Hardware Matrix](docs/HARDWARE-MATRIX.md).
+
+### Optional: MeshCore USB Companion
 
 Add one or more Heltec V3/V4 or T-Beam nodes running [MeshCore USB companion firmware](https://flasher.meshcore.co.uk/) to monitor MeshCore traffic alongside Meshtastic. Up to 4 companions can be attached simultaneously, each labeled by band. The setup wizard auto-detects each device.
 
@@ -376,6 +392,11 @@ FastAPI server on port 8080 (configurable via `dashboard.port` in `local.yaml`):
 | `GET /api/listener/stream` | Live MP3 audio stream for the browser player |
 | `GET /api/device/spectrum` | Latest band sweep from the SX1302 spectral scanner (median/peak per 100 kHz step) |
 | `POST /api/device/spectrum/sweep` | Trigger an on-demand band sweep (admin) |
+| `GET /api/rf/status` | RF Environment tab data: noise floor, calibration, latest scan histogram |
+| `GET /api/config/export` | Quick Deploy export: public channel params + Meshtastic QR URL (no private PSKs) |
+| `GET /api/system/backup/download` | Download config + data backup archive (admin) |
+| `POST /api/system/backup/restore` | Restore a backup archive (admin) |
+| `GET /metrics` | Prometheus scrape endpoint (opt-in via `metrics.enabled`) |
 | `WS /ws` | Real-time packet + message stream |
 
 ---
@@ -417,11 +438,15 @@ See [docs/COMMON-ERRORS.md](docs/COMMON-ERRORS.md#upgrades) if the service fails
 
 **Setup and configuration**
 - **[Onboarding Guide](docs/ONBOARDING.md):** step-by-step from empty Pi to running Meshpoint
-- **[Hardware Matrix](docs/HARDWARE-MATRIX.md):** all supported hardware, companion radios, antennas, what's not supported
+- **[Hardware Matrix](docs/HARDWARE-MATRIX.md):** RAK V2 vs SenseCap M1 vs Chameleon vs Bobcat vs DIY, WisMesh Node (experimental), MeshCore companion radios, antennas, what's not supported
+- **[Bobcat Miner 300](docs/BOBCAT-300.md):** Rockchip RK3566 + Armbian repurposing (manual SPI/GPIO)
+- **[WisMesh Node (experimental)](docs/plans/WISMESH-BRANCH.md):** RAK6421 HAT, meshtasticd, branch install until v0.7.6
+- **[Gateway ↔ Node migration](docs/MIGRATE-GATEWAY-TO-NODE.md):** switch between concentrator Gateway and WisMesh Node platforms
 - **[Configuration Guide](docs/CONFIGURATION.md):** all config options, private channels, relay, upstream, MQTT, radio tuning
 - **[Radio Config Explained](docs/RADIO-CONFIG-EXPLAINED.md):** the "why" behind region, spreading factor, bandwidth, custom slots
 - **[MQTT and Meshradar](docs/MQTT-AND-MESHRADAR.md):** the two cloud paths side-by-side, what data flows where, privacy posture
-- **[Network Watchdog](docs/NETWORK-WATCHDOG.md):** how the WiFi auto-recovery service works, default thresholds
+- **[Home Assistant cookbook](docs/HOME-ASSISTANT-COOKBOOK.md):** copy-paste REST sensors, alerts, and broadcast automations for LAN integrations
+- **[Network Watchdog](docs/NETWORK-WATCHDOG.md):** how the WiFi auto-recovery service works, default thresholds, re-enabling auto-reboot
 
 **When something goes wrong**
 - **[FAQ](docs/FAQ.md):** quick answers to common questions
@@ -429,6 +454,7 @@ See [docs/COMMON-ERRORS.md](docs/COMMON-ERRORS.md#upgrades) if the service fails
 - **[Troubleshooting](docs/TROUBLESHOOTING.md):** longer diagnostic flows, recovery from corrupted installs
 
 **Project**
+- **[Contributor PR roadmap](docs/plans/master-pr-roadmap.md):** ordered queue for diagnostics, intelligence, and field-ops PRs
 - **[Changelog](docs/CHANGELOG.md):** version history and release notes
 - **[GitHub Issues](https://github.com/javastraat/meshpoint/issues)** for bugs in this fork; **[upstream Discussions](https://github.com/KMX415/meshpoint/discussions)** for general Meshpoint questions
 - **[Discord](https://discord.gg/BnhSeFXVY8)** for real-time community support

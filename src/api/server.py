@@ -51,10 +51,14 @@ from src.api.routes import (
     meshcore_config_routes,
     mqtt_config_routes,
     nodeinfo_routes,
+    position_broadcast_routes,
+    telemetry_broadcast_routes,
     nodes,
     packets,
     public_radar_routes,
     spectrum_routes,
+    metrics_routes,
+    rf_routes,
     stats_routes,
     system_config_routes,
     system_metrics,
@@ -62,6 +66,7 @@ from src.api.routes import (
     upstream_config_routes,
     update_check,
     update_routes,
+    backup_routes,
 )
 from src.api.terminal import CommandCatalog, SessionManager
 from src.api.update import ReleaseChannelRegistry, UpdateApplier
@@ -77,10 +82,8 @@ from src.models.packet import Packet
 from src.storage.message_repository import MessageRepository
 from src.api.telemetry.noise_floor import NoiseFloorTracker
 from src.api.telemetry.spectral_scan_service import SpectralScanService
-from src.transmit.nodeinfo_broadcaster import (
-    NodeInfoBroadcaster,
-    clamp_interval_minutes,
-)
+from src.transmit.broadcast_interval import clamp_interval_minutes
+from src.transmit.nodeinfo_broadcaster import NodeInfoBroadcaster
 from src.transmit.position_broadcaster import PositionBroadcaster
 from src.transmit.telemetry_broadcaster import TelemetryBroadcaster
 from src.transmit.meshtastic_inbound_handler import MeshtasticInboundHandler
@@ -131,6 +134,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
             config.storage.database_path,
         ),
     )
+    backup_routes.init_routes(config)
     # Dangerous registry is wired in lifespan so clear-db / wipe-phantoms /
     # force-nodeinfo can close over the live pipeline objects.
 
@@ -175,7 +179,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
                 asyncio.get_running_loop().create_task(
                     _send_meshcore_advert(meshcore_tx_ref, mc_source)
                 )
-        _setup_message_interception(
+        channel_hash_resolver = _setup_message_interception(
             pipeline, message_repo, config, meshcore_tx_ref, tx_service
         )
         _setup_inbound_responder(pipeline, tx_service, config)
@@ -230,7 +234,13 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
         spectrum_routes.init_routes(_spectral_scan_service)
 
         _init_routes(
-            pipeline, config, identity, auth_subsystem, tx_service, message_repo
+            pipeline,
+            config,
+            identity,
+            auth_subsystem,
+            tx_service,
+            message_repo,
+            channel_hash_resolver=channel_hash_resolver,
         )
         _init_dangerous_registry(pipeline)
         global _rtl_listener
@@ -267,11 +277,13 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     )
 
     app.include_router(auth_routes.router)
+    app.include_router(metrics_routes.router)
     app.include_router(identity_routes.router)
     app.include_router(auth_config_routes.router)
     app.include_router(public_radar_routes.router)
     app.include_router(terminal_routes.router)
     app.include_router(update_routes.router)
+    app.include_router(backup_routes.router)
     app.include_router(dangerous_routes.router)
 
     protected = [Depends(require_auth)]
@@ -283,6 +295,8 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     app.include_router(update_check.router, dependencies=protected)
     app.include_router(messages.router, dependencies=protected)
     app.include_router(nodeinfo_routes.router, dependencies=protected)
+    app.include_router(position_broadcast_routes.router, dependencies=protected)
+    app.include_router(telemetry_broadcast_routes.router, dependencies=protected)
     app.include_router(mqtt_config_routes.router, dependencies=protected)
     app.include_router(upstream_config_routes.router, dependencies=protected)
     app.include_router(device_config_routes.router, dependencies=protected)
@@ -296,6 +310,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     app.include_router(spectrum_routes.router, dependencies=protected)
     app.include_router(meshtastic_routes.router, dependencies=protected)
     app.include_router(meshcore_routes.router, dependencies=protected)
+    app.include_router(rf_routes.router, dependencies=protected)
 
     @app.websocket("/ws")
     async def websocket_endpoint(websocket: WebSocket):
@@ -571,11 +586,20 @@ def _build_telemetry_broadcaster(
 ) -> TelemetryBroadcaster | None:
     if tx_service is None or not tx_service.meshtastic_enabled:
         return None
-    telem = config.transmit.telemetry
-    if clamp_interval_minutes(telem.interval_minutes) == 0:
-        return None
 
     import time
+
+    telem = config.transmit.telemetry
+    interval_minutes = clamp_interval_minutes(
+        telem.interval_minutes,
+        field_name="transmit.telemetry.interval_minutes",
+    )
+    if interval_minutes == 0:
+        logger.info(
+            "Telemetry broadcaster starting paused "
+            "(transmit.telemetry.interval_minutes=0); save a non-zero "
+            "interval on the Configuration tab to resume."
+        )
 
     service_started = time.monotonic()
     device_fn, _local_fn = _telemetry_metrics_providers(
@@ -601,11 +625,20 @@ def _build_position_broadcaster(
 ) -> PositionBroadcaster | None:
     if tx_service is None or not tx_service.meshtastic_enabled:
         return None
-    pos_cfg = config.transmit.position
-    if clamp_interval_minutes(pos_cfg.interval_minutes) == 0:
-        return None
 
     from src.transmit.mesh_position_resolver import MeshPositionResolver
+
+    pos_cfg = config.transmit.position
+    interval_minutes = clamp_interval_minutes(
+        pos_cfg.interval_minutes,
+        field_name="transmit.position.interval_minutes",
+    )
+    if interval_minutes == 0:
+        logger.info(
+            "Position broadcaster starting paused "
+            "(transmit.position.interval_minutes=0); save a non-zero "
+            "interval on the Configuration tab to resume."
+        )
 
     resolver = MeshPositionResolver(config, coord.location_source)
 
@@ -739,7 +772,10 @@ def _build_nodeinfo_broadcaster(
         return None
 
     ni = config.transmit.nodeinfo
-    interval_minutes = clamp_interval_minutes(ni.interval_minutes)
+    interval_minutes = clamp_interval_minutes(
+        ni.interval_minutes,
+        field_name="transmit.nodeinfo.interval_minutes",
+    )
     startup_delay = max(0, ni.startup_delay_seconds)
     if interval_minutes == 0:
         logger.info(
@@ -978,21 +1014,15 @@ def _setup_message_interception(
     mc_name_cache: dict[str, str] = {}
     mc_pubkey_canon: dict[str, str] = {}
 
-    channel_hash_map: dict[int, int] = {}
+    from src.api.channel_hash_resolver import ChannelHashResolver
+
+    channel_hash_resolver = ChannelHashResolver()
     try:
-        crypto = coord._crypto
-        all_keys = crypto.get_all_keys()
-        primary_name = config.meshtastic.primary_channel_name
-        if all_keys:
-            h = crypto.compute_channel_hash(primary_name, all_keys[0])
-            channel_hash_map[h] = 0
-        for i, (ch_name, _) in enumerate(
-            config.meshtastic.channel_keys.items(), start=1
-        ):
-            if i < len(all_keys):
-                h = crypto.compute_channel_hash(ch_name, all_keys[i])
-                channel_hash_map[h] = i
-        logger.info("Channel hash map: %s", channel_hash_map)
+        channel_hash_resolver.rebuild(
+            coord._crypto,
+            config.meshtastic.primary_channel_name,
+            config.meshtastic.channel_keys,
+        )
     except Exception:
         logger.debug("Failed to build channel hash map", exc_info=True)
 
@@ -1070,7 +1100,7 @@ def _setup_message_interception(
             if packet.protocol == Protocol.MESHCORE:
                 ch_idx = packet.channel_hash or 0
             else:
-                ch_idx = channel_hash_map.get(packet.channel_hash, 0)
+                ch_idx = channel_hash_resolver.lookup(packet.channel_hash)
             node_id = f"broadcast:{packet.protocol.value}:{ch_idx}"
             direction = "received"
         elif is_for_us:
@@ -1234,6 +1264,7 @@ def _setup_message_interception(
             pass
 
     coord.on_packet(on_text_packet)
+    return channel_hash_resolver
 
 
 def _init_routes(
@@ -1243,6 +1274,7 @@ def _init_routes(
     auth_subsystem: AuthSubsystem,
     tx_service: TxService | None = None,
     message_repo: MessageRepository | None = None,
+    channel_hash_resolver=None,
 ) -> None:
     identity_routes.init_routes(identity, auth_subsystem.service)
     network_mapper = NetworkMapper(coord.node_repo)
@@ -1266,6 +1298,23 @@ def _init_routes(
         node_repo=coord.node_repo,
         packet_repo=coord.packet_repo,
     )
+    metrics_routes.init_routes(
+        metrics_config=config.metrics,
+        stats_reporter=coord.stats_reporter,
+        signal_analyzer=signal_analyzer,
+        traffic_monitor=traffic_monitor,
+        relay_manager=coord.relay_manager,
+        node_repo=coord.node_repo,
+        noise_floor_tracker=noise_floor_tracker,
+        capture_coordinator=coord.capture_coordinator,
+        region=config.radio.region or "US",
+    )
+    global _spectral_scan_service
+    rf_routes.init_routes(
+        noise_floor_tracker,
+        _spectral_scan_service,
+        config,
+    )
 
     meshcore_tx = None
     if tx_service and hasattr(tx_service, '_meshcore_tx'):
@@ -1285,13 +1334,25 @@ def _init_routes(
         config=config,
         nodeinfo_broadcaster=nodeinfo_broadcaster,
     )
+    position_broadcast_routes.init_routes(
+        config=config,
+        position_broadcaster=position_broadcaster,
+    )
+    telemetry_broadcast_routes.init_routes(
+        config=config,
+        telemetry_broadcaster=telemetry_broadcaster,
+    )
     config_routes.init_routes(
         config=config,
         crypto=crypto,
         tx_service=tx_service,
         identity=identity,
+        channel_hash_resolver=channel_hash_resolver,
     )
-    mqtt_config_routes.init_routes(config=config)
+    mqtt_config_routes.init_routes(
+        config=config,
+        mqtt_publisher=coord.mqtt_publisher,
+    )
     upstream_config_routes.init_routes(config=config)
     device_config_routes.init_routes(config=config, identity=identity)
     gps_status.init_routes(location_source=coord.location_source)

@@ -21,6 +21,7 @@ const UPDATE_CHANNEL_ALIASES = {
     'rc-075': 'stable',
     'rc-076': 'stable',
     'rc-077': 'stable',
+    'rc-078': 'stable',
     'wismesh-node': 'stable',
 };
 
