@@ -137,6 +137,16 @@ class SerialCaptureSource(CaptureSource):
             # one a passive multi-channel sniffer most needs (its own
             # channel_keys config may decrypt what the stick couldn't).
             raw_bytes = self._reconstruct_raw(packet)
+            # TEMPORARY DEBUG (remove once confirmed) -- checking whether
+            # reconstructed packets actually carry rxRssi/rxSnr or always
+            # fall through to the -100/0 defaults below.
+            logger.info(
+                "serial_source DEBUG reconstructed packet keys=%s "
+                "rxRssi=%r rssi=%r rxSnr=%r snr=%r",
+                sorted(packet.keys()),
+                packet.get("rxRssi"), packet.get("rssi"),
+                packet.get("rxSnr"), packet.get("snr"),
+            )
 
         if not raw_bytes:
             return None
