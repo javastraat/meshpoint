@@ -335,6 +335,13 @@
         inset 0 0 14px rgba(239, 68, 68, 0.04);
 }
 
+.topbar-serial--reconnecting {
+    border-color: rgba(245, 158, 11, 0.45);
+    box-shadow:
+        0 0 12px rgba(245, 158, 11, 0.2),
+        inset 0 0 14px rgba(245, 158, 11, 0.04);
+}
+
 .topbar-serial__brand {
     font-size: 0.58rem;
     font-weight: 700;
@@ -370,6 +377,11 @@
     box-shadow: 0 0 6px rgba(239, 68, 68, 0.5);
 }
 
+.topbar-serial__lamp--reconnecting .topbar-serial__dot {
+    background: var(--accent-amber, #f59e0b);
+    animation: topbar-meshtastic-blink 0.9s steps(2, end) infinite;
+}
+
 .topbar-serial__label {
     font-size: 0.82rem;
     font-weight: 700;
@@ -393,7 +405,9 @@
 }
 
 .topbar-serial--offline .topbar-serial__region,
-.topbar-serial--offline .topbar-serial__freq {
+.topbar-serial--offline .topbar-serial__freq,
+.topbar-serial--reconnecting .topbar-serial__region,
+.topbar-serial--reconnecting .topbar-serial__freq {
     opacity: 0.55;
 }
 
