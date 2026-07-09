@@ -315,27 +315,36 @@
 .topbar-serial {
     display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
-    padding: 0.2rem 0.5rem;
+    gap: 0.45rem;
+    padding: 0.25rem 0.55rem;
     border-radius: var(--radius-sm);
-    border: 1px solid rgba(6, 182, 212, 0.3);
-    background: rgba(6, 182, 212, 0.05);
+    border: 1px solid rgba(6, 182, 212, 0.45);
+    background: rgba(6, 182, 212, 0.08);
+    box-shadow:
+        0 0 14px rgba(6, 182, 212, 0.22),
+        inset 0 0 18px rgba(6, 182, 212, 0.05);
     font-family: var(--font-mono);
-    font-size: 0.62rem;
+    font-size: 0.7rem;
     color: var(--text-secondary);
 }
 
 .topbar-serial--offline {
-    border-color: rgba(239, 68, 68, 0.3);
+    border-color: rgba(239, 68, 68, 0.45);
+    box-shadow:
+        0 0 12px rgba(239, 68, 68, 0.18),
+        inset 0 0 14px rgba(239, 68, 68, 0.04);
 }
 
 .topbar-serial__brand {
-    font-size: 0.55rem;
+    font-size: 0.58rem;
     font-weight: 700;
-    letter-spacing: 0.1em;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
     color: var(--accent-cyan);
-    opacity: 0.85;
+    text-shadow: 0 0 8px rgba(6, 182, 212, 0.4);
+    border-right: 1px solid rgba(6, 182, 212, 0.28);
+    padding-right: 0.45rem;
+    margin-right: 0.05rem;
 }
 
 .topbar-serial__lamp {
@@ -344,10 +353,11 @@
 }
 
 .topbar-serial__dot {
-    width: 6px;
-    height: 6px;
+    width: 7px;
+    height: 7px;
     border-radius: 50%;
     background: var(--text-muted);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
 }
 
 .topbar-serial__lamp--online .topbar-serial__dot {
@@ -361,8 +371,11 @@
 }
 
 .topbar-serial__label {
+    font-size: 0.82rem;
     font-weight: 700;
+    letter-spacing: 0.18em;
     color: var(--text-primary);
+    text-shadow: 0 0 6px rgba(6, 182, 212, 0.2);
 }
 
 .topbar-serial__sep {
