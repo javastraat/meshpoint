@@ -186,5 +186,27 @@ class SerialCaptureSourcePubsubGuardTest(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(source._queue.empty())
 
 
+class BuildPreDecodedEarlyExitTest(unittest.TestCase):
+    """_build_pre_decoded's early-exit paths (no real meshtastic import
+    reached, so these run without the package installed -- the
+    portnum-resolution success path needs the real
+    meshtastic.protobuf.portnums_pb2 enum and lives in
+    test_serial_radio_handshake.py instead, alongside this module's
+    other real-library-dependent tests."""
+
+    def test_no_decoded_key_returns_none(self):
+        self.assertIsNone(SerialCaptureSource._build_pre_decoded({"raw": "aa"}))
+
+    def test_decoded_not_a_dict_returns_none(self):
+        self.assertIsNone(
+            SerialCaptureSource._build_pre_decoded({"decoded": "not-a-dict"})
+        )
+
+    def test_decoded_missing_portnum_returns_none(self):
+        self.assertIsNone(
+            SerialCaptureSource._build_pre_decoded({"decoded": {"payload": "AQI="}})
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

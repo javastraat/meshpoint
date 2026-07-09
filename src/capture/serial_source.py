@@ -275,7 +275,49 @@ class SerialCaptureSource(CaptureSource):
             signal=signal,
             capture_source=self.name,
             timestamp=datetime.now(timezone.utc),
+            pre_decoded=self._build_pre_decoded(packet),
         )
+
+    @staticmethod
+    def _build_pre_decoded(packet: dict) -> Optional[dict]:
+        """Portnum + inner payload when meshtastic-python decrypted this
+        packet locally with the connected radio's own key.
+
+        "decoded" and "encrypted" share one protobuf oneof (see
+        _packet_to_raw_capture's comment above), so when "decoded" is
+        present there is no ciphertext left for Meshpoint's own
+        crypto_service to attempt -- without this, such packets always
+        showed as "Unknown" even though the actual decoded content
+        (position, telemetry, nodeinfo, ...) was sitting right there in
+        the dict the whole time. Portnum names/encoding verified against
+        the installed meshtastic.protobuf.portnums_pb2 (MessageToDict
+        emits the enum NAME string and base64-encodes payload bytes).
+        """
+        decoded = packet.get("decoded")
+        if not isinstance(decoded, dict):
+            return None
+        portnum_name = decoded.get("portnum")
+        if not portnum_name:
+            return None
+        try:
+            from meshtastic.protobuf import portnums_pb2
+            portnum = portnums_pb2.PortNum.Value(portnum_name)
+        except (ImportError, ValueError):
+            logger.debug("Unrecognized portnum name %r", portnum_name)
+            return None
+
+        payload_b64 = decoded.get("payload", "")
+        try:
+            payload = base64.b64decode(payload_b64) if payload_b64 else b""
+        except Exception:
+            logger.debug("Could not base64-decode decoded.payload", exc_info=True)
+            payload = b""
+
+        return {
+            "portnum": portnum,
+            "payload": payload,
+            "request_id": decoded.get("requestId", 0),
+        }
 
     @staticmethod
     def _reconstruct_raw(packet: dict) -> bytes:

@@ -11,10 +11,11 @@ meshtastic was pip-installed there).
 
 from __future__ import annotations
 
+import base64
 import unittest
 from unittest.mock import MagicMock
 
-from meshtastic.protobuf import config_pb2  # noqa: F401 -- import-time dependency probe
+from meshtastic.protobuf import config_pb2, portnums_pb2  # noqa: F401 -- import-time dependency probe
 
 from src.capture.serial_source import SerialCaptureSource, _default_frequency_mhz
 
@@ -90,6 +91,39 @@ class ReadRadioInfoFailureIsolationTest(unittest.TestCase):
         self.assertIsNone(info["region"])
         self.assertIsNone(info["channel_num"])
         self.assertIsNone(info["short_name"])
+
+
+class BuildPreDecodedTest(unittest.TestCase):
+    """Locally-decoded packets (meshtastic-python's own key succeeded)
+    carry real portnum + payload in packet["decoded"] -- previously
+    thrown away, showing as "Unknown" even though the content was
+    right there. Verifies the real enum-name -> int resolution and
+    base64 payload decode against the actual portnums_pb2 descriptor.
+    """
+
+    def test_known_portnum_resolves_and_decodes_payload(self):
+        payload = base64.b64encode(b"\x01\x02\x03").decode()
+        pre = SerialCaptureSource._build_pre_decoded({
+            "decoded": {"portnum": "TELEMETRY_APP", "payload": payload, "requestId": 7},
+        })
+        self.assertIsNotNone(pre)
+        self.assertEqual(pre["portnum"], portnums_pb2.PortNum.TELEMETRY_APP)
+        self.assertEqual(pre["payload"], b"\x01\x02\x03")
+        self.assertEqual(pre["request_id"], 7)
+
+    def test_unrecognized_portnum_name_returns_none(self):
+        pre = SerialCaptureSource._build_pre_decoded({
+            "decoded": {"portnum": "NOT_A_REAL_PORTNUM_XYZ", "payload": ""},
+        })
+        self.assertIsNone(pre)
+
+    def test_missing_payload_yields_empty_bytes_not_error(self):
+        pre = SerialCaptureSource._build_pre_decoded({
+            "decoded": {"portnum": "NODEINFO_APP"},
+        })
+        self.assertIsNotNone(pre)
+        self.assertEqual(pre["payload"], b"")
+        self.assertEqual(pre["request_id"], 0)
 
 
 if __name__ == "__main__":

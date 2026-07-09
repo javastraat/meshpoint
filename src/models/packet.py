@@ -47,6 +47,14 @@ class RawCapture:
     capture_source: str
     timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     protocol_hint: Optional[Protocol] = None
+    # Set only by sources whose upstream library decrypts locally before
+    # handing us the packet (meshtastic-python's serial capture): the
+    # portnum (int) and inner Data payload (bytes) it already parsed.
+    # `encrypted`/`decoded` share one protobuf oneof on MeshPacket, so
+    # when this is set, `payload` above is a header-only reconstruction
+    # with no ciphertext to decrypt -- the decoder uses this instead of
+    # running its own crypto_service pass.
+    pre_decoded: Optional[dict] = None
 
 
 @dataclass
