@@ -191,6 +191,21 @@ The setup wizard configures sources automatically. To add or remove a MeshCore c
 
 When running both Meshtastic concentrator capture and a MeshCore USB companion, pin `meshcore_usb.serial_port` explicitly. Auto-detect can grab the wrong device when multiple Espressif boards are attached.
 
+**Multiple Meshtastic USB sticks.** A single stick uses the `serial_port` / `serial_baud` fields above. To capture from more than one at once (e.g. one on 433 MHz, one on 868 MHz), use the `serial` list instead — same shape as `meshcore_usb`'s companion list:
+
+```yaml
+capture:
+  sources:
+    - serial
+  serial:
+    - serial_port: "/dev/ttyUSB0"
+      label: "433"
+    - serial_port: "/dev/ttyUSB1"
+      label: "868"
+```
+
+Each entry's `label` tags its captured packets' `capture_source` as `serial_433` / `serial_868` so the packet feed and drawer can tell them apart, the same way labelled MeshCore companions do. When `capture.serial` is set, the top-level `serial_port` / `serial_baud` fields are ignored.
+
 ---
 
 ## Location (GPS) source
@@ -793,8 +808,13 @@ capture:               # what packet sources to read from
       baud_rate: 115200
       auto_detect: true
       label: ""
-  serial_port: "/dev/ttyUSB0"   # only used by the `serial` source
+  serial_port: "/dev/ttyUSB0"   # single-stick `serial` source (legacy)
   serial_baud: 115200
+  serial: []             # OR: list of devices for multiple Meshtastic USB sticks
+    # - serial_port: "/dev/ttyUSB0"
+    #   label: "433"
+    # - serial_port: "/dev/ttyUSB1"
+    #   label: "868"
 
 location:              # GPS / location source
   source: "static"            # static | gpsd | uart

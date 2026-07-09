@@ -24,16 +24,18 @@ class SerialCaptureSource(CaptureSource):
         self,
         port: Optional[str] = None,
         baud: int = 115200,
+        label: str = "",
     ):
         self._port = port
         self._baud = baud
+        self._label = label
         self._interface = None
         self._running = False
         self._queue: asyncio.Queue[RawCapture] = asyncio.Queue(maxsize=500)
 
     @property
     def name(self) -> str:
-        return "serial"
+        return f"serial_{self._label}" if self._label else "serial"
 
     @property
     def is_running(self) -> bool:
@@ -88,8 +90,16 @@ class SerialCaptureSource(CaptureSource):
                 continue
 
     def _on_receive(self, packet, interface) -> None:
-        """Callback invoked by meshtastic-python on packet reception."""
-        if not self._running:
+        """Callback invoked by meshtastic-python on packet reception.
+
+        meshtastic-python publishes every open interface's packets on one
+        process-wide pypubsub topic ("meshtastic.receive"), so with more
+        than one SerialCaptureSource running (multiple USB sticks), each
+        instance's callback fires for every stick's packets, not just its
+        own. Compare identity against our own interface so a multi-stick
+        setup doesn't duplicate/misattribute packets across devices.
+        """
+        if not self._running or interface is not self._interface:
             return
 
         try:
@@ -125,7 +135,7 @@ class SerialCaptureSource(CaptureSource):
         return RawCapture(
             payload=raw_bytes,
             signal=signal,
-            capture_source="serial",
+            capture_source=self.name,
             timestamp=datetime.now(timezone.utc),
         )
 

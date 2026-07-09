@@ -232,6 +232,8 @@ Add one or more Heltec V3/V4 or T-Beam nodes running [MeshCore USB companion fir
 
 A Heltec V3 (or any Meshtastic node) flashed with **Meshtastic EU_433** firmware and connected via USB adds a fifth capture stream at 433 MHz. Use the `serial` source in `local.yaml` — not `meshcore_usb`. These two sources speak different protocols and are not interchangeable.
 
+More than one Meshtastic USB stick can be captured at once (e.g. one 433 MHz, one 868 MHz): use the `capture.serial` list instead of the single `serial_port`/`serial_baud` fields, each entry with its own `label` — same shape as the MeshCore companion list. See [CONFIGURATION.md](docs/CONFIGURATION.md#capture-sources).
+
 ### Optional: RTL-SDR Radio Listener
 
 Add an **RTL-SDR dongle** (RTL2832U + R820T/R860 — e.g. RTL-SDR Blog V3/V4, ~€25) to turn Meshpoint into a browser-based broadcast/utility radio receiver. It is completely independent of the SX1302, so LoRa capture continues uninterrupted.

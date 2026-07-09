@@ -137,10 +137,52 @@ def _coerce_meshcore_usb(value) -> list[MeshcoreUsbConfig]:
 
 
 @dataclass
+class SerialDeviceConfig:
+    """Meshtastic USB serial radio -- one entry per physical device.
+
+    Optional: single-stick setups use the legacy ``capture.serial_port`` /
+    ``capture.serial_baud`` scalar fields instead. This list is only needed
+    when more than one Meshtastic USB stick is connected at once (e.g. one
+    on 433 MHz, one on 868 MHz).
+    """
+
+    serial_port: Optional[str] = None
+    serial_baud: int = 115200
+    label: str = ""   # e.g. "433" or "868" — shown in logs and capture_source tag
+
+
+_SERIAL_DEVICE_FIELDS: frozenset[str] = frozenset({"serial_port", "serial_baud", "label"})
+
+
+def _coerce_serial_devices(value) -> list[SerialDeviceConfig]:
+    """Parse the multi-device ``capture.serial`` list.
+
+    capture:
+      serial:
+        - serial_port: /dev/ttyUSB0
+          label: "433"
+        - serial_port: /dev/ttyUSB1
+          label: "868"
+
+    Only a list is accepted here -- the single-device case stays on the
+    legacy ``capture.serial_port`` / ``serial_baud`` scalar fields, which
+    are untouched for backward compatibility. Anything else (missing key,
+    wrong type) yields an empty list so callers fall back to those scalars.
+    """
+    def _from_dict(d: dict) -> SerialDeviceConfig:
+        return SerialDeviceConfig(**{k: v for k, v in d.items() if k in _SERIAL_DEVICE_FIELDS})
+
+    if isinstance(value, list):
+        return [_from_dict(d) for d in value if isinstance(d, dict)]
+    return []
+
+
+@dataclass
 class CaptureConfig:
     sources: list[str] = field(default_factory=lambda: ["mock"])
     serial_port: Optional[str] = None
     serial_baud: int = 115200
+    serial: list[SerialDeviceConfig] = field(default_factory=list)
     concentrator_spi_device: str = "/dev/spidev0.0"
     meshcore_usb: list[MeshcoreUsbConfig] = field(
         default_factory=lambda: [MeshcoreUsbConfig()]
@@ -441,6 +483,10 @@ def _apply_yaml(cfg: AppConfig, path: Path) -> None:
     cap_raw = raw.get("capture")
     if isinstance(cap_raw, dict) and "meshcore_usb" in cap_raw:
         cfg.capture.meshcore_usb = _coerce_meshcore_usb(cap_raw.pop("meshcore_usb"))
+    # serial is opt-in multi-device list; legacy serial_port/serial_baud
+    # scalars keep working untouched when this key is absent.
+    if isinstance(cap_raw, dict) and "serial" in cap_raw:
+        cfg.capture.serial = _coerce_serial_devices(cap_raw.pop("serial"))
 
     section_map = {
         "radio": cfg.radio,

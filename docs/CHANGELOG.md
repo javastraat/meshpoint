@@ -19,6 +19,7 @@ First tagged release of the javastraat/meshpoint fork: LoRaWAN sniffing, multi-r
 #### Multi-radio capture (5 networks at once)
 
 - **Multiple MeshCore USB companions.** `capture.meshcore_usb` accepts a list (up to 4) with per-stick labels; packets carry `meshcore_usb_<label>` as capture source. New `PUT /api/config/capture/meshcore-companions` replaces the list atomically; the Configuration page grew a dynamic companion section.
+- **Multiple Meshtastic USB sticks.** `capture.serial` accepts the same list-plus-label shape as `meshcore_usb` (e.g. one stick on 433 MHz, one on 868 MHz), packets tagged `serial_<label>`; the legacy single `serial_port`/`serial_baud` fields keep working unchanged when the list is empty. Also fixes a latent duplicate-capture bug: meshtastic-python publishes every open USB interface's packets on one process-wide pypubsub topic, so running more than one stick without an identity check would have cross-attributed packets between devices.
 - **MeshCore signal metadata.** Frequency/bandwidth/SF stamped from each companion's connect-time radio handshake (per stick, so 868 and 433 report their real channel), and hop count derived from `path_len` on contact/channel messages.
 - **Simultaneous LoRaWAN + Meshtastic 868 + MeshCore 868/433 + Meshtastic 433.** Concentrator, two labelled MeshCore sticks, and a Meshtastic serial node run side by side; only Meshtastic is ever relayed.
 

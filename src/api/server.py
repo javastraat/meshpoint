@@ -74,7 +74,7 @@ from src.api.update.rollback_state import resolve_rollback_state_path
 from src.api.upstream_client import UpstreamClient
 from src.audio.rtl_listener import RtlListener
 from src.api.websocket_manager import WebSocketManager
-from src.config import AppConfig, load_config, validate_activation
+from src.config import AppConfig, SerialDeviceConfig, load_config, validate_activation
 from src.coordinator import PipelineCoordinator
 from src.log_format import print_banner, print_packet, setup_logging
 from src.models.device_identity import DeviceIdentity, _stable_device_id
@@ -377,16 +377,25 @@ def _build_pipeline(config: AppConfig) -> PipelineCoordinator:
 
 
 def _add_serial_source(coordinator: PipelineCoordinator, config: AppConfig):
+    """Add one SerialCaptureSource per configured Meshtastic USB device."""
     try:
         from src.capture.serial_source import SerialCaptureSource
-        coordinator.capture_coordinator.add_source(
-            SerialCaptureSource(
-                port=config.capture.serial_port,
-                baud=config.capture.serial_baud,
-            )
-        )
     except ImportError:
         logger.warning("Serial capture unavailable")
+        return
+
+    devices = config.capture.serial or [
+        SerialDeviceConfig(
+            serial_port=config.capture.serial_port,
+            serial_baud=config.capture.serial_baud,
+        )
+    ]
+    for dev in devices:
+        coordinator.capture_coordinator.add_source(
+            SerialCaptureSource(
+                port=dev.serial_port, baud=dev.serial_baud, label=dev.label,
+            )
+        )
 
 
 def _add_concentrator_source(

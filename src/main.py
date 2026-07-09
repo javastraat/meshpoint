@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from src.config import load_config, validate_activation
+from src.config import SerialDeviceConfig, load_config, validate_activation
 from src.coordinator import PipelineCoordinator
 from src.log_format import print_banner, print_packet, setup_logging
 
@@ -14,17 +14,26 @@ logger = logging.getLogger("concentrator")
 
 
 def _add_serial_source(coordinator: PipelineCoordinator, config) -> None:
+    """Add one SerialCaptureSource per configured Meshtastic USB device."""
     try:
         from src.capture.serial_source import SerialCaptureSource
-        coordinator.capture_coordinator.add_source(
-            SerialCaptureSource(
-                port=config.capture.serial_port,
-                baud=config.capture.serial_baud,
-            )
-        )
     except ImportError:
         logger.warning(
             "Serial capture unavailable -- meshtastic package not installed"
+        )
+        return
+
+    devices = config.capture.serial or [
+        SerialDeviceConfig(
+            serial_port=config.capture.serial_port,
+            serial_baud=config.capture.serial_baud,
+        )
+    ]
+    for dev in devices:
+        coordinator.capture_coordinator.add_source(
+            SerialCaptureSource(
+                port=dev.serial_port, baud=dev.serial_baud, label=dev.label,
+            )
         )
 
 
