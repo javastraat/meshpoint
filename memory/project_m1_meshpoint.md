@@ -1259,6 +1259,33 @@ from the CDN).
 - Changelog now 63 bullets, parser-verified. All pushed by user
   incrementally; CI green through the round.
 
+**Fan-control chown broke Check for updates (2026-07-09 evening, fixed on Mac,
+needs manual Pi bootstrap):** dashboard showed `Could not fetch origin: error:
+cannot open '.git/FETCH_HEAD': Permission denied` + "Could not reach GitHub."
+(the latter is just the frontend's `sync_error` status line in
+update_panel_controller.js — SAME root cause, not a network problem; the real
+network version check at /api/device/update-check is separate and was fine).
+ROOT CAUSE = collision of two of our own fixes: daf9356 added non-recursive
+`ExecStartPre=+/bin/chown meshpoint:meshpoint /opt/meshpoint` (lgpio fan pipe),
+which flipped the repo TOP dir to meshpoint-owned; `sudo_needed()` in
+install_status.py stat'ed exactly that top dir → decided "no sudo" → plain git
+fetch as meshpoint hit the still-root-owned `.git/` and died. Apply/rollback
+were never affected (apply.py hardcodes sudo git). User's manual `git pull` as
+pi failed the same way (`insufficient permission for adding an object to
+repository database .git/objects`) — expected, .git is root-owned; use sudo
+git on the Pi. FIX: `sudo_needed()` now stats `.git` via new
+`_ownership_probe()` (falls back to repo root when no `.git`); Pi (.git
+root-owned) → sudo restored, Mac dev checkout → still plain git. 5 new tests
+in TestSudoNeeded (23 pass on Mac). Changelog bullet under "Self-update
+system" (74 bullets, parser-verified). IMPORTANT: do NOT chown `.git` to
+meshpoint as a workaround — the apply chain's sudo git writes root-owned files
+into .git again, and MIXED ownership inside .git re-breaks plain git; the
+stable steady state is uniformly root-owned .git + sudo path. BOOTSTRAP: the
+box can't fetch this fix via Check (broken), but "Apply update" works
+(hardcoded sudo) — or manually: `cd /opt/meshpoint && sudo git fetch origin
+main && sudo git reset --hard origin/main && sudo systemctl restart
+meshpoint`. NOT yet Pi-verified.
+
 ## OLD LIST (superseded, kept for the DONE details)
 
 User has been committing incrementally with the suggested one-liners (verified

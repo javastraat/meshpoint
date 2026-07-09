@@ -43,18 +43,29 @@ def default_git_runner(
 
 
 def sudo_needed(repo_path: str) -> bool:
-    """True when the install tree belongs to another user.
+    """True when the install tree's git metadata belongs to another user.
 
-    On the Pi ``/opt/meshpoint`` is root-owned and the service runs as
-    ``meshpoint``, which has NOPASSWD sudoers rules for exactly these git
-    commands. A dev checkout owned by the current user (e.g. on macOS,
-    where no sudoers rules exist) needs no sudo — and using it there
-    breaks with "a terminal is required to read the password".
+    On the Pi ``.git`` is root-owned (sudo clone, sudo apply chain) and the
+    service runs as ``meshpoint``, which has NOPASSWD sudoers rules for
+    exactly these git commands. A dev checkout owned by the current user
+    (e.g. on macOS, where no sudoers rules exist) needs no sudo — and using
+    it there breaks with "a terminal is required to read the password".
+
+    Stat ``.git`` rather than the repo root: the systemd unit chowns
+    ``/opt/meshpoint`` itself to the service user (lgpio must create its
+    notification pipe in WorkingDirectory), so the top directory no longer
+    says who owns the tree — fetch/reset write into ``.git``.
     """
     try:
-        return Path(repo_path).stat().st_uid != os.getuid()
+        return _ownership_probe(repo_path).stat().st_uid != os.getuid()
     except OSError:
         return True
+
+
+def _ownership_probe(repo_path: str) -> Path:
+    """Path whose owner decides sudo: ``.git`` when present, else the root."""
+    git_dir = Path(repo_path) / ".git"
+    return git_dir if git_dir.exists() else Path(repo_path)
 
 
 def _git_argv(repo_path: str, use_sudo: Optional[bool]) -> list[str]:

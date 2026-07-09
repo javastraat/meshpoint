@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import os
+import tempfile
 import unittest
+from pathlib import Path
 from typing import Optional
 from unittest import mock
 
 from src.api.update.channels import ReleaseChannelRegistry
 from src.api.update.install_status import (
+    _ownership_probe,
     build_install_status_payload,
     count_commits_behind_ahead,
     list_branch_commits,
@@ -15,6 +19,7 @@ from src.api.update.install_status import (
     read_install_git_ref,
     resolve_compare_branch,
     suggest_active_channel_for_install,
+    sudo_needed,
 )
 
 
@@ -70,6 +75,41 @@ class _FakeGitRunner:
             if spec.startswith("origin/") and spec.endswith("..HEAD"):
                 return 0, ("cd\n" * self.ahead), ""
         return 1, "", "err"
+
+
+class TestSudoNeeded(unittest.TestCase):
+    """The service unit chowns the repo TOP dir to the service user (lgpio
+    pipe fix), so ownership must be probed on ``.git`` — the thing git
+    fetch/reset actually write to — never the top directory."""
+
+    def test_probe_prefers_git_dir_when_present(self) -> None:
+        with tempfile.TemporaryDirectory() as repo:
+            git_dir = Path(repo) / ".git"
+            git_dir.mkdir()
+            self.assertEqual(_ownership_probe(repo), git_dir)
+
+    def test_probe_falls_back_to_repo_root_without_git_dir(self) -> None:
+        with tempfile.TemporaryDirectory() as repo:
+            self.assertEqual(_ownership_probe(repo), Path(repo))
+
+    def test_no_sudo_when_current_user_owns_git_dir(self) -> None:
+        with tempfile.TemporaryDirectory() as repo:
+            (Path(repo) / ".git").mkdir()
+            self.assertFalse(sudo_needed(repo))
+
+    def test_sudo_when_git_dir_owned_by_another_user(self) -> None:
+        # Can't chown as non-root; simulate the Pi (root-owned .git) by
+        # pretending our uid differs from the probe's st_uid.
+        with tempfile.TemporaryDirectory() as repo:
+            (Path(repo) / ".git").mkdir()
+            with mock.patch(
+                "src.api.update.install_status.os.getuid",
+                return_value=os.getuid() + 1,
+            ):
+                self.assertTrue(sudo_needed(repo))
+
+    def test_sudo_when_repo_path_unreadable(self) -> None:
+        self.assertTrue(sudo_needed("/nonexistent/meshpoint"))
 
 
 class TestMatchChannelForBranch(unittest.TestCase):
