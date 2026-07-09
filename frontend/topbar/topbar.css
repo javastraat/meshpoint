@@ -382,17 +382,33 @@
     animation: topbar-meshtastic-blink 0.9s steps(2, end) infinite;
 }
 
-.topbar-serial__label {
+.topbar-serial__call {
     font-size: 0.82rem;
     font-weight: 700;
     letter-spacing: 0.18em;
     color: var(--text-primary);
     text-shadow: 0 0 6px rgba(6, 182, 212, 0.2);
+    min-width: 3ch;
+}
+
+.topbar-serial__preset {
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    border-left: 1px solid rgba(6, 182, 212, 0.22);
+    padding-left: 0.4rem;
+    margin-left: 0.05rem;
 }
 
 .topbar-serial__sep {
     color: var(--text-muted);
     opacity: 0.5;
+}
+
+.topbar-serial__sep--bar {
+    opacity: 0.35;
+    margin: 0 0.05rem;
 }
 
 .topbar-serial__region {
@@ -406,8 +422,10 @@
 
 .topbar-serial--offline .topbar-serial__region,
 .topbar-serial--offline .topbar-serial__freq,
+.topbar-serial--offline .topbar-serial__preset,
 .topbar-serial--reconnecting .topbar-serial__region,
-.topbar-serial--reconnecting .topbar-serial__freq {
+.topbar-serial--reconnecting .topbar-serial__freq,
+.topbar-serial--reconnecting .topbar-serial__preset {
     opacity: 0.55;
 }
 
@@ -454,6 +472,7 @@
     .topbar { gap: 0.4rem 0.5rem; padding: 0.35rem 0.7rem; min-height: 44px; }
     .topbar-meshtastic__preset { display: none; }
     .topbar-meshcore__channel { display: none; }
+    .topbar-serial__preset { display: none; }
 }
 
 @media (max-width: 768px) {

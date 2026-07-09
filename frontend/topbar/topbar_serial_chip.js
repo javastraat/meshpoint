@@ -8,6 +8,12 @@
  * not a USB stick) -- there's no single "the" device, so this renders
  * one badge per configured stick and hides the whole group when none
  * are configured.
+ *
+ * Layout mirrors the Meshtastic/MeshCore chips: brand, lamp, a "call
+ * sign" slot (here: the stick's own node ID, since region already
+ * disambiguates band -- a config label would be redundant), region,
+ * frequency, and the stick's own modem preset (same data the
+ * Meshtastic chip's trailing segment shows, read at connect time).
  */
 class TopbarSerialChip {
     constructor(groupEl) {
@@ -41,25 +47,25 @@ class TopbarSerialChip {
     _buildBadge(dev) {
         const reachable = this._dashboardReachable;
         const connected = reachable && Boolean(dev.connected);
-        const label = this._labelFromName(dev.name);
         const ownId = this._shortNodeId(dev.own_node_id_hex);
+        const callText = !reachable ? '----' : (ownId || '----');
 
         const root = document.createElement('span');
         root.className = 'topbar-serial';
         root.setAttribute(
             'aria-label',
-            `Meshtastic USB${label ? ` ${label}` : ''} `
+            `Meshtastic USB ${ownId || 'device'} `
                 + `${!reachable ? 'reconnecting' : (connected ? 'connected' : 'offline')}`,
         );
         root.title = !reachable
             ? 'Reconnecting to the dashboard…'
             : (ownId
-                ? `This stick's own node ID: ${ownId} (its self-telemetry/nodeinfo is filtered from the packet feed)`
+                ? 'Self-telemetry/nodeinfo from this ID is filtered from the packet feed'
                 : "This stick's own node ID is not known yet");
 
         const brand = document.createElement('span');
         brand.className = 'topbar-serial__brand';
-        brand.textContent = 'USB';
+        brand.textContent = 'Meshtastic';
         root.appendChild(brand);
 
         const lampState = !reachable ? 'reconnecting' : (connected ? 'online' : 'offline');
@@ -73,12 +79,10 @@ class TopbarSerialChip {
         lamp.appendChild(dot);
         root.appendChild(lamp);
 
-        if (label) {
-            const labelEl = document.createElement('span');
-            labelEl.className = 'topbar-serial__label';
-            labelEl.textContent = label;
-            root.appendChild(labelEl);
-        }
+        const callEl = document.createElement('span');
+        callEl.className = 'topbar-serial__call';
+        callEl.textContent = callText;
+        root.appendChild(callEl);
 
         const region = !reachable
             ? '--'
@@ -95,16 +99,22 @@ class TopbarSerialChip {
         root.appendChild(this._sep());
         root.appendChild(freqEl);
 
+        const presetEl = document.createElement('span');
+        presetEl.className = 'topbar-serial__preset';
+        presetEl.textContent = !reachable ? '--' : this._formatPresetLabel(dev.modem_preset);
+        root.appendChild(this._sep(true));
+        root.appendChild(presetEl);
+
         root.classList.toggle('topbar-serial--offline', reachable && !connected);
         root.classList.toggle('topbar-serial--reconnecting', !reachable);
         return root;
     }
 
-    _sep() {
+    _sep(bar = false) {
         const sep = document.createElement('span');
-        sep.className = 'topbar-serial__sep';
+        sep.className = bar ? 'topbar-serial__sep topbar-serial__sep--bar' : 'topbar-serial__sep';
         sep.setAttribute('aria-hidden', 'true');
-        sep.textContent = '·';
+        sep.textContent = bar ? '|' : '·';
         return sep;
     }
 
@@ -114,12 +124,23 @@ class TopbarSerialChip {
         return `${n.toFixed(3)} MHz`;
     }
 
-    /** "serial_433" -> "433"; bare "serial" -> null (no useful label). */
-    _labelFromName(name) {
-        const raw = String(name || '');
-        const idx = raw.indexOf('_');
-        if (idx === -1) return null;
-        return raw.slice(idx + 1) || null;
+    /** Mirrors TopbarMeshtasticChip._formatPresetLabel -- same enum-name
+     * strings (both read via meshtastic.protobuf ModemPreset.Name()). */
+    _formatPresetLabel(presetName) {
+        if (!presetName || presetName === 'CUSTOM') return 'Custom';
+        const labels = {
+            LONG_FAST: 'LongFast',
+            LONG_TURBO: 'LongTurbo',
+            LONG_MODERATE: 'LongModerate',
+            LONG_SLOW: 'LongSlow',
+            VERY_LONG_SLOW: 'VeryLongSlow',
+            MEDIUM_FAST: 'MediumFast',
+            MEDIUM_SLOW: 'MediumSlow',
+            SHORT_FAST: 'ShortFast',
+            SHORT_SLOW: 'ShortSlow',
+            SHORT_TURBO: 'ShortTurbo',
+        };
+        return labels[String(presetName)] || String(presetName);
     }
 
     /** "09d406f4" -> "!06f4", matching the packet feed's node ID style. */
