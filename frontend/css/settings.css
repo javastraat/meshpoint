@@ -1088,7 +1088,7 @@ select.update-field__input option:checked {
     font-style: italic;
 }
 
-/* Recent updates history under the rollback hint. */
+/* Latest commits on origin/<branch>, under the rollback hint. */
 .update-history {
     margin-top: 12px;
     padding-top: 10px;
@@ -1121,8 +1121,10 @@ select.update-field__input option:checked {
     color: rgba(243, 244, 246, 0.75);
 }
 
-.update-history__row--failed {
-    color: #f87171;
+.update-history__what code {
+    font-family: var(--font-mono, monospace);
+    color: var(--accent-cyan, #06b6d4);
+    margin-right: 4px;
 }
 
 .update-history__when {

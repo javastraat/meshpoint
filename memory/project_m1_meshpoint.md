@@ -1219,15 +1219,25 @@ resolved:
   normal r-readout-row entries in the two-col grid; channels block got
   dashed-divider separation (.r-mt-channels). User-verified, matches
   MeshCore companion card.
-- **Update history built (user chose Option A):** `src/api/update/history.py`
-  (append/read, newest-first, cap 20, corrupt-safe), entries appended in all
-  4 route handlers (apply/rollback × plain/stream; from_sha=pre_update_sha,
-  to_sha only known for rollback), `GET /api/update/history` (admin),
-  "Recent updates" list (last 5) under the rollback hint (mono rows,
-  ✓/✗ + kind + branch + from→to, failed rows red). History file =
-  data/update_history.json sibling of rollback state (resolve_history_path).
-  9 unit tests pass on Mac + 2 route tests for CI. NOTE: history only
-  populates from the NEXT apply onward (no retroactive entries).
+- **Update history built then REPLACED (2026-07-09):** the apply/rollback
+  action log (`history.py`, `GET /api/update/history`, "Recent updates" list)
+  shipped in 50eed38 but the user saw a single sparse "apply … → …" row and
+  wanted **the last 5 commits on GitHub with their messages** instead
+  ("not what we installed but whats on git commited"). REMOVED entirely
+  (module, endpoint, 4 route appends, test_update_history.py, 2 route tests;
+  leftover data/update_history.json on the Pi is inert). REPLACED with
+  `list_branch_commits(repo_path, ref)` in install_status.py — `git log -n 5
+  --format=%h%x09%ct%x09%s origin/<branch>` (matches existing `git log *`
+  sudoers rules, both safe.directory forms) → `remote_commits` in
+  build_install_status_payload (keyed off version_branch = compare_branch or
+  install branch). Freshness = as of last fetch (Check for updates / apply
+  both fetch). Frontend: same .update-history CSS block, title "Latest
+  commits", data-update-commits[-list] attrs, `_renderRemoteCommits()` called
+  from _loadInstallStatus + _checkForUpdates (date + cyan code SHA + subject;
+  --failed modifier dropped, __what code style added). 5 new unit tests in
+  test_update_install_status.py (18 pass on Mac); live-verified on the Mac
+  repo (5 real origin/main commits render from the function). Changelog
+  bullet rewritten in place (still 63), README fork bullet reworded.
 - Changelog now 63 bullets, parser-verified. All pushed by user
   incrementally; CI green through the round.
 

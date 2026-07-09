@@ -10,6 +10,7 @@ from src.api.update.channels import ReleaseChannelRegistry
 from src.api.update.install_status import (
     build_install_status_payload,
     count_commits_behind_ahead,
+    list_branch_commits,
     match_channel_for_branch,
     read_install_git_ref,
     resolve_compare_branch,
@@ -193,6 +194,84 @@ class TestBuildInstallStatusPayload(unittest.TestCase):
             any(
                 _FakeGitRunner._strip_prefix(c)[:3] == ["git", "fetch", "origin"]
                 for c in runner.calls
+            ),
+        )
+
+
+class TestListBranchCommits(unittest.TestCase):
+    """Latest-commits list shown on the Updates page (git log origin/<branch>)."""
+
+    @staticmethod
+    def _runner_returning(out: str, rc: int = 0):
+        calls: list[list[str]] = []
+
+        def runner(args, cwd, timeout):
+            calls.append(list(args))
+            return rc, out, ""
+
+        runner.calls = calls
+        return runner
+
+    def test_parses_sha_date_and_subject(self) -> None:
+        out = (
+            "fee568e\t1751972400\tdocs: default yaml header\n"
+            "50eed38\t1751968800\tfeat: updates page history\n"
+        )
+        runner = self._runner_returning(out)
+        commits = list_branch_commits(
+            "/opt/meshpoint", "origin/main", runner=runner, use_sudo=False,
+        )
+        self.assertEqual(len(commits), 2)
+        self.assertEqual(commits[0]["sha"], "fee568e")
+        self.assertEqual(commits[0]["subject"], "docs: default yaml header")
+        self.assertEqual(commits[0]["committed_at"], "2025-07-08T11:00:00+00:00")
+        self.assertIn("origin/main", runner.calls[0])
+
+    def test_bad_timestamp_yields_none_date(self) -> None:
+        runner = self._runner_returning("abc1234\tnot-a-ts\tfix: something\n")
+        commits = list_branch_commits(
+            "/opt/meshpoint", "origin/main", runner=runner, use_sudo=False,
+        )
+        self.assertEqual(commits[0]["sha"], "abc1234")
+        self.assertIsNone(commits[0]["committed_at"])
+
+    def test_limit_is_enforced(self) -> None:
+        out = "".join(f"sha{i}\t1751972400\tsubject {i}\n" for i in range(9))
+        runner = self._runner_returning(out)
+        commits = list_branch_commits(
+            "/opt/meshpoint", "origin/main",
+            runner=runner, use_sudo=False, limit=5,
+        )
+        self.assertEqual(len(commits), 5)
+
+    def test_git_failure_returns_empty(self) -> None:
+        runner = self._runner_returning("", rc=128)
+        self.assertEqual(
+            list_branch_commits(
+                "/opt/meshpoint", "origin/main", runner=runner, use_sudo=False,
+            ),
+            [],
+        )
+
+    def test_payload_includes_remote_commits(self) -> None:
+        runner = _FakeGitRunner(branch="main")
+        with mock.patch(
+            "src.api.update.install_status.fetch_remote_version_sync",
+            return_value=None,
+        ):
+            payload = build_install_status_payload(
+                registry=ReleaseChannelRegistry(),
+                repo_path="/opt/meshpoint",
+                runner=runner,
+                use_sudo=False,
+            )
+        # _FakeGitRunner answers no --format log call → empty but present.
+        self.assertIn("remote_commits", payload)
+        self.assertEqual(payload["remote_commits"], [])
+        self.assertTrue(
+            any(
+                "origin/main" in c and "log" in c
+                for c in (_FakeGitRunner._strip_prefix(c) for c in runner.calls)
             ),
         )
 

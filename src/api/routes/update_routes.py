@@ -35,11 +35,6 @@ from src.api.update.apply import ApplyResult, UpdateApplier
 from src.api.update.channels import ReleaseChannelRegistry
 from src.api.update.streaming import stream_update
 from src.api.update.install_status import build_install_status_payload
-from src.api.update.history import (
-    append_history_entry,
-    read_history,
-    resolve_history_path,
-)
 from src.api.update.rollback_state import clear_rollback_state, write_rollback_state
 from src.api.update.release_notes import (
     ChangelogParser,
@@ -56,7 +51,6 @@ _applier: UpdateApplier | None = None
 _registry: ReleaseChannelRegistry | None = None
 _changelog_path: Path | None = None
 _rollback_state_path: Path = Path("/opt/meshpoint/data/update_rollback.json")
-_history_path: Path = Path("/opt/meshpoint/data/update_history.json")
 
 
 def init_routes(
@@ -66,23 +60,19 @@ def init_routes(
     rollback_state_path: Path | None = None,
 ) -> None:
     global _applier, _registry, _changelog_path, _rollback_state_path
-    global _history_path
     _applier = applier
     _registry = registry
     _changelog_path = changelog_path
     if rollback_state_path is not None:
         _rollback_state_path = rollback_state_path
-    _history_path = resolve_history_path(_rollback_state_path)
 
 
 def reset_routes() -> None:
     global _applier, _registry, _changelog_path, _rollback_state_path
-    global _history_path
     _applier = None
     _registry = None
     _changelog_path = None
     _rollback_state_path = Path("/opt/meshpoint/data/update_rollback.json")
-    _history_path = Path("/opt/meshpoint/data/update_history.json")
 
 
 def _require_initialized() -> tuple[UpdateApplier, ReleaseChannelRegistry]:
@@ -180,15 +170,6 @@ async def release_notes(
     }
 
 
-@router.get("/history")
-async def update_history(
-    _claims: SessionClaims = Depends(require_admin),
-) -> dict:
-    """Last apply/rollback events on this box, newest first."""
-    _require_initialized()
-    return {"entries": read_history(_history_path, limit=10)}
-
-
 def _load_changelog_sections() -> list:
     if _changelog_path is None or not _changelog_path.exists():
         return []
@@ -228,22 +209,6 @@ def _clear_rollback_after_success(result: ApplyResult) -> None:
         clear_rollback_state(path=_rollback_state_path)
 
 
-def _record_history(result: ApplyResult, *, kind: str, to_sha: str | None = None) -> None:
-    """Append one apply/rollback event for the Updates-page history list."""
-    append_history_entry(
-        {
-            "kind": kind,
-            "branch": result.target_branch,
-            "from_sha": result.pre_update_sha,
-            "to_sha": to_sha,
-            "success": result.success,
-            "failed_step": result.failed_step,
-            "duration_seconds": round(result.duration_seconds, 1),
-        },
-        path=_history_path,
-    )
-
-
 @router.post("/apply")
 async def apply_update(
     payload: ApplyRequest,
@@ -267,7 +232,6 @@ async def apply_update(
         result = applier.apply(branch=branch)
         _audit_apply_result(ctx, result)
         _persist_rollback_after_apply(result)
-        _record_history(result, kind="apply")
     return asdict(result)
 
 
@@ -309,7 +273,6 @@ async def apply_update_stream(
                         result = ApplyResult(**result_dict)
                         _audit_apply_result(ctx, result)
                         _persist_rollback_after_apply(result)
-                        _record_history(result, kind="apply")
             if result is None:
                 ctx.set_result("error")
 
@@ -338,7 +301,6 @@ async def rollback_update(
             ctx.params["failed_step"] = result.failed_step
             ctx.set_result("error")
         _clear_rollback_after_success(result)
-        _record_history(result, kind="rollback", to_sha=payload.sha)
     return asdict(result)
 
 
@@ -375,9 +337,6 @@ async def rollback_update_stream(
                             ctx.params["failed_step"] = result.failed_step
                             ctx.set_result("error")
                         _clear_rollback_after_success(result)
-                        _record_history(
-                            result, kind="rollback", to_sha=payload.sha
-                        )
             if result is None:
                 ctx.set_result("error")
 
