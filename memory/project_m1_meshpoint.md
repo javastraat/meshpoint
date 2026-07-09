@@ -1147,10 +1147,39 @@ resolved:
   Hard Reload". After any dashboard update, stale JS = first suspect for
   "new feature dead, no errors" (candidate wishlist: cache-busting ?v= on
   script tags).
-- **Still to eyeball on the Pi:** RF Environment tab, packet detail modal,
-  Quick Deploy QR, restore flow (only download verified), release-notes
-  categories on the Updates page. NOTE: full `unittest discover` HANGS on
-  Mac (terminal PTY tests) — run per-module with `timeout 60` instead.
+- **FULL PI VERIFICATION 2026-07-09 morning — ALL GREEN (screenshots):**
+  backup download (34MB archive stored) · Quick Deploy QR (LongFast/EU_868/
+  869.525/hop3) · RF Environment tab (LIVE SCAN badge, -84 dBm, 28 scans 0
+  failed — proves fork's sx1261_spi_path beats upstream's "unavailable on
+  M1" claim) · broadcast cadence editors (telemetry 30m + position 15m,
+  live countdowns) · release-notes categories (all 15 headings) · packet
+  detail modal (rendered a MESHCORE packet incl. fork companion freq/SF
+  metadata) · Band Spectrum card coexists with RF tab on the shared scan
+  service (the riskiest merge spot — confirmed) · regression sweep:
+  LoRaWAN page (117 pkts/23 devices/16 joins), RTL-SDR listener (SLAM!
+  RDS+VU), Hardware cards (concentrator 6/9 on), MeshCore (1331 contacts,
+  companions live), Meshtastic feed — all working. Operator status strip
+  visible on Dashboard. MQTT broker-health strip verified too (LAN broker
+  192.168.2.26:1883 connected, publishing, 0 drops). NOT tested (fine):
+  restore upload flow, viewer 403 on new broadcast PUTs.
+  MESSAGING INCIDENT (same morning, NOT a merge bug): MeshCore channel
+  sends timed out AND incoming channel msgs stopped reaching chats, while
+  adverts still hit the packet feed. Logs: repeated "get_contacts: 0
+  contacts parsed", "auto message fetching restarted", "health probe
+  missed (1/2)". DIAGNOSIS: companion's COMMAND channel wedged while its
+  push-event stream kept working — sends (commands) unacked, channel-msg
+  auto-FETCH (command-based) dead, adverts (push) fine. Merge ruled out by
+  diff: meshcore chat routing + tx client untouched (only Meshtastic hash
+  lookup was refactored into ChannelHashResolver). FIX: Pi reboot → full
+  round-trip verified (send + HA bot reply in chat, -37 dBm). RECOVERY
+  DRILL for next time: (1) systemctl restart meshpoint, (2) RST button on
+  the Heltec (NOT USB replug — inrush), (3) only then suspect software.
+  Note: user runs a MeshCore HA bot ("light on/off/help") on this channel.
+  RF CURIOSITY: sweep shows a NEW strong flat block ~863.6–864.2 MHz at
+  ~-60 dBm (SRD audio sub-band — wireless mics/audio links nearby);
+  RFID plateau still present but quieter (~-80). Watch list.
+  NOTE: full `unittest discover` HANGS on Mac (terminal PTY tests) — run
+  per-module with `timeout 60` instead.
 - **NEVER put Co-Authored-By/AI trailers in commit messages (user: "never
   ever").**
 
