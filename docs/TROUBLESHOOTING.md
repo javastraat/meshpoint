@@ -11,6 +11,7 @@ Common issues:
 - **"Permission denied: /dev/spidev0.0"**: Run `sudo usermod -a -G spi meshpoint`
 - **"No module named 'psutil'"**: Run `sudo /opt/meshpoint/venv/bin/pip install psutil`
 - **"no GPIO tool found (pinctrl or gpioset)"**: This means the concentrator reset script can't toggle GPIO. Raspberry Pi OS Lite (64-bit) includes `pinctrl` by default. If you're on a non-standard image, install `gpiod`: `sudo apt install -y gpiod`
+- **"fan control enabled but gpiozero is not installed"**: `fan.enabled: true` is set but the Meshpoint **venv** doesn't have `gpiozero` (Raspberry Pi OS ships it system-wide, which is a different Python environment). Run `sudo /opt/meshpoint/venv/bin/pip install gpiozero` and restart. The fan is simply not driven while this is missing -- the app still starts normally.
 
 ### Concentrator fails to start
 

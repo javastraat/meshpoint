@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Diagnostic probe for the SenseCap M1's onboard LED/button/fan.
 
-Run directly on the Pi (needs `gpiozero`, preinstalled on Raspberry Pi OS —
-this is NOT a Meshpoint runtime dependency, just a one-off hardware check).
+Run directly on the Pi (needs `gpiozero` -- preinstalled system-wide on
+Raspberry Pi OS, and also a declared Meshpoint dependency as of the PWM
+fan controller in src/hardware/fan_control.py, but this script itself
+can run standalone even without a Meshpoint venv set up).
 
 Pin numbers below are BCM GPIO numbers, NOT physical header pin numbers.
 All three are now confirmed live on the actual board (via `button-scan`/

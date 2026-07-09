@@ -625,7 +625,7 @@ fan:
 
 Temperature-driven PWM control for the SenseCap M1's onboard fan, reading CPU temperature from the Pi's thermal zone. GPIO 13 is a hardware-PWM-capable pin on the Pi 4 (BCM2711 PWM1), confirmed live as this board's fan pin with `scripts/test_gpio_hardware.py`; the onboard LED (GPIO 22) and user button (GPIO 27) were confirmed the same way.
 
-Disabled by default: this fan/GPIO wiring is specific to the SenseCap M1 carrier board, not other supported hardware. Duty ramps linearly between `min_temp_c` and `max_temp_c`; below `min_temp_c - hysteresis_c` the fan turns fully off. Requires `gpiozero` (preinstalled on Raspberry Pi OS); if unavailable, a clear error is logged at startup and the fan is simply not driven rather than the app failing to start.
+Disabled by default: this fan/GPIO wiring is specific to the SenseCap M1 carrier board, not other supported hardware. Duty ramps linearly between `min_temp_c` and `max_temp_c`; below `min_temp_c - hysteresis_c` the fan turns fully off. Requires `gpiozero` (in `requirements.txt`, but Raspberry Pi OS also ships it system-wide -- the Meshpoint **venv** needs its own copy: `sudo /opt/meshpoint/venv/bin/pip install gpiozero` if you enabled `fan` on an existing install and see `fan control enabled but gpiozero is not installed` in the logs). If unavailable, a clear error is logged at startup and the fan is simply not driven rather than the app failing to start.
 
 ---
 

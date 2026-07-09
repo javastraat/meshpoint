@@ -8,6 +8,7 @@ protobuf>=4.25.0
 pyyaml>=6.0
 websockets>=12.0
 psutil>=5.9.0
+gpiozero>=2.0
 urllib3>=2.6.3
 meshcore>=2.1.0
 paho-mqtt>=2.1.0
