@@ -25,6 +25,7 @@ class RadioSpectrumCard {
         this._markers = [];
         this._pollTimer = null;
         this._refreshTimer = null;
+        this._emptyRetryTimer = null;
         this._redraw = () => this._draw();
     }
 
@@ -102,6 +103,7 @@ class RadioSpectrumCard {
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
             if (!data.available) {
+                // Spectral scan genuinely unsupported/disabled on this box.
                 this._root.style.display = 'none';
                 return;
             }
@@ -110,7 +112,27 @@ class RadioSpectrumCard {
             this._draw();
         } catch (e) {
             console.error('Spectrum load failed:', e);
+            // Transient failure (service still starting): stay visible with
+            // the "no sweep yet" hint instead of vanishing.
+            this._root.style.display = '';
+            this._draw();
         }
+        this._armEmptyRetry();
+    }
+
+    // While visible but without sweep data (service just started, first
+    // sweep still running), poll faster than the 60s auto-refresh so the
+    // chart fills in shortly after the first scan completes.
+    _armEmptyRetry() {
+        const havePoints = !!(
+            this._sweep && this._sweep.points && this._sweep.points.length
+        );
+        if (havePoints || this._root.style.display === 'none') return;
+        if (this._emptyRetryTimer) return;
+        this._emptyRetryTimer = setTimeout(() => {
+            this._emptyRetryTimer = null;
+            this._load();
+        }, 10000);
     }
 
     _armAutoRefresh() {
