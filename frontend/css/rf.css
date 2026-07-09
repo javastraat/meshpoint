@@ -182,3 +182,8 @@
     font-size: 0.72rem;
     color: var(--text-secondary, #94a3b8);
 }
+
+/* Fork band-spectrum card mounted on the RF Environment page. */
+.rf-band-spectrum-host {
+    grid-column: 1 / -1;
+}

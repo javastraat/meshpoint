@@ -115,6 +115,7 @@ class RfTab {
                         <dl class="rf-meta" id="rf-scan-meta"></dl>
                         <div class="rf-scan-stats" id="rf-scan-stats"></div>
                     </article>
+                    <div id="rf-band-spectrum" class="rf-band-spectrum-host"></div>
                     <article class="rf-card rf-card--wide">
                         <h3 class="rf-card__title">Channel histogram</h3>
                         <p class="rf-card__hint">Latest hardware scan — RSSI level distribution across the tuned channel.</p>
@@ -130,6 +131,29 @@ class RfTab {
                 <div id="rf-status-strip-host"></div>
             </div>
         `;
+
+        const spectrumHost = document.getElementById('rf-band-spectrum');
+        if (spectrumHost && window.RadioSpectrumCard) {
+            // Fork band-spectrum card (whole-band sweep) lives on this page;
+            // minimal api adapter matching the card's get/post contract.
+            const api = {
+                get: async (url) => {
+                    const r = await fetch(url, { credentials: 'same-origin' });
+                    return r.ok ? r.json() : null;
+                },
+                post: async (url, body) => {
+                    const r = await fetch(url, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(body || {}),
+                    });
+                    return r.ok ? r.json() : null;
+                },
+            };
+            this._bandSpectrum = new window.RadioSpectrumCard(api);
+            this._bandSpectrum.mount(spectrumHost);
+        }
 
         const stripHost = document.getElementById('rf-status-strip-host');
         if (stripHost && window.StatusStrip) {

@@ -116,7 +116,7 @@ class RadioSpectrumCard {
     _armAutoRefresh() {
         if (this._refreshTimer) return;
         this._refreshTimer = setInterval(() => {
-            const section = document.querySelector('[data-section="radio"]');
+            const section = this._root && this._root.closest('[data-section]');
             if (section && section.classList.contains('section--active')) {
                 this._load();
             }

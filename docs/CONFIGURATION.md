@@ -100,7 +100,7 @@ ERROR: failed to patch sx1261 radio for LBT/Spectral Scan
 
 If your `libloragw` build does not expose the spectral scan symbols at all (older HAL revisions), the service logs a single info line at startup and falls back automatically.
 
-**Band spectrum sweep.** With spectral scan enabled, the service also sweeps the whole region band (one scan per 100 kHz step; EU868 = 71 points in a few seconds) every `spectrum_sweep_interval_seconds` (default 300) and draws the result as the **Band Spectrum** card on the Hardware page — median and peak level per step with the channel positions overlaid. Set it to `0` to disable automatic sweeps; the card's "Sweep now" button (admin) still works. A full sweep costs roughly 4 s of scan time per interval (~1% of receive time at the default cadence).
+**Band spectrum sweep.** With spectral scan enabled, the service also sweeps the whole region band (one scan per 100 kHz step; EU868 = 71 points in a few seconds) every `spectrum_sweep_interval_seconds` (default 300) and draws the result as the **Band Spectrum** card on the RF Environment page — median and peak level per step with the channel positions overlaid. Set it to `0` to disable automatic sweeps; the card's "Sweep now" button (admin) still works. A full sweep costs roughly 4 s of scan time per interval (~1% of receive time at the default cadence).
 
 ### Standard Meshtastic Presets
 
