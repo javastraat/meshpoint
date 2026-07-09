@@ -153,6 +153,12 @@ class RfTab {
             };
             this._bandSpectrum = new window.RadioSpectrumCard(api);
             this._bandSpectrum.mount(spectrumHost);
+            // render(config) triggers the first load and unhides the card;
+            // config supplies the channel-marker positions.
+            fetch('/api/config', { credentials: 'same-origin' })
+                .then((r) => (r.ok ? r.json() : null))
+                .then((config) => this._bandSpectrum.render(config || {}))
+                .catch(() => this._bandSpectrum.render({}));
         }
 
         const stripHost = document.getElementById('rf-status-strip-host');
