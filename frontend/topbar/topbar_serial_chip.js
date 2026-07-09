@@ -24,6 +24,7 @@ class TopbarSerialChip {
     _buildBadge(dev) {
         const connected = Boolean(dev.connected);
         const label = this._labelFromName(dev.name);
+        const ownId = this._shortNodeId(dev.own_node_id_hex);
 
         const root = document.createElement('span');
         root.className = 'topbar-serial';
@@ -31,6 +32,9 @@ class TopbarSerialChip {
             'aria-label',
             `Meshtastic USB${label ? ` ${label}` : ''} ${connected ? 'connected' : 'offline'}`,
         );
+        root.title = ownId
+            ? `This stick's own node ID: ${ownId} (its self-telemetry/nodeinfo is filtered from the packet feed)`
+            : "This stick's own node ID is not known yet";
 
         const brand = document.createElement('span');
         brand.className = 'topbar-serial__brand';
@@ -91,6 +95,12 @@ class TopbarSerialChip {
         const idx = raw.indexOf('_');
         if (idx === -1) return null;
         return raw.slice(idx + 1) || null;
+    }
+
+    /** "09d406f4" -> "!06f4", matching the packet feed's node ID style. */
+    _shortNodeId(hex) {
+        if (!hex) return null;
+        return `!${String(hex).slice(-4)}`;
     }
 }
 

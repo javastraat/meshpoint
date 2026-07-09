@@ -151,6 +151,7 @@ def _serial_status_entry(src) -> dict:
     from src.radio.channel_frequency import resolve_frequency_mhz
 
     info = src.get_radio_info() if hasattr(src, "get_radio_info") else {}
+    own_node_num = info.get("own_node_num")
     return {
         "name": src.name,
         "connected": bool(getattr(src, "connected", False)),
@@ -165,6 +166,7 @@ def _serial_status_entry(src) -> dict:
             override_frequency=info.get("override_frequency") or 0.0,
         ),
         **info,
+        "own_node_id_hex": f"{own_node_num:08x}" if own_node_num is not None else None,
     }
 
 

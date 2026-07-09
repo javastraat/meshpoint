@@ -208,5 +208,57 @@ class BuildPreDecodedEarlyExitTest(unittest.TestCase):
         )
 
 
+class DropSelfOriginatedPacketTest(unittest.TestCase):
+    """A stick's own self-telemetry/nodeinfo passes through the same
+    "meshtastic.receive" stream as genuinely received packets --
+    meshtastic-python doesn't distinguish them, and firmware's own
+    rx_rssi==rx_snr==0 convention confirms there's no real signal for
+    a node reporting on itself. These must be dropped before any other
+    processing (decode/storage/packet feed/node counters), not just
+    hidden cosmetically.
+    """
+
+    def test_packet_from_own_node_is_dropped(self):
+        source = SerialCaptureSource(port="/dev/ttyUSB1", label="433")
+        source._radio_info = {"own_node_num": 0x09D406F4}
+
+        result = source._packet_to_raw_capture({
+            "from": 0x09D406F4, "to": 0xFFFFFFFF,
+            "decoded": {"portnum": "TELEMETRY_APP", "payload": ""},
+        })
+
+        self.assertIsNone(result)
+
+    def test_packet_from_a_remote_node_is_not_dropped(self):
+        source = SerialCaptureSource(port="/dev/ttyUSB1", label="433")
+        source._radio_info = {"own_node_num": 0x09D406F4}
+
+        result = source._packet_to_raw_capture({
+            "from": 0xAABBCCDD, "to": 0xFFFFFFFF, "raw": "aabbccddeeff",
+        })
+
+        self.assertIsNotNone(result)
+
+    def test_unknown_own_node_num_does_not_drop_anything(self):
+        # Handshake hasn't populated own_node_num yet -- must not
+        # accidentally treat every packet (or none) as self-originated.
+        source = SerialCaptureSource(port="/dev/ttyUSB1", label="433")
+        source._radio_info = {"own_node_num": None}
+
+        result = source._packet_to_raw_capture({
+            "from": 0x09D406F4, "to": 0xFFFFFFFF, "raw": "aabbccddeeff",
+        })
+
+        self.assertIsNotNone(result)
+
+    def test_missing_from_field_does_not_crash(self):
+        source = SerialCaptureSource(port="/dev/ttyUSB1", label="433")
+        source._radio_info = {"own_node_num": 0x09D406F4}
+
+        result = source._packet_to_raw_capture({"raw": "aabbccddeeff"})
+
+        self.assertIsNotNone(result)
+
+
 if __name__ == "__main__":
     unittest.main()

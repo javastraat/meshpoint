@@ -118,6 +118,7 @@ class SerialCaptureSource(CaptureSource):
             "modem_preset": None, "use_preset": True,
             "spreading_factor": None, "bandwidth_khz": None, "coding_rate": None,
             "channel_name": None, "frequency_offset": 0.0, "override_frequency": 0.0,
+            "own_node_num": None,
         }
         try:
             from meshtastic.protobuf import config_pb2
@@ -156,6 +157,10 @@ class SerialCaptureSource(CaptureSource):
             info["channel_name"] = SerialCaptureSource._read_primary_channel_name(interface)
         except Exception:
             logger.debug("Could not read primary channel name from serial interface", exc_info=True)
+        try:
+            info["own_node_num"] = int(interface.myInfo.my_node_num)
+        except Exception:
+            logger.debug("Could not read own node number from serial interface", exc_info=True)
         return info
 
     @staticmethod
@@ -221,6 +226,23 @@ class SerialCaptureSource(CaptureSource):
 
     def _packet_to_raw_capture(self, packet: dict) -> Optional[RawCapture]:
         """Convert a meshtastic-python packet dict to a RawCapture."""
+        own_node_num = self._radio_info.get("own_node_num")
+        if own_node_num is not None and packet.get("from") == own_node_num:
+            # The connected stick's own periodic self-telemetry/nodeinfo
+            # (and anything else it locally originates) passes through
+            # the same "meshtastic.receive" event stream as genuinely
+            # received packets -- meshtastic-python doesn't distinguish
+            # them. Firmware's own convention (rx_rssi == rx_snr == 0)
+            # confirms these were never actually received over the air,
+            # so there's no real signal to report; dropped here rather
+            # than flowing through decode/storage/the packet feed/node
+            # counters as a confusing, spammy "-100 dBm" reading of the
+            # stick reporting on itself.
+            logger.debug(
+                "Dropping self-originated packet from own node %08x", own_node_num,
+            )
+            return None
+
         raw_bytes = packet.get("raw", b"")
         if isinstance(raw_bytes, str):
             raw_bytes = bytes.fromhex(raw_bytes)

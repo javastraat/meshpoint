@@ -42,6 +42,7 @@ class ReadRadioInfoLongFastPresetTest(unittest.TestCase):
         iface.localNode.channels = [_mock_primary_channel("")]
         iface.getShortName.return_value = "EMC3"
         iface.getLongName.return_value = "Meshpoint433"
+        iface.myInfo.my_node_num = 0x09D406F4
 
         info = SerialCaptureSource._read_radio_info(iface)
 
@@ -55,6 +56,7 @@ class ReadRadioInfoLongFastPresetTest(unittest.TestCase):
         self.assertEqual(info["coding_rate"], "4/5")
         self.assertEqual(info["short_name"], "EMC3")
         self.assertEqual(info["long_name"], "Meshpoint433")
+        self.assertEqual(info["own_node_num"], 0x09D406F4)
 
     def test_reads_primary_channel_name_when_set(self):
         iface = MagicMock()
