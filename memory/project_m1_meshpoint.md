@@ -974,6 +974,16 @@ ALSO (user decision on the topbar question): Meshtastic USB chip now shows
 wording as the MeshCore chip (was '----' dashes; topbar_serial_chip.js).
 Concentrator chip untouched (keeps last-known values + amber lamp).
 Changelog: +1 bullet (77 total, parser-verified).
+FONT FOLLOW-UP (user screenshot): the serial chip's "Reconnecting…" looked
+like a different font — `.topbar-serial__call` is call-sign styled (700
+weight, 0.18em letter-spacing, cyan text-shadow, 0.82rem) vs MeshCore's
+plain 600-weight name slot. Added `.topbar-serial__call--status` modifier
+(inherit size, 600, normal spacing, no shadow) applied only when the slot
+shows status text; real call signs keep the glow styling.
+ALSO dropped the REGION segment (EU_433) from the serial chip per user
+("we can see the freq that enough"): region element + sep removed from
+_buildBadge, docstring updated, `.topbar-serial__region` CSS rules deleted.
+Concentrator Meshtastic chip KEEPS its region segment (not asked).
 
 Watch: RFID plateau 865.6-867.6 (identified, only interesting if it changes); noise pill should read a few dB lower post-percentile-fix.
 

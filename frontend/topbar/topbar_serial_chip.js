@@ -10,10 +10,10 @@
  * are configured.
  *
  * Layout mirrors the Meshtastic/MeshCore chips: brand, lamp, a "call
- * sign" slot (here: the stick's own node ID, since region already
- * disambiguates band -- a config label would be redundant), region,
- * frequency, and the stick's own modem preset (same data the
- * Meshtastic chip's trailing segment shows, read at connect time).
+ * sign" slot (here: the stick's own node ID -- a config label would be
+ * redundant), frequency (which already tells the band; the region enum
+ * was dropped as noise), and the stick's own modem preset (same data
+ * the Meshtastic chip's trailing segment shows, read at connect time).
  */
 class TopbarSerialChip {
     constructor(groupEl) {
@@ -81,18 +81,10 @@ class TopbarSerialChip {
         root.appendChild(lamp);
 
         const callEl = document.createElement('span');
-        callEl.className = 'topbar-serial__call';
+        callEl.className = 'topbar-serial__call'
+            + (!reachable ? ' topbar-serial__call--status' : '');
         callEl.textContent = callText;
         root.appendChild(callEl);
-
-        const region = !reachable
-            ? '--'
-            : ((dev.region && dev.region !== 'UNSET') ? dev.region : '--');
-        const regionEl = document.createElement('span');
-        regionEl.className = 'topbar-serial__region';
-        regionEl.textContent = region;
-        root.appendChild(this._sep());
-        root.appendChild(regionEl);
 
         const freqEl = document.createElement('span');
         freqEl.className = 'topbar-serial__freq';

@@ -391,6 +391,15 @@
     min-width: 3ch;
 }
 
+/* Status text ("Reconnecting…") reads like the MeshCore chip's name
+   slot, not like a spaced-out glowing call sign. */
+.topbar-serial__call--status {
+    font-size: inherit;
+    font-weight: 600;
+    letter-spacing: normal;
+    text-shadow: none;
+}
+
 .topbar-serial__preset {
     font-size: 0.62rem;
     text-transform: uppercase;
@@ -411,19 +420,12 @@
     margin: 0 0.05rem;
 }
 
-.topbar-serial__region {
-    font-weight: 600;
-    color: var(--text-primary);
-}
-
 .topbar-serial__freq {
     color: var(--accent-cyan);
 }
 
-.topbar-serial--offline .topbar-serial__region,
 .topbar-serial--offline .topbar-serial__freq,
 .topbar-serial--offline .topbar-serial__preset,
-.topbar-serial--reconnecting .topbar-serial__region,
 .topbar-serial--reconnecting .topbar-serial__freq,
 .topbar-serial--reconnecting .topbar-serial__preset {
     opacity: 0.55;
