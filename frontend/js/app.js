@@ -656,6 +656,7 @@ function _bootCommandPaletteAndKeymap(router) {
         ['stats', 'Go to Stats', 'Pages'],
         ['messages', 'Go to Messages', 'Pages'],
         ['radio', 'Go to Hardware', 'Pages'],
+        ['rf', 'Go to RF Environment', 'Pages'],
         ['terminal', 'Go to Terminal', 'Pages'],
         ['configuration/identity', 'Go to Configuration · Identity', 'Configuration'],
         ['configuration/radio', 'Go to Configuration · Radio', 'Configuration'],

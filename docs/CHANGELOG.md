@@ -70,7 +70,7 @@ First tagged release of the javastraat/meshpoint fork: LoRaWAN sniffing, multi-r
 
 #### Dashboard and UI
 
-- **Sidebar regrouped.** Dashboard on top, then **Networks** (LoRaWAN, Meshtastic, MeshCore, Messages, Stats), **Radio** (Hardware, RTL-SDR), and **Ops** (Terminal, Configuration, Settings). The former "Radio" page is now called **Hardware** and the listener appears as **RTL-SDR**.
+- **Sidebar regrouped.** Dashboard on top, then **Networks** (LoRaWAN, Meshtastic, MeshCore, Messages, Stats), **Radio** (Hardware, RF Environment, RTL-SDR), and **Ops** (Terminal, Configuration, Settings). The former "Radio" page is now called **Hardware**, the listener appears as **RTL-SDR**, and the RF Environment tab lives in the Radio group instead of a link below the sidebar telemetry rail.
 - **Inline modals instead of browser popups.** Confirmation dialogs in the update panel, channel and MeshCore configuration cards, sign-out-all, viewer-role form, and dangerous actions now use the dashboard's own modal styling instead of native `confirm()` popups.
 - **Dates on packet feeds.** LoRaWAN, Meshtastic, and MeshCore panels show a date for packets from previous days ("Jul 5, 16:19"); today's packets keep the compact time-only form.
 - **Theme toggle in the topbar.** Cycles the three dark themes (default, high-contrast, sunlight) with per-theme icon, in sync with the command palette.
