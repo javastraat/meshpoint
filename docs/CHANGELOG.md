@@ -88,6 +88,7 @@ First tagged release of the javastraat/meshpoint fork: LoRaWAN sniffing, multi-r
 
 - **Contacts + neighbours import.** Root `import_contacts.py` imports MeshCore contacts and neighbours with synthetic neighbour-advert rows (SNR surfaced in panels), skew-immune `last_heard` anchored to the local clock, and authoritative timestamp upserts floored at real captures.
 - **Repair and backfill tools.** `scripts/repair_neighbour_timestamps.py` fixes past/future neighbour timestamps; `scripts/backfill_meshcore_signal.py` stamps frequency/SF on older MeshCore rows.
+- **SenseCap M1 onboard LED/button/fan GPIO probe.** No public schematic exists for this board's expansion peripherals; new `scripts/test_gpio_hardware.py` (`gpiozero`, not a runtime dependency) identifies and exercises them. `led`/`button`/`fan` test one pin directly; `button-scan`/`fan-scan` sweep a batch of candidate pins at once (skipping the concentrator's SPI0 bus, the I2C crypto/temp chips, the HAT ID pins, and the concentrator reset lines) rather than guessing pin-by-pin. Confirmed live on real hardware: LED = GPIO 22, button = GPIO 27, fan = GPIO 13.
 
 #### Self-update system
 

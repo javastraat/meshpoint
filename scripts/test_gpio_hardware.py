@@ -5,17 +5,12 @@ Run directly on the Pi (needs `gpiozero`, preinstalled on Raspberry Pi OS —
 this is NOT a Meshpoint runtime dependency, just a one-off hardware check).
 
 Pin numbers below are BCM GPIO numbers, NOT physical header pin numbers.
-Only GPIO 22 (LED) is corroborated by outside sources (a community teardown
-and a Seeed `dtoverlay=gpio-led,gpio=22,label=lorawan` config snippet both
-name it). GPIO 13 (button) and GPIO 14 (fan) are unverified -- no public
-schematic exists for this board -- so this script is deliberately cautious:
-the button test only ever reads, and the fan test requires an explicit
-Enter keypress before it drives anything. If a guess is wrong, override it
-with the matching --*-pin flag and retry rather than editing this file.
+All three are now confirmed live on the actual board (via `button-scan`/
+`fan-scan`, see below): LED = GPIO 22, button = GPIO 27, fan = GPIO 13.
+(Initial guesses of button=13/fan=14 were wrong -- 13 is actually the fan.)
 
-GPIO 13 (button) and GPIO 14 (fan) turned out wrong on the real board (LED
-on GPIO 22 worked). Rather than keep guessing one pin at a time, `button-scan`
-and `fan-scan` sweep a whole batch of candidate pins at once:
+`button-scan` and `fan-scan` sweep a whole batch of candidate pins at once,
+useful if this ever needs re-deriving on different hardware:
 
     python3 test_gpio_hardware.py button-scan   # press the button a few
                                                   # times during the 20s scan
@@ -27,14 +22,13 @@ Candidates exclude pins already known to be spoken for on this board:
 SPI0 (7-11, the concentrator's bus -- confirmed by /dev/spidev0.x elsewhere
 in this repo), I2C1 (2-3, the ATECC608 crypto chip + temp sensor), the HAT ID
 EEPROM pins (0-1), the concentrator reset lines (17, 25, from
-reset_concentrator.sh), and GPIO 22 (the now-confirmed LED).
+reset_concentrator.sh), and GPIO 22 (the LED).
 
 Usage:
     python3 test_gpio_hardware.py led
     python3 test_gpio_hardware.py button
     python3 test_gpio_hardware.py fan
     python3 test_gpio_hardware.py all
-    python3 test_gpio_hardware.py button --button-pin 6   # try a specific guess
     python3 test_gpio_hardware.py button-scan
     python3 test_gpio_hardware.py fan-scan
 """
@@ -46,11 +40,11 @@ import sys
 import time
 
 LED_PIN_DEFAULT = 22
-BUTTON_PIN_DEFAULT = 13
-FAN_PIN_DEFAULT = 14
+BUTTON_PIN_DEFAULT = 27
+FAN_PIN_DEFAULT = 13
 
 # Pins already spoken for on this board -- never included in a scan.
-RESERVED_PINS = {0, 1, 2, 3, 7, 8, 9, 10, 11, 17, 22, 25}
+RESERVED_PINS = {0, 1, 2, 3, 7, 8, 9, 10, 11, 13, 17, 22, 25, 27}
 SCAN_CANDIDATES = [p for p in range(2, 28) if p not in RESERVED_PINS]
 
 
