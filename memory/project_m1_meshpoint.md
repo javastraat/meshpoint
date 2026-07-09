@@ -1201,6 +1201,36 @@ resolved:
 - **NEVER put Co-Authored-By/AI trailers in commit messages (user: "never
   ever").**
 
+**Post-merge polish round (2026-07-09 afternoon, all user-requested):**
+- RF Environment moved from telemetry-rail link into the Radio sidebar group
+  (Hardware · RF Environment · RTL-SDR) + palette entry; rail is status-only
+  again (dead .telemetry-rail__rf-* CSS left in place).
+- Band Spectrum card moved Hardware → RF Environment page: rf_tab.js hosts
+  it (`#rf-band-spectrum` grid-span div + minimal fetch api adapter), card's
+  auto-refresh gating generalized to closest('[data-section]'), Hardware
+  slot/mount removed. GOTCHA THAT BIT: card lifecycle is mount() THEN
+  render(config) — render triggers first load + unhide; forgot render →
+  invisible card. Also: card now stays visible with "no sweep yet"
+  placeholder (10s retry while empty) instead of hiding on fetch failure;
+  hides only when endpoint says available:false.
+- RF tab histogram page-growth fixed earlier same day (fixed-height
+  .rf-histogram-wrap — Chart.js maintainAspectRatio:false needs it).
+- Meshtastic Configuration card: computed SF/BW/CR/Sync/Preamble tiles →
+  normal r-readout-row entries in the two-col grid; channels block got
+  dashed-divider separation (.r-mt-channels). User-verified, matches
+  MeshCore companion card.
+- **Update history built (user chose Option A):** `src/api/update/history.py`
+  (append/read, newest-first, cap 20, corrupt-safe), entries appended in all
+  4 route handlers (apply/rollback × plain/stream; from_sha=pre_update_sha,
+  to_sha only known for rollback), `GET /api/update/history` (admin),
+  "Recent updates" list (last 5) under the rollback hint (mono rows,
+  ✓/✗ + kind + branch + from→to, failed rows red). History file =
+  data/update_history.json sibling of rollback state (resolve_history_path).
+  9 unit tests pass on Mac + 2 route tests for CI. NOTE: history only
+  populates from the NEXT apply onward (no retroactive entries).
+- Changelog now 63 bullets, parser-verified. All pushed by user
+  incrementally; CI green through the round.
+
 ## OLD LIST (superseded, kept for the DONE details)
 
 User has been committing incrementally with the suggested one-liners (verified

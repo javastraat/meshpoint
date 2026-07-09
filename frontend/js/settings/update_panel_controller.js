@@ -37,6 +37,8 @@ class UpdatePanelController {
         this.rollbackHintEl = rootEl.querySelector('[data-update-rollback-hint]');
         this.syncHintEl = rootEl.querySelector('[data-update-sync-hint]');
         this.incomingEl = rootEl.querySelector('[data-update-incoming]');
+        this.historyEl = rootEl.querySelector('[data-update-history]');
+        this.historyListEl = rootEl.querySelector('[data-update-history-list]');
         this.statusEl = rootEl.querySelector('[data-update-status]');
         this.descriptionEl = rootEl.querySelector('[data-update-description]');
         this.localVersionEl = rootEl.querySelector('[data-update-local-version]');
@@ -81,6 +83,66 @@ class UpdatePanelController {
         await this._loadChannels();
         await this._loadInstallStatus();
         this._syncChannelPickerToInstall();
+        await this._loadHistory();
+    }
+
+    async _loadHistory() {
+        if (!this.historyEl || !this.historyListEl) return;
+        try {
+            const response = await fetch('/api/update/history', {
+                credentials: 'same-origin',
+            });
+            if (!response.ok) return;
+            const body = await response.json();
+            this._renderHistory(body.entries || []);
+        } catch (_e) {
+            /* history is decorative; never block the panel on it */
+        }
+    }
+
+    _renderHistory(entries) {
+        this.historyListEl.textContent = '';
+        const shown = entries.slice(0, 5);
+        if (!shown.length) {
+            this.historyEl.hidden = true;
+            return;
+        }
+        shown.forEach((e) => {
+            const li = document.createElement('li');
+            li.className = 'update-history__row'
+                + (e.success ? '' : ' update-history__row--failed');
+
+            const when = document.createElement('span');
+            when.className = 'update-history__when';
+            when.textContent = this._formatHistoryTime(e.at);
+            li.appendChild(when);
+
+            const what = document.createElement('span');
+            what.className = 'update-history__what';
+            const mark = e.success ? '✓' : '✗';
+            const kind = e.kind === 'rollback' ? 'rollback' : 'apply';
+            const from = (e.from_sha || '').slice(0, 8);
+            const to = (e.to_sha || '').slice(0, 8);
+            let text = `${mark} ${kind}`;
+            if (e.branch && e.branch !== 'rollback') text += ` ${e.branch}`;
+            if (from) text += ` ${from}${to ? ` → ${to}` : ' → …'}`;
+            if (!e.success && e.failed_step) text += ` (failed at ${e.failed_step})`;
+            what.textContent = text;
+            li.appendChild(what);
+
+            this.historyListEl.appendChild(li);
+        });
+        this.historyEl.hidden = false;
+    }
+
+    _formatHistoryTime(iso) {
+        if (!iso) return '--';
+        const d = new Date(iso);
+        if (Number.isNaN(d.getTime())) return '--';
+        return d.toLocaleString([], {
+            month: 'short', day: 'numeric',
+            hour: '2-digit', minute: '2-digit', hour12: false,
+        });
     }
 
     async _loadChannels() {

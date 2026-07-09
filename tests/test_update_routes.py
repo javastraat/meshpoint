@@ -124,6 +124,31 @@ class TestUpdateRoutes(unittest.TestCase):
         response = self.client.get("/api/update/channels")
         self.assertEqual(response.status_code, 403)
 
+    def test_history_returned_for_admin(self) -> None:
+        # Re-init with a tmp rollback path so history resolves into tmp too.
+        update_routes.init_routes(
+            applier=self.applier,
+            registry=ReleaseChannelRegistry(),
+            rollback_state_path=Path(self.tmp.name) / "update_rollback.json",
+        )
+        from src.api.update.history import append_history_entry
+        append_history_entry(
+            {"kind": "apply", "branch": "main", "success": True},
+            path=Path(self.tmp.name) / "update_history.json",
+        )
+        self.client.cookies.set("meshpoint_session", self.admin_token)
+        response = self.client.get("/api/update/history")
+        self.assertEqual(response.status_code, 200)
+        entries = response.json()["entries"]
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(entries[0]["kind"], "apply")
+        self.assertTrue(entries[0]["at"])
+
+    def test_history_rejects_anonymous(self) -> None:
+        client = TestClient(self.client.app)
+        response = client.get("/api/update/history")
+        self.assertEqual(response.status_code, 401)
+
     def test_apply_runs_chain_for_known_channel(self) -> None:
         self.client.cookies.set("meshpoint_session", self.admin_token)
         response = self.client.post(
