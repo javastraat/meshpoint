@@ -48,7 +48,8 @@ class TopbarSerialChip {
         const reachable = this._dashboardReachable;
         const connected = reachable && Boolean(dev.connected);
         const ownId = this._shortNodeId(dev.own_node_id_hex);
-        const callText = !reachable ? '----' : (ownId || '----');
+        // Same wording as the MeshCore chip's name slot in this state.
+        const callText = !reachable ? 'Reconnecting…' : (ownId || '----');
 
         const root = document.createElement('span');
         root.className = 'topbar-serial';

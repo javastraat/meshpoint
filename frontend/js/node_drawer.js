@@ -437,9 +437,11 @@ class NodeDrawer {
     }
 
     _signalQuality(rssi) {
+        // Tier breaks match the packet feed / protocol panels' -100/-115
+        // color bands (duplicated in node_cards.js).
         if (rssi > -80) return { label: 'Excellent', cls: 'excellent' };
-        if (rssi > -95) return { label: 'Good', cls: 'good' };
-        if (rssi > -110) return { label: 'Fair', cls: 'fair' };
+        if (rssi >= -100) return { label: 'Good', cls: 'good' };
+        if (rssi >= -115) return { label: 'Fair', cls: 'fair' };
         return { label: 'Poor', cls: 'poor' };
     }
 

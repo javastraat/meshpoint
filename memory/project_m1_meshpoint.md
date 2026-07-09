@@ -962,6 +962,18 @@ a comment pointing at the panels' `_rssiClass`. No other views color RSSI
 "Dashboard and UI" (76, parser-verified). Class names differ per view
 (rssi-* in dashboard.css vs lw-signal--* in lorawan.css) but colors map to
 the same green/amber/red tokens — only thresholds were the problem.
+FOLLOW-UP (user screenshot post-deploy: feed fixed, "right side still 100
+yellow"): the NODES list uses a FOURTH scheme — `_signalQuality` 4-tier
+labels (Excellent/Good/Fair/Poor at >−80/>−95/>−110), duplicated in
+node_cards.js AND node_drawer.js, plus `_signalBars` icon levels. −100 →
+"Fair" amber chip. ALIGNED both copies to the same breakpoints: Good ≥−100,
+Fair ≥−115 (Excellent >−80 kept; bars 4-bar cutoff now ≥−100, 3-bar ≥−115).
+−100 now shows teal "Good" chip. Folded into the same changelog bullet.
+ALSO (user decision on the topbar question): Meshtastic USB chip now shows
+"Reconnecting…" in its call slot when the dashboard is unreachable, same
+wording as the MeshCore chip (was '----' dashes; topbar_serial_chip.js).
+Concentrator chip untouched (keeps last-known values + amber lamp).
+Changelog: +1 bullet (77 total, parser-verified).
 
 Watch: RFID plateau 865.6-867.6 (identified, only interesting if it changes); noise pill should read a few dB lower post-percentile-fix.
 

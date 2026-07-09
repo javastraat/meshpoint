@@ -398,7 +398,7 @@ class NodeCards {
     }
 
     _signalBars(rssi) {
-        const level = rssi > -80 ? 5 : rssi > -95 ? 4 : rssi > -110 ? 3 : rssi > -125 ? 2 : 1;
+        const level = rssi > -80 ? 5 : rssi >= -100 ? 4 : rssi >= -115 ? 3 : rssi >= -125 ? 2 : 1;
         let bars = '';
         for (let i = 1; i <= 5; i++) {
             const active = i <= level ? 'active' : '';
@@ -408,9 +408,12 @@ class NodeCards {
     }
 
     _signalQuality(rssi) {
+        // Tier breaks match the packet feed / protocol panels' -100/-115
+        // color bands so the same RSSI never reads green on one page and
+        // amber on another (duplicated in node_drawer.js).
         if (rssi > -80) return { label: 'Excellent', cls: 'excellent' };
-        if (rssi > -95) return { label: 'Good', cls: 'good' };
-        if (rssi > -110) return { label: 'Fair', cls: 'fair' };
+        if (rssi >= -100) return { label: 'Good', cls: 'good' };
+        if (rssi >= -115) return { label: 'Fair', cls: 'fair' };
         return { label: 'Poor', cls: 'poor' };
     }
 
