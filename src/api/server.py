@@ -104,6 +104,7 @@ _noise_floor_emitter_task = None
 _spectral_scan_service: SpectralScanService | None = None
 _rtl_listener: RtlListener | None = None
 _fan_controller_task = None
+_fan_controller = None
 
 
 def create_app(config: AppConfig | None = None) -> FastAPI:
@@ -234,11 +235,11 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
             await _spectral_scan_service.start()
         spectrum_routes.init_routes(_spectral_scan_service)
 
-        global _fan_controller_task
+        global _fan_controller_task, _fan_controller
         if config.fan.enabled:
             from src.hardware.fan_control import FanController, FanCurve
 
-            fan_controller = FanController(
+            _fan_controller = FanController(
                 pin=config.fan.gpio_pin,
                 curve=FanCurve(
                     min_temp_c=config.fan.min_temp_c,
@@ -249,8 +250,9 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
                 poll_interval_s=config.fan.poll_interval_s,
             )
             _fan_controller_task = asyncio.get_running_loop().create_task(
-                fan_controller.run()
+                _fan_controller.run()
             )
+        system_metrics.init_routes(_fan_controller)
 
         _init_routes(
             pipeline,

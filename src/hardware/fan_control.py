@@ -85,6 +85,8 @@ class FanController:
         self._pwm_frequency_hz = pwm_frequency_hz
         self._pwm = None
         self._on = False
+        self.current_duty: float = 0.0
+        self.previous_duty: float = 0.0
 
     async def run(self) -> None:
         try:
@@ -127,18 +129,30 @@ class FanController:
         )
         try:
             while True:
-                temp = self._temp_fn()
-                if temp is not None:
-                    duty = self._curve.duty_for(temp, self._on)
-                    if duty != self._pwm.value:
-                        logger.debug(
-                            "Fan: %.1fC -> duty %.2f (was %.2f)",
-                            temp, duty, self._pwm.value,
-                        )
-                    self._pwm.value = duty
-                    self._on = duty > 0.0
+                self._poll_once()
                 await asyncio.sleep(self._poll_interval_s)
         except asyncio.CancelledError:
             pass
         finally:
             self._pwm.close()
+
+    def _poll_once(self) -> None:
+        """Read temperature, compute duty, drive the pin once.
+
+        Split out from ``run()``'s loop so the duty-tracking logic
+        (``current_duty``/``previous_duty``, used by the dashboard fan
+        card) is testable without real asyncio timing.
+        """
+        temp = self._temp_fn()
+        if temp is None:
+            return
+        duty = self._curve.duty_for(temp, self._on)
+        if duty != self._pwm.value:
+            logger.info(
+                "Fan: %.1fC -> duty %.2f (was %.2f)",
+                temp, duty, self._pwm.value,
+            )
+            self.previous_duty = self.current_duty
+        self._pwm.value = duty
+        self._on = duty > 0.0
+        self.current_duty = duty

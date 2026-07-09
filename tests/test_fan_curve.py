@@ -77,5 +77,52 @@ class FanControllerPinPwmUnsupportedTest(unittest.TestCase):
         self.assertNotIn("Traceback", message)
 
 
+class FanControllerDutyTrackingTest(unittest.TestCase):
+    """current_duty/previous_duty back the dashboard fan stat card --
+    verified directly against _poll_once() rather than real asyncio
+    timing, since it's the same logic run() calls every tick.
+    """
+
+    def setUp(self):
+        class FakePWM:
+            def __init__(self):
+                self.value = 0.0
+
+        self.pwm = FakePWM()
+        self.controller = FanController(pin=13, curve=FanCurve())
+        self.controller._pwm = self.pwm
+
+    def _poll_at(self, temp_c: float) -> None:
+        self.controller._temp_fn = lambda: temp_c
+        self.controller._poll_once()
+
+    def test_current_duty_tracks_latest_computed_value(self):
+        self._poll_at(55.0)
+        self.assertAlmostEqual(self.controller.current_duty, self.pwm.value)
+        self.assertGreater(self.controller.current_duty, 0.0)
+
+    def test_previous_duty_only_updates_on_a_change(self):
+        self._poll_at(55.0)
+        first_duty = self.controller.current_duty
+        self._poll_at(60.0)
+        second_duty = self.controller.current_duty
+        self.assertEqual(self.controller.previous_duty, first_duty)
+        self.assertNotEqual(second_duty, first_duty)
+
+    def test_previous_duty_stays_put_across_unchanged_polls(self):
+        self._poll_at(55.0)
+        self._poll_at(60.0)
+        prev_after_first_change = self.controller.previous_duty
+        self._poll_at(60.0)  # same temp -> no change -> previous_duty untouched
+        self.assertEqual(self.controller.previous_duty, prev_after_first_change)
+
+    def test_missing_temp_reading_does_not_update_duty(self):
+        self._poll_at(55.0)
+        duty_before = self.controller.current_duty
+        self.controller._temp_fn = lambda: None
+        self.controller._poll_once()
+        self.assertEqual(self.controller.current_duty, duty_before)
+
+
 if __name__ == "__main__":
     unittest.main()

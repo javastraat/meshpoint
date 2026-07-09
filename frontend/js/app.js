@@ -546,6 +546,21 @@ async function _updateStats() {
                 _setText('stat-load-val', 'N/A');
                 _setText('stat-load-sub', '');
             }
+
+            const fanCard = document.getElementById('stat-fan');
+            if (fanCard) {
+                const dutyPct = metrics.fan_duty_percent;
+                if (dutyPct == null) {
+                    fanCard.hidden = true;
+                } else {
+                    fanCard.hidden = false;
+                    _setText('stat-fan-val', dutyPct > 0 ? `${dutyPct}%` : 'Off');
+                    const prevPct = metrics.fan_previous_duty_percent;
+                    _setText('stat-fan-sub', prevPct != null
+                        ? `was ${prevPct > 0 ? `${prevPct}%` : 'off'}`
+                        : '');
+                }
+            }
         }
     } catch (e) {
         console.error('Failed to update stats:', e);

@@ -295,6 +295,52 @@ The command auto-detects the USB port, stops the service, configures the radio, 
 
 ---
 
+## Enabling the SenseCap M1 Onboard Fan (Optional)
+
+The SenseCap M1 has an onboard fan header, an LED, and a user button on GPIO 13, 22, and 27 respectively (BCM numbering, confirmed live via `scripts/test_gpio_hardware.py` -- no public schematic exists for this board, so these were found by testing rather than documented anywhere). Meshpoint can drive the fan proportionally from CPU temperature (PWM, not just on/off) -- useful in hot weather so it isn't either silent-and-overheating or full-speed-and-loud all the time. This hardware doesn't exist on RAK V2, Chameleon, or DIY builds, so it's opt-in and does nothing unless enabled.
+
+### Step 1: Install the GPIO Backend
+
+`gpiozero` and `lgpio` aren't part of the base install (most Meshpoint hardware doesn't need GPIO control at all). `lgpio` specifically needs three system packages to build from source -- there's no prebuilt wheel for every Pi/Python combination:
+
+```bash
+sudo apt install -y python3-dev swig liblgpio-dev
+sudo /opt/meshpoint/venv/bin/pip install gpiozero lgpio
+```
+
+Without `lgpio` (or `RPi.GPIO`/`pigpio`), gpiozero falls back to a pure-Python pin factory that refuses PWM on this board's repurposed GPIO 13 (`PinPWMUnsupported`), even though it's a genuine PWM-capable pin on the Pi 4 SoC underneath.
+
+### Step 2: Enable It in `local.yaml`
+
+```yaml
+fan:
+  enabled: true
+```
+
+That line alone is enough -- every other setting (`gpio_pin`, `min_temp_c`, `max_temp_c`, `min_duty`, `hysteresis_c`, `poll_interval_s`) has a working default, all documented with inline comments in `config/default.yaml` if you want to tune the temperature range or ramp behaviour. Full reference: `docs/CONFIGURATION.md` → "Fan Control (SenseCap M1)".
+
+### Step 3: Restart
+
+```bash
+sudo systemctl restart meshpoint
+```
+
+Check `meshpoint logs` for:
+
+```
+fan_control: Fan control started on GPIO13 (45-65C range, poll every 10s)
+```
+
+If you're upgrading an existing install rather than doing a fresh `install.sh` run, also make sure `/opt/meshpoint` itself (not just `config/`/`data/`) is owned by the `meshpoint` service user -- `lgpio` writes a notification pipe directly into the working directory, and older deployments only chowned the subdirectories:
+
+```bash
+sudo chown meshpoint:meshpoint /opt/meshpoint
+```
+
+Current `scripts/meshpoint.service` does this automatically on every start, so this is only needed once if your live systemd unit predates that fix. See `docs/TROUBLESHOOTING.md` for the full failure-mode-by-failure-mode breakdown if any of these steps don't go cleanly.
+
+---
+
 ## Pre-Provisioned Device (Received from Someone)
 
 If you received a pre-built Meshpoint, all the software is already configured. You just need to set it up physically.

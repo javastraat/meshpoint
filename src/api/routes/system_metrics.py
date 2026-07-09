@@ -4,10 +4,26 @@ from __future__ import annotations
 
 import shutil
 from pathlib import Path
+from typing import TYPE_CHECKING, Optional
 
 from fastapi import APIRouter
 
+if TYPE_CHECKING:
+    from src.hardware.fan_control import FanController
+
 router = APIRouter(prefix="/api/device", tags=["device"])
+
+_fan_controller: Optional["FanController"] = None
+
+
+def init_routes(fan_controller: Optional["FanController"] = None) -> None:
+    global _fan_controller
+    _fan_controller = fan_controller
+
+
+def reset_routes() -> None:
+    global _fan_controller
+    _fan_controller = None
 
 
 def _read_cpu_temp() -> float | None:
@@ -56,4 +72,12 @@ async def system_metrics():
         "cpu_temp_c": round(cpu_temp, 1) if cpu_temp is not None else None,
         "load_avg": [round(v, 2) for v in load_avg] if load_avg is not None else None,
         "system_uptime_seconds": int(_read_uptime_seconds()),
+        "fan_duty_percent": (
+            round(_fan_controller.current_duty * 100, 1)
+            if _fan_controller is not None else None
+        ),
+        "fan_previous_duty_percent": (
+            round(_fan_controller.previous_duty * 100, 1)
+            if _fan_controller is not None else None
+        ),
     }
