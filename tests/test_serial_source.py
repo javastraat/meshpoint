@@ -229,6 +229,21 @@ class DropSelfOriginatedPacketTest(unittest.TestCase):
 
         self.assertIsNone(result)
 
+    def test_self_originated_text_message_is_not_dropped(self):
+        # A message typed via a BLE/WiFi-connected app on this same
+        # physical stick is genuine chat content, not a beacon -- it
+        # must still reach decode/storage/Messages even though this
+        # stick is also the packet's "from" node.
+        source = SerialCaptureSource(port="/dev/ttyUSB1", label="433")
+        source._radio_info = {"own_node_num": 0x09D406F4}
+
+        result = source._packet_to_raw_capture({
+            "from": 0x09D406F4, "to": 0xFFFFFFFF, "raw": "aabbccddeeff",
+            "decoded": {"portnum": "TEXT_MESSAGE_APP", "payload": ""},
+        })
+
+        self.assertIsNotNone(result)
+
     def test_packet_from_a_remote_node_is_not_dropped(self):
         source = SerialCaptureSource(port="/dev/ttyUSB1", label="433")
         source._radio_info = {"own_node_num": 0x09D406F4}

@@ -227,7 +227,12 @@ class SerialCaptureSource(CaptureSource):
     def _packet_to_raw_capture(self, packet: dict) -> Optional[RawCapture]:
         """Convert a meshtastic-python packet dict to a RawCapture."""
         own_node_num = self._radio_info.get("own_node_num")
-        if own_node_num is not None and packet.get("from") == own_node_num:
+        is_self = own_node_num is not None and packet.get("from") == own_node_num
+        is_text = (
+            isinstance(packet.get("decoded"), dict)
+            and packet["decoded"].get("portnum") == "TEXT_MESSAGE_APP"
+        )
+        if is_self and not is_text:
             # The connected stick's own periodic self-telemetry/nodeinfo
             # (and anything else it locally originates) passes through
             # the same "meshtastic.receive" event stream as genuinely
@@ -238,6 +243,12 @@ class SerialCaptureSource(CaptureSource):
             # than flowing through decode/storage/the packet feed/node
             # counters as a confusing, spammy "-100 dBm" reading of the
             # stick reporting on itself.
+            #
+            # Text messages are exempt: a message the user typed via a
+            # BLE/WiFi-connected app on this same physical stick is
+            # genuine chat content, not a beacon -- it should still reach
+            # decode/storage so it shows up in the Messages panel, even
+            # though this stick is also its own "from" node here.
             logger.debug(
                 "Dropping self-originated packet from own node %08x", own_node_num,
             )
