@@ -1180,6 +1180,24 @@ resolved:
   fastapi/aiosqlite tests run (Mac can't); check the Actions tab after
   pushes. Chart.js on the RF tab loads from CDN (index.html) — offline
   dashboards skip the histogram; vendoring = candidate task.
+
+**Chart.js vendored locally (2026-07-09, "easy" candidate task picked up):**
+Same rationale/pattern as `frontend/vendor/xterm/` and `frontend/vendor/qrcode/`
+(both already document "vendored so it works with no outbound CDN access").
+Pulled `chart.js@4.4.4` UMD bundle (`dist/chart.umd.min.js`, 205749 bytes,
+`window.Chart = An` confirmed at tail of file — matches both consumers'
+`window.Chart`/`new Chart(...)` usage) into NEW
+`frontend/vendor/chartjs/chart.umd.min.js` + README (same table/license/refresh
+format as the other two vendor READMEs). `index.html` script tag repointed
+from the jsdelivr CDN URL to `vendor/chartjs/chart.umd.min.js`. Used by
+`node_metrics_chart.js` (node drawer) and `rf_tab.js` (RF Environment
+histogram) — both already read the global, no JS changes needed. Verified:
+`node --check` on the vendored file, no leftover CDN references in
+index.html, changelog bullet added under "Dashboard and operator tools"
+(folded next to the existing RF histogram sizing fix). NOT yet Pi-verified
+(no CDN egress needed now, so nothing to newly test beyond "does the page
+still load the charts" — low risk, same file that was already loading fine
+from the CDN).
   MESSAGING INCIDENT (same morning, NOT a merge bug): MeshCore channel
   sends timed out AND incoming channel msgs stopped reaching chats, while
   adverts still hit the packet feed. Logs: repeated "get_contacts: 0
