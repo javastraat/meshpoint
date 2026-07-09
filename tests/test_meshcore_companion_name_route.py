@@ -18,6 +18,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from src.api.auth.dependencies import require_admin, require_auth
+from src.api.auth.jwt_session import ROLE_ADMIN, SessionClaims
+
 from src.api.routes import meshcore_config_routes as mc_routes
 
 class _RenameResult:
@@ -35,6 +38,10 @@ class _RenameResult:
 def _build_app() -> FastAPI:
     app = FastAPI()
     app.include_router(mc_routes.router)
+    # Routes are auth-gated (fork viewer lockdown); satisfy the dependencies
+    # with an admin session so these tests exercise the route logic itself.
+    app.dependency_overrides[require_admin] = lambda: SessionClaims("test-admin", ROLE_ADMIN, 1)
+    app.dependency_overrides[require_auth] = lambda: SessionClaims("test-admin", ROLE_ADMIN, 1)
     return app
 
 

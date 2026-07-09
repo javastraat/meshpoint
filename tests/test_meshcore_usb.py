@@ -11,7 +11,6 @@ from src.config import (
     AppConfig,
     CaptureConfig,
     MeshcoreUsbConfig,
-    _merge_dataclass,
 )
 from src.decode.crypto_service import CryptoService
 from src.decode.meshcore_decoder import MeshcoreDecoder
@@ -327,28 +326,32 @@ class TestMeshcoreUsbConfig(unittest.TestCase):
         self.assertTrue(cfg.auto_detect)
 
     def test_capture_config_has_meshcore_usb(self):
+        # Multi-companion support: meshcore_usb is a list of companions.
         cap = CaptureConfig()
-        self.assertIsInstance(cap.meshcore_usb, MeshcoreUsbConfig)
+        self.assertIsInstance(cap.meshcore_usb, list)
+        self.assertTrue(
+            all(isinstance(c, MeshcoreUsbConfig) for c in cap.meshcore_usb)
+        )
 
-    def test_nested_dataclass_merge(self):
+    def test_legacy_single_dict_coerced_to_list(self):
+        # load_config coerces the YAML value before the dataclass merge;
+        # legacy single-dict local.yaml keeps working.
+        from src.config import _coerce_meshcore_usb
         cfg = AppConfig()
-        overrides = {
-            "meshcore_usb": {
-                "serial_port": "/dev/ttyUSB1",
-                "auto_detect": False,
-            }
-        }
-        _merge_dataclass(cfg.capture, overrides)
-        self.assertEqual(cfg.capture.meshcore_usb.serial_port, "/dev/ttyUSB1")
-        self.assertFalse(cfg.capture.meshcore_usb.auto_detect)
-        self.assertEqual(cfg.capture.meshcore_usb.baud_rate, 115200)
+        cfg.capture.meshcore_usb = _coerce_meshcore_usb(
+            {"serial_port": "/dev/ttyUSB1", "auto_detect": False}
+        )
+        self.assertEqual(len(cfg.capture.meshcore_usb), 1)
+        companion = cfg.capture.meshcore_usb[0]
+        self.assertEqual(companion.serial_port, "/dev/ttyUSB1")
+        self.assertFalse(companion.auto_detect)
+        self.assertEqual(companion.baud_rate, 115200)
 
-    def test_nested_merge_preserves_other_fields(self):
-        cfg = AppConfig()
-        overrides = {"meshcore_usb": {"baud_rate": 9600}}
-        _merge_dataclass(cfg.capture, overrides)
-        self.assertEqual(cfg.capture.meshcore_usb.baud_rate, 9600)
-        self.assertTrue(cfg.capture.meshcore_usb.auto_detect)
+    def test_coercion_preserves_unset_fields(self):
+        from src.config import _coerce_meshcore_usb
+        companions = _coerce_meshcore_usb({"baud_rate": 9600})
+        self.assertEqual(companions[0].baud_rate, 9600)
+        self.assertTrue(companions[0].auto_detect)
 
 
 class TestFindSerialCandidates(unittest.TestCase):

@@ -8,6 +8,9 @@ from unittest.mock import patch
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from src.api.auth.dependencies import require_admin, require_auth
+from src.api.auth.jwt_session import ROLE_ADMIN, SessionClaims
+
 from src.api.channel_hash_resolver import ChannelHashResolver
 from src.api import channel_hash_resolver as resolver_module
 from src.api.routes import config_routes as config_module
@@ -22,6 +25,10 @@ PRIVATE_PSK_B64 = "wLvS00jm+SlCkdkZ6DRZXvLoqoSgPT+3vh8zX+MJoyQ="
 def _build_config_app() -> FastAPI:
     app = FastAPI()
     app.include_router(config_module.router)
+    # Routes are auth-gated (fork viewer lockdown); satisfy the dependencies
+    # with an admin session so these tests exercise the route logic itself.
+    app.dependency_overrides[require_admin] = lambda: SessionClaims("test-admin", ROLE_ADMIN, 1)
+    app.dependency_overrides[require_auth] = lambda: SessionClaims("test-admin", ROLE_ADMIN, 1)
     return app
 
 
