@@ -854,9 +854,19 @@ def _inject_tx_gain_into_source(coord: PipelineCoordinator) -> None:
 
 
 def _find_meshcore_source(coord: PipelineCoordinator):
-    """Find the MeshCore USB capture source if it exists."""
+    """Find the (first) MeshCore USB capture source if it exists.
+
+    Exact ``== "meshcore_usb"`` broke the moment a companion gets a
+    label (name becomes "meshcore_usb_<label>", e.g. "meshcore_usb_868")
+    -- silently disabling MeshCore TX/advert/status (no crash, just
+    ``meshcore_tx.set_source`` never runs). Matches the same
+    ``startswith`` rule already used for packet routing in
+    coordinator.py. With multiple companions this picks the first,
+    consistent with the existing "companion[0] is primary" convention
+    (e.g. the backward-compat single-companion config PUT endpoint).
+    """
     for src in coord.capture_coordinator._sources:
-        if src.name == "meshcore_usb":
+        if src.name.startswith("meshcore_usb"):
             return src
     return None
 
