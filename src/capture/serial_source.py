@@ -9,41 +9,10 @@ from typing import AsyncIterator, Optional
 from src.capture.base import CaptureSource
 from src.models.packet import RawCapture
 from src.models.signal import SignalMetrics
+from src.radio.channel_frequency import resolve_frequency_mhz
 from src.radio.presets import get_preset
 
 logger = logging.getLogger(__name__)
-
-# Default LongFast center frequency per region (channel_num=0, the
-# firmware's hash-derived default channel). Mirrors
-# ConcentratorChannelPlan's own EU_868 default in
-# src/hal/concentrator_config.py, plus EU_433 (433.875 MHz, the
-# documented Meshtastic EU_433 LongFast default -- not on the
-# concentrator table since the M1's SX1302 is 868-only hardware).
-_REGION_DEFAULT_MHZ: dict[str, float] = {
-    "US": 906.875,
-    "EU_433": 433.875,
-    "EU_868": 869.525,
-    "ANZ": 919.875,
-    "IN": 865.875,
-    "KR": 922.875,
-    "SG_923": 917.875,
-}
-
-
-def _default_frequency_mhz(region: Optional[str], channel_num: Optional[int]) -> float:
-    """Best-effort center frequency for a region's default LongFast channel.
-
-    Only meaningful when the node's own reported ``channel_num`` is 0
-    (the default/auto channel, hash-derived by the firmware from the
-    channel PSK name) -- these are the well-known default LongFast
-    frequencies per region. A non-zero channel_num means the true
-    frequency depends on that hash, which isn't replicated here, so
-    this returns 0.0 (this codebase's existing "unknown" sentinel --
-    see the MeshCore self_info fix) rather than guessing.
-    """
-    if not region or channel_num not in (0, None):
-        return 0.0
-    return _REGION_DEFAULT_MHZ.get(region, 0.0)
 
 
 class SerialCaptureSource(CaptureSource):
@@ -146,14 +115,18 @@ class SerialCaptureSource(CaptureSource):
         info: dict = {
             "region": None, "channel_num": None,
             "short_name": None, "long_name": None,
-            "modem_preset": None, "spreading_factor": None,
-            "bandwidth_khz": None, "coding_rate": None,
+            "modem_preset": None, "use_preset": True,
+            "spreading_factor": None, "bandwidth_khz": None, "coding_rate": None,
+            "channel_name": None, "frequency_offset": 0.0, "override_frequency": 0.0,
         }
         try:
             from meshtastic.protobuf import config_pb2
             lora = interface.localNode.localConfig.lora
             info["channel_num"] = int(lora.channel_num)
             info["region"] = config_pb2.Config.LoRaConfig.RegionCode.Name(lora.region)
+            info["use_preset"] = bool(lora.use_preset)
+            info["frequency_offset"] = float(lora.frequency_offset)
+            info["override_frequency"] = float(lora.override_frequency)
             if lora.use_preset:
                 preset_name = config_pb2.Config.LoRaConfig.ModemPreset.Name(
                     lora.modem_preset,
@@ -179,7 +152,28 @@ class SerialCaptureSource(CaptureSource):
             info["long_name"] = interface.getLongName()
         except Exception:
             logger.debug("Could not read node identity from serial interface", exc_info=True)
+        try:
+            info["channel_name"] = SerialCaptureSource._read_primary_channel_name(interface)
+        except Exception:
+            logger.debug("Could not read primary channel name from serial interface", exc_info=True)
         return info
+
+    @staticmethod
+    def _read_primary_channel_name(interface) -> Optional[str]:
+        """The primary channel's own name, for frequency-slot hashing.
+
+        meshtastic/firmware's Channels::getName() hashes this string
+        (falling back to the modem preset's display name when it's
+        blank -- the common case for a stock setup) to pick a default
+        frequency slot. Returns None (not "") when there's no primary
+        channel, so callers can tell "blank name" from "no data".
+        """
+        from meshtastic.protobuf import channel_pb2
+        channels = getattr(interface.localNode, "channels", None) or []
+        for ch in channels:
+            if ch.role == channel_pb2.Channel.Role.PRIMARY:
+                return ch.settings.name
+        return None
 
     async def stop(self) -> None:
         self._running = False
@@ -257,8 +251,15 @@ class SerialCaptureSource(CaptureSource):
         signal = SignalMetrics(
             rssi=float(packet.get("rxRssi", packet.get("rssi", -100))),
             snr=float(packet.get("rxSnr", packet.get("snr", 0))),
-            frequency_mhz=_default_frequency_mhz(
-                radio.get("region"), radio.get("channel_num"),
+            frequency_mhz=resolve_frequency_mhz(
+                region=radio.get("region"),
+                channel_num=radio.get("channel_num"),
+                bandwidth_khz=radio.get("bandwidth_khz") or 250.0,
+                channel_name=radio.get("channel_name"),
+                modem_preset=radio.get("modem_preset"),
+                use_preset=radio.get("use_preset", True),
+                frequency_offset=radio.get("frequency_offset") or 0.0,
+                override_frequency=radio.get("override_frequency") or 0.0,
             ),
             # Fall back to LongFast (the de facto default preset almost
             # every Meshtastic node runs) only when the handshake

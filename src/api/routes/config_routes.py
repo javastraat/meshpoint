@@ -144,18 +144,25 @@ def _concentrator_status(config: AppConfig) -> dict:
 def _serial_status_entry(src) -> dict:
     """Topbar status for one Meshtastic USB serial capture source.
 
-    Reuses the same region+channel_num -> frequency helper the source
-    itself uses to stamp captured packets, so the badge and the packet
-    feed never disagree.
+    Reuses the same channel-frequency resolver the source itself uses
+    to stamp captured packets, so the badge and the packet feed never
+    disagree.
     """
-    from src.capture.serial_source import _default_frequency_mhz
+    from src.radio.channel_frequency import resolve_frequency_mhz
 
     info = src.get_radio_info() if hasattr(src, "get_radio_info") else {}
     return {
         "name": src.name,
         "connected": bool(getattr(src, "connected", False)),
-        "frequency_mhz": _default_frequency_mhz(
-            info.get("region"), info.get("channel_num"),
+        "frequency_mhz": resolve_frequency_mhz(
+            region=info.get("region"),
+            channel_num=info.get("channel_num"),
+            bandwidth_khz=info.get("bandwidth_khz") or 250.0,
+            channel_name=info.get("channel_name"),
+            modem_preset=info.get("modem_preset"),
+            use_preset=info.get("use_preset", True),
+            frequency_offset=info.get("frequency_offset") or 0.0,
+            override_frequency=info.get("override_frequency") or 0.0,
         ),
         **info,
     }

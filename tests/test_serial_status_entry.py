@@ -2,9 +2,10 @@
 
 The topbar badge and the packet feed must never disagree about a
 serial device's frequency, so this reuses the exact same
-region+channel_num -> frequency helper serial_source.py stamps onto
-captured packets. Needs fastapi (config_routes.py imports it at module
-level), so CI-only like the other api/server.py-adjacent tests.
+channel_frequency.resolve_frequency_mhz() call serial_source.py uses
+to stamp captured packets. Needs fastapi (config_routes.py imports it
+at module level), so CI-only like the other api/server.py-adjacent
+tests.
 """
 
 from __future__ import annotations
