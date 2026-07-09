@@ -625,7 +625,9 @@ fan:
 
 Temperature-driven PWM control for the SenseCap M1's onboard fan, reading CPU temperature from the Pi's thermal zone. GPIO 13 is a hardware-PWM-capable pin on the Pi 4 (BCM2711 PWM1), confirmed live as this board's fan pin with `scripts/test_gpio_hardware.py`; the onboard LED (GPIO 22) and user button (GPIO 27) were confirmed the same way.
 
-Disabled by default: this fan/GPIO wiring is specific to the SenseCap M1 carrier board, not other supported hardware. Duty ramps linearly between `min_temp_c` and `max_temp_c`; below `min_temp_c - hysteresis_c` the fan turns fully off. Requires `gpiozero` (in `requirements.txt`, but Raspberry Pi OS also ships it system-wide -- the Meshpoint **venv** needs its own copy: `sudo /opt/meshpoint/venv/bin/pip install gpiozero` if you enabled `fan` on an existing install and see `fan control enabled but gpiozero is not installed` in the logs). If unavailable, a clear error is logged at startup and the fan is simply not driven rather than the app failing to start.
+Disabled by default: this fan/GPIO wiring is specific to the SenseCap M1 carrier board, not other supported hardware. Duty ramps linearly between `min_temp_c` and `max_temp_c`; below `min_temp_c - hysteresis_c` the fan turns fully off. If either dependency below is missing, a clear error is logged at startup and the fan is simply not driven rather than the app failing to start.
+
+Requires `gpiozero` and `lgpio` in the Meshpoint **venv** specifically (both in `requirements.txt`, but a venv doesn't share Raspberry Pi OS's system-wide packages, so an existing install needs these added by hand — see `docs/TROUBLESHOOTING.md` for the full command chain, since `lgpio` builds a C extension and needs `python3-dev`/`swig`/`liblgpio-dev` first). Without `lgpio` (or `RPi.GPIO`/`pigpio`), gpiozero falls back to a pure-Python pin factory that refuses PWM on this board's repurposed GPIO13 (`PinPWMUnsupported`), even though it's a real PWM-capable pin on the Pi 4 SoC.
 
 ---
 

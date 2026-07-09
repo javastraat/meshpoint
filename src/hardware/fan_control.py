@@ -100,10 +100,24 @@ class FanController:
             self._pwm = PWMOutputDevice(
                 self._pin, frequency=self._pwm_frequency_hz, initial_value=0.0,
             )
-        except Exception:
-            logger.exception(
-                "Failed to open GPIO%d for fan control", self._pin,
-            )
+        except Exception as exc:
+            if type(exc).__name__ == "PinPWMUnsupported":
+                # gpiozero's pure-Python NativeFactory fallback (used when
+                # lgpio/RPi.GPIO/pigpio are all absent) only allows PWM on
+                # pins it recognizes from a hardcoded per-board table --
+                # this custom carrier board's GPIO13 isn't in it, even
+                # though it's a real PWM1 hardware channel on the Pi 4 SoC.
+                # A real pin-factory backend doesn't have that restriction.
+                logger.error(
+                    "GPIO%d PWM unsupported on gpiozero's fallback pin "
+                    "factory (no lgpio/RPi.GPIO/pigpio installed) -- "
+                    "run: sudo /opt/meshpoint/venv/bin/pip install lgpio, "
+                    "then restart. Not driving the fan.", self._pin,
+                )
+            else:
+                logger.exception(
+                    "Failed to open GPIO%d for fan control", self._pin,
+                )
             return
 
         logger.info(
