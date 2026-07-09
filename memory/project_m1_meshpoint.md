@@ -1134,12 +1134,23 @@ resolved:
   endpoint rows. Sudoers merged: restore rules + our safe.directory
   variants coexist. index.html auto-merged: our sidebar regroup intact, RF
   link landed in upstream's telemetry rail.
-- **TODO after user merges to main:** deploy to Pi needs `install.sh` (new
-  sudoers for restore); Pi browser-verify RF tab + backup/restore + packet
-  modal + Quick Deploy + release-notes categories; consider a "merged
-  upstream v0.7.7" README fork-section note. NOTE: full
-  `unittest discover` HANGS on Mac (terminal PTY tests) — run per-module
-  with `timeout 60` instead.
+- **DEPLOYED 2026-07-09:** merged to main (`cca3a90`), pushed via SSH (user
+  added ~/.ssh/id_rsa.pub to GitHub after a PAT rejection — the .netrc
+  "Database-Server" classic token lacks `workflow` scope and the merge
+  touches .github/workflows/ci.yml; SSH remote is now the push path).
+  Dashboard Apply on the Pi worked; NO install.sh needed (fork's
+  ExecStartPre self-installs the new restore sudoers on service start).
+  **Backup download LIVE-VERIFIED** (Device PD2EMC, ~34 MB archive, disk
+  9.4%; user stored a backup). GOTCHA that cost debugging time: after the
+  apply the backup buttons were dead with NO console errors — STALE CACHED
+  app.js; plain reload wasn't enough, needed DevTools-open "Empty Cache and
+  Hard Reload". After any dashboard update, stale JS = first suspect for
+  "new feature dead, no errors" (candidate wishlist: cache-busting ?v= on
+  script tags).
+- **Still to eyeball on the Pi:** RF Environment tab, packet detail modal,
+  Quick Deploy QR, restore flow (only download verified), release-notes
+  categories on the Updates page. NOTE: full `unittest discover` HANGS on
+  Mac (terminal PTY tests) — run per-module with `timeout 60` instead.
 - **NEVER put Co-Authored-By/AI trailers in commit messages (user: "never
   ever").**
 
