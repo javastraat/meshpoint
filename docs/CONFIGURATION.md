@@ -769,6 +769,8 @@ radio:                 # LoRa physical layer
   preamble_length: 16
   tx_power_dbm: 22
   spectral_scan_interval_seconds: 60   # noise floor sampler; 0 disables
+  sx1261_spi_path: ""                  # SX1261 SPI device for hardware spectral scan (empty = packet fallback)
+  spectrum_sweep_interval_seconds: 300 # band-sweep cadence for the spectrum card; 0 = on-demand only
 
 meshtastic:            # Meshtastic protocol settings
   primary_channel_name: "LongFast"
@@ -785,10 +787,14 @@ capture:               # what packet sources to read from
   sources:
     - concentrator
     - meshcore_usb
-  meshcore_usb:
-    auto_detect: true
-    serial_port: null
-    baud_rate: 115200
+    # - serial           # optional: Meshtastic node on USB (e.g. 433 MHz)
+  meshcore_usb:          # list — up to 4 companions, each with a label
+    - serial_port: null  # null + auto_detect finds /dev/ttyACM*
+      baud_rate: 115200
+      auto_detect: true
+      label: ""
+  serial_port: "/dev/ttyUSB0"   # only used by the `serial` source
+  serial_baud: 115200
 
 location:              # GPS / location source
   source: "static"            # static | gpsd | uart

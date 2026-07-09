@@ -50,7 +50,7 @@ Everything is managed from a browser dashboard: full chat with channels and DMs,
 
 ## What's Different in This Fork
 
-This is a customized fork of upstream [KMX415/meshpoint](https://github.com/KMX415/meshpoint), tuned for a SenseCap M1 "mega-sniffer" **and** a browser radio receiver. On top of everything upstream provides, this version adds:
+This is a customized fork of upstream [KMX415/meshpoint](https://github.com/KMX415/meshpoint), tuned for a SenseCap M1 "mega-sniffer" **and** a browser radio receiver. It tracks upstream (their v0.7.7 — backup/restore, RF Environment, Quick Deploy QR, Prometheus metrics — is merged in full), and on top of everything upstream provides, this version adds:
 
 **RTL-SDR broadcast & utility radio listener** (entirely new)
 - Browser radio receiver on a cheap RTL-SDR dongle — FM broadcast, airband (AM), marine VHF/UHF, PMR446, 2 m / 70 cm ham, SSB (~24–1766 MHz), independent of the SX1302 so LoRa capture keeps running.
@@ -70,6 +70,7 @@ This is a customized fork of upstream [KMX415/meshpoint](https://github.com/KMX4
 
 **Hardware page & spectrum**
 - **Band spectrum card** — the concentrator module's onboard SX1261 companion chip (not a USB radio) sweeps the whole region band (100 kHz steps, EU868: 863–870 MHz) and draws a live spectrum chart with median + peak level and the LoRaWAN / Meshtastic / MeshCore channel positions overlaid; "Sweep now" button, hover readout, `GET /api/device/spectrum`. Requires `radio.sx1261_spi_path` (e.g. `/dev/spidev0.1`) in `local.yaml`; cadence via `radio.spectrum_sweep_interval_seconds`.
+- **RF Environment works on the SenseCap M1** — upstream marks spectral scan unavailable on the M1; this fork's `sx1261_spi_path` support powers upstream's RF Environment tab with live hardware scans here (and its histogram's endless-page-growth bug is fixed).
 - **Concentrator channels card** — read-only table of all 9 SX1302 slots (frequency, BW, SF, sync word, protocol, RF chain, state), derived from the same channel-plan code the radio runs.
 - **Unified protocol cards** — "Meshtastic Configuration" (radio settings + channel list in one card) and a matching MeshCore Companion layout.
 - **Node drawer recent packets** — every node shows its last 15 packets (time, type, RSSI/SNR).
@@ -121,6 +122,14 @@ This is a customized fork of upstream [KMX415/meshpoint](https://github.com/KMX4
 **RTL-SDR broadcast & utility radio listener.** Plug in a cheap RTL-SDR dongle and listen to real radio from the browser — FM broadcast, airband (AM), marine VHF/UHF, PMR446, 2 m / 70 cm ham, and anything else in ~24–1766 MHz. Server-side `rtl_fm` demodulates (a **Mode** selector for WFM / NFM / AM / USB / LSB, plus squelch, gain, and pre-encoder level) and streams MP3 to a browser `<audio>` player, while the SX1302 keeps sniffing LoRa uninterrupted (separate hardware). Two selectable radio faces — a **Digital** VFD-style readout with a segmented VU meter, and an **Analogue** slide-rule tuner with a swinging-needle VU gauge — and a real-time Web Audio level meter that dances with the audio. **RDS** on FM (via [`redsea`](https://github.com/windytan/redsea)): station name, scrolling RadioText / now-playing, program type (PTY), and a block-error-rate signal-quality meter. A preset stations picker with category tabs, search, and ★ favorites (Amsterdam FM, PMR446, marine, Schiphol airband, ham). See [RTL-SDR Radio Listener](#optional-rtl-sdr-radio-listener) for setup.
 
 **Band spectrum view.** The concentrator module's onboard SX1261 sweeps the entire region band (EU868: 863–870 MHz in 100 kHz steps) every few minutes — without interrupting packet capture — and the Hardware page draws the result as a live spectrum chart with every LoRaWAN, Meshtastic, and MeshCore channel position overlaid. See interferers (RFID readers, alarms) sharing your band at a glance, next to a read-only table of the full 9-slot SX1302 channel plan.
+
+**RF Environment tab.** A full-page view of your radio's health: live noise-floor readout with sparkline, calibration state, and the latest spectral-scan histogram — hardware-scanned when the SX1261 is available, packet-derived fallback otherwise.
+
+**Backup and restore.** Download a timestamped archive of `local.yaml` and the full `data/` directory (SQLite hot snapshot, PKI keys) from Settings, and restore it after an SD failure or bad experiment — the box returns to the snapshot, even after a database wipe. Admin-only; the archive contains all secrets, so store it offline.
+
+**Operator tooling.** Click any packet-feed row for a full decode-metadata modal. KPI status strips on the Dashboard and RF tabs, and live MQTT broker health on the MQTT page. A **Quick Deploy QR** exports public channel parameters for field provisioning straight into the Meshtastic app (default key only — private PSKs never leave the box). Optional **Prometheus `/metrics`** endpoint with packet, node, relay, and system counters.
+
+**Broadcast cadence controls.** Position and telemetry broadcast intervals are editable from the dashboard with live countdowns (off, or 5 min–24 h), independent of NodeInfo, applied hot without a restart.
 
 **Full packet decoding.** 14 Meshtastic portnums decoded: TEXT, POSITION, NODEINFO, TELEMETRY, ROUTING, ADMIN, WAYPOINT, DETECTION_SENSOR, PAXCOUNTER, STORE_FORWARD, RANGE_TEST, TRACEROUTE, NEIGHBORINFO, and MAP_REPORT. 6 MeshCore message types decoded. Device roles (CLIENT, ROUTER, REPEATER, TRACKER, SENSOR) extracted from NodeInfo.
 
@@ -380,6 +389,8 @@ FastAPI server on port 8080 (configurable via `dashboard.port` in `local.yaml`):
 | `PUT /api/config/transmit` | Update TX settings |
 | `PUT /api/config/identity` | Update node ID, long/short name |
 | `PUT /api/config/radio` | Change region, preset, frequency |
+| `PUT /api/config/position` | Set position broadcast interval (admin) |
+| `PUT /api/config/telemetry` | Set telemetry broadcast interval (admin) |
 | `PUT /api/config/capture/meshcore-companions` | Replace full MeshCore companion list (max 4) |
 | `POST /api/messages/send` | Send a Meshtastic or MeshCore message |
 | `GET /api/messages/conversations` | Message history by conversation |

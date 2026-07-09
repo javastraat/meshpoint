@@ -39,6 +39,7 @@ First tagged release of the javastraat/meshpoint fork: LoRaWAN sniffing, multi-r
 - **Blocked sends show a toast.** A viewer using the Messages compose box gets a "Not sent: admin role required" toast instead of a failed message bubble left in the thread.
 - **Login page no longer prefills the username.** Both fields start empty on every visit.
 - **Role section lists match the real navigation.** The per-role section lists behind `/api/identity` now include the LoRaWAN, Meshtastic, MeshCore, and RTL-SDR listener sections for both roles, so future UI gating on those sections behaves correctly.
+- **Upstream's new write endpoints are admin-gated too.** The position and telemetry broadcast-interval PUTs merged from upstream v0.7.7 had no role check; they now require the admin session like every other write endpoint, and CI asserts the gate.
 
 #### Hardware page and band spectrum
 
