@@ -199,7 +199,12 @@ class TestUpdateMeshcoreChannels(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         mock_save.assert_called_once_with(
             "meshcore",
-            {"channel_keys": {"orangecounty": "f708715569f4ee34c273f8f32d32e0e8"}},
+            {
+                "channel_keys": {
+                    "orangecounty": "f708715569f4ee34c273f8f32d32e0e8"
+                },
+                "private_channels": [],
+            },
         )
 
     def test_response_shape(self):
