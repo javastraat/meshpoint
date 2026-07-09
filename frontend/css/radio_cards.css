@@ -558,3 +558,38 @@
     padding-top: 0.85rem;
     border-top: 1px dashed rgba(35, 48, 73, 0.6);
 }
+
+/* ── Thermals card (CPU temp + fan duty history) ─────────────────── */
+
+.thermals-meta {
+    color: var(--text-muted, #64748b);
+    font-family: var(--font-mono, monospace);
+    font-size: 0.75rem;
+}
+
+.thermals-panel {
+    margin-top: 10px;
+}
+
+.thermals-panel__label {
+    color: var(--text-muted, #64748b);
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 4px;
+}
+
+/* Fixed height is required: Chart.js maintainAspectRatio:false grows
+   the page unbounded without a sized wrapper (same lesson as the RF
+   tab histogram). */
+.thermals-panel__plot {
+    position: relative;
+    height: 110px;
+}
+
+.thermals-empty {
+    padding: 24px 16px;
+    text-align: center;
+    color: var(--text-muted, #64748b);
+    font-size: 0.85rem;
+}

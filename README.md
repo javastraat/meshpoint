@@ -78,6 +78,7 @@ This is a customized fork of upstream [KMX415/meshpoint](https://github.com/KMX4
 - **SNR distribution chart** on Stats next to the RSSI histogram; signal stats ignore implausible near-field readings (> −20 dBm).
 - **Relay tuning from the dashboard** — burst size and the min/max RSSI relay window are editable on Configuration → Transmit.
 - **Temperature-driven PWM fan control** (opt-in, SenseCap M1 only) — the onboard fan ramps speed with CPU temperature instead of running flat-out or not at all; `fan:` in `local.yaml`.
+- **Thermals card** — 6 h of CPU temperature + fan duty history as two stacked charts on the Hardware page (`GET /api/device/thermals`); shown only when fan control is enabled.
 
 **Roles, config & self-update**
 - **Viewer role locked down server-side** — all write endpoints require admin; channel PSKs/keys are redacted for viewers; admin-only links show a toast instead of navigating away.
@@ -413,6 +414,7 @@ FastAPI server on port 8080 (configurable via `dashboard.port` in `local.yaml`):
 | `GET /api/listener/stream` | Live MP3 audio stream for the browser player |
 | `GET /api/device/spectrum` | Latest band sweep from the SX1302 spectral scanner (median/peak per 100 kHz step) |
 | `POST /api/device/spectrum/sweep` | Trigger an on-demand band sweep (admin) |
+| `GET /api/device/thermals` | CPU temperature + fan duty history (6 h in-memory, requires fan control enabled) |
 | `GET /api/rf/status` | RF Environment tab data: noise floor, calibration, latest scan histogram |
 | `GET /api/config/export` | Quick Deploy export: public channel params + Meshtastic QR URL (no private PSKs) |
 | `GET /api/system/backup/download` | Download config + data backup archive (admin) |

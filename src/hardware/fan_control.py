@@ -9,11 +9,18 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
+from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Optional
 
 logger = logging.getLogger(__name__)
+
+# In-memory thermal history window (backs the Hardware page Thermals
+# chart). At the default 10s poll this is 2160 samples -- a few tens of
+# kilobytes, cleared on restart by design.
+HISTORY_HOURS = 6.0
 
 
 def read_cpu_temp_c() -> Optional[float]:
@@ -87,6 +94,14 @@ class FanController:
         self._on = False
         self.current_duty: float = 0.0
         self.previous_duty: float = 0.0
+        # (unix_ts, temp_c, duty) per poll; oldest samples fall off.
+        self.history: deque[tuple[float, float, float]] = deque(
+            maxlen=max(1, int(HISTORY_HOURS * 3600 / poll_interval_s)),
+        )
+
+    @property
+    def poll_interval_s(self) -> float:
+        return self._poll_interval_s
 
     async def run(self) -> None:
         try:
@@ -164,3 +179,4 @@ class FanController:
         self._pwm.value = duty
         self._on = duty > 0.0
         self.current_duty = duty
+        self.history.append((time.time(), temp, duty))

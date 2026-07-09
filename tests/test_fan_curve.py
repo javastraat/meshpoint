@@ -158,5 +158,49 @@ class FanControllerDutyTrackingTest(unittest.TestCase):
         self.assertEqual(self.controller.previous_duty, 0.0)
 
 
+class FanControllerHistoryTest(unittest.TestCase):
+    """The in-memory (ts, temp, duty) ring buffer backs the Hardware
+    page Thermals chart via GET /api/device/thermals."""
+
+    def setUp(self):
+        class FakePWM:
+            def __init__(self):
+                self.value = 0.0
+
+        self.controller = FanController(pin=13, curve=FanCurve())
+        self.controller._pwm = FakePWM()
+
+    def _poll_at(self, temp_c):
+        self.controller._temp_fn = lambda: temp_c
+        self.controller._poll_once()
+
+    def test_every_successful_poll_is_sampled_even_unchanged(self):
+        self._poll_at(46.7)
+        self._poll_at(46.7)
+        self.assertEqual(len(self.controller.history), 2)
+        ts, temp, duty = self.controller.history[-1]
+        self.assertEqual(temp, 46.7)
+        self.assertEqual(duty, self.controller.current_duty)
+        self.assertGreater(ts, 0)
+
+    def test_missing_temp_reading_is_not_sampled(self):
+        self.controller._temp_fn = lambda: None
+        self.controller._poll_once()
+        self.assertEqual(len(self.controller.history), 0)
+
+    def test_ring_buffer_is_bounded_by_history_window(self):
+        # 6h window / 6h poll interval -> maxlen 1: oldest sample falls off.
+        slow = FanController(
+            pin=13, curve=FanCurve(), poll_interval_s=6 * 3600.0,
+        )
+        slow._pwm = self.controller._pwm
+        slow._temp_fn = lambda: 50.0
+        slow._poll_once()
+        slow._temp_fn = lambda: 55.0
+        slow._poll_once()
+        self.assertEqual(len(slow.history), 1)
+        self.assertEqual(slow.history[0][1], 55.0)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1325,6 +1325,36 @@ comment saying why; quantization test switched to level="DEBUG"
 at debug … temporarily info to verify the ramp live … dashboard Fan card is
 the live view"). 15 tests pass, still 74 bullets parser-verified. The
 dashboard Fan card is the intended way to watch duty from now on.
+Fan card LIVE-VERIFIED by user screenshot (2026-07-09 late): stats bar shows
+CPU TEMP 45.3°C · LOAD AVG 0.16 · FAN 39% "was 41%" — whole pipeline
+(sensor → curve → PWM → /api/device/metrics → card) working; the small
+temp-vs-duty offset is just the two values sampling at different instants
+(temp jitters ±1C between the fan's 10s polls), not a bug. Fan feature is
+DONE end to end.
+
+**Thermals card on Hardware page (2026-07-09 late, user-requested "graph
+orso"):** 6h CPU-temp + fan-duty history chart. DESIGN NOTE: dual-axis
+(temp+duty on one chart) rejected per dataviz guidance (#1 anti-pattern) →
+TWO STACKED Chart.js panels sharing the time window, one scale each (temp
+°C top #f97316, duty % bottom #06b6d4 — house colors from
+node_metrics_chart; CVD/contrast validated). Backend: `FanController.history`
+deque (HISTORY_HOURS=6.0 / poll_interval → maxlen 2160 @10s, sampled EVERY
+successful poll in _poll_once, in-memory only) + `poll_interval_s` property;
+`GET /api/device/thermals` in system_metrics.py (same protected router as
+/metrics, viewer-open; available:false when fan disabled → card hides, same
+grammar as stat-bar Fan card). Frontend: NEW radio_thermals_card.js
+(mount/render card pattern, 60s auto-refresh gated on section--active,
+downsample to ≤720 pts, "Collecting data" empty state, live "temp · fan %"
+header meta), slot `r-card-thermals` after nodeinfo in radio_settings.js
+(docstring card list also fixed — was missing concentrator), script tag in
+index.html, `.thermals-*` CSS in radio_cards.css (FIXED-HEIGHT
+.thermals-panel__plot 110px — the Chart.js maintainAspectRatio:false
+lesson). Tests: FanControllerHistoryTest (3, Mac-runnable, 18 pass in
+test_fan_curve.py) + SystemMetricsThermalsTest (2, CI-only in
+test_system_metrics_fan.py). Changelog bullet under "Dashboard and operator
+tools" (75, parser-verified); README: Hardware-group bullet + API table row.
+NOT yet Pi-verified (needs deploy; check card renders, hides for viewer=no
+—it's viewer-open actually—, and fills after ~1min).
 
 ## OLD LIST (superseded, kept for the DONE details)
 

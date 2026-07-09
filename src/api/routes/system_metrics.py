@@ -81,3 +81,23 @@ async def system_metrics():
             if _fan_controller is not None else None
         ),
     }
+
+
+@router.get("/thermals")
+async def thermals():
+    """CPU temperature + fan duty history for the Hardware Thermals chart.
+
+    Sampled by the fan controller's poll loop, so it only exists when fan
+    control is enabled; ``available: false`` hides the card. In-memory
+    ring buffer -- cleared on restart, no database involvement.
+    """
+    if _fan_controller is None:
+        return {"available": False, "points": []}
+    return {
+        "available": True,
+        "poll_interval_s": _fan_controller.poll_interval_s,
+        "points": [
+            {"ts": int(ts), "temp_c": round(temp, 1), "duty": duty}
+            for ts, temp, duty in _fan_controller.history
+        ],
+    }

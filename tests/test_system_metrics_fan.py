@@ -43,5 +43,31 @@ class SystemMetricsFanFieldsTest(unittest.TestCase):
         self.assertEqual(result["fan_previous_duty_percent"], 35.0)
 
 
+class SystemMetricsThermalsTest(unittest.TestCase):
+    def tearDown(self):
+        system_metrics.reset_routes()
+
+    def test_no_fan_controller_reports_unavailable(self):
+        system_metrics.init_routes(None)
+        result = asyncio.run(system_metrics.thermals())
+        self.assertEqual(result, {"available": False, "points": []})
+
+    def test_history_serialized_as_points(self):
+        fan = FakeFanController(current_duty=0.41, previous_duty=0.36)
+        fan.poll_interval_s = 10.0
+        fan.history = [(1000.9, 45.26, 0.36), (1010.9, 46.74, 0.41)]
+        system_metrics.init_routes(fan)
+        result = asyncio.run(system_metrics.thermals())
+        self.assertTrue(result["available"])
+        self.assertEqual(result["poll_interval_s"], 10.0)
+        self.assertEqual(
+            result["points"],
+            [
+                {"ts": 1000, "temp_c": 45.3, "duty": 0.36},
+                {"ts": 1010, "temp_c": 46.7, "duty": 0.41},
+            ],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

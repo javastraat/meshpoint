@@ -7,11 +7,13 @@
  * Transmit; the orchestrator no longer owns Save/restart wiring.
  *
  * Cards rendered, in order:
- *   - RadioStatusCard      (TX duty gauge + TX-enabled indicator)
- *   - RadioIdentityCard    (long/short name, node ID)
- *   - RadioConfigCard      (region/preset/freq/power readouts)
- *   - RadioNodeInfoCard    (countdown + last-sent + interval)
- *   - RadioCompanionCard   (MeshCore companion: operational, kept)
+ *   - RadioStatusCard       (TX duty gauge + TX-enabled indicator)
+ *   - RadioIdentityCard     (long/short name, node ID)
+ *   - RadioConcentratorCard (SX1302 channel plan readout)
+ *   - RadioConfigCard       (region/preset/freq/power readouts)
+ *   - RadioCompanionCard    (MeshCore companion: operational, kept)
+ *   - RadioNodeInfoCard     (countdown + last-sent + interval)
+ *   - RadioThermalsCard     (CPU temp + fan duty history charts)
  *
  * Each card receives a shared ``api`` helper (put / post / refresh /
  * toast / escape) so the few operational actions still living in
@@ -79,6 +81,7 @@ class RadioSettings {
                     <div id="r-card-config"></div>
                     <div id="r-card-companion"></div>
                     <div id="r-card-nodeinfo"></div>
+                    <div id="r-card-thermals"></div>
 
                     <div class="r-console-foot">
                         <span class="r-console-foot__hint">
@@ -116,6 +119,10 @@ class RadioSettings {
         const companion = new RadioCompanionCard(api);
         companion.mount(document.getElementById('r-card-companion'));
         this._cards.push(companion);
+
+        const thermals = new RadioThermalsCard(api);
+        thermals.mount(document.getElementById('r-card-thermals'));
+        this._cards.push(thermals);
     }
 
     _buildApi() {
