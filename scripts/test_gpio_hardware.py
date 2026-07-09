@@ -13,12 +13,30 @@ the button test only ever reads, and the fan test requires an explicit
 Enter keypress before it drives anything. If a guess is wrong, override it
 with the matching --*-pin flag and retry rather than editing this file.
 
+GPIO 13 (button) and GPIO 14 (fan) turned out wrong on the real board (LED
+on GPIO 22 worked). Rather than keep guessing one pin at a time, `button-scan`
+and `fan-scan` sweep a whole batch of candidate pins at once:
+
+    python3 test_gpio_hardware.py button-scan   # press the button a few
+                                                  # times during the 20s scan
+    python3 test_gpio_hardware.py fan-scan       # one Enter to arm, then
+                                                  # watches/announces each
+                                                  # candidate pin in turn
+
+Candidates exclude pins already known to be spoken for on this board:
+SPI0 (7-11, the concentrator's bus -- confirmed by /dev/spidev0.x elsewhere
+in this repo), I2C1 (2-3, the ATECC608 crypto chip + temp sensor), the HAT ID
+EEPROM pins (0-1), the concentrator reset lines (17, 25, from
+reset_concentrator.sh), and GPIO 22 (the now-confirmed LED).
+
 Usage:
     python3 test_gpio_hardware.py led
     python3 test_gpio_hardware.py button
     python3 test_gpio_hardware.py fan
     python3 test_gpio_hardware.py all
-    python3 test_gpio_hardware.py button --button-pin 6   # try another guess
+    python3 test_gpio_hardware.py button --button-pin 6   # try a specific guess
+    python3 test_gpio_hardware.py button-scan
+    python3 test_gpio_hardware.py fan-scan
 """
 
 from __future__ import annotations
@@ -30,6 +48,10 @@ import time
 LED_PIN_DEFAULT = 22
 BUTTON_PIN_DEFAULT = 13
 FAN_PIN_DEFAULT = 14
+
+# Pins already spoken for on this board -- never included in a scan.
+RESERVED_PINS = {0, 1, 2, 3, 7, 8, 9, 10, 11, 17, 22, 25}
+SCAN_CANDIDATES = [p for p in range(2, 28) if p not in RESERVED_PINS]
 
 
 def test_led(pin: int) -> None:
@@ -92,10 +114,79 @@ def test_fan(pin: int, seconds: float) -> None:
         fan.close()
 
 
+def button_scan(pins: list[int], seconds: float, pull_up: bool) -> None:
+    from gpiozero import Button
+
+    mode = "pull_up (idle HIGH, press pulls LOW)" if pull_up else "pull_down (idle LOW, press pulls HIGH)"
+    print(f"Scanning {len(pins)} candidate pins for {seconds:.0f}s, {mode}: {pins}")
+    print("Press the button repeatedly throughout the whole scan now...")
+
+    changed: set[int] = set()
+    buttons = []
+    for pin in pins:
+        try:
+            b = Button(pin, pull_up=pull_up, bounce_time=0.05)
+        except Exception as exc:
+            print(f"  GPIO{pin}: skipped ({exc})")
+            continue
+        def on_press(p=pin):
+            changed.add(p)
+            print(f"  GPIO{p} -> pressed")
+
+        b.when_pressed = on_press
+        b.when_released = lambda p=pin: print(f"  GPIO{p} -> released")
+        buttons.append(b)
+
+    try:
+        time.sleep(seconds)
+    finally:
+        for b in buttons:
+            b.close()
+
+    if changed:
+        print(f"\nCandidate button pin(s), changed state during the scan: {sorted(changed)}")
+    else:
+        print(
+            "\nNo pin changed state. If you were pressing the button, retry with "
+            "--pull-up-mode down (some buttons are wired the other way), or the "
+            "button may be on one of the excluded/reserved pins."
+        )
+
+
+def fan_scan(pins: list[int], pulse_seconds: float) -> None:
+    from gpiozero import OutputDevice
+
+    print(f"About to pulse {len(pins)} candidate pins one at a time: {pins}")
+    print(
+        "Each pin is driven HIGH briefly, then released. Watch/listen for the "
+        "fan and note which announced GPIO number lines up with it spinning. "
+        "Be ready to Ctrl+C if anything else on the board reacts unexpectedly."
+    )
+    input("Press Enter to arm and start the sweep, or Ctrl+C to abort... ")
+
+    for pin in pins:
+        print(f"Testing GPIO{pin}...")
+        try:
+            dev = OutputDevice(pin, active_high=True, initial_value=False)
+        except Exception as exc:
+            print(f"  GPIO{pin}: skipped ({exc})")
+            continue
+        try:
+            dev.on()
+            time.sleep(pulse_seconds)
+            dev.off()
+        finally:
+            dev.close()
+        time.sleep(0.8)
+
+    print("\nSweep done. Which GPIO number was announced when the fan moved?")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "target", choices=["led", "button", "fan", "all"],
+        "target",
+        choices=["led", "button", "fan", "all", "button-scan", "fan-scan"],
         help="which peripheral to test",
     )
     parser.add_argument("--led-pin", type=int, default=LED_PIN_DEFAULT)
@@ -104,6 +195,18 @@ def main() -> int:
     parser.add_argument(
         "--seconds", type=float, default=10.0,
         help="how long to run the button/fan tests (default 10s)",
+    )
+    parser.add_argument(
+        "--scan-seconds", type=float, default=20.0,
+        help="how long button-scan listens for (default 20s)",
+    )
+    parser.add_argument(
+        "--pulse-seconds", type=float, default=0.4,
+        help="how long fan-scan drives each candidate pin (default 0.4s)",
+    )
+    parser.add_argument(
+        "--pull-up-mode", choices=["up", "down"], default="up",
+        help="button-scan pull resistor direction to try (default up)",
     )
     args = parser.parse_args()
 
@@ -123,6 +226,10 @@ def main() -> int:
         test_button(args.button_pin, args.seconds)
     if args.target in ("fan", "all"):
         test_fan(args.fan_pin, min(args.seconds, 5.0))
+    if args.target == "button-scan":
+        button_scan(SCAN_CANDIDATES, args.scan_seconds, args.pull_up_mode == "up")
+    if args.target == "fan-scan":
+        fan_scan(SCAN_CANDIDATES, args.pulse_seconds)
 
     return 0
 
