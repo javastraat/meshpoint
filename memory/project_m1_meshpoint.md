@@ -922,7 +922,34 @@ All of T1-T4, T6 DONE (see entries below). Fresh numbering:
 | N1 | P3 | M | Multiple Meshtastic USB sticks — list-field treatment for `serial` source (config list + labels + meshtastic_usb_<label>), like meshcore_usb. Do when 2nd stick wanted (spare Heltec V3 433 "TBD/play" is candidate) |
 | N2 | DONE 2026-07-08 | S-M | Endpoint housekeeping done via live diagnosis (user ran stdlib diag script on Pi, all comparisons byte-identical). PRUNED 4: packets/protocols+types, nodes/map (+ orphans: telemetry.py router whole file, TelemetryRepository.get_latest_for_node, NodeRepository.get_with_position, NetworkMapper's get_map_data/get_all_nodes/get_nodes_with_position/get_node_count). **KEPT 2 — double-check saved us: `meshpoint report` CLI (report_command.py) uses /api/packets/count AND /api/nodes/summary** (frontend-only grep missed CLI consumers; remember to grep src/cli too when auditing endpoints). BONUS BUG FIXED: network summary totals were computed over get_all(LIMIT 500) → Stats page + CLI report under-reported (500 vs real 1445 nodes); now `NodeRepository.get_network_totals()` whole-table SQL aggregates (COUNT/SUM CASE/GROUP BY, COALESCE for empty table; SQL validated via stdlib sqlite3 on Mac). nodes.py no longer takes network_mapper (server call updated); NetworkMapper slimmed to get_network_summary→get_network_totals (stats_routes still uses it). README API table: nodes/map row → nodes/summary. 2 changelog bullets (45 total) |
 
-Wishlist: W1 LoRaWAN CSV/TTN export (S-M, best value) · W2 LoRaWAN MIC verify (S) · W3 433-node UI tags (S-M) · W4 light theme (L) · W5 DAB+ welle-cli (M-L) · W6 pyrtlsdr true-RF S-meter (M-L).
+Wishlist: W1 LoRaWAN CSV/TTN export (S-M, best value) · W2 LoRaWAN MIC verify (S) · W3 433-node UI tags (S-M, DONE as T8) · W4 light theme (L) · W5 DAB+ welle-cli (M-L) · W6 pyrtlsdr true-RF S-meter (M-L) · W7 MeshCore repeater status polling (unsized) · W8 LED status light (S) · W9 button physical control (S-M) — W8/W9 details below.
+
+### W8/W9: LED + button features (TODO, added 2026-07-09)
+
+Physically they're the SenseCap M1's case LED and side button. In code they
+exist ONLY in the probe script — nothing in the app drives them yet:
+
+- **LED = GPIO 22, button = GPIO 27** (confirmed live via the `button-scan`
+  sweep in `scripts/test_gpio_hardware.py`, commit 1edcccc — the initial
+  guesses of button=13/fan=14 were wrong; 13 turned out to be the fan).
+- Of the three probed peripherals, only the fan graduated to a real runtime
+  feature (`src/hardware/fan_control.py` + the `fan:` config section). The
+  LED and button have no config section, no controller, no mention in `src/`
+  beyond a comment.
+
+Confirmed-and-idle, waiting for a feature. Natural candidates, same opt-in
+config shape as the fan, living in `src/hardware/` on the proven
+gpiozero/lgpio stack:
+
+- **W8 — LED as a status light** (S): e.g. steady on when the service is
+  healthy (all capture sources connected), blink on packet activity,
+  off/fast-blink on trouble. Cheap, makes the box readable from across the
+  room.
+- **W9 — button as a safe physical control** (S-M): classic pattern — short
+  press = something harmless and useful (e.g. trigger a MeshCore advert or
+  an identify-blink), long press (3-5 s) = clean service restart or safe
+  shutdown. Needs debounce, hold detection, and guarding of the destructive
+  action.
 
 Watch: RFID plateau 865.6-867.6 (identified, only interesting if it changes); noise pill should read a few dB lower post-percentile-fix.
 
