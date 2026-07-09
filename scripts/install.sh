@@ -490,12 +490,15 @@ usermod -a -G spi,gpio,dialout,i2c meshpoint 2>/dev/null || true
 # inside the web terminal) work without sudo. This is the same group
 # Raspberry Pi OS uses to gate journal access for the `pi` user.
 usermod -a -G systemd-journal,adm meshpoint 2>/dev/null || true
-chown -R meshpoint:meshpoint "${MESHPOINT_DIR}/data"
-chown -R meshpoint:meshpoint "${MESHPOINT_DIR}/config"
+# Whole tree to the service user (not just data/ and config/): plain-git
+# update checks need .git writable, and lgpio's fan-control pipe lands in
+# the WorkingDirectory itself. The service unit + post_update.sh re-apply
+# this after every dashboard apply (sudo git leaves root-owned files).
+chown -R meshpoint:meshpoint "${MESHPOINT_DIR}"
 
-# The repo is root-owned but the service runs as `meshpoint`, so git would
-# refuse dashboard updates with "detected dubious ownership". Trust the repo
-# for every user (root, meshpoint, pi). Idempotent — no duplicate entries.
+# The apply chain still runs git as root (sudo) on the meshpoint-owned
+# tree, so git would refuse with "detected dubious ownership". Trust the
+# repo for every user (root, meshpoint, pi). Idempotent — no duplicates.
 if [ -d "${MESHPOINT_DIR}/.git" ]; then
     git config --system --get-all safe.directory 2>/dev/null \
         | grep -qx "${MESHPOINT_DIR}" \

@@ -1277,14 +1277,30 @@ git on the Pi. FIX: `sudo_needed()` now stats `.git` via new
 `_ownership_probe()` (falls back to repo root when no `.git`); Pi (.git
 root-owned) → sudo restored, Mac dev checkout → still plain git. 5 new tests
 in TestSudoNeeded (23 pass on Mac). Changelog bullet under "Self-update
-system" (74 bullets, parser-verified). IMPORTANT: do NOT chown `.git` to
-meshpoint as a workaround — the apply chain's sudo git writes root-owned files
-into .git again, and MIXED ownership inside .git re-breaks plain git; the
-stable steady state is uniformly root-owned .git + sudo path. BOOTSTRAP: the
-box can't fetch this fix via Check (broken), but "Apply update" works
-(hardcoded sudo) — or manually: `cd /opt/meshpoint && sudo git fetch origin
-main && sudo git reset --hard origin/main && sudo systemctl restart
-meshpoint`. NOT yet Pi-verified.
+system" (74 bullets, parser-verified).
+**FINAL RESOLUTION (user's call, supersedes the probe-only plan): the REAL
+fix is permissions — the service user owns the WHOLE tree, recursively.**
+User ran `sudo chown -R meshpoint:meshpoint /opt/meshpoint` on the Pi,
+pushed+applied the probe fix (b29e09c) via dashboard Apply (Apply works even
+while Check is broken — hardcoded sudo), and the Updates page went green
+("Up to date with origin/main") — LIVE-VERIFIED 2026-07-09 ~21:05. To make
+the chown -R durable (the apply chain's `sudo git fetch/reset` re-poisons
+.git + working tree with root-owned files on EVERY apply), it's baked in at
+all three lifecycle points: (1) meshpoint.service ExecStartPre — the 3 chown
+lines (config -R / data -R / top non-recursive) merged into ONE
+`chown -R meshpoint:meshpoint /opt/meshpoint` (every apply ends in a restart
+→ self-heals); (2) post_update.sh step 3 — whole tree instead of config-only
+(heals during the apply itself, before restart); (3) install.sh — whole tree
+instead of data+config (fresh installs start correct). safe.directory trust
+STAYS (root's sudo git on a meshpoint-owned tree also trips the
+dubious-ownership check); sudoers git rules STAY (apply chain unchanged);
+the `.git` probe in sudo_needed() KEPT (right answer in mixed/transitional
+states and on dev checkouts). New steady state: tree meshpoint-owned
+everywhere, Check runs PLAIN git, only Apply uses sudo. bash -n both
+scripts OK; changelog bullet reworded to the permissions story (still 74,
+parser-verified). Unit-file rollout is automatic (post_update.sh step 2
+copies + daemon-reloads when it differs). Pi-verify after next apply: fan
+still spins (lgpio pipe) + Check stays green after an Apply cycle.
 
 ## OLD LIST (superseded, kept for the DONE details)
 

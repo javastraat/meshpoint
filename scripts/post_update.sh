@@ -47,8 +47,12 @@ if [ -f "$SERVICE_SRC" ]; then
     fi
 fi
 
-# ── 3. Config directory permissions ─────────────────────────────────
-chown -R meshpoint:meshpoint "${MESHPOINT_DIR}/config" 2>/dev/null || true
+# ── 3. Install tree ownership ────────────────────────────────────────
+# Whole tree, recursive: the apply chain's `sudo git fetch/reset` (which
+# runs right before this script) leaves root-owned files in .git and the
+# working tree; hand everything back to the service user so plain git
+# (Check for updates) and lgpio's WorkingDirectory pipe keep working.
+chown -R meshpoint:meshpoint "${MESHPOINT_DIR}" 2>/dev/null || true
 
 # ── 3a. Service-user group membership (idempotent) ──────────────────
 # v0.7.4+: meshpoint user needs systemd-journal + adm to read its own

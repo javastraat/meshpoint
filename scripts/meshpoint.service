@@ -10,16 +10,14 @@ User=meshpoint
 Group=meshpoint
 WorkingDirectory=/opt/meshpoint
 ExecStartPre=+/bin/bash -c "cp /opt/meshpoint/config/sudoers-meshpoint /etc/sudoers.d/meshpoint && chmod 440 /etc/sudoers.d/meshpoint"
-ExecStartPre=+/bin/chown -R meshpoint:meshpoint /opt/meshpoint/config
-ExecStartPre=+/bin/chown -R meshpoint:meshpoint /opt/meshpoint/data
-# Non-recursive: lgpio (fan control) creates a notification pipe
-# (.lgd-nfyN) directly in WorkingDirectory. The dir itself was never
-# chowned to the service user (only config/ and data/ were), so lgpio
-# failed with "xCreatePipe: Can't set permissions ... Operation not
-# permitted" and fan control silently fell back to a PWM-incapable
-# pin factory. Self-heals on every start regardless of how the repo
-# checkout was deployed/updated.
-ExecStartPre=+/bin/chown meshpoint:meshpoint /opt/meshpoint
+# Recursive, whole tree: the service user owns the entire install.
+# Covers config/ and data/, the WorkingDirectory itself (lgpio's fan
+# notification pipe .lgd-nfyN needs it), AND .git/ — the dashboard's
+# apply chain runs `sudo git fetch/reset`, which leaves root-owned
+# files in .git and the working tree; every apply ends in a service
+# restart, so this line self-heals ownership and plain-git update
+# checks keep working.
+ExecStartPre=+/bin/chown -R meshpoint:meshpoint /opt/meshpoint
 ExecStartPre=+/bin/bash /opt/meshpoint/scripts/reset_concentrator.sh
 # Bind host/port come from dashboard.host/dashboard.port in the YAML config
 ExecStart=/opt/meshpoint/venv/bin/python -m src.serve
