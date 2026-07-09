@@ -373,9 +373,28 @@ class NodeCards {
         if (n.role != null) {
             parts.push(`<span class="nc-chip nc-chip--meta">${this._roleName(n.role)}</span>`);
         }
+        const band = this._bandLabel(n.latest_capture_source);
+        if (band) {
+            parts.push(`<span class="nc-chip nc-chip--band">${band}</span>`);
+        }
         parts.push(`<span class="nc-chip nc-chip--id">!${this._esc(n.node_id)}</span>`);
 
         return `<div class="nc-card__row nc-card__row--meta">${parts.join('')}</div>`;
+    }
+
+    /**
+     * Band tag from the latest packet's labelled capture source (e.g.
+     * "serial_433", "meshcore_usb_868"). Not derived from frequency_mhz:
+     * the `serial` Meshtastic USB source stamps a hardcoded placeholder
+     * frequency regardless of the stick's real firmware region, so the
+     * config-driven capture_source label is the only reliable signal.
+     */
+    _bandLabel(captureSource) {
+        if (!captureSource) return null;
+        if (captureSource.endsWith('_433')) return '433 MHz';
+        if (captureSource.endsWith('_868')) return '868 MHz';
+        if (captureSource === 'concentrator') return '868 MHz';
+        return null;
     }
 
     _signalBars(rssi) {
