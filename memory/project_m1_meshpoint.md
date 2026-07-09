@@ -1162,6 +1162,24 @@ resolved:
   visible on Dashboard. MQTT broker-health strip verified too (LAN broker
   192.168.2.26:1883 connected, publishing, 0 drops). NOT tested (fine):
   restore upload flow, viewer 403 on new broadcast PUTs.
+  **CI NOW GREEN (2026-07-09, commit 9f99c81):** the merge brought
+  upstream's .github/workflows/ci.yml (ruff + pytest on every push to
+  main/feat/**) — the fork's FIRST-EVER CI immediately exposed latent debt
+  (3 pushes to green): (1) 3 unused imports in lorawan_routes.py (ruff);
+  (2) 36 test failures, none merge bugs: fork route tests written BEFORE
+  the 2026-07-06 viewer lockdown called APIs unauthenticated (fixed with
+  `app.dependency_overrides[require_admin/require_auth] = lambda:
+  SessionClaims("test-admin", ROLE_ADMIN, 1)` in the _build_app builders —
+  THE pattern for fork route tests now; also added explicit
+  401-without-admin gate tests), stale test_meshcore_usb tests predating
+  the list-based multi-companion config (rewritten against
+  _coerce_meshcore_usb), upstream's broadcast/channel-hash tests hitting
+  our new admin gates (same override fix); (3) meshcore channels yaml-save
+  test now expects private_channels alongside channel_keys. Final: ruff
+  clean + 960 tests / 68 subtests green on ubuntu. CI = the only place the
+  fastapi/aiosqlite tests run (Mac can't); check the Actions tab after
+  pushes. Chart.js on the RF tab loads from CDN (index.html) — offline
+  dashboards skip the histogram; vendoring = candidate task.
   MESSAGING INCIDENT (same morning, NOT a merge bug): MeshCore channel
   sends timed out AND incoming channel msgs stopped reaching chats, while
   adverts still hit the packet feed. Logs: repeated "get_contacts: 0
