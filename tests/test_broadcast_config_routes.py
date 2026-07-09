@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from src.api.auth.dependencies import require_admin
 from src.api.routes import position_broadcast_routes as pos_module
 from src.api.routes import telemetry_broadcast_routes as telem_module
 from src.config import AppConfig, load_config
@@ -17,10 +18,14 @@ def _fake_config() -> AppConfig:
     return load_config()
 
 
-def _build_app() -> FastAPI:
+def _build_app(*, as_admin: bool = True) -> FastAPI:
     app = FastAPI()
     app.include_router(pos_module.router)
     app.include_router(telem_module.router)
+    if as_admin:
+        # Both PUTs are admin-gated (fork viewer lockdown); satisfy the
+        # dependency so these tests exercise the route logic itself.
+        app.dependency_overrides[require_admin] = lambda: None
     return app
 
 
@@ -119,3 +124,28 @@ class TestTelemetryBroadcastRoutes(unittest.TestCase):
         body = res.json()
         self.assertTrue(body["restart_required"])
         self.assertFalse(body["interval_hot_reloaded"])
+
+
+class TestBroadcastRoutesRequireAdmin(unittest.TestCase):
+    """Without an admin session both PUTs are rejected, not accepted."""
+
+    def setUp(self):
+        _reset()
+        self.client = TestClient(_build_app(as_admin=False))
+        pos_module.init_routes(_fake_config())
+        telem_module.init_routes(_fake_config())
+
+    def tearDown(self):
+        _reset()
+
+    def test_position_put_rejected_without_admin(self):
+        res = self.client.put(
+            "/api/config/position", json={"interval_minutes": 30}
+        )
+        self.assertIn(res.status_code, (401, 403))
+
+    def test_telemetry_put_rejected_without_admin(self):
+        res = self.client.put(
+            "/api/config/telemetry", json={"interval_minutes": 30}
+        )
+        self.assertIn(res.status_code, (401, 403))
