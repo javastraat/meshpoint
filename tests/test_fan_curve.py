@@ -123,6 +123,40 @@ class FanControllerDutyTrackingTest(unittest.TestCase):
         self.controller._poll_once()
         self.assertEqual(self.controller.current_duty, duty_before)
 
+    def test_duty_is_rounded_to_display_precision(self):
+        # 46.7C -> 0.35 + (1.7/20)*0.65 = 0.40525; stored as the 1% step
+        # the log and dashboard show, so "(was X)" always matches a
+        # previously printed value.
+        self._poll_at(46.7)
+        self.assertEqual(self.controller.current_duty, 0.41)
+
+    def test_change_detection_ignores_pin_readback_quantization(self):
+        # lgpio quantizes the duty it reports back through pwm.value; the
+        # controller must compare against its own last-set duty, not the
+        # read-back, or every poll logs "a change" with a mismatched
+        # "(was X)". FakeQuantizingPWM returns a value that never equals
+        # what was written -- under read-back comparison both polls below
+        # would log; under own-bookkeeping only the first does.
+        class FakeQuantizingPWM:
+            def __init__(self):
+                self._raw = 0.0
+
+            @property
+            def value(self):
+                return self._raw - 0.01 if self._raw else 0.0
+
+            @value.setter
+            def value(self, v):
+                self._raw = v
+
+        self.controller._pwm = FakeQuantizingPWM()
+        with self.assertLogs("src.hardware.fan_control", level="DEBUG") as logs:
+            self._poll_at(46.7)
+        self.assertIn("was 0.00", logs.output[0])
+        with self.assertNoLogs("src.hardware.fan_control", level="DEBUG"):
+            self._poll_at(46.7)  # unchanged temp: no spurious change
+        self.assertEqual(self.controller.previous_duty, 0.0)
+
 
 if __name__ == "__main__":
     unittest.main()

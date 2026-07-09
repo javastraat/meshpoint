@@ -1302,6 +1302,30 @@ parser-verified). Unit-file rollout is automatic (post_update.sh step 2
 copies + daemon-reloads when it differs). Pi-verify after next apply: fan
 still spins (lgpio pipe) + Check stays green after an Apply cycle.
 
+**Fan control LIVE-VERIFIED + duty-log cosmetic fix (2026-07-09 ~21:20):**
+user's journal shows real PWM tracking temp (45.3C→0.36 … 47.2C→0.42, exactly
+the linear curve; sweep + capture unaffected). Log paste exposed a cosmetic
+bug in `_poll_once` (src/hardware/fan_control.py): it compared/logged the
+PIN READ-BACK (`self._pwm.value`, which lgpio quantizes) against the freshly
+computed full-precision duty → "(was X)" disagreed with the previously
+printed duty (0.41 → "was 0.40") and every poll counted as "a change" (even
+"0.37 (was 0.37)" lines). FIX: duty is now `round(..., 2)` (the 1% step the
+log/dashboard show) and compared against `self.current_duty` (own
+bookkeeping, read-back no longer consulted) → consecutive lines agree,
+identical polls stay silent. current_duty is now stored rounded (dashboard
+card unaffected — it displays percent). 2 new tests (rounding; a
+FakeQuantizingPWM proving read-back is ignored, assertLogs/assertNoLogs) —
+15 pass in test_fan_curve.py. Changelog: folded into the existing fan bullet
+(unreleased-feature convention) + that bullet's stale "third non-recursive
+chown" sentence updated to point at the recursive whole-tree chown (still
+74 bullets, parser-verified). DECIDED same evening (user: "back to debug we
+dont want extra 8k+ logs"): duty-change line demoted INFO→DEBUG with a code
+comment saying why; quantization test switched to level="DEBUG"
+(assertLogs/assertNoLogs); changelog fan-bullet sentence rewritten ("stays
+at debug … temporarily info to verify the ramp live … dashboard Fan card is
+the live view"). 15 tests pass, still 74 bullets parser-verified. The
+dashboard Fan card is the intended way to watch duty from now on.
+
 ## OLD LIST (superseded, kept for the DONE details)
 
 User has been committing incrementally with the suggested one-liners (verified

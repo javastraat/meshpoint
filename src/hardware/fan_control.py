@@ -146,11 +146,19 @@ class FanController:
         temp = self._temp_fn()
         if temp is None:
             return
-        duty = self._curve.duty_for(temp, self._on)
-        if duty != self._pwm.value:
-            logger.info(
+        # Round to the 1% steps the log/dashboard display, and compare
+        # against our own last-set value -- not the pin's read-back, which
+        # lgpio quantizes differently from the computed float, making
+        # every poll "a change" and the logged "(was X)" disagree with the
+        # previously logged duty.
+        duty = round(self._curve.duty_for(temp, self._on), 2)
+        if duty != self.current_duty:
+            # debug, not info: with ~1C temp jitter this fires most polls
+            # (thousands of journal lines/day). Live duty is on the
+            # dashboard's Fan card.
+            logger.debug(
                 "Fan: %.1fC -> duty %.2f (was %.2f)",
-                temp, duty, self._pwm.value,
+                temp, duty, self.current_duty,
             )
             self.previous_duty = self.current_duty
         self._pwm.value = duty
