@@ -4,6 +4,7 @@
  * Coordinates protocol chips and quick actions:
  *   - TopbarMeshtasticChip  (WS lamp · short name · region · MHz · preset)
  *   - TopbarMeshcoreChip    (companion lamp · name · MHz · channel)
+ *   - TopbarSerialChip      (one badge per Meshtastic USB serial device)
  *   - TopbarActions         (right-side quick-action buttons)
  *
  * Data: /api/config on a 10s cadence; dashboard WebSocket for connection lamp.
@@ -19,6 +20,9 @@ class TopbarController {
         this._meshcore = new TopbarMeshcoreChip(
             rootEl.querySelector('#topbar-meshcore-group'),
             rootEl.querySelector('.topbar-meshcore'),
+        );
+        this._serial = new TopbarSerialChip(
+            rootEl.querySelector('#topbar-serial-group'),
         );
         this._actions = new TopbarActions(
             rootEl.querySelector('.topbar-actions'),
@@ -75,6 +79,7 @@ class TopbarController {
                 radio: cfg.radio || null,
             });
             this._meshcore.setMeshcore(cfg.meshcore || null);
+            this._serial.setSerial(cfg.serial || []);
             document.dispatchEvent(
                 new CustomEvent('meshpoint:configUpdated', { detail: cfg }),
             );

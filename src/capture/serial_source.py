@@ -9,8 +9,41 @@ from typing import AsyncIterator, Optional
 from src.capture.base import CaptureSource
 from src.models.packet import RawCapture
 from src.models.signal import SignalMetrics
+from src.radio.presets import get_preset
 
 logger = logging.getLogger(__name__)
+
+# Default LongFast center frequency per region (channel_num=0, the
+# firmware's hash-derived default channel). Mirrors
+# ConcentratorChannelPlan's own EU_868 default in
+# src/hal/concentrator_config.py, plus EU_433 (433.875 MHz, the
+# documented Meshtastic EU_433 LongFast default -- not on the
+# concentrator table since the M1's SX1302 is 868-only hardware).
+_REGION_DEFAULT_MHZ: dict[str, float] = {
+    "US": 906.875,
+    "EU_433": 433.875,
+    "EU_868": 869.525,
+    "ANZ": 919.875,
+    "IN": 865.875,
+    "KR": 922.875,
+    "SG_923": 917.875,
+}
+
+
+def _default_frequency_mhz(region: Optional[str], channel_num: Optional[int]) -> float:
+    """Best-effort center frequency for a region's default LongFast channel.
+
+    Only meaningful when the node's own reported ``channel_num`` is 0
+    (the default/auto channel, hash-derived by the firmware from the
+    channel PSK name) -- these are the well-known default LongFast
+    frequencies per region. A non-zero channel_num means the true
+    frequency depends on that hash, which isn't replicated here, so
+    this returns 0.0 (this codebase's existing "unknown" sentinel --
+    see the MeshCore self_info fix) rather than guessing.
+    """
+    if not region or channel_num not in (0, None):
+        return 0.0
+    return _REGION_DEFAULT_MHZ.get(region, 0.0)
 
 
 class SerialCaptureSource(CaptureSource):
@@ -32,6 +65,8 @@ class SerialCaptureSource(CaptureSource):
         self._label = label
         self._interface = None
         self._running = False
+        self._connected = False
+        self._radio_info: dict = {}
         self._queue: asyncio.Queue[RawCapture] = asyncio.Queue(maxsize=500)
 
     @property
@@ -41,6 +76,20 @@ class SerialCaptureSource(CaptureSource):
     @property
     def is_running(self) -> bool:
         return self._running
+
+    @property
+    def connected(self) -> bool:
+        return self._connected
+
+    def get_radio_info(self) -> dict:
+        """Region/channel/name from the connect-time handshake.
+
+        Empty dict before the first successful connect. Same role as
+        MeshCore's ``self_info`` readout, exposed for the topbar chip
+        and for stamping real signal metadata instead of a hardcoded
+        placeholder.
+        """
+        return dict(self._radio_info)
 
     async def start(self) -> None:
         try:
@@ -54,11 +103,15 @@ class SerialCaptureSource(CaptureSource):
             else:
                 self._interface = meshtastic.serial_interface.SerialInterface()
 
+            self._radio_info = self._read_radio_info(self._interface)
+            self._connected = True
             pub.subscribe(self._on_receive, "meshtastic.receive")
             self._running = True
             logger.info(
-                "Serial capture started on %s",
+                "Serial capture started on %s (region=%s channel_num=%s)",
                 self._port or "auto-detect",
+                self._radio_info.get("region"),
+                self._radio_info.get("channel_num"),
             )
         except ImportError:
             logger.error(
@@ -70,8 +123,67 @@ class SerialCaptureSource(CaptureSource):
             logger.exception("Failed to open serial interface")
             raise
 
+    @staticmethod
+    def _read_radio_info(interface) -> dict:
+        """Region/channel/modem/name from the interface's own config.
+
+        meshtastic-python's StreamInterface.__init__ already calls
+        waitForConfig() synchronously before SerialInterface(...)
+        returns, so localNode.localConfig.lora and the node identity
+        are populated by the time this runs -- no extra wait needed.
+        Best-effort: any read failure leaves that field None rather
+        than raising, since this must never block a successful capture
+        start.
+
+        SF/bandwidth/coding rate depend on whether the node uses a
+        named modem preset (the common case -- looked up in
+        src.radio.presets, the same table the dashboard's preset
+        picker uses) or a fully custom config (use_preset=False,
+        reading the raw spread_factor/bandwidth/coding_rate fields
+        directly; coding_rate is stored as just the denominator, e.g.
+        5 means "4/5").
+        """
+        info: dict = {
+            "region": None, "channel_num": None,
+            "short_name": None, "long_name": None,
+            "modem_preset": None, "spreading_factor": None,
+            "bandwidth_khz": None, "coding_rate": None,
+        }
+        try:
+            from meshtastic.protobuf import config_pb2
+            lora = interface.localNode.localConfig.lora
+            info["channel_num"] = int(lora.channel_num)
+            info["region"] = config_pb2.Config.LoRaConfig.RegionCode.Name(lora.region)
+            if lora.use_preset:
+                preset_name = config_pb2.Config.LoRaConfig.ModemPreset.Name(
+                    lora.modem_preset,
+                )
+                info["modem_preset"] = preset_name
+                preset = get_preset(preset_name)
+                if preset:
+                    info["spreading_factor"] = preset.spreading_factor
+                    info["bandwidth_khz"] = preset.bandwidth_khz
+                    info["coding_rate"] = preset.coding_rate
+            else:
+                info["modem_preset"] = "CUSTOM"
+                if lora.spread_factor:
+                    info["spreading_factor"] = int(lora.spread_factor)
+                if lora.bandwidth:
+                    info["bandwidth_khz"] = float(lora.bandwidth)
+                if lora.coding_rate:
+                    info["coding_rate"] = f"4/{int(lora.coding_rate)}"
+        except Exception:
+            logger.debug("Could not read LoRa config from serial interface", exc_info=True)
+        try:
+            info["short_name"] = interface.getShortName()
+            info["long_name"] = interface.getLongName()
+        except Exception:
+            logger.debug("Could not read node identity from serial interface", exc_info=True)
+        return info
+
     async def stop(self) -> None:
         self._running = False
+        self._connected = False
         if self._interface:
             try:
                 self._interface.close()
@@ -137,26 +249,25 @@ class SerialCaptureSource(CaptureSource):
             # one a passive multi-channel sniffer most needs (its own
             # channel_keys config may decrypt what the stick couldn't).
             raw_bytes = self._reconstruct_raw(packet)
-            # TEMPORARY DEBUG (remove once confirmed) -- checking whether
-            # reconstructed packets actually carry rxRssi/rxSnr or always
-            # fall through to the -100/0 defaults below.
-            logger.info(
-                "serial_source DEBUG reconstructed packet keys=%s "
-                "rxRssi=%r rssi=%r rxSnr=%r snr=%r",
-                sorted(packet.keys()),
-                packet.get("rxRssi"), packet.get("rssi"),
-                packet.get("rxSnr"), packet.get("snr"),
-            )
 
         if not raw_bytes:
             return None
 
+        radio = self._radio_info
         signal = SignalMetrics(
             rssi=float(packet.get("rxRssi", packet.get("rssi", -100))),
             snr=float(packet.get("rxSnr", packet.get("snr", 0))),
-            frequency_mhz=906.875,
-            spreading_factor=11,
-            bandwidth_khz=250.0,
+            frequency_mhz=_default_frequency_mhz(
+                radio.get("region"), radio.get("channel_num"),
+            ),
+            # Fall back to LongFast (the de facto default preset almost
+            # every Meshtastic node runs) only when the handshake
+            # hasn't populated these yet -- better than the previous
+            # unconditional 11/250.0 which never reflected non-LongFast
+            # presets either.
+            spreading_factor=radio.get("spreading_factor") or 11,
+            bandwidth_khz=radio.get("bandwidth_khz") or 250.0,
+            coding_rate=radio.get("coding_rate") or "4/5",
         )
 
         return RawCapture(

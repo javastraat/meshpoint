@@ -46,6 +46,7 @@ _crypto = None
 _tx_service = None
 _identity: DeviceIdentity | None = None
 _channel_hash_resolver = None
+_serial_sources: list = []
 
 
 def init_routes(
@@ -54,13 +55,16 @@ def init_routes(
     tx_service=None,
     identity: DeviceIdentity | None = None,
     channel_hash_resolver=None,
+    serial_sources: list | None = None,
 ) -> None:
     global _config, _crypto, _tx_service, _identity, _channel_hash_resolver
+    global _serial_sources
     _config = config
     _crypto = crypto
     _tx_service = tx_service
     _identity = identity
     _channel_hash_resolver = channel_hash_resolver
+    _serial_sources = serial_sources or []
 
 
 def _refresh_channel_hash_map() -> None:
@@ -137,6 +141,26 @@ def _concentrator_status(config: AppConfig) -> dict:
     }
 
 
+def _serial_status_entry(src) -> dict:
+    """Topbar status for one Meshtastic USB serial capture source.
+
+    Reuses the same region+channel_num -> frequency helper the source
+    itself uses to stamp captured packets, so the badge and the packet
+    feed never disagree.
+    """
+    from src.capture.serial_source import _default_frequency_mhz
+
+    info = src.get_radio_info() if hasattr(src, "get_radio_info") else {}
+    return {
+        "name": src.name,
+        "connected": bool(getattr(src, "connected", False)),
+        "frequency_mhz": _default_frequency_mhz(
+            info.get("region"), info.get("channel_num"),
+        ),
+        **info,
+    }
+
+
 @router.get("")
 async def get_config(claims: SessionClaims = Depends(require_auth)):
     """Full configuration summary for the Radio tab.
@@ -188,6 +212,8 @@ async def get_config(claims: SessionClaims = Depends(require_auth)):
         for name, key in (_config.meshcore.channel_keys.items() if _config else [])
     ]
     mc_status["private_channels"] = list(_config.meshcore.private_channels) if _config else []
+
+    serial_status = [_serial_status_entry(src) for src in _serial_sources]
 
     duty_info = {"used_percent": 0.0, "remaining_ms": 0}
     if _tx_service and hasattr(_tx_service, "_duty"):
@@ -262,6 +288,7 @@ async def get_config(claims: SessionClaims = Depends(require_auth)):
         ),
         "channels": channels,
         "meshcore": mc_status,
+        "serial": serial_status,
         "duty_cycle": duty_info,
         "presets": all_presets_list(),
         "regions": [

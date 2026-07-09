@@ -871,6 +871,21 @@ def _find_meshcore_source(coord: PipelineCoordinator):
     return None
 
 
+def _find_serial_sources(coord: PipelineCoordinator) -> list:
+    """All Meshtastic USB serial capture sources, in configured order.
+
+    Unlike MeshCore's TX-bound "primary" source, every serial device is
+    just a passive capture source (Meshtastic TX from the dashboard
+    goes through the concentrator, not a USB stick), so there's no
+    single "the" source to pick -- the topbar shows one badge per
+    configured device.
+    """
+    return [
+        src for src in coord.capture_coordinator._sources
+        if src.name.startswith("serial")
+    ]
+
+
 async def _reapply_companion_name(meshcore_tx, config: AppConfig) -> None:
     """Re-apply the configured companion name on every USB connect.
 
@@ -1367,6 +1382,7 @@ def _init_routes(
         tx_service=tx_service,
         identity=identity,
         channel_hash_resolver=channel_hash_resolver,
+        serial_sources=_find_serial_sources(coord),
     )
     mqtt_config_routes.init_routes(
         config=config,
