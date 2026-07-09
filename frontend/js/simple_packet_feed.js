@@ -145,8 +145,11 @@ class SimplePacketFeed {
     _rssiClass(val) {
         if (val == null) return '';
         const n = Number(val);
-        if (n >= -90) return 'rssi-good';
-        if (n >= -110) return 'rssi-mid';
+        // Same bands as the Meshtastic/MeshCore/LoRaWAN panels' _rssiClass,
+        // so a packet keeps its color across pages (-100 dBm is still a
+        // comfortable LoRa signal).
+        if (n >= -100) return 'rssi-good';
+        if (n >= -115) return 'rssi-mid';
         return 'rssi-bad';
     }
 

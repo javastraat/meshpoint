@@ -951,6 +951,18 @@ gpiozero/lgpio stack:
   shutdown. Needs debounce, hold detection, and guarding of the destructive
   action.
 
+**RSSI color mismatch Dashboard vs panels (2026-07-09 late, user screenshots):**
+Dashboard packet feed's `_rssiClass` (simple_packet_feed.js) used −90/−110
+green/amber/red cutoffs while ALL THREE protocol panels
+(meshtastic/meshcore/lorawan_panel.js) use −100/−115 — so −97…−100 dBm
+packets were amber on Dashboard but green on the panels. FIXED: feed now
+uses −100/−115 (the LoRa-appropriate scale; −90 was Wi-Fi-calibrated), with
+a comment pointing at the panels' `_rssiClass`. No other views color RSSI
+(grep app.js/node_cards/node_drawer clean). Changelog bullet under
+"Dashboard and UI" (76, parser-verified). Class names differ per view
+(rssi-* in dashboard.css vs lw-signal--* in lorawan.css) but colors map to
+the same green/amber/red tokens — only thresholds were the problem.
+
 Watch: RFID plateau 865.6-867.6 (identified, only interesting if it changes); noise pill should read a few dB lower post-percentile-fix.
 
 **CLI report/status auth fix (2026-07-08 ~16:00, found via N2):** `meshpoint report`
