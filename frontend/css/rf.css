@@ -156,8 +156,11 @@
 }
 
 .rf-histogram-wrap {
+    /* Chart.js with maintainAspectRatio:false needs a height-constrained
+       container -- an auto-height wrapper feeds back into the canvas resize
+       loop and the chart grows without bound. */
     position: relative;
-    min-height: 220px;
+    height: 260px;
 }
 
 .rf-histogram-empty {

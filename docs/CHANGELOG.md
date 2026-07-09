@@ -103,6 +103,7 @@ First tagged release of the javastraat/meshpoint fork: LoRaWAN sniffing, multi-r
 
 - **RF Environment tab.** Spectral scan and noise-floor telemetry for concentrators with SX1261 spectral-scan support. (On this fork the SenseCap M1 *does* support scan -- set `radio.sx1261_spi_path: "/dev/spidev0.1"`; the tab shares the same scan service as the Band Spectrum card.)
 - **Packet detail modal.** Click a row in the live packet feed for full decode metadata without leaving the dashboard.
+- **RF tab histogram no longer grows the page without bound.** The channel-histogram chart lacked a height-constrained container, so Chart.js re-sized itself into an ever-taller page on hardware that actually produces scan data; the wrapper now has a fixed height.
 - **Operator status strips.** KPI-style strips on Dashboard and RF tabs; MQTT broker health on Configuration → MQTT.
 - **Quick Deploy QR.** Configuration → Channels exports public channel parameters as a scannable QR for field provisioning.
 - **Prometheus `/metrics`.** Optional scrape endpoint with packet, node, relay, and system counters.
