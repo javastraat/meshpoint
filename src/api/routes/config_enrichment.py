@@ -54,6 +54,14 @@ def enrich_config_payload(cfg: AppConfig, base: dict) -> dict:
             "auto_detect": mc_usb.auto_detect if mc_usb else True,
             "label": mc_usb.label if mc_usb else "",
         },
+        "serial": [
+            {
+                "serial_port": d.serial_port,
+                "serial_baud": d.serial_baud,
+                "label": d.label,
+            }
+            for d in capture.serial
+        ],
     }
     base["relay"] = {
         "enabled": relay.enabled,

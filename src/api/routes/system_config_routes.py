@@ -55,6 +55,17 @@ class MeshcoreCompanionsUpdate(BaseModel):
     enable_source: Optional[bool] = None
 
 
+class SerialDeviceEntry(BaseModel):
+    label: str = ""
+    serial_port: Optional[str] = None
+    serial_baud: int = Field(115200, ge=9600, le=921600)
+
+
+class SerialDevicesUpdate(BaseModel):
+    devices: list[SerialDeviceEntry] = Field(..., min_length=0, max_length=4)
+    enable_source: Optional[bool] = None
+
+
 class RelayUpdate(BaseModel):
     enabled: Optional[bool] = None
     serial_port: Optional[str] = None
@@ -228,6 +239,63 @@ async def update_meshcore_companions(
     return {"saved": True, "restart_required": True}
 
 
+@router.put("/capture/serial-devices")
+async def update_serial_devices(
+    req: SerialDevicesUpdate,
+    _claims: SessionClaims = Depends(require_admin),
+    audit: AuditLogWriter = Depends(get_audit_writer),
+):
+    """Replace the full Meshtastic USB serial device list (up to 4 entries).
+
+    Mirrors ``update_meshcore_companions`` -- same shape, minus
+    ``auto_detect`` (SerialDeviceConfig has no such field: an empty
+    serial_port already means "let meshtastic-python auto-detect").
+    """
+    from src.config import SerialDeviceConfig
+    if _config is None:
+        raise HTTPException(503, "Config not loaded")
+
+    new_devices = [
+        SerialDeviceConfig(
+            label=d.label,
+            serial_port=d.serial_port.strip() if d.serial_port else None,
+            serial_baud=d.serial_baud,
+        )
+        for d in req.devices
+    ]
+    _config.capture.serial = new_devices
+
+    yaml_updates: dict = {}
+    capture_updates: dict = {}
+
+    devices_list = [_serial_device_dict(d) for d in new_devices]
+    yaml_updates["serial"] = devices_list
+
+    sources = list(_config.capture.sources or [])
+    if req.enable_source is not None:
+        has_serial = "serial" in sources
+        if req.enable_source and not has_serial:
+            sources.append("serial")
+            capture_updates["sources"] = sources
+            _config.capture.sources = sources
+        elif not req.enable_source and has_serial:
+            sources = [s for s in sources if s != "serial"]
+            capture_updates["sources"] = sources
+            _config.capture.sources = sources
+
+    with audit.timed_action(
+        user=_claims.subject,
+        action="config.serial_devices_update",
+        params={"devices": devices_list},
+    ):
+        try:
+            save_section_to_yaml("capture", {**yaml_updates, **capture_updates})
+        except PermissionError as exc:
+            raise HTTPException(403, str(exc)) from exc
+
+    return {"saved": True, "restart_required": True}
+
+
 @router.put("/relay")
 async def update_relay(
     req: RelayUpdate,
@@ -324,4 +392,12 @@ def _meshcore_usb_dict(mc_usb) -> dict:
         "baud_rate": mc_usb.baud_rate,
         "auto_detect": mc_usb.auto_detect,
         "label": mc_usb.label,
+    }
+
+
+def _serial_device_dict(dev) -> dict:
+    return {
+        "serial_port": dev.serial_port,
+        "serial_baud": dev.serial_baud,
+        "label": dev.label,
     }

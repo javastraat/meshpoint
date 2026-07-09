@@ -206,6 +206,8 @@ capture:
 
 Each entry's `label` tags its captured packets' `capture_source` as `serial_433` / `serial_868` so the packet feed and drawer can tell them apart, the same way labelled MeshCore companions do. When `capture.serial` is set, the top-level `serial_port` / `serial_baud` fields are ignored.
 
+Configuration → Serial in the dashboard edits this list without hand-editing `local.yaml` — same add/remove/label UI as Configuration → MeshCore's companion editor, minus auto-detect (an empty port already means "let meshtastic-python auto-detect").
+
 ---
 
 ## Location (GPS) source
