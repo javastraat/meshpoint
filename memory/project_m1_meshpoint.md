@@ -1097,6 +1097,52 @@ separate bullet); still 50 bullets, parser-verified. Chevron fix
 LIVE-VERIFIED on Pi 2026-07-08 evening (second user screenshot: marker
 inline left of every headline, all categories + stacked detail correct).
 
+**UPSTREAM v0.7.7 MERGE (2026-07-09, branch `merge/upstream-v0.7.7`, commit c6ca07a — NOT yet on main):**
+Upstream KMX415 released their own v0.7.7 (39 commits); user keeps a local
+clone at `/Users/einstein/Software/meshpoint-original`; added as git remote
+`upstream` (local path). Merged into the fork with 12 conflicted files, all
+resolved:
+- **Upstream brings:** Settings backup/restore (tar.gz of config+data,
+  systemd-run transient units, new sudoers restore rules — `install.sh`
+  needed on upgrade), RF Environment tab (rf.css/rf_tab.js, /api/rf/status,
+  reuses OUR SpectralScanService instance), packet detail modal, Quick
+  Deploy QR (vendored qrcode.js, /api/config/export — public PSK only,
+  verified), Prometheus /metrics (disabled by default, own auth),
+  position/telemetry broadcast cadence controls, channel-hash rebuild fix
+  (#89), operator status strips + MQTT health, Bobcat Miner 300 docs +
+  HOME-ASSISTANT-COOKBOOK, CI on feat/**.
+- **Fork decisions kept:** channel picker stays Stable+Custom (upstream's
+  new rc-078/wismesh ids alias→stable, tests rewritten); EU868 LoRaWAN plan
+  kept (upstream test_eu868_longfast_uses_preset asserted radio_0=869.525 —
+  PRE-EXISTING failure on the fork, never noticed via targeted runs; now
+  asserts fork plan 868.3/869.525); README badges stay KMX415 per user.
+- **Fork lockdown extended to upstream code:** their PUT /api/config/position
+  + /api/config/telemetry had NO admin gate → added require_admin (viewer
+  lockdown); `rf` added to _ADMIN_SECTIONS/_VIEWER_SECTIONS. backup_routes
+  were already admin-gated upstream; rf GET viewer-open (fine).
+- **Version collision:** upstream also calls their release v0.7.7. CHANGELOG
+  v0.7.7 sections COMBINED: fork intro (mentions merged upstream features +
+  install.sh note) + our 11 categories + their 4 (Backup and restore / Mesh
+  broadcast cadence / Dashboard and operator tools / Docs). 60 bullets, 15
+  categories, parser-verified. RF tab bullet corrected: scan DOES work on
+  the M1 on this fork via sx1261_spi_path.
+- **Verification (Mac):** every src/*.py compiles, every frontend/*.js
+  parses, 49 test modules pass (incl. rewritten channel/plan tests), 28
+  modules skip on missing Mac deps (jwt/bcrypt/aiosqlite/Crypto/fastapi —
+  pre-existing), test_terminal_session_manager hangs on Mac PTY
+  (pre-existing, untouched by upstream). README API table +5 upstream
+  endpoint rows. Sudoers merged: restore rules + our safe.directory
+  variants coexist. index.html auto-merged: our sidebar regroup intact, RF
+  link landed in upstream's telemetry rail.
+- **TODO after user merges to main:** deploy to Pi needs `install.sh` (new
+  sudoers for restore); Pi browser-verify RF tab + backup/restore + packet
+  modal + Quick Deploy + release-notes categories; consider a "merged
+  upstream v0.7.7" README fork-section note. NOTE: full
+  `unittest discover` HANGS on Mac (terminal PTY tests) — run per-module
+  with `timeout 60` instead.
+- **NEVER put Co-Authored-By/AI trailers in commit messages (user: "never
+  ever").**
+
 ## OLD LIST (superseded, kept for the DONE details)
 
 User has been committing incrementally with the suggested one-liners (verified
