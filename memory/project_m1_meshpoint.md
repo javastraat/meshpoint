@@ -990,6 +990,29 @@ contacts) — no separate companion/CLI needed. Build:
   (the messaging incident) — watch that capture/messaging stay healthy
   under polling; back-off is built in but cadence may need raising if
   it interferes.
+  LIVE-VERIFIED on Pi 2026-07-10 18:59 (user screenshot): "Repeater
+  da0b77f13bc7 polled OK", Repeaters page renders — real name
+  "NL-AMS-R-PD2EMC ☀🔋" auto-titled (emoji intact, no config label),
+  green lamp, 4.12V / 37d uptime / 218,778 recv / 88,840 sent / -103
+  noise / 13 SNR / 53,022 errors / "polled just now". mesh_name join
+  works.
+- **TELEMETRY SHAPE BUG (found 2026-07-10 from user's live
+  req_telemetry, fixed):** the first live card showed NO temp/humidity
+  even though poll_repeater DOES call req_telemetry. Root cause:
+  `req_telemetry_sync` returns the LPP LIST DIRECTLY
+  (`telem_event.payload["lpp"]`) — NOT a dict; the CLI wraps it as
+  `{"lpp": res}`. My poller stored the bare list but both `_iter_lpp`
+  (telemetry-table mapper) and the card read `telemetry.lpp` → silently
+  dropped every sensor. FIX: poll_repeater normalizes
+  `list → {"lpp": [...]}`. Card ENRICHED: now shows Temperature (ambient
+  BMP280/SHT3X), Humidity, Pressure, Solar (V·W when non-zero) from the
+  LPP, plus the status counters. 2 new tests (PollRepeaterShapeTest:
+  bare-list-wrapped, none-stays-none) — 8 pass. NOTE for W12/future: all
+  repeater data comes through the M1's ONE connected USB companion
+  (meshcore_tx_client, self._mc) — no separate connection.
+  Changelog reworded (still 89). NOT re-verified on Pi after the fix —
+  next poll should now show temp/humidity/pressure on the card + write
+  telemetry rows (drawer chart + CSV).
 
 **W2 REFRAMED (2026-07-10 discussion, user has no own LoRaWAN devices):**
 MIC verify is IMPOSSIBLE for a passive sniffer without the device's

@@ -106,10 +106,18 @@ class RepeatersTab {
         const bat = s.bat != null ? `${(s.bat / 1000).toFixed(2)} V` : '--';
         rows.push(['Battery', bat]);
         rows.push(['Uptime', this._uptime(s.uptime)]);
+        // Sensors from the LPP telemetry (only shown when present).
         const temp = this._lppTemp(r.telemetry);
         if (temp != null) rows.push(['Temperature', `${temp.toFixed(1)} °C`]);
         const hum = this._lpp(r.telemetry, 4, 'humidity');
         if (hum != null) rows.push(['Humidity', `${hum.toFixed(0)} %`]);
+        const baro = this._lpp(r.telemetry, 3, 'barometer');
+        if (baro != null) rows.push(['Pressure', `${baro.toFixed(1)} hPa`]);
+        const solarW = this._lpp(r.telemetry, 2, 'power');
+        const solarV = this._lpp(r.telemetry, 2, 'voltage');
+        if (solarW > 0 || solarV > 0) {
+            rows.push(['Solar', `${(solarV ?? 0).toFixed(1)} V · ${(solarW ?? 0).toFixed(1)} W`]);
+        }
         rows.push(['Airtime (tx/rx)', this._airtime(s)]);
         rows.push(['Packets recv', this._num(s.nb_recv)]);
         rows.push(['Packets sent', this._num(s.nb_sent)]);

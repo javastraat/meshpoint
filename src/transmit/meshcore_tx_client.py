@@ -280,7 +280,13 @@ class MeshCoreTxClient:
                 telem = await asyncio.wait_for(
                     self._mc.commands.req_telemetry_sync(contact), timeout=25.0,
                 )
-                out["telemetry"] = _json_safe(telem)
+                # req_telemetry_sync returns the LPP list directly (or
+                # None); normalize to {"lpp": [...]} so readers have a
+                # stable shape (matches the CLI's own wrapping).
+                if isinstance(telem, list):
+                    out["telemetry"] = {"lpp": _json_safe(telem)}
+                elif telem is not None:
+                    out["telemetry"] = _json_safe(telem)
             except Exception:
                 logger.debug("req_telemetry failed for %s", key, exc_info=True)
         except asyncio.TimeoutError:

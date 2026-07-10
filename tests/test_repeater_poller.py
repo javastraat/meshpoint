@@ -110,5 +110,47 @@ class PollerTelemetryTest(unittest.TestCase):
         self.assertEqual(repo.inserted, [])  # no voltage/temp -> nothing stored
 
 
+class PollRepeaterShapeTest(unittest.TestCase):
+    """req_telemetry_sync returns the LPP list directly; poll_repeater
+    must normalize it to {"lpp": [...]} so readers find the sensors."""
+
+    def _client_with_fakes(self, telem_return):
+        from src.transmit.meshcore_tx_client import MeshCoreTxClient
+
+        class _Cmds:
+            async def send_login_sync(self, contact, pwd, *a, **k):
+                return object()  # login success
+
+            async def req_status_sync(self, contact, *a, **k):
+                return {"bat": 4119}
+
+            async def req_telemetry_sync(self, contact, *a, **k):
+                return telem_return
+
+        class _Mc:
+            commands = _Cmds()
+
+            def get_contact_by_key_prefix(self, key):
+                return {"public_key": key + "00", "adv_name": "R"}
+
+        client = MeshCoreTxClient()
+        client._owned_mc = _Mc()
+        client._owned_connected = True
+        return client
+
+    def test_bare_lpp_list_is_wrapped(self):
+        lpp = [{"channel": 1, "type": "voltage", "value": 4.11}]
+        client = self._client_with_fakes(lpp)
+        out = asyncio.run(client.poll_repeater("da0b77f13bc7", "pw"))
+        self.assertTrue(out["ok"])
+        self.assertEqual(out["telemetry"], {"lpp": lpp})  # wrapped
+
+    def test_none_telemetry_stays_none(self):
+        client = self._client_with_fakes(None)
+        out = asyncio.run(client.poll_repeater("da0b77f13bc7", "pw"))
+        self.assertTrue(out["ok"])                 # status still succeeded
+        self.assertIsNone(out["telemetry"])
+
+
 if __name__ == "__main__":
     unittest.main()
