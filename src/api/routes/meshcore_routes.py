@@ -15,6 +15,7 @@ router = APIRouter(prefix="/api/meshcore", tags=["meshcore"])
 _packet_repo: PacketRepository | None = None
 _node_repo: NodeRepository | None = None
 _device_name: str = "meshpoint"
+_repeater_poller = None
 
 
 def init_routes(
@@ -26,6 +27,52 @@ def init_routes(
     _packet_repo = packet_repo
     _node_repo = node_repo
     _device_name = device_name or "meshpoint"
+
+
+def set_repeater_poller(poller) -> None:
+    """Wire the repeater poller so /repeaters can serve its latest data."""
+    global _repeater_poller
+    _repeater_poller = poller
+
+
+@router.get("/repeaters")
+async def meshcore_repeaters():
+    """Latest polled status/telemetry for configured MeshCore repeaters.
+
+    ``available: false`` when repeater polling isn't enabled -- the page
+    hides itself in that case. Each entry gets ``mesh_name`` -- the
+    repeater's real advertised name from our contact roster -- so the
+    card can show that instead of requiring a hand-typed config label.
+    """
+    if _repeater_poller is None:
+        return {"available": False, "repeaters": []}
+
+    names = await _repeater_names(list(_repeater_poller.latest.keys()))
+    reps = []
+    for key, entry in _repeater_poller.latest.items():
+        reps.append({**entry, "mesh_name": names.get(key)})
+    return {"available": True, "repeaters": reps}
+
+
+async def _repeater_names(keys: list[str]) -> dict:
+    """Real advertised names for the given node keys, from the roster."""
+    if _node_repo is None or not keys:
+        return {}
+    placeholders = ",".join("?" for _ in keys)
+    try:
+        rows = await _node_repo._db.fetch_all(
+            f"SELECT node_id, long_name, short_name FROM nodes "
+            f"WHERE node_id IN ({placeholders})",
+            tuple(keys),
+        )
+    except Exception:
+        return {}
+    out = {}
+    for r in rows:
+        name = (r.get("long_name") or r.get("short_name") or "").strip()
+        if name:
+            out[r["node_id"]] = name
+    return out
 
 
 _PACKET_EXPORT_COLUMNS = [

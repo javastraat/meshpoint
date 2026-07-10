@@ -662,6 +662,25 @@ The status LED (when enabled) narrates: double-blink = advert sent, one long dar
 
 ---
 
+## Repeater Polling (MeshCore)
+
+```yaml
+repeater_poll:
+  enabled: false
+  interval_minutes: 30
+  repeaters:
+    - key: da0b77f13bc7        # public-key prefix (12 hex, == node_id)
+      password: "your-password" # the repeater's login password
+      # name: "PD2EMC"          # optional label; the real advertised
+                                # name is used automatically otherwise
+```
+
+MeshCore nodes advertise identity only — no battery/uptime like Meshtastic broadcasts — so a repeater's stats have to be *asked for*. When enabled, Meshpoint periodically queries each listed repeater via the companion's `req_status`/`req_telemetry` (the same calls `meshcore-cli` and the phone app make) and shows the results on a **Repeaters** page (Radio group in the sidebar, only visible when polling is configured): battery, uptime, airtime, packet counters, noise floor, and LPP sensors (temperature/humidity/pressure). The charted fields (voltage, temperature, humidity, uptime) also land in the telemetry table, so they flow into the node drawer chart and CSV export.
+
+This is **active two-way RF on a schedule** — the most chatty thing Meshpoint does — so it's off by default, polls sequentially with gaps, and only targets repeaters you have the login `password` for (required for `req_status`). Passwords stay in `local.yaml` and are never exposed by the API. Poll cadence is `interval_minutes` (floored at 1); the first poll runs ~45 s after startup once the contact roster has loaded.
+
+---
+
 ## Device Identity
 
 ```yaml

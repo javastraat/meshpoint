@@ -14,6 +14,21 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+
+def _json_safe(value):
+    """Recursively convert bytes -> hex so a payload is JSON-serialisable.
+
+    The meshcore status/telemetry payloads are plain dicts of numbers,
+    but the odd field (tags, keys) can be bytes.
+    """
+    if isinstance(value, dict):
+        return {k: _json_safe(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(v) for v in value]
+    if isinstance(value, (bytes, bytearray)):
+        return value.hex()
+    return value
+
 # Companion firmware caps the advert name at roughly 32 ASCII bytes; the
 # exact ceiling varies with location/unicode payload per MeshCore docs.
 # We enforce 32 UTF-8 bytes as a conservative upper bound that fits every
@@ -223,6 +238,59 @@ class MeshCoreTxClient:
             logger.exception("MeshCore advert send failed")
             await self._run_post_command()
             return SendResult(success=False, error=str(exc))
+
+    async def poll_repeater(self, key: str, password: str = "") -> dict:
+        """Login + req_status + req_telemetry for one repeater.
+
+        Same calls meshcore-cli's ``req_status``/``req_telemetry`` make,
+        through the companion Meshpoint already holds. ``key`` is the
+        node's public-key prefix (== its node_id). Returns
+        ``{ok, status, telemetry, error}`` with the raw payload dicts;
+        req_status needs a prior login on this firmware, so a login
+        failure short-circuits.
+        """
+        if not self.connected:
+            return {"ok": False, "error": "companion not connected"}
+        contact = None
+        try:
+            contact = self._mc.get_contact_by_key_prefix(key)
+        except Exception:
+            logger.debug("contact lookup failed for %s", key, exc_info=True)
+        if contact is None:
+            return {"ok": False, "error": "contact not in companion roster"}
+
+        out = {"ok": False, "status": None, "telemetry": None, "error": ""}
+        try:
+            if password:
+                login = await asyncio.wait_for(
+                    self._mc.commands.send_login_sync(contact, password),
+                    timeout=15.0,
+                )
+                if login is None:
+                    out["error"] = "login failed or timed out"
+                    return out
+            status = await asyncio.wait_for(
+                self._mc.commands.req_status_sync(contact), timeout=25.0,
+            )
+            out["status"] = _json_safe(status)
+            out["ok"] = status is not None
+            if status is None:
+                out["error"] = "no status response"
+            try:
+                telem = await asyncio.wait_for(
+                    self._mc.commands.req_telemetry_sync(contact), timeout=25.0,
+                )
+                out["telemetry"] = _json_safe(telem)
+            except Exception:
+                logger.debug("req_telemetry failed for %s", key, exc_info=True)
+        except asyncio.TimeoutError:
+            out["error"] = "timed out"
+        except Exception as exc:
+            logger.exception("poll_repeater %s failed", key)
+            out["error"] = str(exc)
+        finally:
+            await self._run_post_command()
+        return out
 
     async def set_companion_name(self, name: str) -> SendResult:
         """Rename the USB companion via CMD_SET_ADVERT_NAME (0x08).

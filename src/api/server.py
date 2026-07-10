@@ -109,6 +109,7 @@ _fan_controller = None
 _led_controller_task = None
 _led_controller = None
 _button_controller_task = None
+_repeater_poller = None
 
 
 def create_app(config: AppConfig | None = None) -> FastAPI:
@@ -224,6 +225,14 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
             await position_broadcaster.start()
 
         _wire_native_relay(pipeline, tx_service)
+
+        global _repeater_poller
+        _repeater_poller = _build_repeater_poller(
+            config, meshcore_tx_ref, coord=pipeline,
+        )
+        if _repeater_poller is not None:
+            await _repeater_poller.start()
+            meshcore_routes.set_repeater_poller(_repeater_poller)
 
         global _noise_floor_emitter_task
         import asyncio
@@ -350,6 +359,8 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
             await telemetry_broadcaster.stop()
         if position_broadcaster is not None:
             await position_broadcaster.stop()
+        if _repeater_poller is not None:
+            await _repeater_poller.stop()
         await upstream.stop()
         await pipeline.stop()
         session_manager.shutdown()
@@ -843,6 +854,31 @@ def _wire_native_relay(
     relay.set_local_node_id(f"{tx_service.source_node_id:08x}")
     logger.info(
         "Relay backend: native onboard SX1302 (identity-preserving)"
+    )
+
+
+def _build_repeater_poller(config: AppConfig, meshcore_tx, coord):
+    """Repeater status/telemetry poller when enabled and TX is live."""
+    rp = config.repeater_poll
+    if not rp.enabled or not rp.repeaters:
+        return None
+    if meshcore_tx is None:
+        logger.warning(
+            "repeater_poll enabled but MeshCore TX is unavailable -- "
+            "not polling repeaters",
+        )
+        return None
+    import os
+
+    from src.transmit.repeater_poller import RepeaterPoller
+
+    data_dir = os.path.dirname(config.storage.database_path) or "data"
+    return RepeaterPoller(
+        tx_client=meshcore_tx,
+        repeaters=rp.repeaters,
+        interval_minutes=rp.interval_minutes,
+        telemetry_repo=coord.telemetry_repo,
+        data_dir=data_dir,
     )
 
 

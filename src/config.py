@@ -177,6 +177,22 @@ def _coerce_serial_devices(value) -> list[SerialDeviceConfig]:
     return []
 
 
+_REPEATER_FIELDS = {"key", "password", "name"}
+
+
+def _coerce_repeaters(value) -> list["RepeaterConfig"]:
+    """Parse ``repeater_poll.repeaters`` (list of {key, password, name})."""
+    def _from_dict(d: dict) -> "RepeaterConfig":
+        return RepeaterConfig(
+            **{k: v for k, v in d.items() if k in _REPEATER_FIELDS}
+        )
+
+    if isinstance(value, list):
+        out = [_from_dict(d) for d in value if isinstance(d, dict)]
+        return [r for r in out if r.key]  # drop entries with no key
+    return []
+
+
 @dataclass
 class CaptureConfig:
     sources: list[str] = field(default_factory=lambda: ["mock"])
@@ -452,6 +468,38 @@ class ButtonConfig:
 
 
 @dataclass
+class RepeaterConfig:
+    """One MeshCore repeater to poll for status/telemetry.
+
+    ``key`` is the node's public-key prefix (12 hex, == its node_id in
+    our DB). ``password`` is the repeater's login password -- needed for
+    ``req_status``; it's a secret and gets redacted for viewers like the
+    channel keys. ``name`` is an optional label for logs only.
+    """
+
+    key: str = ""
+    password: str = ""
+    name: str = ""
+
+
+@dataclass
+class RepeaterPollConfig:
+    """Periodically query configured MeshCore repeaters (opt-in).
+
+    Uses the companion's own ``req_status``/``req_telemetry`` (the same
+    the phone app and meshcore-cli use) to pull battery, uptime, airtime,
+    packet counters and LPP sensors from repeaters you operate, filling
+    the otherwise-empty MeshCore node stats. Active two-way RF, so it's
+    off by default and targets a short list you have passwords for, not
+    the whole contact roster.
+    """
+
+    enabled: bool = False
+    interval_minutes: int = 30
+    repeaters: list = field(default_factory=list)
+
+
+@dataclass
 class AppConfig:
     radio: RadioConfig = field(default_factory=RadioConfig)
     meshtastic: MeshtasticConfig = field(default_factory=MeshtasticConfig)
@@ -470,6 +518,7 @@ class AppConfig:
     fan: FanConfig = field(default_factory=FanConfig)
     led: LedConfig = field(default_factory=LedConfig)
     button: ButtonConfig = field(default_factory=ButtonConfig)
+    repeater_poll: RepeaterPollConfig = field(default_factory=RepeaterPollConfig)
 
 
 def _resolve_radio_frequency(radio: "RadioConfig") -> None:
@@ -547,6 +596,11 @@ def _apply_yaml(cfg: AppConfig, path: Path) -> None:
     # scalars keep working untouched when this key is absent.
     if isinstance(cap_raw, dict) and "serial" in cap_raw:
         cfg.capture.serial = _coerce_serial_devices(cap_raw.pop("serial"))
+    # repeater_poll.repeaters is a list-of-dicts; pop it before the
+    # generic merge so _merge_dataclass doesn't store raw dicts.
+    rp_raw = raw.get("repeater_poll")
+    if isinstance(rp_raw, dict) and "repeaters" in rp_raw:
+        cfg.repeater_poll.repeaters = _coerce_repeaters(rp_raw.pop("repeaters"))
 
     section_map = {
         "radio": cfg.radio,
@@ -566,6 +620,7 @@ def _apply_yaml(cfg: AppConfig, path: Path) -> None:
         "fan": cfg.fan,
         "led": cfg.led,
         "button": cfg.button,
+        "repeater_poll": cfg.repeater_poll,
     }
 
     unknown_keys: list[str] = []

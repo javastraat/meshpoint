@@ -35,6 +35,7 @@
     <link rel="stylesheet" href="css/radio_channels.css" />
     <link rel="stylesheet" href="css/radio_readout.css" />
     <link rel="stylesheet" href="css/stats.css" />
+    <link rel="stylesheet" href="css/repeaters.css" />
     <link rel="stylesheet" href="css/settings.css" />
     <link rel="stylesheet" href="css/configuration.css" />
     <link rel="stylesheet" href="css/lorawan.css" />
@@ -199,6 +200,19 @@
                                 </svg>
                             </span>
                             <span class="sidebar__label">RTL-SDR</span>
+                        </a>
+                    </li>
+                    <li class="sidebar__item" id="nav-repeaters" style="display:none">
+                        <a href="#/repeaters" class="sidebar__link" data-route="repeaters">
+                            <span class="sidebar__icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M12 2v20"/>
+                                    <path d="M8 6a5.66 5.66 0 0 0 0 8"/>
+                                    <path d="M16 6a5.66 5.66 0 0 1 0 8"/>
+                                    <circle cx="12" cy="10" r="2"/>
+                                </svg>
+                            </span>
+                            <span class="sidebar__label">Repeaters</span>
                         </a>
                     </li>
                     <li class="sidebar__group-header" aria-hidden="true" data-requires-section="terminal configuration.identity settings">
@@ -495,6 +509,10 @@
 
             <section class="section" data-section="listener" style="display:none">
                 <div id="listener-panel"></div>
+            </section>
+
+            <section class="section" data-section="repeaters" style="display:none">
+                <div id="repeaters-panel"></div>
             </section>
 
             <section class="section" data-section="stats" style="display:none">
@@ -832,6 +850,7 @@
     <script src="js/radio_thermals_card.js"></script>
     <script src="js/radio_settings.js"></script>
     <script src="js/stats_tab.js"></script>
+    <script src="js/repeaters_tab.js"></script>
     <script src="js/signout_controller.js"></script>
     <script src="js/settings/password_change_form.js"></script>
     <script src="js/settings/sign_out_all_form.js"></script>

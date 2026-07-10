@@ -187,6 +187,25 @@ led:
   # calm steady light that only signals health.
   activity_blink: true
 
+repeater_poll:
+  # Periodically query MeshCore repeaters you operate for their
+  # status/telemetry (battery, uptime, airtime, packet counters, LPP
+  # sensors) -- MeshCore nodes advertise identity only, so these stats
+  # have to be asked for. Active two-way RF, so it's off by default and
+  # targets a short list you have the login password for.
+  enabled: false
+  # How often (minutes) to poll each repeater. Floored at 1 minute.
+  interval_minutes: 30
+  # Repeaters to poll. key = public-key prefix (12 hex, == node_id);
+  # password = the repeater's login password (needed for req_status).
+  # The Repeaters page shows the repeater's real advertised name from
+  # the contact roster automatically -- `name` is an optional override.
+  # repeaters:
+  #   - key: a1b2c3d4e5
+  #     password: "your-repeater-password"
+  #     name: "Repeatername"   # optional label; real advertised name used otherwise
+  repeaters: []
+
 button:
   # SenseCap M1 user button (opt-in -- same rationale as fan:/led:).
   # Short press: advert on every TX-capable radio (concentrator

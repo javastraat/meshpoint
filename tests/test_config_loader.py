@@ -298,6 +298,40 @@ class LoadConfigIntegrationTest(unittest.TestCase):
         self.assertEqual(cfg.button.hold_time_s, 5.0)
         self.assertEqual(cfg.button.gpio_pin, 27)  # untouched default
 
+    def test_repeater_poll_section_is_applied(self):
+        # section_map + the repeaters list coercion both exercised.
+        tmp = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", delete=False, encoding="utf-8"
+        )
+        tmp.write(
+            "repeater_poll:\n"
+            "  enabled: true\n"
+            "  interval_minutes: 20\n"
+            "  repeaters:\n"
+            "    - key: da0b77f13bc7\n"
+            "      password: secret\n"
+            "      name: PD2EMC\n"
+        )
+        tmp.close()
+        path = Path(tmp.name)
+        self.addCleanup(lambda: path.unlink(missing_ok=True))
+
+        old = os.environ.get("CONCENTRATOR_CONFIG")
+        os.environ["CONCENTRATOR_CONFIG"] = str(path)
+        try:
+            cfg = load_config()
+        finally:
+            if old is None:
+                os.environ.pop("CONCENTRATOR_CONFIG", None)
+            else:
+                os.environ["CONCENTRATOR_CONFIG"] = old
+
+        self.assertTrue(cfg.repeater_poll.enabled)
+        self.assertEqual(cfg.repeater_poll.interval_minutes, 20)
+        self.assertEqual(len(cfg.repeater_poll.repeaters), 1)
+        self.assertEqual(cfg.repeater_poll.repeaters[0].key, "da0b77f13bc7")
+        self.assertEqual(cfg.repeater_poll.repeaters[0].name, "PD2EMC")
+
 
 if __name__ == "__main__":
     unittest.main()

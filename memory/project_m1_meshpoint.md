@@ -922,7 +922,74 @@ All of T1-T4, T6 DONE (see entries below). Fresh numbering:
 | N1 | P3 | M | Multiple Meshtastic USB sticks — list-field treatment for `serial` source (config list + labels + meshtastic_usb_<label>), like meshcore_usb. Do when 2nd stick wanted (spare Heltec V3 433 "TBD/play" is candidate) |
 | N2 | DONE 2026-07-08 | S-M | Endpoint housekeeping done via live diagnosis (user ran stdlib diag script on Pi, all comparisons byte-identical). PRUNED 4: packets/protocols+types, nodes/map (+ orphans: telemetry.py router whole file, TelemetryRepository.get_latest_for_node, NodeRepository.get_with_position, NetworkMapper's get_map_data/get_all_nodes/get_nodes_with_position/get_node_count). **KEPT 2 — double-check saved us: `meshpoint report` CLI (report_command.py) uses /api/packets/count AND /api/nodes/summary** (frontend-only grep missed CLI consumers; remember to grep src/cli too when auditing endpoints). BONUS BUG FIXED: network summary totals were computed over get_all(LIMIT 500) → Stats page + CLI report under-reported (500 vs real 1445 nodes); now `NodeRepository.get_network_totals()` whole-table SQL aggregates (COUNT/SUM CASE/GROUP BY, COALESCE for empty table; SQL validated via stdlib sqlite3 on Mac). nodes.py no longer takes network_mapper (server call updated); NetworkMapper slimmed to get_network_summary→get_network_totals (stats_routes still uses it). README API table: nodes/map row → nodes/summary. 2 changelog bullets (45 total) |
 
-Wishlist: W1 CSV export (DONE 2026-07-10, details below) · W2 LoRaWAN MIC verify (S, DEPRIORITIZED — see note) · W3 433-node UI tags (DONE as T8) · W4 light theme (L) · W5 DAB+ welle-cli (M-L) · W6 pyrtlsdr true-RF S-meter (M-L) · W7 MeshCore repeater status polling (unsized) · W8 LED status light (DONE) · W9 button physical control (DONE) · W10 packets/nodes tab switch (DONE) · W11 TTN uplink forwarder (PARKED — see note).
+Wishlist: W1 CSV export (DONE) · W2 LoRaWAN MIC verify (DEPRIORITIZED) · W3 433-node UI tags (DONE as T8) · W4 light theme (L) · W5 DAB+ welle-cli (M-L) · W6 pyrtlsdr true-RF S-meter (M-L) · W7 MeshCore repeater monitoring (DONE 2026-07-10, details below) · W8 LED (DONE) · W9 button (DONE) · W10 tab switch (DONE) · W11 TTN uplink forwarder (PARKED) · W12 repeater detail: neighbours/regions/owner/acl/clock (PARKED, see W7 note).
+
+**W7 MeshCore REPEATER MONITORING — DONE 2026-07-10.** User co-designed
+via live meshcore-cli tests (companion reachable at meshcore.local:5000
+TCP = "PD2EMC Companion 🏠" v1.15.0; also BLE TAGs; scripts in
+/Users/einstein/Software/meshcore [telemetry.sh]). Key realizations:
+(1) MeshCore adverts carry IDENTITY ONLY — no telemetry broadcast like
+Meshtastic — so stats must be ASKED via req_status/req_telemetry (needs
+login with repeater password first). (2) The `meshcore` python lib
+(2.3.7, meshcore-cli's, ~= what's on Pi) exposes
+`commands.req_status_sync(contact)`, `req_telemetry_sync(contact)`,
+`send_login_sync(dst,pwd)`; contact resolved via
+`mc.get_contact_by_key_prefix(key)`. (3) req_status returns rich router
+health: bat(mV), uptime, noise_floor, last_rssi/snr, nb_recv/nb_sent
+(+flood/direct splits), airtime/rx_airtime, dups, recv_errors,
+tx_queue_len, full_evts. req_telemetry returns LPP list
+[{channel,type,value}]: ch1 battery V + MCU temp, ch2 solar V/A/W, ch3
+BMP280 temp/baro/alt, ch4 SHT3X temp/humidity. (4) Poll through the M1's
+OWN USB companion (meshcore_tx_client, already connected, has the 350
+contacts) — no separate companion/CLI needed. Build:
+- `RepeaterConfig`/`RepeaterPollConfig` (top-level section, enabled
+  False/interval_minutes 30/repeaters list) + `_coerce_repeaters`
+  (drops keyless) + section_map + regression test.
+- `MeshCoreTxClient.poll_repeater(key, password)` — resolve contact,
+  send_login_sync (if pwd) → req_status_sync → req_telemetry_sync, all
+  asyncio.wait_for-wrapped, returns {ok,status,telemetry,error}; bytes
+  JSON-safed via `_json_safe`.
+- NEW `src/transmit/repeater_poller.py` — RepeaterPoller (broadcaster
+  lifecycle: start/stop/loop; 45s startup delay, 5s per-repeater gap,
+  interval floored 60s), maps status.bat→voltage + uptime + LPP
+  ambient temp/humidity/baro → Telemetry row (drawer chart + CSV);
+  keeps latest per key in `self.latest`, PERSISTS to
+  data/repeater_status.json (survives restart); failed poll preserves
+  last-good status + marks stale.
+- `GET /api/meshcore/repeaters` (available:false when off → page hides)
+  + `set_repeater_poller()` wired in server lifespan
+  (`_build_repeater_poller`, stopped in shutdown).
+- **Dedicated PAGE (user changed mind tab→page→stats-style):** sidebar
+  nav item "Repeaters" in Radio group (id nav-repeaters, hidden until
+  checkAvailable()), section, NEW frontend/js/repeaters_tab.js
+  (RepeatersTab — matches stats_tab.js naming) + css/repeaters.css.
+  Summary stat cards + health card per repeater (battery/uptime/temp/
+  humidity/airtime/pkts/noise/snr/errors, stale badge, "polled Xm ago").
+  app.js: allowedRoutes+'repeaters', _bootRepeatersPanel, palette entry.
+- PASSWORD SECURITY: passwords only in local.yaml (never in GET
+  /api/config — hand-built payload doesn't include repeater_poll) and
+  NOT in the poller's latest/endpoint output → no redaction needed.
+- Tests: test_repeater_poller.py (6: coercion, LPP→telemetry mapping,
+  latest+persistence, stale-preserves-last-good, skip-empty) + config
+  regression. 25 pass. ruff clean. Changelog (89, "Configuration and
+  server"), README fork bullet, CONFIGURATION.md "Repeater Polling",
+  default.yaml block.
+- **Real name auto-shown (user follow-up):** config `name` is now
+  OPTIONAL. `/repeaters` endpoint joins the nodes table (`_repeater_names`
+  helper, IN-clause) → each entry gets `mesh_name` (real advertised
+  name from the 350-contact roster, e.g. "NL-AMS-R-PD2EMC ☀🔋"); card
+  title priority = mesh_name → config name → key. default.yaml/CONFIG.md
+  updated (name commented out).
+- **W12 PARKED** — more repeater query commands seen working live but
+  not built: req_neighbours (repeater's neighbour list + SNR + age),
+  req_regions, req_owner, req_clock, req_acl. Future "expand repeater"
+  detail view. req_mma errored (needs a sensor arg).
+- NOT yet Pi-verified — user: add repeater_poll to local.yaml (PD2EMC
+  da0b77f13bc7 + password), restart, wait ~45s, open Repeaters page.
+  CAUTION: this is the companion's command channel that wedged once
+  (the messaging incident) — watch that capture/messaging stay healthy
+  under polling; back-off is built in but cadence may need raising if
+  it interferes.
 
 **W2 REFRAMED (2026-07-10 discussion, user has no own LoRaWAN devices):**
 MIC verify is IMPOSSIBLE for a passive sniffer without the device's
@@ -965,9 +1032,12 @@ rides along), ds picked from this._tab. Tests: NEW test_csv_export.py
 (9: cell/line/document formatting, BOM, emoji, JSON-stays-one-cell,
 filename sanitization, stream_query paging+transform+cursor-close). ruff
 + node --check clean; changelog bullet under "LoRaWAN sniffing" (88,
-parser-verified); README fork bullet + API table rows. NOT yet
-Pi-verified — user: click Export on each tab of all 3 pages, confirm
-downloads + open in Excel (emoji intact).
+parser-verified); README fork bullet + API table rows.
+LIVE-VERIFIED 2026-07-10 (user screenshots): MeshCore packets export
+(timestamp/packet_id/source_id/source_name/…/decoded_payload JSON cell)
+and contacts export (node_id/long_name/…/lat/lon/last_heard) both
+download and open cleanly in Excel — named repeaters flow through,
+JSON payload stays one cell (no split rows), columns aligned. W1 DONE.
 
 ### W8/W9: LED + button features (TODO, added 2026-07-09)
 

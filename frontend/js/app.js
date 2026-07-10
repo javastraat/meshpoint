@@ -41,7 +41,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const router = new Router({
         defaultRoute: 'dashboard',
         allowedRoutes: [
-            'dashboard', 'meshtastic', 'meshcore', 'lorawan', 'listener', 'stats', 'rf', 'messages', 'radio', 'terminal',
+            'dashboard', 'meshtastic', 'meshcore', 'lorawan', 'listener', 'stats', 'rf', 'repeaters', 'messages', 'radio', 'terminal',
             'configuration/identity', 'configuration/radio',
             'configuration/channels', 'configuration/transmit',
             'configuration/mqtt',
@@ -132,6 +132,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     _bootDangerousPanel(router);
     _bootLoRaWANPanel(router);
     _bootListenerPanel(router);
+    _bootRepeatersPanel(router);
     _bootMeshtasticPanel(router);
     _bootMeshCorePanel(router);
 
@@ -287,6 +288,20 @@ function _bootListenerPanel(router) {
     const panel = new window.ListenerPanel();
     router.onRouteChange((route) => {
         if (route === 'listener') panel.show();
+        else panel.hide();
+    });
+}
+
+function _bootRepeatersPanel(router) {
+    if (!window.RepeatersTab) return;
+    const panel = new window.RepeatersTab();
+    // Reveal the sidebar item only when repeater polling is configured.
+    panel.checkAvailable().then((available) => {
+        const nav = document.getElementById('nav-repeaters');
+        if (nav) nav.style.display = available ? '' : 'none';
+    });
+    router.onRouteChange((route) => {
+        if (route === 'repeaters') panel.show();
         else panel.hide();
     });
 }
@@ -672,6 +687,7 @@ function _bootCommandPaletteAndKeymap(router) {
         ['messages', 'Go to Messages', 'Pages'],
         ['radio', 'Go to Hardware', 'Pages'],
         ['rf', 'Go to RF Environment', 'Pages'],
+        ['repeaters', 'Go to Repeaters', 'Pages'],
         ['terminal', 'Go to Terminal', 'Pages'],
         ['configuration/identity', 'Go to Configuration · Identity', 'Configuration'],
         ['configuration/radio', 'Go to Configuration · Radio', 'Configuration'],
