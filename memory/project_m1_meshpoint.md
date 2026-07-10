@@ -1128,10 +1128,14 @@ PacketDetailModal.show(pkt, {formatNodeId: _nodeNames lookup (mt/mc),
 selectedRow}). `.lw-pkt-row` cursor/hover CSS in lorawan.css. Fields
 the DB doesn't store (want_ack/channel_hash/relay_node) render n/a/
 omitted — acceptable. ALSO: Meshtastic NODES table Last heard moved to
-FIRST column (matching MeshCore contacts). LoRaWAN Devices census order
-unchanged (First/Last seen already mid-table; not asked). Changelog +1
+FIRST column (matching MeshCore contacts). LoRaWAN Devices census
+reordered too (user follow-up): Last seen FIRST, First seen SECOND,
+then DevEUI/Type/Frames/RSSI/SNR/Freq/SF. All three censuses now lead
+with time. Changelog +1
 bullet & tab bullet extended (86, parser-verified). ruff + node --check
-clean. Pi-verify: click packet rows on all 3 pages.
+clean. LIVE-VERIFIED 2026-07-10 (user: "on all 3 networks packets show
+modal when clicking"; screenshot shows meshcore nodeinfo with resolved
+name, companion RF metadata, full payload JSON). W10 + modal round DONE.
 
 ### W10: packets/nodes VIEW SWITCH on protocol pages (idea, 2026-07-10)
 

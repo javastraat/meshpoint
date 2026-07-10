@@ -112,11 +112,11 @@ class LoRaWANPanel {
                         <div class="panel__body lw-table-wrap">
                         <table class="lw-table lw-table--devices">
                             <colgroup>
+                                <col class="col-time">
+                                <col class="col-time">
                                 <col class="col-id">
                                 <col class="col-type">
                                 <col class="col-frames">
-                                <col class="col-time">
-                                <col class="col-time">
                                 <col class="col-rssi">
                                 <col class="col-snr">
                                 <col class="col-freq">
@@ -124,11 +124,11 @@ class LoRaWANPanel {
                             </colgroup>
                             <thead>
                                 <tr>
+                                    <th>Last seen</th>
+                                    <th>First seen</th>
                                     <th>DevEUI / DevAddr</th>
                                     <th>Type</th>
                                     <th class="lw-r">Frames</th>
-                                    <th>First seen</th>
-                                    <th>Last seen</th>
                                     <th class="lw-r">RSSI</th>
                                     <th class="lw-r">SNR</th>
                                     <th class="lw-r">Freq (MHz)</th>
@@ -252,11 +252,11 @@ class LoRaWANPanel {
 
             tbody.innerHTML = devices.map((d) => `
                 <tr data-device-id="${this._esc(d.dev_eui || d.source_id || '')}" class="lw-device-row">
+                    <td class="lw-time">${this._fmtTime(d.last_seen)}</td>
+                    <td class="lw-time">${this._fmtTime(d.first_seen)}</td>
                     <td class="lw-id">${this._fmtId(d)}</td>
                     <td>${this._fmtType(d.packet_type)}</td>
                     <td class="lw-num">${d.frame_count}</td>
-                    <td class="lw-time">${this._fmtTime(d.first_seen)}</td>
-                    <td class="lw-time">${this._fmtTime(d.last_seen)}</td>
                     <td class="lw-signal ${this._rssiClass(d.last_rssi)}">${this._fmtRssi(d.last_rssi)}</td>
                     <td class="lw-signal">${this._fmtSnr(d.last_snr)}</td>
                     <td class="lw-num">${d.last_frequency_mhz != null ? d.last_frequency_mhz.toFixed(3) : '--'}</td>
