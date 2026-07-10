@@ -430,6 +430,23 @@ instead of ttyUSB0 for robustness if more USB devices get added.
 - Follow-up visual polish: stronger card hierarchy (subtle layered background,
   improved spacing/typography), plus Sensors card meta label (`N ch · M vals`).
 
+## MeshCore DB import (2026-07-10)
+
+- Root `meshcore.db` contains `contacts`, `neighbours`, `telemetry_history`,
+  `status_history`, and `neighbour_history` tables.
+- Best-win import target is the telemetry history subset that maps to Meshpoint's
+  flat telemetry model: voltage, one temperature stream, humidity,
+  barometric_pressure, and uptime_seconds.
+- New importer script writes raw history into `packets` (JSON payload for the
+  unmapped fields) and summary telemetry rows for the chartable fields.
+- Importer defaults to the live archive URL `https://einstein.amsterdam/meshcore/meshcore.db`;
+  local `--source-db /path/to/file.db` remains available as an override.
+- Contacts and neighbours are now true upserts (overwrite on conflict instead of
+  ignore), and `--telemetry-only` limits the import to chartable telemetry rows
+  while skipping nodes and packet history.
+- Added `--contacts-only` to refresh just the contacts/neighbours roster while
+  skipping packet and telemetry history entirely.
+
 #### Listener enhancements (2026-07-05 evening → live, working)
 Built on the base above; all verified working in the browser (FM audio + meter).
 
