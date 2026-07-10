@@ -1334,7 +1334,16 @@ decoded_payload JSON, returned by the packets endpoints, so Details shows
 them on both Dashboard + tab. Shared modal so lorawan/meshcore benefit too.
 Hops row (2026-07-11): _meshRows now omits the Hops row entirely when
 hopLabel==='n/a' (hop_start not >0) instead of showing "Hops: n/a" — both
-protocols, user idea. ALSO: Meshtastic NODES table Last heard moved to
+protocols, user idea. LoRaWAN round (2026-07-11): (1) _buildLayer now skips
+any simple (non-html/non-expandable) row whose val is 'n/a' or '(unknown)'
+— hides Modem/RSSI/SNR/Channel on bare LoRaWAN joins, Channel on meshcore
+adverts, etc. From/To are composite "name (id)" so never match → always
+show. (2) simple_packet_feed _resolveName fallback changed from _shortId
+(removed, was `!{last4}`) to the FULL id, so a LoRaWAN DevEUI
+("A4:11:...:DE") or "network-server" is no longer mangled to "!D:DE"/
+"!rver" in the Dashboard modal — matches the LoRaWAN tab (formatNodeId =
+nodeNames[id]||id). Unknown meshtastic/meshcore nodes now also show full id
+(e.g. "fa4e8270") instead of "!8270", matching their tabs. ALSO: Meshtastic NODES table Last heard moved to
 FIRST column (matching MeshCore contacts). LoRaWAN Devices census
 reordered too (user follow-up): Last seen FIRST, First seen SECOND,
 then DevEUI/Type/Frames/RSSI/SNR/Freq/SF. All three censuses now lead

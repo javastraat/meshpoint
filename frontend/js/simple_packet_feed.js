@@ -160,19 +160,16 @@ class SimplePacketFeed {
         return `<span class="td-node-short">${short}</span>`;
     }
 
-    _shortId(id) {
-        if (!id) return '--';
-        if (id === 'ffffffff' || id === 'ffff' || id === 'broadcast') return '!cast';
-        return id.length > 6 ? `!${id.slice(-4)}` : `!${id}`;
-    }
-
-    // Plain-string name for the packet-detail modal: the node's real
-    // name when known (same map the feed rows use), else the short id.
+    // Plain-string name for the packet-detail modal: the node's real name
+    // when known (same map the feed rows use), else the full id. Falling
+    // back to the full id (not a last-4-char "!xxxx" short form) matches
+    // what the protocol tabs show and avoids mangling non-hex ids like a
+    // LoRaWAN DevEUI ("A4:11:...:DE") or "network-server" into "!D:DE".
     _resolveName(id) {
         if (!id) return 'n/a';
         if (id === 'ffffffff' || id === 'ffff' || id === 'broadcast') return 'broadcast';
         const name = this._nodeNames && this._nodeNames.get(String(id).toLowerCase());
-        return name || this._shortId(id);
+        return name || id;
     }
 
     _fmtId(id) {

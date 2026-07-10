@@ -86,6 +86,14 @@ class PacketDetailModal {
         const rowsEl = document.createElement('div');
         rowsEl.className = 'pdm-layer__rows';
         for (const row of rows) {
+            // Skip rows with no meaningful value rather than printing an
+            // empty "n/a" / "(unknown)" -- e.g. Modem/RSSI/SNR/Channel on a
+            // bare LoRaWAN join. From/To are composite ("name (id)") so they
+            // never match and always show.
+            if (!row.html && !row.expandable
+                && (row.val === 'n/a' || row.val === '(unknown)')) {
+                continue;
+            }
             if (row.html) {
                 rowsEl.insertAdjacentHTML('beforeend', row.html);
             } else if (row.expandable) {
