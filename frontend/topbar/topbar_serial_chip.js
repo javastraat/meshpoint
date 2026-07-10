@@ -81,8 +81,7 @@ class TopbarSerialChip {
         root.appendChild(lamp);
 
         const callEl = document.createElement('span');
-        callEl.className = 'topbar-serial__call'
-            + (!reachable ? ' topbar-serial__call--status' : '');
+        callEl.className = 'topbar-serial__call';
         callEl.textContent = callText;
         root.appendChild(callEl);
 

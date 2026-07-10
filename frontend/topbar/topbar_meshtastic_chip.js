@@ -10,7 +10,6 @@ class TopbarMeshtasticChip {
         this._root = chipEl;
         this._lampEl = chipEl.querySelector('.topbar-meshtastic__lamp');
         this._callEl = chipEl.querySelector('.topbar-meshtastic__call');
-        this._regionEl = chipEl.querySelector('.topbar-meshtastic__region');
         this._freqEl = chipEl.querySelector('.topbar-meshtastic__freq');
         this._presetEl = chipEl.querySelector('.topbar-meshtastic__preset');
         this._lastCall = null;
@@ -59,13 +58,11 @@ class TopbarMeshtasticChip {
         }
 
         const r = radio || {};
-        const region = r.region ? r.region : '--';
         const freq = r.frequency_mhz
             ? `${Number(r.frequency_mhz).toFixed(3)} MHz`
             : '--';
         const preset = this._formatPresetLabel(r.current_preset);
 
-        this._regionEl.textContent = region;
         this._freqEl.textContent = freq;
         this._presetEl.textContent = preset;
         this._root.classList.toggle(

@@ -1022,7 +1022,18 @@ push (2026-07-10, user-verified).
 ALSO dropped the REGION segment (EU_433) from the serial chip per user
 ("we can see the freq that enough"): region element + sep removed from
 _buildBadge, docstring updated, `.topbar-serial__region` CSS rules deleted.
-Concentrator Meshtastic chip KEEPS its region segment (not asked).
+TOPBAR UNIFICATION COMPLETED (2026-07-10, user request): concentrator chip
+too — EU_868 region span+sep removed from index.html markup (this chip's
+markup is STATIC in index.html, unlike the JS-built serial badges),
+`_regionEl` refs removed from topbar_meshtastic_chip.js, and BOTH
+Meshtastic chips' name slots (`__call`) restyled to MeshCore's plain
+600-weight style (was 700/0.18em letter-spacing/cyan glow/0.82rem). The
+`.topbar-serial__call--status` modifier from the earlier same-day fix
+became redundant (base is now plain) — CSS rule + JS conditional REMOVED.
+End state: all 3 chips = brand · lamp · plain name · cyan freq · preset/
+channel; NO region segments anywhere. `--unknown` toggle in the
+meshtastic chip still keys off radio.region (data still present, just not
+displayed). Changelog 79 bullets, parser-verified. ruff clean.
 
 Watch: RFID plateau 865.6-867.6 (identified, only interesting if it changes); noise pill should read a few dB lower post-percentile-fix.
 

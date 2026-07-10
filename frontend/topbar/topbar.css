@@ -125,13 +125,11 @@
     animation: topbar-meshtastic-blink 0.9s steps(2, end) infinite;
 }
 
+/* Same plain style as the MeshCore chip's name slot -- the node name
+   is a name, not a spaced-out glowing call sign. */
 .topbar-meshtastic__call {
-    font-size: 0.82rem;
-    font-weight: 700;
-    letter-spacing: 0.18em;
+    font-weight: 600;
     color: var(--text-primary);
-    text-shadow: 0 0 6px rgba(6, 182, 212, 0.2);
-    min-width: 3ch;
 }
 
 .topbar-meshtastic__call--flicker {
@@ -171,12 +169,6 @@
 .topbar-meshtastic__sep--bar {
     opacity: 0.35;
     margin: 0 0.05rem;
-}
-
-.topbar-meshtastic__region {
-    font-weight: 700;
-    color: var(--text-primary);
-    letter-spacing: 0.04em;
 }
 
 .topbar-meshtastic__freq {
@@ -382,22 +374,11 @@
     animation: topbar-meshtastic-blink 0.9s steps(2, end) infinite;
 }
 
+/* Same plain style as the MeshCore/Meshtastic name slots (covers the
+   node ID and status text like "Reconnecting…" alike). */
 .topbar-serial__call {
-    font-size: 0.82rem;
-    font-weight: 700;
-    letter-spacing: 0.18em;
-    color: var(--text-primary);
-    text-shadow: 0 0 6px rgba(6, 182, 212, 0.2);
-    min-width: 3ch;
-}
-
-/* Status text ("Reconnecting…") reads like the MeshCore chip's name
-   slot, not like a spaced-out glowing call sign. */
-.topbar-serial__call--status {
-    font-size: inherit;
     font-weight: 600;
-    letter-spacing: normal;
-    text-shadow: none;
+    color: var(--text-primary);
 }
 
 .topbar-serial__preset {
