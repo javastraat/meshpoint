@@ -1316,7 +1316,13 @@ didn't map the broadcast address → showed raw "ffffffff"; now returns
 "broadcast" (matches Dashboard + MeshCore tab). Only remaining modal diff
 is the fake "CR 4/8" Modem segment on the live feed: coding_rate is NOT a
 DB column and is a Signal-model default (meshcore genuinely reports N/A);
-user said leave it (2026-07-11 "its ok"). ALSO: Meshtastic NODES table Last heard moved to
+user said leave it (2026-07-11 "its ok"). MeshCore round (2026-07-11
+"show as much as we can"): added a readable "Node type" row to the shared
+modal's Mesh section — decoded_payload.node_type (0 None 1 Client 2 Repeater
+3 Room server 4 Sensor, from _build_advertisement/_find_payload_type in
+meshcore_event_adapter) was only a bare int in the payload JSON; now
+labeled. Stored in decoded_payload JSON so it shows on BOTH the live
+Dashboard feed and the MeshCore tab. ALSO: Meshtastic NODES table Last heard moved to
 FIRST column (matching MeshCore contacts). LoRaWAN Devices census
 reordered too (user follow-up): Last seen FIRST, First seen SECOND,
 then DevEUI/Type/Frames/RSSI/SNR/Freq/SF. All three censuses now lead

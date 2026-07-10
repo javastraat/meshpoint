@@ -210,6 +210,14 @@ class PacketDetailModal {
             rows.push({ key: 'Portnum', val: String(portnum) });
         }
 
+        // MeshCore adverts carry a node type (0=None 1=Client 2=Repeater
+        // 3=Room server 4=Sensor) -- otherwise only a bare int in the JSON.
+        const nodeType = packet.decoded_payload && packet.decoded_payload.node_type;
+        if (nodeType != null) {
+            const labels = { 0: 'None', 1: 'Client', 2: 'Repeater', 3: 'Room server', 4: 'Sensor' };
+            rows.push({ key: 'Node type', val: labels[nodeType] || `type ${nodeType}` });
+        }
+
         return rows;
     }
 
