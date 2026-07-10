@@ -3,6 +3,16 @@
  * Shows the imported contact census and live MeshCore packets.
  */
 
+// Reuses the Meshtastic page's mt-badge--* palette so packet types wear
+// the same colors on both protocol tabs.
+const MC_TYPE_COLORS = {
+    text:             'mt-badge--text',
+    nodeinfo:         'mt-badge--nodeinfo',
+    neighbour_advert: 'mt-badge--neighborinfo',
+    telemetry:        'mt-badge--telemetry',
+    position:         'mt-badge--position',
+};
+
 class MeshCorePanel {
     constructor() {
         this._refreshTimer = null;
@@ -259,7 +269,7 @@ class MeshCorePanel {
             tbody.innerHTML = packets.map((p) => `
                 <tr>
                     <td class="lw-time">${this._fmtTime(p.timestamp)}</td>
-                    <td><span class="mt-badge">${this._esc(p.packet_type || '--')}</span></td>
+                    <td><span class="mt-badge ${MC_TYPE_COLORS[p.packet_type] || ''}">${this._esc(p.packet_type || '--')}</span></td>
                     <td class="lw-id">${this._fmtSrc(p.source_id)}</td>
                     <td class="lw-id">${this._fmtDest(p.destination_id)}</td>
                     <td class="lw-signal ${this._rssiClass(p.rssi)}">${this._fmtRssi(p.rssi)}</td>

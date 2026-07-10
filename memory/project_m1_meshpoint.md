@@ -1052,7 +1052,11 @@ Recent Packets on top, Nodes census below (pure template swap in
 _buildShell, ids/handlers untouched; folded into the same changelog
 bullet). ALSO: meshcore_panel.js _fmtDest gained the same name lookup
 (its dest only handled 'broadcast' before; source already resolved).
-Both protocol pages now fully symmetric: layout + src/dest naming.
+ALSO: MeshCore type badges colorized via new MC_TYPE_COLORS map reusing
+the mt-badge--* palette from lorawan.css (nodeinfo amber, text cyan,
+neighbour_advert→neighborinfo green, telemetry purple, position green;
+unknown stays gray default). Both protocol pages now fully symmetric:
+layout + src/dest naming + badge colors.
 Timestamp-less boot lines EXPLAINED, user OK leaving as-is (2026-07-10):
 bare lines (Opening SPI / chip version / ARB / SX1261 PRAM) = libloragw C
 printf to stdout, can't reformat without fd hacks — leave; "INFO:" lines
