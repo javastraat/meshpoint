@@ -76,6 +76,16 @@
     font-family: var(--font-mono, monospace);
 }
 
+.rp-card__section {
+    margin: 12px 0 6px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--border, #232a38);
+    font-size: 0.66rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted, #64748b);
+}
+
 .rp-card__foot {
     margin-top: 10px;
     padding-top: 8px;

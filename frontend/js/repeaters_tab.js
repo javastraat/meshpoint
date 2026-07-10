@@ -102,32 +102,33 @@ class RepeatersTab {
     _card(r) {
         const s = r.status || {};
         const stale = !r.ok;
-        const rows = [];
-        const bat = s.bat != null ? `${(s.bat / 1000).toFixed(2)} V` : '--';
-        rows.push(['Battery', bat]);
-        rows.push(['Uptime', this._uptime(s.uptime)]);
-        // Sensors from the LPP telemetry (only shown when present).
-        const temp = this._lppTemp(r.telemetry);
-        if (temp != null) rows.push(['Temperature', `${temp.toFixed(1)} °C`]);
-        const hum = this._lpp(r.telemetry, 4, 'humidity');
-        if (hum != null) rows.push(['Humidity', `${hum.toFixed(0)} %`]);
-        const baro = this._lpp(r.telemetry, 3, 'barometer');
-        if (baro != null) rows.push(['Pressure', `${baro.toFixed(1)} hPa`]);
-        const solarW = this._lpp(r.telemetry, 2, 'power');
-        const solarV = this._lpp(r.telemetry, 2, 'voltage');
-        if (solarW > 0 || solarV > 0) {
-            rows.push(['Solar', `${(solarV ?? 0).toFixed(1)} V · ${(solarW ?? 0).toFixed(1)} W`]);
-        }
-        rows.push(['Airtime (tx/rx)', this._airtime(s)]);
-        rows.push(['Packets recv', this._num(s.nb_recv)]);
-        rows.push(['Packets sent', this._num(s.nb_sent)]);
-        rows.push(['Noise floor', s.noise_floor != null ? `${s.noise_floor} dBm` : '--']);
-        rows.push(['Last SNR', s.last_snr != null ? `${s.last_snr} dB` : '--']);
-        if (s.recv_errors != null) rows.push(['Recv errors', this._num(s.recv_errors)]);
+
+        // Radio / router health from req_status.
+        const health = [];
+        health.push(['Battery', s.bat != null ? `${(s.bat / 1000).toFixed(2)} V` : '--']);
+        health.push(['Uptime', this._uptime(s.uptime)]);
+        health.push(['Airtime (tx/rx)', this._airtime(s)]);
+        health.push(['Packets recv', this._num(s.nb_recv)]);
+        health.push(['Packets sent', this._num(s.nb_sent)]);
+        health.push(['Noise floor', s.noise_floor != null ? `${s.noise_floor} dBm` : '--']);
+        health.push(['Last SNR', s.last_snr != null ? `${s.last_snr} dB` : '--']);
+        if (s.recv_errors != null) health.push(['Recv errors', this._num(s.recv_errors)]);
+
+        // Every LPP sensor reading (any channel / any sensor).
+        const sensors = this._sensorRows(r.telemetry);
 
         // Prefer the repeater's real advertised name, then a config
         // label, then the raw key.
         const title = r.mesh_name || r.name || r.key;
+        const rowsHtml = (rows) => rows.map(([k, v]) => `
+            <div class="rp-row"><span class="rp-row__k">${this._esc(k)}</span>
+            <span class="rp-row__v">${this._esc(v)}</span></div>
+        `).join('');
+        const sensorBlock = sensors.length ? `
+            <div class="rp-card__section">Sensors</div>
+            <div class="rp-card__rows">${rowsHtml(sensors)}</div>
+        ` : '';
+
         return `
             <div class="rp-card ${stale ? 'rp-card--stale' : ''}">
                 <div class="rp-card__head">
@@ -136,28 +137,36 @@ class RepeatersTab {
                           title="${r.ok ? 'Reporting' : this._esc(r.error || 'stale')}"></span>
                 </div>
                 <div class="rp-card__id">!${this._esc(r.key)}</div>
-                <div class="rp-card__rows">
-                    ${rows.map(([k, v]) => `
-                        <div class="rp-row"><span class="rp-row__k">${this._esc(k)}</span>
-                        <span class="rp-row__v">${this._esc(v)}</span></div>
-                    `).join('')}
-                </div>
+                <div class="rp-card__rows">${rowsHtml(health)}</div>
+                ${sensorBlock}
                 <div class="rp-card__foot">${stale ? 'stale · ' : ''}polled ${this._ago(r.updated_at)}</div>
             </div>
         `;
     }
 
-    _lppTemp(t) {
-        // Prefer the ambient BMP280/SHT3X sensor over MCU die temp.
-        return this._lpp(t, 3, 'temperature')
-            ?? this._lpp(t, 4, 'temperature')
-            ?? this._lpp(t, 1, 'temperature');
-    }
+    static UNITS = {
+        voltage: 'V', temperature: '°C', barometer: 'hPa', altitude: 'm',
+        current: 'A', power: 'W', humidity: '%', relative_humidity: '%',
+    };
 
-    _lpp(t, channel, type) {
+    static TYPE_LABELS = { barometer: 'pressure' };
+
+    /** One row per LPP reading, in channel order. Labels are
+     * ``Ch{n} {type}`` -- universal, no per-repeater sensor assumptions;
+     * the channel disambiguates the multiple temperature sensors. */
+    _sensorRows(t) {
         const lpp = t && Array.isArray(t.lpp) ? t.lpp : [];
-        const hit = lpp.find((r) => r.channel === channel && r.type === type);
-        return hit ? Number(hit.value) : null;
+        return lpp
+            .slice()
+            .sort((a, b) => (a.channel - b.channel)
+                || String(a.type).localeCompare(String(b.type)))
+            .map((rd) => {
+                const type = RepeatersTab.TYPE_LABELS[rd.type] || rd.type;
+                const unit = RepeatersTab.UNITS[rd.type] || '';
+                // Up to 2 decimals, trailing zeros trimmed (4.11, 37.7, 0, 52).
+                const num = parseFloat(Number(rd.value).toFixed(2));
+                return [`Ch${rd.channel} ${type}`, `${num}${unit ? ' ' + unit : ''}`];
+            });
     }
 
     _airtime(s) {

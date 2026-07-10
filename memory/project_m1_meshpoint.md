@@ -1010,9 +1010,20 @@ contacts) — no separate companion/CLI needed. Build:
   bare-list-wrapped, none-stays-none) — 8 pass. NOTE for W12/future: all
   repeater data comes through the M1's ONE connected USB companion
   (meshcore_tx_client, self._mc) — no separate connection.
-  Changelog reworded (still 89). NOT re-verified on Pi after the fix —
-  next poll should now show temp/humidity/pressure on the card + write
-  telemetry rows (drawer chart + CSV).
+  Changelog reworded (still 89).
+- **ALL sensors shown (user: "where are all my sensors... more channels
+  i mean"):** first sensor display collapsed to one temp + humidity +
+  pressure and hid solar/altitude/MCU-temp. REDESIGNED: card now has a
+  "Sensors" section (rp-card__section dashed divider) listing EVERY LPP
+  reading generically via `_sensorRows` — sorted by channel, label
+  `Ch{n} {type}` (barometer→pressure), unit per type, ≤2-decimal trim.
+  NO per-repeater sensor-model assumptions (works for any channel
+  count/sensor mix; the user's has ch1 batt+MCU temp, ch2 solar V/A/W,
+  ch3 BMP280 temp/baro/alt, ch4 SHT3X temp/humidity = 10 readings).
+  Radio-health rows (battery/uptime/airtime/pkts/noise/snr/errors) stay
+  in the top block. Verified render with the user's real 10-reading lpp
+  (node -e preview). NOT re-verified on Pi after this — next poll shows
+  the full Sensors list.
 
 **W2 REFRAMED (2026-07-10 discussion, user has no own LoRaWAN devices):**
 MIC verify is IMPOSSIBLE for a passive sniffer without the device's
