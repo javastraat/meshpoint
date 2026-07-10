@@ -26,10 +26,11 @@
 
 .rp-card--sensors .rp-card__head {
     margin-bottom: 12px;
-.rp-card--history {
-    grid-column: span 2;
 }
 
+/* History spans the full width below Health + Sensors. */
+.rp-card--history {
+    grid-column: span 2;
 }
 
 .rp-card--history .rp-card__head {
