@@ -2130,3 +2130,23 @@ settings.css. Tests: 2 new in test_update_release_notes.py (full keeps
 untruncated detail; sanitize_full de-markdowns without cutting) — 25 pass.
 ruff + node --check + CSS braces clean. Changelog bullet under "Self-update
 system" (88). NOT Pi-verified.
+
+**Packet modal protocol-aware payload (2026-07-10, user compared MeshCore
+tab vs Dashboard modal for same packet):** the Dashboard modal showed
+"Decrypt: No matching key" + no JSON for a MeshCore advert, while the
+MeshCore tab showed "Decrypt: Success" + the decoded JSON. Root cause:
+`_payloadRows` in packet_detail_modal.js was Meshtastic-centric
+(`decrypted = packet.decrypted !== false`); the live WS packet carried
+decrypted=false (hiding the payload), the stored /api/meshcore/packets
+packet had no `decrypted` field (defaulted to shown). But MeshCore isn't
+encrypted with channel keys — adverts/nodeinfo are DECODED. FIX: modal
+now checks `packet.protocol==='meshcore'` → forces decrypted=true (skips
+the "No matching key" branch) AND omits the "Decrypt" row entirely
+(meaningless for MeshCore), always showing Content/JSON. Both feeds carry
+decoded_payload (WS uses packet.to_dict which includes it), so both modals
+now show the advert JSON consistently. Meshtastic/LoRaWAN unchanged.
+Other still-differing-but-cosmetic bits noted, not fixed: Dashboard feed
+uses _shortId formatNodeId ("!3bc7") vs MeshCore tab's name-resolving
+(_nodeNames) callback; Dashboard packet has coding_rate ("CR N/A") the
+stored meshcore API omits. node --check clean; changelog folded into
+"Packet detail modal everywhere" (88). NOT Pi-verified.

@@ -216,9 +216,14 @@ class PacketDetailModal {
     _payloadRows(packet) {
         const p = packet.decoded_payload;
         const type = packet.packet_type || 'unknown';
-        const decrypted = packet.decrypted !== false && type !== 'encrypted';
+        // MeshCore adverts/nodeinfo are decoded, not decrypted with a
+        // Meshtastic channel key, so the "Decrypt / No matching key" row
+        // is meaningless for it -- always show its decoded content.
+        const isMeshcore = (packet.protocol || '') === 'meshcore';
+        const decrypted =
+            isMeshcore || (packet.decrypted !== false && type !== 'encrypted');
 
-        if (!decrypted || type === 'encrypted') {
+        if (!decrypted) {
             const hex = (p && p.raw_hex) ? p.raw_hex : null;
             const rows = [
                 {
@@ -239,10 +244,11 @@ class PacketDetailModal {
             return rows;
         }
 
-        const rows = [
-            { key: 'Decrypt', val: 'Success', valClass: 'good' },
-            { key: 'Channel', val: this._channelLabel(packet) },
-        ];
+        const rows = [];
+        if (!isMeshcore) {
+            rows.push({ key: 'Decrypt', val: 'Success', valClass: 'good' });
+        }
+        rows.push({ key: 'Channel', val: this._channelLabel(packet) });
 
         const summary = this._payloadSummary(packet);
         if (summary) {
