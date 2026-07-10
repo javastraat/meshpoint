@@ -1949,6 +1949,49 @@ tools" (75, parser-verified); README: Hardware-group bullet + API table row.
 NOT yet Pi-verified (needs deploy; check card renders, hides for viewer=no
 —it's viewer-open actually—, and fills after ~1min).
 
+## MeshCore historical database import + repeater history cards (2026-07-10)
+
+**Goal:** Bring 18 days of MeshCore repeater history into Meshpoint for charting and UI context.
+**Source:** https://einstein.amsterdam/meshcore/meshcore.db (5117 telemetry rows, Jun 22 - Jul 10)
+**Destination:** The same `telemetry` table that live repeater polls write to.
+
+### Import script (`scripts/import_meshcore_db.py`)
+
+Fetches the remote MeshCore SQLite database (or accepts local `--source-db /path`), maps the 9471 rows in `telemetry_history` to Meshpoint's flat telemetry schema (voltage, temperature, humidity, barometric_pressure, uptime_seconds), and inserts them as chart-ready rows. Unmapped fields (current, power, altitude) are preserved as synthetic `meshcoredb:` packets with the full row as JSON in `decoded_payload`, indexed by node_id for future analytics.
+
+**Design decisions:**
+1. **Upsert, not insert:** Contacts/neighbours use `ON CONFLICT(node_id) DO UPDATE` with CASE logic to preserve better data (newer `last_heard`, updated lat/lon/role/name) across re-imports.
+2. **Temperature preference:** Per-timestamp ranking (SHT3X ch4 > BMP280 ch3 > MCU ch1) — environmental sensors preferred over die temperature spikes.
+3. **Multi-mode:** `--telemetry-only` (skip nodes), `--contacts-only` (skip telemetry) for incremental updates.
+4. **Remote fetch:** Default URL via urllib; tempfile cleanup; backward-compat `--dest-db` override (prod default `/opt/meshpoint/data/concentrator.db`).
+5. **Dry-run:** `--dry-run` previews counts without writes.
+
+**Files:**
+- `scripts/import_meshcore_db.py` — Main importer, fully tested and live-deployed
+- `docs/CHANGELOG.md` — 3 bullets documenting importer features
+- `memory/project_m1_meshpoint.md` — This section
+
+**Verified live:** 5117 telemetry rows imported, 38 distinct nodes, 5 samples each Voltage/Temperature/Humidity/Barometric_Pressure/Uptime spread across the full Jun 22 - Jul 10 arc.
+
+### Repeater history display (frontend + backend)
+
+**Backend changes (`src/api/routes/meshcore_routes.py`):**
+- Added `TelemetryRepository` injection to `init_routes()` (and wired in `src/api/server.py`)
+- New `_fetch_telemetry_history(node_id)` queries telemetry for min/max/avg: voltage, temperature, humidity, plus date range and total sample count
+- Endpoint `GET /api/meshcore/repeaters` now appends `history` dict to each repeater object
+
+**Frontend changes (`frontend/js/repeaters_tab.js`):**
+- New `_historyRows(h)` helper formats history stats: period (date range), voltage min/avg/max, temperature min/avg/max, humidity min/avg/max
+- New `_fmt(n, decimals)` and `_shortDate(iso)` formatters for consistent display
+- `_card(r)` expanded to render a third card: "History" alongside Health + Sensors
+- History card shows: `Period Jun 22 to Jul 10 | Voltage 4.05/4.11/4.15 V | Temperature 14.1/26.4/56.1°C | Humidity 45.0/51.4/57.0%` with sample count meta
+
+**CSS changes (`frontend/css/repeaters.css`):**
+- Grid auto-fits 3 cards per repeater (Health | Sensors | History), stacking on narrow screens
+- `.rp-card--history` reuses existing card styles; special-cased `.rp-card__head` margin
+
+**Result:** Repeater cards now show the full lifecycle: current status (Health), active sensors (Sensors), and a 18-day statistical summary (History). All three write to the same `telemetry` table, so live future polls automatically extend the history as they arrive.
+
 ## OLD LIST (superseded, kept for the DONE details)
 
 User has been committing incrementally with the suggested one-liners (verified
