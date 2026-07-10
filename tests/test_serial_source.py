@@ -275,5 +275,97 @@ class DropSelfOriginatedPacketTest(unittest.TestCase):
         self.assertIsNotNone(result)
 
 
+class SendNodeinfoTest(unittest.TestCase):
+    """Button advert: the stick broadcasts its own NodeInfo.
+
+    The real meshtastic.protobuf isn't installed on the Mac, so the
+    modules are stubbed (same trick as the aiosqlite stubs elsewhere)
+    and restored afterwards.
+    """
+
+    _STUB_KEYS = (
+        "meshtastic", "meshtastic.protobuf",
+        "meshtastic.protobuf.mesh_pb2", "meshtastic.protobuf.portnums_pb2",
+    )
+
+    def setUp(self):
+        import sys
+        import types
+
+        self._saved = {k: sys.modules.get(k) for k in self._STUB_KEYS}
+
+        class _FakeUser:
+            def __init__(self):
+                self.id = ""
+                self.long_name = ""
+                self.short_name = ""
+
+            def SerializeToString(self):
+                return b"user-bytes"
+
+        mesh_pb2 = types.ModuleType("mesh_pb2")
+        mesh_pb2.User = _FakeUser
+        portnums_pb2 = types.ModuleType("portnums_pb2")
+        portnums_pb2.PortNum = types.SimpleNamespace(NODEINFO_APP=4)
+        proto_pkg = types.ModuleType("meshtastic.protobuf")
+        proto_pkg.mesh_pb2 = mesh_pb2
+        proto_pkg.portnums_pb2 = portnums_pb2
+        root = types.ModuleType("meshtastic")
+        root.protobuf = proto_pkg
+
+        sys.modules["meshtastic"] = root
+        sys.modules["meshtastic.protobuf"] = proto_pkg
+        sys.modules["meshtastic.protobuf.mesh_pb2"] = mesh_pb2
+        sys.modules["meshtastic.protobuf.portnums_pb2"] = portnums_pb2
+
+    def tearDown(self):
+        import sys
+        for k, v in self._saved.items():
+            if v is None:
+                sys.modules.pop(k, None)
+            else:
+                sys.modules[k] = v
+
+    def _source_with_fake_interface(self):
+        source = SerialCaptureSource(port="/dev/ttyUSB1", label="433")
+        source._running = True
+
+        class _FakeInterface:
+            def __init__(self):
+                self.sent = []
+
+            def getMyNodeInfo(self):
+                return {"user": {
+                    "id": "!09d406f4", "longName": "EMC2-433",
+                    "shortName": "E433",
+                }}
+
+            def sendData(self, data, **kwargs):
+                self.sent.append((data, kwargs))
+
+        source._interface = _FakeInterface()
+        return source
+
+    def test_broadcasts_own_user_on_nodeinfo_port(self):
+        source = self._source_with_fake_interface()
+        self.assertTrue(source.send_nodeinfo())
+        (data, kwargs), = source._interface.sent
+        self.assertEqual(data, b"user-bytes")
+        self.assertEqual(kwargs["portNum"], 4)  # NODEINFO_APP
+
+    def test_returns_false_when_not_running(self):
+        source = self._source_with_fake_interface()
+        source._running = False
+        self.assertFalse(source.send_nodeinfo())
+        self.assertEqual(source._interface.sent, [])
+
+    def test_returns_false_when_send_raises(self):
+        source = self._source_with_fake_interface()
+        source._interface.sendData = lambda *a, **k: (_ for _ in ()).throw(
+            RuntimeError("stick unplugged"),
+        )
+        self.assertFalse(source.send_nodeinfo())
+
+
 if __name__ == "__main__":
     unittest.main()

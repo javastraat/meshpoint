@@ -60,6 +60,40 @@ class SerialCaptureSource(CaptureSource):
         """
         return dict(self._radio_info)
 
+    def send_nodeinfo(self) -> bool:
+        """Broadcast this stick's own NodeInfo on its band.
+
+        The stick is a full Meshtastic node with its own identity (not
+        the Meshpoint's node_id) -- this asks it to introduce itself,
+        which is what the physical advert button wants: "this box is
+        here" on the stick's band. Sync and cheap: meshtastic-python
+        queues the frame to the radio's stream.
+        """
+        iface = self._interface
+        if iface is None or not self._running:
+            return False
+        try:
+            from meshtastic.protobuf import mesh_pb2, portnums_pb2
+
+            my = iface.getMyNodeInfo() or {}
+            user_info = my.get("user") or {}
+            user = mesh_pb2.User()
+            user.id = user_info.get("id") or ""
+            user.long_name = user_info.get("longName") or ""
+            user.short_name = user_info.get("shortName") or ""
+            iface.sendData(
+                user.SerializeToString(),
+                portNum=portnums_pb2.PortNum.NODEINFO_APP,
+            )
+            logger.info(
+                "%s: NodeInfo broadcast sent (%s)",
+                self.name, user_info.get("id") or "unknown id",
+            )
+            return True
+        except Exception:
+            logger.exception("%s: NodeInfo broadcast failed", self.name)
+            return False
+
     async def start(self) -> None:
         try:
             import meshtastic.serial_interface

@@ -1131,7 +1131,7 @@ omitted — acceptable. ALSO: Meshtastic NODES table Last heard moved to
 FIRST column (matching MeshCore contacts). LoRaWAN Devices census
 reordered too (user follow-up): Last seen FIRST, First seen SECOND,
 then DevEUI/Type/Frames/RSSI/SNR/Freq/SF. All three censuses now lead
-with time. Changelog +1
+with time. LIVE-VERIFIED 2026-07-10 (user screenshot, "better :)"). Changelog +1
 bullet & tab bullet extended (86, parser-verified). ruff + node --check
 clean. LIVE-VERIFIED 2026-07-10 (user: "on all 3 networks packets show
 modal when clicking"; screenshot shows meshcore nodeinfo with resolved
@@ -1158,11 +1158,55 @@ printf to stdout, can't reformat without fd hacks — leave; "INFO:" lines
 = uvicorn's own loggers, COULD be unified via log_config in serve.py —
 offered, user declined ("its ok i was just wondering"). Don't re-propose.
 journald stamps every line anyway.
-- **W9 — button as a safe physical control** (S-M): classic pattern — short
-  press = something harmless and useful (e.g. trigger a MeshCore advert or
-  an identify-blink), long press (3-5 s) = clean service restart or safe
-  shutdown. Needs debounce, hold detection, and guarding of the destructive
-  action.
+- **W9 — button: BUILT 2026-07-10 evening (user-spec'd design).** Short
+  press = advert on ALL TX-capable radios; long press 3s = service
+  restart. Full spec agreed through Q&A: adverts SERIALIZED 2s apart
+  (the 868 signals OVERLAP outright — Meshtastic 869.525/BW250 contains
+  MeshCore 869.618/BW62.5 — plus same-box desense), 30s cooldown
+  (denied press = 1 long dark LED blink), LoRaWAN excluded by design
+  (pure listener). Implementation: `ButtonConfig` (enabled False/pin 27/
+  hold_time_s 3.0/advert_cooldown_s 30.0) + section_map + regression
+  test; NEW `src/hardware/button_control.py` — ButtonController
+  poll-based `_tick(now)` state machine (20 Hz, gpiozero Button
+  pull_up=True bounce 0.05 — polarity per probe script; NO callback
+  threads), **starts DISARMED (release required before any press
+  counts — held-through-restart can't retrigger)**, short fires on
+  release <3s, warning blink from 0.5s of hold, long fires AT 3s while
+  held (once); `advert_all_radios(steps, spacing)` free async fn (each
+  step independent, failures logged not fatal); `restart_service()`
+  spawns `sudo systemctl restart meshpoint` DETACHED
+  (start_new_session — the apply-chain lesson; sudoers rule was already
+  present line 15). LED feedback via NEW `LedController.flash(pattern,
+  duration)` override ('fast' 5Hz / 'off'), checked in _tick before
+  normal states, self-expires; button re-issues 'fast' every tick
+  during hold. Advert steps built by `_build_advert_steps()` in
+  server.py: nodeinfo_broadcaster.broadcast_now (Meshtastic 868) +
+  meshcore_tx_ref.send_advert() + every source with send_nodeinfo
+  (serial sticks). NEW `SerialCaptureSource.send_nodeinfo()` —
+  broadcasts the STICK's OWN identity (its firmware name, not EMC2;
+  suggested user rename stick to e.g. EMC2-433 via phone app) via
+  `iface.sendData(user.SerializeToString(),
+  portNum=NODEINFO_APP)` — **API verified against real meshtastic
+  2.7.10 wheel source** (sendData accepts bytes+portNum, broadcast
+  default; getMyNodeInfo→dict with camelCase user keys). NOTE:
+  meshcore advert covers the PRIMARY companion only (one tx client —
+  fine, one companion configured). Server wiring: LED block refactored
+  to keep `_led_controller` instance (button borrows it for feedback);
+  `_button_controller_task` lifecycle like fan/LED. Tests: NEW
+  test_button_control.py (6: disarmed boot, release-fires, cooldown
+  denial+expiry, hold-once-no-short, warn threshold, advert sequence
+  order+failure isolation) + LED flash tests (2) + SendNodeinfoTest (3,
+  sys.modules stub for meshtastic.protobuf, saved/restored) + config
+  regression — 74 pass across the hardware/config suites. ruff clean.
+  Docs: default.yaml button: block, CONFIGURATION.md "User Button"
+  section, README fork bullet, changelog bullet next to LED (87,
+  parser-verified). NOT yet Pi-verified — user: add
+  `button: {enabled: true}` to local.yaml, apply, then test short press
+  (LED double-blink + adverts in log + EMC2 appears on both meshes) and
+  3s hold (fast blink → restart → LED dark → steady).
+  User also pointed at local checkouts for API verification:
+  /Users/einstein/Software/meshtastic (FIRMWARE repo, C++) and
+  /Users/einstein/Software/meshcore-dev.
 
 **RSSI color mismatch Dashboard vs panels (2026-07-09 late, user screenshots):**
 Dashboard packet feed's `_rssiClass` (simple_packet_feed.js) used −90/−110

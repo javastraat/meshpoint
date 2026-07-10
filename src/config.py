@@ -432,6 +432,26 @@ class LedConfig:
 
 
 @dataclass
+class ButtonConfig:
+    """SenseCap M1 user button: physical advert + service restart.
+
+    Disabled by default -- opt-in via local.yaml, same rationale as
+    ``FanConfig``/``LedConfig``. GPIO 27 confirmed live as this board's
+    button via scripts/test_gpio_hardware.py button-scan. Short press
+    adverts on every TX-capable radio (concentrator NodeInfo, MeshCore
+    companion advert, Meshtastic USB sticks), serialized so the
+    overlapping 868 signals don't collide; long press restarts the
+    meshpoint service -- the one recovery action that works when the
+    dashboard doesn't.
+    """
+
+    enabled: bool = False
+    gpio_pin: int = 27
+    hold_time_s: float = 3.0
+    advert_cooldown_s: float = 30.0
+
+
+@dataclass
 class AppConfig:
     radio: RadioConfig = field(default_factory=RadioConfig)
     meshtastic: MeshtasticConfig = field(default_factory=MeshtasticConfig)
@@ -449,6 +469,7 @@ class AppConfig:
     metrics: MetricsConfig = field(default_factory=MetricsConfig)
     fan: FanConfig = field(default_factory=FanConfig)
     led: LedConfig = field(default_factory=LedConfig)
+    button: ButtonConfig = field(default_factory=ButtonConfig)
 
 
 def _resolve_radio_frequency(radio: "RadioConfig") -> None:
@@ -544,6 +565,7 @@ def _apply_yaml(cfg: AppConfig, path: Path) -> None:
         "metrics": cfg.metrics,
         "fan": cfg.fan,
         "led": cfg.led,
+        "button": cfg.button,
     }
 
     unknown_keys: list[str] = []

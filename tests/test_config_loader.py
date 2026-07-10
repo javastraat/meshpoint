@@ -274,6 +274,30 @@ class LoadConfigIntegrationTest(unittest.TestCase):
         self.assertFalse(cfg.led.activity_blink)
         self.assertEqual(cfg.led.gpio_pin, 22)  # untouched default
 
+    def test_button_section_is_applied_without_warning(self):
+        # Same regression class as fan/led: section_map must list it.
+        tmp = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", delete=False, encoding="utf-8"
+        )
+        tmp.write("button:\n  enabled: true\n  hold_time_s: 5.0\n")
+        tmp.close()
+        path = Path(tmp.name)
+        self.addCleanup(lambda: path.unlink(missing_ok=True))
+
+        old = os.environ.get("CONCENTRATOR_CONFIG")
+        os.environ["CONCENTRATOR_CONFIG"] = str(path)
+        try:
+            cfg = load_config()
+        finally:
+            if old is None:
+                os.environ.pop("CONCENTRATOR_CONFIG", None)
+            else:
+                os.environ["CONCENTRATOR_CONFIG"] = old
+
+        self.assertTrue(cfg.button.enabled)
+        self.assertEqual(cfg.button.hold_time_s, 5.0)
+        self.assertEqual(cfg.button.gpio_pin, 27)  # untouched default
+
 
 if __name__ == "__main__":
     unittest.main()

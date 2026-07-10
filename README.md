@@ -80,6 +80,7 @@ This is a customized fork of upstream [KMX415/meshpoint](https://github.com/KMX4
 - **Temperature-driven PWM fan control** (opt-in, SenseCap M1 only) — the onboard fan ramps speed with CPU temperature instead of running flat-out or not at all; `fan:` in `local.yaml`.
 - **Thermals card** — 6 h of CPU temperature + fan duty history as two stacked charts on the Hardware page (`GET /api/device/thermals`); shown only when fan control is enabled.
 - **Status LED** (opt-in, SenseCap M1 only) — the case LED becomes a glanceable health light: steady on = all capture sources healthy, brief flicker = packet captured, 1 Hz blink = a source is down, dark = service not running; `led:` in `local.yaml`.
+- **User button** (opt-in, SenseCap M1 only) — short press adverts on every TX-capable radio (Meshtastic 868 + 433, MeshCore), long press (3 s) restarts the service; LED feedback for every gesture; `button:` in `local.yaml`.
 
 **Roles, config & self-update**
 - **Viewer role locked down server-side** — all write endpoints require admin; channel PSKs/keys are redacted for viewers; admin-only links show a toast instead of navigating away.

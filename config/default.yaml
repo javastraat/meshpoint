@@ -186,3 +186,21 @@ led:
   # Dip the LED briefly for every captured packet. Set false for a
   # calm steady light that only signals health.
   activity_blink: true
+
+button:
+  # SenseCap M1 user button (opt-in -- same rationale as fan:/led:).
+  # Short press: advert on every TX-capable radio (concentrator
+  # Meshtastic NodeInfo, MeshCore companion advert, Meshtastic USB
+  # sticks), serialized 2s apart so the overlapping 868 signals don't
+  # collide. Long press: restart the meshpoint service.
+  enabled: false
+  # BCM GPIO number; 27 confirmed as this board's button via
+  # scripts/test_gpio_hardware.py button-scan.
+  gpio_pin: 27
+  # Hold this many seconds to trigger the service restart. The status
+  # LED (if enabled) blinks fast during the hold as a warning.
+  hold_time_s: 3.0
+  # Ignore further advert presses for this long after one fires, so a
+  # bouncy button can't spam the duty-cycle budget. Denied presses get
+  # a single long LED blink.
+  advert_cooldown_s: 30.0

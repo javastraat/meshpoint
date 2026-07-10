@@ -55,6 +55,17 @@ class LedController:
         self._lit: bool | None = None  # None = never driven yet
         self._last_count: int | None = None
         self._flicker_until = 0.0
+        # External override (button feedback): (pattern, expires_at).
+        self._override: tuple[str, float] | None = None
+
+    def flash(self, pattern: str, duration_s: float) -> None:
+        """Override the normal state for ``duration_s`` seconds.
+
+        ``pattern``: 'fast' = 5 Hz blink (ack / hold warning),
+        'off' = dark (denied). Callers may re-issue every tick to keep
+        a warning alive while a button is held; it self-expires.
+        """
+        self._override = (pattern, time.monotonic() + duration_s)
 
     async def run(self) -> None:
         try:
@@ -99,6 +110,13 @@ class LedController:
             self._last_count = count
             if self._activity_blink and healthy:
                 self._flicker_until = now + FLICKER_SECS
+
+        if self._override is not None:
+            pattern, until = self._override
+            if now < until:
+                self._set(now % 0.2 < 0.1 if pattern == 'fast' else False)
+                return
+            self._override = None
 
         if not healthy:
             # 1 Hz blink, phase-locked to the clock so the cadence is

@@ -94,6 +94,32 @@ class LedControllerTickTest(unittest.TestCase):
         ctl._tick(20.7)
         self.assertTrue(self.led.lit)
 
+    def test_flash_override_wins_then_expires(self):
+        # Button feedback: 'off' forces dark despite healthy...
+        import time as _time
+        ctl = self._controller()
+        ctl._tick(10.0)
+        self.assertTrue(self.led.lit)
+        ctl.flash('off', 60.0)
+        now = _time.monotonic()
+        ctl._tick(now)
+        self.assertFalse(self.led.lit)
+        # ...and after expiry the normal state machine resumes.
+        ctl._override = ('off', now - 1.0)  # force-expire
+        ctl._tick(now)
+        self.assertTrue(self.led.lit)
+
+    def test_flash_fast_blinks(self):
+        import time as _time
+        ctl = self._controller()
+        now = _time.monotonic()
+        ctl.flash('fast', 60.0)
+        base = now - (now % 0.2)  # align to blink phase
+        ctl._tick(base + 0.05)    # on half of the 5 Hz cycle
+        self.assertTrue(self.led.lit)
+        ctl._tick(base + 0.15)    # off half
+        self.assertFalse(self.led.lit)
+
 
 class _FakeSource:
     def __init__(self, running):

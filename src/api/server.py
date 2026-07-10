@@ -107,6 +107,8 @@ _rtl_listener: RtlListener | None = None
 _fan_controller_task = None
 _fan_controller = None
 _led_controller_task = None
+_led_controller = None
+_button_controller_task = None
 
 
 def create_app(config: AppConfig | None = None) -> FastAPI:
@@ -256,17 +258,45 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
             )
         system_metrics.init_routes(_fan_controller)
 
-        global _led_controller_task
+        global _led_controller_task, _led_controller
         if config.led.enabled:
             from src.hardware.led_status import LedController
 
             stats = pipeline.stats_reporter
+            _led_controller = LedController(
+                pin=config.led.gpio_pin,
+                health_fn=pipeline.capture_coordinator.all_sources_running,
+                packet_count_fn=lambda: stats.total_packets,
+                activity_blink=config.led.activity_blink,
+            )
             _led_controller_task = asyncio.get_running_loop().create_task(
-                LedController(
-                    pin=config.led.gpio_pin,
-                    health_fn=pipeline.capture_coordinator.all_sources_running,
-                    packet_count_fn=lambda: stats.total_packets,
-                    activity_blink=config.led.activity_blink,
+                _led_controller.run()
+            )
+
+        global _button_controller_task
+        if config.button.enabled:
+            from src.hardware.button_control import (
+                ButtonController,
+                advert_all_radios,
+                restart_service,
+            )
+
+            advert_steps = _build_advert_steps(
+                nodeinfo_broadcaster,
+                meshcore_tx_ref,
+                pipeline.capture_coordinator.sources,
+            )
+            loop = asyncio.get_running_loop()
+            _button_controller_task = loop.create_task(
+                ButtonController(
+                    pin=config.button.gpio_pin,
+                    on_short_press=lambda: loop.create_task(
+                        advert_all_radios(advert_steps)
+                    ),
+                    on_long_press=restart_service,
+                    hold_time_s=config.button.hold_time_s,
+                    advert_cooldown_s=config.button.advert_cooldown_s,
+                    led=_led_controller,
                 ).run()
             )
 
@@ -306,6 +336,12 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
             _led_controller_task.cancel()
             try:
                 await _led_controller_task
+            except BaseException:
+                pass
+        if _button_controller_task is not None:
+            _button_controller_task.cancel()
+            try:
+                await _button_controller_task
             except BaseException:
                 pass
         if nodeinfo_broadcaster is not None:
@@ -906,6 +942,29 @@ def _inject_tx_gain_into_source(coord: PipelineCoordinator) -> None:
         )
 
     conc_source.start = _start_with_tx_gain
+
+
+def _build_advert_steps(broadcaster, meshcore_tx, sources):
+    """(name, async sender) per TX-capable radio for the button advert.
+
+    LoRaWAN is deliberately absent: the box is a pure listener there
+    (no keys, no identity, never transmits). Each step is attempted
+    independently by advert_all_radios; a disconnected radio just logs
+    its failure result.
+    """
+    steps = []
+    if broadcaster is not None:
+        steps.append(("meshtastic-868", broadcaster.broadcast_now))
+    if meshcore_tx is not None:
+        async def _mc_advert(tx=meshcore_tx):
+            return await tx.send_advert()
+        steps.append(("meshcore", _mc_advert))
+    for src in sources:
+        if hasattr(src, "send_nodeinfo"):
+            async def _stick_nodeinfo(s=src):
+                return s.send_nodeinfo()
+            steps.append((src.name, _stick_nodeinfo))
+    return steps
 
 
 def _find_meshcore_source(coord: PipelineCoordinator):

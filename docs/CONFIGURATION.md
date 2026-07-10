@@ -646,6 +646,22 @@ Plain on/off GPIO — no PWM involved, so unlike the fan it works even without `
 
 ---
 
+## User Button (SenseCap M1)
+
+```yaml
+button:
+  enabled: false          # opt-in -- same rationale as fan:/led:
+  gpio_pin: 27             # confirmed via scripts/test_gpio_hardware.py button-scan
+  hold_time_s: 3.0         # hold this long to restart the service
+  advert_cooldown_s: 30.0  # ignore further advert presses for this long
+```
+
+Gives the M1's case button two gestures. **Short press** announces this box on every TX-capable radio — the concentrator's Meshtastic NodeInfo, the MeshCore companion's advert, and each Meshtastic USB stick's own NodeInfo — serialized ~2 s apart, because the two 868 MHz signals overlap outright (Meshtastic 869.525/BW250 contains MeshCore 869.618/BW62.5) and simultaneous TX would jam both. LoRaWAN is deliberately excluded: the box is a pure listener there. A 30 s cooldown stops accidental advert spam. **Hold 3 s** restarts the meshpoint service — the recovery action you need exactly when the dashboard is unreachable; the required sudoers rule already ships and self-installs.
+
+The status LED (when enabled) narrates: double-blink = advert sent, one long dark blink = press ignored (cooldown), fast blink while holding = restart warning, then the normal restart story (dark → steady) plays out. With the LED disabled the button still works, just silently. Booting with the button held (e.g. held straight through the restart it triggered) does nothing — a release must be seen first.
+
+---
+
 ## Device Identity
 
 ```yaml
