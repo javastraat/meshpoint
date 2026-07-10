@@ -295,6 +295,8 @@ class MeshCorePanel {
     _fmtDest(id) {
         if (!id) return '--';
         if (id === 'ffffffff' || id === 'broadcast') return '<span class="lw-time">broadcast</span>';
+        const name = this._nodeNames[id];
+        if (name) return `<span class="mt-name">${this._esc(name)}</span> <span class="lw-time">${this._esc(id)}</span>`;
         return this._esc(id);
     }
 

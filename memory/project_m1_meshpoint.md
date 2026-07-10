@@ -1050,7 +1050,9 @@ UI" (84, parser-verified). Pi-verify: Meshtastic page after deploy.
 FOLLOW-UP same session: section ORDER swapped to match MeshCore page —
 Recent Packets on top, Nodes census below (pure template swap in
 _buildShell, ids/handlers untouched; folded into the same changelog
-bullet).
+bullet). ALSO: meshcore_panel.js _fmtDest gained the same name lookup
+(its dest only handled 'broadcast' before; source already resolved).
+Both protocol pages now fully symmetric: layout + src/dest naming.
 Timestamp-less boot lines EXPLAINED, user OK leaving as-is (2026-07-10):
 bare lines (Opening SPI / chip version / ARB / SX1261 PRAM) = libloragw C
 printf to stdout, can't reformat without fd hacks — leave; "INFO:" lines
