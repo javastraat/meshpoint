@@ -1017,7 +1017,8 @@ commit implemented the serial decoded-path feature flagged earlier as a
 candidate; not done by this assistant, details unreviewed) and dead
 `freq_default` in test_channel_frequency.py (its comment already said the
 comparison is deliberately not made; call removed). Both lint-only, no
-behavior change. ruff now passes clean locally.
+behavior change. ruff now passes clean locally. CI CONFIRMED GREEN after
+push (2026-07-10, user-verified).
 ALSO dropped the REGION segment (EU_433) from the serial chip per user
 ("we can see the freq that enough"): region element + sep removed from
 _buildBadge, docstring updated, `.topbar-serial__region` CSS rules deleted.
