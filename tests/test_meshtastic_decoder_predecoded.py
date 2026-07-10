@@ -20,7 +20,7 @@ import unittest
 from meshtastic.protobuf import portnums_pb2, telemetry_pb2  # noqa: F401 -- import-time dependency probe
 
 from src.decode.crypto_service import CryptoService
-from src.decode.meshtastic_decoder import MESHTASTIC_HEADER_SIZE, MeshtasticDecoder
+from src.decode.meshtastic_decoder import MeshtasticDecoder
 from src.models.packet import PacketType
 
 

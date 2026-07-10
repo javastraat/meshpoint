@@ -988,8 +988,12 @@ mismatch — lorawan_decoder.py stores `fcnt`/`fport` (no underscore) in
 decoded_payload; lorawan_routes.py /packets read `payload.get("f_cnt")`/
 `("f_port")` → always None. Fixed at the route (reads decoder's keys,
 response keeps f_port/f_cnt names the panel reads). No test added (route
-file has no test scaffolding; fastapi CI-only) — verify on Pi: LoRaWAN page
-packets log should show FCnt counting up per device. Changelog bullet under
+file has no test scaffolding; fastapi CI-only). LIVE-VERIFIED on Pi
+2026-07-10 (user paste): FCnt/FPort populate (154D66DD FPort5 FCnt~18.3k
+mature session ~35min cadence, we catch ~1/3 — SF11 decode edge + 5-of-8
+channel coverage; 780002FC FPort2 FCnt 11-14 WITH DUPLICATES on different
+freqs = confirmed-uplink retries with no ACK → orphaned device, explains
+the sequential-DevAddr rejoin parade F8→FC). Changelog bullet under
 "LoRaWAN sniffing" (78, parser-verified).
 RF-log review conclusions (same session, for reference): −98..−103/negative
 SNR rows = direct below-noise receptions (RSSI pins at the ~−100 dBm local
@@ -1002,6 +1006,18 @@ floor; joins on multiple EUIs; RSSI step −95→−101 around Jul 8/9 for that
 device = propagation/device change, predates nothing suspicious in our
 code. One-off impossible reading "Galdere Tracker −120 dBm / SNR +11.3" =
 companion misreport, watch-only.
+
+**CI ruff red 19h (fixed 2026-07-10): ALWAYS run `pipx run ruff check src/
+tests/` on the Mac before suggesting a commit** (no ruff installed, pipx
+works; CI runs exactly that and fails the whole test job on lint). Two
+F-lints fixed: unused `MESHTASTIC_HEADER_SIZE` import in
+test_meshtastic_decoder_predecoded.py (shipped with run #29 "serial
+meshtastic packets the connected stick decrypts locally…" — NOTE: that
+commit implemented the serial decoded-path feature flagged earlier as a
+candidate; not done by this assistant, details unreviewed) and dead
+`freq_default` in test_channel_frequency.py (its comment already said the
+comparison is deliberately not made; call removed). Both lint-only, no
+behavior change. ruff now passes clean locally.
 ALSO dropped the REGION segment (EU_433) from the serial chip per user
 ("we can see the freq that enough"): region element + sep removed from
 _buildBadge, docstring updated, `.topbar-serial__region` CSS rules deleted.

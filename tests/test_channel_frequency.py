@@ -55,10 +55,6 @@ class ResolveFrequencyDefaultChannelTest(unittest.TestCase):
     def test_eu433_custom_channel_name_changes_the_slot(self):
         # A real (non-blank) channel name is hashed directly -- a
         # different name can land on a different one of the 4 slots.
-        freq_default = resolve_frequency_mhz(
-            region="EU_433", channel_num=0, bandwidth_khz=250,
-            channel_name="", modem_preset="LONG_FAST",
-        )
         freq_custom = resolve_frequency_mhz(
             region="EU_433", channel_num=0, bandwidth_khz=250,
             channel_name="MySecretChannel",
@@ -66,9 +62,9 @@ class ResolveFrequencyDefaultChannelTest(unittest.TestCase):
         # Not asserting a specific value (that depends on the hash of
         # an arbitrary string) -- just that a real channel name is
         # actually used rather than always falling back to the preset.
-        self.assertIn(freq_custom, (433.125, 433.375, 433.625, 433.875))
-        # Deliberately not asserting freq_custom != freq_default: a
+        # Deliberately not comparing against the blank-name default: a
         # different name can coincidentally land on the same slot.
+        self.assertIn(freq_custom, (433.125, 433.375, 433.625, 433.875))
 
     def test_eu868_single_slot_is_independent_of_channel_name(self):
         # EU_868's band (869.4-869.65 MHz) only fits one 250kHz slot,
