@@ -103,7 +103,7 @@ class SimplePacketFeed {
         if (this._onFocus) this._onFocus(packet.source_id);
 
         window.PacketDetailModal.show(packet, {
-            formatNodeId: (id) => this._shortId(id),
+            formatNodeId: (id) => this._resolveName(id),
             selectedRow: tr,
             onClose: () => {
                 if (this._onFocus) this._onFocus(null);
@@ -164,6 +164,15 @@ class SimplePacketFeed {
         if (!id) return '--';
         if (id === 'ffffffff' || id === 'ffff' || id === 'broadcast') return '!cast';
         return id.length > 6 ? `!${id.slice(-4)}` : `!${id}`;
+    }
+
+    // Plain-string name for the packet-detail modal: the node's real
+    // name when known (same map the feed rows use), else the short id.
+    _resolveName(id) {
+        if (!id) return 'n/a';
+        if (id === 'ffffffff' || id === 'ffff' || id === 'broadcast') return 'broadcast';
+        const name = this._nodeNames && this._nodeNames.get(String(id).toLowerCase());
+        return name || this._shortId(id);
     }
 
     _fmtId(id) {
