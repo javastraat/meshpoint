@@ -29,6 +29,12 @@ logger = logging.getLogger(__name__)
 PER_REPEATER_GAP_S = 5.0
 STATE_FILENAME = "repeater_status.json"
 
+# A poll (login + req_status + req_telemetry) fails transiently when the
+# companion's command channel is momentarily busy -- retry a couple of
+# times with a short gap before giving up, like the manual telemetry.sh.
+POLL_ATTEMPTS = 3
+RETRY_DELAY_S = 4.0
+
 # LPP (channel, type) -> Telemetry field. Channel 1 is the node's own
 # board; higher channels are attached sensors. Battery voltage doubles
 # as battery_level's source (we store the volts, not a fake %).
@@ -109,13 +115,24 @@ class RepeaterPoller:
     async def _poll_one(self, rep) -> None:
         key = getattr(rep, "key", "")
         name = getattr(rep, "name", "") or key
-        try:
-            result = await self._tx.poll_repeater(
-                key, getattr(rep, "password", ""),
-            )
-        except Exception:
-            logger.exception("Repeater poll raised for %s", name)
-            result = {"ok": False, "error": "exception"}
+        password = getattr(rep, "password", "")
+
+        result = {"ok": False, "error": "not attempted"}
+        for attempt in range(1, POLL_ATTEMPTS + 1):
+            try:
+                result = await self._tx.poll_repeater(key, password)
+            except Exception:
+                logger.exception("Repeater poll raised for %s", name)
+                result = {"ok": False, "error": "exception"}
+            if result.get("ok"):
+                break
+            if attempt < POLL_ATTEMPTS:
+                logger.info(
+                    "Repeater %s poll attempt %d/%d failed (%s), retrying "
+                    "in %.0fs", name, attempt, POLL_ATTEMPTS,
+                    result.get("error") or "?", RETRY_DELAY_S,
+                )
+                await asyncio.sleep(RETRY_DELAY_S)
 
         entry = {
             "key": key,

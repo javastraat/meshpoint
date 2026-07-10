@@ -5,7 +5,11 @@ import tempfile
 import unittest
 
 from src.config import RepeaterConfig, _coerce_repeaters
+from src.transmit import repeater_poller as rp_mod
 from src.transmit.repeater_poller import RepeaterPoller
+
+# Don't sleep between retries in tests.
+rp_mod.RETRY_DELAY_S = 0
 
 
 class CoerceRepeatersTest(unittest.TestCase):
@@ -36,9 +40,26 @@ class _FakeTelemetryRepo:
 class _FakeTx:
     def __init__(self, result):
         self._result = result
+        self.calls = 0
 
     async def poll_repeater(self, key, password=""):
+        self.calls += 1
         return self._result
+
+
+class _FlakyTx:
+    """Fails ``fail_times`` polls, then succeeds."""
+
+    def __init__(self, fail_times, success):
+        self._fail_times = fail_times
+        self._success = success
+        self.calls = 0
+
+    async def poll_repeater(self, key, password=""):
+        self.calls += 1
+        if self.calls <= self._fail_times:
+            return {"ok": False, "error": "login failed or timed out"}
+        return self._success
 
 
 def _poller(tx, repo, tmpdir):
@@ -108,6 +129,22 @@ class PollerTelemetryTest(unittest.TestCase):
         p = _poller(_FakeTx(result), repo, self._tmp)
         asyncio.run(p._poll_one(p._repeaters[0]))
         self.assertEqual(repo.inserted, [])  # no voltage/temp -> nothing stored
+
+    def test_retries_then_succeeds(self):
+        # Two transient failures, then a good poll -> ends OK, 3 calls.
+        good = {"ok": True, "status": {"bat": 4119}, "telemetry": None, "error": ""}
+        tx = _FlakyTx(fail_times=2, success=good)
+        p = _poller(tx, _FakeTelemetryRepo(), self._tmp)
+        asyncio.run(p._poll_one(p._repeaters[0]))
+        self.assertEqual(tx.calls, 3)
+        self.assertTrue(p.latest["da0b77f13bc7"]["ok"])
+
+    def test_gives_up_after_max_attempts(self):
+        tx = _FakeTx({"ok": False, "error": "login failed or timed out"})
+        p = _poller(tx, _FakeTelemetryRepo(), self._tmp)
+        asyncio.run(p._poll_one(p._repeaters[0]))
+        self.assertEqual(tx.calls, rp_mod.POLL_ATTEMPTS)  # tried the max
+        self.assertFalse(p.latest["da0b77f13bc7"]["ok"])
 
 
 class PollRepeaterShapeTest(unittest.TestCase):

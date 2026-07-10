@@ -2014,6 +2014,16 @@ screenshot was AMBER/stale/"0/1 reporting/polled 5m ago" — a poll FAILED
 works (stored history, poll-independent). Watch poll health. NOT
 re-verified on Pi after this change.
 
+**Poll retry (2026-07-10, user saw "login failed or timed out" in logs):**
+`_poll_one` now retries up to `POLL_ATTEMPTS=3` times with `RETRY_DELAY_S=4`
+between attempts before giving up (same shape as the user's telemetry.sh
+RETRIES/RETRY_DELAY). Transient "login failed or timed out" (companion
+command channel momentarily busy, often right after the 350-contact boot
+sync) usually clears on retry. Tests: RETRY_DELAY_S=0 in the test module
+for speed; 2 new (retries-then-succeeds asserts 3 calls; gives-up-after-
+max asserts POLL_ATTEMPTS calls). 10 pass, ruff clean, changelog reworded
+(still 95).
+
 ## OLD LIST (superseded, kept for the DONE details)
 
 User has been committing incrementally with the suggested one-liners (verified
