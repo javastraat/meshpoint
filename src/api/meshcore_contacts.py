@@ -95,14 +95,26 @@ def schedule_startup_meshcore_contact_sync(
     )
 
 
+# Full roster is browsable on the MeshCore page; the journal only needs
+# proof the sync worked, not 350 lines per boot.
+_ROSTER_LOG_LIMIT = 10
+
+
 def log_meshcore_contact_peers(contacts: list[dict]) -> None:
-    """Log the companion roster (same lines as startup advert path)."""
+    """Log the companion roster: count + first few names, not the lot."""
     logger.info("MeshCore contacts: %d peers", len(contacts))
-    for contact in contacts:
-        pk = contact.get("public_key", "")
-        name = contact.get("name", "")
-        if pk and name:
-            logger.info("  %s  %s", pk[:12], name)
+    named = [
+        (c.get("public_key", ""), c.get("name", ""))
+        for c in contacts
+        if c.get("public_key") and c.get("name")
+    ]
+    for pk, name in named[:_ROSTER_LOG_LIMIT]:
+        logger.info("  %s  %s", pk[:12], name)
+    remaining = len(named) - _ROSTER_LOG_LIMIT
+    if remaining > 0:
+        logger.info(
+            "  … and %d more (full roster on the MeshCore page)", remaining,
+        )
 
 
 async def _startup_contact_bootstrap(coord, meshcore_tx, mc_source=None) -> None:

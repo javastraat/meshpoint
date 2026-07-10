@@ -967,7 +967,44 @@ gpiozero/lgpio stack:
   (43 pass with fan+config suites). ruff clean. NOT yet Pi-verified —
   user must add `led: {enabled: true}` to local.yaml, apply, and watch
   the case LED (expect: steady, dips on packets; unplug a companion →
-  1 Hz blink; stop service → dark).
+  1 Hz blink; stop service → dark). Boot log 2026-07-10 13:20 shows
+  "Status LED started on GPIO22" — running live; visual confirmation
+  pending.
+
+**Box identity stabilized (2026-07-10):** boot log showed `tx_service
+WARNING source_node_id (source: RANDOM, will change on every restart)` —
+root cause: neither transmit.node_id nor device.device_id set (resolver:
+config → derive-from-device_id → CSPRNG). User froze the current random
+ID in local.yaml: `transmit.node_id: 0xc3ecf862` (validated: all keys ok,
+PyYAML parses hex, not in RESERVED {0, 0xFFFFFFFF}; their 27 dBm + 10%
+duty is the legal EU pairing for the 869.4-869.65 sub-band). VERIFIED
+next boot: "source_node_id=0xc3ecf862 (source: config)" + "Meshtastic PKI
+identity configured: 0xc3ecf862" (PKI now bound to stable ID). Long name
+now 'Meshpoint PD2EMC', short 'EMC2'. STILL OPEN (cosmetic, upstream
+disabled): device_identity ephemeral-ID warning + banner "PD2EMC (unset)"
+— fixed only by `meshpoint setup` writing device.device_id. MQTT id is a
+separate identity (!b5c10364, stable, explicit mqtt.gateway_id in yaml).
+RESOLVED same day: user added `device.device_id:
+474724a2-27ba-4905-8402-6bcb72bf34ef` (the last ephemeral one) to
+local.yaml — next boot has ZERO warnings, banner "PD2EMC (474724a2-…)".
+Their full local.yaml was reviewed against every dataclass: all valid
+(incl. the baud_rate-vs-serial_baud naming split between meshcore_usb and
+serial lists — both correct). Noted to user: mqtt.password absent → falls
+back to default "large4cats" (their LAN broker accepts it; explicit value
+recommended); storage.max_packets_retained raised to 1M (intentional).
+keys.yaml lives in data/ not config/ (user asked — not missing).
+
+**Contact roster log trimmed (2026-07-10, user request after seeing the
+350-line dump):** `log_meshcore_contact_peers` in
+src/api/meshcore_contacts.py now logs count + first `_ROSTER_LOG_LIMIT`
+(10) named contacts + "… and N more (full roster on the MeshCore page)";
+unnamed contacts don't burn slots. The 350 contacts COME FROM THE
+COMPANION's own flash contact DB (get_contacts serial command; the
+350→342 wobble between fetches = its pagination settling). NEW
+tests/test_meshcore_contact_log_trim.py (4, Mac-runnable — module imports
+clean on Mac unlike test_meshcore_contact_enrichment.py which needs
+aiosqlite). Changelog bullet under "Configuration and server" (82,
+parser-verified). ruff clean.
 - **W9 — button as a safe physical control** (S-M): classic pattern — short
   press = something harmless and useful (e.g. trigger a MeshCore advert or
   an identify-blink), long press (3-5 s) = clean service restart or safe

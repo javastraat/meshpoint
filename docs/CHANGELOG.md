@@ -66,6 +66,7 @@ First tagged release of the javastraat/meshpoint fork: LoRaWAN sniffing, multi-r
 
 #### Configuration and server
 
+- **Quieter boot log.** The MeshCore contact sync logged the companion's entire roster — 350 lines per boot on a well-connected stick. It now logs the peer count, the first 10 names, and "… and N more"; the full roster stays browsable on the MeshCore page.
 - **Web server port is now set in the config.** The dashboard bind address comes from `dashboard.host` / `dashboard.port` in the YAML config (override in `local.yaml`, applied on service restart) via the new `src/serve.py` launcher; previously the port was hardcoded in the systemd unit and the config value only affected the startup banner. If the config fails to load, or the configured address cannot be bound (port in use, privileged port, bad host), the server falls back to `0.0.0.0:8080` so the dashboard (and its update/rollback page) stays reachable.
 - **Relay burst and RSSI filters editable in Configuration → Transmit.** Burst size and the min/max RSSI relay window (only packets heard inside the window are rebroadcast) can now be set from the dashboard; previously these existed in `local.yaml` and the relay API but had no UI.
 - **MeshCore channel limit raised from 7 to 40 user channels.** The configuration card, YAML `meshcore.channel_keys`, and companion slot sync now accept up to 40 user channels (slots 1–40; slot 0 stays Public), up from 7.
