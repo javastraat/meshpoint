@@ -427,6 +427,8 @@ instead of ttyUSB0 for robustness if more USB devices get added.
   This suppresses dead channels like Ch2 current/power/voltage all at 0.
 - Added responsive CSS so paired cards collapse to a single column on narrow
   screens.
+- Follow-up visual polish: stronger card hierarchy (subtle layered background,
+  improved spacing/typography), plus Sensors card meta label (`N ch · M vals`).
 
 #### Listener enhancements (2026-07-05 evening → live, working)
 Built on the base above; all verified working in the browser (FM audio + meter).

@@ -124,6 +124,17 @@ class RepeatersTab {
             <div class="rp-row"><span class="rp-row__k">${this._esc(k)}</span>
             <span class="rp-row__v">${this._esc(v)}</span></div>
         `).join('');
+        const sensorChannels = new Set(
+            sensors
+                .map(([k]) => {
+                    const m = String(k).match(/^Ch\d+/);
+                    return m ? m[0] : null;
+                })
+                .filter(Boolean)
+        ).size;
+        const sensorMeta = sensors.length
+            ? `${sensorChannels} ch · ${sensors.length} vals`
+            : 'No data';
         const sensorRows = sensors.length
             ? rowsHtml(sensors)
             : '<div class="rp-row"><span class="rp-row__k">No sensor telemetry</span><span class="rp-row__v">--</span></div>';
@@ -143,6 +154,7 @@ class RepeatersTab {
                 <div class="rp-card rp-card--sensors ${stale ? 'rp-card--stale' : ''}">
                     <div class="rp-card__head">
                         <span class="rp-card__name">Sensors</span>
+                        <span class="rp-card__meta">${this._esc(sensorMeta)}</span>
                     </div>
                     <div class="rp-card__rows">${sensorRows}</div>
                 </div>
