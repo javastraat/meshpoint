@@ -1061,6 +1061,19 @@ ALSO: LoRaWAN page section order swapped the same way (Recent packets
 above Devices) — ALL THREE protocol pages now read packets-first,
 census-below. Pure template swap in lorawan_panel.js _buildShell.
 
+**Topbar reconnect grammar unified (2026-07-10, user challenged the old
+"concentrator keeps last-known values" decision — REVERSED with user
+approval):** topbar_meshtastic_chip.js refactored: `_renderData()` split
+out, `_lastData` cache; non-online connection states now blank to
+"Reconnecting…" + "--" like the MeshCore/serial chips (was: stale values
++ amber lamp only); values restored from cache the moment the lamp goes
+green (setMeshtastic arriving during a drop is cached, not rendered).
+Topbar grammar now: green+values / amber+"Reconnecting…"+dashes (link
+down) / red+name (link fine, radio offline). ALSO: MeshCore chip's last
+separator `·` → `|` bar (index.html + new .topbar-meshcore__sep--bar
+CSS), matching the Meshtastic chips' pre-trailing-segment bar. Folded
+into the "Topbar chips unified" changelog bullet (84, parser-verified).
+
 ### W10: packets/nodes VIEW SWITCH on protocol pages (idea, 2026-07-10)
 
 User idea, refined in the same breath: instead of both sections stacked

@@ -13,6 +13,7 @@ class TopbarMeshtasticChip {
         this._freqEl = chipEl.querySelector('.topbar-meshtastic__freq');
         this._presetEl = chipEl.querySelector('.topbar-meshtastic__preset');
         this._lastCall = null;
+        this._lastData = null;
         this._connState = 'connecting';
     }
 
@@ -34,18 +35,37 @@ class TopbarMeshtasticChip {
             this._lampEl.classList.add('topbar-meshtastic__lamp--online');
             this._root.classList.add('topbar-meshtastic--online');
             this._lampEl.setAttribute('aria-label', 'Dashboard connected');
-        } else if (state === 'offline') {
-            this._lampEl.classList.add('topbar-meshtastic__lamp--offline');
-            this._root.classList.add('topbar-meshtastic--offline');
-            this._lampEl.setAttribute('aria-label', 'Dashboard offline');
+            // Restore the values that were showing before the drop.
+            if (this._lastData) this._renderData(this._lastData);
         } else {
-            this._lampEl.classList.add('topbar-meshtastic__lamp--reconnecting');
-            this._root.classList.add('topbar-meshtastic--reconnecting');
-            this._lampEl.setAttribute('aria-label', 'Dashboard reconnecting');
+            if (state === 'offline') {
+                this._lampEl.classList.add('topbar-meshtastic__lamp--offline');
+                this._root.classList.add('topbar-meshtastic--offline');
+                this._lampEl.setAttribute('aria-label', 'Dashboard offline');
+            } else {
+                this._lampEl.classList.add('topbar-meshtastic__lamp--reconnecting');
+                this._root.classList.add('topbar-meshtastic--reconnecting');
+                this._lampEl.setAttribute('aria-label', 'Dashboard reconnecting');
+            }
+            // Same treatment as the MeshCore/serial chips: don't keep
+            // showing stale values as if they were live.
+            this._callEl.textContent = 'Reconnecting…';
+            this._callEl.classList.remove('topbar-meshtastic__call--flicker');
+            this._freqEl.textContent = '--';
+            this._presetEl.textContent = '--';
+            this._lastCall = null;  // force re-render on next data
         }
     }
 
     setMeshtastic({ shortName, radio }) {
+        this._lastData = { shortName, radio };
+        if (this._connState === 'offline' || this._connState === 'reconnecting') {
+            return;  // keep showing Reconnecting… until the lamp is green
+        }
+        this._renderData(this._lastData);
+    }
+
+    _renderData({ shortName, radio }) {
         const next = (shortName && String(shortName).trim())
             ? String(shortName).trim().toUpperCase()
             : '----';

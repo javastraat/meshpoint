@@ -273,6 +273,11 @@
     opacity: 0.5;
 }
 
+.topbar-meshcore__sep--bar {
+    opacity: 0.35;
+    margin: 0 0.05rem;
+}
+
 .topbar-meshcore__freq {
     color: var(--accent-purple);
     text-shadow: 0 0 6px rgba(168, 85, 247, 0.25);
