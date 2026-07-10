@@ -259,9 +259,24 @@ class PacketDetailModal {
         rows.push({ key: 'Channel', val: this._channelLabel(packet) });
 
         const summary = this._payloadSummary(packet);
+        const hasObj = p && typeof p === 'object' && Object.keys(p).length > 0;
         if (summary) {
             rows.push({ key: 'Content', val: summary });
-        } else if (p && typeof p === 'object') {
+            // Show every decoded field, not just the ones the summary picked:
+            // Meshtastic position/telemetry/nodeinfo carry extras (sats in
+            // view, ground speed, precision, humidity, pressure, channel
+            // utilization, air-util, uptime, role, public key...) that the
+            // one-line summary drops. Skip plain text, where the summary IS
+            // the whole payload.
+            if (hasObj && type !== 'text') {
+                rows.push({
+                    key: 'Details',
+                    expandable: true,
+                    full: JSON.stringify(p, null, 2),
+                    previewLen: 480,
+                });
+            }
+        } else if (hasObj) {
             rows.push({
                 key: 'JSON',
                 expandable: true,

@@ -1322,7 +1322,17 @@ modal's Mesh section — decoded_payload.node_type (0 None 1 Client 2 Repeater
 3 Room server 4 Sensor, from _build_advertisement/_find_payload_type in
 meshcore_event_adapter) was only a bare int in the payload JSON; now
 labeled. Stored in decoded_payload JSON so it shows on BOTH the live
-Dashboard feed and the MeshCore tab. ALSO: Meshtastic NODES table Last heard moved to
+Dashboard feed and the MeshCore tab. Meshtastic round (2026-07-11 same
+"show as much as we can"): the modal's _payloadRows now keeps the readable
+Content summary AND appends an expandable "Details" row = full decoded
+payload JSON (skipped for type=='text' where it's redundant). Meshtastic
+position/telemetry/nodeinfo decode MANY more fields than the summary shows
+(portnum_handlers: sats_in_view, precision_bits, ground_speed, ground_track;
+humidity, barometric_pressure, channel_utilization, air_util_tx,
+uptime_seconds, num_packets_tx/rx; role, public_key) — all stored in
+decoded_payload JSON, returned by the packets endpoints, so Details shows
+them on both Dashboard + tab. Shared modal so lorawan/meshcore benefit too.
+ALSO: Meshtastic NODES table Last heard moved to
 FIRST column (matching MeshCore contacts). LoRaWAN Devices census
 reordered too (user follow-up): Last seen FIRST, First seen SECOND,
 then DevEUI/Type/Frames/RSSI/SNR/Freq/SF. All three censuses now lead
