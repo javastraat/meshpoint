@@ -59,44 +59,6 @@ class LoRaWANPanel {
 
             <section class="lw-section">
                 <div class="panel">
-                    <div class="panel__header">Devices</div>
-                    <div class="panel__body lw-table-wrap">
-                        <table class="lw-table lw-table--devices">
-                            <colgroup>
-                                <col class="col-id">
-                                <col class="col-type">
-                                <col class="col-frames">
-                                <col class="col-time">
-                                <col class="col-time">
-                                <col class="col-rssi">
-                                <col class="col-snr">
-                                <col class="col-freq">
-                                <col class="col-sf">
-                            </colgroup>
-                            <thead>
-                                <tr>
-                                    <th>DevEUI / DevAddr</th>
-                                    <th>Type</th>
-                                    <th class="lw-r">Frames</th>
-                                    <th>First seen</th>
-                                    <th>Last seen</th>
-                                    <th class="lw-r">RSSI</th>
-                                    <th class="lw-r">SNR</th>
-                                    <th class="lw-r">Freq (MHz)</th>
-                                    <th class="lw-r">SF</th>
-                                </tr>
-                            </thead>
-                            <tbody id="lw-device-tbody"></tbody>
-                        </table>
-                        <p class="lw-empty" id="lw-device-empty" style="display:none">
-                            No LoRaWAN devices heard yet.
-                        </p>
-                    </div>
-                </div>
-            </section>
-
-            <section class="lw-section">
-                <div class="panel">
                     <div class="panel__header">
                         Recent packets
                         <span class="lw-panel__limit">(last 100)</span>
@@ -131,6 +93,44 @@ class LoRaWANPanel {
                         </table>
                         <p class="lw-empty" id="lw-packet-empty" style="display:none">
                             No packets yet.
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="lw-section">
+                <div class="panel">
+                    <div class="panel__header">Devices</div>
+                    <div class="panel__body lw-table-wrap">
+                        <table class="lw-table lw-table--devices">
+                            <colgroup>
+                                <col class="col-id">
+                                <col class="col-type">
+                                <col class="col-frames">
+                                <col class="col-time">
+                                <col class="col-time">
+                                <col class="col-rssi">
+                                <col class="col-snr">
+                                <col class="col-freq">
+                                <col class="col-sf">
+                            </colgroup>
+                            <thead>
+                                <tr>
+                                    <th>DevEUI / DevAddr</th>
+                                    <th>Type</th>
+                                    <th class="lw-r">Frames</th>
+                                    <th>First seen</th>
+                                    <th>Last seen</th>
+                                    <th class="lw-r">RSSI</th>
+                                    <th class="lw-r">SNR</th>
+                                    <th class="lw-r">Freq (MHz)</th>
+                                    <th class="lw-r">SF</th>
+                                </tr>
+                            </thead>
+                            <tbody id="lw-device-tbody"></tbody>
+                        </table>
+                        <p class="lw-empty" id="lw-device-empty" style="display:none">
+                            No LoRaWAN devices heard yet.
                         </p>
                     </div>
                 </div>

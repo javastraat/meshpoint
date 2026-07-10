@@ -1057,6 +1057,25 @@ the mt-badge--* palette from lorawan.css (nodeinfo amber, text cyan,
 neighbour_advert→neighborinfo green, telemetry purple, position green;
 unknown stays gray default). Both protocol pages now fully symmetric:
 layout + src/dest naming + badge colors.
+ALSO: LoRaWAN page section order swapped the same way (Recent packets
+above Devices) — ALL THREE protocol pages now read packets-first,
+census-below. Pure template swap in lorawan_panel.js _buildShell.
+
+### W10: packets/nodes VIEW SWITCH on protocol pages (idea, 2026-07-10)
+
+User idea, refined in the same breath: instead of both sections stacked
+on each protocol page (LoRaWAN/Meshtastic/MeshCore), make each page ONE
+view with a **switch/toggle** (e.g. "Packets | Nodes" segmented control
+in the page header) that flips between the recent-packets feed and the
+node/device census. First thought was separate sidebar tabs per network
+("every network gets a nodes and lastheard tab") but user immediately
+preferred the in-page switch variant. Benefits: no scrolling past one
+table to reach the other, more vertical room per table (could raise the
+100-packet limit — API already allows up to 500), consistent shell
+across all 3 panels (they're already structural twins after today's
+symmetry work, so one shared pattern could serve all three; candidate:
+persist choice in localStorage like meshpoint.listenerSkin). Not sized,
+not started — parked as W10.
 Timestamp-less boot lines EXPLAINED, user OK leaving as-is (2026-07-10):
 bare lines (Opening SPI / chip version / ARB / SX1261 PRAM) = libloragw C
 printf to stdout, can't reformat without fd hacks — leave; "INFO:" lines
