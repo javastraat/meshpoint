@@ -446,6 +446,8 @@ instead of ttyUSB0 for robustness if more USB devices get added.
   while skipping nodes and packet history.
 - Added `--contacts-only` to refresh just the contacts/neighbours roster while
   skipping packet and telemetry history entirely.
+- Telemetry import now prefers environmental temperature channels per timestamp:
+  channel 4 first, then 3, then channel 1 MCU die temp only as a fallback.
 
 #### Listener enhancements (2026-07-05 evening → live, working)
 Built on the base above; all verified working in the browser (FM audio + meter).

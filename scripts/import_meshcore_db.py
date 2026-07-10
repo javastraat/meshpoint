@@ -335,6 +335,9 @@ def _import_telemetry_samples(
     cur = dst.cursor()
     inserted = skipped = 0
     field_counts: dict[str, int] = defaultdict(int)
+    temp_rank = {4: 0, 3: 1, 1: 2}
+    best_temperatures: dict[tuple[str, str], tuple[int, dict, float | int]] = {}
+    temp_candidates = 0
 
     def record(sample: dict, field_name: str, field_value):
         nonlocal inserted, skipped
@@ -369,14 +372,24 @@ def _import_telemetry_samples(
 
         if channel == 1 and kind == "voltage":
             record(sample, "voltage", value)
-        elif channel == 1 and kind == "temperature":
-            record(sample, "temperature", value)
         elif channel == 3 and kind == "barometer":
             record(sample, "barometric_pressure", value)
         elif channel == 4 and kind == "humidity":
             record(sample, "humidity", value)
+        elif kind == "temperature" and channel in temp_rank:
+            temp_candidates += 1
+            key = (sample["node_id"], sample["timestamp"])
+            rank = temp_rank[channel]
+            current = best_temperatures.get(key)
+            if current is None or rank < current[0]:
+                best_temperatures[key] = (rank, sample, value)
         else:
             skipped += 1
+
+    for _rank, sample, value in best_temperatures.values():
+        record(sample, "temperature", value)
+
+    skipped += max(0, temp_candidates - len(best_temperatures))
 
     if include_status_history:
         for row in src.execute("SELECT * FROM status_history ORDER BY ts ASC, id ASC"):
