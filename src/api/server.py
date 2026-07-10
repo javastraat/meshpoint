@@ -1550,6 +1550,7 @@ def _init_routes(
     )
     meshcore_routes.init_routes(
         coord.packet_repo, coord.node_repo, device_name=_dev_name,
+        telemetry_repo=coord.telemetry_repo,
     )
 
 

@@ -117,6 +117,10 @@ class RepeatersTab {
         // Every LPP sensor reading (any channel / any sensor).
         const sensors = this._sensorRows(r.telemetry);
 
+        // Historical telemetry stats (min/max/avg from imported data + live polls).
+        const history = r.history || {};
+        const historyRows = this._historyRows(history);
+
         // Prefer the repeater's real advertised name, then a config
         // label, then the raw key.
         const title = r.mesh_name || r.name || r.key;
@@ -139,6 +143,13 @@ class RepeatersTab {
             ? rowsHtml(sensors)
             : '<div class="rp-row"><span class="rp-row__k">No sensor telemetry</span><span class="rp-row__v">--</span></div>';
 
+        const historyMeta = history.total_samples
+            ? `${history.total_samples} samples`
+            : 'No data';
+        const historyRowsHtml = historyRows.length
+            ? rowsHtml(historyRows)
+            : '<div class="rp-row"><span class="rp-row__k">No history</span><span class="rp-row__v">--</span></div>';
+
         return `
             <div class="rp-repeater">
                 <div class="rp-card ${stale ? 'rp-card--stale' : ''}">
@@ -158,8 +169,38 @@ class RepeatersTab {
                     </div>
                     <div class="rp-card__rows">${sensorRows}</div>
                 </div>
+                <div class="rp-card rp-card--history ${stale ? 'rp-card--stale' : ''}">
+                    <div class="rp-card__head">
+                        <span class="rp-card__name">History</span>
+                        <span class="rp-card__meta">${this._esc(historyMeta)}</span>
+                    </div>
+                    <div class="rp-card__rows">${historyRowsHtml}</div>
+                </div>
             </div>
         `;
+    }
+
+    _historyRows(h) {
+        const rows = [];
+        if (h.min_ts && h.max_ts) {
+            rows.push(['Period', `${this._shortDate(h.min_ts)} to ${this._shortDate(h.max_ts)}`]);
+        }
+        if (h.voltage && (h.voltage.min != null || h.voltage.max != null)) {
+            const v = h.voltage;
+            rows.push(['Voltage (min/avg/max)', 
+                `${this._fmt(v.min, 2)} / ${this._fmt(v.avg, 2)} / ${this._fmt(v.max, 2)} V`]);
+        }
+        if (h.temperature && (h.temperature.min != null || h.temperature.max != null)) {
+            const t = h.temperature;
+            rows.push(['Temperature (min/avg/max)', 
+                `${this._fmt(t.min, 1)} / ${this._fmt(t.avg, 1)} / ${this._fmt(t.max, 1)} °C`]);
+        }
+        if (h.humidity && (h.humidity.min != null || h.humidity.max != null)) {
+            const hm = h.humidity;
+            rows.push(['Humidity (min/avg/max)', 
+                `${this._fmt(hm.min, 1)} / ${this._fmt(hm.avg, 1)} / ${this._fmt(hm.max, 1)} %`]);
+        }
+        return rows;
     }
 
     static UNITS = {
@@ -238,6 +279,21 @@ class RepeatersTab {
         const el = document.createElement('span');
         el.textContent = s == null ? '' : String(s);
         return el.innerHTML;
+    }
+
+    _fmt(n, decimals = 2) {
+        if (n == null) return '--';
+        return Number(n).toFixed(decimals);
+    }
+
+    _shortDate(iso) {
+        if (!iso) return '--';
+        try {
+            const d = new Date(iso);
+            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        } catch (_) {
+            return '--';
+        }
     }
 }
 

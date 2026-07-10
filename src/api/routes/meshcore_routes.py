@@ -9,11 +9,13 @@ from fastapi import APIRouter, HTTPException, Query
 
 from src.storage.node_repository import NodeRepository
 from src.storage.packet_repository import PacketRepository
+from src.storage.telemetry_repository import TelemetryRepository
 
 router = APIRouter(prefix="/api/meshcore", tags=["meshcore"])
 
 _packet_repo: PacketRepository | None = None
 _node_repo: NodeRepository | None = None
+_telemetry_repo: TelemetryRepository | None = None
 _device_name: str = "meshpoint"
 _repeater_poller = None
 
@@ -22,10 +24,12 @@ def init_routes(
     packet_repo: PacketRepository,
     node_repo: NodeRepository,
     device_name: str = "meshpoint",
+    telemetry_repo: TelemetryRepository | None = None,
 ) -> None:
-    global _packet_repo, _node_repo, _device_name
+    global _packet_repo, _node_repo, _telemetry_repo, _device_name
     _packet_repo = packet_repo
     _node_repo = node_repo
+    _telemetry_repo = telemetry_repo
     _device_name = device_name or "meshpoint"
 
 
@@ -50,7 +54,8 @@ async def meshcore_repeaters():
     names = await _repeater_names(list(_repeater_poller.latest.keys()))
     reps = []
     for key, entry in _repeater_poller.latest.items():
-        reps.append({**entry, "mesh_name": names.get(key)})
+        history = await _fetch_telemetry_history(key)
+        reps.append({**entry, "mesh_name": names.get(key), "history": history})
     return {"available": True, "repeaters": reps}
 
 
@@ -73,6 +78,57 @@ async def _repeater_names(keys: list[str]) -> dict:
         if name:
             out[r["node_id"]] = name
     return out
+
+
+async def _fetch_telemetry_history(node_id: str) -> dict:
+    """Fetch min/max/avg telemetry for a repeater node, with date range."""
+    if _telemetry_repo is None:
+        return {}
+    try:
+        row = await _telemetry_repo._db.fetch_one(
+            """
+            SELECT
+                MIN(timestamp) AS min_ts,
+                MAX(timestamp) AS max_ts,
+                COUNT(*) AS total_samples,
+                MIN(voltage) AS min_voltage,
+                MAX(voltage) AS max_voltage,
+                AVG(voltage) AS avg_voltage,
+                MIN(temperature) AS min_temperature,
+                MAX(temperature) AS max_temperature,
+                AVG(temperature) AS avg_temperature,
+                MIN(humidity) AS min_humidity,
+                MAX(humidity) AS max_humidity,
+                AVG(humidity) AS avg_humidity
+            FROM telemetry
+            WHERE node_id = ?
+            """,
+            (node_id,),
+        )
+        if not row:
+            return {}
+        return {
+            "min_ts": row.get("min_ts"),
+            "max_ts": row.get("max_ts"),
+            "total_samples": row.get("total_samples"),
+            "voltage": {
+                "min": row.get("min_voltage"),
+                "max": row.get("max_voltage"),
+                "avg": row.get("avg_voltage"),
+            },
+            "temperature": {
+                "min": row.get("min_temperature"),
+                "max": row.get("max_temperature"),
+                "avg": row.get("avg_temperature"),
+            },
+            "humidity": {
+                "min": row.get("min_humidity"),
+                "max": row.get("max_humidity"),
+                "avg": row.get("avg_humidity"),
+            },
+        }
+    except Exception:
+        return {}
 
 
 _PACKET_EXPORT_COLUMNS = [
