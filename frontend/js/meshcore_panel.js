@@ -169,6 +169,20 @@ class MeshCorePanel {
         });
         this._applyTab();
 
+        const pktTbody = document.getElementById('mc-packet-tbody');
+        if (pktTbody) {
+            pktTbody.addEventListener('click', (e) => {
+                const tr = e.target.closest('tr[data-pkt]');
+                if (!tr || !window.PacketDetailModal) return;
+                const pkt = (this._lastPackets || [])[Number(tr.dataset.pkt)];
+                if (!pkt) return;
+                window.PacketDetailModal.show(pkt, {
+                    formatNodeId: (id) => this._nodeNames[id] || id || 'n/a',
+                    selectedRow: tr,
+                });
+            });
+        }
+
         const nodeTbody = document.getElementById('mc-node-tbody');
         if (nodeTbody) {
             nodeTbody.addEventListener('click', (e) => {
@@ -300,8 +314,9 @@ class MeshCorePanel {
             }
             if (empty) empty.style.display = 'none';
 
-            tbody.innerHTML = packets.map((p) => `
-                <tr>
+            this._lastPackets = packets;
+            tbody.innerHTML = packets.map((p, i) => `
+                <tr class="lw-pkt-row" data-pkt="${i}">
                     <td class="lw-time">${this._fmtTime(p.timestamp)}</td>
                     <td><span class="mt-badge ${MC_TYPE_COLORS[p.packet_type] || ''}">${this._esc(p.packet_type || '--')}</span></td>
                     <td class="lw-id">${this._fmtSrc(p.source_id)}</td>

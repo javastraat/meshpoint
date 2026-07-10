@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, Query
@@ -60,8 +61,8 @@ async def meshtastic_packets(limit: int = Query(100, ge=1, le=500)):
         SELECT
             packet_id, source_id, destination_id, packet_type,
             hop_limit, hop_start, rssi, snr,
-            frequency_mhz, spreading_factor, decoded_payload,
-            decrypted, capture_source, timestamp
+            frequency_mhz, spreading_factor, bandwidth_khz,
+            decoded_payload, decrypted, capture_source, timestamp
         FROM packets
         WHERE protocol = 'meshtastic'
         ORDER BY timestamp DESC
@@ -77,6 +78,7 @@ async def meshtastic_packets(limit: int = Query(100, ge=1, le=500)):
         hops = max(0, hop_start - hop_limit) if hop_start else None
         result.append({
             "packet_id": row["packet_id"],
+            "protocol": "meshtastic",
             "source_id": row["source_id"],
             "destination_id": row["destination_id"],
             "packet_type": row["packet_type"],
@@ -84,12 +86,28 @@ async def meshtastic_packets(limit: int = Query(100, ge=1, le=500)):
             "snr": row["snr"],
             "frequency_mhz": row["frequency_mhz"],
             "spreading_factor": row["spreading_factor"],
+            "bandwidth_khz": row.get("bandwidth_khz"),
             "hops": hops,
+            "hop_start": hop_start,
+            "hop_limit": hop_limit,
+            "decoded_payload": _parse_payload(row.get("decoded_payload")),
             "decrypted": bool(row.get("decrypted")),
             "capture_source": row.get("capture_source"),
             "timestamp": row["timestamp"],
         })
     return result
+
+
+def _parse_payload(raw) -> dict | None:
+    """decoded_payload column is JSON text; the packet-detail modal
+    wants the object."""
+    if not raw:
+        return None
+    try:
+        parsed = json.loads(raw)
+        return parsed if isinstance(parsed, dict) else None
+    except (ValueError, TypeError):
+        return None
 
 
 @router.get("/stats")

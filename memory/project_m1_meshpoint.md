@@ -1113,6 +1113,26 @@ LoRaWAN census column order NOT changed (not asked). Verified: node
 21/21). Changelog bullet rewritten pilot→rollout (85, parser-verified).
 Pi-verify all three tabs after deploy.
 
+**Packet-detail modal on protocol pages + Meshtastic nodes time-first
+(2026-07-10 evening, user request):** upstream's PacketDetailModal
+(window.PacketDetailModal singleton, packet_detail_modal.js/css, loaded
+globally, renders from an IN-MEMORY packet object — no API call) is now
+opened by clicking any Recent Packets row on all 3 protocol pages.
+Backend: /api/{meshtastic,meshcore,lorawan}/packets responses enriched
+to the modal's shape — added protocol, hop_start/hop_limit,
+bandwidth_khz, decoded_payload (JSON column parsed via _parse_payload
+helper, dict-or-None), packet_id/destination_id/capture_source where
+missing (lorawan). Frontend: each panel stores `this._lastPackets`,
+rows get `class="lw-pkt-row" data-pkt="${i}"`, delegated tbody click →
+PacketDetailModal.show(pkt, {formatNodeId: _nodeNames lookup (mt/mc),
+selectedRow}). `.lw-pkt-row` cursor/hover CSS in lorawan.css. Fields
+the DB doesn't store (want_ack/channel_hash/relay_node) render n/a/
+omitted — acceptable. ALSO: Meshtastic NODES table Last heard moved to
+FIRST column (matching MeshCore contacts). LoRaWAN Devices census order
+unchanged (First/Last seen already mid-table; not asked). Changelog +1
+bullet & tab bullet extended (86, parser-verified). ruff + node --check
+clean. Pi-verify: click packet rows on all 3 pages.
+
 ### W10: packets/nodes VIEW SWITCH on protocol pages (idea, 2026-07-10)
 
 User idea, refined in the same breath: instead of both sections stacked

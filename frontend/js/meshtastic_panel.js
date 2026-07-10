@@ -138,6 +138,7 @@ class MeshtasticPanel {
                         <div class="panel__body lw-table-wrap">
                         <table class="lw-table lw-table--mt-nodes">
                             <colgroup>
+                                <col class="col-time">
                                 <col class="col-id">
                                 <col class="col-name">
                                 <col class="col-hw">
@@ -147,10 +148,10 @@ class MeshtasticPanel {
                                 <col class="col-hops">
                                 <col class="col-dist">
                                 <col class="col-pkts">
-                                <col class="col-time">
                             </colgroup>
                             <thead>
                                 <tr>
+                                    <th>Last heard</th>
                                     <th>Node ID</th>
                                     <th>Name</th>
                                     <th>Hardware</th>
@@ -160,7 +161,6 @@ class MeshtasticPanel {
                                     <th class="lw-r">Hops</th>
                                     <th class="lw-r">Dist</th>
                                     <th class="lw-r">Packets</th>
-                                    <th>Last heard</th>
                                 </tr>
                             </thead>
                             <tbody id="mt-node-tbody"></tbody>
@@ -191,6 +191,25 @@ class MeshtasticPanel {
                 if (node) window.nodeDrawer.open({ ...node, has_position: !!(node.latitude && node.longitude) });
             });
         }
+
+        this._wirePacketModal('mt-packet-tbody');
+    }
+
+    /** Row click in the packets feed opens the shared packet-detail
+     * modal (same one the Dashboard's live feed uses). */
+    _wirePacketModal(tbodyId) {
+        const tbody = document.getElementById(tbodyId);
+        if (!tbody) return;
+        tbody.addEventListener('click', (e) => {
+            const tr = e.target.closest('tr[data-pkt]');
+            if (!tr || !window.PacketDetailModal) return;
+            const pkt = (this._lastPackets || [])[Number(tr.dataset.pkt)];
+            if (!pkt) return;
+            window.PacketDetailModal.show(pkt, {
+                formatNodeId: (id) => (this._nodeNames || {})[id] || id || 'n/a',
+                selectedRow: tr,
+            });
+        });
     }
 
     _setTab(tab) {
@@ -265,6 +284,7 @@ class MeshtasticPanel {
 
             tbody.innerHTML = nodes.map((n) => `
                 <tr data-node-id="${this._esc(n.node_id || '')}" class="mt-node-row">
+                    <td class="lw-time">${this._fmtTime(n.last_heard)}</td>
                     <td class="lw-id">${this._fmtNodeId(n.node_id)}</td>
                     <td class="mt-name">${this._fmtName(n)}</td>
                     <td class="mt-hw">${this._fmtHw(n.hardware_model)}</td>
@@ -274,7 +294,6 @@ class MeshtasticPanel {
                     <td class="lw-num">${n.latest_hops != null ? n.latest_hops : '--'}</td>
                     <td class="lw-num">${this._fmtDist(n.latitude, n.longitude)}</td>
                     <td class="lw-num">${n.packet_count ?? '--'}</td>
-                    <td class="lw-time">${this._fmtTime(n.last_heard)}</td>
                 </tr>
             `).join('');
         } catch (_) {}
@@ -296,8 +315,9 @@ class MeshtasticPanel {
             }
             if (empty) empty.style.display = 'none';
 
-            tbody.innerHTML = packets.map((p) => `
-                <tr>
+            this._lastPackets = packets;
+            tbody.innerHTML = packets.map((p, i) => `
+                <tr class="lw-pkt-row" data-pkt="${i}">
                     <td class="lw-time">${this._fmtTime(p.timestamp)}</td>
                     <td>${this._fmtType(p.packet_type)}</td>
                     <td class="lw-id">${this._fmtSrc(p.source_id)}</td>

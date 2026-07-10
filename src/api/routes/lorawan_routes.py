@@ -89,9 +89,9 @@ async def lorawan_packets(limit: int = Query(100, ge=1, le=1000)):
     rows = await _packet_repo._db.fetch_all(
         """
         SELECT
-            source_id, packet_type,
+            packet_id, source_id, destination_id, packet_type,
             rssi, snr, frequency_mhz, spreading_factor, bandwidth_khz,
-            timestamp, decoded_payload
+            capture_source, timestamp, decoded_payload
         FROM packets
         WHERE protocol = 'lorawan'
         ORDER BY timestamp DESC
@@ -110,14 +110,19 @@ async def lorawan_packets(limit: int = Query(100, ge=1, le=1000)):
                 pass
 
         packets.append({
+            "packet_id": row.get("packet_id"),
+            "protocol": "lorawan",
             "source_id": row["source_id"],
+            "destination_id": row.get("destination_id"),
             "packet_type": row["packet_type"],
             "rssi": row["rssi"],
             "snr": row["snr"],
             "frequency_mhz": row["frequency_mhz"],
             "spreading_factor": row["spreading_factor"],
             "bandwidth_khz": row["bandwidth_khz"],
+            "capture_source": row.get("capture_source"),
             "timestamp": row["timestamp"],
+            "decoded_payload": payload if isinstance(payload, dict) else None,
             "app_eui": payload.get("app_eui"),
             "dev_eui": payload.get("dev_eui"),
             # Decoder stores these without underscores (fport/fcnt); the

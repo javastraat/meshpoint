@@ -364,3 +364,12 @@
     background: rgba(34, 211, 238, 0.08);
     border-color: rgba(34, 211, 238, 0.35);
 }
+
+/* Packet rows open the shared packet-detail modal on click. */
+.lw-pkt-row {
+    cursor: pointer;
+}
+
+.lw-pkt-row:hover {
+    background: rgba(255, 255, 255, 0.05);
+}

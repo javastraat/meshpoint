@@ -153,6 +153,17 @@ class LoRaWANPanel {
         });
         this._applyTab();
 
+        const pktTbody = document.getElementById('lw-packet-tbody');
+        if (pktTbody) {
+            pktTbody.addEventListener('click', (e) => {
+                const tr = e.target.closest('tr[data-pkt]');
+                if (!tr || !window.PacketDetailModal) return;
+                const pkt = (this._lastPackets || [])[Number(tr.dataset.pkt)];
+                if (!pkt) return;
+                window.PacketDetailModal.show(pkt, { selectedRow: tr });
+            });
+        }
+
         const deviceTbody = document.getElementById('lw-device-tbody');
         if (deviceTbody) {
             deviceTbody.addEventListener('click', (e) => {
@@ -271,8 +282,9 @@ class LoRaWANPanel {
             }
             if (empty) empty.style.display = 'none';
 
-            tbody.innerHTML = packets.map((p) => `
-                <tr>
+            this._lastPackets = packets;
+            tbody.innerHTML = packets.map((p, i) => `
+                <tr class="lw-pkt-row" data-pkt="${i}">
                     <td class="lw-time">${this._fmtTime(p.timestamp)}</td>
                     <td>${this._fmtType(p.packet_type)}</td>
                     <td class="lw-id">${p.dev_eui || p.source_id || '--'}</td>
