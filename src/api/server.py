@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from src._so_compat_check import warn_if_stale_so_files
@@ -13,6 +13,7 @@ from src.analytics.network_mapper import NetworkMapper
 from src.analytics.signal_analyzer import SignalAnalyzer
 from src.analytics.traffic_monitor import TrafficMonitor
 from src.api.audit import AuditLogWriter
+from src.api.html_assets import bust_asset_urls
 from src.api.audit import dependencies as audit_deps
 from src.api.auth import dependencies as auth_deps
 from src.api.auth.auth_bootstrap import AuthSubsystem, build_auth_subsystem
@@ -373,8 +374,14 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
         ):
             target = "/login" if auth_subsystem.service.is_setup_complete() else "/setup"
             return RedirectResponse(url=target, status_code=302)
-        return FileResponse(
-            str(static_dir / "index.html"), media_type="text/html"
+        # Rewrite local JS/CSS URLs with a per-boot ?v= token so every
+        # dashboard apply (which restarts the service) busts browser
+        # caches -- stale SPA JS against fresh HTML broke features
+        # silently twice. no-cache keeps the HTML itself revalidated.
+        html = (static_dir / "index.html").read_text(encoding="utf-8")
+        return HTMLResponse(
+            bust_asset_urls(html),
+            headers={"Cache-Control": "no-cache"},
         )
 
     if static_dir.exists():

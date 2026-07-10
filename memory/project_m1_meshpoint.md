@@ -1034,6 +1034,27 @@ End state: all 3 chips = brand · lamp · plain name · cyan freq · preset/
 channel; NO region segments anywhere. `--unknown` toggle in the
 meshtastic chip still keys off radio.region (data still present, just not
 displayed). Changelog 79 bullets, parser-verified. ruff clean.
+DEPLOY INCIDENT (same change, expected in hindsight): after Apply the
+topbar showed EMC2 with all "--", MeshCore dashes, serial chip GONE — the
+STALE-JS TRAP again (2nd bite): new index.html (region span removed) +
+old cached topbar_meshtastic_chip.js → querySelector('.__region')=null →
+TypeError mid-paint → whole topbar update chain dead incl. serial group.
+One-time fix: Empty Cache and Hard Reload.
+**PERMANENT FIX BUILT (cache-busting, the wishlist item): NEW
+src/api/html_assets.py** — `BOOT_TOKEN` (hex timestamp minted at import =
+service start) + pure `bust_asset_urls(html, token)` regex-rewriting every
+LOCAL .js/.css src/href in index.html to `?v=<token>`; skips http(s)://
+and // externals (unpkg leaflet.markercluster is still a live CDN dep —
+noted, untouched) and non-asset URLs; kept fastapi-free for Mac testing
+(serve.py pattern). server.py `/` route: FileResponse → HTMLResponse
+(bust_asset_urls(index.html), Cache-Control: no-cache — HTML itself must
+revalidate or tokens never arrive). Every apply restarts the service →
+new token → browsers refetch automatically. login/setup pages left as-is
+(low churn). NEW tests/test_html_assets.py (7, Mac-runnable, incl. sweep
+of the REAL index.html: zero un-tokened local assets, externals byte-
+identical). ruff clean. Changelog bullet under "Self-update system" (80,
+parser-verified). NOTE: the deploy carrying THIS fix is itself the last
+one needing a manual hard reload.
 
 Watch: RFID plateau 865.6-867.6 (identified, only interesting if it changes); noise pill should read a few dB lower post-percentile-fix.
 
