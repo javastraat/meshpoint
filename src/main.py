@@ -94,7 +94,7 @@ async def run_standalone() -> None:
 
     coordinator.on_packet(lambda pkt: print_packet(pkt))
     await coordinator.start()
-    print_banner(config)
+    print_banner(config, sources=coordinator.capture_coordinator.sources)
     logger.info("Standalone mode -- listening for packets")
 
     try:

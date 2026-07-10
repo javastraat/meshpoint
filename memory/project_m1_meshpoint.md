@@ -1004,7 +1004,35 @@ COMPANION's own flash contact DB (get_contacts serial command; the
 tests/test_meshcore_contact_log_trim.py (4, Mac-runnable — module imports
 clean on Mac unlike test_meshcore_contact_enrichment.py which needs
 aiosqlite). Changelog bullet under "Configuration and server" (82,
-parser-verified). ruff clean.
+parser-verified). ruff clean. LIVE-VERIFIED 2026-07-10 13:39 boot: 10
+names + "… and 340 more", full import intact (350 parsed → applied to
+349 rows). Boot log is now fully clean AND compact.
+**Banner per-source lines + logo alignment (2026-07-10, user request
+"line for each source"):** the ASCII logo box was crooked IN SOURCE
+(content rows 43 cols between │s vs 46-col borders — upstream heritage;
++3 spaces per row fixed). `print_banner(config, sources=None)` now takes
+the live capture sources (new `CaptureCoordinator.sources` tuple
+property; both call sites server.py + main.py pass it) and replaces the
+Source+Frequency pair with one line per source:
+`concentrator      LoRaWAN x5 867.9-868.7 MHz + Meshtastic 869.525 MHz
+SF11 (EU_868)` (from ConcentratorChannelPlan, hardware-free; multi-SF
+labelled LoRaWAN only for EU_868) / `meshcore_usb_868  MeshCore 869.618
+MHz SF8` (from src._meshcore.self_info — radio_freq is ALREADY MHz) /
+`serial_433  Meshtastic 433.875 MHz SF11 (EU_433)` (from
+src._radio_info via resolve_frequency_mhz — NOTE: serial_source already
+resolves real freq from handshake now, the 906.875 placeholder is gone,
+fixed in the run-#29-era session). Not-yet-handshaken sources show
+"(radio info pending)"; sources=None falls back to legacy lines.
+Mac-rendered with fakes (exact output verified) + NEW
+tests/test_banner_sources.py (7, Mac-runnable). Changelog bullet under
+"Configuration and server" (83, parser-verified). ruff clean. Pi-verify:
+next boot's banner.
+Timestamp-less boot lines EXPLAINED, user OK leaving as-is (2026-07-10):
+bare lines (Opening SPI / chip version / ARB / SX1261 PRAM) = libloragw C
+printf to stdout, can't reformat without fd hacks — leave; "INFO:" lines
+= uvicorn's own loggers, COULD be unified via log_config in serve.py —
+offered, user declined ("its ok i was just wondering"). Don't re-propose.
+journald stamps every line anyway.
 - **W9 — button as a safe physical control** (S-M): classic pattern — short
   press = something harmless and useful (e.g. trigger a MeshCore advert or
   an identify-blink), long press (3-5 s) = clean service restart or safe

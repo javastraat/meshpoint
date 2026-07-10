@@ -283,7 +283,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
         global _rtl_listener
         _rtl_listener = RtlListener()
         listener_routes.init_routes(_rtl_listener)
-        print_banner(config)
+        print_banner(config, sources=pipeline.capture_coordinator.sources)
         logger.info("Meshpoint started -- listening for packets")
         yield
         if _rtl_listener is not None:

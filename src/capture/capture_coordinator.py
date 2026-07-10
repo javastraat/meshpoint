@@ -94,6 +94,11 @@ class CaptureCoordinator:
     def source_count(self) -> int:
         return len(self._sources)
 
+    @property
+    def sources(self) -> tuple:
+        """Registered capture sources (read-only view, banner/status use)."""
+        return tuple(self._sources)
+
     def all_sources_running(self) -> bool:
         """True when every registered capture source reports running.
 

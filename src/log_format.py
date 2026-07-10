@@ -243,9 +243,9 @@ def _local_ip() -> str:
 
 _BANNER_ART = r"""
   {c}┌──────────────────────────────────────────────┐{r}
-  {c}│{r}  {g}╔╦╗╔═╗╔═╗╦ ╦  ╔═╗╔═╗╦╔╗╔╔╦╗{r}              {c}│{r}
-  {c}│{r}  {g}║║║║╣ ╚═╗╠═╣  ╠═╝║ ║║║║║ ║{r}               {c}│{r}
-  {c}│{r}  {g}╩ ╩╚═╝╚═╝╩ ╩  ╩  ╚═╝╩╝╚╝ ╩{r}               {c}│{r}
+  {c}│{r}  {g}╔╦╗╔═╗╔═╗╦ ╦  ╔═╗╔═╗╦╔╗╔╔╦╗{r}                 {c}│{r}
+  {c}│{r}  {g}║║║║╣ ╚═╗╠═╣  ╠═╝║ ║║║║║ ║{r}                  {c}│{r}
+  {c}│{r}  {g}╩ ╩╚═╝╚═╝╩ ╩  ╩  ╚═╝╩╝╚╝ ╩{r}                  {c}│{r}
   {c}└──────────────────────────────────────────────┘{r}"""
 
 
@@ -292,8 +292,105 @@ def _region_frequency_line(config: AppConfig) -> str:
     return f"{radio.frequency_mhz} MHz / SF{radio.spreading_factor} / BW{radio.bandwidth_khz:.0f}"
 
 
-def print_banner(config: AppConfig) -> None:
-    """Print the ASCII art startup banner with live config values."""
+def _describe_concentrator(config: AppConfig) -> str:
+    """Frequency summary for the SX1302: multi-SF span + service channel."""
+    radio = config.radio
+    try:
+        from src.hal.concentrator_config import ConcentratorChannelPlan
+        plan = ConcentratorChannelPlan.from_radio_config(
+            region=radio.region,
+            frequency_mhz=radio.frequency_mhz,
+            spreading_factor=radio.spreading_factor,
+            bandwidth_khz=radio.bandwidth_khz,
+        )
+    except Exception:
+        return _region_frequency_line(config)
+
+    parts = []
+    multi = [ch for ch in plan.multi_sf_channels if ch.enabled]
+    if multi:
+        lo = min(ch.frequency_hz for ch in multi) / 1e6
+        hi = max(ch.frequency_hz for ch in multi) / 1e6
+        # Only the EU868 plan points the multi-SF channels at LoRaWAN
+        # (sync word 0x34); elsewhere they're generic scan channels.
+        label = "LoRaWAN" if radio.region == "EU_868" else "multi-SF"
+        span = f"{lo:.1f}" if lo == hi else f"{lo:.1f}-{hi:.1f}"
+        parts.append(f"{label} x{len(multi)} {span} MHz")
+    ch8 = plan.single_sf_channel
+    if ch8:
+        parts.append(
+            f"Meshtastic {ch8.frequency_hz / 1e6:.3f} MHz"
+            f" SF{ch8.spreading_factor}"
+        )
+    if not parts:
+        return _region_frequency_line(config)
+    region_tag = f" ({radio.region})" if radio.region else ""
+    return " + ".join(parts) + region_tag
+
+
+def _describe_meshcore_source(src) -> str:
+    """Frequency summary from the companion's connect-time self_info."""
+    info = getattr(getattr(src, "_meshcore", None), "self_info", None) or {}
+    freq = float(info.get("radio_freq") or 0.0)
+    if not freq:
+        return "MeshCore (radio info pending)"
+    sf = int(info.get("radio_sf") or 0)
+    sf_tag = f" SF{sf}" if sf else ""
+    return f"MeshCore {freq:.3f} MHz{sf_tag}"
+
+
+def _describe_serial_source(src) -> str:
+    """Frequency summary from the Meshtastic stick's connect handshake."""
+    radio = getattr(src, "_radio_info", None) or {}
+    region = radio.get("region")
+    if not region:
+        return "Meshtastic (radio info pending)"
+    try:
+        from src.radio.channel_frequency import resolve_frequency_mhz
+        freq = resolve_frequency_mhz(
+            region=region,
+            channel_num=radio.get("channel_num"),
+            bandwidth_khz=radio.get("bandwidth_khz") or 250.0,
+            channel_name=radio.get("channel_name"),
+            modem_preset=radio.get("modem_preset"),
+            use_preset=radio.get("use_preset", True),
+            frequency_offset=radio.get("frequency_offset") or 0.0,
+            override_frequency=radio.get("override_frequency") or 0.0,
+        )
+    except Exception:
+        return f"Meshtastic ({region})"
+    sf = radio.get("spreading_factor")
+    sf_tag = f" SF{sf}" if sf else ""
+    return f"Meshtastic {freq:.3f} MHz{sf_tag} ({region})"
+
+
+def _source_lines(config: AppConfig, sources) -> list[str]:
+    """One '<name>  <frequency summary>' line per live capture source."""
+    lines = []
+    for src in sources:
+        name = getattr(src, "name", "?")
+        try:
+            if name == "concentrator":
+                desc = _describe_concentrator(config)
+            elif name.startswith("meshcore_usb"):
+                desc = _describe_meshcore_source(src)
+            elif name.startswith("serial"):
+                desc = _describe_serial_source(src)
+            else:
+                desc = ""
+        except Exception:
+            desc = ""
+        lines.append(f"{name:<17} {desc}".rstrip())
+    return lines
+
+
+def print_banner(config: AppConfig, sources=None) -> None:
+    """Print the ASCII art startup banner with live config values.
+
+    ``sources`` (optional) is the list of started capture sources; when
+    given, the banner shows one line per source with its real frequency
+    plan instead of the single combined Source/Frequency pair.
+    """
     from src.version import __version__
 
     art = _BANNER_ART.format(c=CYAN, g=BRIGHT_GREEN, r=RESET)
@@ -302,14 +399,18 @@ def print_banner(config: AppConfig) -> None:
     device = config.device
     upstream = config.upstream
     dashboard = config.dashboard
-    source_desc = _describe_sources(config)
 
     info_lines = [
         ("Device", f"{device.device_name} ({device.device_id or 'unset'})"),
         ("Version", __version__),
-        ("Source", source_desc),
-        ("Frequency", _region_frequency_line(config)),
     ]
+    per_source = _source_lines(config, sources) if sources else []
+    if per_source:
+        info_lines.append(("Sources", per_source[0]))
+        info_lines.extend(("", line) for line in per_source[1:])
+    else:
+        info_lines.append(("Source", _describe_sources(config)))
+        info_lines.append(("Frequency", _region_frequency_line(config)))
     if upstream.enabled:
         info_lines.append(("Upstream", upstream.url))
     else:
