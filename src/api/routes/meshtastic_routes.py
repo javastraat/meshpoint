@@ -151,7 +151,8 @@ async def meshtastic_packets(limit: int = Query(100, ge=1, le=500)):
         """
         SELECT
             packet_id, source_id, destination_id, packet_type,
-            hop_limit, hop_start, rssi, snr,
+            hop_limit, hop_start, channel_hash, want_ack, relay_node,
+            rssi, snr,
             frequency_mhz, spreading_factor, bandwidth_khz,
             decoded_payload, decrypted, capture_source, timestamp
         FROM packets
@@ -181,6 +182,9 @@ async def meshtastic_packets(limit: int = Query(100, ge=1, le=500)):
             "hops": hops,
             "hop_start": hop_start,
             "hop_limit": hop_limit,
+            "channel_hash": row.get("channel_hash"),
+            "want_ack": bool(row.get("want_ack")),
+            "relay_node": row.get("relay_node"),
             "decoded_payload": _parse_payload(row.get("decoded_payload")),
             "decrypted": bool(row.get("decrypted")),
             "capture_source": row.get("capture_source"),

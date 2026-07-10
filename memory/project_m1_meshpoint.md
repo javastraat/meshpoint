@@ -1304,9 +1304,19 @@ helper, dict-or-None), packet_id/destination_id/capture_source where
 missing (lorawan). Frontend: each panel stores `this._lastPackets`,
 rows get `class="lw-pkt-row" data-pkt="${i}"`, delegated tbody click →
 PacketDetailModal.show(pkt, {formatNodeId: _nodeNames lookup (mt/mc),
-selectedRow}). `.lw-pkt-row` cursor/hover CSS in lorawan.css. Fields
-the DB doesn't store (want_ack/channel_hash/relay_node) render n/a/
-omitted — acceptable. ALSO: Meshtastic NODES table Last heard moved to
+selectedRow}). `.lw-pkt-row` cursor/hover CSS in lorawan.css.
+CORRECTION (2026-07-11): channel_hash/relay_node/want_ack ARE persisted
+(packet_repository INSERT has all three) — the tab endpoints just weren't
+SELECTing them, so protocol-page modals dropped the Channel hash / Relay
+byte rows and showed "Channel: (unknown)" while the live Dashboard feed
+(reads Packet.to_dict) showed them. Fixed: added channel_hash, want_ack,
+relay_node to the SELECT + response dict in BOTH meshtastic_routes and
+meshcore_routes packets endpoints. Also the Meshtastic tab formatNodeId
+didn't map the broadcast address → showed raw "ffffffff"; now returns
+"broadcast" (matches Dashboard + MeshCore tab). Only remaining modal diff
+is the fake "CR 4/8" Modem segment on the live feed: coding_rate is NOT a
+DB column and is a Signal-model default (meshcore genuinely reports N/A);
+user said leave it (2026-07-11 "its ok"). ALSO: Meshtastic NODES table Last heard moved to
 FIRST column (matching MeshCore contacts). LoRaWAN Devices census
 reordered too (user follow-up): Last seen FIRST, First seen SECOND,
 then DevEUI/Type/Frames/RSSI/SNR/Freq/SF. All three censuses now lead

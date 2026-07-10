@@ -212,7 +212,11 @@ class MeshtasticPanel {
             const pkt = (this._lastPackets || [])[Number(tr.dataset.pkt)];
             if (!pkt) return;
             window.PacketDetailModal.show(pkt, {
-                formatNodeId: (id) => (this._nodeNames || {})[id] || id || 'n/a',
+                formatNodeId: (id) => {
+                    if (!id) return 'n/a';
+                    if (id === 'ffffffff' || id === 'ffff' || id === 'broadcast') return 'broadcast';
+                    return (this._nodeNames || {})[id] || id;
+                },
                 selectedRow: tr,
             });
         });
