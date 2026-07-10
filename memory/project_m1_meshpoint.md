@@ -992,7 +992,14 @@ Their full local.yaml was reviewed against every dataclass: all valid
 serial lists — both correct). Noted to user: mqtt.password absent → falls
 back to default "large4cats" (their LAN broker accepts it; explicit value
 recommended); storage.max_packets_retained raised to 1M (intentional).
-keys.yaml lives in data/ not config/ (user asked — not missing).
+keys.yaml lives in data/ not config/ (user asked — not missing). It holds
+the Meshtastic PKI X25519 pair (private_key_hex + public_key_hex),
+auto-generates on first run. 2026-07-10: user pasted the private key into
+chat → ROTATED (stop service, rm data/keys.yaml, start → fresh pair,
+rebinds to stable node_id 0xc3ecf862). Side effect: DM partners must
+re-accept the new key; old encrypted DMs unreadable. Backup archives made
+BEFORE the rotation contain the OLD (burned) key — restoring one restores
+the old pair; rotate again after any such restore.
 
 **Contact roster log trimmed (2026-07-10, user request after seeing the
 350-line dump):** `log_meshcore_contact_peers` in
@@ -1025,8 +1032,25 @@ fixed in the run-#29-era session). Not-yet-handshaken sources show
 "(radio info pending)"; sources=None falls back to legacy lines.
 Mac-rendered with fakes (exact output verified) + NEW
 tests/test_banner_sources.py (7, Mac-runnable). Changelog bullet under
-"Configuration and server" (83, parser-verified). ruff clean. Pi-verify:
-next boot's banner.
+"Configuration and server" (83, parser-verified). ruff clean.
+LIVE-VERIFIED on Pi 2026-07-10 13:53 boot — banner matches the Mac
+render exactly (square box, all 3 source lines with real frequencies).
+**Meshtastic packets feed shows names (2026-07-10, user request):**
+Recent Packets on the Meshtastic page showed bare hex source/dest while
+the node census above had names. Mirrored the MeshCore panel's existing
+pattern into meshtastic_panel.js: `_nodeNames` map built in _loadNodes
+(long_name||short_name, skip empty/id-equal), `_fmtSrc` (name +
+dimmed id), `_fmtDest` now resolves names too (BCAST unchanged; handles
+`!`-prefixed dest ids by stripping to bare hex for lookup). Also fixed
+the first-paint race: `_load` was Promise.all(stats,nodes,packets) →
+packets could render before the name map; now nodes complete first
+(meshcore_panel already sequenced it this way — meshtastic was the only
+straggler). node --check + ruff clean; changelog under "Dashboard and
+UI" (84, parser-verified). Pi-verify: Meshtastic page after deploy.
+FOLLOW-UP same session: section ORDER swapped to match MeshCore page —
+Recent Packets on top, Nodes census below (pure template swap in
+_buildShell, ids/handlers untouched; folded into the same changelog
+bullet).
 Timestamp-less boot lines EXPLAINED, user OK leaving as-is (2026-07-10):
 bare lines (Opening SPI / chip version / ARB / SX1261 PRAM) = libloragw C
 printf to stdout, can't reformat without fd hacks — leave; "INFO:" lines

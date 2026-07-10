@@ -87,6 +87,45 @@ class MeshtasticPanel {
 
             <section class="lw-section">
                 <div class="panel">
+                    <div class="panel__header">
+                        Recent packets
+                        <span class="lw-panel__limit">(last 100)</span>
+                    </div>
+                    <div class="panel__body lw-table-wrap">
+                        <table class="lw-table lw-table--mt-packets">
+                            <colgroup>
+                                <col class="col-time">
+                                <col class="col-type">
+                                <col class="col-src">
+                                <col class="col-dst">
+                                <col class="col-rssi">
+                                <col class="col-snr">
+                                <col class="col-sf">
+                                <col class="col-hops">
+                            </colgroup>
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Type</th>
+                                    <th>Source</th>
+                                    <th>Dest</th>
+                                    <th class="lw-r">RSSI</th>
+                                    <th class="lw-r">SNR</th>
+                                    <th class="lw-r">SF</th>
+                                    <th class="lw-r">Hops</th>
+                                </tr>
+                            </thead>
+                            <tbody id="mt-packet-tbody"></tbody>
+                        </table>
+                        <p class="lw-empty" id="mt-packet-empty" style="display:none">
+                            No packets yet.
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="lw-section">
+                <div class="panel">
                     <div class="panel__header">Nodes</div>
                     <div class="panel__body lw-table-wrap">
                         <table class="lw-table lw-table--mt-nodes">
@@ -124,45 +163,6 @@ class MeshtasticPanel {
                     </div>
                 </div>
             </section>
-
-            <section class="lw-section">
-                <div class="panel">
-                    <div class="panel__header">
-                        Recent packets
-                        <span class="lw-panel__limit">(last 100)</span>
-                    </div>
-                    <div class="panel__body lw-table-wrap">
-                        <table class="lw-table lw-table--mt-packets">
-                            <colgroup>
-                                <col class="col-time">
-                                <col class="col-type">
-                                <col class="col-src">
-                                <col class="col-dst">
-                                <col class="col-rssi">
-                                <col class="col-snr">
-                                <col class="col-sf">
-                                <col class="col-hops">
-                            </colgroup>
-                            <thead>
-                                <tr>
-                                    <th>Time</th>
-                                    <th>Type</th>
-                                    <th>Source</th>
-                                    <th>Dest</th>
-                                    <th class="lw-r">RSSI</th>
-                                    <th class="lw-r">SNR</th>
-                                    <th class="lw-r">SF</th>
-                                    <th class="lw-r">Hops</th>
-                                </tr>
-                            </thead>
-                            <tbody id="mt-packet-tbody"></tbody>
-                        </table>
-                        <p class="lw-empty" id="mt-packet-empty" style="display:none">
-                            No packets yet.
-                        </p>
-                    </div>
-                </div>
-            </section>
         `;
 
         document.getElementById('mt-refresh-btn')
@@ -181,11 +181,10 @@ class MeshtasticPanel {
     }
 
     async _load() {
-        await Promise.all([
-            this._loadStats(),
-            this._loadNodes(),
-            this._loadPackets(),
-        ]);
+        // Nodes before packets: the packets feed resolves source/dest
+        // names from the node list built by _loadNodes.
+        await Promise.all([this._loadStats(), this._loadNodes()]);
+        await this._loadPackets();
     }
 
     async _loadStats() {
@@ -215,6 +214,16 @@ class MeshtasticPanel {
                 return;
             }
             if (empty) empty.style.display = 'none';
+
+            // id -> display name, used by the packets feed (same
+            // pattern as the MeshCore panel's _nodeNames/_fmtSrc).
+            this._nodeNames = {};
+            nodes.forEach((n) => {
+                const name = (n.long_name || n.short_name || '').trim();
+                if (n.node_id && name && name !== n.node_id) {
+                    this._nodeNames[n.node_id] = name;
+                }
+            });
 
             this._allNodes = nodes;
 
@@ -255,7 +264,7 @@ class MeshtasticPanel {
                 <tr>
                     <td class="lw-time">${this._fmtTime(p.timestamp)}</td>
                     <td>${this._fmtType(p.packet_type)}</td>
-                    <td class="lw-id">${p.source_id || '--'}</td>
+                    <td class="lw-id">${this._fmtSrc(p.source_id)}</td>
                     <td class="lw-id">${this._fmtDest(p.destination_id)}</td>
                     <td class="lw-signal ${this._rssiClass(p.rssi)}">${this._fmtRssi(p.rssi)}</td>
                     <td class="lw-signal">${this._fmtSnr(p.snr)}</td>
@@ -301,10 +310,26 @@ class MeshtasticPanel {
         return `<span class="mt-badge ${cls}">${label}</span>`;
     }
 
+    _fmtSrc(id) {
+        if (!id) return '--';
+        const name = (this._nodeNames || {})[id];
+        if (name) {
+            return `<span class="mt-name">${this._esc(name)}</span> `
+                + `<span class="lw-time">${this._esc(id)}</span>`;
+        }
+        return this._esc(id);
+    }
+
     _fmtDest(id) {
         if (!id) return '--';
         if (id === 'ffffffff' || id === '!ffffffff') return '<span class="lw-time">BCAST</span>';
-        return id.startsWith('!') ? id : `!${id}`;
+        const bare = id.startsWith('!') ? id.slice(1) : id;
+        const name = (this._nodeNames || {})[bare];
+        if (name) {
+            return `<span class="mt-name">${this._esc(name)}</span> `
+                + `<span class="lw-time">!${this._esc(bare)}</span>`;
+        }
+        return id.startsWith('!') ? this._esc(id) : `!${this._esc(id)}`;
     }
 
     _fmtTime(ts) {
