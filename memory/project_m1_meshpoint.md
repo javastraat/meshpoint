@@ -99,6 +99,19 @@ capture:
 
 ## Key technical solutions
 
+### 2026-07-11 follow-up: LoRaWAN packet-detail consistency fix
+
+- Root cause: same LoRaWAN packet could render different decrypt status in Packet detail depending on entry point.
+  - Dashboard live feed uses websocket packet objects that include `decrypted`.
+  - LoRaWAN tab used `GET /api/lorawan/packets`, which did not include `decrypted`.
+- Fix: `src/api/routes/lorawan_routes.py` now selects and returns `decrypted` for each packet row.
+- Result: opening the same LoRaWAN packet from Dashboard or LoRaWAN tab now shows the same decrypt state.
+
+### 2026-07-11 follow-up #2: Dashboard LoRaWAN modal readability
+
+- Problem: Dashboard modal showed only "No matching key" for some LoRaWAN packets and hid already-decoded header/MAC metadata, while LoRaWAN tab still showed JSON.
+- Fix: `frontend/js/packet_detail_modal.js` now keeps LoRaWAN decoded JSON visible even when `decrypted === false` (no app session keys), and suppresses CR rendering for LoRaWAN modem rows so Dashboard and LoRaWAN-tab labels stay consistent.
+
 ### Dual sync word on SX1302
 
 SX1302 has one global syncword register set but the service channel (ch8) has

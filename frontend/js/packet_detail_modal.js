@@ -158,12 +158,16 @@ class PacketDetailModal {
         const freq = sig.frequency_mhz != null ? sig.frequency_mhz : packet.frequency_mhz;
         const sf = sig.spreading_factor != null ? sig.spreading_factor : packet.spreading_factor;
         const bw = sig.bandwidth_khz != null ? sig.bandwidth_khz : packet.bandwidth_khz;
+        const protocol = (packet.protocol || '').toLowerCase();
         const cr = sig.coding_rate || packet.coding_rate;
 
         const modemParts = [];
         if (sf != null) modemParts.push(`SF${sf}`);
         if (bw != null) modemParts.push(`BW${Number(bw)}`);
-        if (cr) modemParts.push(`CR ${cr}`);
+        // LoRaWAN packet rows from protocol endpoints do not currently
+        // carry coding_rate, while live feed packets may. Hide CR for
+        // LoRaWAN so both entry points render the same modem label.
+        if (cr && protocol !== 'lorawan') modemParts.push(`CR ${cr}`);
 
         return [
             { key: 'Frequency', val: freq != null ? `${Number(freq).toFixed(3)} MHz` : 'n/a' },
@@ -236,14 +240,17 @@ class PacketDetailModal {
     _payloadRows(packet) {
         const p = packet.decoded_payload;
         const type = packet.packet_type || 'unknown';
+        const protocol = (packet.protocol || '').toLowerCase();
         // MeshCore adverts/nodeinfo are decoded, not decrypted with a
         // Meshtastic channel key, so the "Decrypt / No matching key" row
         // is meaningless for it -- always show its decoded content.
-        const isMeshcore = (packet.protocol || '') === 'meshcore';
+        const isMeshcore = protocol === 'meshcore';
+        const isLorawan = protocol === 'lorawan';
         const decrypted =
             isMeshcore || (packet.decrypted !== false && type !== 'encrypted');
+        const hasObj = p && typeof p === 'object' && Object.keys(p).length > 0;
 
-        if (!decrypted) {
+        if (!decrypted && !isLorawan) {
             const hex = (p && p.raw_hex) ? p.raw_hex : null;
             const rows = [
                 {
@@ -266,12 +273,15 @@ class PacketDetailModal {
 
         const rows = [];
         if (!isMeshcore) {
-            rows.push({ key: 'Decrypt', val: 'Success', valClass: 'good' });
+            if (isLorawan && packet.decrypted === false) {
+                rows.push({ key: 'Decrypt', val: 'No app session keys', valClass: 'bad' });
+            } else {
+                rows.push({ key: 'Decrypt', val: 'Success', valClass: 'good' });
+            }
         }
         rows.push({ key: 'Channel', val: this._channelLabel(packet) });
 
         const summary = this._payloadSummary(packet);
-        const hasObj = p && typeof p === 'object' && Object.keys(p).length > 0;
         if (summary) {
             rows.push({ key: 'Content', val: summary });
             // Show every decoded field, not just the ones the summary picked:

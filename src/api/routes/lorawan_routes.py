@@ -194,7 +194,7 @@ async def lorawan_packets(limit: int = Query(100, ge=1, le=1000)):
         SELECT
             packet_id, source_id, destination_id, packet_type,
             rssi, snr, frequency_mhz, spreading_factor, bandwidth_khz,
-            capture_source, timestamp, decoded_payload
+            capture_source, timestamp, decoded_payload, decrypted
         FROM packets
         WHERE protocol = 'lorawan'
         ORDER BY timestamp DESC
@@ -226,6 +226,7 @@ async def lorawan_packets(limit: int = Query(100, ge=1, le=1000)):
             "capture_source": row.get("capture_source"),
             "timestamp": row["timestamp"],
             "decoded_payload": payload if isinstance(payload, dict) else None,
+            "decrypted": bool(row.get("decrypted")),
             "app_eui": payload.get("app_eui"),
             "dev_eui": payload.get("dev_eui"),
             # Decoder stores these without underscores (fport/fcnt); the
