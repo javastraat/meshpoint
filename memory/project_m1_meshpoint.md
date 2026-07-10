@@ -1332,7 +1332,9 @@ humidity, barometric_pressure, channel_utilization, air_util_tx,
 uptime_seconds, num_packets_tx/rx; role, public_key) — all stored in
 decoded_payload JSON, returned by the packets endpoints, so Details shows
 them on both Dashboard + tab. Shared modal so lorawan/meshcore benefit too.
-ALSO: Meshtastic NODES table Last heard moved to
+Hops row (2026-07-11): _meshRows now omits the Hops row entirely when
+hopLabel==='n/a' (hop_start not >0) instead of showing "Hops: n/a" — both
+protocols, user idea. ALSO: Meshtastic NODES table Last heard moved to
 FIRST column (matching MeshCore contacts). LoRaWAN Devices census
 reordered too (user follow-up): Last seen FIRST, First seen SECOND,
 then DevEUI/Type/Frames/RSSI/SNR/Freq/SF. All three censuses now lead

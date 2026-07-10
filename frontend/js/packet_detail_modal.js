@@ -185,9 +185,13 @@ class PacketDetailModal {
             { key: 'To', val: `${fmt(packet.destination_id)} (${packet.destination_id || 'n/a'})` },
             { key: 'Type', val: packet.packet_type || 'n/a' },
             { key: 'Protocol', val: packet.protocol || 'n/a' },
-            { key: 'Hops', val: hopLabel },
-            { key: 'Want ACK', val: packet.want_ack ? 'Yes' : 'No' },
         ];
+        // Hop info is often unknown (MeshCore direct packets, Meshtastic
+        // packets with no hop_start) -- omit the row rather than show "n/a".
+        if (hopLabel !== 'n/a') {
+            rows.push({ key: 'Hops', val: hopLabel });
+        }
+        rows.push({ key: 'Want ACK', val: packet.want_ack ? 'Yes' : 'No' });
 
         if (packet.channel_hash != null && packet.channel_hash !== 0) {
             rows.push({
