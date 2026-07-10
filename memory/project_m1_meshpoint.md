@@ -1992,6 +1992,28 @@ Fetches the remote MeshCore SQLite database (or accepts local `--source-db /path
 
 **Result:** Repeater cards now show the full lifecycle: current status (Health), active sensors (Sensors), and a 18-day statistical summary (History). All three write to the same `telemetry` table, so live future polls automatically extend the history as they arrive.
 
+**Repeaters page layout + Trends chart (2026-07-10, this-assistant, user
+"3 cards in one row? + nice stats card with charts?"):** (1) Fixed a
+BROKEN CSS brace from the history session — `.rp-card--history {
+grid-column: span 2 }` was nested INSIDE `.rp-card--sensors .rp-card__head`
+(misplaced `}`), never applied. (2) Layout now `.rp-repeater`
+`repeat(3, minmax(0,1fr))` = Health | Sensors | History in ONE row, with
+a full-width **Trends** chart card below (`.rp-card--trends` grid-column
+1/-1). (3) Trends REUSES NodeMetricsChart (Chart.js, node-drawer's) —
+`_renderTrends(r)` fetches `/api/nodes/{key}/metrics_history?hours=1000&
+limit=2000` (returns {telemetry,signal} = NodeMetricsChart input;
+repeater key==node_id, imported+live telemetry already there) → renders
+into `canvas[data-rp-chart]`; charts destroyed on hide + before
+re-render (this._charts). NodeMetricsChart charts VOLTAGE(y1)+
+TEMPERATURE(y3) for repeaters (battery_level/chutil/airutil null;
+humidity/pressure NOT its series → stay in History/Sensors; charting
+them = future extension). `.rp-trends-wrap` fixed 240px. 3-col→1-col
+<1100px. node --check + CSS 27/27 clean; changelog 95. NOTE live
+screenshot was AMBER/stale/"0/1 reporting/polled 5m ago" — a poll FAILED
+(companion command-channel busy, messaging-incident risk); chart still
+works (stored history, poll-independent). Watch poll health. NOT
+re-verified on Pi after this change.
+
 ## OLD LIST (superseded, kept for the DONE details)
 
 User has been committing incrementally with the suggested one-liners (verified

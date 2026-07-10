@@ -36,6 +36,8 @@ class RepeatersTab {
     hide() {
         clearInterval(this._timer);
         this._timer = null;
+        Object.values(this._charts || {}).forEach((c) => c.destroy());
+        this._charts = {};
     }
 
     _mount() {
@@ -90,6 +92,32 @@ class RepeatersTab {
         }
         if (empty) empty.style.display = 'none';
         grid.innerHTML = reps.map((r) => this._card(r)).join('');
+        // Render the per-repeater trend charts after the DOM is in place.
+        reps.forEach((r) => this._renderTrends(r));
+    }
+
+    /** Fetch this repeater's telemetry history and draw it with the
+     * shared NodeMetricsChart (same component the node drawer uses). */
+    async _renderTrends(r) {
+        const canvas = document.querySelector(`canvas[data-rp-chart="${r.key}"]`);
+        if (!canvas || !window.NodeMetricsChart) return;
+        this._charts = this._charts || {};
+        if (this._charts[r.key]) this._charts[r.key].destroy();
+        try {
+            // Wide window + high limit to cover the full imported history.
+            const res = await fetch(
+                `/api/nodes/${encodeURIComponent(r.key)}/metrics_history`
+                + '?hours=1000&limit=2000',
+            );
+            if (!res.ok) return;
+            const history = await res.json();
+            const chart = new window.NodeMetricsChart(canvas);
+            const drawn = chart.render(history);
+            const wrap = canvas.closest('.rp-card--trends');
+            const emptyEl = wrap && wrap.querySelector('.rp-trends-empty');
+            if (emptyEl) emptyEl.style.display = drawn ? 'none' : '';
+            if (drawn) this._charts[r.key] = chart;
+        } catch (_) {}
     }
 
     _statCard(label, value) {
@@ -175,6 +203,18 @@ class RepeatersTab {
                         <span class="rp-card__meta">${this._esc(historyMeta)}</span>
                     </div>
                     <div class="rp-card__rows">${historyRowsHtml}</div>
+                </div>
+                <div class="rp-card rp-card--trends">
+                    <div class="rp-card__head">
+                        <span class="rp-card__name">Trends</span>
+                        <span class="rp-card__meta">tap legend to toggle</span>
+                    </div>
+                    <div class="rp-trends-wrap">
+                        <canvas data-rp-chart="${this._esc(r.key)}"></canvas>
+                    </div>
+                    <div class="rp-trends-empty" style="display:none">
+                        No telemetry history yet.
+                    </div>
                 </div>
             </div>
         `;
