@@ -329,3 +329,38 @@
 .lw-device-row:hover {
     background: rgba(255, 255, 255, 0.05);
 }
+
+/* ── Packets | Contacts view tabs (W10 pilot — shared by all three
+   protocol pages so the rollout reuses these classes verbatim) ───── */
+
+.panel__header--tabs {
+    gap: 10px;
+}
+
+.lw-tabs {
+    display: inline-flex;
+    gap: 4px;
+}
+
+.lw-tab {
+    font: inherit;
+    text-transform: inherit;
+    letter-spacing: inherit;
+    font-weight: 600;
+    color: var(--text-muted, #64748b);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    padding: 3px 10px;
+    cursor: pointer;
+}
+
+.lw-tab:hover {
+    color: var(--text-primary, #e2e8f0);
+}
+
+.lw-tab--active {
+    color: var(--accent-cyan, #22d3ee);
+    background: rgba(34, 211, 238, 0.08);
+    border-color: rgba(34, 211, 238, 0.35);
+}

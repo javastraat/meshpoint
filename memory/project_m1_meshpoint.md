@@ -967,9 +967,14 @@ gpiozero/lgpio stack:
   (43 pass with fan+config suites). ruff clean. NOT yet Pi-verified —
   user must add `led: {enabled: true}` to local.yaml, apply, and watch
   the case LED (expect: steady, dips on packets; unplug a companion →
-  1 Hz blink; stop service → dark). Boot log 2026-07-10 13:20 shows
-  "Status LED started on GPIO22" — running live; visual confirmation
-  pending.
+  1 Hz blink; stop service → dark). LIVE-VERIFIED 2026-07-10 ~15:20
+  (user): steady glow + visible blink when sending an advert from their
+  MeshCore tag. W8 fully closed.
+  SAME MESSAGE also confirmed: Thermals card renders live (screenshot:
+  temp ~46-48°C orange panel, duty ~40-45% cyan panel, curves visibly
+  correlated, header "46.7 °C · fan 41%") — thermals feature fully
+  closed. AND MeshCore badge colors + LoRaWAN section swap confirmed on
+  the tabs. All 2026-07-10 UI work now live-verified.
 
 **Box identity stabilized (2026-07-10):** boot log showed `tx_service
 WARNING source_node_id (source: RANDOM, will change on every restart)` —
@@ -1073,6 +1078,26 @@ down) / red+name (link fine, radio offline). ALSO: MeshCore chip's last
 separator `·` → `|` bar (index.html + new .topbar-meshcore__sep--bar
 CSS), matching the Meshtastic chips' pre-trailing-segment bar. Folded
 into the "Topbar chips unified" changelog bullet (84, parser-verified).
+LIVE-VERIFIED 2026-07-10 (user screenshot taken mid-apply): all 3 chips
+identical amber "Reconnecting… · -- | --". User: "better?" → confirmed.
+
+**W10 PILOT BUILT on MeshCore page (2026-07-10 evening, user "go go
+gadgeteers"):** the two stacked sections merged into ONE panel with a
+"Recent packets | Contacts" tab strip in panel__header. Implementation:
+both table-wraps live in the body inside `[data-mc-view]` wrapper divs
+(pagination div moved INSIDE the contacts wrapper so its own
+display:none logic is untouched); tab buttons `[data-mc-tab]`; header
+suffixes `[data-mc-suffix]` ("(last 100)" vs mc-node-count) follow the
+active tab. `_setTab/_applyTab` + `MC_TAB_STORE_KEY =
+'meshpoint.mcTab'` localStorage persistence (default packets). ALL
+existing ids/loaders/pagination/row-click handlers byte-identical; both
+tables still refresh every 15s regardless of active tab. CSS: new
+`.panel__header--tabs`, `.lw-tabs`, `.lw-tab`, `.lw-tab--active` block
+appended to lorawan.css (shared by all 3 protocol pages — rollout to
+Meshtastic "Packets|Nodes" and LoRaWAN "Packets|Devices" reuses
+verbatim; panel__header is already flex space-between so tabs sit left,
+suffix right). Changelog bullet (85, parser-verified). Pi-verify, then
+decide rollout.
 
 ### W10: packets/nodes VIEW SWITCH on protocol pages (idea, 2026-07-10)
 
@@ -1164,7 +1189,13 @@ F-lints fixed: unused `MESHTASTIC_HEADER_SIZE` import in
 test_meshtastic_decoder_predecoded.py (shipped with run #29 "serial
 meshtastic packets the connected stick decrypts locally…" — NOTE: that
 commit implemented the serial decoded-path feature flagged earlier as a
-candidate; not done by this assistant, details unreviewed) and dead
+candidate; not done by this assistant. REVIEWED 2026-07-10: that era's
+serial_source.py work is healthy and MORE was done than known — the
+TEMPORARY debug log is REMOVED (todo closed), dc3fc0a computes serial
+channel freq from the real firmware formula (proper fix for the old
+906.875 placeholder), db4de9f auto-detects the stick's own node id +
+drops self-telemetry, c190b3e keeps user's own BLE/WiFi chat messages
+while dropping routine self-telemetry. No follow-up needed.) and dead
 `freq_default` in test_channel_frequency.py (its comment already said the
 comparison is deliberately not made; call removed). Both lint-only, no
 behavior change. ruff now passes clean locally. CI CONFIRMED GREEN after

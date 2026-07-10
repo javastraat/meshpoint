@@ -13,6 +13,9 @@ const MC_TYPE_COLORS = {
     position:         'mt-badge--position',
 };
 
+// Persisted Packets|Contacts tab choice (W10 pilot on this page).
+const MC_TAB_STORE_KEY = 'meshpoint.mcTab';
+
 class MeshCorePanel {
     constructor() {
         this._refreshTimer = null;
@@ -21,6 +24,9 @@ class MeshCorePanel {
         this._allNodes = [];
         this._page = 0;
         this._pageSize = 50;
+        let stored = null;
+        try { stored = localStorage.getItem(MC_TAB_STORE_KEY); } catch (_) {}
+        this._tab = stored === 'contacts' ? 'contacts' : 'packets';
     }
 
     show() {
@@ -69,83 +75,84 @@ class MeshCorePanel {
 
             <section class="lw-section">
                 <div class="panel">
-                    <div class="panel__header">
-                        Recent packets
-                        <span class="lw-panel__limit">(last 100)</span>
+                    <div class="panel__header panel__header--tabs">
+                        <div class="lw-tabs" role="tablist">
+                            <button class="lw-tab" type="button" role="tab"
+                                    data-mc-tab="packets">Recent packets</button>
+                            <button class="lw-tab" type="button" role="tab"
+                                    data-mc-tab="contacts">Contacts</button>
+                        </div>
+                        <span class="lw-panel__limit" data-mc-suffix="packets">(last 100)</span>
+                        <span class="lw-panel__limit" id="mc-node-count" data-mc-suffix="contacts" hidden></span>
                     </div>
-                    <div class="panel__body lw-table-wrap">
-                        <table class="lw-table lw-table--mc-packets">
-                            <colgroup>
-                                <col class="col-time">
-                                <col class="col-type">
-                                <col class="col-src">
-                                <col class="col-dst">
-                                <col class="col-rssi">
-                                <col class="col-snr">
-                                <col class="col-sf">
-                                <col class="col-hops">
-                            </colgroup>
-                            <thead>
-                                <tr>
-                                    <th>Time</th>
-                                    <th>Type</th>
-                                    <th>Source</th>
-                                    <th>Dest</th>
-                                    <th class="lw-r">RSSI</th>
-                                    <th class="lw-r">SNR</th>
-                                    <th class="lw-r">SF</th>
-                                    <th class="lw-r">Hops</th>
-                                </tr>
-                            </thead>
-                            <tbody id="mc-packet-tbody"></tbody>
-                        </table>
-                        <p class="lw-empty" id="mc-packet-empty" style="display:none">
-                            No MeshCore packets captured yet.
-                        </p>
+                    <div data-mc-view="packets">
+                        <div class="panel__body lw-table-wrap">
+                            <table class="lw-table lw-table--mc-packets">
+                                <colgroup>
+                                    <col class="col-time">
+                                    <col class="col-type">
+                                    <col class="col-src">
+                                    <col class="col-dst">
+                                    <col class="col-rssi">
+                                    <col class="col-snr">
+                                    <col class="col-sf">
+                                    <col class="col-hops">
+                                </colgroup>
+                                <thead>
+                                    <tr>
+                                        <th>Time</th>
+                                        <th>Type</th>
+                                        <th>Source</th>
+                                        <th>Dest</th>
+                                        <th class="lw-r">RSSI</th>
+                                        <th class="lw-r">SNR</th>
+                                        <th class="lw-r">SF</th>
+                                        <th class="lw-r">Hops</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="mc-packet-tbody"></tbody>
+                            </table>
+                            <p class="lw-empty" id="mc-packet-empty" style="display:none">
+                                No MeshCore packets captured yet.
+                            </p>
+                        </div>
                     </div>
-                </div>
-            </section>
-
-            <section class="lw-section">
-                <div class="panel">
-                    <div class="panel__header">
-                        Contacts
-                        <span class="lw-panel__limit" id="mc-node-count"></span>
-                    </div>
-                    <div class="panel__body lw-table-wrap">
-                        <table class="lw-table lw-table--mc-nodes">
-                            <colgroup>
-                                <col class="col-id">
-                                <col class="col-name">
-                                <col class="col-role">
-                                <col class="col-rssi">
-                                <col class="col-snr">
-                                <col class="col-dist">
-                                <col class="col-pkts">
-                                <col class="col-time">
-                            </colgroup>
-                            <thead>
-                                <tr>
-                                    <th>Node ID</th>
-                                    <th>Name</th>
-                                    <th>Role</th>
-                                    <th class="lw-r">RSSI</th>
-                                    <th class="lw-r">SNR</th>
-                                    <th class="lw-r">Dist</th>
-                                    <th class="lw-r">Packets</th>
-                                    <th>Last heard</th>
-                                </tr>
-                            </thead>
-                            <tbody id="mc-node-tbody"></tbody>
-                        </table>
-                        <p class="lw-empty" id="mc-node-empty" style="display:none">
-                            No MeshCore contacts yet. Import contacts.json to populate.
-                        </p>
-                    </div>
-                    <div class="lw-pagination" id="mc-pagination" style="display:none">
-                        <button class="lw-page-btn" id="mc-page-prev">&#8249; Prev</button>
-                        <span class="lw-page-info" id="mc-page-info"></span>
-                        <button class="lw-page-btn" id="mc-page-next">Next &#8250;</button>
+                    <div data-mc-view="contacts" hidden>
+                        <div class="panel__body lw-table-wrap">
+                            <table class="lw-table lw-table--mc-nodes">
+                                <colgroup>
+                                    <col class="col-id">
+                                    <col class="col-name">
+                                    <col class="col-role">
+                                    <col class="col-rssi">
+                                    <col class="col-snr">
+                                    <col class="col-dist">
+                                    <col class="col-pkts">
+                                    <col class="col-time">
+                                </colgroup>
+                                <thead>
+                                    <tr>
+                                        <th>Node ID</th>
+                                        <th>Name</th>
+                                        <th>Role</th>
+                                        <th class="lw-r">RSSI</th>
+                                        <th class="lw-r">SNR</th>
+                                        <th class="lw-r">Dist</th>
+                                        <th class="lw-r">Packets</th>
+                                        <th>Last heard</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="mc-node-tbody"></tbody>
+                            </table>
+                            <p class="lw-empty" id="mc-node-empty" style="display:none">
+                                No MeshCore contacts yet. Import contacts.json to populate.
+                            </p>
+                        </div>
+                        <div class="lw-pagination" id="mc-pagination" style="display:none">
+                            <button class="lw-page-btn" id="mc-page-prev">&#8249; Prev</button>
+                            <span class="lw-page-info" id="mc-page-info"></span>
+                            <button class="lw-page-btn" id="mc-page-next">Next &#8250;</button>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -157,6 +164,10 @@ class MeshCorePanel {
             ?.addEventListener('click', () => { this._page--; this._renderNodePage(); });
         document.getElementById('mc-page-next')
             ?.addEventListener('click', () => { this._page++; this._renderNodePage(); });
+        root.querySelectorAll('[data-mc-tab]').forEach((btn) => {
+            btn.addEventListener('click', () => this._setTab(btn.dataset.mcTab));
+        });
+        this._applyTab();
 
         const nodeTbody = document.getElementById('mc-node-tbody');
         if (nodeTbody) {
@@ -168,6 +179,29 @@ class MeshCorePanel {
                 if (node) window.nodeDrawer.open({ ...node, has_position: !!(node.latitude && node.longitude) });
             });
         }
+    }
+
+    _setTab(tab) {
+        if (tab === this._tab) return;
+        this._tab = tab;
+        try { localStorage.setItem(MC_TAB_STORE_KEY, tab); } catch (_) {}
+        this._applyTab();
+    }
+
+    _applyTab() {
+        const root = document.getElementById('meshcore-panel');
+        if (!root) return;
+        root.querySelectorAll('[data-mc-tab]').forEach((btn) => {
+            const active = btn.dataset.mcTab === this._tab;
+            btn.classList.toggle('lw-tab--active', active);
+            btn.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+        root.querySelectorAll('[data-mc-view]').forEach((el) => {
+            el.hidden = el.dataset.mcView !== this._tab;
+        });
+        root.querySelectorAll('[data-mc-suffix]').forEach((el) => {
+            el.hidden = el.dataset.mcSuffix !== this._tab;
+        });
     }
 
     async _load() {
