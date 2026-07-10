@@ -2054,7 +2054,12 @@ fixed high limit will eventually truncate again — proper fix is
 server-side downsample-across-range (candidate task). (4) REFRESH CADENCE
 (user: "why 30s, data updates every 20min"): page auto-refresh 30s→300s
 (5min) — no point re-fetching the full history + re-rendering the chart
-40× between actual 20-min polls. NOT Pi-verified.
+40× between actual 20-min polls.
+LIVE-VERIFIED on Pi 2026-07-10 (user screenshot "you like it?"): roomy
+full-width 3-up cards, Trends chart shows the FULL Jun22-Jul11 range
+dense throughout (truncation fixed), all 4 series (voltage flat ~4V =
+solar healthy, temp daily sawtooth, humidity inverse, pressure weather),
+RSSI toggled off. Repeater monitoring feature COMPLETE end-to-end.
 
 ## OLD LIST (superseded, kept for the DONE details)
 
