@@ -980,6 +980,28 @@ weight, 0.18em letter-spacing, cyan text-shadow, 0.82rem) vs MeshCore's
 plain 600-weight name slot. Added `.topbar-serial__call--status` modifier
 (inherit size, 600, normal spacing, no shadow) applied only when the slot
 shows status text; real call signs keep the glow styling.
+
+**LoRaWAN FPort/FCnt "--" bug (2026-07-10, found while reviewing user's
+panel logs):** every Data row showed FCnt/FPort as "--" even though FCnt is
+mandatory in the MAC header and the decoder extracts both. ROOT CAUSE: key
+mismatch — lorawan_decoder.py stores `fcnt`/`fport` (no underscore) in
+decoded_payload; lorawan_routes.py /packets read `payload.get("f_cnt")`/
+`("f_port")` → always None. Fixed at the route (reads decoder's keys,
+response keeps f_port/f_cnt names the panel reads). No test added (route
+file has no test scaffolding; fastapi CI-only) — verify on Pi: LoRaWAN page
+packets log should show FCnt counting up per device. Changelog bullet under
+"LoRaWAN sniffing" (78, parser-verified).
+RF-log review conclusions (same session, for reference): −98..−103/negative
+SNR rows = direct below-noise receptions (RSSI pins at the ~−100 dBm local
+noise floor; SNR carries the margin; SF11 decode edge ≈ SNR −20, SF12 ≈
+−22.5); −35..−44/positive-SNR = last hop was own PD2EMC repeater or desk
+gear (incl. all far UK/DE nodes at −41 "Excellent" = relayed, high hop
+counts); PD2EMC adverts hourly at :21:05. LoRaWAN capture healthy: 780002Fx
+sequential DevAddrs (same device rejoining), SF12 ~30-min cadence at the
+floor; joins on multiple EUIs; RSSI step −95→−101 around Jul 8/9 for that
+device = propagation/device change, predates nothing suspicious in our
+code. One-off impossible reading "Galdere Tracker −120 dBm / SNR +11.3" =
+companion misreport, watch-only.
 ALSO dropped the REGION segment (EU_433) from the serial chip per user
 ("we can see the freq that enough"): region element + sep removed from
 _buildBadge, docstring updated, `.topbar-serial__region` CSS rules deleted.

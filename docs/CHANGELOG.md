@@ -14,6 +14,7 @@ First tagged release of the javastraat/meshpoint fork: LoRaWAN sniffing, multi-r
 - **LoRaWAN MAC decoder.** Join-Request, Data Up, and Rejoin frames parsed (DevEUI/AppEUI, DevAddr, FCnt, FPort, MIC); payloads stay encrypted (no session keys), listen-only.
 - **LoRaWAN dashboard page.** Devices, recent packets, and stats views backed by `GET /api/lorawan/devices`, `/api/lorawan/packets`, `/api/lorawan/stats`.
 - **Strict isolation.** LoRaWAN traffic is never relayed and never enters the mesh node roster or telemetry store; router checks LoRaWAN before Meshtastic to avoid false positives.
+- **FPort/FCnt show up in the packets log.** The LoRaWAN page's FPort and FCnt columns were permanently "--": the API read the decoded payload with underscored key names (`f_cnt`) while the decoder stores them without (`fcnt`). The frame counter and port now display for every data packet.
 - **Service channel RF chain fix.** ch8 now picks the correct radio chain from its frequency instead of hardcoded RF0.
 
 #### Multi-radio capture (5 networks at once)

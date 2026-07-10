@@ -120,8 +120,10 @@ async def lorawan_packets(limit: int = Query(100, ge=1, le=1000)):
             "timestamp": row["timestamp"],
             "app_eui": payload.get("app_eui"),
             "dev_eui": payload.get("dev_eui"),
-            "f_port": payload.get("f_port"),
-            "f_cnt": payload.get("f_cnt"),
+            # Decoder stores these without underscores (fport/fcnt); the
+            # response keeps the f_port/f_cnt names the frontend reads.
+            "f_port": payload.get("fport"),
+            "f_cnt": payload.get("fcnt"),
             "mic": payload.get("mic"),
         })
     return packets
