@@ -631,6 +631,21 @@ Requires `gpiozero` and `lgpio` in the Meshpoint **venv** specifically (both in 
 
 ---
 
+## Status LED (SenseCap M1)
+
+```yaml
+led:
+  enabled: false        # opt-in -- same rationale as fan:
+  gpio_pin: 22           # confirmed via scripts/test_gpio_hardware.py led
+  activity_blink: true   # brief off-dip per captured packet
+```
+
+Drives the M1's onboard case LED as a glanceable status light with four states: **steady on** = service running and every configured capture source healthy (concentrator, MeshCore companions, Meshtastic USB sticks); **brief off-flicker** = a packet was just captured (set `activity_blink: false` for a calm steady light); **1 Hz blink** = one or more configured capture sources are down; **dark** = the service isn't running (when the process dies the kernel releases the GPIO line, so no watchdog is needed).
+
+Plain on/off GPIO — no PWM involved, so unlike the fan it works even without `lgpio` (gpiozero's fallback pin factory handles simple output pins fine). Same venv note as the fan applies for `gpiozero` itself.
+
+---
+
 ## Device Identity
 
 ```yaml

@@ -106,6 +106,7 @@ _spectral_scan_service: SpectralScanService | None = None
 _rtl_listener: RtlListener | None = None
 _fan_controller_task = None
 _fan_controller = None
+_led_controller_task = None
 
 
 def create_app(config: AppConfig | None = None) -> FastAPI:
@@ -255,6 +256,20 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
             )
         system_metrics.init_routes(_fan_controller)
 
+        global _led_controller_task
+        if config.led.enabled:
+            from src.hardware.led_status import LedController
+
+            stats = pipeline.stats_reporter
+            _led_controller_task = asyncio.get_running_loop().create_task(
+                LedController(
+                    pin=config.led.gpio_pin,
+                    health_fn=pipeline.capture_coordinator.all_sources_running,
+                    packet_count_fn=lambda: stats.total_packets,
+                    activity_blink=config.led.activity_blink,
+                ).run()
+            )
+
         _init_routes(
             pipeline,
             config,
@@ -285,6 +300,12 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
             _fan_controller_task.cancel()
             try:
                 await _fan_controller_task
+            except BaseException:
+                pass
+        if _led_controller_task is not None:
+            _led_controller_task.cancel()
+            try:
+                await _led_controller_task
             except BaseException:
                 pass
         if nodeinfo_broadcaster is not None:

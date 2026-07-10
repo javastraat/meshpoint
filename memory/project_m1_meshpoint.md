@@ -941,10 +941,33 @@ Confirmed-and-idle, waiting for a feature. Natural candidates, same opt-in
 config shape as the fan, living in `src/hardware/` on the proven
 gpiozero/lgpio stack:
 
-- **W8 — LED as a status light** (S): e.g. steady on when the service is
-  healthy (all capture sources connected), blink on packet activity,
-  off/fast-blink on trouble. Cheap, makes the box readable from across the
-  room.
+- **W8 — LED as a status light: DONE 2026-07-10** (user-approved design,
+  explicitly NO PWM). Four states: steady on = all configured capture
+  sources healthy; brief OFF-flicker (0.08s) per captured packet; 1 Hz
+  blink (phase-locked to clock) = degraded; dark = service dead (kernel
+  releases the line on process exit — free watchdog). Built: NEW
+  `src/hardware/led_status.py` (LedController, `_tick(now)` state machine
+  split out for tests, `_lit` guard avoids redundant pin writes, 10 Hz
+  loop, fan-style lifecycle incl. gpiozero-missing error path);
+  `LedConfig` in config.py (enabled False/gpio_pin 22/activity_blink True)
+  + AppConfig.led + **section_map entry (the fan lesson!)** + regression
+  test; `CaptureCoordinator.all_sources_running()` (all src.is_running,
+  vacuously True — is_running exists on every source via base protocol);
+  wired in server.py lifespan after the fan block (health_fn =
+  capture_coordinator.all_sources_running, packet_count_fn =
+  stats_reporter.total_packets — cheap in-memory counter, hot path
+  untouched), cancelled in shutdown like fan. First tick swallows
+  pre-existing packet count (no spurious flicker); activity during
+  degraded doesn't arm a flicker. Docs: default.yaml `led:` block,
+  CONFIGURATION.md "Status LED (SenseCap M1)" section (notes: no PWM →
+  works even without lgpio), README fork bullet, changelog bullet next to
+  the fan bullet (81, parser-verified). Tests: test_led_status.py (8,
+  Mac-runnable: fake LED; steady/flicker/1Hz phases/recovery/first-tick/
+  activity-off/degraded-no-arm + all_sources_running) + config regression
+  (43 pass with fan+config suites). ruff clean. NOT yet Pi-verified —
+  user must add `led: {enabled: true}` to local.yaml, apply, and watch
+  the case LED (expect: steady, dips on packets; unplug a companion →
+  1 Hz blink; stop service → dark).
 - **W9 — button as a safe physical control** (S-M): classic pattern — short
   press = something harmless and useful (e.g. trigger a MeshCore advert or
   an identify-blink), long press (3-5 s) = clean service restart or safe
@@ -1055,6 +1078,10 @@ of the REAL index.html: zero un-tokened local assets, externals byte-
 identical). ruff clean. Changelog bullet under "Self-update system" (80,
 parser-verified). NOTE: the deploy carrying THIS fix is itself the last
 one needing a manual hard reload.
+TOPBAR LIVE-VERIFIED (2026-07-10, user screenshot + "better?"): all 3
+chips render unified (EMC2 · 869.525 · LongFast / PD2EMC Meshpoint ·
+869.618 · TECHINC +7 / !06f4 · 433.875 · LongFast), green lamps, no
+region segments, plain names. User satisfied. Topbar polish round DONE.
 
 Watch: RFID plateau 865.6-867.6 (identified, only interesting if it changes); noise pill should read a few dB lower post-percentile-fix.
 

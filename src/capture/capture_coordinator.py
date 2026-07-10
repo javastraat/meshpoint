@@ -94,6 +94,14 @@ class CaptureCoordinator:
     def source_count(self) -> int:
         return len(self._sources)
 
+    def all_sources_running(self) -> bool:
+        """True when every registered capture source reports running.
+
+        Backs the status LED's healthy/degraded split. Vacuously True
+        with no sources -- nothing configured is broken.
+        """
+        return all(src.is_running for src in self._sources)
+
     @property
     def queue_size(self) -> int:
         return self._queue.qsize()

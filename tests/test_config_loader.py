@@ -248,6 +248,32 @@ class LoadConfigIntegrationTest(unittest.TestCase):
         self.assertEqual(cfg.fan.min_temp_c, 50.0)
         self.assertEqual(cfg.fan.gpio_pin, 13)  # untouched default
 
+    def test_led_section_is_applied_without_warning(self):
+        # Same regression class as the fan test above: every AppConfig
+        # section field must appear in _apply_yaml's section_map or its
+        # local.yaml block is silently ignored.
+        tmp = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", delete=False, encoding="utf-8"
+        )
+        tmp.write("led:\n  enabled: true\n  activity_blink: false\n")
+        tmp.close()
+        path = Path(tmp.name)
+        self.addCleanup(lambda: path.unlink(missing_ok=True))
+
+        old = os.environ.get("CONCENTRATOR_CONFIG")
+        os.environ["CONCENTRATOR_CONFIG"] = str(path)
+        try:
+            cfg = load_config()
+        finally:
+            if old is None:
+                os.environ.pop("CONCENTRATOR_CONFIG", None)
+            else:
+                os.environ["CONCENTRATOR_CONFIG"] = old
+
+        self.assertTrue(cfg.led.enabled)
+        self.assertFalse(cfg.led.activity_blink)
+        self.assertEqual(cfg.led.gpio_pin, 22)  # untouched default
+
 
 if __name__ == "__main__":
     unittest.main()

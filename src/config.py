@@ -415,6 +415,23 @@ class FanConfig:
 
 
 @dataclass
+class LedConfig:
+    """SenseCap M1 case LED: glanceable service/capture status light.
+
+    Disabled by default -- opt-in via local.yaml, same rationale as
+    ``FanConfig`` (this GPIO doesn't exist on other carriers). GPIO 22
+    confirmed live as this board's LED via scripts/test_gpio_hardware.py.
+    Steady on = all capture sources healthy; brief off-flicker = packet
+    captured; 1 Hz blink = a configured source is down; dark = service
+    not running.
+    """
+
+    enabled: bool = False
+    gpio_pin: int = 22
+    activity_blink: bool = True
+
+
+@dataclass
 class AppConfig:
     radio: RadioConfig = field(default_factory=RadioConfig)
     meshtastic: MeshtasticConfig = field(default_factory=MeshtasticConfig)
@@ -431,6 +448,7 @@ class AppConfig:
     location: LocationConfig = field(default_factory=LocationConfig)
     metrics: MetricsConfig = field(default_factory=MetricsConfig)
     fan: FanConfig = field(default_factory=FanConfig)
+    led: LedConfig = field(default_factory=LedConfig)
 
 
 def _resolve_radio_frequency(radio: "RadioConfig") -> None:
@@ -525,6 +543,7 @@ def _apply_yaml(cfg: AppConfig, path: Path) -> None:
         "location": cfg.location,
         "metrics": cfg.metrics,
         "fan": cfg.fan,
+        "led": cfg.led,
     }
 
     unknown_keys: list[str] = []

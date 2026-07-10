@@ -173,3 +173,16 @@ fan:
   hysteresis_c: 5.0
   # How often (seconds) to re-read CPU temp and adjust duty.
   poll_interval_s: 10.0
+
+led:
+  # SenseCap M1 onboard case LED (opt-in -- same rationale as fan:).
+  # Glanceable status: steady on = all capture sources healthy, brief
+  # off-flicker = packet captured, 1 Hz blink = a configured source is
+  # down, dark = service not running.
+  enabled: false
+  # BCM GPIO number; 22 confirmed as this board's LED via
+  # scripts/test_gpio_hardware.py led.
+  gpio_pin: 22
+  # Dip the LED briefly for every captured packet. Set false for a
+  # calm steady light that only signals health.
+  activity_blink: true
