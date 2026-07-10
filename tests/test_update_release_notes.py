@@ -12,7 +12,9 @@ import unittest
 from src.api.update.release_notes import (
     ChangelogParser,
     ChangelogSection,
+    format_section_full,
     format_section_for_preview,
+    sanitize_detail_full,
     sanitize_detail_for_preview,
     select_preview_section,
 )
@@ -133,6 +135,26 @@ class TestChangelogParser(unittest.TestCase):
         section = ChangelogParser.parse_text(text)[0]
         preview = format_section_for_preview(section)
         self.assertEqual(preview["bullets"][0]["category"], "CLI")
+
+    def test_full_section_keeps_untruncated_detail(self) -> None:
+        long = "word " * 60  # ~300 chars, well past the 140 preview cap
+        text = f"### v0.7.7 (July 2026)\n\n- **Big.** {long.strip()}\n"
+        section = ChangelogParser.parse_text(text)[0]
+        preview = format_section_for_preview(section)
+        full = format_section_full(section)
+        self.assertTrue(preview["bullets"][0]["detail"].endswith("…"))
+        self.assertFalse(full["bullets"][0]["detail"].endswith("…"))
+        self.assertIn("word word", full["bullets"][0]["detail"])
+        self.assertEqual(full["bullets"][0]["headline"], "Big")
+
+    def test_sanitize_full_demarkdowns_without_truncating(self) -> None:
+        d = "A `code` and [link](http://x) " + ("x" * 200)
+        out = sanitize_detail_full(d)
+        self.assertNotIn("`", out)
+        self.assertNotIn("](", out)
+        self.assertIn("code", out)
+        self.assertIn("link", out)
+        self.assertFalse(out.endswith("…"))
 
 
 class TestSelectPreviewSection(unittest.TestCase):

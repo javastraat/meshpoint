@@ -2111,3 +2111,22 @@ good resource for any future question needing firmware-level (not just
 meshtastic-python-level) ground truth.
 
 Suggested order: T3 → T2 → T1 → T4, then by mood.
+
+**"Read full release notes" modal (2026-07-10, user: keep the 140-char
+preview truncation but link to the full text):** the Updates "What's new"
+preview truncates each bullet to 140 chars (`sanitize_detail_for_preview`,
+_PREVIEW_DETAIL_MAX=140) — intentional teaser, our bullets are just very
+long. Added a LOCAL full-notes view (offline-safe, no GitHub link — box
+may be air-gapped, same reason Chart.js/xterm are vendored): NEW
+`sanitize_detail_full` (de-markdown, NO truncation) + `format_bullet_full`
+/`format_section_full` in release_notes.py; `/api/update/release_notes`
+now returns `full_section` alongside `preview_section` (same parsed data,
+untruncated). Frontend: release_notes_view.js stores `_fullSection`, adds
+a "Read full release notes" link (only when bullets present) → lightweight
+self-built modal (`.rn-modal-overlay`/`.rn-modal`, Escape/click-outside/×
+close) reusing `_renderBullets` (category grouping preserved). Scope =
+INSTALLED VERSION only (user chose (a) over whole-changelog). CSS in
+settings.css. Tests: 2 new in test_update_release_notes.py (full keeps
+untruncated detail; sanitize_full de-markdowns without cutting) — 25 pass.
+ruff + node --check + CSS braces clean. Changelog bullet under "Self-update
+system" (88). NOT Pi-verified.
