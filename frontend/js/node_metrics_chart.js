@@ -164,12 +164,24 @@ class NodeMetricsChart {
                 ticks: { color: '#64748b', font: { size: 9 } },
                 grid: { drawOnChartArea: false },
             },
+            y4: {
+                display: hasAxis('y4'),
+                position: 'right',
+                title: {
+                    display: hasAxis('y4'),
+                    text: 'hPa',
+                    color: '#c084fc',
+                    font: { size: 9 },
+                },
+                ticks: { color: '#64748b', font: { size: 9 } },
+                grid: { drawOnChartArea: false },
+            },
         };
     }
 
     _syncAxes(chart) {
         if (!chart) return;
-        const ids = ['y', 'y1', 'y2', 'y3'];
+        const ids = ['y', 'y1', 'y2', 'y3', 'y4'];
         for (const id of ids) {
             const scale = chart.scales[id];
             if (!scale) continue;
@@ -215,6 +227,13 @@ class NodeMetricsChart {
             const c = Number(t.temperature);
             if (Number.isNaN(c) || c === 0 || c < -60 || c > 85) return null;
             return c;
+        }, false);
+        // Humidity shares the 0-100% left axis; Pressure gets its own hPa
+        // axis. Both only appear when the node reports them (>= 2 points).
+        this._addSeries(out, 'Humidity', '#38bdf8', 'y', telem, (t) => t.humidity, false);
+        this._addSeries(out, 'Pressure', '#c084fc', 'y4', telem, (t) => {
+            const p = t.barometric_pressure;
+            return p != null && Number(p) > 0 ? Number(p) : null;
         }, false);
         // RSSI is dense: hidden by default; click legend to show.
         this._addSeries(out, 'RSSI', '#06b6d4', 'y2', signal, (s) => s.rssi, true);
@@ -296,6 +315,8 @@ class NodeMetricsChart {
         if (label === 'ChUtil' || label === 'AirUtil') {
             return `${label}: ${value.toFixed(1)}%`;
         }
+        if (label === 'Humidity') return `${label}: ${value.toFixed(0)}%`;
+        if (label === 'Pressure') return `${label}: ${value.toFixed(1)} hPa`;
         return `${label}: ${value}`;
     }
 }

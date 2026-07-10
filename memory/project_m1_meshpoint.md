@@ -2024,6 +2024,18 @@ for speed; 2 new (retries-then-succeeds asserts 3 calls; gives-up-after-
 max asserts POLL_ATTEMPTS calls). 10 pass, ruff clean, changelog reworded
 (still 95).
 
+**Humidity+Pressure charted + scroll fix (2026-07-10):** (1) Extended the
+SHARED NodeMetricsChart (benefits node drawer too) — added Humidity (y
+axis, %, #38bdf8) + Pressure (NEW y4 hPa axis, #c084fc) series + y4 scale
++ y4 in _syncAxes + tooltip labels. Each only appears when the node has
+≥2 points of that field, so Meshtastic nodes without them are unaffected.
+Repeater trends now show voltage/temp/humidity/pressure, all legend-
+toggleable. (2) SCROLL BUG: repeaters page couldn't scroll to Trends/
+History — parent `.section` is overflow:hidden and each page must promote
+itself; added `.section[data-section="repeaters"] { overflow-y: auto }`
+(same rule lorawan/meshcore/meshtastic have). node --check + CSS 28/28
+clean; changelog reworded (95). NOT Pi-verified.
+
 ## OLD LIST (superseded, kept for the DONE details)
 
 User has been committing incrementally with the suggested one-liners (verified

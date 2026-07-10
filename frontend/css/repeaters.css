@@ -1,5 +1,12 @@
 /* Repeaters page — MeshCore repeater health cards. */
 
+/* The parent .section is overflow:hidden — promote this one to a scroll
+   container so the Trends/History cards below the fold are reachable
+   (same pattern as the lorawan/meshcore/meshtastic sections). */
+.section[data-section="repeaters"] {
+    overflow-y: auto;
+}
+
 .rp-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(560px, 1fr));
