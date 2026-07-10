@@ -121,6 +121,7 @@ class MeshCorePanel {
                         <div class="panel__body lw-table-wrap">
                             <table class="lw-table lw-table--mc-nodes">
                                 <colgroup>
+                                    <col class="col-time">
                                     <col class="col-id">
                                     <col class="col-name">
                                     <col class="col-role">
@@ -128,10 +129,10 @@ class MeshCorePanel {
                                     <col class="col-snr">
                                     <col class="col-dist">
                                     <col class="col-pkts">
-                                    <col class="col-time">
                                 </colgroup>
                                 <thead>
                                     <tr>
+                                        <th>Last heard</th>
                                         <th>Node ID</th>
                                         <th>Name</th>
                                         <th>Role</th>
@@ -139,7 +140,6 @@ class MeshCorePanel {
                                         <th class="lw-r">SNR</th>
                                         <th class="lw-r">Dist</th>
                                         <th class="lw-r">Packets</th>
-                                        <th>Last heard</th>
                                     </tr>
                                 </thead>
                                 <tbody id="mc-node-tbody"></tbody>
@@ -259,6 +259,7 @@ class MeshCorePanel {
         if (tbody) {
             tbody.innerHTML = slice.map((n) => `
                 <tr data-node-id="${this._esc(n.node_id || '')}" class="mc-contact-row">
+                    <td class="lw-time">${this._fmtTime(n.last_heard)}</td>
                     <td class="lw-id">${this._esc(n.node_id || '--')}</td>
                     <td class="mt-name">${this._fmtName(n)}</td>
                     <td>${this._fmtRole(n.role)}</td>
@@ -266,7 +267,6 @@ class MeshCorePanel {
                     <td class="lw-signal">${this._fmtSnr(n.latest_snr)}</td>
                     <td class="lw-num">${this._fmtDist(n.latitude, n.longitude)}</td>
                     <td class="lw-num">${n.packet_count ?? 0}</td>
-                    <td class="lw-time">${this._fmtTime(n.last_heard)}</td>
                 </tr>
             `).join('');
         }

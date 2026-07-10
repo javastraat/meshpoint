@@ -4,11 +4,17 @@
  * Loaded once; auto-refreshes every 15 seconds while the section is visible.
  */
 
+// Persisted Packets|Devices tab choice (W10, same pattern as MeshCore).
+const LW_TAB_STORE_KEY = 'meshpoint.lwTab';
+
 class LoRaWANPanel {
     constructor() {
         this._refreshTimer = null;
         this._mounted = false;
         this._allDevices = [];
+        let storedTab = null;
+        try { storedTab = localStorage.getItem(LW_TAB_STORE_KEY); } catch (_) {}
+        this._tab = storedTab === 'devices' ? 'devices' : 'packets';
     }
 
     /** Called by the router when the section becomes active. */
@@ -59,11 +65,17 @@ class LoRaWANPanel {
 
             <section class="lw-section">
                 <div class="panel">
-                    <div class="panel__header">
-                        Recent packets
-                        <span class="lw-panel__limit">(last 100)</span>
+                    <div class="panel__header panel__header--tabs">
+                        <div class="lw-tabs" role="tablist">
+                            <button class="lw-tab" type="button" role="tab"
+                                    data-lw-tab="packets">Recent packets</button>
+                            <button class="lw-tab" type="button" role="tab"
+                                    data-lw-tab="devices">Devices</button>
+                        </div>
+                        <span class="lw-panel__limit" data-lw-suffix="packets">(last 100)</span>
                     </div>
-                    <div class="panel__body lw-table-wrap">
+                    <div data-lw-view="packets">
+                        <div class="panel__body lw-table-wrap">
                         <table class="lw-table lw-table--packets">
                             <colgroup>
                                 <col class="col-time">
@@ -94,14 +106,10 @@ class LoRaWANPanel {
                         <p class="lw-empty" id="lw-packet-empty" style="display:none">
                             No packets yet.
                         </p>
+                        </div>
                     </div>
-                </div>
-            </section>
-
-            <section class="lw-section">
-                <div class="panel">
-                    <div class="panel__header">Devices</div>
-                    <div class="panel__body lw-table-wrap">
+                    <div data-lw-view="devices" hidden>
+                        <div class="panel__body lw-table-wrap">
                         <table class="lw-table lw-table--devices">
                             <colgroup>
                                 <col class="col-id">
@@ -132,6 +140,7 @@ class LoRaWANPanel {
                         <p class="lw-empty" id="lw-device-empty" style="display:none">
                             No LoRaWAN devices heard yet.
                         </p>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -139,6 +148,10 @@ class LoRaWANPanel {
 
         document.getElementById('lw-refresh-btn')
             ?.addEventListener('click', () => this._load());
+        root.querySelectorAll('[data-lw-tab]').forEach((btn) => {
+            btn.addEventListener('click', () => this._setTab(btn.dataset.lwTab));
+        });
+        this._applyTab();
 
         const deviceTbody = document.getElementById('lw-device-tbody');
         if (deviceTbody) {
@@ -163,6 +176,29 @@ class LoRaWANPanel {
                 });
             });
         }
+    }
+
+    _setTab(tab) {
+        if (tab === this._tab) return;
+        this._tab = tab;
+        try { localStorage.setItem(LW_TAB_STORE_KEY, tab); } catch (_) {}
+        this._applyTab();
+    }
+
+    _applyTab() {
+        const root = document.getElementById('lorawan-panel');
+        if (!root) return;
+        root.querySelectorAll('[data-lw-tab]').forEach((btn) => {
+            const active = btn.dataset.lwTab === this._tab;
+            btn.classList.toggle('lw-tab--active', active);
+            btn.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+        root.querySelectorAll('[data-lw-view]').forEach((el) => {
+            el.hidden = el.dataset.lwView !== this._tab;
+        });
+        root.querySelectorAll('[data-lw-suffix]').forEach((el) => {
+            el.hidden = el.dataset.lwSuffix !== this._tab;
+        });
     }
 
     async _load() {

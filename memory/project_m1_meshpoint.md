@@ -1096,8 +1096,22 @@ tables still refresh every 15s regardless of active tab. CSS: new
 appended to lorawan.css (shared by all 3 protocol pages — rollout to
 Meshtastic "Packets|Nodes" and LoRaWAN "Packets|Devices" reuses
 verbatim; panel__header is already flex space-between so tabs sit left,
-suffix right). Changelog bullet (85, parser-verified). Pi-verify, then
-decide rollout.
+suffix right). Changelog bullet (85, parser-verified).
+LIVE-VERIFIED 2026-07-10 (user screenshots, "nice :)"): both tabs render
+and switch correctly, suffixes follow the tab, contacts count shows.
+Pilot APPROVED → **ROLLED OUT same evening (user request): W10 DONE on
+all three pages.** meshtastic_panel.js (MT_TAB_STORE_KEY
+'meshpoint.mtTab', data-mt-* attrs, "Recent packets | Nodes") and
+lorawan_panel.js (LW_TAB_STORE_KEY 'meshpoint.lwTab', data-lw-*,
+"Recent packets | Devices") got the identical mechanical treatment;
+per-page localStorage keys; shared .lw-tab CSS reused untouched. ALSO
+per user: MeshCore CONTACTS table column order changed — Last heard
+FIRST (colgroup + thead + row template in _renderNodePage), rest
+unchanged (ID, Name, Role, RSSI, SNR, Dist, Packets). Meshtastic/
+LoRaWAN census column order NOT changed (not asked). Verified: node
+--check all 3 panels + div/section balance script (20/20, 20/20,
+21/21). Changelog bullet rewritten pilot→rollout (85, parser-verified).
+Pi-verify all three tabs after deploy.
 
 ### W10: packets/nodes VIEW SWITCH on protocol pages (idea, 2026-07-10)
 

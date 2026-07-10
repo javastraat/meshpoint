@@ -34,10 +34,16 @@ const MT_TYPE_COLORS = {
     neighborinfo: 'mt-badge--neighborinfo',
 };
 
+// Persisted Packets|Nodes tab choice (W10, same pattern as MeshCore).
+const MT_TAB_STORE_KEY = 'meshpoint.mtTab';
+
 class MeshtasticPanel {
     constructor() {
         this._refreshTimer = null;
         this._mounted = false;
+        let storedTab = null;
+        try { storedTab = localStorage.getItem(MT_TAB_STORE_KEY); } catch (_) {}
+        this._tab = storedTab === 'nodes' ? 'nodes' : 'packets';
         this._allNodes = [];
     }
 
@@ -87,47 +93,49 @@ class MeshtasticPanel {
 
             <section class="lw-section">
                 <div class="panel">
-                    <div class="panel__header">
-                        Recent packets
-                        <span class="lw-panel__limit">(last 100)</span>
+                    <div class="panel__header panel__header--tabs">
+                        <div class="lw-tabs" role="tablist">
+                            <button class="lw-tab" type="button" role="tab"
+                                    data-mt-tab="packets">Recent packets</button>
+                            <button class="lw-tab" type="button" role="tab"
+                                    data-mt-tab="nodes">Nodes</button>
+                        </div>
+                        <span class="lw-panel__limit" data-mt-suffix="packets">(last 100)</span>
                     </div>
-                    <div class="panel__body lw-table-wrap">
-                        <table class="lw-table lw-table--mt-packets">
-                            <colgroup>
-                                <col class="col-time">
-                                <col class="col-type">
-                                <col class="col-src">
-                                <col class="col-dst">
-                                <col class="col-rssi">
-                                <col class="col-snr">
-                                <col class="col-sf">
-                                <col class="col-hops">
-                            </colgroup>
-                            <thead>
-                                <tr>
-                                    <th>Time</th>
-                                    <th>Type</th>
-                                    <th>Source</th>
-                                    <th>Dest</th>
-                                    <th class="lw-r">RSSI</th>
-                                    <th class="lw-r">SNR</th>
-                                    <th class="lw-r">SF</th>
-                                    <th class="lw-r">Hops</th>
-                                </tr>
-                            </thead>
-                            <tbody id="mt-packet-tbody"></tbody>
-                        </table>
-                        <p class="lw-empty" id="mt-packet-empty" style="display:none">
-                            No packets yet.
-                        </p>
+                    <div data-mt-view="packets">
+                        <div class="panel__body lw-table-wrap">
+                            <table class="lw-table lw-table--mt-packets">
+                                <colgroup>
+                                    <col class="col-time">
+                                    <col class="col-type">
+                                    <col class="col-src">
+                                    <col class="col-dst">
+                                    <col class="col-rssi">
+                                    <col class="col-snr">
+                                    <col class="col-sf">
+                                    <col class="col-hops">
+                                </colgroup>
+                                <thead>
+                                    <tr>
+                                        <th>Time</th>
+                                        <th>Type</th>
+                                        <th>Source</th>
+                                        <th>Dest</th>
+                                        <th class="lw-r">RSSI</th>
+                                        <th class="lw-r">SNR</th>
+                                        <th class="lw-r">SF</th>
+                                        <th class="lw-r">Hops</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="mt-packet-tbody"></tbody>
+                            </table>
+                            <p class="lw-empty" id="mt-packet-empty" style="display:none">
+                                No packets yet.
+                            </p>
+                        </div>
                     </div>
-                </div>
-            </section>
-
-            <section class="lw-section">
-                <div class="panel">
-                    <div class="panel__header">Nodes</div>
-                    <div class="panel__body lw-table-wrap">
+                    <div data-mt-view="nodes" hidden>
+                        <div class="panel__body lw-table-wrap">
                         <table class="lw-table lw-table--mt-nodes">
                             <colgroup>
                                 <col class="col-id">
@@ -160,6 +168,7 @@ class MeshtasticPanel {
                         <p class="lw-empty" id="mt-node-empty" style="display:none">
                             No Meshtastic nodes heard yet.
                         </p>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -167,6 +176,10 @@ class MeshtasticPanel {
 
         document.getElementById('mt-refresh-btn')
             ?.addEventListener('click', () => this._load());
+        root.querySelectorAll('[data-mt-tab]').forEach((btn) => {
+            btn.addEventListener('click', () => this._setTab(btn.dataset.mtTab));
+        });
+        this._applyTab();
 
         const nodeTbody = document.getElementById('mt-node-tbody');
         if (nodeTbody) {
@@ -178,6 +191,29 @@ class MeshtasticPanel {
                 if (node) window.nodeDrawer.open({ ...node, has_position: !!(node.latitude && node.longitude) });
             });
         }
+    }
+
+    _setTab(tab) {
+        if (tab === this._tab) return;
+        this._tab = tab;
+        try { localStorage.setItem(MT_TAB_STORE_KEY, tab); } catch (_) {}
+        this._applyTab();
+    }
+
+    _applyTab() {
+        const root = document.getElementById('meshtastic-panel');
+        if (!root) return;
+        root.querySelectorAll('[data-mt-tab]').forEach((btn) => {
+            const active = btn.dataset.mtTab === this._tab;
+            btn.classList.toggle('lw-tab--active', active);
+            btn.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+        root.querySelectorAll('[data-mt-view]').forEach((el) => {
+            el.hidden = el.dataset.mtView !== this._tab;
+        });
+        root.querySelectorAll('[data-mt-suffix]').forEach((el) => {
+            el.hidden = el.dataset.mtSuffix !== this._tab;
+        });
     }
 
     async _load() {
