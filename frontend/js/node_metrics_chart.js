@@ -212,7 +212,10 @@ class NodeMetricsChart {
 
     _buildDatasets(history) {
         const out = [];
-        const telem = history.telemetry || [];
+        // Downsample both series so a long history (repeater trends can
+        // be thousands of points) stays smooth; the drawer's short
+        // histories are below the cap so this is a no-op there.
+        const telem = this._downsampleSignal(history.telemetry || [], 800);
         const signal = this._downsampleSignal(history.signal || [], 350);
 
         this._addSeries(out, 'Battery', '#22c55e', 'y', telem, (t) => {

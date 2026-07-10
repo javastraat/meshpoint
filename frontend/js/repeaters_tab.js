@@ -30,7 +30,9 @@ class RepeatersTab {
             this._mounted = true;
         }
         this._load();
-        this._timer = setInterval(() => this._load(), 30_000);
+        // Repeaters are polled every ~20 min, so a slow refresh is
+        // plenty -- no point re-fetching the full history every 30s.
+        this._timer = setInterval(() => this._load(), 300_000);
     }
 
     hide() {
@@ -104,10 +106,13 @@ class RepeatersTab {
         this._charts = this._charts || {};
         if (this._charts[r.key]) this._charts[r.key].destroy();
         try {
-            // Wide window + high limit to cover the full imported history.
+            // Wide window + high limit to cover the full history. The
+            // query returns oldest-first, so a low limit would drop the
+            // most recent samples (incl. today's) -- keep it well above
+            // the imported+live sample count.
             const res = await fetch(
                 `/api/nodes/${encodeURIComponent(r.key)}/metrics_history`
-                + '?hours=1000&limit=2000',
+                + '?hours=100000&limit=50000',
             );
             if (!res.ok) return;
             const history = await res.json();

@@ -2036,6 +2036,26 @@ itself; added `.section[data-section="repeaters"] { overflow-y: auto }`
 (same rule lorawan/meshcore/meshtastic have). node --check + CSS 28/28
 clean; changelog reworded (95). NOT Pi-verified.
 
+**Trends chart truncation + card-size fixes (2026-07-10):** (1) CARD SIZE:
+`.rp-grid` used `auto-fill minmax(560px,1fr)` → a single repeater filled
+only ONE 560px column, cramming the 3-up into the left half (text
+wrapped). Fixed to `minmax(0,1fr)` (one full-width block per repeater) +
+`.rp-card` padding 15px→1.25rem to match RF cards. (2) CHART MISSING
+RECENT DATA: `metrics_history` / `TelemetryRepository.get_history` return
+`ORDER BY timestamp ASC LIMIT ?` = OLDEST-first, so the chart's
+`limit=2000` fetched samples Jun22-29 and DROPPED everything newer incl.
+today; x-axis still reached Jul11 only via the hidden RSSI signal series
+(recent packets), so telemetry lines flatlined after Jun29. Fixed: fetch
+`?hours=100000&limit=50000` (all rows). (3) PERF: NodeMetricsChart now
+downsamples TELEMETRY too (`_downsampleSignal(telem, 800)` — was signal-
+only) so 5000+ points render smoothly; no-op for the drawer's short
+histories. KNOWN FUTURE: as live polls grow the row count unbounded, a
+fixed high limit will eventually truncate again — proper fix is
+server-side downsample-across-range (candidate task). (4) REFRESH CADENCE
+(user: "why 30s, data updates every 20min"): page auto-refresh 30s→300s
+(5min) — no point re-fetching the full history + re-rendering the chart
+40× between actual 20-min polls. NOT Pi-verified.
+
 ## OLD LIST (superseded, kept for the DONE details)
 
 User has been committing incrementally with the suggested one-liners (verified
