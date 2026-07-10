@@ -1507,9 +1507,14 @@ def _init_routes(
     gps_status.init_routes(location_source=coord.location_source)
     system_config_routes.init_routes(config=config)
     meshcore_config_routes.init_routes(config=config, tx_service=tx_service)
-    lorawan_routes.init_routes(coord.packet_repo)
-    meshtastic_routes.init_routes(coord.packet_repo, coord.node_repo)
-    meshcore_routes.init_routes(coord.packet_repo, coord.node_repo)
+    _dev_name = config.device.device_name or "meshpoint"
+    lorawan_routes.init_routes(coord.packet_repo, device_name=_dev_name)
+    meshtastic_routes.init_routes(
+        coord.packet_repo, coord.node_repo, device_name=_dev_name,
+    )
+    meshcore_routes.init_routes(
+        coord.packet_repo, coord.node_repo, device_name=_dev_name,
+    )
 
 
 def _init_dangerous_registry(coord: PipelineCoordinator) -> None:

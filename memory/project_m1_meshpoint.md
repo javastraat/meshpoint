@@ -922,7 +922,52 @@ All of T1-T4, T6 DONE (see entries below). Fresh numbering:
 | N1 | P3 | M | Multiple Meshtastic USB sticks — list-field treatment for `serial` source (config list + labels + meshtastic_usb_<label>), like meshcore_usb. Do when 2nd stick wanted (spare Heltec V3 433 "TBD/play" is candidate) |
 | N2 | DONE 2026-07-08 | S-M | Endpoint housekeeping done via live diagnosis (user ran stdlib diag script on Pi, all comparisons byte-identical). PRUNED 4: packets/protocols+types, nodes/map (+ orphans: telemetry.py router whole file, TelemetryRepository.get_latest_for_node, NodeRepository.get_with_position, NetworkMapper's get_map_data/get_all_nodes/get_nodes_with_position/get_node_count). **KEPT 2 — double-check saved us: `meshpoint report` CLI (report_command.py) uses /api/packets/count AND /api/nodes/summary** (frontend-only grep missed CLI consumers; remember to grep src/cli too when auditing endpoints). BONUS BUG FIXED: network summary totals were computed over get_all(LIMIT 500) → Stats page + CLI report under-reported (500 vs real 1445 nodes); now `NodeRepository.get_network_totals()` whole-table SQL aggregates (COUNT/SUM CASE/GROUP BY, COALESCE for empty table; SQL validated via stdlib sqlite3 on Mac). nodes.py no longer takes network_mapper (server call updated); NetworkMapper slimmed to get_network_summary→get_network_totals (stats_routes still uses it). README API table: nodes/map row → nodes/summary. 2 changelog bullets (45 total) |
 
-Wishlist: W1 LoRaWAN CSV/TTN export (S-M, best value) · W2 LoRaWAN MIC verify (S) · W3 433-node UI tags (S-M, DONE as T8) · W4 light theme (L) · W5 DAB+ welle-cli (M-L) · W6 pyrtlsdr true-RF S-meter (M-L) · W7 MeshCore repeater status polling (unsized) · W8 LED status light (S) · W9 button physical control (S-M) — W8/W9 details below.
+Wishlist: W1 CSV export (DONE 2026-07-10, details below) · W2 LoRaWAN MIC verify (S, DEPRIORITIZED — see note) · W3 433-node UI tags (DONE as T8) · W4 light theme (L) · W5 DAB+ welle-cli (M-L) · W6 pyrtlsdr true-RF S-meter (M-L) · W7 MeshCore repeater status polling (unsized) · W8 LED status light (DONE) · W9 button physical control (DONE) · W10 packets/nodes tab switch (DONE) · W11 TTN uplink forwarder (PARKED — see note).
+
+**W2 REFRAMED (2026-07-10 discussion, user has no own LoRaWAN devices):**
+MIC verify is IMPOSSIBLE for a passive sniffer without the device's
+secret key (NwkSKey/AppKey) — can only validate frames from devices
+whose keys you've entered. User's captures are all strangers' devices →
+W2 would light up zero rows. So W2 = "add a known-device key store +
+verify + optional payload decrypt", only worth building if user starts
+running their own LoRaWAN devices. The export's raw `mic` column (in the
+JSON payload, not yet a flat column — decoder stores it) is all the
+integrity data a pure sniffer can surface. DEPRIORITIZED hard.
+
+**W11 TTN uplink forwarder (PARKED 2026-07-10):** the SX1302 IS literal
+TTN gateway hardware, but a real gateway must TX downlinks with ms-precise
+RX-window timing (our TX belongs to Meshtastic). An uplink-ONLY Semtech
+UDP PUSH_DATA forwarder is feasible (M) but: we cover 5 of TTN's 8
+channels, uplink-only gateways are second-class on TTN, and it entangles
+the box with an external service. Decide later; not on the active list.
+
+**W1 CSV EXPORT — DONE 2026-07-10 (user: "export button on lorawan,
+meshcore and meshtastic, give all packets").** Scope: 6 endpoints
+(packets + census per protocol), one context-aware Export button per
+page (exports the ACTIVE tab's dataset — packets vs census, reuses the
+W10 `this._tab` state). Backend: NEW `src/api/csv_export.py` — pure
+helpers `csv_cell`/`csv_line`/`csv_document`/`export_filename`
+(fastapi-free, Mac-tested) + `streaming_csv()` (lazy StreamingResponse
+import) + `stream_query()` async generator paging the cursor 500 rows at
+a time (fetchmany, cursor always closed) so a full-table packets export
+never buffers. UTF-8 BOM (Excel + emoji), CRLF/csv.writer quoting,
+decoded_payload as one JSON cell. Endpoints on the existing
+lorawan/meshtastic/meshcore routers (dependencies=protected → viewer-open,
+session-cookie auth): `/export/packets.csv` + `/export/{devices,nodes,
+contacts}.csv`. Packet exports LEFT JOIN nodes for a source_name column;
+LoRaWAN packets flatten dev_eui/app_eui/fcnt/fport/mic out of the JSON
+payload into flat columns (via _lorawan_flatten). init_routes now takes
+device_name (from config.device.device_name, threaded in server.py) for
+the download filename `meshpoint-<dev>-<dataset>-<UTCstamp>.csv`.
+Frontend: Export CSV button next to Refresh in each panel header, click →
+`window.location = /api/<proto>/export/<ds>.csv` (browser download, cookie
+rides along), ds picked from this._tab. Tests: NEW test_csv_export.py
+(9: cell/line/document formatting, BOM, emoji, JSON-stays-one-cell,
+filename sanitization, stream_query paging+transform+cursor-close). ruff
++ node --check clean; changelog bullet under "LoRaWAN sniffing" (88,
+parser-verified); README fork bullet + API table rows. NOT yet
+Pi-verified — user: click Export on each tab of all 3 pages, confirm
+downloads + open in Excel (emoji intact).
 
 ### W8/W9: LED + button features (TODO, added 2026-07-09)
 
@@ -1207,6 +1252,16 @@ journald stamps every line anyway.
   User also pointed at local checkouts for API verification:
   /Users/einstein/Software/meshtastic (FIRMWARE repo, C++) and
   /Users/einstein/Software/meshcore-dev.
+  **LIVE-VERIFIED 2026-07-10 17:33-17:35, ALL behaviors:** short press →
+  all 3 adverts in sequence at exact 2s spacing (meshtastic-868
+  SendResult success airtime 1092ms → meshcore command_ok → serial_433
+  NodeInfo !09d406f4), PLUS an accidental live demo of the cooldown
+  (second press mid-sequence → "cooldown active (27s left)", sequence
+  undisturbed). Hold → "Button held 3.0s" WARNING → sudo ran the exact
+  whitelisted argv → graceful shutdown of every subsystem → clean boot
+  in 11s with button re-armed → box captured+decrypted+RELAYED a packet
+  12s after startup. W9 fully closed. Physical controls story complete:
+  fan + LED + button.
 
 **RSSI color mismatch Dashboard vs panels (2026-07-09 late, user screenshots):**
 Dashboard packet feed's `_rssiClass` (simple_packet_feed.js) used −90/−110
@@ -1383,6 +1438,11 @@ battery/telemetry like Meshtastic); metrics are request/response and mostly
 encrypted. Our meshcore _decode_telemetry is a raw-hex stub too. Candidate
 wishlist W7: active repeater status polling via companion (like the phone
 app does) → would give MeshCore nodes drawer metrics; not yet added/sized.
+
+**Commit message style (user, 2026-07-10): NEVER put internal tracking
+numbers (W9, T5, N2 etc.) in commit messages** — those are memory-file
+shorthand, meaningless in git history. Describe the user-visible effect
+only. (Also still in force: no Co-Authored-By/AI trailers ever.)
 
 ## SESSION BOOTSTRAP — check this every time you read this file
 

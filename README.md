@@ -81,6 +81,7 @@ This is a customized fork of upstream [KMX415/meshpoint](https://github.com/KMX4
 - **Thermals card** — 6 h of CPU temperature + fan duty history as two stacked charts on the Hardware page (`GET /api/device/thermals`); shown only when fan control is enabled.
 - **Status LED** (opt-in, SenseCap M1 only) — the case LED becomes a glanceable health light: steady on = all capture sources healthy, brief flicker = packet captured, 1 Hz blink = a source is down, dark = service not running; `led:` in `local.yaml`.
 - **User button** (opt-in, SenseCap M1 only) — short press adverts on every TX-capable radio (Meshtastic 868 + 433, MeshCore), long press (3 s) restarts the service; LED feedback for every gesture; `button:` in `local.yaml`.
+- **CSV export** — an Export button on each protocol page (LoRaWAN / Meshtastic / MeshCore) downloads the active tab's dataset: all captured packets, or the full device/node/contact census. Streamed straight from the database (so "all packets" really is all), UTF-8 with a BOM so Excel handles the emoji, and LoRaWAN packet exports flatten DevEUI/FCnt/FPort/MIC into their own columns for coverage analysis.
 
 **Roles, config & self-update**
 - **Viewer role locked down server-side** — all write endpoints require admin; channel PSKs/keys are redacted for viewers; admin-only links show a toast instead of navigating away.
@@ -410,6 +411,8 @@ FastAPI server on port 8080 (configurable via `dashboard.port` in `local.yaml`):
 | `GET /api/lorawan/devices` | LoRaWAN device list (frame count, RSSI, SF, first/last seen) |
 | `GET /api/lorawan/packets` | Recent LoRaWAN packet log (max 1000) |
 | `GET /api/lorawan/stats` | LoRaWAN totals: packets, unique devices, by frame type |
+| `GET /api/{lorawan,meshtastic,meshcore}/export/packets.csv` | Download all captured packets as CSV (LoRaWAN adds DevEUI/FCnt/FPort/MIC columns) |
+| `GET /api/lorawan/export/devices.csv` · `.../meshtastic/export/nodes.csv` · `.../meshcore/export/contacts.csv` | Download the device/node/contact census as CSV |
 | `GET /api/listener/status` | RTL-SDR listener state: frequency, mode, RDS (PS/RadioText/PTY/BLER), audio level |
 | `POST /api/listener/tune` | Tune the RTL-SDR: frequency, mode, squelch, gain, level |
 | `POST /api/listener/stop` | Stop the RTL-SDR listener |

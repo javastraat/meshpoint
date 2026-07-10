@@ -11,11 +11,114 @@ from src.storage.packet_repository import PacketRepository
 router = APIRouter(prefix="/api/lorawan", tags=["lorawan"])
 
 _packet_repo: PacketRepository | None = None
+_device_name: str = "meshpoint"
 
 
-def init_routes(packet_repo: PacketRepository) -> None:
-    global _packet_repo
+def init_routes(
+    packet_repo: PacketRepository, device_name: str = "meshpoint",
+) -> None:
+    global _packet_repo, _device_name
     _packet_repo = packet_repo
+    _device_name = device_name or "meshpoint"
+
+
+_PACKET_EXPORT_COLUMNS = [
+    "timestamp", "packet_id", "source_id", "packet_type",
+    "dev_eui", "app_eui", "fcnt", "fport", "mic",
+    "rssi", "snr", "frequency_mhz", "spreading_factor", "bandwidth_khz",
+    "capture_source", "decoded_payload",
+]
+
+
+def _lorawan_flatten(row):
+    """Lift dev_eui/fcnt/fport/mic out of the JSON payload into columns."""
+    payload = {}
+    raw = row.get("decoded_payload")
+    if raw:
+        try:
+            payload = json.loads(raw)
+        except (ValueError, TypeError):
+            payload = {}
+    row["dev_eui"] = payload.get("dev_eui")
+    row["app_eui"] = payload.get("app_eui")
+    row["fcnt"] = payload.get("fcnt")
+    row["fport"] = payload.get("fport")
+    row["mic"] = payload.get("mic")
+    return row
+
+
+@router.get("/export/packets.csv")
+async def lorawan_packets_csv():
+    """All captured LoRaWAN packets as a downloadable CSV.
+
+    The LoRaWAN gold (DevEUI/FCnt/FPort/MIC) is flattened out of the
+    decoded_payload JSON into its own columns so the export pivots
+    straight into coverage/FCnt-gap analysis.
+    """
+    if _packet_repo is None:
+        raise HTTPException(503, "Routes not initialised")
+    from src.api.csv_export import export_filename, streaming_csv, stream_query
+
+    rows = stream_query(
+        _packet_repo._db,
+        """
+        SELECT timestamp, packet_id, source_id, packet_type,
+               rssi, snr, frequency_mhz, spreading_factor, bandwidth_khz,
+               capture_source, decoded_payload
+        FROM packets
+        WHERE protocol = 'lorawan'
+        ORDER BY timestamp DESC
+        """,
+        (),
+        _PACKET_EXPORT_COLUMNS,
+        transform=_lorawan_flatten,
+    )
+    return streaming_csv(
+        _PACKET_EXPORT_COLUMNS, rows,
+        export_filename(_device_name, "lorawan-packets"),
+    )
+
+
+_DEVICE_EXPORT_COLUMNS = [
+    "source_id", "packet_type", "frame_count", "first_seen", "last_seen",
+    "last_rssi", "last_snr", "last_frequency_mhz", "last_sf",
+]
+
+
+@router.get("/export/devices.csv")
+async def lorawan_devices_csv():
+    """All LoRaWAN devices (one row per DevAddr/DevEUI) as CSV."""
+    if _packet_repo is None:
+        raise HTTPException(503, "Routes not initialised")
+    from src.api.csv_export import export_filename, streaming_csv, stream_query
+
+    rows = stream_query(
+        _packet_repo._db,
+        """
+        SELECT p.source_id, p.packet_type,
+               agg.frame_count, agg.first_seen,
+               p.timestamp        AS last_seen,
+               p.rssi             AS last_rssi,
+               p.snr              AS last_snr,
+               p.frequency_mhz    AS last_frequency_mhz,
+               p.spreading_factor AS last_sf
+        FROM packets p
+        JOIN (
+            SELECT source_id, COUNT(*) AS frame_count,
+                   MIN(timestamp) AS first_seen, MAX(id) AS last_id
+            FROM packets
+            WHERE protocol = 'lorawan' AND source_id != ''
+            GROUP BY source_id
+        ) agg ON p.id = agg.last_id
+        ORDER BY p.timestamp DESC
+        """,
+        (),
+        _DEVICE_EXPORT_COLUMNS,
+    )
+    return streaming_csv(
+        _DEVICE_EXPORT_COLUMNS, rows,
+        export_filename(_device_name, "lorawan-devices"),
+    )
 
 
 @router.get("/devices")

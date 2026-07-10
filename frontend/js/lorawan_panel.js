@@ -40,6 +40,7 @@ class LoRaWANPanel {
             <header class="lw-panel__head">
                 <h2 class="lw-panel__title">LoRaWAN</h2>
                 <div class="lw-panel__actions">
+                    <button class="terminal-button" type="button" id="lw-export-btn">Export CSV</button>
                     <button class="terminal-button" type="button" id="lw-refresh-btn">Refresh</button>
                 </div>
             </header>
@@ -148,6 +149,11 @@ class LoRaWANPanel {
 
         document.getElementById('lw-refresh-btn')
             ?.addEventListener('click', () => this._load());
+        document.getElementById('lw-export-btn')
+            ?.addEventListener('click', () => {
+                const ds = this._tab === 'devices' ? 'devices' : 'packets';
+                window.location = `/api/lorawan/export/${ds}.csv`;
+            });
         root.querySelectorAll('[data-lw-tab]').forEach((btn) => {
             btn.addEventListener('click', () => this._setTab(btn.dataset.lwTab));
         });

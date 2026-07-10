@@ -50,6 +50,7 @@ class MeshCorePanel {
             <header class="lw-panel__head">
                 <h2 class="lw-panel__title">MeshCore</h2>
                 <div class="lw-panel__actions">
+                    <button class="terminal-button" type="button" id="mc-export-btn">Export CSV</button>
                     <button class="terminal-button" type="button" id="mc-refresh-btn">Refresh</button>
                 </div>
             </header>
@@ -160,6 +161,11 @@ class MeshCorePanel {
 
         document.getElementById('mc-refresh-btn')
             ?.addEventListener('click', () => this._load());
+        document.getElementById('mc-export-btn')
+            ?.addEventListener('click', () => {
+                const ds = this._tab === 'contacts' ? 'contacts' : 'packets';
+                window.location = `/api/meshcore/export/${ds}.csv`;
+            });
         document.getElementById('mc-page-prev')
             ?.addEventListener('click', () => { this._page--; this._renderNodePage(); });
         document.getElementById('mc-page-next')

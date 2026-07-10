@@ -68,6 +68,7 @@ class MeshtasticPanel {
             <header class="lw-panel__head">
                 <h2 class="lw-panel__title">Meshtastic</h2>
                 <div class="lw-panel__actions">
+                    <button class="terminal-button" type="button" id="mt-export-btn">Export CSV</button>
                     <button class="terminal-button" type="button" id="mt-refresh-btn">Refresh</button>
                 </div>
             </header>
@@ -176,6 +177,11 @@ class MeshtasticPanel {
 
         document.getElementById('mt-refresh-btn')
             ?.addEventListener('click', () => this._load());
+        document.getElementById('mt-export-btn')
+            ?.addEventListener('click', () => {
+                const ds = this._tab === 'nodes' ? 'nodes' : 'packets';
+                window.location = `/api/meshtastic/export/${ds}.csv`;
+            });
         root.querySelectorAll('[data-mt-tab]').forEach((btn) => {
             btn.addEventListener('click', () => this._setTab(btn.dataset.mtTab));
         });
