@@ -419,6 +419,15 @@ right now. Repo copy `meshpoint_lorawan/config/local.yaml` is also stale vs
 the live one. Consider `/dev/serial/by-id/usb-Silicon_Labs_CP2102_...-if00-port0`
 instead of ttyUSB0 for robustness if more USB devices get added.
 
+## Repeaters UI split + zero-filter (2026-07-10)
+
+- Frontend `repeaters_tab` now renders each repeater as a two-card unit: one
+  card for radio/health identity + one dedicated Sensors card.
+- LPP sensor channels where every numeric reading is exactly 0 are now hidden.
+  This suppresses dead channels like Ch2 current/power/voltage all at 0.
+- Added responsive CSS so paired cards collapse to a single column on narrow
+  screens.
+
 #### Listener enhancements (2026-07-05 evening → live, working)
 Built on the base above; all verified working in the browser (FM audio + meter).
 

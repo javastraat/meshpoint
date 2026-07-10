@@ -124,22 +124,28 @@ class RepeatersTab {
             <div class="rp-row"><span class="rp-row__k">${this._esc(k)}</span>
             <span class="rp-row__v">${this._esc(v)}</span></div>
         `).join('');
-        const sensorBlock = sensors.length ? `
-            <div class="rp-card__section">Sensors</div>
-            <div class="rp-card__rows">${rowsHtml(sensors)}</div>
-        ` : '';
+        const sensorRows = sensors.length
+            ? rowsHtml(sensors)
+            : '<div class="rp-row"><span class="rp-row__k">No sensor telemetry</span><span class="rp-row__v">--</span></div>';
 
         return `
-            <div class="rp-card ${stale ? 'rp-card--stale' : ''}">
-                <div class="rp-card__head">
-                    <span class="rp-card__name">${this._esc(title)}</span>
-                    <span class="rp-card__lamp ${r.ok ? 'rp-ok' : 'rp-stale'}"
-                          title="${r.ok ? 'Reporting' : this._esc(r.error || 'stale')}"></span>
+            <div class="rp-repeater">
+                <div class="rp-card ${stale ? 'rp-card--stale' : ''}">
+                    <div class="rp-card__head">
+                        <span class="rp-card__name">${this._esc(title)}</span>
+                        <span class="rp-card__lamp ${r.ok ? 'rp-ok' : 'rp-stale'}"
+                              title="${r.ok ? 'Reporting' : this._esc(r.error || 'stale')}"></span>
+                    </div>
+                    <div class="rp-card__id">!${this._esc(r.key)}</div>
+                    <div class="rp-card__rows">${rowsHtml(health)}</div>
+                    <div class="rp-card__foot">${stale ? 'stale · ' : ''}polled ${this._ago(r.updated_at)}</div>
                 </div>
-                <div class="rp-card__id">!${this._esc(r.key)}</div>
-                <div class="rp-card__rows">${rowsHtml(health)}</div>
-                ${sensorBlock}
-                <div class="rp-card__foot">${stale ? 'stale · ' : ''}polled ${this._ago(r.updated_at)}</div>
+                <div class="rp-card rp-card--sensors ${stale ? 'rp-card--stale' : ''}">
+                    <div class="rp-card__head">
+                        <span class="rp-card__name">Sensors</span>
+                    </div>
+                    <div class="rp-card__rows">${sensorRows}</div>
+                </div>
             </div>
         `;
     }
@@ -156,7 +162,7 @@ class RepeatersTab {
      * the channel disambiguates the multiple temperature sensors. */
     _sensorRows(t) {
         const lpp = t && Array.isArray(t.lpp) ? t.lpp : [];
-        return lpp
+        const rows = lpp
             .slice()
             .sort((a, b) => (a.channel - b.channel)
                 || String(a.type).localeCompare(String(b.type)))
@@ -165,8 +171,23 @@ class RepeatersTab {
                 const unit = RepeatersTab.UNITS[rd.type] || '';
                 // Up to 2 decimals, trailing zeros trimmed (4.11, 37.7, 0, 52).
                 const num = parseFloat(Number(rd.value).toFixed(2));
-                return [`Ch${rd.channel} ${type}`, `${num}${unit ? ' ' + unit : ''}`];
+                return {
+                    channel: rd.channel,
+                    label: `Ch${rd.channel} ${type}`,
+                    value: `${num}${unit ? ' ' + unit : ''}`,
+                    isZero: Number.isFinite(num) && num === 0,
+                };
             });
+
+        const channelHasNonZero = new Map();
+        for (const row of rows) {
+            const current = channelHasNonZero.get(row.channel) || false;
+            channelHasNonZero.set(row.channel, current || !row.isZero);
+        }
+
+        return rows
+            .filter((row) => channelHasNonZero.get(row.channel))
+            .map((row) => [row.label, row.value]);
     }
 
     _airtime(s) {
