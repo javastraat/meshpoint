@@ -30,7 +30,8 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SOURCE_URL = "https://einstein.amsterdam/meshcore/meshcore.db"
-DEFAULT_DEST_DB = REPO_ROOT / "data" / "concentrator.db"
+#DEFAULT_DEST_DB = REPO_ROOT / "data" / "concentrator.db"
+DEFAULT_DEST_DB = "/opt/meshpoint/data/concentrator.db"
 
 _CONTACT_ROLE = {
     1: "CLIENT",
