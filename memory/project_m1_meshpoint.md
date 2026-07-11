@@ -1099,8 +1099,31 @@ status/telemetry pair and what args it wants → how poll_repeater calls it.
   `python3 -c "import json;print(json.dumps(json.load(open('/opt/meshpoint/data/repeater_status.json'))['da0b77f13bc7'].get('neighbours'),indent=1)[:2000])"`
   → paste the SHAPE so step 2 (multi-anchor topo merge) knows the field
   names (expect pubkey prefix + snr + age per neighbour).
+- **STEP 1 LIVE-VERIFIED 2026-07-11 (user pasted repeater_status.json):**
+  neighbours field shape CONFIRMED on the real repeater:
+  `{"pubkey_prefix": "da0b77f13bc7", "pubkey_prefix_length": 6,
+  "neighbours_count": 25, "results_count": 25, "neighbours":
+  [{"pubkey": "ebd1ba87b868", "secs_ago": 2238, "snr": -7.25}, ...]}`
+  — 25 neighbours, pubkeys are 12-hex (== our node_id format, thanks to
+  prefix_length=6), secs_ago spans 37min..24days, snr floats. EXACTLY what
+  step 2 needs.
 - NEXT (step 2): multi-anchor assemble_graph + endpoint merge of live
-  poller neighbours; then step 3 context layer.
+  poller neighbours; then step 3 context layer. Concrete step-2 spec:
+  - topology_routes.init_routes gains `poller` (or provider callable);
+    endpoint builds live rows from poller.latest: for each entry with
+    entry["neighbours"]["neighbours"]: anchor = entry["key"], per
+    neighbour: source_id = n["pubkey"], snr = n["snr"], last_seen =
+    entry["updated_at"] − n["secs_ago"] (our-clock anchored, skew-immune),
+    cnt = 1.
+  - assemble_graph: neighbour_rows rows gain "anchor" field (fallback to
+    the single anchor_node_id param for the import rows); add_edge anchored
+    per row. Tests: multi-anchor + merge-with-import (same neighbour in
+    import + live → one edge, newest last_seen wins).
+  - server.py: thread the repeater poller into topology_routes.init_routes
+    (it's built in _build_repeater_poller; check availability when
+    repeater_poll disabled → provider returns nothing).
+  - Then step 3: context layer (positioned-but-unlinked nodes, ?context=1
+    param + faint-dot map toggle).
 
 **1. Teach the poller to ask for neighbours (backend core).**
 `MeshCoreTxClient.poll_repeater()` already does login → req_status →
