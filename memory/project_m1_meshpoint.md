@@ -312,8 +312,8 @@ path info — those stay blank by design.
 `"meshcore_usb"`), so labelled companions store `meshcore_usb_868` /
 `meshcore_usb_433` etc. Only matcher is the coordinator's
 `startswith("meshcore_usb")`, which all variants satisfy. (The Meshtastic
-`serial` source is still single-instance / unlabelled — would need a list-field
-config change to support `meshtastic_usb_*`.)
+`serial` source has SINCE gained the same treatment — `capture.serial` list,
+source name `serial_<label>`, e.g. `serial_433`; see backlog #7 DONE.)
 
 ## Imported-contacts / neighbours workflow (`import_contacts.py` in repo ROOT)
 
@@ -922,7 +922,7 @@ terminal WS admin check + shlex-quoted listener pipeline). Backlog:
 | 4 | ~~P2~~ DONE 2026-07-08 | S | Dead frontend/js/simple_node_list.js DELETED (nothing referenced it; superseded by node_cards.js) |
 | 5 | ~~P2~~ DONE 2026-07-08 | M | Of the 8 unused endpoints only 2 carried NEW data (verified: /api/stats/summary already embeds rssi_distribution + protocol/type dists — the old "wire 5" plan would have re-plotted duplicates). WIRED: `/api/analytics/signal/snr` → SNR histogram card on Stats next to RSSI (purple #a855f7, clone of _updateRssiHist, fetched via Promise.all in refresh(), NOT part of session/all-time toggle — last-500-packets only); `/api/packets/by-source/{id}` → "Recent Packets" collapsible section in node drawer (last 15: time · type · RSSI/SNR; source_id==node_id, both 8-hex no `!`). KEPT for later inspection per user (NOT pruned): /api/packets/count+protocols+types, /api/nodes/map+summary, /api/telemetry/{id}(+history) — all duplicate data already on screen via other endpoints. SNR chart browser-verified (screenshot 2026-07-08: renders next to RSSI, bimodal far/near clusters; drawer packets not yet checked). NOTE spotted in screenshot: "Best RSSI −4 dBm" is implausible — likely one synthetic/self-report outlier; candidate small fix: filter RSSI > −20 dBm from best/avg tiles |
 | 6 | ~~P3~~ DONE 2026-07-08 | L | Spectrum view — built as T6 (Band Spectrum card, see OLD LIST): sweep mode + /api/device/spectrum + canvas card, live-verified; later moved to its own RF Environment page |
-| 7 | P3 | M | Meshtastic `serial` source single-instance — needs the list-field treatment meshcore_usb got |
+| 7 | ~~P3~~ DONE (verified in code 2026-07-11) | M | Meshtastic `serial` multi-device — `capture.serial` list of `SerialDeviceConfig` (+label) in config.py, `_add_serial_source` loops it in server.py, source name `serial_<label>` (serial_source.py). Legacy scalar serial_port/serial_baud still works. Live on the Pi as `serial_433` (banner-verified 2026-07-10) |
 | 8 | P3 | S | `nb:` synthetic rows blank RSSI/FREQ/SF in feed (cosmetic, SNR-only) |
 | 9 | ~~P3~~ DONE 2026-07-08 | M | Concentrator-channels card — built as T4 (see OLD LIST): radio_concentrator_card.js + `concentrator` key in GET /api/config, live on Hardware page |
 
@@ -941,9 +941,9 @@ on user-owned repos, sync role section lists, remove dead simple_node_list.js`.
 #3 done later same day (relay UI, changelog bullet under "Dashboard and UI",
 36 bullets total). #5 done same day (SNR chart + node-drawer recent packets,
 2 more bullets → 38). #6 was in fact DONE the same day as T6 (Band Spectrum
-card) and #9 too (T4, Concentrator Channels card — both lines were stale
-until 2026-07-11). Remaining open: #7 multi Meshtastic USB, #8 nb: blank
-RSSI cosmetic.
+card), #9 too (T4, Concentrator Channels card), and #7 too (multi
+Meshtastic serial — live as `serial_433`; all three lines were stale until
+2026-07-11). Remaining open: #8 nb: blank RSSI cosmetic.
 
 ---
 
@@ -964,7 +964,7 @@ All of T1-T4, T6 DONE (see entries below). Fresh numbering:
 
 | # | Prio | Effort | Task |
 |---|------|--------|------|
-| N1 | P3 | M | Multiple Meshtastic USB sticks — list-field treatment for `serial` source (config list + labels + meshtastic_usb_<label>), like meshcore_usb. Do when 2nd stick wanted (spare Heltec V3 433 "TBD/play" is candidate) |
+| N1 | ~~P3~~ DONE (verified 2026-07-11) | M | Multiple Meshtastic USB sticks — built as `capture.serial` list (SerialDeviceConfig + label, source name `serial_<label>`, legacy scalars kept). Same item as backlog #7; running live as `serial_433` |
 | N2 | DONE 2026-07-08 | S-M | Endpoint housekeeping done via live diagnosis (user ran stdlib diag script on Pi, all comparisons byte-identical). PRUNED 4: packets/protocols+types, nodes/map (+ orphans: telemetry.py router whole file, TelemetryRepository.get_latest_for_node, NodeRepository.get_with_position, NetworkMapper's get_map_data/get_all_nodes/get_nodes_with_position/get_node_count). **KEPT 2 — double-check saved us: `meshpoint report` CLI (report_command.py) uses /api/packets/count AND /api/nodes/summary** (frontend-only grep missed CLI consumers; remember to grep src/cli too when auditing endpoints). BONUS BUG FIXED: network summary totals were computed over get_all(LIMIT 500) → Stats page + CLI report under-reported (500 vs real 1445 nodes); now `NodeRepository.get_network_totals()` whole-table SQL aggregates (COUNT/SUM CASE/GROUP BY, COALESCE for empty table; SQL validated via stdlib sqlite3 on Mac). nodes.py no longer takes network_mapper (server call updated); NetworkMapper slimmed to get_network_summary→get_network_totals (stats_routes still uses it). README API table: nodes/map row → nodes/summary. 2 changelog bullets (45 total) |
 
 Wishlist: W1 CSV export (DONE) · W2 LoRaWAN MIC verify (DEPRIORITIZED) · W3 433-node UI tags (DONE as T8) · W4 light theme (L) · W5 DAB+ welle-cli (M-L) · W6 pyrtlsdr true-RF S-meter (M-L) · W7 MeshCore repeater monitoring (DONE 2026-07-10, details below) · W8 LED (DONE) · W9 button (DONE) · W10 tab switch (DONE) · W11 TTN uplink forwarder (PARKED) · W12 repeater detail: neighbours/regions/owner/acl/clock (PARKED, see W7 note).
