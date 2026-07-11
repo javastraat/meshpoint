@@ -918,3 +918,55 @@
 }
 
 /* Responsive overrides for legacy paths live in css/responsive.css. */
+
+/* Incoming-message notification toast (message_notifier.js). Appended to
+ * <body>, overlays every page. Click opens the conversation. */
+
+.msg-notify {
+    position: fixed;
+    top: 4.2rem;
+    right: 1.25rem;
+    z-index: 9999;
+    min-width: 220px;
+    max-width: min(340px, 90vw);
+    padding: 0.7rem 0.95rem;
+    background: var(--bg-card);
+    border: 1px solid var(--accent-cyan);
+    border-radius: var(--radius);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    font-size: 0.82rem;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), var(--glow-cyan);
+    opacity: 0;
+    transform: translateY(-8px);
+    pointer-events: none;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.2s;
+}
+
+.msg-notify--visible {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+.msg-notify__name {
+    font-weight: 600;
+    font-size: 0.78rem;
+    color: var(--accent-cyan);
+    margin-bottom: 0.2rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.msg-notify__text {
+    line-height: 1.35;
+    word-break: break-word;
+}
+
+.msg-notify__more {
+    margin-top: 0.25rem;
+    font-size: 0.72rem;
+    color: var(--text-secondary, #8b98a9);
+}

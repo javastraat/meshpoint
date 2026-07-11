@@ -796,6 +796,17 @@
                                 <span class="cfg-field__label">Kilometers and meters</span>
                             </label>
                         </fieldset>
+                        <fieldset class="cfg-fieldset">
+                            <legend class="cfg-fieldset__legend">Message notifications</legend>
+                            <label class="cfg-field cfg-field--toggle">
+                                <input type="checkbox" data-display-msg-toast>
+                                <span class="cfg-field__label">Popup on incoming message</span>
+                            </label>
+                            <label class="cfg-field cfg-field--toggle">
+                                <input type="checkbox" data-display-msg-sound>
+                                <span class="cfg-field__label">Sound on incoming message</span>
+                            </label>
+                        </fieldset>
                         <p class="auth-status" data-display-units-status aria-live="polite"></p>
                     </article>
                     <article class="auth-card backup-restore-card" id="meshpoint-backup-restore">
@@ -922,6 +933,7 @@
     <script src="js/command_palette.js"></script>
     <script src="js/keymap_overlay.js"></script>
     <script src="js/sound_engine.js"></script>
+    <script src="js/message_notifier.js"></script>
     <script src="js/theme_controller.js"></script>
     <script src="js/lorawan_panel.js"></script>
     <script src="js/listener_panel.js"></script>

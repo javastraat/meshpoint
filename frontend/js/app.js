@@ -122,6 +122,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (window.themeController) window.themeController.init();
     _bootCommandPaletteAndKeymap(router);
     _wireSoundEvents();
+    if (window.messageNotifier && window.concentratorWS) {
+        window.messageNotifier.init(window.concentratorWS);
+    }
 
     new SignOutController('signout-btn').bind();
 
@@ -730,6 +733,32 @@ function _bootCommandPaletteAndKeymap(router) {
             const next = !window.soundEngine.isEnabled();
             window.soundEngine.setEnabled(next);
             console.info('sounds →', next ? 'on' : 'off');
+        },
+    });
+
+    palette.register({
+        id: 'messages:toggle-toast',
+        label: 'Toggle message popups',
+        group: 'View',
+        icon: '💬',
+        run: () => {
+            if (!window.messageNotifier) return;
+            const next = !window.messageNotifier.isToastEnabled();
+            window.messageNotifier.setToastEnabled(next);
+            console.info('message popups →', next ? 'on' : 'off');
+        },
+    });
+
+    palette.register({
+        id: 'messages:toggle-sound',
+        label: 'Toggle message sound',
+        group: 'View',
+        icon: '🔔',
+        run: () => {
+            if (!window.messageNotifier) return;
+            const next = !window.messageNotifier.isSoundEnabled();
+            window.messageNotifier.setSoundEnabled(next);
+            console.info('message sound →', next ? 'on' : 'off');
         },
     });
 

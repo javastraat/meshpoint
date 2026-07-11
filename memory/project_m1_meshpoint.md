@@ -985,7 +985,7 @@ Sorted in suggested working order (top = next up):
 | # | Status | Effort | Item |
 |---|--------|--------|------|
 | — | To-do: EMPTY | — | Entire inspection backlog + N-list done, verified, or closed by design |
-| W16 | Open | S | Message notification sound — browser ping via the existing message-broadcast path (upstream #49/#47) |
+| W16 | DONE 2026-07-11 (Mac-verified, Pi-verify pending) | S | Message notifications: toast + optional sound + per-browser toggles — see "W16 build" section below |
 | W13 | Open | M-L | Mesh topology graph — force-directed, Meshtastic NEIGHBORINFO/TRACEROUTE + MeshCore neighbour SNR (upstream #72; absorb W12's req_neighbours here) |
 | W14 | Open | M | Stray-frames table — log RF frames that fail all three decoders instead of dropping silently (upstream #80) |
 | W5 | Open | M-L | DAB+ listener mode via welle-cli — unlocks NPO Radio 5 (DAB-only) |
@@ -996,6 +996,47 @@ Sorted in suggested working order (top = next up):
 | W11 | Parked | M | TTN uplink-only forwarder — trigger: TTN entanglement deemed worth it |
 | — | Noted | — | Firmware flasher / companion version check (upstream #85/#59) — if flashing the 3 sticks becomes a pain (needs serial release/reclaim handover) |
 | — | Noted | — | Reticulum as 6th network on the spare Heltec V3 433 via RNode firmware (upstream #11) — wildcard |
+
+### W16 build (2026-07-11) — message toast + sound + toggles
+
+User refined the design: "popup" = in-dashboard TOAST (never browser
+Notification API — which wouldn't work anyway: plain-HTTP LAN origin is not a
+secure context, so OS notifications are impossible until the box gets TLS;
+tab-title unread count already existed via tab_title_telemetry.js watching
+#msg-unread-badge). Zero backend changes — rides the existing
+`message_received` ws broadcast (server.py:1443, has text/node_name/protocol/
+direction).
+
+- NEW `frontend/js/message_notifier.js` (MessageNotifier, window.messageNotifier):
+  fires ONLY on direction==='received' (never sent/overheard — monitor mode
+  would toast half the mesh); suppressed while location.hash is #/messages AND
+  tab visible (still fires on the Messages page when tab hidden); bursts
+  coalesce into one toast + "+N more" (no stacking); click → router.navigate
+  ('messages') + messagingPanel.openConversation (same pattern as
+  _openMessagingForNode; is_broadcast = node_id.startsWith('broadcast:'));
+  5s auto-hide. Toggles in localStorage: `meshpoint:msg-toast:enabled:v1`
+  (DEFAULT ON) / `meshpoint:msg-sound:enabled:v1` (DEFAULT OFF).
+- sound_engine.js: new 'message' recipe (880→1175 Hz soft two-note) + NEW
+  `playAlert(name)` = play bypassing the global UI-sounds flag; message sound
+  is deliberately INDEPENDENT of the connect/disconnect chrome-sounds toggle.
+  `play()` now delegates to playAlert after the enabled check.
+- Toggles UI: "Message notifications" fieldset (2 checkboxes) in the Settings →
+  System display card (index.html) bound in meshpoint_display_form.js (writes
+  straight to messageNotifier, own status text); 2 command-palette entries
+  (messages:toggle-toast 💬 / messages:toggle-sound 🔔) next to sound:toggle
+  in app.js. Enabling either gives immediate feedback (probe toast / probe ping).
+- `.msg-notify` CSS appended to messaging.css (top-right fixed, bg-card +
+  accent-cyan border like r-toast, clickable).
+- app.js boots it right after _wireSoundEvents (init(window.concentratorWS)).
+- Known caveat (accepted): browsers block WebAudio until first page
+  interaction — toast still shows.
+- Verified on Mac: node --check on all 4 touched js; behavior test with fake
+  DOM/localStorage/soundEngine (12 assertions: defaults, received-only,
+  suppression on messages page, hidden-tab exception, coalescing, sound/toast
+  independence, probe feedback) ALL PASS. Changelog bullet under "Dashboard
+  and UI" (91 bullets, parser-verified). Pi-verify: send a DM/channel msg to
+  the box with the dashboard open on another page → toast top-right; click →
+  opens the conversation; toggles in Settings → System.
 
 ## OLD: TO-DO LIST v2 (2026-07-08 15:22 — superseded by v3 above, kept for DONE details)
 

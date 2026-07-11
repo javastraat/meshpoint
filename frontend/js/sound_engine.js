@@ -9,7 +9,7 @@
  * localStorage; settings UI flips the flag and other modules call
  * window.soundEngine.play(name).
  *
- * Supported events: 'connect', 'disconnect', 'error', 'success'.
+ * Supported events: 'connect', 'disconnect', 'error', 'success', 'message'.
  */
 class SoundEngine {
     constructor(storageKey = 'meshpoint:sound:enabled:v1') {
@@ -31,6 +31,13 @@ class SoundEngine {
 
     play(name) {
         if (!this._enabled) return;
+        this.playAlert(name);
+    }
+
+    // Plays regardless of the UI-sounds flag. For events that carry their
+    // own user-facing switch (message notifications) so enabling those
+    // doesn't also opt the user into connect/disconnect chrome sounds.
+    playAlert(name) {
         const ctx = this._getContext();
         if (!ctx) return;
         const recipe = SoundEngine._recipes[name] || SoundEngine._recipes.success;
@@ -101,6 +108,13 @@ SoundEngine._recipes = {
         notes: [
             { freq: 740, duration: 0.06, gain: 0.04 },
             { freq: 988, duration: 0.1, gain: 0.05 },
+        ],
+    },
+    message: {
+        interval: 0.07,
+        notes: [
+            { freq: 880, duration: 0.07, gain: 0.045 },
+            { freq: 1175, duration: 0.14, gain: 0.05 },
         ],
     },
 };
