@@ -999,6 +999,23 @@ Sorted in suggested working order (top = next up):
 
 ### W13 build phase 1 (2026-07-11) — Topology page (force-directed mesh graph)
 
+**PHASE 2 REMARK (user, 2026-07-11): MeshCore repeater neighbours still need
+to be fetched FROM THE REPEATER itself.** The graph's meshcore star currently
+comes only from the static imports (nb: rows from neighbours.json +
+meshcoredb: archive) — a snapshot around ONE repeater. The live path is
+`req_neighbours` through the existing RepeaterPoller (Repeaters tab
+machinery, src/transmit/repeater_poller.py): it already logs in and polls
+req_status/req_telemetry per configured repeater on a cadence; adding
+req_neighbours (seen working live via meshcore-cli during the W7 session,
+returns neighbour list + SNR + age) would give a LIVE, per-repeater star —
+every repeater in repeater_poll.repeaters becomes its own edge source, and
+the topology graph updates without imports. Store per-repeater neighbour
+sets (poller latest dict + persist like repeater_status.json, or synthetic
+packet rows like nb:), then topology_routes picks them up as `neighbour`
+edges anchored on each polled repeater instead of the single config anchor.
+This is the W12 fold-in; same caution as W7: it rides the companion's
+command channel — keep cadence gentle.
+
 DATA SURVEY FIRST (scripts/survey_topology_data.py, read-only, run live on
 Pi): **NEIGHBORINFO = 0 packets — modern Meshtastic firmware doesn't
 broadcast it over RF by default; the upstream #72 design leaned on it.**
