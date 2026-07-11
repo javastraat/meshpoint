@@ -75,6 +75,11 @@ _upgrade_refresh_python_deps() {
         return 0
     fi
     info "Refreshing Python dependencies (upgrade fast path)..."
+    # lgpio in requirements.txt builds a C extension: it needs swig +
+    # python3-dev to compile and liblgpio-dev to link (no piwheels wheel).
+    # Ensure they exist before pip runs, or set -e aborts the upgrade here.
+    apt-get install -y -qq python3-dev swig liblgpio-dev 2>/dev/null \
+        || warn "Could not preinstall lgpio build deps (pip may fail)"
     "$pip" install --upgrade pip -q
     "$pip" install -r "$req" -q
     "$pip" install pyserial -q
@@ -97,6 +102,9 @@ apt-get install -y -qq \
     python3 \
     python3-venv \
     python3-pip \
+    python3-dev \
+    swig \
+    liblgpio-dev \
     libsqlite3-dev \
     i2c-tools
 

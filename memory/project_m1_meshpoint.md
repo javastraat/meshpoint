@@ -998,6 +998,88 @@ live-verified). W12 no longer exists as its own item — req_neighbours
 lives inside W13-p2; req_regions/owner/acl/clock remain a possible
 "expand repeater" card on the Repeaters tab someday.
 
+### install.sh lgpio build deps fix (2026-07-11)
+User hit `error: command 'swig' failed` at "Setting up Python virtual
+environment" — lgpio (requirements.txt) compiles a C extension needing
+swig + python3-dev + liblgpio-dev (documented in TROUBLESHOOTING.md since
+the fan build, but never added to scripts/install.sh). FIXED: all three
+added to the main apt block AND preinstalled in `_upgrade_refresh_python_deps`
+(the upgrade fast path runs pip BEFORE the apt section, and `set -euo
+pipefail` would abort the whole upgrade there). bash -n clean; changelog
+bullet under "Configuration and server" (parser-verified). Pi-verify:
+rerun the installer.
+
+### W13-p2 PLAN (2026-07-11, user-approved — build one step at a time)
+
+Mostly threading one new command through machinery that already exists.
+
+**STEP 0 (FIRST, pending — user runs on Pi):** confirm the exact
+`req_neighbours` method name/shape in the `meshcore` Python lib (only seen
+working via meshcore-cli in the W7 session). Snippet given to user
+(read-only introspection, no radio contact):
+```
+python3 - <<'EOF'
+import inspect
+import meshcore
+from meshcore import commands
+print("meshcore lib:", meshcore.__file__)
+try:
+    print("version:", meshcore.__version__)
+except AttributeError:
+    pass
+for name, fn in inspect.getmembers(commands.CommandHandler, inspect.isfunction):
+    if any(k in name.lower() for k in ("neigh", "nb", "req")):
+        try:
+            print(f"{name}{inspect.signature(fn)}")
+        except (ValueError, TypeError):
+            print(name)
+EOF
+```
+Output tells us whether it's `req_neighbours_sync(contact)` like the
+status/telemetry pair and what args it wants → how poll_repeater calls it.
+
+**1. Teach the poller to ask for neighbours (backend core).**
+`MeshCoreTxClient.poll_repeater()` already does login → req_status →
+req_telemetry per configured repeater. Add req_neighbours as a THIRD step
+in the same sequence — same asyncio.wait_for timeout guard, tolerant: if a
+repeater's firmware doesn't support it, status/telemetry still succeed. No
+new connections, no new cadence — one extra command inside the existing
+15-minute poll with its 5-second gaps (respects the command-channel
+caution). RepeaterPoller stores the neighbour list (node key, SNR, age) in
+its `latest` dict and persists it in repeater_status.json like the status
+data — survives restarts. Timestamps computed as now − secs_ago (the
+skew-immune lesson from the import saga).
+
+**2. Feed the topology graph live (multi-anchor).**
+Today assemble_graph() takes ONE config-derived anchor for the import star.
+Generalize the neighbour input to carry its anchor PER ROW, then the
+endpoint merges two sources: the static import rows (nb: / meshcoredb:) —
+anchored as now — and the poller's live neighbour sets — each polled
+repeater becomes its own anchor. The existing edge-merge logic (newest
+last_seen wins, counts accumulate) already handles overlap, so a neighbour
+seen in both the old import and the live poll shows as one fresh edge. Net
+effect: the star stops being a snapshot, and a second repeater in
+repeater_poll grows a second star for free.
+
+**3. Context layer on the map (user-approved toggle).**
+Graph payload gains an optional set of positioned-but-unlinked nodes
+(fetched only when requested, so the default stays light); Map mode gets a
+"context" legend toggle — OFF by default — rendering them as faint grey
+dots with tooltips and click-to-drawer. The linked skeleton stays
+foreground; the ~1200 known-location nodes become the backdrop.
+
+**4. The usual finishing.**
+One optional config knob (repeater_poll opt-out for the neighbour query,
+default ON — remember the section_map lesson), Mac-runnable tests (poller
+with fake client, multi-anchor assembly), changelog + README touches,
+memory update. Pi verification: restart, wait one poll cycle, open
+Topology — star edges show fresh timestamps; bonus: Repeaters card could
+show an "N neighbours" line.
+
+**SEQUENCE: step 0 → poller (1) → verify live neighbour fetch on Pi →
+graph merge (2) → context layer (3)** — so if the repeater firmware
+surprises us on req_neighbours, we find out before building on top of it.
+
 ### W13 build phase 1 (2026-07-11) — Topology page (force-directed mesh graph)
 
 **PHASE 2 REMARK (user, 2026-07-11): MeshCore repeater neighbours still need
