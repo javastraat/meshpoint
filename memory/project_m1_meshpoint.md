@@ -1104,7 +1104,25 @@ Build (zero capture-path changes, graph assembled at request time):
   correct, empty-text overlay gone, meshtastic traceroute web + meshcore
   star + green self node with direct edges all rendering, legend toggles
   present. W13 phase 1 CLOSED; phase 2 = req_neighbours live polling (see
-  remark at top of this section). (The meshcore.db archive import does NOT grow the graph —
+  remark at top of this section).
+- **MAP MODE added same day (user idea "map modus", default off):** Graph|Map
+  lw-tabs switch in the header (localStorage 'meshpoint.topoMode', default
+  graph). Data check first: 32/46 graph nodes have coordinates (all 26
+  meshcore + 6 meshtastic), 29/48 edges drawable. Backend: roster SQL +
+  node entries gained lat/lon (0,0 null-island treated as no position; NEW
+  `_field()` tolerant accessor because sqlite3.Row has no .get and old row
+  shapes lack the columns — 9th unit test covers passthrough + null-island).
+  Frontend: `.topo-map` div overlays the canvas (z-index 2), Leaflet lazily
+  initialized (window.L is global — index.html loads leaflet for the
+  dashboard map; same CARTO dark_all tiles as node_map.js), nodes =
+  circleMarkers (same colors, self/anchor ringed), edges = polylines (kind
+  color, weight by count, dashed stale), tooltips + click→nodeDrawer, corner
+  note counts hidden position-less nodes, zoom/Fit buttons route to leaflet
+  in map mode, chips + legend toggles re-render the map, first render
+  fitBounds. Harness rebuilt (leaflet from unpkg + lorawan.css for lw-tabs)
+  and opened on Mac. Changelog bullet extended (parser-verified).
+  Pi-verify: Topology → Map tab, expect ~32 markers around Amsterdam, star
+  as geographic lines, "14 nodes without position not shown" note. (The meshcore.db archive import does NOT grow the graph —
   same 25 neighbours.)
 
 ### W16 build (2026-07-11) — message toast + sound + toggles

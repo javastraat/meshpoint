@@ -18,6 +18,9 @@ class TopologyTab {
         this._staleDays = 7;
         this._kinds = { route: true, direct: true, neighbour: true };
         this._show = { self: true, anchor: true, meshtastic: true, meshcore: true };
+        this._mode = this._readMode();
+        this._map = null;
+        this._mapLayer = null;
         this._built = false;
         this._visible = false;
         this._raf = null;
@@ -49,6 +52,10 @@ class TopologyTab {
             <div class="panel topo-panel">
                 <div class="panel__header panel__header--tabs">
                     <h2>Mesh Topology</h2>
+                    <div class="lw-tabs" data-topo-modes>
+                        <button class="lw-tab" data-mode="graph">Graph</button>
+                        <button class="lw-tab" data-mode="map">Map</button>
+                    </div>
                     <div class="topo-chips">
                         <button class="topo-chip topo-chip--route topo-chip--active" data-kind="route">Traceroute</button>
                         <button class="topo-chip topo-chip--direct topo-chip--active" data-kind="direct">Direct RX</button>
@@ -61,6 +68,8 @@ class TopologyTab {
                 </div>
                 <div class="topo-canvas-wrap">
                     <canvas class="topo-canvas"></canvas>
+                    <div class="topo-map" hidden></div>
+                    <div class="topo-map-note" hidden></div>
                     <div class="topo-tooltip" hidden></div>
                     <div class="topo-empty" hidden>
                         No topology data yet. Edges appear from traceroutes, direct
@@ -86,16 +95,25 @@ class TopologyTab {
         this.root.querySelector('[data-topo-refresh]').addEventListener('click', () => this._load());
         this.root.querySelectorAll('[data-topo-zoom]').forEach((btn) => {
             btn.addEventListener('click', () => {
-                this._zoomBy(btn.dataset.topoZoom === 'in' ? 1.3 : 1 / 1.3);
+                const zoomIn = btn.dataset.topoZoom === 'in';
+                if (this._mode === 'map' && this._map) {
+                    if (zoomIn) this._map.zoomIn(); else this._map.zoomOut();
+                    return;
+                }
+                this._zoomBy(zoomIn ? 1.3 : 1 / 1.3);
             });
         });
-        this.root.querySelector('[data-topo-fit]').addEventListener('click', () => this._fitView());
+        this.root.querySelector('[data-topo-fit]').addEventListener('click', () => {
+            if (this._mode === 'map') this._fitMap();
+            else this._fitView();
+        });
         this.root.querySelectorAll('[data-show]').forEach((btn) => {
             btn.addEventListener('click', () => {
                 const key = btn.dataset.show;
                 this._show[key] = !this._show[key];
                 btn.classList.toggle('topo-legend__toggle--off', !this._show[key]);
                 if (this._selected && !this._nodeVisible(this._selected)) this._selected = null;
+                if (this._mode === 'map') this._renderMap();
                 this._kick(0.3);
             });
         });
@@ -104,12 +122,131 @@ class TopologyTab {
                 const kind = chip.dataset.kind;
                 this._kinds[kind] = !this._kinds[kind];
                 chip.classList.toggle('topo-chip--active', this._kinds[kind]);
+                if (this._mode === 'map') this._renderMap();
                 this._kick(0.3);
             });
         });
 
+        this.root.querySelectorAll('[data-mode]').forEach((btn) => {
+            btn.addEventListener('click', () => this._setMode(btn.dataset.mode));
+        });
+
         this._bindPointer();
         window.addEventListener('resize', () => { if (this._visible) this._resize(); });
+        this._applyMode();
+    }
+
+    _readMode() {
+        try {
+            return localStorage.getItem('meshpoint.topoMode') === 'map' ? 'map' : 'graph';
+        } catch (_e) { return 'graph'; }
+    }
+
+    _setMode(mode) {
+        this._mode = mode === 'map' ? 'map' : 'graph';
+        try { localStorage.setItem('meshpoint.topoMode', this._mode); } catch (_e) {}
+        this._applyMode();
+    }
+
+    _applyMode() {
+        const mapEl = this.root.querySelector('.topo-map');
+        const noteEl = this.root.querySelector('.topo-map-note');
+        this.root.querySelectorAll('[data-mode]').forEach((btn) => {
+            btn.classList.toggle('lw-tab--active', btn.dataset.mode === this._mode);
+        });
+        const onMap = this._mode === 'map';
+        mapEl.hidden = !onMap;
+        if (!onMap) {
+            if (noteEl) noteEl.hidden = true;
+            this._kick(0.1);
+            return;
+        }
+        this._initMap();
+        this._renderMap();
+        // Leaflet measures its container; it is display:none until now.
+        setTimeout(() => { if (this._map) this._map.invalidateSize(); }, 50);
+    }
+
+    _initMap() {
+        if (this._map || !window.L) return;
+        const mapEl = this.root.querySelector('.topo-map');
+        this._map = L.map(mapEl, { zoomControl: false, scrollWheelZoom: true });
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; CARTO',
+            subdomains: 'abcd',
+            maxZoom: 19,
+        }).addTo(this._map);
+        this._mapLayer = L.layerGroup().addTo(this._map);
+        this._map.setView([52.37, 4.89], 11);
+    }
+
+    _renderMap() {
+        if (!this._map || !this._mapLayer) return;
+        const col = this._colors();
+        this._mapLayer.clearLayers();
+
+        const placed = (n) => n.lat != null && n.lon != null;
+        const visible = this._visibleNodes();
+        const bounds = [];
+
+        this._activeEdges().forEach((e) => {
+            if (!placed(e.na) || !placed(e.nb)) return;
+            L.polyline(
+                [[e.na.lat, e.na.lon], [e.nb.lat, e.nb.lon]],
+                {
+                    color: col[e.kind] || col.dim,
+                    weight: Math.min(1 + Math.log2(1 + (e.count || 1)), 4),
+                    opacity: e.stale ? 0.3 : 0.65,
+                    dashArray: e.stale ? '4 6' : null,
+                },
+            ).addTo(this._mapLayer);
+        });
+
+        let unplaced = 0;
+        visible.forEach((n) => {
+            if (!placed(n)) { unplaced += 1; return; }
+            bounds.push([n.lat, n.lon]);
+            const fill = n.is_self ? col.self
+                : (n.protocol === 'meshcore' ? col.meshcore : col.meshtastic);
+            const marker = L.circleMarker([n.lat, n.lon], {
+                radius: n.is_self || n.is_anchor ? 8 : 5,
+                color: n.is_anchor && !n.is_self ? col.meshcore : fill,
+                weight: n.is_self || n.is_anchor ? 3 : 1.5,
+                fillColor: fill,
+                fillOpacity: 0.85,
+            }).addTo(this._mapLayer);
+            marker.bindTooltip(
+                `${n.name || n.id}${n.name ? `<br>${n.id}` : ''} · ${n.degree} link${n.degree === 1 ? '' : 's'}`,
+            );
+            marker.on('click', () => {
+                if (!window.nodeDrawer) return;
+                window.nodeDrawer.open({
+                    node_id: n.id,
+                    long_name: n.name || null,
+                    protocol: n.protocol || null,
+                    role: n.role || null,
+                });
+            });
+        });
+
+        const noteEl = this.root.querySelector('.topo-map-note');
+        if (noteEl) {
+            noteEl.textContent = unplaced > 0
+                ? `${unplaced} node${unplaced === 1 ? '' : 's'} without position not shown`
+                : '';
+            noteEl.hidden = unplaced === 0;
+        }
+        if (bounds.length && !this._mapFitted) {
+            this._map.fitBounds(bounds, { padding: [40, 40] });
+            this._mapFitted = true;
+        }
+    }
+
+    _fitMap() {
+        const pts = this._visibleNodes()
+            .filter((n) => n.lat != null && n.lon != null)
+            .map((n) => [n.lat, n.lon]);
+        if (pts.length && this._map) this._map.fitBounds(pts, { padding: [40, 40] });
     }
 
     async _load() {
@@ -153,6 +290,7 @@ class TopologyTab {
         this._needsFit = true;
         this._resize();
         this._kick(1);
+        if (this._mode === 'map') this._renderMap();
     }
 
     _zoomBy(factor) {

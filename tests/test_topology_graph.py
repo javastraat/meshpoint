@@ -94,6 +94,25 @@ class AssembleGraphTest(unittest.TestCase):
         self.assertEqual(node["name"], "Node Alpha")
         self.assertEqual(node["role"], "ROUTER")
 
+    def test_positions_passed_through_and_null_island_dropped(self):
+        roster = [
+            {"node_id": "aa", "long_name": "Placed", "short_name": None,
+             "protocol": "meshcore", "role": None,
+             "latitude": 52.37, "longitude": 4.85},
+            {"node_id": "bb", "long_name": "NullIsland", "short_name": None,
+             "protocol": "meshcore", "role": None,
+             "latitude": 0, "longitude": 0},
+        ]
+        graph = assemble_graph(
+            [_tr("aa", ["bb"])], [], [], roster,
+            self_node_id=None, self_name="box", anchor_node_id=None,
+        )
+        placed = next(n for n in graph["nodes"] if n["id"] == "aa")
+        null_island = next(n for n in graph["nodes"] if n["id"] == "bb")
+        self.assertEqual((placed["lat"], placed["lon"]), (52.37, 4.85))
+        self.assertIsNone(null_island["lat"])
+        self.assertIsNone(null_island["lon"])
+
     def test_self_loop_and_blank_ids_skipped(self):
         graph = assemble_graph(
             [_tr("aa", ["aa", "", "bb"])], [], [], [],

@@ -63,7 +63,8 @@ async def get_graph():
         "GROUP BY source_id"
     )
     roster_rows = await db.fetch_all(
-        "SELECT node_id, long_name, short_name, protocol, role FROM nodes"
+        "SELECT node_id, long_name, short_name, protocol, role, "
+        "latitude, longitude FROM nodes"
     )
 
     return assemble_graph(

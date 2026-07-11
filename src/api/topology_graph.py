@@ -17,6 +17,15 @@ def _norm(node_id) -> str:
     return (node_id or "").strip().lower()
 
 
+def _field(row, key):
+    """Tolerant column access: sqlite3.Row has no .get(), and older row
+    shapes (tests, callers) may lack newer optional columns."""
+    try:
+        return row[key]
+    except (KeyError, IndexError):
+        return None
+
+
 def assemble_graph(
     traceroute_rows,
     direct_rows,
@@ -32,7 +41,8 @@ def assemble_graph(
       traceroute_rows: source_id, decoded_payload (JSON), timestamp
       direct_rows:     source_id, protocol, cnt, last_seen, avg_rssi, avg_snr
       neighbour_rows:  source_id, cnt, last_seen, avg_snr
-      roster_rows:     node_id, long_name, short_name, protocol, role
+      roster_rows:     node_id, long_name, short_name, protocol, role,
+                       latitude, longitude (optional)
     """
     edges: dict[tuple[str, str, str], dict] = {}
     node_proto_hint: dict[str, str] = {}
@@ -113,16 +123,24 @@ def assemble_graph(
         info = roster.get(nid)
         name = None
         role = None
+        lat = lon = None
         protocol = node_proto_hint.get(nid)
         if info is not None:
             name = info["long_name"] or info["short_name"] or None
             role = info["role"]
             protocol = info["protocol"] or protocol
+            # 0,0 is the null island placeholder some nodes report -- treat
+            # it as no position rather than mapping into the Atlantic.
+            if _field(info, "latitude") and _field(info, "longitude"):
+                lat = info["latitude"]
+                lon = info["longitude"]
         entry = {
             "id": nid,
             "name": name,
             "protocol": protocol,
             "role": role,
+            "lat": lat,
+            "lon": lon,
             "is_self": nid == self_node_id,
             "is_anchor": nid == anchor_node_id,
         }

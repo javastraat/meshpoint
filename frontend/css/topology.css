@@ -47,6 +47,30 @@
     touch-action: none;
 }
 
+.topo-map {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+}
+
+.topo-map[hidden] { display: none; }
+
+.topo-map-note {
+    position: absolute;
+    left: 0.75rem;
+    bottom: 0.75rem;
+    z-index: 3;
+    padding: 0.3rem 0.7rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border, #253248);
+    border-radius: 999px;
+    color: var(--text-secondary, #8b98a9);
+    font-size: 0.7rem;
+    pointer-events: none;
+}
+
+.topo-map-note[hidden] { display: none; }
+
 .topo-tooltip {
     position: absolute;
     z-index: 5;
