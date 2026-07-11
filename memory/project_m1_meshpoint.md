@@ -981,7 +981,32 @@ All of T1-T4, T6 DONE (see entries below). Fresh numbering:
 | N1 | ~~P3~~ DONE (verified 2026-07-11) | M | Multiple Meshtastic USB sticks — built as `capture.serial` list (SerialDeviceConfig + label, source name `serial_<label>`, legacy scalars kept). Same item as backlog #7; running live as `serial_433` |
 | N2 | DONE 2026-07-08 | S-M | Endpoint housekeeping done via live diagnosis (user ran stdlib diag script on Pi, all comparisons byte-identical). PRUNED 4: packets/protocols+types, nodes/map (+ orphans: telemetry.py router whole file, TelemetryRepository.get_latest_for_node, NodeRepository.get_with_position, NetworkMapper's get_map_data/get_all_nodes/get_nodes_with_position/get_node_count). **KEPT 2 — double-check saved us: `meshpoint report` CLI (report_command.py) uses /api/packets/count AND /api/nodes/summary** (frontend-only grep missed CLI consumers; remember to grep src/cli too when auditing endpoints). BONUS BUG FIXED: network summary totals were computed over get_all(LIMIT 500) → Stats page + CLI report under-reported (500 vs real 1445 nodes); now `NodeRepository.get_network_totals()` whole-table SQL aggregates (COUNT/SUM CASE/GROUP BY, COALESCE for empty table; SQL validated via stdlib sqlite3 on Mac). nodes.py no longer takes network_mapper (server call updated); NetworkMapper slimmed to get_network_summary→get_network_totals (stats_routes still uses it). README API table: nodes/map row → nodes/summary. 2 changelog bullets (45 total) |
 
-Wishlist: W1 CSV export (DONE) · W2 LoRaWAN MIC verify (DEPRIORITIZED) · W3 433-node UI tags (DONE as T8) · W4 light theme (L) · W5 DAB+ welle-cli (M-L) · W6 pyrtlsdr true-RF S-meter (M-L) · W7 MeshCore repeater monitoring (DONE 2026-07-10, details below) · W8 LED (DONE) · W9 button (DONE) · W10 tab switch (DONE) · W11 TTN uplink forwarder (PARKED) · W12 repeater detail: neighbours/regions/owner/acl/clock (PARKED, see W7 note).
+Wishlist: W1 CSV export (DONE) · W2 LoRaWAN MIC verify (DEPRIORITIZED) · W3 433-node UI tags (DONE as T8) · W4 light theme (L) · W5 DAB+ welle-cli (M-L) · W6 pyrtlsdr true-RF S-meter (M-L) · W7 MeshCore repeater monitoring (DONE 2026-07-10, details below) · W8 LED (DONE) · W9 button (DONE) · W10 tab switch (DONE) · W11 TTN uplink forwarder (PARKED) · W12 repeater detail: neighbours/regions/owner/acl/clock (PARKED, see W7 note) · W13 mesh topology graph (M-L) · W14 stray-frames table (M) · W15 live duty-cycle budget (S-M) · W16 message notification sound (S).
+
+**W13-W16 added 2026-07-11 — sourced from upstream KMX415/meshpoint open
+issues/PRs (user reviewed the list, picked these).** CAUTION: the upstream PRs
+are OPEN/unmerged, unknown quality, and the fork has diverged heavily (auth,
+sidebar, panels, CSS) — treat them as design references to reimplement
+fork-style, never merge the branches.
+- **W13 — mesh topology graph** (upstream PR #72): force-directed graph from
+  Meshtastic NEIGHBORINFO/TRACEROUTE; fork version should also plot MeshCore
+  neighbour SNR data (already imported via nb: rows + meshcore.db archive).
+  Natural home for parked W12's req_neighbours data — consider folding W12 in.
+- **W14 — stray-frames table** (upstream PR #80): log RF frames that fail all
+  three decoders to a `stray_frames` table instead of dropping silently —
+  where a 6th unknown protocol or misconfigured neighbour would show up.
+- **W15 — live duty-cycle budget** (upstream PR #74): per-channel TX throttle
+  + live duty budget readout. We TX 27 dBm / 10% in 869.4-869.65 — this is a
+  legal-compliance gauge for the Hardware page.
+- **W16 — message notification sound** (upstream issues #49/#47, twice
+  requested, good-first-issue): browser audio ping in the existing
+  message-broadcast path — the browser equivalent of the LED message blink.
+Also noted from the same review: upstream #75 = our W4 (light theme — port if
+upstream builds it first); #11 Reticulum monitoring = wildcard 6th network for
+the spare Heltec V3 433 via RNode firmware; #85/#59 (dashboard firmware
+flasher / companion version check) interesting but needs serial-port
+release/reclaim handover from the capture sources — not listed, revisit if
+flashing pain grows.
 
 **W7 MeshCore REPEATER MONITORING — DONE 2026-07-10.** User co-designed
 via live meshcore-cli tests (companion reachable at meshcore.local:5000
