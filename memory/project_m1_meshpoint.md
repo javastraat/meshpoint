@@ -1069,6 +1069,39 @@ EOF
 Output tells us whether it's `req_neighbours_sync(contact)` like the
 status/telemetry pair and what args it wants → how poll_repeater calls it.
 
+**STEP 0 DONE 2026-07-11 (live output from Pi venv,
+/opt/meshpoint/venv/.../meshcore):**
+- `req_neighbours_sync(self, contact, count=255, offset=0, order_by=0,
+  pubkey_prefix_length=4, timeout=0, min_timeout=0)` — EXISTS, same
+  contact-first sync shape as req_status_sync/req_telemetry_sync. Paginated
+  via count/offset.
+- **BETTER: `fetch_all_neighbours(self, contact, order_by=0,
+  pubkey_prefix_length=4, timeout=0, min_timeout=0)`** — convenience helper
+  that presumably loops the pagination; preferred call for poll_repeater
+  (inspect its return shape when building step 1: likely list of neighbour
+  dicts with pubkey prefix + snr + age). NOTE pubkey_prefix_length default 4
+  — probably want 6 (12 hex chars) to match our node_id keys; verify.
+- Also confirmed for the future expand-repeater card: `req_acl_sync`,
+  `req_owner_sync`, `req_regions_sync` (contact,timeout), `req_mma_sync
+  (contact, start, end)` — the W7-era req_mma error was the missing
+  start/end args.
+- **STEP 1 BUILT 2026-07-11 (code in, Pi-verify pending):**
+  poll_repeater (meshcore_tx_client.py) now runs `fetch_all_neighbours
+  (contact, pubkey_prefix_length=6)` as a THIRD step after telemetry —
+  25s wait_for, tolerant (absence never fails the poll), result unwrapped
+  via `getattr(neigh, "payload", neigh)` (Event-or-plain unknown) then
+  _json_safe'd into out["neighbours"]. RepeaterPoller entry carries +
+  persists "neighbours" with the same keep-last-good fallback as telemetry.
+  The /api/meshcore/repeaters endpoint returns latest entries → neighbours
+  visible there automatically. NOT yet changelogged (bullet when phase 2
+  completes with the topo merge). Poller tests pass, py_compile clean.
+  **Pi-verify step 1:** pull, restart, wait one poll, then:
+  `python3 -c "import json;print(json.dumps(json.load(open('/opt/meshpoint/data/repeater_status.json'))['da0b77f13bc7'].get('neighbours'),indent=1)[:2000])"`
+  → paste the SHAPE so step 2 (multi-anchor topo merge) knows the field
+  names (expect pubkey prefix + snr + age per neighbour).
+- NEXT (step 2): multi-anchor assemble_graph + endpoint merge of live
+  poller neighbours; then step 3 context layer.
+
 **1. Teach the poller to ask for neighbours (backend core).**
 `MeshCoreTxClient.poll_repeater()` already does login → req_status →
 req_telemetry per configured repeater. Add req_neighbours as a THIRD step

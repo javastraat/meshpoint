@@ -245,7 +245,7 @@ class MeshCoreTxClient:
         Same calls meshcore-cli's ``req_status``/``req_telemetry`` make,
         through the companion Meshpoint already holds. ``key`` is the
         node's public-key prefix (== its node_id). Returns
-        ``{ok, status, telemetry, error}`` with the raw payload dicts;
+        ``{ok, status, telemetry, neighbours, error}`` with the raw payload dicts;
         req_status needs a prior login on this firmware, so a login
         failure short-circuits.
         """
@@ -259,7 +259,7 @@ class MeshCoreTxClient:
         if contact is None:
             return {"ok": False, "error": "contact not in companion roster"}
 
-        out = {"ok": False, "status": None, "telemetry": None, "error": ""}
+        out = {"ok": False, "status": None, "telemetry": None, "neighbours": None, "error": ""}
         try:
             if password:
                 login = await asyncio.wait_for(
@@ -289,6 +289,24 @@ class MeshCoreTxClient:
                     out["telemetry"] = _json_safe(telem)
             except Exception:
                 logger.debug("req_telemetry failed for %s", key, exc_info=True)
+            try:
+                # Third query on the same logged-in session: the repeater's
+                # own neighbour list (for the topology graph). Shape is
+                # firmware-dependent, so store it json-safe as-is;
+                # prefix_length 6 = 12 hex chars, matching our node_ids.
+                # Tolerant like telemetry: absence never fails the poll.
+                neigh = await asyncio.wait_for(
+                    self._mc.commands.fetch_all_neighbours(
+                        contact, pubkey_prefix_length=6,
+                    ),
+                    timeout=25.0,
+                )
+                if neigh is not None:
+                    # May be a plain list/dict or an Event; unwrap .payload
+                    # so the poller's JSON state file can always store it.
+                    out["neighbours"] = _json_safe(getattr(neigh, "payload", neigh))
+            except Exception:
+                logger.debug("fetch_all_neighbours failed for %s", key, exc_info=True)
         except asyncio.TimeoutError:
             out["error"] = "timed out"
         except Exception as exc:

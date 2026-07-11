@@ -141,6 +141,7 @@ class RepeaterPoller:
             "error": result.get("error") or "",
             "status": result.get("status"),
             "telemetry": result.get("telemetry"),
+            "neighbours": result.get("neighbours"),
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
         # Preserve last-good status when a poll fails, so the tab keeps
@@ -156,6 +157,7 @@ class RepeaterPoller:
         # Keep showing the last real sensor data instead of blanking the
         # Sensors card until the next full poll.
         entry["telemetry"] = entry["telemetry"] or prev.get("telemetry")
+        entry["neighbours"] = entry["neighbours"] or prev.get("neighbours")
 
         self.latest[key] = entry
         self._save_state()
