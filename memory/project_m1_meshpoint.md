@@ -1121,8 +1121,16 @@ Build (zero capture-path changes, graph assembled at request time):
   in map mode, chips + legend toggles re-render the map, first render
   fitBounds. Harness rebuilt (leaflet from unpkg + lorawan.css for lw-tabs)
   and opened on Mac. Changelog bullet extended (parser-verified).
-  Pi-verify: Topology → Map tab, expect ~32 markers around Amsterdam, star
-  as geographic lines, "14 nodes without position not shown" note. (The meshcore.db archive import does NOT grow the graph —
+  MAP MODE LIVE-VERIFIED on Pi 2026-07-11 (user screenshots): Graph|Map
+  tabs render, map shows the meshcore star over Amsterdam (solid fresh +
+  dashed stale spokes), blue meshtastic edges, "14 nodes without position
+  not shown" corner note, CARTO dark tiles. Both modes CLOSED.
+- **Phase-2 idea (user-approved 2026-07-11): map "context layer" toggle** —
+  optionally show UNLINKED positioned nodes as faint dots behind the linked
+  skeleton (63 meshtastic + 1168 meshcore nodes have coordinates but only
+  32 have known links; topology admits nodes only via edges — the dashboard
+  map covers "where is everything", topology covers "what connects").
+  OFF by default; do it together with req_neighbours phase 2. (The meshcore.db archive import does NOT grow the graph —
   same 25 neighbours.)
 
 ### W16 build (2026-07-11) — message toast + sound + toggles
