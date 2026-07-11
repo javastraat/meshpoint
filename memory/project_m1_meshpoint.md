@@ -1107,6 +1107,10 @@ status/telemetry pair and what args it wants → how poll_repeater calls it.
   — 25 neighbours, pubkeys are 12-hex (== our node_id format, thanks to
   prefix_length=6), secs_ago spans 37min..24days, snr floats. EXACTLY what
   step 2 needs.
+- Bonus (user idea, same evening): Repeaters health card now shows a
+  "Neighbours: N" row (repeaters_tab.js, reads entry.neighbours
+  .neighbours_count, fallback list length; /repeaters endpoint already
+  spread the whole entry so no backend change). Pi-verify with next deploy.
 - NEXT (step 2): multi-anchor assemble_graph + endpoint merge of live
   poller neighbours; then step 3 context layer. Concrete step-2 spec:
   - topology_routes.init_routes gains `poller` (or provider callable);

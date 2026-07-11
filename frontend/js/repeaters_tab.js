@@ -146,6 +146,13 @@ class RepeatersTab {
         health.push(['Noise floor', s.noise_floor != null ? `${s.noise_floor} dBm` : '--']);
         health.push(['Last SNR', s.last_snr != null ? `${s.last_snr} dB` : '--']);
         if (s.recv_errors != null) health.push(['Recv errors', this._num(s.recv_errors)]);
+        const nbData = r.neighbours;
+        const nbCount = nbData
+            ? (nbData.neighbours_count != null
+                ? nbData.neighbours_count
+                : (Array.isArray(nbData.neighbours) ? nbData.neighbours.length : null))
+            : null;
+        if (nbCount != null) health.push(['Neighbours', this._num(nbCount)]);
 
         // Every LPP sensor reading (any channel / any sensor).
         const sensors = this._sensorRows(r.telemetry);
