@@ -972,7 +972,32 @@ Meshtastic serial — live as `serial_433`; all three lines were stale until
 
 ---
 
-## CURRENT TO-DO LIST v2 (2026-07-08 15:22 — supersedes T-list below)
+## CURRENT WORKLIST v3 (2026-07-11 — supersedes v2 below; THE list to work off)
+
+Result of the 2026-07-11 full audit: every v2/backlog to-do was found done,
+live-verified, or closed by design (five were stale — see
+code-ahead-of-tracking lesson). To-do is EMPTY; wishlist below. W13-W16
+sourced from upstream KMX415/meshpoint issue review (design references only,
+never merge upstream branches — fork has diverged).
+
+Sorted in suggested working order (top = next up):
+
+| # | Status | Effort | Item |
+|---|--------|--------|------|
+| — | To-do: EMPTY | — | Entire inspection backlog + N-list done, verified, or closed by design |
+| W16 | Open | S | Message notification sound — browser ping via the existing message-broadcast path (upstream #49/#47) |
+| W13 | Open | M-L | Mesh topology graph — force-directed, Meshtastic NEIGHBORINFO/TRACEROUTE + MeshCore neighbour SNR (upstream #72; absorb W12's req_neighbours here) |
+| W14 | Open | M | Stray-frames table — log RF frames that fail all three decoders instead of dropping silently (upstream #80) |
+| W5 | Open | M-L | DAB+ listener mode via welle-cli — unlocks NPO Radio 5 (DAB-only) |
+| W6 | Open | M-L | True-RF S-meter via pyrtlsdr — replace the audio-loudness meter with real dBm |
+| W4 | Open | L | Light theme — all 3 themes dark; tokenize colors, light map tiles, contrast pass. Topbar toggle ready for a `light` entry. (Upstream #75 wants it too) |
+| W12 | Parked | M | Repeater detail view (req_neighbours/regions/owner/acl/clock) — likely folds into W13 |
+| W2 | Parked | M | LoRaWAN key store + MIC verify/decrypt — trigger: user runs own LoRaWAN devices |
+| W11 | Parked | M | TTN uplink-only forwarder — trigger: TTN entanglement deemed worth it |
+| — | Noted | — | Firmware flasher / companion version check (upstream #85/#59) — if flashing the 3 sticks becomes a pain (needs serial release/reclaim handover) |
+| — | Noted | — | Reticulum as 6th network on the spare Heltec V3 433 via RNode firmware (upstream #11) — wildcard |
+
+## OLD: TO-DO LIST v2 (2026-07-08 15:22 — superseded by v3 above, kept for DONE details)
 
 All of T1-T4, T6 DONE (see entries below). Fresh numbering:
 
