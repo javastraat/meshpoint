@@ -980,11 +980,13 @@ design references only, never merge upstream branches (fork has diverged).
 
 | # | Status | Effort | Item |
 |---|--------|--------|------|
-| W13-p2 | Open — next up | M | Topology phase 2: live `req_neighbours` polling per repeater through the existing RepeaterPoller (absorbs parked W12) + the map "context layer" toggle (faint dots for the ~1200 positioned-but-unlinked nodes). Caution: rides the companion's command channel, keep cadence gentle. |
+| W13-p2 | **DONE 2026-07-11, ALL STEPS LIVE-VERIFIED** | M | Topology phase 2 complete: live neighbour polling (fetch_all_neighbours, per-repeater stars, skew-immune freshness), Repeaters card neighbour count, map "all positions" context layer (user screenshot: grey constellation across the Randstad behind the linked stars). See W13-p2 PLAN section for details. Only leftover: optional poller→roster/nb:-row upsert decision |
+| — | Open — quick win | S | Installer RTL-SDR bits: udev rule (0bda:2838 → plugdev) + meshpoint into plugdev + dvb_usb_rtl28xxu blacklist into install.sh (all manual per-box today; see fresh-install fixes round 2) |
 | W14 | Open | M | Stray-frames table — log RF frames that fail all three decoders instead of dropping silently (upstream #80) |
 | W5 | Open | M-L | DAB+ listener mode via welle-cli — unlocks NPO Radio 5 (DAB-only) |
 | W6 | Open | M-L | True-RF S-meter via pyrtlsdr — real dBm instead of post-demod audio loudness |
 | W4 | Open | L | Light theme — tokenize the dark-first CSS, light map tiles, per-page contrast pass; topbar toggle ready for a `light` entry |
+| — | Decide | S | Poller → roster? Should live neighbour polls also upsert nodes / write nb:-style rows (bump last_heard, name unknown pubkeys)? Currently repeater_status.json only, by design |
 | W2 | Parked | M | LoRaWAN key store + MIC verify/decrypt — trigger: you run your own LoRaWAN devices |
 | W11 | Parked | M | TTN uplink-only forwarder — trigger: TTN entanglement deemed worth it |
 | — | Noted | — | Firmware flasher / companion version check (upstream #85/#59) — if flashing the 3 sticks becomes a pain |

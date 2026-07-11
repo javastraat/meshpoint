@@ -94,7 +94,7 @@ This is a customized fork of upstream [KMX415/meshpoint](https://github.com/KMX4
 - `scripts/repair_neighbour_timestamps.py` + `scripts/backfill_meshcore_signal.py` fix bad past/future timestamps and backfill freq/SF on old rows.
 
 **UI / UX**
-- **Mesh topology graph** — a Topology page draws the mesh as a force-directed graph (no mapping libraries): Meshtastic traceroute chains, direct receptions by this box, and imported MeshCore neighbour SNR become nodes and edges you can drag, zoom, and filter. `GET /api/topology/graph`.
+- **Mesh topology graph + map** — a Topology page draws the mesh as a force-directed graph: Meshtastic traceroute chains, direct receptions by this box, and MeshCore neighbour SNR become nodes and edges you can drag, zoom, and filter. A Graph|Map switch projects the same network onto real map tiles, an "all positions" layer shows every positioned-but-unlinked node as a faint scouting dot, and with repeater polling enabled the graph refreshes itself — each poll fetches the repeater's own neighbour list (`fetch_all_neighbours`), so every polled repeater becomes a live star. `GET /api/topology/graph`.
 - **Incoming-message notifications** — corner toast with sender + snippet (click jumps to the conversation) and an optional soft notification sound; independent per-browser toggles in Settings → System.
 - **Topbar theme toggle** (cycles the dark / high-contrast / sunlight themes with a per-theme icon).
 - **24-hour time** across the whole dashboard.
