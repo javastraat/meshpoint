@@ -423,14 +423,16 @@ and kicks it out") turned out to be FALSE as stated but real in effect:
 - Everything self-heals after a reboot: meshpoint.service auto-starts and the
   MeshCore source reconnects on its own.
 
-#### Live device config drift (2026-07-05)
+#### Live device config drift — RESOLVED 2026-07-11
 The M1 (`pi@192.168.2.189`, service config at `/opt/meshpoint/config/local.yaml`)
-currently runs only TWO sources: `concentrator` + ONE `meshcore_usb` companion
-at `/dev/ttyUSB0` (CP2102, label "", auto_detect false). The 5-network
-local.yaml above (2× ACM MeshCore + Meshtastic serial) is NOT what is deployed
-right now. Repo copy `meshpoint_lorawan/config/local.yaml` is also stale vs
-the live one. Consider `/dev/serial/by-id/usb-Silicon_Labs_CP2102_...-if00-port0`
-instead of ttyUSB0 for robustness if more USB devices get added.
+now runs THREE sources: `concentrator` + `meshcore_usb` label "868" at
+/dev/ttyUSB0 + `serial` list label "433" at /dev/ttyUSB1, plus repeater_poll
+(1 repeater @ 15 min), led/fan/button enabled, mqtt, frozen node_id 0xc3ecf862.
+User copied the live file into repo `config/local.yaml` (2026-07-11) — verified:
+gitignored (.gitignore:27, secrets safe) and loads cleanly through
+`load_config()` on the Mac (all dataclasses populated correctly).
+Still open suggestion: `/dev/serial/by-id/usb-Silicon_Labs_CP2102_...` paths
+instead of ttyUSB0/1 for robustness if more USB devices get added.
 
 ## Repeaters UI split + zero-filter (2026-07-10)
 
@@ -1067,8 +1069,11 @@ contacts) — no separate companion/CLI needed. Build:
   ch3 BMP280 temp/baro/alt, ch4 SHT3X temp/humidity = 10 readings).
   Radio-health rows (battery/uptime/airtime/pkts/noise/snr/errors) stay
   in the top block. Verified render with the user's real 10-reading lpp
-  (node -e preview). NOT re-verified on Pi after this — next poll shows
-  the full Sensors list.
+  (node -e preview). LIVE-VERIFIED on Pi 2026-07-11 (user screenshot):
+  Sensors card "3 CH · 7 VALS" — Ch1 temp+voltage, Ch3 alt/pressure/temp,
+  Ch4 humidity+temp all listed; Ch2 solar correctly hidden by the
+  zero-filter (evening, all readings 0). History card (5083 samples,
+  min/avg/max) + Trends chart also rendering on the same page.
 
 **W2 REFRAMED (2026-07-10 discussion, user has no own LoRaWAN devices):**
 MIC verify is IMPOSSIBLE for a passive sniffer without the device's
