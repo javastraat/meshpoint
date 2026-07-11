@@ -17,6 +17,7 @@ class TopologyTab {
         this._edges = [];
         this._staleDays = 7;
         this._kinds = { route: true, direct: true, neighbour: true };
+        this._show = { self: true, anchor: true, meshtastic: true, meshcore: true };
         this._built = false;
         this._visible = false;
         this._raf = null;
@@ -67,11 +68,11 @@ class TopologyTab {
                     </div>
                 </div>
                 <div class="topo-legend">
-                    <span class="topo-legend__item"><i class="topo-dot topo-dot--self"></i> this box</span>
-                    <span class="topo-legend__item"><i class="topo-dot topo-dot--anchor"></i> neighbour source</span>
-                    <span class="topo-legend__item"><i class="topo-dot topo-dot--meshtastic"></i> Meshtastic</span>
-                    <span class="topo-legend__item"><i class="topo-dot topo-dot--meshcore"></i> MeshCore</span>
-                    <span class="topo-legend__item topo-legend__hint">drag = move / pan · wheel = zoom · click = highlight</span>
+                    <button class="topo-legend__item topo-legend__toggle" data-show="self"><i class="topo-dot topo-dot--self"></i> this box</button>
+                    <button class="topo-legend__item topo-legend__toggle" data-show="anchor"><i class="topo-dot topo-dot--anchor"></i> neighbour source</button>
+                    <button class="topo-legend__item topo-legend__toggle" data-show="meshtastic"><i class="topo-dot topo-dot--meshtastic"></i> Meshtastic</button>
+                    <button class="topo-legend__item topo-legend__toggle" data-show="meshcore"><i class="topo-dot topo-dot--meshcore"></i> MeshCore</button>
+                    <span class="topo-legend__item topo-legend__hint">drag = move / pan · wheel = zoom · click = highlight · legend = show/hide</span>
                     <span class="topo-legend__stats" data-topo-stats></span>
                 </div>
             </div>`;
@@ -89,6 +90,15 @@ class TopologyTab {
             });
         });
         this.root.querySelector('[data-topo-fit]').addEventListener('click', () => this._fitView());
+        this.root.querySelectorAll('[data-show]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const key = btn.dataset.show;
+                this._show[key] = !this._show[key];
+                btn.classList.toggle('topo-legend__toggle--off', !this._show[key]);
+                if (this._selected && !this._nodeVisible(this._selected)) this._selected = null;
+                this._kick(0.3);
+            });
+        });
         this.root.querySelectorAll('.topo-chip').forEach((chip) => {
             chip.addEventListener('click', () => {
                 const kind = chip.dataset.kind;
@@ -153,9 +163,10 @@ class TopologyTab {
     }
 
     _fitView() {
-        if (!this._nodes.length) return;
+        const visible = this._visibleNodes();
+        if (!visible.length) return;
         let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-        this._nodes.forEach((n) => {
+        visible.forEach((n) => {
             if (n.x < minX) minX = n.x;
             if (n.x > maxX) maxX = n.x;
             if (n.y < minY) minY = n.y;
@@ -171,8 +182,19 @@ class TopologyTab {
         this._draw();
     }
 
+    _nodeVisible(n) {
+        if (n.is_self) return this._show.self;
+        if (n.is_anchor) return this._show.anchor;
+        return n.protocol === 'meshcore' ? this._show.meshcore : this._show.meshtastic;
+    }
+
+    _visibleNodes() {
+        return this._nodes.filter((n) => this._nodeVisible(n));
+    }
+
     _activeEdges() {
-        return this._edges.filter((e) => this._kinds[e.kind]);
+        return this._edges.filter((e) =>
+            this._kinds[e.kind] && this._nodeVisible(e.na) && this._nodeVisible(e.nb));
     }
 
     _resize() {
@@ -209,7 +231,7 @@ class TopologyTab {
     }
 
     _simulate() {
-        const nodes = this._nodes;
+        const nodes = this._visibleNodes();
         const edges = this._activeEdges();
         const a = this._alpha;
         const repulsion = 1800;
@@ -291,7 +313,7 @@ class TopologyTab {
         ctx.setLineDash([]);
         ctx.globalAlpha = 1;
 
-        this._nodes.forEach((n) => {
+        this._visibleNodes().forEach((n) => {
             const r = (n.is_self ? 9 : 4 + Math.min(Math.log2(1 + n.degree) * 2, 6)) / Math.sqrt(this._view.k);
             const fill = n.is_self ? col.self : (n.protocol === 'meshcore' ? col.meshcore : col.meshtastic);
             const faded = selected && n !== selected &&
@@ -332,7 +354,7 @@ class TopologyTab {
         const p = this._toWorld(px, py);
         let best = null;
         let bestD = 12 / this._view.k;
-        this._nodes.forEach((n) => {
+        this._visibleNodes().forEach((n) => {
             const d = Math.hypot(n.x - p.x, n.y - p.y);
             if (d < bestD) { best = n; bestD = d; }
         });

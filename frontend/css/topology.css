@@ -88,6 +88,26 @@
 }
 
 .topo-legend__item { display: inline-flex; align-items: center; gap: 0.35rem; }
+
+.topo-legend__toggle {
+    background: transparent;
+    border: none;
+    padding: 0.1rem 0.2rem;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: opacity 0.15s;
+}
+
+.topo-legend__toggle:hover { color: var(--text-primary); }
+
+.topo-legend__toggle--off {
+    opacity: 0.35;
+    text-decoration: line-through;
+}
+
+.topo-legend__toggle--off .topo-dot { filter: grayscale(1); }
 .topo-legend__hint { opacity: 0.7; }
 .topo-legend__stats { margin-left: auto; font-family: var(--font-mono); }
 

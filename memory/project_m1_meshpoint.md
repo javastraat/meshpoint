@@ -1065,7 +1065,15 @@ Build (zero capture-path changes, graph assembled at request time):
   detail/metrics/packets itself — telemetry chart + recent packets for
   free). Harness re-verified on Mac. Changelog bullet extended (still 92,
   parser-verified). Pi re-verify: empty-text gone, auto-fit, zoom buttons,
-  click → drawer. (The meshcore.db archive import does NOT grow the graph —
+  click → drawer.
+- Follow-up 2 (user request "selectors to turn off things"): legend entries
+  are now TOGGLE BUTTONS (this box / neighbour source / Meshtastic /
+  MeshCore) — `this._show` map; hidden node classes leave the simulation,
+  drawing, hit-testing, AND fit (`_nodeVisible`/`_visibleNodes`; edges only
+  active when kind enabled AND both endpoints visible; selection cleared if
+  its node hides). Off-state = dimmed + line-through + grayscale dot.
+  Header chips = edge kinds, legend = node classes. Changelog bullet
+  extended again (parser-verified). (The meshcore.db archive import does NOT grow the graph —
   same 25 neighbours.)
 
 ### W16 build (2026-07-11) — message toast + sound + toggles
