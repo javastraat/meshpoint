@@ -36,6 +36,7 @@
     <link rel="stylesheet" href="css/radio_readout.css" />
     <link rel="stylesheet" href="css/stats.css" />
     <link rel="stylesheet" href="css/repeaters.css" />
+    <link rel="stylesheet" href="css/topology.css" />
     <link rel="stylesheet" href="css/settings.css" />
     <link rel="stylesheet" href="css/configuration.css" />
     <link rel="stylesheet" href="css/lorawan.css" />
@@ -157,6 +158,21 @@
                                 </svg>
                             </span>
                             <span class="sidebar__label">Stats</span>
+                        </a>
+                    </li>
+                    <li class="sidebar__item">
+                        <a href="#/topology" class="sidebar__link" data-route="topology">
+                            <span class="sidebar__icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <circle cx="5" cy="6" r="2.2"/>
+                                    <circle cx="19" cy="6" r="2.2"/>
+                                    <circle cx="12" cy="18" r="2.2"/>
+                                    <line x1="6.8" y1="7.4" x2="10.4" y2="16.2"/>
+                                    <line x1="17.2" y1="7.4" x2="13.6" y2="16.2"/>
+                                    <line x1="7.2" y1="6" x2="16.8" y2="6"/>
+                                </svg>
+                            </span>
+                            <span class="sidebar__label">Topology</span>
                         </a>
                     </li>
                     <li class="sidebar__group-header" aria-hidden="true">
@@ -515,6 +531,10 @@
                 <div id="repeaters-panel"></div>
             </section>
 
+            <section class="section" data-section="topology" style="display:none">
+                <div id="topology-panel"></div>
+            </section>
+
             <section class="section" data-section="stats" style="display:none">
                 <div id="stats-panel" class="stats-panel">
                     <div class="stats-panel__loading">Loading stats...</div>
@@ -862,6 +882,7 @@
     <script src="js/radio_settings.js"></script>
     <script src="js/stats_tab.js"></script>
     <script src="js/repeaters_tab.js"></script>
+    <script src="js/topology_tab.js"></script>
     <script src="js/signout_controller.js"></script>
     <script src="js/settings/password_change_form.js"></script>
     <script src="js/settings/sign_out_all_form.js"></script>

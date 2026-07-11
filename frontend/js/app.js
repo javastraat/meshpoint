@@ -41,7 +41,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const router = new Router({
         defaultRoute: 'dashboard',
         allowedRoutes: [
-            'dashboard', 'meshtastic', 'meshcore', 'lorawan', 'listener', 'stats', 'rf', 'repeaters', 'messages', 'radio', 'terminal',
+            'dashboard', 'meshtastic', 'meshcore', 'lorawan', 'listener', 'stats', 'rf', 'repeaters', 'topology', 'messages', 'radio', 'terminal',
             'configuration/identity', 'configuration/radio',
             'configuration/channels', 'configuration/transmit',
             'configuration/mqtt',
@@ -136,6 +136,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     _bootLoRaWANPanel(router);
     _bootListenerPanel(router);
     _bootRepeatersPanel(router);
+    _bootTopologyPanel(router);
     _bootMeshtasticPanel(router);
     _bootMeshCorePanel(router);
 
@@ -291,6 +292,15 @@ function _bootListenerPanel(router) {
     const panel = new window.ListenerPanel();
     router.onRouteChange((route) => {
         if (route === 'listener') panel.show();
+        else panel.hide();
+    });
+}
+
+function _bootTopologyPanel(router) {
+    if (!window.TopologyTab) return;
+    const panel = new window.TopologyTab();
+    router.onRouteChange((route) => {
+        if (route === 'topology') panel.show();
         else panel.hide();
     });
 }
@@ -691,6 +701,7 @@ function _bootCommandPaletteAndKeymap(router) {
         ['radio', 'Go to Hardware', 'Pages'],
         ['rf', 'Go to RF Environment', 'Pages'],
         ['repeaters', 'Go to Repeaters', 'Pages'],
+        ['topology', 'Go to Topology', 'Pages'],
         ['terminal', 'Go to Terminal', 'Pages'],
         ['configuration/identity', 'Go to Configuration · Identity', 'Configuration'],
         ['configuration/radio', 'Go to Configuration · Radio', 'Configuration'],

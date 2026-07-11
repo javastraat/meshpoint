@@ -986,7 +986,7 @@ Sorted in suggested working order (top = next up):
 |---|--------|--------|------|
 | — | To-do: EMPTY | — | Entire inspection backlog + N-list done, verified, or closed by design |
 | W16 | DONE 2026-07-11, LIVE-VERIFIED | S | Message notifications: toast + optional sound + per-browser toggles — see "W16 build" section below |
-| W13 | Open | M-L | Mesh topology graph — force-directed, Meshtastic NEIGHBORINFO/TRACEROUTE + MeshCore neighbour SNR (upstream #72; absorb W12's req_neighbours here) |
+| W13 | PHASE 1 BUILT 2026-07-11 (Mac-verified incl. browser harness on real data; Pi-verify pending) | M-L | Mesh topology graph — see "W13 build" section below. Phase 2 later: W12 req_neighbours live edges, opt-in traceroute probing, map overlay |
 | W14 | Open | M | Stray-frames table — log RF frames that fail all three decoders instead of dropping silently (upstream #80) |
 | W5 | Open | M-L | DAB+ listener mode via welle-cli — unlocks NPO Radio 5 (DAB-only) |
 | W6 | Open | M-L | True-RF S-meter via pyrtlsdr — replace the audio-loudness meter with real dBm |
@@ -996,6 +996,60 @@ Sorted in suggested working order (top = next up):
 | W11 | Parked | M | TTN uplink-only forwarder — trigger: TTN entanglement deemed worth it |
 | — | Noted | — | Firmware flasher / companion version check (upstream #85/#59) — if flashing the 3 sticks becomes a pain (needs serial release/reclaim handover) |
 | — | Noted | — | Reticulum as 6th network on the spare Heltec V3 433 via RNode firmware (upstream #11) — wildcard |
+
+### W13 build phase 1 (2026-07-11) — Topology page (force-directed mesh graph)
+
+DATA SURVEY FIRST (scripts/survey_topology_data.py, read-only, run live on
+Pi): **NEIGHBORINFO = 0 packets — modern Meshtastic firmware doesn't
+broadcast it over RF by default; the upstream #72 design leaned on it.**
+What exists instead: traceroute 16 pkts → 23 hop edges (incl. a 7-node
+chain); direct receptions (hop_start==hop_limit>0) 2 meshtastic nodes
+(undercounted — most packets have hop_start 0; meshcore can't be detected
+this way at all, its hop_limit stays 0); nb: star 25 edges w/ SNR;
+meshcoredb: 0 on the live DB (archive import never run there — running it
+adds ~715 neighbour-history edges, recommended to user). NOTE the repo-root
+concentrator.db is a FRESH copy of the live Pi DB (timestamps matched to the
+minute) — surveys/tests on it are representative.
+
+Build (zero capture-path changes, graph assembled at request time):
+- NEW `src/api/topology_graph.py` — fastapi-free pure `assemble_graph()`
+  (csv_export pattern, so Mac tests run): merges 3 edge kinds into
+  undirected sorted-pair edges keyed (a,b,kind) with count/last_seen/snr/
+  rssi; traceroute chains → consecutive hop pairs (blank hops filtered so
+  they don't break the chain — test-caught bug); direct rows → edges from
+  self node; neighbour rows → star from anchor; roster join for
+  name/protocol/role; is_self/is_anchor flags; counts summary; STALE_DAYS=7.
+- NEW `src/api/routes/topology_routes.py` — GET /api/topology/graph
+  (viewer-open, dependencies=protected), 4 SQL queries (traceroute rows,
+  direct GROUP BY source+protocol w/ AVG rssi/snr, nb:%+meshcoredb:neighbour:%
+  GROUP BY source, nodes roster). init_routes(packet_repo, self_node_id=
+  transmit.node_id as 8-hex, self_name=device_name, anchor_node_id=
+  repeater_poll.repeaters[0].key) wired in server.py _init_routes.
+- identity_routes: 'topology' added to BOTH section lists (the #2 lesson).
+- NEW `frontend/js/topology_tab.js` (TopologyTab) — canvas force sim
+  hand-rolled (~60 lines physics: pairwise repulsion 1800/d², springs len 90
+  k .04, centering .003, damping .85, alpha decay .985, rAF loop stops at
+  .005); drag node / drag background pan / wheel zoom (.2-5x) / hover
+  tooltip / click = spotlight node's edges (others fade) / legend chips
+  toggle edge kinds. Node color by protocol (self green + ring, anchor amber
+  ring), radius by log degree, labels for named nodes (hex only when
+  degree>=3); edge width log(count), stale (>7d) dashed + faded. Colors read
+  from CSS vars w/ fallbacks (theme-aware). NEW css/topology.css.
+- index.html: nav "Topology" in Networks after Stats, section, css+script
+  tags; app.js: allowedRoutes+'topology', _bootTopologyPanel, palette entry.
+- Tests: NEW tests/test_topology_graph.py (8, Mac-runnable, no stubs needed
+  since module is fastapi-free) — chain pairing, edge merge+newest-ts,
+  direct-to-self, no-self-id drop, anchor star, roster precedence, self-loop/
+  blank skip, bad JSON. All pass. Real-data check: assemble_graph on the DB
+  copy → 46 nodes / 48 edges (21 route, 2 direct, 25 neighbour), 36 named,
+  self+anchor resolved w/ real names. BROWSER HARNESS (scratchpad
+  topology_harness.html): real topology_tab.js + topology.css + real graph
+  JSON w/ stubbed fetch, opened on the Mac — user saw it live.
+- Changelog bullet under "Stats and node insights" (92, parser-verified);
+  README: UI/UX fork bullet (+ message-notifications bullet added same
+  round) + API table row.
+- Pi-verify: open Topology page, expect ~46 nodes; run the meshcore.db
+  archive import to fatten the star; drag/zoom/filter.
 
 ### W16 build (2026-07-11) — message toast + sound + toggles
 

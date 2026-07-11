@@ -94,6 +94,8 @@ This is a customized fork of upstream [KMX415/meshpoint](https://github.com/KMX4
 - `scripts/repair_neighbour_timestamps.py` + `scripts/backfill_meshcore_signal.py` fix bad past/future timestamps and backfill freq/SF on old rows.
 
 **UI / UX**
+- **Mesh topology graph** — a Topology page draws the mesh as a force-directed graph (no mapping libraries): Meshtastic traceroute chains, direct receptions by this box, and imported MeshCore neighbour SNR become nodes and edges you can drag, zoom, and filter. `GET /api/topology/graph`.
+- **Incoming-message notifications** — corner toast with sender + snippet (click jumps to the conversation) and an optional soft notification sound; independent per-browser toggles in Settings → System.
 - **Topbar theme toggle** (cycles the dark / high-contrast / sunlight themes with a per-theme icon).
 - **24-hour time** across the whole dashboard.
 - **Metric defaults** (Celsius + kilometers) for a fresh browser.
@@ -420,6 +422,7 @@ FastAPI server on port 8080 (configurable via `dashboard.port` in `local.yaml`):
 | `GET /api/listener/stream` | Live MP3 audio stream for the browser player |
 | `GET /api/device/spectrum` | Latest band sweep from the SX1302 spectral scanner (median/peak per 100 kHz step) |
 | `POST /api/device/spectrum/sweep` | Trigger an on-demand band sweep (admin) |
+| `GET /api/topology/graph` | Mesh topology graph: nodes + edges from traceroutes, direct receptions, and neighbour imports |
 | `GET /api/device/thermals` | CPU temperature + fan duty history (6 h in-memory, requires fan control enabled) |
 | `GET /api/rf/status` | RF Environment tab data: noise floor, calibration, latest scan histogram |
 | `GET /api/config/export` | Quick Deploy export: public channel params + Meshtastic QR URL (no private PSKs) |

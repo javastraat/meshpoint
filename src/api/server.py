@@ -64,6 +64,7 @@ from src.api.routes import (
     system_config_routes,
     system_metrics,
     terminal_routes,
+    topology_routes,
     upstream_config_routes,
     update_check,
     update_routes,
@@ -407,6 +408,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     app.include_router(meshtastic_routes.router, dependencies=protected)
     app.include_router(meshcore_routes.router, dependencies=protected)
     app.include_router(rf_routes.router, dependencies=protected)
+    app.include_router(topology_routes.router, dependencies=protected)
 
     @app.websocket("/ws")
     async def websocket_endpoint(websocket: WebSocket):
@@ -1551,6 +1553,19 @@ def _init_routes(
     meshcore_routes.init_routes(
         coord.packet_repo, coord.node_repo, device_name=_dev_name,
         telemetry_repo=coord.telemetry_repo,
+    )
+    _self_hex = (
+        format(config.transmit.node_id, "08x") if config.transmit.node_id else None
+    )
+    _anchor = (
+        config.repeater_poll.repeaters[0].key
+        if config.repeater_poll.repeaters else None
+    )
+    topology_routes.init_routes(
+        coord.packet_repo,
+        self_node_id=_self_hex,
+        self_name=_dev_name,
+        anchor_node_id=_anchor,
     )
 
 
