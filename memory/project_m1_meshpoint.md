@@ -1009,6 +1009,18 @@ pipefail` would abort the whole upgrade there). bash -n clean; changelog
 bullet under "Configuration and server" (parser-verified). Pi-verify:
 rerun the installer.
 
+### Repeater Sensors card blank-after-restart fix (2026-07-11 evening)
+User screenshot: health card fine ("polled 3m ago", green) but Sensors "NO
+DATA" until next poll. ROOT CAUSE: preserve-last-good branch in
+repeater_poller.py only ran on FAILED polls; an OK poll with EMPTY
+telemetry (req_telemetry can return nothing while status succeeds — e.g.
+companion settling right after restart) overwrote the persisted sensors
+with None. FIX: `entry["telemetry"] = entry["telemetry"] or
+prev.get("telemetry")` now applies unconditionally (ok or failed). Poller
+tests pass; changelog bullet under "MeshCore repeaters". Pi-verify:
+restart service → Sensors card should show last-known readings
+immediately.
+
 ### Fresh-install fixes round 2 (2026-07-11 evening, new sensecap deploy)
 - RTL-SDR "idle — Failed to open rtlsdr device #0" on new box (2nd sensecap,
   RTL-SDR Blog V4, R828D): rtl_test worked as pi but `sudo -u meshpoint

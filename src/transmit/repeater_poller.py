@@ -145,13 +145,17 @@ class RepeaterPoller:
         }
         # Preserve last-good status when a poll fails, so the tab keeps
         # showing the most recent real data with a stale marker.
-        if not entry["ok"] and key in self.latest:
-            prev = self.latest[key]
+        prev = self.latest.get(key) or {}
+        if not entry["ok"]:
             entry["status"] = entry["status"] or prev.get("status")
-            entry["telemetry"] = entry["telemetry"] or prev.get("telemetry")
             entry["last_ok_at"] = prev.get("last_ok_at")
-        elif entry["ok"]:
+        else:
             entry["last_ok_at"] = entry["updated_at"]
+        # req_telemetry can come back empty on an otherwise-OK poll (status
+        # succeeded, telemetry step timed out / companion still settling).
+        # Keep showing the last real sensor data instead of blanking the
+        # Sensors card until the next full poll.
+        entry["telemetry"] = entry["telemetry"] or prev.get("telemetry")
 
         self.latest[key] = entry
         self._save_state()
