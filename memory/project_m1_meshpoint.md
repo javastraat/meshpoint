@@ -1006,8 +1006,11 @@ What exists instead: traceroute 16 pkts → 23 hop edges (incl. a 7-node
 chain); direct receptions (hop_start==hop_limit>0) 2 meshtastic nodes
 (undercounted — most packets have hop_start 0; meshcore can't be detected
 this way at all, its hop_limit stays 0); nb: star 25 edges w/ SNR;
-meshcoredb: 0 on the live DB (archive import never run there — running it
-adds ~715 neighbour-history edges, recommended to user). NOTE the repo-root
+meshcoredb: 0 on the live DB (archive import never run there — CORRECTION
+2026-07-11, user challenged: its 715 neighbour_history rows are the SAME 25
+distinct pubkeys as the nb: star → adds ZERO new graph edges, only fattens
+observation counts; import stays worthwhile for telemetry History/Trends
+only). NOTE the repo-root
 concentrator.db is a FRESH copy of the live Pi DB (timestamps matched to the
 minute) — surveys/tests on it are representative.
 
@@ -1048,8 +1051,22 @@ Build (zero capture-path changes, graph assembled at request time):
 - Changelog bullet under "Stats and node insights" (92, parser-verified);
   README: UI/UX fork bullet (+ message-notifications bullet added same
   round) + API table row.
-- Pi-verify: open Topology page, expect ~46 nodes; run the meshcore.db
-  archive import to fatten the star; drag/zoom/filter.
+- LIVE ON PI 2026-07-11 (user screenshot): 46 nodes / 48 edges render,
+  meshtastic traceroute web + meshcore star + green self node all visible.
+  Follow-up round from the screenshot: (1) BUG — ".topo-empty { display:flex }"
+  beat the [hidden] attribute, so "No topology data yet" overlaid a full
+  graph; fixed with ".topo-empty[hidden] { display:none }" (remember: any
+  styled element that uses the hidden attribute needs an explicit [hidden]
+  rule). (2) Zoom −/+/Fit buttons in the header (wheel zoom kept; buttons
+  also cover trackpad-less/mobile); auto-fit runs once per load when the
+  sim settles (alpha<0.05), Fit re-centers manually — fixes nodes drifting
+  off-canvas ("blue bleep" top of screen). (3) Click now spotlights AND
+  opens the regular window.nodeDrawer (needs only node_id; drawer fetches
+  detail/metrics/packets itself — telemetry chart + recent packets for
+  free). Harness re-verified on Mac. Changelog bullet extended (still 92,
+  parser-verified). Pi re-verify: empty-text gone, auto-fit, zoom buttons,
+  click → drawer. (The meshcore.db archive import does NOT grow the graph —
+  same 25 neighbours.)
 
 ### W16 build (2026-07-11) — message toast + sound + toggles
 

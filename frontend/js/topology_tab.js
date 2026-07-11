@@ -52,6 +52,9 @@ class TopologyTab {
                         <button class="topo-chip topo-chip--route topo-chip--active" data-kind="route">Traceroute</button>
                         <button class="topo-chip topo-chip--direct topo-chip--active" data-kind="direct">Direct RX</button>
                         <button class="topo-chip topo-chip--neighbour topo-chip--active" data-kind="neighbour">Neighbours</button>
+                        <button class="btn btn--small" data-topo-zoom="out" title="Zoom out">&minus;</button>
+                        <button class="btn btn--small" data-topo-zoom="in" title="Zoom in">+</button>
+                        <button class="btn btn--small" data-topo-fit title="Fit graph to view">Fit</button>
                         <button class="btn btn--small" data-topo-refresh>Refresh</button>
                     </div>
                 </div>
@@ -80,6 +83,12 @@ class TopologyTab {
         this._statsEl = this.root.querySelector('[data-topo-stats]');
 
         this.root.querySelector('[data-topo-refresh]').addEventListener('click', () => this._load());
+        this.root.querySelectorAll('[data-topo-zoom]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                this._zoomBy(btn.dataset.topoZoom === 'in' ? 1.3 : 1 / 1.3);
+            });
+        });
+        this.root.querySelector('[data-topo-fit]').addEventListener('click', () => this._fitView());
         this.root.querySelectorAll('.topo-chip').forEach((chip) => {
             chip.addEventListener('click', () => {
                 const kind = chip.dataset.kind;
@@ -131,8 +140,35 @@ class TopologyTab {
                 `${c.nodes} nodes · ${c.edges} edges (${c.route} route / ${c.direct} direct / ${c.neighbour} neighbour)`;
         }
         if (this._emptyEl) this._emptyEl.hidden = this._edges.length > 0;
+        this._needsFit = true;
         this._resize();
         this._kick(1);
+    }
+
+    _zoomBy(factor) {
+        this._view.k = Math.min(Math.max(this._view.k * factor, 0.2), 5);
+        this._view.x *= factor;
+        this._view.y *= factor;
+        this._draw();
+    }
+
+    _fitView() {
+        if (!this._nodes.length) return;
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        this._nodes.forEach((n) => {
+            if (n.x < minX) minX = n.x;
+            if (n.x > maxX) maxX = n.x;
+            if (n.y < minY) minY = n.y;
+            if (n.y > maxY) maxY = n.y;
+        });
+        const bw = Math.max(maxX - minX, 40);
+        const bh = Math.max(maxY - minY, 40);
+        // 80px margin keeps labels that extend past node centers readable.
+        const k = Math.min((this._w - 160) / bw, (this._h - 100) / bh);
+        this._view.k = Math.min(Math.max(k, 0.2), 2.5);
+        this._view.x = -((minX + maxX) / 2) * this._view.k;
+        this._view.y = -((minY + maxY) / 2) * this._view.k;
+        this._draw();
     }
 
     _activeEdges() {
@@ -164,6 +200,10 @@ class TopologyTab {
             this._simulate();
             this._draw();
             this._alpha *= 0.985;
+            if (this._needsFit && this._alpha < 0.05) {
+                this._needsFit = false;
+                this._fitView();
+            }
             if (this._alpha > 0.005 || this._drag) this._tickLoop();
         });
     }
@@ -348,6 +388,14 @@ class TopologyTab {
                 const node = this._nodeAt(p.x, p.y);
                 this._selected = (node && node !== this._selected) ? node : null;
                 this._draw();
+                if (this._selected && window.nodeDrawer) {
+                    window.nodeDrawer.open({
+                        node_id: this._selected.id,
+                        long_name: this._selected.name || null,
+                        protocol: this._selected.protocol || null,
+                        role: this._selected.role || null,
+                    });
+                }
             }
             this._drag = null;
         };
