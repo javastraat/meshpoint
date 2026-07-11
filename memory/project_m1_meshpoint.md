@@ -1009,6 +1009,25 @@ pipefail` would abort the whole upgrade there). bash -n clean; changelog
 bullet under "Configuration and server" (parser-verified). Pi-verify:
 rerun the installer.
 
+### Fresh-install fixes round 2 (2026-07-11 evening, new sensecap deploy)
+- RTL-SDR "idle — Failed to open rtlsdr device #0" on new box (2nd sensecap,
+  RTL-SDR Blog V4, R828D): rtl_test worked as pi but `sudo -u meshpoint
+  rtl_test` → usb_open error -3. CAUSE: meshpoint user not in plugdev + no
+  udev rules. FIX (manual, given to user): udev rule 0bda:2838 MODE=0660
+  GROUP=plugdev in /etc/udev/rules.d/60-rtl-sdr.rules + usermod -aG plugdev
+  meshpoint + udevadm reload/trigger + service restart. Deliberately NOT
+  `apt install rtl-sdr` (would shadow the blog-fork rtl_fm; V4 needs the
+  blog build). INSTALLER TODO (small): ship the udev rule + plugdev
+  membership + dvb_usb_rtl28xxu blacklist in install.sh — all three are
+  manual per-box steps today (first box had them hand-done).
+- GET /api/config 500 on new box: `meshcore.private_channels:` bare key in
+  yaml → None overwrites the dataclass [] default → `list(None)` crash at
+  config_routes.py:223. FIXED: null-guard `or []` on private_channels AND
+  `or {}` on channel_keys (same risk). LESSON: yaml bare keys beat
+  default_factory — guard fields at use sites, not just _config.
+- install.sh: ffmpeg added to the apt block (RTL-SDR listener audio
+  pipeline needs it; was manual). Both changelogged (parser-verified).
+
 ### W13-p2 PLAN (2026-07-11, user-approved — build one step at a time)
 
 Mostly threading one new command through machinery that already exists.

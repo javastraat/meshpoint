@@ -106,6 +106,7 @@ apt-get install -y -qq \
     swig \
     liblgpio-dev \
     libsqlite3-dev \
+    ffmpeg \
     i2c-tools
 
 # ── 2. Enable SPI ──────────────────────────────────────────────────

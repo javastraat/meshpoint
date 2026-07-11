@@ -218,9 +218,13 @@ async def get_config(claims: SessionClaims = Depends(require_auth)):
         mc_status["status_note"] = "transmit_disabled"
     mc_status["channel_keys"] = [
         {"name": name, "key_hex": _meshcore_key_hex_for_response(key)}
-        for name, key in (_config.meshcore.channel_keys.items() if _config else [])
+        for name, key in ((_config.meshcore.channel_keys or {}).items() if _config else [])
     ]
-    mc_status["private_channels"] = list(_config.meshcore.private_channels) if _config else []
+    # A bare "private_channels:" key in local.yaml parses to None and
+    # overwrites the dataclass's [] default -- guard the field, not just _config.
+    mc_status["private_channels"] = (
+        list(_config.meshcore.private_channels or []) if _config else []
+    )
 
     serial_status = [_serial_status_entry(src) for src in _serial_sources]
 
