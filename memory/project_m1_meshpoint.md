@@ -985,7 +985,7 @@ Sorted in suggested working order (top = next up):
 | # | Status | Effort | Item |
 |---|--------|--------|------|
 | — | To-do: EMPTY | — | Entire inspection backlog + N-list done, verified, or closed by design |
-| W16 | DONE 2026-07-11 (Mac-verified, Pi-verify pending) | S | Message notifications: toast + optional sound + per-browser toggles — see "W16 build" section below |
+| W16 | DONE 2026-07-11, LIVE-VERIFIED | S | Message notifications: toast + optional sound + per-browser toggles — see "W16 build" section below |
 | W13 | Open | M-L | Mesh topology graph — force-directed, Meshtastic NEIGHBORINFO/TRACEROUTE + MeshCore neighbour SNR (upstream #72; absorb W12's req_neighbours here) |
 | W14 | Open | M | Stray-frames table — log RF frames that fail all three decoders instead of dropping silently (upstream #80) |
 | W5 | Open | M-L | DAB+ listener mode via welle-cli — unlocks NPO Radio 5 (DAB-only) |
@@ -1034,9 +1034,12 @@ direction).
   DOM/localStorage/soundEngine (12 assertions: defaults, received-only,
   suppression on messages page, hidden-tab exception, coalescing, sound/toast
   independence, probe feedback) ALL PASS. Changelog bullet under "Dashboard
-  and UI" (91 bullets, parser-verified). Pi-verify: send a DM/channel msg to
-  the box with the dashboard open on another page → toast top-right; click →
-  opens the conversation; toggles in Settings → System.
+  and UI" (91 bullets, parser-verified).
+- LIVE-VERIFIED on Pi 2026-07-11 (user): toast renders top-right with real
+  sender "PD2EMC Companion 🏠" + snippet, "+1 more" coalescing confirmed in
+  the same screenshot; sound then confirmed working too ("verified with sound
+  on works"). Toast click-through → conversation not explicitly confirmed yet
+  (works in the fake-DOM test; check casually sometime). W16 CLOSED.
 
 ## OLD: TO-DO LIST v2 (2026-07-08 15:22 — superseded by v3 above, kept for DONE details)
 
