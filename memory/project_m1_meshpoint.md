@@ -972,30 +972,31 @@ Meshtastic serial — live as `serial_433`; all three lines were stale until
 
 ---
 
-## CURRENT WORKLIST v3 (2026-07-11 — supersedes v2 below; THE list to work off)
+## CURRENT WORKLIST v4 (2026-07-11 end of day — supersedes v2/v3 below; THE list to work off)
 
-Result of the 2026-07-11 full audit: every v2/backlog to-do was found done,
-live-verified, or closed by design (five were stale — see
-code-ahead-of-tracking lesson). To-do is EMPTY; wishlist below. W13-W16
-sourced from upstream KMX415/meshpoint issue review (design references only,
-never merge upstream branches — fork has diverged).
-
-Sorted in suggested working order (top = next up):
+What's still open after the 2026-07-11 run, sorted in working order
+(top = next up). W13/W14 sourced from upstream KMX415/meshpoint issues —
+design references only, never merge upstream branches (fork has diverged).
 
 | # | Status | Effort | Item |
 |---|--------|--------|------|
-| — | To-do: EMPTY | — | Entire inspection backlog + N-list done, verified, or closed by design |
-| W16 | DONE 2026-07-11, LIVE-VERIFIED | S | Message notifications: toast + optional sound + per-browser toggles — see "W16 build" section below |
-| W13 | PHASE 1 BUILT 2026-07-11 (Mac-verified incl. browser harness on real data; Pi-verify pending) | M-L | Mesh topology graph — see "W13 build" section below. Phase 2 later: W12 req_neighbours live edges, opt-in traceroute probing, map overlay |
+| W13-p2 | Open — next up | M | Topology phase 2: live `req_neighbours` polling per repeater through the existing RepeaterPoller (absorbs parked W12) + the map "context layer" toggle (faint dots for the ~1200 positioned-but-unlinked nodes). Caution: rides the companion's command channel, keep cadence gentle. |
 | W14 | Open | M | Stray-frames table — log RF frames that fail all three decoders instead of dropping silently (upstream #80) |
 | W5 | Open | M-L | DAB+ listener mode via welle-cli — unlocks NPO Radio 5 (DAB-only) |
-| W6 | Open | M-L | True-RF S-meter via pyrtlsdr — replace the audio-loudness meter with real dBm |
-| W4 | Open | L | Light theme — all 3 themes dark; tokenize colors, light map tiles, contrast pass. Topbar toggle ready for a `light` entry. (Upstream #75 wants it too) |
-| W12 | Parked | M | Repeater detail view (req_neighbours/regions/owner/acl/clock) — likely folds into W13 |
-| W2 | Parked | M | LoRaWAN key store + MIC verify/decrypt — trigger: user runs own LoRaWAN devices |
+| W6 | Open | M-L | True-RF S-meter via pyrtlsdr — real dBm instead of post-demod audio loudness |
+| W4 | Open | L | Light theme — tokenize the dark-first CSS, light map tiles, per-page contrast pass; topbar toggle ready for a `light` entry |
+| W2 | Parked | M | LoRaWAN key store + MIC verify/decrypt — trigger: you run your own LoRaWAN devices |
 | W11 | Parked | M | TTN uplink-only forwarder — trigger: TTN entanglement deemed worth it |
-| — | Noted | — | Firmware flasher / companion version check (upstream #85/#59) — if flashing the 3 sticks becomes a pain (needs serial release/reclaim handover) |
-| — | Noted | — | Reticulum as 6th network on the spare Heltec V3 433 via RNode firmware (upstream #11) — wildcard |
+| — | Noted | — | Firmware flasher / companion version check (upstream #85/#59) — if flashing the 3 sticks becomes a pain |
+| — | Noted | — | Reticulum as 6th network on the spare Heltec V3 433 (upstream #11) — wildcard |
+
+Closed 2026-07-11: the entire old to-do backlog (audit found #6/#7/#9
+already built, #8 by-design, RSSI filter already built), importer freq/SF
+stamping, repo local.yaml sync, W16 message notifications (built +
+live-verified), and W13 phase 1 topology graph + map mode (built +
+live-verified). W12 no longer exists as its own item — req_neighbours
+lives inside W13-p2; req_regions/owner/acl/clock remain a possible
+"expand repeater" card on the Repeaters tab someday.
 
 ### W13 build phase 1 (2026-07-11) — Topology page (force-directed mesh graph)
 
