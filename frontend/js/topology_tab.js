@@ -53,10 +53,10 @@ class TopologyTab {
                         <button class="topo-chip topo-chip--route topo-chip--active" data-kind="route">Traceroute</button>
                         <button class="topo-chip topo-chip--direct topo-chip--active" data-kind="direct">Direct RX</button>
                         <button class="topo-chip topo-chip--neighbour topo-chip--active" data-kind="neighbour">Neighbours</button>
-                        <button class="btn btn--small" data-topo-zoom="out" title="Zoom out">&minus;</button>
-                        <button class="btn btn--small" data-topo-zoom="in" title="Zoom in">+</button>
-                        <button class="btn btn--small" data-topo-fit title="Fit graph to view">Fit</button>
-                        <button class="btn btn--small" data-topo-refresh>Refresh</button>
+                        <button class="terminal-button" type="button" data-topo-zoom="out" title="Zoom out">&minus;</button>
+                        <button class="terminal-button" type="button" data-topo-zoom="in" title="Zoom in">+</button>
+                        <button class="terminal-button" type="button" data-topo-fit title="Fit graph to view">Fit</button>
+                        <button class="terminal-button" type="button" data-topo-refresh>Refresh</button>
                     </div>
                 </div>
                 <div class="topo-canvas-wrap">

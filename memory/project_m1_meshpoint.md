@@ -1073,7 +1073,15 @@ Build (zero capture-path changes, graph assembled at request time):
   active when kind enabled AND both endpoints visible; selection cleared if
   its node hides). Off-state = dimmed + line-through + grayscale dot.
   Header chips = edge kinds, legend = node classes. Changelog bullet
-  extended again (parser-verified). (The meshcore.db archive import does NOT grow the graph —
+  extended again (parser-verified).
+- Follow-up 3 (user screenshot: unstyled white −/+/Fit/Refresh on the Pi):
+  I had used `btn btn--small`, a class that DOESN'T EXIST in this app —
+  the dashboard's shared small-button class is **`terminal-button`**
+  (terminal.css even says "can be reused in any context"; all panel
+  Refresh buttons use it). Swapped all 4 buttons. LESSON: the Mac harness
+  masked it by defining its own .btn — harness now loads the real
+  terminal.css instead of inventing styles; when adding UI, copy classes
+  from a neighbouring panel, don't assume a generic .btn exists. (The meshcore.db archive import does NOT grow the graph —
   same 25 neighbours.)
 
 ### W16 build (2026-07-11) — message toast + sound + toggles
