@@ -1098,7 +1098,13 @@ Build (zero capture-path changes, graph assembled at request time):
   Refresh buttons use it). Swapped all 4 buttons. LESSON: the Mac harness
   masked it by defining its own .btn — harness now loads the real
   terminal.css instead of inventing styles; when adding UI, copy classes
-  from a neighbouring panel, don't assume a generic .btn exists. (The meshcore.db archive import does NOT grow the graph —
+  from a neighbouring panel, don't assume a generic .btn exists.
+- **PHASE 1 FULLY LIVE-VERIFIED on Pi 2026-07-11 (user screenshot, "nice
+  :)"):** auto-fit frames all 46 nodes / 48 edges, terminal-button styling
+  correct, empty-text overlay gone, meshtastic traceroute web + meshcore
+  star + green self node with direct edges all rendering, legend toggles
+  present. W13 phase 1 CLOSED; phase 2 = req_neighbours live polling (see
+  remark at top of this section). (The meshcore.db archive import does NOT grow the graph —
   same 25 neighbours.)
 
 ### W16 build (2026-07-11) — message toast + sound + toggles
