@@ -1566,6 +1566,7 @@ def _init_routes(
         self_node_id=_self_hex,
         self_name=_dev_name,
         anchor_node_id=_anchor,
+        repeater_poller=_repeater_poller,
     )
 
 

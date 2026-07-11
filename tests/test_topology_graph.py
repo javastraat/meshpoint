@@ -122,6 +122,44 @@ class AssembleGraphTest(unittest.TestCase):
         self.assertNotIn(("aa", "aa"), pairs)
         self.assertIn(("aa", "bb"), pairs)
 
+    def test_multi_anchor_rows_make_separate_stars(self):
+        neigh = [
+            {"anchor": "rep1", "source_id": "n1", "cnt": 1,
+             "last_seen": "2026-07-11T20:00:00", "avg_snr": 5.0},
+            {"anchor": "rep2", "source_id": "n1", "cnt": 1,
+             "last_seen": "2026-07-11T20:00:00", "avg_snr": -3.0},
+            {"source_id": "n2", "cnt": 1,
+             "last_seen": "2026-07-10T20:00:00", "avg_snr": 1.0},
+        ]
+        graph = assemble_graph(
+            [], [], neigh, [],
+            self_node_id=None, self_name="box", anchor_node_id="cfganchor",
+        )
+        pairs = {(e["a"], e["b"]) for e in graph["edges"]}
+        self.assertIn(tuple(sorted(("rep1", "n1"))), pairs)
+        self.assertIn(tuple(sorted(("rep2", "n1"))), pairs)
+        self.assertIn(tuple(sorted(("cfganchor", "n2"))), pairs)
+        self.assertEqual(graph["counts"]["neighbour"], 3)
+
+    def test_import_and_live_rows_merge_to_one_fresh_edge(self):
+        neigh = [
+            # static import row (no anchor -> config anchor)
+            {"source_id": "n1", "cnt": 3,
+             "last_seen": "2026-07-01T00:00:00", "avg_snr": 2.0},
+            # live poller row for the SAME repeater+neighbour, fresher
+            {"anchor": "cfganchor", "source_id": "n1", "cnt": 1,
+             "last_seen": "2026-07-11T21:00:00", "avg_snr": 8.0},
+        ]
+        graph = assemble_graph(
+            [], [], neigh, [],
+            self_node_id=None, self_name="box", anchor_node_id="cfganchor",
+        )
+        self.assertEqual(len(graph["edges"]), 1)
+        edge = graph["edges"][0]
+        self.assertEqual(edge["count"], 4)
+        self.assertEqual(edge["last_seen"], "2026-07-11T21:00:00")
+        self.assertEqual(edge["snr"], 8.0)
+
     def test_unparseable_payload_ignored(self):
         rows = [{"source_id": "aa", "decoded_payload": "not json", "timestamp": "t"}]
         graph = assemble_graph(

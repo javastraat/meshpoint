@@ -1111,8 +1111,21 @@ status/telemetry pair and what args it wants → how poll_repeater calls it.
   "Neighbours: N" row (repeaters_tab.js, reads entry.neighbours
   .neighbours_count, fallback list length; /repeaters endpoint already
   spread the whole entry so no backend change). Pi-verify with next deploy.
-- NEXT (step 2): multi-anchor assemble_graph + endpoint merge of live
-  poller neighbours; then step 3 context layer. Concrete step-2 spec:
+- **STEP 2 BUILT 2026-07-11 (Mac-verified, Pi-verify pending):**
+  assemble_graph neighbour rows now carry optional "anchor" per row
+  (fallback = config anchor for import rows); topology_routes gained
+  `_live_neighbour_rows()` (poller.latest → rows: anchor=key,
+  source_id=pubkey, last_seen = updated_at − secs_ago our-clock,
+  avg_snr=snr) appended to the SQL rows; init_routes takes
+  repeater_poller, threaded in server.py (poller built before
+  _init_routes — verified order). 11/11 tests incl. NEW multi-anchor +
+  import/live-merge-to-one-fresh-edge. Changelog topology bullet extended
+  (parser-verified). NOTE `_live_neighbour_rows` can't be Mac-tested
+  (fastapi import) — logic mirrored in the tested assembly.
+  **Pi-verify step 2: pull, restart, wait one poll, open Topology —
+  star edges should show FRESH last_seen (solid, not dashed) and the
+  count line still 25 neighbour edges (import+live merged).**
+- Original step-2 spec (implemented as above):
   - topology_routes.init_routes gains `poller` (or provider callable);
     endpoint builds live rows from poller.latest: for each entry with
     entry["neighbours"]["neighbours"]: anchor = entry["key"], per

@@ -97,17 +97,21 @@ def assemble_graph(
             )
             node_proto_hint.setdefault(src, row["protocol"] or "meshtastic")
 
-    # Neighbour star around the reporting repeater.
-    if anchor_node_id:
-        for row in neighbour_rows:
-            src = _norm(row["source_id"])
-            add_edge(
-                anchor_node_id, src, "neighbour", row["last_seen"],
-                count=row["cnt"],
-                snr=round(row["avg_snr"], 1) if row["avg_snr"] is not None else None,
-            )
-            node_proto_hint.setdefault(src, "meshcore")
-        node_proto_hint.setdefault(anchor_node_id, "meshcore")
+    # Neighbour stars: each row may carry its own anchor (live poller rows,
+    # one star per polled repeater); rows without one fall back to the
+    # single config-derived anchor (static import rows).
+    for row in neighbour_rows:
+        anchor = _norm(_field(row, "anchor")) or anchor_node_id
+        if not anchor:
+            continue
+        src = _norm(row["source_id"])
+        add_edge(
+            anchor, src, "neighbour", row["last_seen"],
+            count=row["cnt"],
+            snr=round(row["avg_snr"], 1) if row["avg_snr"] is not None else None,
+        )
+        node_proto_hint.setdefault(src, "meshcore")
+        node_proto_hint.setdefault(anchor, "meshcore")
 
     roster = {_norm(r["node_id"]): r for r in roster_rows}
 
