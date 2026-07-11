@@ -82,7 +82,7 @@ def _live_neighbour_rows() -> list[dict]:
 
 
 @router.get("/graph")
-async def get_graph():
+async def get_graph(context: int = 0):
     if not _packet_repo:
         return {"available": False, "nodes": [], "edges": []}
     db = _packet_repo._db
@@ -109,7 +109,7 @@ async def get_graph():
         "latitude, longitude FROM nodes"
     )
 
-    return assemble_graph(
+    graph = assemble_graph(
         traceroute_rows,
         direct_rows,
         list(neighbour_rows) + _live_neighbour_rows(),
@@ -118,3 +118,21 @@ async def get_graph():
         _self_name,
         _anchor_node_id,
     )
+
+    if context:
+        # Positioned-but-unlinked nodes: known to exist somewhere, no link
+        # evidence yet. Map-mode backdrop; opt-in so default loads stay light.
+        linked = {n["id"] for n in graph["nodes"]}
+        graph["context_nodes"] = [
+            {
+                "id": row["node_id"].lower(),
+                "name": row["long_name"] or row["short_name"] or None,
+                "protocol": row["protocol"],
+                "lat": row["latitude"],
+                "lon": row["longitude"],
+            }
+            for row in roster_rows
+            if row["latitude"] and row["longitude"]
+            and row["node_id"].lower() not in linked
+        ]
+    return graph

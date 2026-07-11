@@ -19,6 +19,8 @@ class TopologyTab {
         this._kinds = { route: true, direct: true, neighbour: true };
         this._show = { self: true, anchor: true, meshtastic: true, meshcore: true };
         this._mode = this._readMode();
+        this._context = false;
+        this._contextNodes = null;
         this._map = null;
         this._mapLayer = null;
         this._built = false;
@@ -81,6 +83,7 @@ class TopologyTab {
                     <button class="topo-legend__item topo-legend__toggle" data-show="anchor"><i class="topo-dot topo-dot--anchor"></i> neighbour source</button>
                     <button class="topo-legend__item topo-legend__toggle" data-show="meshtastic"><i class="topo-dot topo-dot--meshtastic"></i> Meshtastic</button>
                     <button class="topo-legend__item topo-legend__toggle" data-show="meshcore"><i class="topo-dot topo-dot--meshcore"></i> MeshCore</button>
+                    <button class="topo-legend__item topo-legend__toggle topo-legend__toggle--off" data-topo-context title="Map only: show all positioned nodes without known links as faint dots"><i class="topo-dot topo-dot--context"></i> all positions</button>
                     <span class="topo-legend__item topo-legend__hint">drag = move / pan · wheel = zoom · click = highlight · legend = show/hide</span>
                     <span class="topo-legend__stats" data-topo-stats></span>
                 </div>
@@ -106,6 +109,13 @@ class TopologyTab {
         this.root.querySelector('[data-topo-fit]').addEventListener('click', () => {
             if (this._mode === 'map') this._fitMap();
             else this._fitView();
+        });
+        const ctxBtn = this.root.querySelector('[data-topo-context]');
+        ctxBtn.addEventListener('click', async () => {
+            this._context = !this._context;
+            ctxBtn.classList.toggle('topo-legend__toggle--off', !this._context);
+            if (this._context && this._contextNodes === null) await this._load();
+            if (this._mode === 'map') this._renderMap();
         });
         this.root.querySelectorAll('[data-show]').forEach((btn) => {
             btn.addEventListener('click', () => {
@@ -189,6 +199,30 @@ class TopologyTab {
         const visible = this._visibleNodes();
         const bounds = [];
 
+        if (this._context && Array.isArray(this._contextNodes)) {
+            this._contextNodes.forEach((n) => {
+                const dot = L.circleMarker([n.lat, n.lon], {
+                    radius: 3,
+                    color: '#6b7687',
+                    weight: 1,
+                    fillColor: '#6b7687',
+                    fillOpacity: 0.35,
+                    opacity: 0.4,
+                }).addTo(this._mapLayer);
+                dot.bindTooltip(
+                    `${n.name || n.id}<br>no link evidence yet`,
+                );
+                dot.on('click', () => {
+                    if (!window.nodeDrawer) return;
+                    window.nodeDrawer.open({
+                        node_id: n.id,
+                        long_name: n.name || null,
+                        protocol: n.protocol || null,
+                    });
+                });
+            });
+        }
+
         this._activeEdges().forEach((e) => {
             if (!placed(e.na) || !placed(e.nb)) return;
             L.polyline(
@@ -251,9 +285,10 @@ class TopologyTab {
 
     async _load() {
         try {
-            const res = await fetch('/api/topology/graph');
+            const res = await fetch(this._context ? '/api/topology/graph?context=1' : '/api/topology/graph');
             if (!res.ok) return;
             const data = await res.json();
+            if (data.context_nodes) this._contextNodes = data.context_nodes;
             this._ingest(data);
         } catch (_e) { /* transient */ }
     }

@@ -1122,9 +1122,25 @@ status/telemetry pair and what args it wants → how poll_repeater calls it.
   import/live-merge-to-one-fresh-edge. Changelog topology bullet extended
   (parser-verified). NOTE `_live_neighbour_rows` can't be Mac-tested
   (fastapi import) — logic mirrored in the tested assembly.
-  **Pi-verify step 2: pull, restart, wait one poll, open Topology —
-  star edges should show FRESH last_seen (solid, not dashed) and the
-  count line still 25 neighbour edges (import+live merged).**
+  **STEP 2 LIVE-VERIFIED 2026-07-11 (user screenshots):** star isolated
+  via legend toggles shows solid fresh + dashed stale per-neighbour edges;
+  48 nodes / 53 edges (25 route / 3 direct / 25 neighbour — graph growing
+  on its own); Repeaters card "Neighbours 25" row also live. STEP 2 CLOSED.
+  Also answered user q: live neighbours are NOT written to the DB (only
+  repeater_status.json) — unlike import_contacts.py's nb: rows; option
+  noted for later: poller could also upsert nodes/nb: rows so live
+  neighbours bump last_heard/feed/roster. Decide at step 3 time.
+- **STEP 3 BUILT 2026-07-11 (Mac syntax-verified, Pi-verify pending):**
+  context layer. Backend: GET /api/topology/graph?context=1 adds
+  `context_nodes` = positioned roster nodes NOT in the graph
+  (id/name/protocol/lat/lon; default request stays light). Frontend:
+  legend gains "all positions" toggle (grey dot icon, off by default,
+  map-only); on first enable refetches with ?context=1, map draws faint
+  grey r=3 circleMarkers as backdrop (tooltip "no link evidence yet",
+  click → node drawer). Changelog map sentence extended (parser-ok).
+  Pi-verify: Topology → Map → click "all positions" → ~1200 grey dots
+  behind the star. W13-p2 then FULLY DONE (steps 0-3 complete; optional
+  later: poller nb:-row/roster upsert decision, see step-2 note).
 - Original step-2 spec (implemented as above):
   - topology_routes.init_routes gains `poller` (or provider callable);
     endpoint builds live rows from poller.latest: for each entry with

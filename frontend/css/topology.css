@@ -151,3 +151,5 @@
     .topo-canvas-wrap { height: 55vh; }
     .topo-legend__stats { margin-left: 0; width: 100%; }
 }
+
+.topo-dot--context { background: #6b7687; opacity: 0.6; }
