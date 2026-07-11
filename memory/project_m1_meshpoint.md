@@ -921,10 +921,10 @@ terminal WS admin check + shlex-quoted listener pipeline). Backlog:
 | 3 | ~~P2~~ DONE 2026-07-08 | M | Relay burst + RSSI window exposed on Transmit card. GET /api/config relay dicts (both `transmit.relay` and top-level `relay` in config_routes.py) now include burst_size/min_relay_rssi/max_relay_rssi; transmit_card.js adds 3 inputs + `_collectRelayFilters()` (client-validates numbers + max>min), saves via PUT /api/config/transmit (enable/rate, unchanged) THEN PUT /api/config/relay (filters only, skipped when all blank); backend 400 detail surfaces via panel toast. relay serial_port/baud intentionally NOT exposed (SX1262 legacy, confusing on Transmit). Values apply on restart (existing signalRestart toast). User confirmed the card renders live with correct values (screenshot 2026-07-08); Save path not explicitly exercised yet |
 | 4 | ~~P2~~ DONE 2026-07-08 | S | Dead frontend/js/simple_node_list.js DELETED (nothing referenced it; superseded by node_cards.js) |
 | 5 | ~~P2~~ DONE 2026-07-08 | M | Of the 8 unused endpoints only 2 carried NEW data (verified: /api/stats/summary already embeds rssi_distribution + protocol/type dists — the old "wire 5" plan would have re-plotted duplicates). WIRED: `/api/analytics/signal/snr` → SNR histogram card on Stats next to RSSI (purple #a855f7, clone of _updateRssiHist, fetched via Promise.all in refresh(), NOT part of session/all-time toggle — last-500-packets only); `/api/packets/by-source/{id}` → "Recent Packets" collapsible section in node drawer (last 15: time · type · RSSI/SNR; source_id==node_id, both 8-hex no `!`). KEPT for later inspection per user (NOT pruned): /api/packets/count+protocols+types, /api/nodes/map+summary, /api/telemetry/{id}(+history) — all duplicate data already on screen via other endpoints. SNR chart browser-verified (screenshot 2026-07-08: renders next to RSSI, bimodal far/near clusters; drawer packets not yet checked). NOTE spotted in screenshot: "Best RSSI −4 dBm" is implausible — likely one synthetic/self-report outlier; candidate small fix: filter RSSI > −20 dBm from best/avg tiles |
-| 6 | P3 | L | Spectrum view: SpectralScanService already scans periodically but discards the histogram (only floor/median → noise pill). Endpoint + canvas = the wishlist "spectral scan overlay" |
+| 6 | ~~P3~~ DONE 2026-07-08 | L | Spectrum view — built as T6 (Band Spectrum card, see OLD LIST): sweep mode + /api/device/spectrum + canvas card, live-verified; later moved to its own RF Environment page |
 | 7 | P3 | M | Meshtastic `serial` source single-instance — needs the list-field treatment meshcore_usb got |
 | 8 | P3 | S | `nb:` synthetic rows blank RSSI/FREQ/SF in feed (cosmetic, SNR-only) |
-| 9 | P3 | M | Concentrator-channels card on Hardware page (no UI/API shows ch0-ch4 LoRaWAN + ch8 Meshtastic plan) |
+| 9 | ~~P3~~ DONE 2026-07-08 | M | Concentrator-channels card — built as T4 (see OLD LIST): radio_concentrator_card.js + `concentrator` key in GET /api/config, live on Hardware page |
 
 Intentional / leave alone: sx1262_spi_source.py (parked per ROADMAP, RAK HAT
 coexistence), /api/public/recent_rx unauth (login-page radar blips),
@@ -940,8 +940,10 @@ Suggested commit msgs: `feat: web server port configurable via dashboard.port
 on user-owned repos, sync role section lists, remove dead simple_node_list.js`.
 #3 done later same day (relay UI, changelog bullet under "Dashboard and UI",
 36 bullets total). #5 done same day (SNR chart + node-drawer recent packets,
-2 more bullets → 38). Remaining open: #6 spectrum view, #7 multi Meshtastic
-USB, #8 nb: blank RSSI cosmetic, #9 concentrator-channels card.
+2 more bullets → 38). #6 was in fact DONE the same day as T6 (Band Spectrum
+card) and #9 too (T4, Concentrator Channels card — both lines were stale
+until 2026-07-11). Remaining open: #7 multi Meshtastic USB, #8 nb: blank
+RSSI cosmetic.
 
 ---
 
