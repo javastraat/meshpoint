@@ -463,6 +463,18 @@ instead of ttyUSB0/1 for robustness if more USB devices get added.
   skipping packet and telemetry history entirely.
 - Telemetry import now prefers environmental temperature channels per timestamp:
   channel 4 first, then 3, then channel 1 MCU die temp only as a fallback.
+- **freq/SF/BW stamping added 2026-07-11** (was hardcoded NULL): all
+  `meshcoredb:%` synthetic rows now stamp the companion's radio settings via
+  `--freq/--sf/--bw` (defaults 869.618 / SF8 / 62.5), same treatment as the
+  `nb:` rows in import_contacts.py, so they don't render blank freq/SF in the
+  feed. RSSI stays NULL except status_history `last_rssi` rows (the archive
+  chain only records SNR — verified against meshcore.db schema). Mac-verified
+  end-to-end: real script run against local meshcore.db into a scratch DB
+  built from src/storage/database.py schema — 33,611 rows all stamped, 715/715
+  neighbour rows SNR-present, 907 real last_rssi values preserved.
+- **NOT changelogged — BY DESIGN (user, 2026-07-11): standalone scripts are
+  operator tooling, never in CHANGELOG.md or README.** The CLAUDE.md changelog
+  rule applies to app code only.
 
 #### Listener enhancements (2026-07-05 evening → live, working)
 Built on the base above; all verified working in the browser (FM audio + meter).
@@ -925,7 +937,7 @@ terminal WS admin check + shlex-quoted listener pipeline). Backlog:
 | 5 | ~~P2~~ DONE 2026-07-08 | M | Of the 8 unused endpoints only 2 carried NEW data (verified: /api/stats/summary already embeds rssi_distribution + protocol/type dists — the old "wire 5" plan would have re-plotted duplicates). WIRED: `/api/analytics/signal/snr` → SNR histogram card on Stats next to RSSI (purple #a855f7, clone of _updateRssiHist, fetched via Promise.all in refresh(), NOT part of session/all-time toggle — last-500-packets only); `/api/packets/by-source/{id}` → "Recent Packets" collapsible section in node drawer (last 15: time · type · RSSI/SNR; source_id==node_id, both 8-hex no `!`). KEPT for later inspection per user (NOT pruned): /api/packets/count+protocols+types, /api/nodes/map+summary, /api/telemetry/{id}(+history) — all duplicate data already on screen via other endpoints. SNR chart browser-verified (screenshot 2026-07-08: renders next to RSSI, bimodal far/near clusters; drawer packets not yet checked). NOTE spotted in screenshot: "Best RSSI −4 dBm" is implausible — likely one synthetic/self-report outlier; candidate small fix: filter RSSI > −20 dBm from best/avg tiles |
 | 6 | ~~P3~~ DONE 2026-07-08 | L | Spectrum view — built as T6 (Band Spectrum card, see OLD LIST): sweep mode + /api/device/spectrum + canvas card, live-verified; later moved to its own RF Environment page |
 | 7 | ~~P3~~ DONE (verified in code 2026-07-11) | M | Meshtastic `serial` multi-device — `capture.serial` list of `SerialDeviceConfig` (+label) in config.py, `_add_serial_source` loops it in server.py, source name `serial_<label>` (serial_source.py). Legacy scalar serial_port/serial_baud still works. Live on the Pi as `serial_433` (banner-verified 2026-07-10) |
-| 8 | P3 | S | `nb:` synthetic rows blank RSSI/FREQ/SF in feed (cosmetic, SNR-only) |
+| 8 | ~~P3~~ CLOSED by-design 2026-07-11 | S | `nb:` rows: freq/SF/BW already stamped since 2026-07-05 (importer --freq/--sf/--bw + backfill script). RSSI stays blank FOREVER by design: neighbours.json carries only SNR (no RSSI exists to fill), and live receptions create new complete rows — synthetic rows are never retro-edited (would conflate our radio path with the remote repeater's). User accepted 2026-07-11 |
 | 9 | ~~P3~~ DONE 2026-07-08 | M | Concentrator-channels card — built as T4 (see OLD LIST): radio_concentrator_card.js + `concentrator` key in GET /api/config, live on Hardware page |
 
 Intentional / leave alone: sx1262_spi_source.py (parked per ROADMAP, RAK HAT

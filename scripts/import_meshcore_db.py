@@ -264,6 +264,9 @@ def _import_packets(
     dst: sqlite3.Connection,
     name_to_node_id: dict[str, str],
     prefix_map: dict[str, str],
+    freq_mhz: float = 869.618,
+    spreading_factor: int = 8,
+    bandwidth_khz: float = 62.5,
 ) -> tuple[int, int]:
     cur = dst.cursor()
     cur.execute("DELETE FROM packets WHERE packet_id LIKE 'meshcoredb:%'")
@@ -275,6 +278,11 @@ def _import_packets(
         if not ts_iso:
             skipped += 1
             return
+        # Stamp the companion's radio settings (freq/SF/BW) so these rows show
+        # freq/SF in the dashboard like real captures -- same treatment as the
+        # nb: rows in import_contacts.py. RSSI stays NULL unless the source
+        # row carries one (status_history last_rssi): the archive only
+        # records SNR for neighbour observations.
         cur.execute(
             """
             INSERT INTO packets (
@@ -284,7 +292,7 @@ def _import_packets(
                 rssi, snr, frequency_mhz, spreading_factor,
                 bandwidth_khz, capture_source, timestamp
             ) VALUES (?, ?, 'ffff', 'meshcore', ?, 0, 0, 0, 0, 0, 0, ?, 0,
-                     ?, ?, NULL, NULL, NULL, 'meshcore_db_import', ?)
+                     ?, ?, ?, ?, ?, 'meshcore_db_import', ?)
             """,
             (
                 packet_id,
@@ -293,6 +301,9 @@ def _import_packets(
                 json.dumps(payload, ensure_ascii=False, separators=(",", ":")),
                 rssi,
                 snr,
+                freq_mhz,
+                spreading_factor,
+                bandwidth_khz,
                 ts_iso,
             ),
         )
@@ -438,6 +449,12 @@ def main() -> int:
         action="store_true",
         help="import only contacts / neighbours and skip packet + telemetry history",
     )
+    parser.add_argument("--freq", type=float, default=869.618,
+                        help="Companion frequency in MHz stamped on history rows (default: 869.618)")
+    parser.add_argument("--sf", type=int, default=8,
+                        help="Companion spreading factor stamped on history rows (default: 8)")
+    parser.add_argument("--bw", type=float, default=62.5,
+                        help="Companion bandwidth in kHz stamped on history rows (default: 62.5)")
     args = parser.parse_args()
 
     if args.telemetry_only and args.contacts_only:
@@ -495,7 +512,10 @@ def main() -> int:
                 field_counts = {}
             else:
                 nodes_inserted, nodes_skipped = _import_nodes(src, dst, name_to_node_id, prefix_map)
-                packets_inserted, packets_skipped = _import_packets(src, dst, name_to_node_id, prefix_map)
+                packets_inserted, packets_skipped = _import_packets(
+                    src, dst, name_to_node_id, prefix_map,
+                    freq_mhz=args.freq, spreading_factor=args.sf, bandwidth_khz=args.bw,
+                )
                 telemetry_inserted, telemetry_skipped, field_counts = _import_telemetry_samples(
                     src,
                     dst,
