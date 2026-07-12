@@ -13,6 +13,31 @@ function fmtFreq3(mhz) {
     return Number.isFinite(mhz) ? mhz.toFixed(3) : '--.---';
 }
 
+// rtl_433's decoded field set varies wildly by device model (a
+// temperature sensor and a remote control share almost no fields), so
+// unlike the fixed protocol/capcode/message row PagerPanel renders by
+// default, this just shows the model name plus whatever other keys a
+// given event happens to carry.
+function _rtl433RowHtml(m, esc) {
+    const time = m.received_at
+        ? new Date(m.received_at * 1000).toLocaleTimeString([], {
+            hour: '2-digit', minute: '2-digit', second: '2-digit',
+        })
+        : '';
+    const skip = new Set(['time', 'model', 'received_at']);
+    const fields = Object.keys(m)
+        .filter((k) => !skip.has(k) && m[k] !== null && m[k] !== undefined && m[k] !== '')
+        .map((k) => `${k}: ${m[k]}`)
+        .join('  ·  ');
+    return `
+        <div class="pager-row">
+            <span class="pager-row__time">${esc(time)}</span>
+            <span class="pager-row__proto">${esc(m.model || '')}</span>
+            <span class="pager-row__msg">${esc(fields)}</span>
+        </div>
+    `;
+}
+
 /* ───────────────────────── Digital skin ───────────────────────── */
 
 class DigitalSkin {
@@ -367,14 +392,18 @@ class ListenerPanel {
         })();
         this._tunedCat = null;   // category index of the currently-tuned preset
         this._tunedKey = null;   // "freq|mode" of the currently-tuned preset
-        // P2000/Pagers/POCSAG tabs -- separate pipelines, same RTL-SDR
-        // dongle (see src/audio/sdr_registry.py), so only one of Radio/
-        // P2000/Pagers/POCSAG can be active at a time. Kept as sibling
-        // panels rather than folded into this already-large file.
+        // P2000/Pagers/POCSAG/RTL433 tabs -- separate pipelines, same
+        // RTL-SDR dongle (see src/audio/sdr_registry.py), so only one
+        // of Radio/P2000/Pagers/POCSAG/RTL433 can be active at a time.
+        // Kept as sibling panels rather than folded into this
+        // already-large file.
         this._activeTab = 'radio';
         this._p2000Panel = window.PagerPanel ? new window.PagerPanel('p2000', '/api/p2000', 'P2000') : null;
         this._pagersPanel = window.PagerPanel ? new window.PagerPanel('pagers', '/api/pagers', 'Pagers') : null;
         this._pocsagPanel = window.PagerPanel ? new window.PagerPanel('pocsag', '/api/pocsag', 'POCSAG') : null;
+        this._rtl433Panel = window.PagerPanel
+            ? new window.PagerPanel('rtl433', '/api/rtl433', 'RTL433', _rtl433RowHtml)
+            : null;
     }
 
     _loadFavs() {
@@ -401,6 +430,7 @@ class ListenerPanel {
         if (this._p2000Panel) this._p2000Panel.hide();
         if (this._pagersPanel) this._pagersPanel.hide();
         if (this._pocsagPanel) this._pocsagPanel.hide();
+        if (this._rtl433Panel) this._rtl433Panel.hide();
     }
 
     _showActiveTab() {
@@ -410,6 +440,8 @@ class ListenerPanel {
             this._pagersPanel.show();
         } else if (this._activeTab === 'pocsag' && this._pocsagPanel) {
             this._pocsagPanel.show();
+        } else if (this._activeTab === 'rtl433' && this._rtl433Panel) {
+            this._rtl433Panel.show();
         } else {
             this._refreshStatus();
             this._statusTimer = setInterval(() => this._refreshStatus(), 500);
@@ -423,6 +455,7 @@ class ListenerPanel {
         if (this._activeTab === 'p2000' && this._p2000Panel) this._p2000Panel.hide();
         if (this._activeTab === 'pagers' && this._pagersPanel) this._pagersPanel.hide();
         if (this._activeTab === 'pocsag' && this._pocsagPanel) this._pocsagPanel.hide();
+        if (this._activeTab === 'rtl433' && this._rtl433Panel) this._rtl433Panel.hide();
 
         this._activeTab = tab;
         const root = document.getElementById('listener-panel');
@@ -450,6 +483,7 @@ class ListenerPanel {
                 <button type="button" class="lsn-tabbar__btn" data-tab="p2000">P2000</button>
                 <button type="button" class="lsn-tabbar__btn" data-tab="pagers">Pagers</button>
                 <button type="button" class="lsn-tabbar__btn" data-tab="pocsag">POCSAG</button>
+                <button type="button" class="lsn-tabbar__btn" data-tab="rtl433">RTL433</button>
             </div>
 
             <div class="lsn-tab-content" data-tab="radio">
@@ -539,11 +573,13 @@ class ListenerPanel {
             <div class="lsn-tab-content" data-tab="p2000" style="display:none" id="lsn-tab-p2000"></div>
             <div class="lsn-tab-content" data-tab="pagers" style="display:none" id="lsn-tab-pagers"></div>
             <div class="lsn-tab-content" data-tab="pocsag" style="display:none" id="lsn-tab-pocsag"></div>
+            <div class="lsn-tab-content" data-tab="rtl433" style="display:none" id="lsn-tab-rtl433"></div>
         `;
 
         if (this._p2000Panel) this._p2000Panel.mount(root.querySelector('#lsn-tab-p2000'));
         if (this._pagersPanel) this._pagersPanel.mount(root.querySelector('#lsn-tab-pagers'));
         if (this._pocsagPanel) this._pocsagPanel.mount(root.querySelector('#lsn-tab-pocsag'));
+        if (this._rtl433Panel) this._rtl433Panel.mount(root.querySelector('#lsn-tab-rtl433'));
 
         root.querySelector('#lsn-tabbar').addEventListener('click', (ev) => {
             const btn = ev.target.closest('[data-tab]');
@@ -816,7 +852,7 @@ class ListenerPanel {
         } else {
             this._playing = false;
             if (busyOwner) {
-                const labels = { p2000: 'P2000', pagers: 'Pagers', pocsag: 'POCSAG' };
+                const labels = { p2000: 'P2000', pagers: 'Pagers', pocsag: 'POCSAG', rtl433: 'RTL433' };
                 this._setStatus(false, `busy — in use by ${labels[busyOwner] || busyOwner}`, true);
             } else {
                 this._setStatus(false, st.last_error ? `idle — ${st.last_error}` : 'idle');

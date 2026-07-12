@@ -1,24 +1,33 @@
 /**
- * P2000/Pagers tab content -- a live-scrolling decoded message log with
- * Start/Stop controls. Reused for both kinds (parameterized) since the
- * pipeline/UI shape is identical, just a different backend endpoint
- * prefix and page title -- see src/audio/pager_listener.py.
+ * P2000/Pagers/RTL433 tab content -- a live-scrolling decoded message
+ * log with Start/Stop controls. Reused across kinds (parameterized)
+ * since the pipeline/UI shape is identical, just a different backend
+ * endpoint prefix, page title, and (for rtl_433, whose decoded field
+ * set varies wildly by device model instead of a fixed protocol/
+ * capcode/message shape) row layout -- see src/audio/pager_listener.py
+ * and src/audio/rtl433_listener.py.
  *
- * Only one of Radio/P2000/Pagers can hold the RTL-SDR dongle at a time
- * (manual-stop-required design, 2026-07-12): starting this while
- * another is active returns an error from the backend, shown inline
- * rather than silently stopping the other one.
+ * Only one of Radio/P2000/Pagers/POCSAG/RTL433 can hold the RTL-SDR
+ * dongle at a time (manual-stop-required design, 2026-07-12): starting
+ * this while another is active returns an error from the backend,
+ * shown inline rather than silently stopping the other one.
  */
 // Matches src/audio/sdr_registry.py's owner names.
-const _DONGLE_OWNER_LABELS = { radio: 'Radio', p2000: 'P2000', pagers: 'Pagers', pocsag: 'POCSAG' };
+const _DONGLE_OWNER_LABELS = {
+    radio: 'Radio', p2000: 'P2000', pagers: 'Pagers', pocsag: 'POCSAG', rtl433: 'RTL433',
+};
 
 class PagerPanel {
-    constructor(kind, apiPrefix, title) {
-        this.kind = kind;              // 'p2000' or 'pagers' -- matches the registry
-        this._apiPrefix = apiPrefix;   // '/api/p2000' or '/api/pagers'
+    constructor(kind, apiPrefix, title, rowRenderer = null) {
+        this.kind = kind;              // 'p2000', 'pagers', 'pocsag', or 'rtl433' -- matches the registry
+        this._apiPrefix = apiPrefix;   // e.g. '/api/p2000'
         this._title = title;
         this._root = null;
         this._statusTimer = null;
+        // Optional (message, escapeFn) -> HTML override for kinds whose
+        // decoded events don't fit the protocol/capcode/message shape
+        // (e.g. rtl_433, whose fields vary per device model).
+        this._rowRenderer = rowRenderer;
     }
 
     mount(root) {
@@ -139,6 +148,7 @@ class PagerPanel {
     }
 
     _rowHtml(m) {
+        if (this._rowRenderer) return this._rowRenderer(m, this._esc.bind(this));
         const time = m.received_at
             ? new Date(m.received_at * 1000).toLocaleTimeString([], {
                 hour: '2-digit', minute: '2-digit', second: '2-digit',
