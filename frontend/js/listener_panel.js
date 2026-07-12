@@ -21,7 +21,7 @@ function fmtFreq3(mhz) {
 function _rtl433RowHtml(m, esc) {
     const time = m.received_at
         ? new Date(m.received_at * 1000).toLocaleTimeString([], {
-            hour: '2-digit', minute: '2-digit', second: '2-digit',
+            hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
         })
         : '';
     const skip = new Set(['time', 'model', 'received_at']);

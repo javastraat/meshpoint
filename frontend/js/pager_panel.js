@@ -151,7 +151,7 @@ class PagerPanel {
         if (this._rowRenderer) return this._rowRenderer(m, this._esc.bind(this));
         const time = m.received_at
             ? new Date(m.received_at * 1000).toLocaleTimeString([], {
-                hour: '2-digit', minute: '2-digit', second: '2-digit',
+                hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
             })
             : '';
         return `

@@ -147,13 +147,14 @@
 .pager-row__time {
     color: rgba(243, 244, 246, 0.4);
     flex-shrink: 0;
-    width: 4.5em;
+    width: 5.5em;
+    white-space: nowrap;
 }
 
 .pager-row__proto {
     color: #34d399;
     flex-shrink: 0;
-    width: 6em;
+    width: 9em;
 }
 
 .pager-row__capcode {
