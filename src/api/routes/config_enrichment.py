@@ -126,6 +126,11 @@ def enrich_config_payload(cfg: AppConfig, base: dict) -> dict:
             for r in repeater_poll.repeaters
         ],
     }
+    metrics = cfg.metrics
+    base["metrics"] = {
+        "enabled": metrics.enabled,
+        "require_auth": metrics.require_auth,
+    }
     pos = cfg.transmit.position
     telem = cfg.transmit.telemetry
     if "transmit" in base:

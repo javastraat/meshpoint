@@ -82,6 +82,7 @@ First tagged release of the javastraat/meshpoint fork: LoRaWAN sniffing, multi-r
 - **Relay burst and RSSI filters editable in Configuration → Transmit.** Burst size and the min/max RSSI relay window (only packets heard inside the window are rebroadcast) can now be set from the dashboard; previously these existed in `local.yaml` and the relay API but had no UI.
 - **MeshCore channel limit raised from 7 to 40 user channels.** The configuration card, YAML `meshcore.channel_keys`, and companion slot sync now accept up to 40 user channels (slots 1–40; slot 0 stays Public), up from 7.
 - **Unused API endpoints removed.** `GET /api/packets/protocols`, `/api/packets/types`, `/api/nodes/map`, and `/api/telemetry/{id}` (+`/history`) served data already available through `/api/stats/summary`, `/api/nodes`, and `/api/nodes/{id}/metrics_history`; nothing in the dashboard or CLI used them.
+- **Prometheus metrics gets a dashboard config page.** `metrics:` was the last config section with no UI at all — enabling the `/metrics` scrape endpoint meant hand-editing `local.yaml`. New **Configuration → Metrics** page toggles `enabled` and `require_auth`; unlike most config pages, both apply immediately (`metrics_routes.py` reads the config live on every request), no restart needed. New `PUT /api/config/metrics`, and `GET /api/config` now includes a `metrics` summary.
 
 #### CLI
 

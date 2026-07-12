@@ -5,7 +5,7 @@
  * editable card into each Configuration subsection container, and
  * re-render every card on data changes. The subsections (Identity,
  * Radio, Channels, MeshCore, Serial, Transmit, MQTT, GPS, Advanced,
- * Peripherals, Repeater Poll)
+ * Peripherals, Repeater Poll, Metrics)
  * all mount dedicated editable cards from ``frontend/js/configuration/``.
  * The observational read-only versions (``RadioIdentityCard``,
  * ``RadioConfigCard``, ``RadioChannels``, ``RadioCompanionCard``)
@@ -205,6 +205,14 @@ class ConfigurationPanel {
                 const card = new window.RepeaterPollConfigCard(api);
                 card.mount(host);
                 this._cards.set('repeater-poll', card);
+            }
+        } else if (section === 'metrics' && window.MetricsConfigCard) {
+            const host = document.getElementById('cfg-metrics-panel');
+            if (host) {
+                host.innerHTML = '';
+                const card = new window.MetricsConfigCard(api);
+                card.mount(host);
+                this._cards.set('metrics', card);
             }
         }
         this._mounted.add(section);

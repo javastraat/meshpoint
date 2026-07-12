@@ -1476,12 +1476,63 @@ flows through correctly to the packet tag. Existing
 `tests/test_repeater_poller.py` (10 cases) and
 `tests/test_report_command.py` (15 cases) both still pass unmodified —
 no regressions from the constructor signature change. All Python
-`ast.parse`-checked, all JS `node --check`ed. Not yet live-verified on
-the Pi.
+`ast.parse`-checked, all JS `node --check`ed.
+
+LIVE-VERIFIED 2026-07-12 on the Pi, with an independent cross-check:
+Repeaters page showed "Farthest neighbour: 113 km · SNR -9.5 dB ·
+DTIS | NL WTE | 8881ED" (pubkey `6d374dc5d68e`). User confirmed this
+matches their own separately-run external tool (`web_map_repeaters.py`
+→ `neighbours.json` → map at einstein.amsterdam/meshcore/, unrelated
+codebase, own distance calculation) showing the identical node at
+113.4 km. Also confirmed live that the real name ("DTIS | NL WTE |
+8881ED") displayed correctly rather than a placeholder pubkey — proof
+`upsert_from_neighbour_report()`'s "never overwrite a known name"
+CASE logic worked as designed, since that node already existed with a
+real name from some earlier direct/relayed capture. Also verified
+(prompted by user question about the CLI's `pubkey_prefix_length: 4`
+default, 8 hex chars) that this doesn't affect Meshpoint at all:
+`MeshCoreTxClient.poll_repeater()` (`src/transmit/meshcore_tx_client.py:299-300`)
+explicitly requests `pubkey_prefix_length=6` (12 hex chars), matching
+the existing `nodes.node_id` convention everywhere else in the
+dashboard — no truncation mismatch. This feature (live poller → nb:
+roster + per-repeater farthest-neighbour stat) is now fully closed
+and live-verified, with real-world cross-validation.
+
+Closed 2026-07-12: `metrics` config gets a dashboard page —
+Configuration → Metrics (enabled/require_auth toggles). User set up a
+real Prometheus server to test against before asking for this. New
+`src/api/routes/metrics_config_routes.py` (`PUT /api/config/metrics`),
+`config_enrichment.py` gained a `metrics: {enabled, require_auth}`
+block in `GET /api/config`. Notable: unlike every other config page
+this session, this one applies LIVE with no restart — confirmed by
+checking `server.py:1509-1510`, `metrics_routes.init_routes()` is
+handed `config.metrics` BY REFERENCE (the same nested dataclass
+instance the rest of the app shares), and `prometheus_metrics()`
+reads `_config.enabled`/`_config.require_auth` fresh on every
+request rather than caching a snapshot at boot — so mutating the
+same object in place from the new PUT route is visible immediately.
+Verified this exact behavior with a stub test (constructed both
+route modules against the same `AppConfig`, called the PUT, asserted
+`metrics_routes._config.enabled` flipped without re-calling
+`init_routes()`). Explained the `require_auth` tradeoff honestly in
+the UI copy rather than glossing over it: `require_auth=True` accepts
+either the dashboard's session cookie or an `Authorization: Bearer
+<jwt>` header (confirmed via `_extract_token()` in
+`src/api/auth/dependencies.py:52-58`), but those JWTs are short-lived
+login session tokens, not a long-lived API key — awkward for an
+unattended Prometheus scrape config in practice; `require_auth=False`
+is fully open but only ever exposes aggregate stats, no secrets.
+Remembered the "3 places, not 2" lesson from the repeater-poll page
+this time: wired `configuration/metrics` into `app.js`'s
+`allowedRoutes` AND command palette AND `identity_routes.py`'s
+`_ADMIN_SECTIONS` (the piece that was missed last time and caused a
+live "admin required" bug for an actual admin session). All Python
+`ast.parse`-checked, all JS `node --check`ed, existing 25-test suite
+(`test_repeater_poller.py` + `test_report_command.py`) still passes.
+Not yet live-verified on the Pi.
 
 | # | Status | Effort | Item |
 |---|--------|--------|------|
-| — | Open | S | `metrics` config gets a dashboard toggle — enabled/require_auth for the Prometheus scrape endpoint. Trivial 2-boolean win. From 2026-07-12 config audit |
 | — | Open | S | Prune or document the 6 kept-for-later duplicate API endpoints (packets/count+protocols+types, nodes/map+summary, telemetry/*) |
 | — | Open | M-L | RTL-SDR page gains P2000 and Pagers tabs alongside the existing Radio tab. Each is a fixed `rtl_fm`→`multimon-ng` pipeline (builds on this session's multimon-ng installer work): P2000 — `rtl_fm -f 169.65M -M fm -s 22050 -l 250 \| multimon-ng -a FLEX -a SCOPE -t raw /dev/stdin`; Pagers — `rtl_fm -f 172.45M -M fm -s 22050 -l 250 \| multimon-ng -a POCSAG512 -a POCSAG1200 -a POCSAG2400 -a SCOPE -t raw /dev/stdin`. Decoded messages should stream live to the web dashboard (new tab/panel per feed, not just a log file). User request 2026-07-12, not yet designed/built — needs a process-management approach (start/stop per tab, parse multimon-ng's stdout per decoder, push over the existing WebSocket feed or a new one). Bumped ahead of lower-effort items 2026-07-12 per effort-vs-win discussion: genuinely new capability + explicit user want outweighs the higher effort |
 | — | Open | M | Server-side downsample-across-range for the Repeater Trends chart — a fixed high limit (`hours=100000&limit=50000`) will eventually start truncating again as live polls keep growing the row count unbounded |

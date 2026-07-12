@@ -681,6 +681,8 @@ This is **active two-way RF on a schedule** — the most chatty thing Meshpoint 
 
 Edit all of this from **Configuration → Repeater Poll** — enable/disable, interval, and add/rename/remove repeaters (up to 8) without hand-editing `local.yaml`. Existing passwords are never sent back to the browser (the form only knows a password is *set*, not what it is); leave the password field blank when editing a repeater to keep its current password, or type a new one to replace it. Changes require a restart to take effect, same as the fan/LED/button peripherals.
 
+Each poll also asks the repeater for its own neighbour list (`req_neighbours`) and writes it into the database — a placeholder node per reported pubkey (never overwrites an already-known name/role/position) plus a synthetic packet tagged `nb:<repeater_key>:<node_id>:<timestamp>`, the same convention `scripts/import_contacts.py`'s manual `neighbours.json` import uses, just live. `last_heard` only ever moves forward relative to a genuinely-captured packet — a stale secondhand report can never un-freshen a node heard more recently some other way — and none of this counts toward `packet_count` (Meshpoint's own radio didn't receive it). The Health card gains a **Farthest neighbour** stat per repeater, distance measured from *that repeater's own position* (not Meshpoint's — a repeater can be a remote site with its own local RF picture). These `nb:`-tagged rows are deliberately excluded from the Stats page's "Farthest Direct Signal", which reports only what Meshpoint's own antenna heard directly.
+
 ---
 
 ## Automatic Update Checks
@@ -694,6 +696,22 @@ update_check:
 Periodically checks GitHub for a newer version in the background, reusing the *exact same* `git fetch` + commits-behind logic as the "Check for updates" button on Settings → Updates — the sidebar badge and the button always agree on whether an update is available, since it's the same check, just run on a timer versus on demand. Server-side and config-driven, not per-browser: every client sees the same state, and it survives restarts.
 
 When an update is found, a small badge appears next to **Settings** in the sidebar (visible even collapsed) and next to the **Updates** sub-item — click either to jump straight to Settings → Updates. Clicking "Check for updates" manually also refreshes this badge immediately, as long as you're checking your actual installed channel (not a different channel/custom branch from the picker — that wouldn't reflect what's really installed, so it's excluded from updating the badge). Edit both fields from Settings → Updates directly; changes require a restart to take effect, same as the fan/LED/button peripherals.
+
+---
+
+## Prometheus Metrics
+
+```yaml
+metrics:
+  enabled: false        # off by default
+  require_auth: true    # gate the endpoint behind a valid dashboard session
+```
+
+Exposes a `/metrics` endpoint in standard Prometheus text format (uptime, packet counts by protocol, RSSI/SNR averages, node counts). Purely passive — Meshpoint never sends this anywhere; a Prometheus server you run elsewhere would *scrape* (periodically fetch) this URL on its own schedule.
+
+`require_auth` gates the endpoint behind the same session auth as the rest of the dashboard — either the browser's session cookie, or an `Authorization: Bearer <token>` header. Since these are short-lived login session tokens rather than a long-lived API key, this is awkward for an unattended Prometheus scrape config to use in practice. Turning `require_auth` off makes the endpoint fully open to anyone who can reach it on the network; it only ever exposes aggregate stats, never credentials or channel keys.
+
+Edit both fields from **Configuration → Metrics**. Unlike most config pages, changes here apply immediately — `metrics_routes.py` reads the config fresh on every request, so no restart is needed.
 
 ---
 
