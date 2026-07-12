@@ -86,6 +86,7 @@ First tagged release of the javastraat/meshpoint fork: LoRaWAN sniffing, multi-r
 
 - **`meshpoint report` works again.** The CLI report had been broken since API auth landed — every request got 401 and the command misreported "service is not running". It now prompts for dashboard admin credentials and uses a session cookie; `meshpoint status` distinguishes "running, login required" from "unreachable". Running it as root (`sudo meshpoint report`) skips the prompt entirely: with read access to the on-disk signing key the CLI mints its own short-lived admin token — same trust model as `meshpoint reset-password`, no server-side bypass.
 - **`meshpoint report` covers all networks.** New PROTOCOLS section (one line per network: packets, nodes/devices, frequency/SF, TX/sniff status) and CAPTURE SOURCES section (SX1302 channel usage, MeshCore companions with serial port and name, last band sweep); the old RADIO CONFIG section slimmed to Meshtastic TX facts, and a MESHCORE section mirrors it (companion state and name, radio settings, TX power, channel list).
+- **`meshpoint report`'s CAPTURE SOURCES section now lists Meshtastic USB serial sticks.** Previously only enumerated the concentrator and MeshCore companions — a connected serial Meshtastic radio (e.g. a Heltec V3) produced no line at all, even though `GET /api/config` already shipped its live connection state. Now reads that same `serial` list and prints one line per stick: frequency/SF, connected/disconnected, and the stick's own long name.
 
 #### Dashboard and UI
 

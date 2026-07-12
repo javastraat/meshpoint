@@ -1047,8 +1047,29 @@ with no `2a`, `3b`/`3c`/`3d`/`3e` under a bare `3`) — comment-only,
 no behavior change. Not yet live-verified on the Pi. Folded into
 CHANGELOG.md (same section).
 
+Also closed 2026-07-12: `meshpoint report`'s CAPTURE SOURCES section
+was missing a line for connected Meshtastic USB serial sticks — caught
+live by the user during the fresh-flash test (their second Meshtastic
+stick, separate from the SX1302 concentrator's own Meshtastic channel,
+never appeared anywhere in the report, not even in MESHTASTIC TX).
+Root cause (`src/cli/report_command.py:295-340`,
+`_print_sources_section`): the function only ever read
+`cfg["concentrator"]` and `cfg["capture"]["meshcore_usb"]` — it never
+touched `capture.serial` or, critically, the top-level `cfg["serial"]`
+key that `GET /api/config` (`src/api/routes/config_routes.py:144-170,
+229, 304`) actually populates with LIVE `SerialCaptureSource` status
+(`connected`, `frequency_mhz`, `spreading_factor`, `long_name`, etc,
+via `_serial_status_entry()`). Fix: added a block in
+`_print_sources_section` reading `cfg.get("serial")` (top-level, not
+nested under capture) and printing one line per stick, mirroring the
+existing `meshcore_usb` block. Verified with a stub `ReportData` for
+both connected and disconnected states — output confirmed correct
+formatting. Folded into CHANGELOG.md (CLI section). Not yet
+live-verified on the Pi against the user's actual second stick.
+
 | # | Status | Effort | Item |
 |---|--------|--------|------|
+| — | Open | S | Configuration audit: check every key in `config/default.yaml` (and by extension `local.yaml`) has a corresponding edit control in the web dashboard — user request 2026-07-12, flag any settings that are YAML-only today with no UI equivalent |
 | — | Decide | S | Poller → roster? Should live neighbour polls also upsert nodes / write nb:-style rows (bump last_heard, name unknown pubkeys)? Currently repeater_status.json only, by design |
 | W14 | Open | M | Stray-frames table — log RF frames that fail all three decoders instead of dropping silently (upstream #80) |
 | — | Open | M | Server-side downsample-across-range for the Repeater Trends chart — a fixed high limit (`hours=100000&limit=50000`) will eventually start truncating again as live polls keep growing the row count unbounded |

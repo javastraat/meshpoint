@@ -328,6 +328,21 @@ def _print_sources_section(d: ReportData) -> None:
         state = "connected" if mc.get("connected") else "disconnected"
         _kv("meshcore_usb", state)
 
+    # Meshtastic USB serial sticks -- live status lives at the payload's
+    # top level (cfg["serial"]), not under capture, since config_routes
+    # builds it from the running SerialCaptureSource instances rather
+    # than the static capture.serial config list.
+    for dev in cfg.get("serial") or []:
+        name = dev.get("name") or "serial"
+        state = (
+            f"{_GREEN}connected{_RESET}" if dev.get("connected") else f"{_DIM}--{_RESET}"
+        )
+        freq = dev.get("frequency_mhz")
+        sf = dev.get("spreading_factor")
+        freq_part = (f"{freq} MHz" + (f" SF{sf}" if sf else "")) if freq else ""
+        detail = dev.get("long_name") or dev.get("channel_name") or ""
+        _kv(name, " · ".join(x for x in (freq_part, state, detail) if x))
+
     sweep = (d.spectrum or {}).get("sweep") or {}
     if sweep.get("generated_at"):
         when = sweep["generated_at"][11:19]  # HH:MM:SS from ISO timestamp (UTC)
