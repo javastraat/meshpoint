@@ -1286,13 +1286,49 @@ guard fires before role-specific messaging). Fixed: added
 page with secrets). Take-away for next time a Configuration page gets
 added: THREE places need the new route, not two — `allowedRoutes` +
 command palette in `app.js`, AND `_ADMIN_SECTIONS` in
-`identity_routes.py`. Not yet live-verified on the Pi.
+`identity_routes.py`. LIVE-VERIFIED 2026-07-12 on the Pi: admin access
+now works, the page loads with the existing repeater
+(`da0b77f13bc7`) populated and the password field correctly shows
+"Leave blank to keep current password" — confirms `password_set`
+round-trips correctly end to end. This entire Repeater Poll config
+page feature is now fully closed and live-verified.
+
+Closed 2026-07-12: W20, but redesigned from the original ask before
+building — user wanted advice first ("advise me first before we do
+anything"). Original W20 spec was full drag-and-drop manual reordering
+(hamburger icon). Recommended favorites/pin instead, citing an
+existing in-repo precedent I found first: `frontend/js/node_cards.js`
++ `node_cards_sort.js` + `meshpoint_node_favorites.js` already
+implement exactly this pattern for the Node Cards list (star toggle,
+localStorage, favorites-pinned-first sort) — simpler to build well
+(no drag/touch/accessibility work), and solves the actual want ("my
+channel(s) at the top") without over-building a full ranking UI. User
+agreed. Built: new `frontend/js/meshpoint_channel_favorites.js`
+(mirrors `meshpoint_node_favorites.js`'s shape almost exactly —
+separate module rather than generalizing the node one, since the two
+domains share nothing else and duplication here is cheap and
+established as the repo's convention for this kind of thing;
+`meshpoint.channelFavorites` storage key, 50-entry cap vs nodes' 200
+since realistically far fewer channels exist). `messaging_contacts.js`:
+constructor subscribes to `MeshpointChannelFavorites.onChange()` for
+auto re-render (same as `node_cards.js`'s pattern), new
+`_sortChannelsWithFavoritesFirst()` (favorited channels first in
+starred order, everyone else keeps existing config order, stable
+sort using original index as tiebreaker — NOT a generic multi-mode
+sort class like node cards has, since channels only ever need this
+one sort, unlike nodes' 4 modes), star toggle button added to
+`_buildConvoEl()` only for channel rows (not DMs), `.msg-convo--fav`
+row highlight mirroring `.nc-card--fav`. Verified the favorites
+toggle + stable sort logic with a Node.js simulation (mocked
+window/localStorage/CustomEvent, no browser needed) — confirmed
+toggle/has/list all work and the sort correctly pins favorited
+channels first while preserving relative order elsewhere. All JS
+`node --check`ed. Not yet live-verified on the Pi.
 
 | # | Status | Effort | Item |
 |---|--------|--------|------|
 | — | Open | S-M | Stats page's "Farthest Direct Signal" (0 hops) shows a repeater (e.g. "Zoetermeer Repeater", 42 km, SNR -6 dB) that came from the `import_meshcore_db.py` historical import, not something Meshpoint's own antenna actually received directly. User's read: since it's a repeater, it belongs on the Repeaters tab, not the personal "farthest direct node I heard" stat on Stats. Needs investigation — likely the farthest-signal query needs to exclude imported/synthetic packets (packet_id prefix `meshcoredb:neighbour:` per `import_meshcore_db.py`) or exclude repeater-role nodes, not just filter by hop_count=0. User request 2026-07-12 |
 | — | Open | S | `metrics` config gets a dashboard toggle — enabled/require_auth for the Prometheus scrape endpoint. Trivial 2-boolean win. From 2026-07-12 config audit |
-| W20 | Open | S | Per-user channel display order, remembered per browser (localStorage, matching the existing node-map-view/node-sort-filter precedent) — let the user drag/reorder which channel appears first in the Channels UI instead of a fixed server-side order. User request 2026-07-12, added to wishlist, not yet built |
 | — | Open | S | Prune or document the 6 kept-for-later duplicate API endpoints (packets/count+protocols+types, nodes/map+summary, telemetry/*) |
 | — | Open | M-L | RTL-SDR page gains P2000 and Pagers tabs alongside the existing Radio tab. Each is a fixed `rtl_fm`→`multimon-ng` pipeline (builds on this session's multimon-ng installer work): P2000 — `rtl_fm -f 169.65M -M fm -s 22050 -l 250 \| multimon-ng -a FLEX -a SCOPE -t raw /dev/stdin`; Pagers — `rtl_fm -f 172.45M -M fm -s 22050 -l 250 \| multimon-ng -a POCSAG512 -a POCSAG1200 -a POCSAG2400 -a SCOPE -t raw /dev/stdin`. Decoded messages should stream live to the web dashboard (new tab/panel per feed, not just a log file). User request 2026-07-12, not yet designed/built — needs a process-management approach (start/stop per tab, parse multimon-ng's stdout per decoder, push over the existing WebSocket feed or a new one). Bumped ahead of lower-effort items 2026-07-12 per effort-vs-win discussion: genuinely new capability + explicit user want outweighs the higher effort |
 | — | Open | M | Server-side downsample-across-range for the Repeater Trends chart — a fixed high limit (`hours=100000&limit=50000`) will eventually start truncating again as live polls keep growing the row count unbounded |

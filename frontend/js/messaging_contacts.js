@@ -11,6 +11,9 @@ class MessagingContacts {
         this._conversations = [];
         this._activeNodeId = null;
         this._filter = 'all';
+        if (window.MeshpointChannelFavorites) {
+            window.MeshpointChannelFavorites.onChange(() => this.render());
+        }
     }
 
     async load(includeOverheard = false) {
@@ -73,9 +76,11 @@ class MessagingContacts {
     render() {
         this._listEl.innerHTML = '';
 
-        const filteredChannels = this._filter === 'all'
-            ? this._channels
-            : this._channels.filter(c => c.protocol === this._filter);
+        const filteredChannels = this._sortChannelsWithFavoritesFirst(
+            this._filter === 'all'
+                ? this._channels
+                : this._channels.filter(c => c.protocol === this._filter)
+        );
 
         if (filteredChannels.length > 0) {
             const label = document.createElement('div');
@@ -110,6 +115,26 @@ class MessagingContacts {
         if (filteredChannels.length === 0 && dmConvos.length === 0) {
             this._listEl.innerHTML = '<div class="msg-chat__empty">No conversations yet</div>';
         }
+    }
+
+    /**
+     * Favorited channels first (stable order among themselves and among
+     * the rest), otherwise unchanged -- the server's channel_keys config
+     * order stays the default for anyone who hasn't starred anything.
+     */
+    _sortChannelsWithFavoritesFirst(channels) {
+        if (!window.MeshpointChannelFavorites) return channels;
+        const favs = new Set(window.MeshpointChannelFavorites.list());
+        if (favs.size === 0) return channels;
+        return channels
+            .map((ch, idx) => ({ ch, idx }))
+            .sort((a, b) => {
+                const af = favs.has(a.ch.node_id) ? 1 : 0;
+                const bf = favs.has(b.ch.node_id) ? 1 : 0;
+                if (af !== bf) return bf - af;
+                return a.idx - b.idx;
+            })
+            .map((entry) => entry.ch);
     }
 
     _channelToConvo(ch) {
@@ -200,6 +225,20 @@ class MessagingContacts {
             ? new Date(convo.last_timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
             : '';
 
+        const isFav = isChannel && !!(window.MeshpointChannelFavorites
+            && window.MeshpointChannelFavorites.has(convo.node_id));
+        if (isFav) el.classList.add('msg-convo--fav');
+        const favTitle = isFav ? 'Remove favorite' : 'Add favorite';
+        const favGlyph = isFav ? '★' : '☆';
+        const favBtnHtml = isChannel ? `
+                <button type="button"
+                        class="msg-convo__favorite${isFav ? ' msg-convo__favorite--on' : ''}"
+                        data-favorite-toggle
+                        aria-label="${favTitle}"
+                        aria-pressed="${isFav ? 'true' : 'false'}"
+                        title="${favTitle}">${favGlyph}</button>
+        ` : '';
+
         el.innerHTML = `
             <div class="msg-convo__icon ${iconClass}">${iconText}</div>
             <div class="msg-convo__info">
@@ -207,6 +246,7 @@ class MessagingContacts {
                 <div class="msg-convo__preview">${this._esc(convo.last_message || '')}</div>
             </div>
             <div class="msg-convo__meta">
+                ${favBtnHtml}
                 <div class="msg-convo__time">${timeStr}</div>
                 ${convo.unread_count > 0 ? `<div class="msg-convo__unread">${convo.unread_count}</div>` : ''}
                 <button class="msg-convo__delete" title="Delete conversation">&times;</button>
@@ -217,6 +257,16 @@ class MessagingContacts {
             e.stopPropagation();
             this._deleteConversation(convo);
         });
+
+        const favBtn = el.querySelector('[data-favorite-toggle]');
+        if (favBtn) {
+            favBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (window.MeshpointChannelFavorites) {
+                    window.MeshpointChannelFavorites.toggle(convo.node_id);
+                }
+            });
+        }
 
         el.addEventListener('click', () => {
             this.setActive(convo.node_id);

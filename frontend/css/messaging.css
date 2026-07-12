@@ -225,6 +225,10 @@
 
 .msg-convo--active .msg-convo__name { color: var(--msg-text); }
 
+.msg-convo--fav:not(.msg-convo--active) {
+    background: rgba(245, 158, 11, 0.04);
+}
+
 .msg-convo__icon {
     width: 34px;
     height: 34px;
@@ -342,6 +346,25 @@
 
 .msg-convo__delete:hover { color: var(--msg-danger); }
 .msg-convo:hover .msg-convo__delete { display: inline-block; }
+
+.msg-convo__favorite {
+    background: none;
+    border: none;
+    color: var(--msg-text-faint);
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 2px;
+}
+
+.msg-convo__favorite:hover {
+    color: var(--accent-amber, #f59e0b);
+    transform: scale(1.1);
+}
+
+.msg-convo__favorite--on {
+    color: var(--accent-amber, #f59e0b);
+}
 
 .msg-sidebar__section-label {
     padding: 14px 16px 6px;
