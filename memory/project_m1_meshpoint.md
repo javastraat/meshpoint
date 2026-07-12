@@ -1364,12 +1364,42 @@ empty-state message to be filter-aware ("No favorited channels yet
 -- click the star..." instead of the generic "No conversations yet"
 when Fav mode is empty). Verified all 4 filter modes (all/meshtastic/
 meshcore/fav) end to end with a Node.js simulation matching the exact
-filtering logic. All JS `node --check`ed. Not yet live-verified on
-the Pi.
+filtering logic. All JS `node --check`ed. LIVE-VERIFIED 2026-07-12 on
+the Pi: star toggles render and persist correctly (Public/TechInc/
+PD2EMC/test all starred), the Fav filter correctly isolates exactly
+those 4 (hiding unstarred LongFast/Techinc), and Configuration →
+MeshCore shows the ▲▼ reorder buttons next to each channel number
+(0=Public locked, 1-8 user channels). Both this session's
+channel-ordering features (favorites+Fav filter, admin reorder) are
+now fully closed and live-verified.
+
+Closed 2026-07-12: "Farthest Direct Signal" imported-repeater bug.
+Root cause confirmed (background agent + my own direct verification):
+`_get_farthest_neighbour_direct()` (`src/api/routes/stats_routes.py:313-363`,
+the FALLBACK used when no genuinely-captured direct reception exists
+yet — the live path via `StatsReporter.record_farthest_direct()` was
+already fine) queried `neighbour_advert` packets by max distance with
+NO filter distinguishing Meshpoint's own captures from
+`scripts/import_meshcore_db.py`'s historical import. That importer
+(`import_meshcore_db.py:286-309`) hardcodes `hop_limit=0` (looks
+direct) and `capture_source='meshcore_db_import'` (a distinct,
+purpose-built tag, cleaner to filter on than the `packet_id` prefix)
+for every third-party neighbour observation it inserts — so an
+imported repeater 42 km away could outrank every packet the box
+actually heard itself. Fix: added `AND (p.capture_source IS NULL OR
+p.capture_source != 'meshcore_db_import')` to the WHERE clause
+(`stats_routes.py:323-324`-ish). Deliberately did NOT also exclude
+repeater-role nodes — repeaters can legitimately be heard directly,
+that's an orthogonal concern the user didn't actually ask to change.
+Verified with a real sqlite3 (not stubbed) test seeding three cases:
+a genuine direct reception, the imported-repeater case, and a legacy
+row with NULL `capture_source` (to catch the SQL NULL-comparison trap
+of a plain `!=` silently excluding NULLs too) — confirmed the fix
+excludes only the imported row and correctly keeps both others. Not
+yet live-verified on the Pi.
 
 | # | Status | Effort | Item |
 |---|--------|--------|------|
-| — | Open | S-M | Stats page's "Farthest Direct Signal" (0 hops) shows a repeater (e.g. "Zoetermeer Repeater", 42 km, SNR -6 dB) that came from the `import_meshcore_db.py` historical import, not something Meshpoint's own antenna actually received directly. User's read: since it's a repeater, it belongs on the Repeaters tab, not the personal "farthest direct node I heard" stat on Stats. Needs investigation — likely the farthest-signal query needs to exclude imported/synthetic packets (packet_id prefix `meshcoredb:neighbour:` per `import_meshcore_db.py`) or exclude repeater-role nodes, not just filter by hop_count=0. User request 2026-07-12 |
 | — | Open | S | `metrics` config gets a dashboard toggle — enabled/require_auth for the Prometheus scrape endpoint. Trivial 2-boolean win. From 2026-07-12 config audit |
 | — | Open | S | Prune or document the 6 kept-for-later duplicate API endpoints (packets/count+protocols+types, nodes/map+summary, telemetry/*) |
 | — | Open | M-L | RTL-SDR page gains P2000 and Pagers tabs alongside the existing Radio tab. Each is a fixed `rtl_fm`→`multimon-ng` pipeline (builds on this session's multimon-ng installer work): P2000 — `rtl_fm -f 169.65M -M fm -s 22050 -l 250 \| multimon-ng -a FLEX -a SCOPE -t raw /dev/stdin`; Pagers — `rtl_fm -f 172.45M -M fm -s 22050 -l 250 \| multimon-ng -a POCSAG512 -a POCSAG1200 -a POCSAG2400 -a SCOPE -t raw /dev/stdin`. Decoded messages should stream live to the web dashboard (new tab/panel per feed, not just a log file). User request 2026-07-12, not yet designed/built — needs a process-management approach (start/stop per tab, parse multimon-ng's stdout per decoder, push over the existing WebSocket feed or a new one). Bumped ahead of lower-effort items 2026-07-12 per effort-vs-win discussion: genuinely new capability + explicit user want outweighs the higher effort |

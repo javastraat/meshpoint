@@ -322,6 +322,7 @@ async def _get_farthest_neighbour_direct() -> dict | None:
         JOIN nodes n ON p.source_id = n.node_id
         WHERE p.packet_type = 'neighbour_advert'
           AND n.latitude IS NOT NULL AND n.longitude IS NOT NULL
+          AND (p.capture_source IS NULL OR p.capture_source != 'meshcore_db_import')
         ORDER BY p.timestamp DESC
         """
     )
