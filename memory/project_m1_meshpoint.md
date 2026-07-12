@@ -1265,11 +1265,32 @@ new-password set on a fresh entry, confirmed both values land
 correctly in a scratch local.yaml, confirmed audit log never contains
 either password. All JS `node --check`ed. Also updated README.md and
 CONFIGURATION.md to reflect dashboard-editability (previously said
-"repeater_poll: in local.yaml" as the only way). Not yet live-verified
-on the Pi.
+"repeater_poll: in local.yaml" as the only way).
+
+Bug found + fixed same day, caught live by the user ("the repeaters
+tab says admin required but i am loged in as admin" — turned out to
+mean the NEW Configuration → Repeater Poll page, not the existing
+Repeaters status page). Root cause: `frontend/js/app.js`'s
+`_buildRouteGuard()` (client-side belt-and-braces gate) checks each
+route against `identity.available_sections`, a list the SERVER
+computes per role in `src/api/routes/identity_routes.py`'s
+`_ADMIN_SECTIONS`/`_VIEWER_SECTIONS` tuples — a completely separate
+allowlist from the `allowedRoutes` array in `app.js` I had already
+updated. I added the route to `allowedRoutes` + the command palette
+but missed this second, server-side list, so the client-side guard
+denied navigation even for a real admin session (the toast literally
+says "Admin access required" regardless of actual role, since the
+guard fires before role-specific messaging). Fixed: added
+`"configuration.repeater-poll"` to `_ADMIN_SECTIONS` only (not
+`_VIEWER_SECTIONS` — correctly admin-only, matches every other config
+page with secrets). Take-away for next time a Configuration page gets
+added: THREE places need the new route, not two — `allowedRoutes` +
+command palette in `app.js`, AND `_ADMIN_SECTIONS` in
+`identity_routes.py`. Not yet live-verified on the Pi.
 
 | # | Status | Effort | Item |
 |---|--------|--------|------|
+| — | Open | S-M | Stats page's "Farthest Direct Signal" (0 hops) shows a repeater (e.g. "Zoetermeer Repeater", 42 km, SNR -6 dB) that came from the `import_meshcore_db.py` historical import, not something Meshpoint's own antenna actually received directly. User's read: since it's a repeater, it belongs on the Repeaters tab, not the personal "farthest direct node I heard" stat on Stats. Needs investigation — likely the farthest-signal query needs to exclude imported/synthetic packets (packet_id prefix `meshcoredb:neighbour:` per `import_meshcore_db.py`) or exclude repeater-role nodes, not just filter by hop_count=0. User request 2026-07-12 |
 | — | Open | S | `metrics` config gets a dashboard toggle — enabled/require_auth for the Prometheus scrape endpoint. Trivial 2-boolean win. From 2026-07-12 config audit |
 | W20 | Open | S | Per-user channel display order, remembered per browser (localStorage, matching the existing node-map-view/node-sort-filter precedent) — let the user drag/reorder which channel appears first in the Channels UI instead of a fixed server-side order. User request 2026-07-12, added to wishlist, not yet built |
 | — | Open | S | Prune or document the 6 kept-for-later duplicate API endpoints (packets/count+protocols+types, nodes/map+summary, telemetry/*) |

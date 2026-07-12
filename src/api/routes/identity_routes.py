@@ -57,6 +57,7 @@ _ADMIN_SECTIONS: tuple[str, ...] = (
     "configuration.gps",
     "configuration.advanced",
     "configuration.peripherals",
+    "configuration.repeater-poll",
     "settings",
     "settings.updates",
     "settings.auth",
