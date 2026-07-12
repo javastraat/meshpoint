@@ -115,6 +115,9 @@ apt-get install -y -qq \
     fastfetch \
     cmake \
     libusb-1.0-0-dev \
+    meson \
+    libsndfile1-dev \
+    libliquid-dev \
     build-essential
 
 # ── 2. Enable SPI ──────────────────────────────────────────────────
@@ -243,6 +246,33 @@ else
         cmake ../ -DINSTALL_UDEV_RULES=ON
         make -j"$(nproc)"
         make install
+        ldconfig
+    )
+fi
+
+# ── 3d. Install redsea (RTL-SDR RDS decoder) ──────────────────────
+#
+# Decodes RDS (station name, radio text, PI code) out of FM broadcast
+# capture, on top of the librtlsdr built in 3c. Built from source
+# (windytan/redsea upstream) via meson, same rationale as rtl-sdr:
+# no distro package tracks upstream closely enough.
+#
+# Idempotent: skips the clone+build if the redsea binary already exists.
+
+REDSEA_BUILD_DIR="/opt/redsea"
+
+if command -v redsea &>/dev/null; then
+    info "redsea already installed, skipping build"
+else
+    info "Cloning and building redsea..."
+    rm -rf "$REDSEA_BUILD_DIR"
+    git clone --depth 1 https://github.com/windytan/redsea.git "$REDSEA_BUILD_DIR"
+    (
+        cd "$REDSEA_BUILD_DIR"
+        meson setup build
+        cd build
+        meson compile
+        meson install
         ldconfig
     )
 fi

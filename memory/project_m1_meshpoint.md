@@ -1015,6 +1015,13 @@ has the rtl-sdr build install its own udev rules. Not yet live-verified
 on the Pi (Mac-side `bash -n` syntax check only). Folded into
 CHANGELOG.md (v0.7.7, Configuration and server section).
 
+Also closed 2026-07-12: installer section "3d" builds `redsea`
+(windytan/redsea, RTL-SDR RDS decoder — station name/radio text/PI
+code) right after the rtl-sdr section, per user's exact given commands
+(apt meson/libsndfile1-dev/libliquid-dev, `meson setup build && meson
+compile && meson install`). Idempotent via `command -v redsea`. Not yet
+live-verified on the Pi. Folded into CHANGELOG.md (same section).
+
 | # | Status | Effort | Item |
 |---|--------|--------|------|
 | — | Decide | S | Poller → roster? Should live neighbour polls also upsert nodes / write nb:-style rows (bump last_heard, name unknown pubkeys)? Currently repeater_status.json only, by design |
