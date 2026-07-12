@@ -681,6 +681,20 @@ This is **active two-way RF on a schedule** — the most chatty thing Meshpoint 
 
 ---
 
+## Automatic Update Checks
+
+```yaml
+update_check:
+  enabled: true          # on by default -- a read-only network check
+  interval_minutes: 60    # floored at 5 -- each check is a real `git fetch`
+```
+
+Periodically checks GitHub for a newer version in the background, reusing the *exact same* `git fetch` + commits-behind logic as the "Check for updates" button on Settings → Updates — the sidebar badge and the button always agree on whether an update is available, since it's the same check, just run on a timer versus on demand. Server-side and config-driven, not per-browser: every client sees the same state, and it survives restarts.
+
+When an update is found, a small badge appears next to **Settings** in the sidebar (visible even collapsed) and next to the **Updates** sub-item — click either to jump straight to Settings → Updates. Clicking "Check for updates" manually also refreshes this badge immediately, as long as you're checking your actual installed channel (not a different channel/custom branch from the picker — that wouldn't reflect what's really installed, so it's excluded from updating the badge). Edit both fields from Settings → Updates directly; changes require a restart to take effect, same as the fan/LED/button peripherals.
+
+---
+
 ## Device Identity
 
 ```yaml

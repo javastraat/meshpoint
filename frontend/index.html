@@ -283,6 +283,7 @@
                                 </svg>
                             </span>
                             <span class="sidebar__label">Settings</span>
+                            <span class="sidebar__badge sidebar__badge--update" data-badge-for="settings" style="display:none"></span>
                             <svg class="sidebar__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                 <polyline points="9 18 15 12 9 6"/>
                             </svg>
@@ -668,6 +669,26 @@
                         </div>
                         <p class="update-status" data-update-status aria-live="polite"></p>
                     </article>
+                    <article class="update-card">
+                        <header class="update-card__row">
+                            <h3 class="update-panel__title" style="font-size:1rem">Automatic checks</h3>
+                        </header>
+                        <p class="update-card__description">Periodically checks for updates in the background using the same git-fetch check as "Check for updates" above, and shows a badge next to Settings in the sidebar when one's found.</p>
+                        <form class="cfg-form" data-update-auto-form>
+                            <label class="cfg-field cfg-field--toggle">
+                                <input type="checkbox" data-update-auto-enabled>
+                                <span class="cfg-field__label">Check automatically</span>
+                            </label>
+                            <label class="cfg-field cfg-field--narrow">
+                                <span class="cfg-field__label">Check interval (minutes)</span>
+                                <input class="cfg-field__input" type="number" min="5" step="1" data-update-auto-interval>
+                            </label>
+                            <div class="cfg-card__actions">
+                                <button class="terminal-button terminal-button--primary" type="submit">Save</button>
+                            </div>
+                            <p class="cfg-status" data-update-auto-status aria-live="polite"></p>
+                        </form>
+                    </article>
                     <section class="update-progress" data-update-progress hidden aria-live="polite"></section>
                     <section class="update-release-notes" data-update-release-notes aria-live="polite"></section>
                     <section class="update-log" data-update-log></section>
@@ -940,6 +961,7 @@
     <script src="sidebar/noise_floor_sparkline.js"></script>
     <script src="sidebar/telemetry_rail.js"></script>
     <script src="sidebar/radio_tx_badge.js"></script>
+    <script src="sidebar/update_check_badge.js"></script>
     <script src="js/reconnect_storyboard.js"></script>
     <script src="js/tab_title_telemetry.js"></script>
     <script src="topbar/topbar_meshtastic_chip.js"></script>

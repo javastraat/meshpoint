@@ -500,6 +500,22 @@ class RepeaterPollConfig:
 
 
 @dataclass
+class UpdateCheckConfig:
+    """Periodic background check for a newer version on GitHub.
+
+    Reuses the exact same git-fetch + commits-behind logic as the
+    manual "Check for updates" button (build_install_status_payload),
+    so the sidebar badge and the button always agree on whether an
+    update is available -- never a separate, looser check that could
+    disagree with it. Server-side and config-driven (not per-browser)
+    so every client sees the same state regardless of who's looking.
+    """
+
+    enabled: bool = True
+    interval_minutes: int = 60
+
+
+@dataclass
 class AppConfig:
     radio: RadioConfig = field(default_factory=RadioConfig)
     meshtastic: MeshtasticConfig = field(default_factory=MeshtasticConfig)
@@ -519,6 +535,7 @@ class AppConfig:
     led: LedConfig = field(default_factory=LedConfig)
     button: ButtonConfig = field(default_factory=ButtonConfig)
     repeater_poll: RepeaterPollConfig = field(default_factory=RepeaterPollConfig)
+    update_check: UpdateCheckConfig = field(default_factory=UpdateCheckConfig)
 
 
 def _resolve_radio_frequency(radio: "RadioConfig") -> None:
@@ -621,6 +638,7 @@ def _apply_yaml(cfg: AppConfig, path: Path) -> None:
         "led": cfg.led,
         "button": cfg.button,
         "repeater_poll": cfg.repeater_poll,
+        "update_check": cfg.update_check,
     }
 
     unknown_keys: list[str] = []

@@ -112,6 +112,7 @@ _led_controller_task = None
 _led_controller = None
 _button_controller_task = None
 _repeater_poller = None
+_update_check_task = None
 
 
 def create_app(config: AppConfig | None = None) -> FastAPI:
@@ -142,6 +143,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
         rollback_state_path=resolve_rollback_state_path(
             config.storage.database_path,
         ),
+        config=config,
     )
     backup_routes.init_routes(config)
     # Dangerous registry is wired in lifespan so clear-db / wipe-phantoms /
@@ -311,6 +313,14 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
                 ).run()
             )
 
+        global _update_check_task
+        if config.update_check.enabled:
+            _update_check_task = asyncio.get_running_loop().create_task(
+                update_routes.periodic_update_check_loop(
+                    config.update_check.interval_minutes,
+                )
+            )
+
         _init_routes(
             pipeline,
             config,
@@ -353,6 +363,12 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
             _button_controller_task.cancel()
             try:
                 await _button_controller_task
+            except BaseException:
+                pass
+        if _update_check_task is not None:
+            _update_check_task.cancel()
+            try:
+                await _update_check_task
             except BaseException:
                 pass
         if nodeinfo_broadcaster is not None:

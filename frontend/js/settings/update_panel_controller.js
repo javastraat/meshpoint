@@ -54,6 +54,10 @@ class UpdatePanelController {
         this.releaseNotesView = new window.ReleaseNotesView(
             rootEl.querySelector('[data-update-release-notes]')
         );
+        this.autoForm = rootEl.querySelector('[data-update-auto-form]');
+        this.autoEnabledEl = rootEl.querySelector('[data-update-auto-enabled]');
+        this.autoIntervalEl = rootEl.querySelector('[data-update-auto-interval]');
+        this.autoStatusEl = rootEl.querySelector('[data-update-auto-status]');
         this._channels = [];
         this._installStatus = null;
         this._lastResult = null;
@@ -77,12 +81,58 @@ class UpdatePanelController {
         this.checkBtn?.addEventListener('click', () => this._checkForUpdates());
         this.applyBtn?.addEventListener('click', () => this._apply());
         this.rollbackBtn?.addEventListener('click', () => this._rollback());
+        this.autoForm?.addEventListener('submit', (e) => this._saveAutoCheckSettings(e));
     }
 
     async refresh() {
         await this._loadChannels();
         await this._loadInstallStatus();
         this._syncChannelPickerToInstall();
+        await this._loadAutoCheckSettings();
+    }
+
+    /** Pre-populate the "Automatic checks" form from live config. */
+    async _loadAutoCheckSettings() {
+        if (!this.autoEnabledEl || !this.autoIntervalEl) return;
+        try {
+            const res = await fetch('/api/config', { credentials: 'same-origin' });
+            if (!res.ok) return;
+            const config = await res.json();
+            const uc = (config && config.update_check) || {};
+            this.autoEnabledEl.checked = Boolean(uc.enabled);
+            if (uc.interval_minutes != null) this.autoIntervalEl.value = uc.interval_minutes;
+        } catch (_e) {
+            // Leave the form at its defaults; not worth surfacing an error for.
+        }
+    }
+
+    async _saveAutoCheckSettings(event) {
+        event.preventDefault();
+        if (this.autoStatusEl) {
+            this.autoStatusEl.dataset.kind = 'pending';
+            this.autoStatusEl.textContent = 'Saving…';
+        }
+        try {
+            const res = await fetch('/api/update/check-settings', {
+                method: 'PUT',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    enabled: this.autoEnabledEl.checked,
+                    interval_minutes: Number(this.autoIntervalEl.value),
+                }),
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            if (this.autoStatusEl) {
+                this.autoStatusEl.dataset.kind = 'success';
+                this.autoStatusEl.textContent = 'Saved. Restart Meshpoint for this to take effect.';
+            }
+        } catch (_e) {
+            if (this.autoStatusEl) {
+                this.autoStatusEl.dataset.kind = 'error';
+                this.autoStatusEl.textContent = 'Save failed.';
+            }
+        }
     }
 
     /** Last commits on origin/<branch> — what the fork looks like on GitHub. */
@@ -190,6 +240,10 @@ class UpdatePanelController {
             this._renderVersionCards(this._installStatus);
             this._renderRemoteCommits(this._installStatus);
             this._renderSyncHint(this._installStatus);
+            // A plain check (no channel override) just refreshed the
+            // same cache the sidebar badge reads -- pull it immediately
+            // instead of waiting for the badge's own 5-minute poll.
+            window.updateCheckBadge?.refreshNow();
             const behind = this._installStatus.commits_behind;
             if (this._installStatus.sync_error) {
                 this._setStatus('error', 'Could not reach GitHub.');

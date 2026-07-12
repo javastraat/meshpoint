@@ -42,6 +42,7 @@ from src.api.update.release_notes import (
     format_section_full,
     select_preview_section,
 )
+from src.config import AppConfig, save_section_to_yaml
 from src.version import __version__ as INSTALLED_VERSION
 
 logger = logging.getLogger(__name__)
@@ -52,6 +53,13 @@ _applier: UpdateApplier | None = None
 _registry: ReleaseChannelRegistry | None = None
 _changelog_path: Path | None = None
 _rollback_state_path: Path = Path("/opt/meshpoint/data/update_rollback.json")
+_config: AppConfig | None = None
+_last_periodic_check: dict | None = None
+
+# Each check is a real `git fetch`, not a cheap request -- floor the
+# interval so a bad config value (or a hand-edited yaml) can't turn
+# this into a tight loop hammering GitHub.
+MIN_CHECK_INTERVAL_MINUTES = 5
 
 
 def init_routes(
@@ -59,21 +67,110 @@ def init_routes(
     registry: ReleaseChannelRegistry,
     changelog_path: Path | None = None,
     rollback_state_path: Path | None = None,
+    config: AppConfig | None = None,
 ) -> None:
-    global _applier, _registry, _changelog_path, _rollback_state_path
+    global _applier, _registry, _changelog_path, _rollback_state_path, _config
     _applier = applier
     _registry = registry
     _changelog_path = changelog_path
     if rollback_state_path is not None:
         _rollback_state_path = rollback_state_path
+    _config = config
 
 
 def reset_routes() -> None:
-    global _applier, _registry, _changelog_path, _rollback_state_path
+    global _applier, _registry, _changelog_path, _rollback_state_path, _config, _last_periodic_check
     _applier = None
     _registry = None
     _changelog_path = None
     _rollback_state_path = Path("/opt/meshpoint/data/update_rollback.json")
+    _config = None
+    _last_periodic_check = None
+
+
+async def periodic_update_check_loop(interval_minutes: float) -> None:
+    """Background task: re-run the same check the "Check for updates"
+    button does, on a timer, caching the result for the sidebar badge.
+
+    Runs an initial check immediately (so the badge isn't blank for a
+    full interval after boot), then repeats every ``interval_minutes``.
+    Same lifecycle pattern as the fan/LED/button controllers -- started
+    via create_task in server.py's lifespan, cancelled on shutdown.
+    """
+    global _last_periodic_check
+    interval_s = max(MIN_CHECK_INTERVAL_MINUTES, interval_minutes) * 60
+    loop = asyncio.get_running_loop()
+    try:
+        while True:
+            if _registry is not None:
+                try:
+                    _last_periodic_check = await loop.run_in_executor(
+                        None,
+                        lambda: build_install_status_payload(
+                            registry=_registry,
+                            sync_remote=True,
+                            rollback_state_path=_rollback_state_path,
+                        ),
+                    )
+                    logger.info(
+                        "Periodic update check: commits_behind=%s",
+                        _last_periodic_check.get("commits_behind"),
+                    )
+                except Exception:
+                    logger.exception("Periodic update check failed")
+            await asyncio.sleep(interval_s)
+    except asyncio.CancelledError:
+        pass
+
+
+class UpdateCheckSettingsUpdate(BaseModel):
+    enabled: bool = True
+    interval_minutes: int = Field(60, ge=MIN_CHECK_INTERVAL_MINUTES)
+
+
+@router.get("/badge")
+async def update_badge(
+    _claims: SessionClaims = Depends(require_admin),
+) -> dict:
+    """Cached result of the periodic check, for the sidebar badge.
+
+    Never triggers a git fetch itself -- just reads whatever the
+    background loop last found, so polling this is cheap.
+    """
+    if _last_periodic_check is None:
+        return {"update_available": False, "commits_behind": None, "checked_at": None}
+    return {
+        "update_available": bool(_last_periodic_check.get("commits_behind")),
+        "commits_behind": _last_periodic_check.get("commits_behind"),
+        "checked_at": _last_periodic_check.get("checked_at"),
+    }
+
+
+@router.put("/check-settings")
+async def update_check_settings(
+    req: UpdateCheckSettingsUpdate,
+    _claims: SessionClaims = Depends(require_admin),
+    audit: AuditLogWriter = Depends(get_audit_writer),
+):
+    if _config is None:
+        raise HTTPException(503, "Config not loaded")
+
+    updates = req.model_dump()
+    with audit.timed_action(
+        user=_claims.subject, action="config.update_check_settings", params=updates
+    ):
+        _config.update_check.enabled = req.enabled
+        _config.update_check.interval_minutes = req.interval_minutes
+        try:
+            save_section_to_yaml("update_check", updates)
+        except PermissionError as exc:
+            raise HTTPException(403, str(exc)) from exc
+
+    logger.info(
+        "Update-check settings changed: enabled=%s interval_minutes=%s",
+        req.enabled, req.interval_minutes,
+    )
+    return {"saved": True, "restart_required": True, "updates": updates}
 
 
 def _require_initialized() -> tuple[UpdateApplier, ReleaseChannelRegistry]:
@@ -127,9 +224,10 @@ async def check_for_updates(
     _claims: SessionClaims = Depends(require_admin),
 ) -> dict:
     """Fetch origin and report how many commits HEAD is behind the target branch."""
+    global _last_periodic_check
     _applier_instance, registry = _require_initialized()
     loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(
+    result = await loop.run_in_executor(
         None,
         lambda: build_install_status_payload(
             registry=registry,
@@ -139,6 +237,14 @@ async def check_for_updates(
             rollback_state_path=_rollback_state_path,
         ),
     )
+    # Only refresh the sidebar badge's cache when this checked the same
+    # thing the periodic background loop would (the current install's
+    # own tracked channel) -- a manual check against a different picker
+    # channel/custom branch shouldn't make the badge reflect THAT
+    # branch's status instead of the actually-installed one.
+    if req.channel_id is None and req.custom_branch is None:
+        _last_periodic_check = result
+    return result
 
 
 @router.get("/release_notes")

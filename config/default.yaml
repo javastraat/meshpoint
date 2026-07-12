@@ -72,7 +72,7 @@ relay:
   max_relay_rssi: -50.0
 
 upstream:
-  enabled: true
+  enabled: false
   url: "wss://api.meshradar.io"
   reconnect_interval_seconds: 10
   buffer_max_size: 5000
@@ -223,3 +223,15 @@ button:
   # bouncy button can't spam the duty-cycle budget. Denied presses get
   # a single long LED blink.
   advert_cooldown_s: 30.0
+
+update_check:
+  # Periodic background check for a newer version on GitHub -- reuses
+  # the exact same git-fetch + commits-behind logic as the "Check for
+  # updates" button on Settings -> Updates, so the sidebar badge and
+  # the button always agree. Server-side, not per-browser: every
+  # client sees the same state. On by default (read-only network
+  # check, low impact); disable if you'd rather only check manually.
+  enabled: true
+  # How often (minutes) to check. Floored at 5 minutes -- each check
+  # is a real `git fetch`, not a cheap request.
+  interval_minutes: 60

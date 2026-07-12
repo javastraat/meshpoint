@@ -108,6 +108,11 @@ def enrich_config_payload(cfg: AppConfig, base: dict) -> dict:
             "advert_cooldown_s": button.advert_cooldown_s,
         },
     }
+    update_check = cfg.update_check
+    base["update_check"] = {
+        "enabled": update_check.enabled,
+        "interval_minutes": update_check.interval_minutes,
+    }
     pos = cfg.transmit.position
     telem = cfg.transmit.telemetry
     if "transmit" in base:

@@ -63,6 +63,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         window.radioTxBadge = radioTxBadge;
     }
 
+    if (window.UpdateCheckBadge) {
+        const updateCheckBadge = new UpdateCheckBadge(sidebar);
+        updateCheckBadge.init();
+        window.updateCheckBadge = updateCheckBadge;
+    }
+
     if (window.SinceLineController && window.lastVisitTracker) {
         const sinceCtrl = new SinceLineController(router, window.lastVisitTracker);
         const dashHost = document.getElementById('dashboard-since-host');
