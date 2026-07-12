@@ -270,6 +270,12 @@ Add an **RTL-SDR dongle** (RTL2832U + R820T/R860 — e.g. RTL-SDR Blog V3/V4, ~�
   sudo cmake --install build
   ```
   Both `redsea` and `multimon-ng` are installed automatically by `scripts/install.sh` on a fresh Pi setup — this is only needed for a manual/non-installer setup. Since P2000/Pagers/POCSAG use the same dongle as the Radio tab, only one of the four can be active at a time; starting one while another is listening returns an error rather than silently stopping it.
+- **rtl_433 (optional, installer-only for now):** `scripts/install.sh` also builds [`rtl_433`](https://github.com/merbanan/rtl_433) from source — a generic OOK/FSK decoder covering weather stations, TPMS, remote sensors, and hundreds of other 433/315/868 MHz devices, much broader than the paging-only P2000/Pagers/POCSAG decoders above. Not yet wired into the dashboard (no tab or API endpoints), so this is currently just available as a CLI tool on the Pi. Manual build:
+  ```bash
+  git clone https://github.com/merbanan/rtl_433.git
+  cd rtl_433 && mkdir build && cd build
+  cmake ../ && make && sudo make install
+  ```
 - **Blacklist the DVB-T driver** so the kernel doesn't claim the dongle as a TV tuner (the #1 "device not found" gotcha):
   ```bash
   echo 'blacklist dvb_usb_rtl28xxu' | sudo tee /etc/modprobe.d/rtl-sdr-blacklist.conf
