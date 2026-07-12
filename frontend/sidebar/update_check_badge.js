@@ -58,6 +58,14 @@ class UpdateCheckBadge {
         const label = available ? 'Update' : null;
         this._sidebar.setStatusBadge('settings', label, 'update');
         this._sidebar.setStatusBadge('settings/updates', label, 'update');
+
+        // Header pill (under the device name/status) -- more prominent
+        // than the Settings-group badges above, since it's not nested
+        // inside anything collapsible. Plain <a href="#/settings/updates">
+        // navigates on its own via the router's hashchange listener, so
+        // this only needs to toggle visibility, no click handler.
+        const headerPill = document.getElementById('sidebar-update-pill');
+        if (headerPill) headerPill.style.display = available ? '' : 'none';
     }
 }
 

@@ -484,6 +484,18 @@
     color: var(--accent-amber);
 }
 
+.sidebar__badge--header {
+    /* Overrides the nav-row margin-left:auto -- this sits in the
+       header's column layout (device name / status / pill), not a
+       horizontal nav item row, so it should hug the left edge like
+       its siblings instead of pushing to the far right. */
+    display: inline-flex;
+    align-self: flex-start;
+    margin: 0.15rem 0 0;
+    text-decoration: none;
+    cursor: pointer;
+}
+
 .sidebar__badge--new {
     background: rgba(0, 229, 160, 0.16);
     color: var(--accent-green);
