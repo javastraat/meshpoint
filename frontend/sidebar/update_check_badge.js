@@ -1,17 +1,19 @@
 /**
- * Sidebar Settings item — GitHub update-available badge.
+ * Sidebar header — GitHub update-available pill.
  *
  * Surfaces the periodic server-side update check (src/api/routes
- * /update_routes.py's periodic_update_check_loop) on the Settings
- * sidebar item, so an update is visible on any page without having
- * to expand Settings and open the Updates tab to find out. Reuses
- * the exact same git-fetch + commits-behind check as the manual
- * "Check for updates" button, so this badge and that button always
- * agree.
+ * /update_routes.py's periodic_update_check_loop) right under the
+ * device name/status at the top of the sidebar, so an update is
+ * visible on any page without digging into Settings. Reuses the
+ * exact same git-fetch + commits-behind check as the manual "Check
+ * for updates" button, so this pill and that button always agree.
  *
- * Mirrors radio_tx_badge.js's structure: a small poller that pushes
- * into SidebarController.setStatusBadge(), decoupled from whichever
- * page happens to be mounted.
+ * Only drives the one header pill (#sidebar-update-pill, a plain
+ * link) -- the Settings-group/Updates-subitem badges were dropped
+ * per user request (redundant once the header pill existed).
+ *
+ * Mirrors radio_tx_badge.js's overall structure (a small poller),
+ * decoupled from whichever page happens to be mounted.
  */
 class UpdateCheckBadge {
     constructor(sidebar, fetchImpl = null) {
@@ -55,15 +57,9 @@ class UpdateCheckBadge {
 
     _apply(data) {
         const available = Boolean(data && data.update_available);
-        const label = available ? 'Update' : null;
-        this._sidebar.setStatusBadge('settings', label, 'update');
-        this._sidebar.setStatusBadge('settings/updates', label, 'update');
-
-        // Header pill (under the device name/status) -- more prominent
-        // than the Settings-group badges above, since it's not nested
-        // inside anything collapsible. Plain <a href="#/settings/updates">
-        // navigates on its own via the router's hashchange listener, so
-        // this only needs to toggle visibility, no click handler.
+        // Plain <a href="#/settings/updates"> navigates on its own via
+        // the router's hashchange listener -- this only needs to
+        // toggle visibility, no click handler.
         const headerPill = document.getElementById('sidebar-update-pill');
         if (headerPill) headerPill.style.display = available ? '' : 'none';
     }

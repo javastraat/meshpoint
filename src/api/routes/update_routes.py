@@ -88,6 +88,34 @@ def reset_routes() -> None:
     _last_periodic_check = None
 
 
+async def _run_and_cache_check(log_context: str = "Periodic") -> None:
+    """Run the same check the "Check for updates" button does, against
+    this install's own tracked channel, and cache the result for the
+    sidebar badge -- shared by the periodic loop and by the post-apply/
+    rollback refresh below, so there's exactly one place that decides
+    what the badge should show.
+    """
+    global _last_periodic_check
+    if _registry is None:
+        return
+    loop = asyncio.get_running_loop()
+    try:
+        _last_periodic_check = await loop.run_in_executor(
+            None,
+            lambda: build_install_status_payload(
+                registry=_registry,
+                sync_remote=True,
+                rollback_state_path=_rollback_state_path,
+            ),
+        )
+        logger.info(
+            "%s update check: commits_behind=%s",
+            log_context, _last_periodic_check.get("commits_behind"),
+        )
+    except Exception:
+        logger.exception("%s update check failed", log_context)
+
+
 async def periodic_update_check_loop(interval_minutes: float) -> None:
     """Background task: re-run the same check the "Check for updates"
     button does, on a timer, caching the result for the sidebar badge.
@@ -97,29 +125,31 @@ async def periodic_update_check_loop(interval_minutes: float) -> None:
     Same lifecycle pattern as the fan/LED/button controllers -- started
     via create_task in server.py's lifespan, cancelled on shutdown.
     """
-    global _last_periodic_check
     interval_s = max(MIN_CHECK_INTERVAL_MINUTES, interval_minutes) * 60
-    loop = asyncio.get_running_loop()
     try:
         while True:
-            if _registry is not None:
-                try:
-                    _last_periodic_check = await loop.run_in_executor(
-                        None,
-                        lambda: build_install_status_payload(
-                            registry=_registry,
-                            sync_remote=True,
-                            rollback_state_path=_rollback_state_path,
-                        ),
-                    )
-                    logger.info(
-                        "Periodic update check: commits_behind=%s",
-                        _last_periodic_check.get("commits_behind"),
-                    )
-                except Exception:
-                    logger.exception("Periodic update check failed")
+            await _run_and_cache_check("Periodic")
             await asyncio.sleep(interval_s)
     except asyncio.CancelledError:
+        pass
+
+
+def _refresh_badge_cache_in_background(log_context: str) -> None:
+    """Fire-and-forget re-check after a successful apply/rollback.
+
+    Neither action is guaranteed to actually restart THIS process (a
+    restart would reset _last_periodic_check to None anyway, since it's
+    a plain in-memory global) -- if it doesn't, or the fresh process's
+    own immediate boot-time check hasn't completed yet, the sidebar
+    badge would otherwise keep showing whatever this stale cache said
+    before the apply, until the next scheduled interval tick (up to
+    the full configured interval later). Scheduled as a background
+    task rather than awaited so it doesn't hold up the apply/rollback
+    HTTP response for an extra git fetch.
+    """
+    try:
+        asyncio.get_running_loop().create_task(_run_and_cache_check(log_context))
+    except RuntimeError:
         pass
 
 
@@ -349,6 +379,8 @@ async def apply_update(
         result = applier.apply(branch=branch)
         _audit_apply_result(ctx, result)
         _persist_rollback_after_apply(result)
+    if result.success:
+        _refresh_badge_cache_in_background("Post-apply")
     return asdict(result)
 
 
@@ -392,6 +424,8 @@ async def apply_update_stream(
                         _persist_rollback_after_apply(result)
             if result is None:
                 ctx.set_result("error")
+            elif result.success:
+                _refresh_badge_cache_in_background("Post-apply")
 
     return StreamingResponse(
         body(),
@@ -418,6 +452,8 @@ async def rollback_update(
             ctx.params["failed_step"] = result.failed_step
             ctx.set_result("error")
         _clear_rollback_after_success(result)
+    if result.success:
+        _refresh_badge_cache_in_background("Post-rollback")
     return asdict(result)
 
 
@@ -456,6 +492,8 @@ async def rollback_update_stream(
                         _clear_rollback_after_success(result)
             if result is None:
                 ctx.set_result("error")
+            elif result.success:
+                _refresh_badge_cache_in_background("Post-rollback")
 
     return StreamingResponse(
         body(),

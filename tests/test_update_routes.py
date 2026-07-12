@@ -134,6 +134,36 @@ class TestUpdateRoutes(unittest.TestCase):
         self.assertTrue(body["success"])
         self.assertEqual(body["target_branch"], "main")
 
+    def test_successful_apply_refreshes_the_badge_cache(self) -> None:
+        # Regression: a successful apply used to leave _last_periodic_check
+        # untouched, so the sidebar badge kept showing "update available"
+        # until the next scheduled interval tick even though the install
+        # just changed underneath it.
+        self.client.cookies.set("meshpoint_session", self.admin_token)
+        with mock.patch.object(update_routes, "_refresh_badge_cache_in_background") as refresh_mock:
+            response = self.client.post(
+                "/api/update/apply", json={"channel_id": "stable"},
+            )
+        self.assertEqual(response.status_code, 200)
+        refresh_mock.assert_called_once()
+        self.assertEqual(refresh_mock.call_args[0][0], "Post-apply")
+
+    def test_failed_apply_does_not_refresh_the_badge_cache(self) -> None:
+        self.client.cookies.set("meshpoint_session", self.admin_token)
+        with mock.patch.object(self.applier, "apply") as apply_mock:
+            from src.api.update.apply import ApplyResult
+            apply_mock.return_value = ApplyResult(
+                success=False, duration_seconds=1.0, pre_update_sha="abc123",
+                target_branch="main", failed_step="fetch", log=[],
+            )
+            with mock.patch.object(update_routes, "_refresh_badge_cache_in_background") as refresh_mock:
+                response = self.client.post(
+                    "/api/update/apply", json={"channel_id": "stable"},
+                )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json()["success"])
+        refresh_mock.assert_not_called()
+
     def test_apply_rejects_unknown_channel(self) -> None:
         self.client.cookies.set("meshpoint_session", self.admin_token)
         response = self.client.post(
