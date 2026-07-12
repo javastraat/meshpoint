@@ -1531,6 +1531,18 @@ live "admin required" bug for an actual admin session). All Python
 (`test_repeater_poller.py` + `test_report_command.py`) still passes.
 Not yet live-verified on the Pi.
 
+Fixed 2026-07-12: CONFIGURATION.md's "Automatic Update Checks" section
+had drifted stale — still described the badge as appearing "next to
+Settings in the sidebar ... and next to the Updates sub-item," which
+was the ORIGINAL W17 design before the user asked to remove those two
+spots ("dont show it on the settings") in favor of a single pill under
+the device name/status at the top of the sidebar. Verified against
+actual current code (`frontend/sidebar/update_check_badge.js:11-13`'s
+own comment: "Only drives the one header pill ... the Settings-group/
+Updates-subitem badges were dropped per user request") before fixing
+the wording — confirmed README.md and CHANGELOG.md were already
+correct/up to date, only CONFIGURATION.md had the stale description.
+
 | # | Status | Effort | Item |
 |---|--------|--------|------|
 | — | Open | S | Prune or document the 6 kept-for-later duplicate API endpoints (packets/count+protocols+types, nodes/map+summary, telemetry/*) |
