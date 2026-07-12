@@ -1905,6 +1905,30 @@ unknown; that's the actual point of shipping this as a cheap ring buffer first r
 than committing to persistent storage. If it proves useful, revisit graduating to a
 DB table with a real retention cap based on observed volume.
 
+**Live-tested 2026-07-12, bug found and fixed same round**: user deployed and
+screenshotted the real card twice. First screenshot: card rendering correctly, empty
+(no stray frames yet) — as expected, nothing to fix. Second screenshot, after the
+spectral scan had produced real histogram data: a stray-looking "No hardware scan yet.
+Enable spectral scan under Configuration → Advanced or wait for the first scheduled
+scan." line appeared to be rendering *inside* the new Stray Frames card, between its
+hint text and its own "No stray frames yet." empty state. Traced this to a pre-existing,
+unrelated bug in `.rf-histogram-empty` (`frontend/css/rf.css`) that predates this
+session entirely and had simply never been visible before: the rule sets
+`display: flex` unconditionally, which beats the browser's built-in
+`[hidden] { display: none }` UA-stylesheet rule regardless of CSS specificity (author
+stylesheets always win over UA styles unless the UA rule is `!important`) — so
+`rf_tab.js`'s `emptyEl.hidden = !!hasHist` stopped actually hiding the message once a
+real histogram existed to hide it for the first time. Sitting inside a
+`.rf-histogram-wrap` with a *fixed* `height: 260px` and default `overflow: visible`,
+the still-visible message overflowed straight past the Channel histogram card's own
+bottom border into the ~16px grid gap and beyond, landing squarely inside the Stray
+Frames card's box below it — nothing to do with the new feature's own code, just the
+first thing on this page ever unlucky enough to expose the CSS bug. Fixed with a
+`.rf-histogram-empty[hidden] { display: none; }` override (higher specificity than the
+bare class rule, wins cleanly). Folded into the existing Stray Frames CHANGELOG bullet
+as a same-round adjacent fix. Not yet re-screenshotted after this specific fix, but the
+mechanism is well understood and the fix is minimal/targeted.
+
 ## CURRENT WORKLIST v4 (2026-07-11 end of day — supersedes v2/v3 below; THE list to work off)
 
 What's still open after the 2026-07-11 run, sorted in working order
