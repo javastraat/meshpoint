@@ -135,7 +135,7 @@ This is a customized fork of upstream [KMX415/meshpoint](https://github.com/KMX4
 
 **Band spectrum view.** The concentrator module's onboard SX1261 sweeps the entire region band (EU868: 863–870 MHz in 100 kHz steps) every few minutes — without interrupting packet capture — and the RF Environment page draws the result as a live spectrum chart with every LoRaWAN, Meshtastic, and MeshCore channel position overlaid. See interferers (RFID readers, alarms) sharing your band at a glance. The Hardware page keeps the read-only table of the full 9-slot SX1302 channel plan.
 
-**RF Environment tab.** A full-page view of your radio's health: live noise-floor readout with sparkline, calibration state, and the latest spectral-scan histogram — hardware-scanned when the SX1261 is available, packet-derived fallback otherwise.
+**RF Environment tab.** A full-page view of your radio's health: live noise-floor readout with sparkline, calibration state, and the latest spectral-scan histogram — hardware-scanned when the SX1261 is available, packet-derived fallback otherwise. A **Stray Frames** card also lists RF frames that failed every protocol decoder (time, source, protocol hint, size, RSSI/SNR, expandable raw hex) instead of dropping them silently — an in-memory ring buffer (newest 500, cleared on restart), not yet a persisted table.
 
 **Backup and restore.** Download a timestamped archive of `local.yaml` and the full `data/` directory (SQLite hot snapshot, PKI keys) from Settings, and restore it after an SD failure or bad experiment — the box returns to the snapshot, even after a database wipe. Admin-only; the archive contains all secrets, so store it offline.
 
@@ -443,6 +443,7 @@ FastAPI server on port 8080 (configurable via `dashboard.port` in `local.yaml`):
 | `GET /api/topology/graph` | Mesh topology graph: nodes + edges from traceroutes, direct receptions, and neighbour imports |
 | `GET /api/device/thermals` | CPU temperature + fan duty history (6 h in-memory, requires fan control enabled) |
 | `GET /api/rf/status` | RF Environment tab data: noise floor, calibration, latest scan histogram |
+| `GET /api/rf/stray-frames` | Frames that failed every protocol decoder (in-memory ring buffer, newest 500) |
 | `GET /api/config/export` | Quick Deploy export: public channel params + Meshtastic QR URL (no private PSKs) |
 | `GET /api/system/backup/download` | Download config + data backup archive (admin) |
 | `POST /api/system/backup/restore` | Restore a backup archive (admin) |

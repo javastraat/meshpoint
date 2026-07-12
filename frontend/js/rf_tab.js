@@ -45,6 +45,8 @@ class RfTab {
             this._showFetchError(e);
         }
 
+        this._refreshStrayFrames();
+
         if (!this._refreshInterval) {
             this._refreshInterval = setInterval(() => {
                 const section = document.querySelector('[data-section="rf"]');
@@ -127,6 +129,16 @@ class RfTab {
                             </div>
                         </div>
                     </article>
+                    <article class="rf-card rf-card--wide">
+                        <h3 class="rf-card__title">Stray frames <span class="rf-stray-count" id="rf-stray-count"></span></h3>
+                        <p class="rf-card__hint">
+                            RF frames that didn't decode as LoRaWAN, Meshtastic, or MeshCore.
+                            In-memory only — newest 500, cleared on restart.
+                        </p>
+                        <div class="rf-stray-table" id="rf-stray-log">
+                            <div class="rf-stray-empty">No stray frames yet.</div>
+                        </div>
+                    </article>
                 </div>
                 <div id="rf-status-strip-host"></div>
             </div>
@@ -187,6 +199,62 @@ class RfTab {
         this._updateNoiseFloor(data.noise_floor || {});
         this._updateSpectralScan(data.spectral_scan || {});
         this._updateStatusStrip(data.noise_floor || {}, data.spectral_scan || {});
+    }
+
+    async _refreshStrayFrames() {
+        try {
+            const res = await fetch('/api/rf/stray-frames', { credentials: 'same-origin' });
+            if (!res.ok) return;
+            const data = await res.json();
+            this._updateStrayFrames(data);
+        } catch (_e) { /* transient network hiccup -- next poll retries */ }
+    }
+
+    _updateStrayFrames(data) {
+        const countEl = document.getElementById('rf-stray-count');
+        if (countEl) countEl.textContent = data.count ? `(${data.count})` : '';
+
+        const log = document.getElementById('rf-stray-log');
+        if (!log) return;
+        const frames = data.frames || [];
+        if (frames.length === 0) {
+            log.innerHTML = '<div class="rf-stray-empty">No stray frames yet.</div>';
+            return;
+        }
+        // Newest first for a live feed.
+        log.innerHTML = frames.slice().reverse().map((f) => this._strayRowHtml(f)).join('');
+    }
+
+    _strayRowHtml(f) {
+        const time = f.received_at
+            ? new Date(f.received_at * 1000).toLocaleTimeString([], {
+                hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+            })
+            : '';
+        const hint = f.protocol_hint || 'unclassified';
+        const rssi = f.rssi != null ? `${Number(f.rssi).toFixed(1)} dBm` : '--';
+        const snr = f.snr != null ? `${Number(f.snr).toFixed(1)} dB` : '--';
+        const hex = f.raw_hex || '';
+        const preview = hex.slice(0, 32) + (hex.length > 32 ? '…' : '');
+        return `
+            <details class="rf-stray-row">
+                <summary>
+                    <span class="rf-stray-row__time">${this._esc(time)}</span>
+                    <span class="rf-stray-row__source">${this._esc(f.capture_source || '')}</span>
+                    <span class="rf-stray-row__hint">${this._esc(hint)}</span>
+                    <span class="rf-stray-row__size">${f.byte_length ?? 0}B</span>
+                    <span class="rf-stray-row__signal">${this._esc(rssi)} / ${this._esc(snr)}</span>
+                    <span class="rf-stray-row__preview">${this._esc(preview)}</span>
+                </summary>
+                <div class="rf-stray-row__hex">${this._esc(hex)}</div>
+            </details>
+        `;
+    }
+
+    _esc(str) {
+        const el = document.createElement('span');
+        el.textContent = str == null ? '' : String(str);
+        return el.innerHTML;
     }
 
     _updateStatusStrip(nf, scan) {

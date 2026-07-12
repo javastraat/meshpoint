@@ -11,6 +11,7 @@ from src.capture.capture_coordinator import CaptureCoordinator
 from src.config import AppConfig
 from src.decode.crypto_service import CryptoService
 from src.decode.packet_router import PacketRouter
+from src.decode.stray_frame_log import StrayFrameLog
 from src.hal.location import LocationSource, build_location_source
 from src.log_format import CYAN, DIM, GREEN, RESET
 from src.models.packet import Packet, Protocol, RawCapture
@@ -41,6 +42,7 @@ class PipelineCoordinator:
         self._db = DatabaseManager(config.storage.database_path)
         self._crypto = CryptoService(config.meshtastic.default_key_b64)
         self._router = PacketRouter(self._crypto)
+        self._stray_frames = StrayFrameLog()
         self._capture = CaptureCoordinator()
         relay_cfg = config.relay
         self._relay = RelayManager(
@@ -99,6 +101,10 @@ class PipelineCoordinator:
     @property
     def capture_coordinator(self) -> CaptureCoordinator:
         return self._capture
+
+    @property
+    def stray_frame_log(self) -> StrayFrameLog:
+        return self._stray_frames
 
     @property
     def relay_manager(self) -> RelayManager:
@@ -273,6 +279,7 @@ class PipelineCoordinator:
                 pre_decoded=raw.pre_decoded,
             )
         if packet is None:
+            self._stray_frames.record(raw)
             return
 
         packet.capture_source = raw.capture_source

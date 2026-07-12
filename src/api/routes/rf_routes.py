@@ -7,6 +7,7 @@ from fastapi import APIRouter
 
 from src.api.telemetry.noise_floor import NoiseFloorTracker
 from src.config import AppConfig
+from src.decode.stray_frame_log import StrayFrameLog
 
 if TYPE_CHECKING:
     from src.api.telemetry.spectral_scan_service import SpectralScanService
@@ -22,17 +23,20 @@ _FLEET_SPECTRAL_SCAN_NOTE = (
 _tracker: NoiseFloorTracker | None = None
 _scan_service: SpectralScanService | None = None
 _config: AppConfig | None = None
+_stray_frame_log: StrayFrameLog | None = None
 
 
 def init_routes(
     tracker: NoiseFloorTracker,
     scan_service: SpectralScanService | None,
     config: AppConfig,
+    stray_frame_log: StrayFrameLog | None = None,
 ) -> None:
-    global _tracker, _scan_service, _config
+    global _tracker, _scan_service, _config, _stray_frame_log
     _tracker = tracker
     _scan_service = scan_service
     _config = config
+    _stray_frame_log = stray_frame_log
 
 
 def _spectral_status() -> dict:
@@ -108,3 +112,11 @@ async def rf_status() -> dict:
         "noise_floor": noise_floor,
         "spectral_scan": _spectral_status(),
     }
+
+
+@router.get("/stray-frames")
+async def rf_stray_frames() -> dict:
+    """Frames that failed every protocol decoder -- in-memory ring buffer, not persisted."""
+    if _stray_frame_log is None:
+        return {"frames": [], "count": 0}
+    return {"frames": _stray_frame_log.snapshot(), "count": _stray_frame_log.count}

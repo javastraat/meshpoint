@@ -1822,7 +1822,7 @@ raising anything file-local. Verified with `node --check`.
 |---|--------|--------|------|
 | — | Open | S | Prune or document the 6 kept-for-later duplicate API endpoints (packets/count+protocols+types, nodes/map+summary, telemetry/*) |
 | — | Open | M | Server-side downsample-across-range for the Repeater Trends chart — a fixed high limit (`hours=100000&limit=50000`) will eventually start truncating again as live polls keep growing the row count unbounded |
-| W14 | Open | M | Stray-frames table — log RF frames that fail all three decoders instead of dropping silently (upstream #80) |
+| W14 | DONE 2026-07-12 | M | **Stray Frames.** See closure paragraph below (built as an in-memory ring buffer, not a DB table, per user's explicit "test first" ask). |
 | W18 | Open | S-M | Mini RTL-SDR player widget — when the Radio/RTL-SDR listener is actively streaming, show a small persistent player (bottom-left of the sidebar/menu) with basic transport controls (stop, etc.) so the user doesn't have to navigate back to the Radio page just to stop playback |
 | W6 | Open | M-L | True-RF S-meter via pyrtlsdr — real dBm instead of post-demod audio loudness |
 | W5 | Open | M-L | DAB+ listener mode via welle-cli — unlocks NPO Radio 5 (DAB-only) |
@@ -1840,6 +1840,70 @@ Then: user reported "radio also nogo" -- the completely separate, unmodified-thi
 | — | Open | S | Retest `scripts/install.sh` on a fresh microSD flash (IS_UPGRADE=0 path — new `meshpoint` user creation, first-time systemd install, SPI/UART/I2C enablement, etc. — none exercised by the upgrade-mode run below). **Upgrade-mode path (IS_UPGRADE=1) LIVE-VERIFIED 2026-07-12**: user ran `sudo scripts/install.sh` on the real Pi end to end, full transcript pasted — every section from this whole session correctly either skipped (already-satisfied idempotency checks: DVB blacklist, librtlsdr, redsea, multimon-ng, libloragw.so, fastfetch banner) or applied cleanly (rtl_433 apt install, HAL TX sync word patch/rebuild), completed with "Meshpoint upgrade to v0.7.7 complete!" and no errors. Still want a genuine fresh-flash run at some point since it exercises a different code branch entirely. |
 | — | Retest | S | Metrics `require_auth`: confirm a valid session actually authenticates a `/metrics` scrape (only the "blocks with no credentials" half was tested live — 401 confirmed correct). Also consider whether a proper long-lived API-key mechanism is worth building instead of reusing short-lived dashboard session JWTs for this, since those expire and are awkward for an unattended Prometheus scrape config. User flagged 2026-07-12, deferred ("its ok for now") |
 | — | Retest | S | P2000/Pagers/POCSAG tabs, remaining gap only: **POCSAG confirmed working live on the Pi 2026-07-12** — screenshot showed the tab tuned to 439.988 MHz, decoding real POCSAG1200 pages end to end through the deployed dashboard UI (tab switch, Start/Stop, status line, message log all working), including the "no Alpha field" case (a tone-only page with `Function: 2` and no text payload) correctly falling back to showing the raw decoded line since there's nothing to extract — that's the intended `m.message || m.raw` fallback in `pager_panel.js`, not a bug. Also live-confirmed 2026-07-12: red busy-dot + normal-case "busy — in use by X" text on the Radio tab (see the CSS-inheritance fix a few paragraphs up). The sidebar "dongle in use" badge (`listener_badge.js`) had a real bug — a `POLL_MS` top-level `const` collision with `update_check_badge.js` threw a page-wide `SyntaxError` that silently killed the whole file before `ListenerBadge` was ever defined, so the badge never appeared no matter how many times the user redeployed/hard-refreshed. Root-caused via the browser console and fixed (renamed to unique top-level names). **LIVE-VERIFIED 2026-07-12 after the fix**: screenshot shows the sidebar RTL-SDR item with a green dot + "POCSAG" label while the POCSAG tab is tuned to 439.988 MHz — badge now shows/hides correctly through a real deploy. **RTL433 also LIVE-VERIFIED 2026-07-12** (see its own closure row above) — running on the real Pi, 24 real decoded events shown. Still open: FLEX (P2000) has not been live-verified against a real signal, and the busy/exclusivity flow (start one tab, confirm a sibling shows "busy" and its Start/Tune is disabled) hasn't been clicked through live across all five tabs |
+
+Closed 2026-07-12: **W14 Stray Frames** (upstream #80 — "log RF frames that fail all
+three decoders instead of dropping silently"). Advised the user through two design
+questions before building: (1) where in the pipeline to hook — found the single choke
+point at `src/coordinator.py:275` (`PipelineCoordinator._process_capture`), the
+`if packet is None: return` that already silently swallows every raw capture whose
+decode failed, whether via the SX1302's protocol-hint path or the full
+`PacketRouter.decode()` try-all-three fallback; also covers the separate
+`meshcore_usb` → `adapt_event()` path, which bypasses `PacketRouter` entirely but hits
+the same `if packet is None` line; (2) where to show it — first proposed a tab bar
+inside the RTL-SDR Listener page's pattern, but caught before building that `rf_tab.js`
+already uses a card-grid (`rf-grid` of `article.rf-card`) with no tabs at all, and the
+Listener page's tabs exist specifically because those are mutually-exclusive dongle
+owners, a constraint Stray Frames doesn't share — corrected to a new
+`rf-card--wide` card instead, same family as the existing Channel histogram card.
+
+Storage design pivoted after the user raised a concrete worry: "we use now retained
+1000000 imagen we get 1m packcges we cant decode" — i.e. don't commit to a persisted
+table + retention cap before knowing real-world stray-frame volume on actual broadband
+SX1302 capture, which could plausibly dwarf genuine decoded traffic. Agreed: built as
+an in-memory ring buffer (`deque(maxlen=500)`) instead, mirroring the exact convention
+`PagerListener` already uses for its own message log in this codebase — no new DB
+table, no new retention config key, resets on restart. Explicit decision: **not**
+gated by a minimum frame-size filter — logs everything that fails decode, since
+filtering by size risked hiding exactly the "small malformed real packet" case that's
+most interesting to catch; growth is bounded by the ring buffer itself, not content
+filtering.
+
+Built: `src/decode/stray_frame_log.py` (new, `StrayFrameLog` class) — records
+`received_at`/`capture_source`/`protocol_hint`/`byte_length`/`rssi`/`snr`/`raw_hex` per
+entry, with the true `byte_length` always preserved even though `raw_hex` itself is
+defensively capped at 512 bytes (genuine LoRaWAN/Meshtastic/MeshCore frames are far
+smaller; an oversized payload here is itself a signal, not something worth storing in
+full). Coordinator (`src/coordinator.py`) gained a `self._stray_frames` instance and
+`stray_frame_log` property, plus the one-line hook at the existing
+`if packet is None: return`. New `GET /api/rf/stray-frames` in
+`src/api/routes/rf_routes.py` (`init_routes()` gained an optional 4th param, backward
+compatible), wired from `server.py` via `coord.stray_frame_log`. Frontend:
+`frontend/js/rf_tab.js` gained the new card (`_refreshStrayFrames()` /
+`_updateStrayFrames()` / `_strayRowHtml()`), polled alongside the existing
+`/api/rf/status` refresh cycle; each row is a native `<details>` element (time, source,
+hint or "unclassified", size, RSSI/SNR, hex preview in the `<summary>`, full hex on
+expand) — no custom expand/collapse JS needed. New CSS in `frontend/css/rf.css`
+(`.rf-stray-*` classes) deliberately written using this page's existing tokenized
+`var(--*)` convention rather than reusing `listener.css`'s hardcoded dark-only pager-log
+colors, since `rf.css` (unlike `listener.css`) is already written for the eventual
+light-theme pass (W4).
+
+Verified without live hardware (none on the Mac dev machine, per this file's standing
+convention): `StrayFrameLog` ring-buffer eviction and the 512-byte hex cap directly;
+`PipelineCoordinator._process_capture()` end to end with `_router.decode` mocked to
+return `None`, confirming both the hinted/fallback decode-failure path AND the separate
+`meshcore_usb` failed-`adapt_event` path both land in the same ring buffer; the
+`rf_stray_frames()` route function directly (stubbed `fastapi.APIRouter`), both
+uninitialized (`init_routes()` never called → empty response, not a crash) and
+initialized. Existing `tests/test_coordinator_location.py` (10 cases) still pass
+unmodified — confirms the new `__init__` line and property didn't disturb the
+location-source wiring. All Python `ast.parse`-checked, `rf_tab.js` `node --check`ed,
+CHANGELOG re-parsed with `ChangelogParser.parse_file()`. README updated (RF Environment
+tab bullet + new `GET /api/rf/stray-frames` row in the API table). **Not yet
+live-verified on the Pi** — in particular, real stray-frame volume/content is still
+unknown; that's the actual point of shipping this as a cheap ring buffer first rather
+than committing to persistent storage. If it proves useful, revisit graduating to a
+DB table with a real retention cap based on observed volume.
 
 ## CURRENT WORKLIST v4 (2026-07-11 end of day — supersedes v2/v3 below; THE list to work off)
 

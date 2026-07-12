@@ -1550,6 +1550,7 @@ def _init_routes(
         noise_floor_tracker,
         _spectral_scan_service,
         config,
+        coord.stray_frame_log,
     )
 
     meshcore_tx = None
