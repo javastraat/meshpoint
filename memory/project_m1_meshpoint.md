@@ -1063,9 +1063,45 @@ via `_serial_status_entry()`). Fix: added a block in
 `_print_sources_section` reading `cfg.get("serial")` (top-level, not
 nested under capture) and printing one line per stick, mirroring the
 existing `meshcore_usb` block. Verified with a stub `ReportData` for
-both connected and disconnected states — output confirmed correct
-formatting. Folded into CHANGELOG.md (CLI section). Not yet
-live-verified on the Pi against the user's actual second stick.
+both connected and disconnected states, then LIVE-VERIFIED 2026-07-12
+on the fresh-flashed Pi: `serial_433: 433.875 MHz SF11 · connected ·
+Meshtastic 06f4` now appears correctly under CAPTURE SOURCES. Folded
+into CHANGELOG.md (CLI section). Fresh-install test overall passed —
+`meshpoint report` came up clean at uptime 0m with all three networks
+(LoRaWAN/Meshtastic/MeshCore) and both USB sticks reporting correctly.
+
+Also closed 2026-07-12: split the PROTOCOLS section's merged
+"Meshtastic" line into per-radio lines (user caught that the
+concentrator's 869.525 MHz channel and the serial stick's 433.875 MHz
+channel — physically separate meshes, different bands, can never talk
+to each other — were being summed into one packet/node count). Chose
+"Both" from AskUserQuestion: split PROTOCOLS AND add a dedicated
+MESHTASTIC SERIAL section mirroring MESHCORE. Root-cause research
+(background agent) confirmed `packets.capture_source`
+(`src/storage/database.py:47`) was already tracked per-packet end to
+end (`"concentrator"` vs `"serial_<label>"`,
+src/capture/concentrator_source.py:160,
+src/capture/serial_source.py:344, src/coordinator.py:266-278) — just
+never grouped by in the aggregate queries. Added
+`PacketRepository.get_protocol_distribution_by_source()` and
+`.get_distinct_node_count_by_source()` (src/storage/packet_repository.py),
+wired through `TrafficMonitor.get_traffic_summary()`'s new
+`meshtastic_by_source` field and `/api/nodes/summary`'s new
+`meshtastic_nodes_by_source` field (src/api/routes/nodes.py). CLI:
+`_print_meshtastic_protocol_lines()` replaces the old inline Meshtastic
+block in `_print_protocols_section` — prints one merged line when
+there's only one source (unchanged single-radio behavior, verified via
+existing `tests/test_report_command.py`, 15/15 still pass) or one line
+per source once a second one appears in packet history, source label
+as a dim suffix in the VALUE (not the key) so the 20-char `_kv` column
+padding doesn't break alignment. New `_print_meshtastic_serial_section()`
+mirrors `_print_meshcore_section` — one block per configured serial
+stick (state, radio, channel, node ID), only prints when
+`cfg["serial"]` is non-empty. Verified with stub `ReportData` for both
+single-radio and split cases, and the new SQL queries verified
+directly against a throwaway in-memory sqlite3 DB (no aiosqlite on
+Mac) — both grouped-count queries returned correct results. Not yet
+live-verified on the Pi.
 
 | # | Status | Effort | Item |
 |---|--------|--------|------|

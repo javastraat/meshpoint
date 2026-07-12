@@ -131,6 +131,34 @@ class PacketRepository:
         )
         return {r["protocol"]: r["cnt"] for r in rows}
 
+    async def get_protocol_distribution_by_source(
+        self, protocol: str
+    ) -> dict[str, int]:
+        """Packet counts for one protocol, split by capture_source.
+
+        Meshtastic can be received on two simultaneous radios (the
+        concentrator's own channel and a USB serial stick, each on a
+        different frequency/mesh) -- this lets callers show a per-radio
+        breakdown instead of merging both into one total.
+        """
+        rows = await self._db.fetch_all(
+            "SELECT capture_source, COUNT(*) as cnt FROM packets "
+            "WHERE protocol = ? GROUP BY capture_source",
+            (protocol,),
+        )
+        return {(r["capture_source"] or "unknown"): r["cnt"] for r in rows}
+
+    async def get_distinct_node_count_by_source(
+        self, protocol: str
+    ) -> dict[str, int]:
+        """Distinct source_id counts for one protocol, split by capture_source."""
+        rows = await self._db.fetch_all(
+            "SELECT capture_source, COUNT(DISTINCT source_id) as cnt FROM packets "
+            "WHERE protocol = ? GROUP BY capture_source",
+            (protocol,),
+        )
+        return {(r["capture_source"] or "unknown"): r["cnt"] for r in rows}
+
     async def get_type_distribution(self) -> dict[str, int]:
         rows = await self._db.fetch_all(
             "SELECT packet_type, COUNT(*) as cnt FROM packets GROUP BY packet_type"

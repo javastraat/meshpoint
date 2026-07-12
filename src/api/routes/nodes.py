@@ -41,7 +41,12 @@ async def node_count():
 @router.get("/summary")
 async def network_summary():
     """Whole-table network totals. Used by the ``meshpoint report`` CLI."""
-    return await _node_repo.get_network_totals()
+    totals = await _node_repo.get_network_totals()
+    if _packet_repo is not None:
+        totals["meshtastic_nodes_by_source"] = (
+            await _packet_repo.get_distinct_node_count_by_source("meshtastic")
+        )
+    return totals
 
 
 @router.get("/{node_id}/metrics_history")

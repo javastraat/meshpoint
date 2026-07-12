@@ -101,6 +101,7 @@ def _render_report(d: ReportData) -> None:
     _print_sources_section(d)
     _print_relay_section(d)
     _print_radio_section(d)
+    _print_meshtastic_serial_section(d)
     _print_meshcore_section(d)
     _print_health_summary(d)
     print()
@@ -264,18 +265,7 @@ def _print_protocols_section(d: ReportData) -> None:
     lw_parts.append("sniff-only")
     _kv("LoRaWAN", " · ".join(lw_parts))
 
-    radio = cfg.get("radio", {})
-    tx_on = cfg.get("transmit", {}).get("enabled", False)
-    mt_parts = [
-        f"{proto_pkts.get('meshtastic', 0):,} pkts",
-        f"{proto_nodes.get('meshtastic', 0):,} nodes",
-    ]
-    if radio.get("frequency_mhz"):
-        mt_parts.append(
-            f"{radio['frequency_mhz']} MHz SF{radio.get('spreading_factor', '?')}"
-        )
-    mt_parts.append("TX on" if tx_on else "TX off")
-    _kv("Meshtastic", " · ".join(mt_parts))
+    _print_meshtastic_protocol_lines(d)
 
     mc_radio = (cfg.get("meshcore") or {}).get("radio") or {}
     mc_parts = [
@@ -290,6 +280,72 @@ def _print_protocols_section(d: ReportData) -> None:
     _kv("MeshCore", " · ".join(mc_parts))
 
     _sep()
+
+
+def _print_meshtastic_protocol_lines(d: ReportData) -> None:
+    """Meshtastic can run on two simultaneous radios: the concentrator's
+    own channel and a USB serial stick, usually on a different
+    frequency/mesh entirely. Splits into one line per radio once a
+    second source shows up in the packet history, instead of merging
+    packet/node counts from physically separate networks into one
+    total.
+    """
+    cfg = d.config
+    proto_pkts = d.traffic.get("protocol_distribution", {})
+    proto_nodes = d.node_summary.get("protocols", {})
+    by_source_pkts = d.traffic.get("meshtastic_by_source") or {}
+    by_source_nodes = d.node_summary.get("meshtastic_nodes_by_source") or {}
+    serial_devices = {
+        s["name"]: s for s in (cfg.get("serial") or []) if s.get("name")
+    }
+
+    radio = cfg.get("radio", {})
+    tx_on = cfg.get("transmit", {}).get("enabled", False)
+
+    if len(by_source_pkts) <= 1 and not serial_devices:
+        mt_parts = [
+            f"{proto_pkts.get('meshtastic', 0):,} pkts",
+            f"{proto_nodes.get('meshtastic', 0):,} nodes",
+        ]
+        if radio.get("frequency_mhz"):
+            mt_parts.append(
+                f"{radio['frequency_mhz']} MHz SF{radio.get('spreading_factor', '?')}"
+            )
+        mt_parts.append("TX on" if tx_on else "TX off")
+        _kv("Meshtastic", " · ".join(mt_parts))
+        return
+
+    conc_parts = [
+        f"{by_source_pkts.get('concentrator', 0):,} pkts",
+        f"{by_source_nodes.get('concentrator', 0):,} nodes",
+    ]
+    if radio.get("frequency_mhz"):
+        conc_parts.append(
+            f"{radio['frequency_mhz']} MHz SF{radio.get('spreading_factor', '?')}"
+        )
+    conc_parts.append("TX on" if tx_on else "TX off")
+    conc_parts.append(f"{_DIM}(concentrator){_RESET}")
+    _kv("Meshtastic", " · ".join(conc_parts))
+
+    other_names = sorted(
+        (set(by_source_pkts) | set(serial_devices)) - {"concentrator"}
+    )
+    for name in other_names:
+        dev = serial_devices.get(name, {})
+        parts = [
+            f"{by_source_pkts.get(name, 0):,} pkts",
+            f"{by_source_nodes.get(name, 0):,} nodes",
+        ]
+        freq = dev.get("frequency_mhz")
+        if freq:
+            sf = dev.get("spreading_factor")
+            parts.append(f"{freq} MHz" + (f" SF{sf}" if sf else ""))
+        state = (
+            f"{_GREEN}connected{_RESET}" if dev.get("connected") else f"{_DIM}--{_RESET}"
+        )
+        parts.append(state)
+        parts.append(f"{_DIM}({name}){_RESET}")
+        _kv("Meshtastic", " · ".join(parts))
 
 
 def _print_sources_section(d: ReportData) -> None:
@@ -384,6 +440,43 @@ def _print_radio_section(d: ReportData) -> None:
         usage = duty.get("current_usage_percent", 0)
         budget = duty.get("remaining_budget_ms", 0)
         _kv("Duty cycle", f"{usage:.1f}%", f"({budget:.0f} ms remaining)")
+
+    _sep()
+
+
+def _print_meshtastic_serial_section(d: ReportData) -> None:
+    """One block per Meshtastic USB serial stick, mirroring MESHCORE.
+
+    Only prints when at least one is configured -- most boxes only run
+    the concentrator's own Meshtastic channel plus a MeshCore companion.
+    """
+    serial_devices = d.config.get("serial") or []
+    if not serial_devices:
+        return
+
+    _section("MESHTASTIC SERIAL")
+    for dev in serial_devices:
+        name = dev.get("name") or "serial"
+        connected = dev.get("connected", False)
+        state = (
+            f"{_GREEN}connected{_RESET}" if connected else f"{_DIM}disconnected{_RESET}"
+        )
+        label = dev.get("long_name") or ""
+        _kv(name, " · ".join(x for x in (state, label) if x))
+
+        freq = dev.get("frequency_mhz")
+        if freq:
+            sf = dev.get("spreading_factor", "--")
+            bw = dev.get("bandwidth_khz", "--")
+            _kv("Radio", f"{freq} MHz · BW{bw} · SF{sf}")
+
+        channel = dev.get("channel_name")
+        if channel:
+            _kv("Channel", channel)
+
+        node_id = dev.get("own_node_id_hex")
+        if node_id:
+            _kv("Node ID", f"!{node_id}")
 
     _sep()
 

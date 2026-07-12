@@ -28,6 +28,11 @@ class TrafficMonitor:
         )
         protocol_dist = await self._packet_repo.get_protocol_distribution()
         type_dist = await self._packet_repo.get_type_distribution()
+        meshtastic_by_source = (
+            await self._packet_repo.get_protocol_distribution_by_source(
+                "meshtastic"
+            )
+        )
 
         return {
             "total_packets": total,
@@ -36,6 +41,7 @@ class TrafficMonitor:
             "packets_last_minute": last_minute,
             "packets_per_minute": round(last_hour / 60.0, 1) if last_hour else 0,
             "protocol_distribution": protocol_dist,
+            "meshtastic_by_source": meshtastic_by_source,
             "type_distribution": type_dist,
         }
 
