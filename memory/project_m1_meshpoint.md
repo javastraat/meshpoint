@@ -1416,6 +1416,69 @@ directly. Not yet re-verified live on the Pi (the DB copy confirms the
 query result, but the actual dashboard render hasn't been re-checked
 since this second fix).
 
+**Poller → roster decision: CLOSED 2026-07-12 (finally).** Reopened by
+the user after seeing the Farthest-Direct-Signal fix — they pointed
+out `import_contacts.py` (repo ROOT, not scripts/, git-tracked since
+the very first commits) already does almost exactly the "poller →
+roster" design from way earlier in this session: upserts `nodes` with
+a `MAX()`-guarded `last_heard` (secondhand data can never un-freshen a
+genuinely-heard node) and inserts synthetic `nb:<node_id>:<timestamp>`
+packets, just run manually against a `neighbours.json` fetched from an
+external URL, never wired to the live `RepeaterPoller`. This resolved
+the main hesitation (was it actually safe/proven?) — it already was,
+just not automated. Told the user this before building (they asked
+"tell me first please" mid-implementation), then built:
+- `NodeRepository.upsert_from_neighbour_report(node_id, last_heard)`
+  (`src/storage/node_repository.py`) — more conservative than
+  `import_contacts.py`'s own SQL: the live poll only has pubkey+SNR
+  (no name/role/position like `neighbours.json` has), so this never
+  overwrites an already-known role/name/position, only fills in if
+  unset. `packet_count` untouched.
+- `PacketRepository.insert_neighbour_report(repeater_key, node_id, snr, last_heard)`
+  (`src/storage/packet_repository.py`) — same `nb:` tag, but
+  `nb:<repeater_key>:<node_id>:<timestamp>` (adds repeater attribution
+  the original script's flat `nb:<node_id>:<timestamp>` doesn't have),
+  needed for the new per-repeater stat below.
+- `RepeaterPoller._store_neighbour_reports()` (new), called from
+  `_poll_one()` alongside `_store_telemetry()` — uses `result` (this
+  poll's raw response), not `entry` (which falls back to the previous
+  poll's neighbour list on a failed/empty poll — reprocessing THAT
+  would recompute `last_heard` as freshly-newer every cycle even
+  though nothing new was actually heard). Constructor gained
+  `node_repo`/`packet_repo` params, wired in `server.py`'s
+  `_build_repeater_poller()` via `coord.node_repo`/`coord.packet_repo`.
+- `_farthest_neighbour_for_repeater()` (new, `meshcore_routes.py`) —
+  per-repeater farthest-neighbour stat, added to each entry in
+  `GET /api/meshcore/repeaters` as `farthest_neighbour`. Distance is
+  measured from **the repeater's own position** (its `node_id` already
+  has lat/lon in `nodes` from prior capture/import), NOT Meshpoint's
+  own antenna — deliberate, matching the "remote repeater" reasoning
+  from earlier in this decision's history: a repeater's neighbours
+  reflect its own local RF environment, not Meshpoint's.
+- `repeaters_tab.js` — new "Farthest neighbour" row on each repeater's
+  Health card (distance/SNR/name), next to the existing "Neighbours"
+  count.
+
+Verified thoroughly before calling it done: (1) real sqlite3 test of
+both new repo methods against the actual schema — confirmed a stale
+secondhand report can't regress a known node's `last_heard` or clobber
+its real name, confirmed a brand-new neighbour gets a placeholder name,
+confirmed re-polling replaces rather than duplicates the per-repeater
+packet, confirmed a genuinely fresher secondhand report DOES advance
+`last_heard` when appropriate; (2) real sqlite3 test of
+`_farthest_neighbour_for_repeater()` with two repeaters at different
+sites and overlapping neighbour pools — confirmed correct per-repeater
+attribution (no cross-contamination) and correct use of the repeater's
+own position, not a device-wide one; (3) direct call to
+`RepeaterPoller._store_neighbour_reports()` with fake repos — confirmed
+pubkeys get lowercased, invalid/empty entries get skipped, repeater_key
+flows through correctly to the packet tag. Existing
+`tests/test_repeater_poller.py` (10 cases) and
+`tests/test_report_command.py` (15 cases) both still pass unmodified —
+no regressions from the constructor signature change. All Python
+`ast.parse`-checked, all JS `node --check`ed. Not yet live-verified on
+the Pi.
+
 | # | Status | Effort | Item |
 |---|--------|--------|------|
 | — | Open | S | `metrics` config gets a dashboard toggle — enabled/require_auth for the Prometheus scrape endpoint. Trivial 2-boolean win. From 2026-07-12 config audit |
@@ -1427,7 +1490,6 @@ since this second fix).
 | W6 | Open | M-L | True-RF S-meter via pyrtlsdr — real dBm instead of post-demod audio loudness |
 | W5 | Open | M-L | DAB+ listener mode via welle-cli — unlocks NPO Radio 5 (DAB-only) |
 | W4 | Open | L | Light theme — tokenize the dark-first CSS, light map tiles, per-page contrast pass; topbar toggle already has a slot reserved |
-| — | Deferred | S | Poller → roster? Should live neighbour polls also upsert nodes / write nb:-style rows (bump last_heard, name unknown pubkeys)? Currently repeater_status.json only. Revisited 2026-07-12, design ready (see note above), user chose to hold off for now |
 | W2 | Parked | M | LoRaWAN key store + MIC verify/decrypt — trigger: you run your own LoRaWAN devices |
 | W11 | Parked | M | TTN uplink-only forwarder — trigger: TTN entanglement deemed worth it |
 | — | Noted | — | Firmware flasher / companion version check (upstream #85/#59) — if flashing the 3 sticks becomes a pain |

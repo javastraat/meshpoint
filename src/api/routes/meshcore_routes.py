@@ -79,8 +79,68 @@ async def meshcore_repeaters():
                     for n in nb_list
                 ],
             }
-        reps.append({**out, "mesh_name": names.get(key), "history": history})
+        farthest = await _farthest_neighbour_for_repeater(key)
+        reps.append({
+            **out,
+            "mesh_name": names.get(key),
+            "history": history,
+            "farthest_neighbour": farthest,
+        })
     return {"available": True, "repeaters": reps}
+
+
+async def _farthest_neighbour_for_repeater(repeater_key: str) -> dict | None:
+    """Farthest neighbour this specific repeater has reported, distance
+    measured from THAT REPEATER's own position -- not Meshpoint's own
+    antenna -- since a polled repeater can be a remote site with its own
+    completely different local RF environment (see the poller-roster
+    design notes). Reads the nb:<repeater_key>:<node_id>:<ts> packets
+    RepeaterPoller._store_neighbour_reports() writes on each live poll.
+    """
+    if _node_repo is None:
+        return None
+    rep_row = await _node_repo._db.fetch_one(
+        "SELECT latitude, longitude FROM nodes WHERE node_id = ?",
+        (repeater_key,),
+    )
+    if not rep_row or rep_row.get("latitude") is None or rep_row.get("longitude") is None:
+        return None
+    rep_lat, rep_lon = rep_row["latitude"], rep_row["longitude"]
+
+    rows = await _node_repo._db.fetch_all(
+        """
+        SELECT p.source_id, p.snr, n.long_name, n.latitude, n.longitude
+        FROM packets p
+        JOIN nodes n ON p.source_id = n.node_id
+        WHERE p.packet_id LIKE ?
+          AND n.latitude IS NOT NULL AND n.longitude IS NOT NULL
+        ORDER BY p.timestamp DESC
+        """,
+        (f"nb:{repeater_key}:%",),
+    )
+    if not rows:
+        return None
+
+    from src.analytics.stats_reporter import _haversine_mi
+
+    seen: set[str] = set()
+    best = None
+    for r in rows:
+        node_id = r["source_id"]
+        if node_id in seen:
+            continue
+        seen.add(node_id)
+        dist_mi = _haversine_mi(rep_lat, rep_lon, r["latitude"], r["longitude"])
+        if dist_mi < 0.1:
+            continue
+        if best is None or dist_mi > best["miles"]:
+            best = {
+                "miles": round(dist_mi, 1),
+                "node_id": node_id,
+                "node_name": r["long_name"] or node_id,
+                "snr": round(r["snr"], 1) if r["snr"] is not None else None,
+            }
+    return best
 
 
 async def _repeater_names(keys: list[str]) -> dict:

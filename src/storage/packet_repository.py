@@ -159,6 +159,36 @@ class PacketRepository:
         )
         return {(r["capture_source"] or "unknown"): r["cnt"] for r in rows}
 
+    async def insert_neighbour_report(
+        self, repeater_key: str, node_id: str, snr: float | None, last_heard
+    ) -> None:
+        """Synthetic neighbour_advert packet from a repeater's own RF
+        observation of ``node_id`` (RepeaterPoller). Mirrors
+        import_contacts.py's ``nb:<node_id>:<timestamp>`` tagging, but
+        scoped per-repeater (``nb:<repeater_key>:<node_id>:<timestamp>``)
+        so the Repeaters page can attribute "farthest neighbour" to the
+        specific repeater that reported it. Deletes any previous
+        synthetic row for this (repeater, node) pair first, same as the
+        original script -- packets has no UNIQUE constraint on
+        packet_id, so re-polling would otherwise pile up duplicates.
+        """
+        last_heard_iso = last_heard.isoformat()
+        packet_id = f"nb:{repeater_key}:{node_id}:{last_heard_iso}"
+        await self._db.execute(
+            "DELETE FROM packets WHERE packet_id LIKE ?",
+            (f"nb:{repeater_key}:{node_id}:%",),
+        )
+        await self._db.execute(
+            """
+            INSERT INTO packets
+                (packet_id, source_id, destination_id, protocol,
+                 packet_type, snr, timestamp)
+            VALUES (?, ?, 'broadcast', 'meshcore', 'neighbour_advert', ?, ?)
+            """,
+            (packet_id, node_id, snr, last_heard_iso),
+        )
+        await self._db.commit()
+
     async def get_type_distribution(self) -> dict[str, int]:
         rows = await self._db.fetch_all(
             "SELECT packet_type, COUNT(*) as cnt FROM packets GROUP BY packet_type"

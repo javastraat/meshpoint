@@ -212,6 +212,25 @@ class RepeatersTab {
                </div>`
             : '';
 
+        // Farthest node THIS repeater has reported (distance measured
+        // from the repeater's own position, not Meshpoint's -- a
+        // repeater can be a remote site with its own local RF picture).
+        const fn = r.farthest_neighbour;
+        const farthestRowHtml = fn
+            ? (() => {
+                const km = fn.miles * 1.60934;
+                const dist = window.MeshpointDisplayUnits
+                    ? window.MeshpointDisplayUnits.formatDistanceKm(km)
+                    : `${km.toFixed(1)} km`;
+                const detail = [fn.snr != null ? `SNR ${fn.snr} dB` : null, fn.node_name]
+                    .filter(Boolean).join(' · ');
+                return `<div class="rp-row">
+                     <span class="rp-row__k">Farthest neighbour</span>
+                     <span class="rp-row__v">${this._esc(dist)} · ${this._esc(detail)}</span>
+                   </div>`;
+            })()
+            : '';
+
         return `
             <div class="rp-repeater">
                 <div class="rp-card ${stale ? 'rp-card--stale' : ''}">
@@ -221,7 +240,7 @@ class RepeatersTab {
                               title="${r.ok ? 'Reporting' : this._esc(r.error || 'stale')}"></span>
                     </div>
                     <div class="rp-card__id">!${this._esc(r.key)}</div>
-                    <div class="rp-card__rows">${rowsHtml(health)}${neighboursRowHtml}</div>
+                    <div class="rp-card__rows">${rowsHtml(health)}${neighboursRowHtml}${farthestRowHtml}</div>
                 </div>
                 <div class="rp-card rp-card--sensors ${stale ? 'rp-card--stale' : ''}">
                     <div class="rp-card__head">

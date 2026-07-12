@@ -900,6 +900,8 @@ def _build_repeater_poller(config: AppConfig, meshcore_tx, coord):
         repeaters=rp.repeaters,
         interval_minutes=rp.interval_minutes,
         telemetry_repo=coord.telemetry_repo,
+        node_repo=coord.node_repo,
+        packet_repo=coord.packet_repo,
         data_dir=data_dir,
     )
 

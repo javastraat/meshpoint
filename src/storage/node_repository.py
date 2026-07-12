@@ -68,6 +68,50 @@ class NodeRepository:
         )
         await self._db.commit()
 
+    async def upsert_from_neighbour_report(
+        self, node_id: str, last_heard: datetime
+    ) -> None:
+        """Create/refresh a placeholder node from a repeater's live
+        neighbour report (RepeaterPoller). Mirrors import_contacts.py's
+        neighbour-import upsert (same MAX()-guarded last_heard so a
+        secondhand report can never un-freshen a node we've genuinely
+        heard more recently), but more conservative: the live poll only
+        ever gives a bare pubkey + SNR, no name/role/position like the
+        neighbours.json import has, so this never overwrites an
+        already-known role/name/position -- only fills them in if
+        unset. Never touches packet_count (this isn't a packet
+        Meshpoint's own radio received).
+        """
+        last_heard_iso = last_heard.isoformat()
+        await self._db.execute(
+            """
+            INSERT INTO nodes (
+                node_id, long_name, protocol, last_heard, first_seen,
+                packet_count
+            ) VALUES (?, ?, 'meshcore', ?, ?, 0)
+            ON CONFLICT(node_id) DO UPDATE SET
+                long_name = CASE
+                    WHEN nodes.long_name IS NULL OR nodes.long_name = ''
+                        THEN excluded.long_name
+                    WHEN LOWER(nodes.long_name) = LOWER(nodes.node_id)
+                        THEN excluded.long_name
+                    ELSE nodes.long_name
+                END,
+                last_heard = MAX(
+                    excluded.last_heard,
+                    COALESCE(
+                        (SELECT MAX(p.timestamp) FROM packets p
+                          WHERE p.source_id = nodes.node_id
+                            AND p.packet_id NOT LIKE 'nb:%'
+                            AND p.packet_id NOT LIKE 'meshcoredb:%'),
+                        excluded.last_heard
+                    )
+                )
+            """,
+            (node_id, node_id, last_heard_iso, last_heard_iso),
+        )
+        await self._db.commit()
+
     async def get_by_id(self, node_id: str) -> Optional[Node]:
         row = await self._db.fetch_one(
             "SELECT * FROM nodes WHERE node_id = ?", (node_id,)

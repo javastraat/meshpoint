@@ -17,7 +17,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -63,12 +63,16 @@ class RepeaterPoller:
         repeaters: list,
         interval_minutes: int,
         telemetry_repo=None,
+        node_repo=None,
+        packet_repo=None,
         data_dir: str = "data",
     ):
         self._tx = tx_client
         self._repeaters = repeaters
         self._interval_s = max(60, int(interval_minutes) * 60)
         self._telemetry_repo = telemetry_repo
+        self._node_repo = node_repo
+        self._packet_repo = packet_repo
         self._state_path = Path(data_dir) / STATE_FILENAME
         self._task: Optional[asyncio.Task] = None
         self.latest: dict[str, dict] = {}
@@ -165,8 +169,46 @@ class RepeaterPoller:
         if entry["ok"]:
             logger.info("Repeater %s polled OK", name)
             await self._store_telemetry(key, result)
+            await self._store_neighbour_reports(key, result)
         else:
             logger.warning("Repeater %s poll failed: %s", name, entry["error"])
+
+    async def _store_neighbour_reports(self, key: str, result: dict) -> None:
+        """Tag this repeater's reported neighbours into the DB (nodes +
+        synthetic nb: packets), same convention as import_contacts.py's
+        manual neighbours.json import -- just live, and scoped per
+        repeater so the Repeaters page can attribute "farthest
+        neighbour" to whichever repeater actually reported it.
+
+        Uses ``result`` (this poll's raw response), not the merged
+        ``entry`` -- entry falls back to the previous poll's neighbour
+        list on a failed/empty poll, which would otherwise get
+        reprocessed with a freshly-computed (and wrongly newer)
+        last_heard every cycle even though nothing new was heard.
+        """
+        if self._node_repo is None or self._packet_repo is None:
+            return
+        neighbours = (result.get("neighbours") or {}).get("neighbours")
+        if not isinstance(neighbours, list):
+            return
+        now = datetime.now(timezone.utc)
+        for nb in neighbours:
+            pubkey = (nb.get("pubkey") or "").strip().lower()
+            secs_ago = nb.get("secs_ago")
+            snr = nb.get("snr")
+            if not pubkey or not isinstance(secs_ago, (int, float)) or secs_ago < 0:
+                continue
+            last_heard = now - timedelta(seconds=secs_ago)
+            try:
+                await self._node_repo.upsert_from_neighbour_report(pubkey, last_heard)
+                await self._packet_repo.insert_neighbour_report(
+                    key, pubkey, snr, last_heard
+                )
+            except Exception:
+                logger.debug(
+                    "Neighbour report store failed for %s via %s",
+                    pubkey, key, exc_info=True,
+                )
 
     async def _store_telemetry(self, key: str, result: dict) -> None:
         """Map status + LPP telemetry onto a Telemetry row (drawer/CSV)."""
