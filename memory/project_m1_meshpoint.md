@@ -1708,6 +1708,57 @@ table). Same live-verification caveat as P2000/Pagers otherwise
 (exclusivity/UI flow not yet clicked through on the Pi) — see the
 retest row below, now covering all three pager tabs.
 
+Closed 2026-07-12 (same day, later still): user sent a screenshot of
+POCSAG working live on the Pi (see above) and noticed the Digital/
+Analogue skin toggle + "idle" status pill — which only make sense for
+the Radio tab — were showing on every tab, including POCSAG, since
+they lived in the shared page-level `<header class="lsn-panel__head">`
+above the tab bar rather than inside the Radio tab's own card. Moved
+them into a new `panel__header` row on top of the `.lsn-radio` panel
+in `listener_panel.js`'s `_mount()`; the page header now holds only
+the "Listener" title. Kept all existing element IDs (`lsn-skins`,
+`lsn-status`, `lsn-status-dot`, `lsn-status-text`) unchanged so no
+other JS (`_mountSkin()`, `_setStatus()`, etc.) needed touching — pure
+markup relocation. No CSS changes needed (`.lsn-head-right` already
+just an inline flex row, `.panel__header` already supports
+space-between). `node --check`ed.
+
+Closed 2026-07-12 (same day, later still): user asked for a way to
+tell the RTL-SDR dongle is in use from anywhere in the dashboard, not
+just by opening the Listener page — confirmed they wanted "a green dot
+and the title Radio/P2000/Pagers/POCSAG" next to the RTL-SDR sidebar
+link. Found the sidebar already has exactly this kind of plumbing
+built and reserved: `SidebarController.setStatusBadge(routeId, value,
+variant)` (`frontend/sidebar/sidebar_controller.js:60`) plus a
+`data-badge-for="radio"` badge span already wired to the existing
+`radio_tx_badge.js` (the "TX 23h" pill next to Hardware) — same
+pattern, new instance. Added `data-badge-for="listener"` next to the
+RTL-SDR label in `index.html`; new `frontend/sidebar/listener_badge.js`
+(`ListenerBadge` class, modeled directly on `RadioTxBadge`) polls the
+existing `GET /api/listener/status` every 5 s and reads its shared
+`dongle_owner` field — deliberately only ONE of the four status
+endpoints, since `dongle_owner` reflects `sdr_registry.current_owner()`
+process-wide and is identical across all four (`/api/listener`,
+`/api/p2000`, `/api/pagers`, `/api/pocsag`); maps the owner name to a
+display label (`radio`→Radio, `p2000`→P2000, etc. — duplicates the
+same small mapping already sitting in `pager_panel.js` and
+`listener_panel.js`, matching this repo's established
+small-duplicated-helper convention rather than a new shared import) and
+calls `setStatusBadge('listener', label, 'live')`, or `null` to hide
+when free. New `.sidebar__badge--live` CSS variant (green dot via
+`::before`, reusing the exact color/glow already used for the
+Listener page's own "ON AIR" LED) added to `sidebar.css`. Wired into
+`app.js` next to the other sidebar badge instantiations
+(`RadioTxBadge`, `UpdateCheckBadge`). Verified with a stub test
+feeding a sequence of fake `dongle_owner` values through `_refresh()`
+and asserting the exact `setStatusBadge` calls (shows "P2000"/"POCSAG"
+with the `live` variant, hides with `null` when owner is absent) — all
+matched expected. `node --check`ed, changelog re-parsed. Not yet
+live-verified on the Pi (does the badge actually show/hide correctly
+when a real tab starts/stops, and does polling from a page other than
+Listener work as expected through a real login session) — folded into
+the existing P2000/Pagers/POCSAG retest row below.
+
 | # | Status | Effort | Item |
 |---|--------|--------|------|
 | — | Open | S | Prune or document the 6 kept-for-later duplicate API endpoints (packets/count+protocols+types, nodes/map+summary, telemetry/*) |
@@ -1723,7 +1774,7 @@ retest row below, now covering all three pager tabs.
 | — | Noted | — | Reticulum as 6th network on the spare Heltec V3 433 (upstream #11) — wildcard |
 | — | Open | S | Retest `scripts/install.sh` on a fresh microSD flash — exercises everything added this session in one shot (RTL-SDR, redsea, multimon-ng, fastfetch banner, section renumbering); first fresh-flash run already passed once, user wants to test again |
 | — | Retest | S | Metrics `require_auth`: confirm a valid session actually authenticates a `/metrics` scrape (only the "blocks with no credentials" half was tested live — 401 confirmed correct). Also consider whether a proper long-lived API-key mechanism is worth building instead of reusing short-lived dashboard session JWTs for this, since those expire and are awkward for an unattended Prometheus scrape config. User flagged 2026-07-12, deferred ("its ok for now") |
-| — | Retest | S | P2000/Pagers/POCSAG tabs, remaining gap only: **POCSAG confirmed working live on the Pi 2026-07-12** — screenshot showed the tab tuned to 439.988 MHz, decoding real POCSAG1200 pages end to end through the deployed dashboard UI (tab switch, Start/Stop, status line, message log all working), including the "no Alpha field" case (a tone-only page with `Function: 2` and no text payload) correctly falling back to showing the raw decoded line since there's nothing to extract — that's the intended `m.message || m.raw` fallback in `pager_panel.js`, not a bug. Still open: FLEX (P2000) has not been live-verified against a real signal, and the busy/exclusivity flow (start one tab, confirm a sibling shows "busy" and its Start/Tune is disabled) hasn't been clicked through live across all four tabs |
+| — | Retest | S | P2000/Pagers/POCSAG tabs, remaining gap only: **POCSAG confirmed working live on the Pi 2026-07-12** — screenshot showed the tab tuned to 439.988 MHz, decoding real POCSAG1200 pages end to end through the deployed dashboard UI (tab switch, Start/Stop, status line, message log all working), including the "no Alpha field" case (a tone-only page with `Function: 2` and no text payload) correctly falling back to showing the raw decoded line since there's nothing to extract — that's the intended `m.message || m.raw` fallback in `pager_panel.js`, not a bug. Still open: FLEX (P2000) has not been live-verified against a real signal, the busy/exclusivity flow (start one tab, confirm a sibling shows "busy" and its Start/Tune is disabled) hasn't been clicked through live across all four tabs, and the new sidebar "dongle in use" badge (`listener_badge.js`) hasn't been watched live to confirm it shows/hides correctly as tabs start and stop |
 
 ## CURRENT WORKLIST v4 (2026-07-11 end of day — supersedes v2/v3 below; THE list to work off)
 

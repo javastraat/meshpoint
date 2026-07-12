@@ -503,6 +503,23 @@
     text-transform: uppercase;
 }
 
+.sidebar__badge--live {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(52, 211, 153, 0.15);
+    color: #34d399;
+}
+
+.sidebar__badge--live::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #34d399;
+    box-shadow: 0 0 6px rgba(52, 211, 153, 0.7);
+}
+
 .sidebar__chevron {
     width: 14px;
     height: 14px;
