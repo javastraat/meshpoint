@@ -40,6 +40,34 @@
     color: var(--text-muted);
     font-family: var(--font-mono);
     font-size: 0.7rem;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.ch-table__reorder {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.ch-table__move {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.5rem;
+    line-height: 1;
+    padding: 1px 2px;
+    cursor: pointer;
+}
+
+.ch-table__move:hover:not(:disabled) {
+    color: var(--accent-cyan);
+}
+
+.ch-table__move:disabled {
+    color: var(--border);
+    cursor: default;
 }
 
 .ch-table__hash {

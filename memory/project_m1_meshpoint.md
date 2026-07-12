@@ -1325,6 +1325,48 @@ toggle/has/list all work and the sort correctly pins favorited
 channels first while preserving relative order elsewhere. All JS
 `node --check`ed. Not yet live-verified on the Pi.
 
+Closed 2026-07-12, same session as the channel favorites above: two
+follow-on asks, both small and both frontend-only.
+
+1. **Admin-side MeshCore channel reorder** (Configuration → MeshCore,
+user's ask: "up down buttons next to the channels... admin task").
+Key discovery before building anything: `meshcore.channel_keys` is
+`dict[str, str]` (`src/config.py:87`) — Python dicts preserve
+insertion order, `save_section_to_yaml` already writes with
+`sort_keys=False`, and `_saveChannels()` in `meshcore_card.js`
+already submits rows in DOM order (`querySelectorAll` returns
+document order) via `PUT /api/config/meshcore/channels`. So this
+needed ZERO backend changes — reordering the `<tr>` elements in the
+DOM and re-saving is the entire mechanism. Added up/down (▲▼) buttons
+to the `#` column of each channel row (Public row 0 stays locked/first,
+never gets buttons), wired in `_wireChannelHandlers()` doing a plain
+`insertBefore` swap with the previous/next sibling, new
+`_reindexChannelRows()` renumbers the `#` column and disables
+up/down at the top/bottom edges — called after initial render,
+`_addEmptyRow()`, and `_deleteRow()`. Verified the swap semantics
+with a plain-array Node.js simulation (edge no-ops, multi-move
+sequences) before touching the DOM code. This also means the admin
+order flows through to `GET /api/messages/channels`
+(`src/api/routes/messages.py:206,224` — same `.items()` iteration)
+so it's the shared default order the channel-favorites layer builds
+on top of.
+2. **"Fav" filter tab in Messages** (user's ask, prompted by seeing
+the All/MT/MC toggle row: "maybe in the all mt mc a fav to show fav
+channels"). Added a 4th toggle button next to All/MT/MC
+(`frontend/js/messaging.js`). In `messaging_contacts.js`'s `render()`,
+`baseChannels` special-cases `this._filter === 'fav'` to filter by
+`MeshpointChannelFavorites.has()` instead of protocol; DM
+conversations are naturally hidden in this mode as a side effect of
+no conversation ever having `protocol === 'fav'` (documented with a
+comment so it doesn't look like a bug later) — Fav is a
+channels-only concept, no favorite-DMs today. Also improved the
+empty-state message to be filter-aware ("No favorited channels yet
+-- click the star..." instead of the generic "No conversations yet"
+when Fav mode is empty). Verified all 4 filter modes (all/meshtastic/
+meshcore/fav) end to end with a Node.js simulation matching the exact
+filtering logic. All JS `node --check`ed. Not yet live-verified on
+the Pi.
+
 | # | Status | Effort | Item |
 |---|--------|--------|------|
 | — | Open | S-M | Stats page's "Farthest Direct Signal" (0 hops) shows a repeater (e.g. "Zoetermeer Repeater", 42 km, SNR -6 dB) that came from the `import_meshcore_db.py` historical import, not something Meshpoint's own antenna actually received directly. User's read: since it's a repeater, it belongs on the Repeaters tab, not the personal "farthest direct node I heard" stat on Stats. Needs investigation — likely the farthest-signal query needs to exclude imported/synthetic packets (packet_id prefix `meshcoredb:neighbour:` per `import_meshcore_db.py`) or exclude repeater-role nodes, not just filter by hop_count=0. User request 2026-07-12 |

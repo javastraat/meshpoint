@@ -330,6 +330,7 @@ class MeshcoreConfigCard {
         `;
         this._focusedRow = null;
         this._wire();
+        this._reindexChannelRows();
         this._updateAddBtn();
     }
 
@@ -341,7 +342,13 @@ class MeshcoreConfigCard {
             const isPrivate = privateSet.has(ch.name || '');
             return `
                 <tr class="ch-table__row" data-index="${idx}">
-                    <td class="ch-table__idx">${idx}</td>
+                    <td class="ch-table__idx">
+                        <span class="ch-table__idx-num">${idx}</span>
+                        <span class="ch-table__reorder">
+                            <button type="button" class="ch-table__move" data-move="up" title="Move up">&#9650;</button>
+                            <button type="button" class="ch-table__move" data-move="down" title="Move down">&#9660;</button>
+                        </span>
+                    </td>
                     <td>
                         <input class="ch-table__name-input" data-field="name"
                                value="${name}" placeholder="Channel name" />
@@ -396,6 +403,28 @@ class MeshcoreConfigCard {
             });
         });
 
+        // Reorders are DOM-only until Save is pressed -- _saveChannels()
+        // submits rows in document order, and the server preserves that
+        // as channel_keys dict insertion order (round-trips through
+        // save_section_to_yaml's sort_keys=False), so this is the whole
+        // mechanism: no separate "order" field or backend change needed.
+        scope.querySelectorAll('.ch-table__move').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const tr = btn.closest('tr');
+                if (!tr) return;
+                if (btn.dataset.move === 'up') {
+                    const prev = tr.previousElementSibling;
+                    if (prev && !prev.classList.contains('ch-table__row--public')) {
+                        tr.parentElement.insertBefore(tr, prev);
+                    }
+                } else {
+                    const next = tr.nextElementSibling;
+                    if (next) tr.parentElement.insertBefore(next, tr);
+                }
+                this._reindexChannelRows();
+            });
+        });
+
         scope.querySelectorAll('.ch-table__row:not(.ch-table__row--locked) input').forEach((input) => {
             input.addEventListener('focus', () => {
                 this._focusedRow = input.closest('tr');
@@ -416,6 +445,24 @@ class MeshcoreConfigCard {
     _syncDeleteBtn() {
         const btn = this._body.querySelector('[data-mc-delete]');
         if (btn) btn.style.display = this._focusedRow ? '' : 'none';
+    }
+
+    /** Renumber rows after add/delete/reorder and disable move buttons
+     * at the top/bottom edge (Public row 0 is never a valid target). */
+    _reindexChannelRows() {
+        const tbody = this._body.querySelector('[data-mc-channels-body]');
+        if (!tbody) return;
+        const rows = Array.from(tbody.querySelectorAll('tr:not(.ch-table__row--public)'));
+        rows.forEach((row, i) => {
+            const idx = i + 1;
+            row.dataset.index = idx;
+            const idxLabel = row.querySelector('.ch-table__idx-num');
+            if (idxLabel) idxLabel.textContent = idx;
+            const upBtn = row.querySelector('[data-move="up"]');
+            const downBtn = row.querySelector('[data-move="down"]');
+            if (upBtn) upBtn.disabled = i === 0;
+            if (downBtn) downBtn.disabled = i === rows.length - 1;
+        });
     }
 
     // Device has 41 slots: 0 = Public (locked row), 1–40 = user channels.
@@ -443,7 +490,13 @@ class MeshcoreConfigCard {
         tr.className = 'ch-table__row';
         tr.dataset.index = idx;
         tr.innerHTML = `
-            <td class="ch-table__idx">${idx}</td>
+            <td class="ch-table__idx">
+                <span class="ch-table__idx-num">${idx}</span>
+                <span class="ch-table__reorder">
+                    <button type="button" class="ch-table__move" data-move="up" title="Move up">&#9650;</button>
+                    <button type="button" class="ch-table__move" data-move="down" title="Move down">&#9660;</button>
+                </span>
+            </td>
             <td>
                 <input class="ch-table__name-input" data-field="name"
                        value="" placeholder="Channel name" />
@@ -460,6 +513,7 @@ class MeshcoreConfigCard {
         `;
         this._wireChannelHandlers(tr);
         tbody.appendChild(tr);
+        this._reindexChannelRows();
         this._updateAddBtn();
     }
 
@@ -474,6 +528,7 @@ class MeshcoreConfigCard {
         this._focusedRow.remove();
         this._focusedRow = null;
         this._syncDeleteBtn();
+        this._reindexChannelRows();
         this._updateAddBtn();
     }
 

@@ -76,11 +76,13 @@ class MessagingContacts {
     render() {
         this._listEl.innerHTML = '';
 
-        const filteredChannels = this._sortChannelsWithFavoritesFirst(
-            this._filter === 'all'
-                ? this._channels
-                : this._channels.filter(c => c.protocol === this._filter)
-        );
+        const baseChannels = this._filter === 'all'
+            ? this._channels
+            : this._filter === 'fav'
+                ? this._channels.filter(c => window.MeshpointChannelFavorites
+                    && window.MeshpointChannelFavorites.has(c.node_id))
+                : this._channels.filter(c => c.protocol === this._filter);
+        const filteredChannels = this._sortChannelsWithFavoritesFirst(baseChannels);
 
         if (filteredChannels.length > 0) {
             const label = document.createElement('div');
@@ -95,6 +97,9 @@ class MessagingContacts {
             });
         }
 
+        // "fav" isn't a real protocol value, so this naturally hides all
+        // DMs in Fav mode -- intentional, favorites are a channels-only
+        // concept (no favorite DMs today).
         const dmConvos = (this._filter === 'all'
             ? this._conversations
             : this._conversations.filter(c => c.protocol === this._filter)
@@ -113,7 +118,10 @@ class MessagingContacts {
         }
 
         if (filteredChannels.length === 0 && dmConvos.length === 0) {
-            this._listEl.innerHTML = '<div class="msg-chat__empty">No conversations yet</div>';
+            const emptyMsg = this._filter === 'fav'
+                ? 'No favorited channels yet -- click the star on a channel to pin it here.'
+                : 'No conversations yet';
+            this._listEl.innerHTML = `<div class="msg-chat__empty">${this._esc(emptyMsg)}</div>`;
         }
     }
 
