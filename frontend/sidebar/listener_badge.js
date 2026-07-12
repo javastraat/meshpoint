@@ -22,7 +22,7 @@ class ListenerBadge {
 
     init() {
         this._refresh();
-        this._pollInterval = setInterval(() => this._refresh(), POLL_MS);
+        this._pollInterval = setInterval(() => this._refresh(), LISTENER_BADGE_POLL_MS);
     }
 
     destroy() {
@@ -51,13 +51,13 @@ class ListenerBadge {
             this._sidebar.setStatusBadge('listener', null);
             return;
         }
-        this._sidebar.setStatusBadge('listener', _OWNER_LABELS[owner] || owner, 'live');
+        this._sidebar.setStatusBadge('listener', _LISTENER_OWNER_LABELS[owner] || owner, 'live');
     }
 }
 
-const POLL_MS = 5000;
+const LISTENER_BADGE_POLL_MS = 5000;
 
 // Matches src/audio/sdr_registry.py's owner names.
-const _OWNER_LABELS = { radio: 'Radio', p2000: 'P2000', pagers: 'Pagers', pocsag: 'POCSAG' };
+const _LISTENER_OWNER_LABELS = { radio: 'Radio', p2000: 'P2000', pagers: 'Pagers', pocsag: 'POCSAG' };
 
 window.ListenerBadge = ListenerBadge;

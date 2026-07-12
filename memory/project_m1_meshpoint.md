@@ -1780,6 +1780,44 @@ when a real tab starts/stops, and does polling from a page other than
 Listener work as expected through a real login session) — folded into
 the existing P2000/Pagers/POCSAG retest row below.
 
+Bug found and fixed same day, live on the Pi: the sidebar badge above
+never appeared at all, even after the user redeployed and hard-refreshed
+with cache cleared (both correctly ruled out as the cause along the
+way — the styling fix shipped in the same deploy WAS visible, proving
+the page wasn't stale). Root cause, found via the browser console:
+`Uncaught SyntaxError: Identifier 'POLL_MS' has already been declared`
+in `listener_badge.js`. **Lesson for this codebase**: none of the
+`<script src="...">` tags in `index.html` use `type="module"`, so every
+top-level `const`/`let`/`class` in every loaded file shares ONE global
+lexical scope — a second file declaring the same top-level name isn't
+silently shadowed like it would be in separate ES modules, it's a
+hard `SyntaxError` that aborts parsing of the whole file. `POLL_MS`
+was already declared at top level in `update_check_badge.js` (loaded
+one script tag earlier); `listener_badge.js` declaring its own
+top-level `const POLL_MS` never got a chance to run at all, so
+`ListenerBadge` was never defined, `window.ListenerBadge` stayed
+`undefined`, and `app.js`'s `if (window.ListenerBadge)` guard silently
+skipped instantiating it — no crash surfaced anywhere else, which is
+why the backend (verified correct and returning `dongle_owner: "p2000"`
+via a direct `GET /api/listener/status` the user pasted) and every
+other diagnostic looked clean. Fixed by renaming this file's two
+top-level constants to unique names (`LISTENER_BADGE_POLL_MS`,
+`_LISTENER_OWNER_LABELS`). While fixing, proactively scanned every
+script-tag-loaded file in `index.html`'s load order for other
+top-level `const`/`let`/`class` name collisions (none found — this was
+the only one) and also for top-level `function` name collisions, which
+are lower-severity (silently overwritten by whichever loads last,
+rather than a hard crash) but same root cause: found five pre-existing
+ones (`_escapeHtml`, `_formatRelative`, `_formatUptime`,
+`_isEditingTarget`, `_parseTimestamp`, each duplicated across two
+files) — left alone since none are newly introduced or reported as
+broken, but worth remembering this is a systemic footgun in a
+non-module multi-script frontend: **any new top-level `const`/`let`/
+`class` name needs to be checked against every other loaded script,
+not just its own file**, since collisions fail silently (via `function`
+overwrite) or fatally (via `const`/`let` `SyntaxError`) rather than
+raising anything file-local. Verified with `node --check`.
+
 | # | Status | Effort | Item |
 |---|--------|--------|------|
 | — | Open | S | Prune or document the 6 kept-for-later duplicate API endpoints (packets/count+protocols+types, nodes/map+summary, telemetry/*) |
@@ -1795,7 +1833,7 @@ the existing P2000/Pagers/POCSAG retest row below.
 | — | Noted | — | Reticulum as 6th network on the spare Heltec V3 433 (upstream #11) — wildcard |
 | — | Open | S | Retest `scripts/install.sh` on a fresh microSD flash — exercises everything added this session in one shot (RTL-SDR, redsea, multimon-ng, fastfetch banner, section renumbering); first fresh-flash run already passed once, user wants to test again |
 | — | Retest | S | Metrics `require_auth`: confirm a valid session actually authenticates a `/metrics` scrape (only the "blocks with no credentials" half was tested live — 401 confirmed correct). Also consider whether a proper long-lived API-key mechanism is worth building instead of reusing short-lived dashboard session JWTs for this, since those expire and are awkward for an unattended Prometheus scrape config. User flagged 2026-07-12, deferred ("its ok for now") |
-| — | Retest | S | P2000/Pagers/POCSAG tabs, remaining gap only: **POCSAG confirmed working live on the Pi 2026-07-12** — screenshot showed the tab tuned to 439.988 MHz, decoding real POCSAG1200 pages end to end through the deployed dashboard UI (tab switch, Start/Stop, status line, message log all working), including the "no Alpha field" case (a tone-only page with `Function: 2` and no text payload) correctly falling back to showing the raw decoded line since there's nothing to extract — that's the intended `m.message || m.raw` fallback in `pager_panel.js`, not a bug. Still open: FLEX (P2000) has not been live-verified against a real signal, the busy/exclusivity flow (start one tab, confirm a sibling shows "busy" and its Start/Tune is disabled) hasn't been clicked through live across all four tabs, and the new sidebar "dongle in use" badge (`listener_badge.js`) hasn't been watched live to confirm it shows/hides correctly as tabs start and stop |
+| — | Retest | S | P2000/Pagers/POCSAG tabs, remaining gap only: **POCSAG confirmed working live on the Pi 2026-07-12** — screenshot showed the tab tuned to 439.988 MHz, decoding real POCSAG1200 pages end to end through the deployed dashboard UI (tab switch, Start/Stop, status line, message log all working), including the "no Alpha field" case (a tone-only page with `Function: 2` and no text payload) correctly falling back to showing the raw decoded line since there's nothing to extract — that's the intended `m.message || m.raw` fallback in `pager_panel.js`, not a bug. Also live-confirmed 2026-07-12: red busy-dot + normal-case "busy — in use by X" text on the Radio tab (see the CSS-inheritance fix a few paragraphs up). The sidebar "dongle in use" badge (`listener_badge.js`) had a real bug — a `POLL_MS` top-level `const` collision with `update_check_badge.js` threw a page-wide `SyntaxError` that silently killed the whole file before `ListenerBadge` was ever defined, so the badge never appeared no matter how many times the user redeployed/hard-refreshed. Root-caused via the browser console and fixed (renamed to unique top-level names) — NOT yet re-confirmed live after this specific fix. Still open: FLEX (P2000) has not been live-verified against a real signal, the busy/exclusivity flow (start one tab, confirm a sibling shows "busy" and its Start/Tune is disabled) hasn't been clicked through live across all four tabs, and the sidebar badge fix above needs one more redeploy + look to confirm it now actually shows/hides as tabs start and stop |
 
 ## CURRENT WORKLIST v4 (2026-07-11 end of day — supersedes v2/v3 below; THE list to work off)
 
