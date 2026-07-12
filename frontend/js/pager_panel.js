@@ -107,7 +107,10 @@ class PagerPanel {
         const busyOwner = (status.dongle_owner && status.dongle_owner !== this.kind)
             ? status.dongle_owner : null;
 
-        if (dot) dot.classList.toggle('pager-status__dot--on', !!status.running);
+        if (dot) {
+            dot.classList.toggle('pager-status__dot--on', !!status.running);
+            dot.classList.toggle('pager-status__dot--busy', !!busyOwner);
+        }
         if (text) {
             if (status.running) {
                 text.textContent = `listening on ${status.frequency_mhz} MHz`;

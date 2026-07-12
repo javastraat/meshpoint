@@ -1723,6 +1723,27 @@ markup relocation. No CSS changes needed (`.lsn-head-right` already
 just an inline flex row, `.panel__header` already supports
 space-between). `node --check`ed.
 
+Follow-up fix same round (bug caught from a live screenshot right
+after the move above): the "busy — in use by P2000" status text on
+the Radio tab rendered huge/shouty ("BUSY — IN USE BY P2000") compared
+to the same text on the P2000/Pagers/POCSAG tabs. Root cause: moving
+`#lsn-status` into the new `.panel__header` row made it inherit that
+class's `text-transform: uppercase` + `font-weight: 600` — plain
+`<span>`s cascade those properties, unlike the `<button>` skin
+toggles sitting right next to it, which keep their own case because
+browsers' UA stylesheets reset `text-transform` on form controls by
+default (that's why "Digital"/"Analogue" looked fine but the status
+text didn't — same header, only the buttons were protected). Fixed
+with an explicit `text-transform: none; font-weight: 400;` on
+`.lsn-status` in `listener.css`. Same round, user also asked for the
+status dot to go **red** while busy (a sibling tab holds the dongle),
+keeping green reserved for "this tab is genuinely on air" — added
+`.lsn-status__dot--busy` / `.pager-status__dot--busy` (red `#f87171`
+with a matching glow, mirroring the existing green `--on` variant)
+and wired `_setStatus()` (`listener_panel.js`) / `_render()`
+(`pager_panel.js`) to toggle it whenever `busyOwner` is set, applied
+identically across Radio and all three pager tabs. `node --check`ed.
+
 Closed 2026-07-12 (same day, later still): user asked for a way to
 tell the RTL-SDR dongle is in use from anywhere in the dashboard, not
 just by opening the Listener page — confirmed they wanted "a green dot

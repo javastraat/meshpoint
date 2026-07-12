@@ -817,17 +817,20 @@ class ListenerPanel {
             this._playing = false;
             if (busyOwner) {
                 const labels = { p2000: 'P2000', pagers: 'Pagers', pocsag: 'POCSAG' };
-                this._setStatus(false, `busy — in use by ${labels[busyOwner] || busyOwner}`);
+                this._setStatus(false, `busy — in use by ${labels[busyOwner] || busyOwner}`, true);
             } else {
                 this._setStatus(false, st.last_error ? `idle — ${st.last_error}` : 'idle');
             }
         }
     }
 
-    _setStatus(running, text) {
+    _setStatus(running, text, busy = false) {
         const dot = document.getElementById('lsn-status-dot');
         const label = document.getElementById('lsn-status-text');
-        if (dot) dot.classList.toggle('lsn-status__dot--on', !!running);
+        if (dot) {
+            dot.classList.toggle('lsn-status__dot--on', !!running);
+            dot.classList.toggle('lsn-status__dot--busy', !!busy);
+        }
         if (label) label.textContent = text;
     }
 

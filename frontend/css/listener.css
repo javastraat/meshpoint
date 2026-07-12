@@ -24,6 +24,8 @@
     align-items: center;
     gap: 8px;
     font-size: 12px;
+    font-weight: 400;
+    text-transform: none;
     color: rgba(243, 244, 246, 0.6);
 }
 
@@ -32,11 +34,18 @@
     height: 8px;
     border-radius: 50%;
     background: rgba(243, 244, 246, 0.25);
+    flex-shrink: 0;
 }
 
 .lsn-status__dot--on {
     background: #34d399;
     box-shadow: 0 0 6px rgba(52, 211, 153, 0.7);
+}
+
+/* Dongle held by a sibling tab -- distinct from the green "on air" dot. */
+.lsn-status__dot--busy {
+    background: #f87171;
+    box-shadow: 0 0 6px rgba(248, 113, 113, 0.7);
 }
 
 /* ── Radio / P2000 / Pagers tab bar ──────────────────── */
@@ -96,6 +105,12 @@
 .pager-status__dot--on {
     background: #34d399;
     box-shadow: 0 0 6px rgba(52, 211, 153, 0.7);
+}
+
+/* Dongle held by a sibling tab -- distinct from the green "on air" dot. */
+.pager-status__dot--busy {
+    background: #f87171;
+    box-shadow: 0 0 6px rgba(248, 113, 113, 0.7);
 }
 
 .pager-actions {
