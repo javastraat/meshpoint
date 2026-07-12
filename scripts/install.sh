@@ -118,6 +118,8 @@ apt-get install -y -qq \
     meson \
     libsndfile1-dev \
     libliquid-dev \
+    libpulse-dev \
+    libx11-dev \
     build-essential
 
 # ── 2. Enable SPI ──────────────────────────────────────────────────
@@ -273,6 +275,34 @@ else
         cd build
         meson compile
         meson install
+        ldconfig
+    )
+fi
+
+# ── 3e. Install multimon-ng (RTL-SDR digital mode decoder) ────────
+#
+# Decodes POCSAG/AFSK/DTMF/etc out of demodulated audio, fed from
+# `rtl_fm` piped in. Built from source (EliasOenal/multimon-ng
+# upstream) via CMake -- the project dropped its old qt4-qmake build
+# system entirely, so no Qt4 packages are needed (and qt4-qmake isn't
+# even in current Raspberry Pi OS repos anymore).
+#
+# Idempotent: skips the clone+build if the multimon-ng binary already
+# exists.
+
+MULTIMON_BUILD_DIR="/opt/multimon-ng"
+
+if command -v multimon-ng &>/dev/null; then
+    info "multimon-ng already installed, skipping build"
+else
+    info "Cloning and building multimon-ng..."
+    rm -rf "$MULTIMON_BUILD_DIR"
+    git clone --depth 1 https://github.com/EliasOenal/multimon-ng.git "$MULTIMON_BUILD_DIR"
+    (
+        cd "$MULTIMON_BUILD_DIR"
+        cmake -S . -B build
+        cmake --build build --parallel "$(nproc)"
+        cmake --install build
         ldconfig
     )
 fi

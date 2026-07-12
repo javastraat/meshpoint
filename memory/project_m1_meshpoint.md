@@ -1022,6 +1022,21 @@ code) right after the rtl-sdr section, per user's exact given commands
 compile && meson install`). Idempotent via `command -v redsea`. Not yet
 live-verified on the Pi. Folded into CHANGELOG.md (same section).
 
+Also closed 2026-07-12: installer section "3e" builds `multimon-ng`
+(EliasOenal/multimon-ng, POCSAG/AFSK/DTMF decoder for `rtl_fm`-piped
+audio). User's given commands used the project's old qt4-qmake build
+(`qt4-qmake`, `libx11-dev`, etc) — verified via WebFetch against the
+upstream README before writing this that multimon-ng dropped Qt4
+entirely and now builds via CMake (`cmake -S . -B build && cmake
+--build build && cmake --install build`); `qt4-qmake` isn't even
+packaged in current Raspberry Pi OS (Bookworm) repos, so the literal
+pasted commands would have hard-failed the installer under `set -euo
+pipefail`. Used the current CMake build instead, apt-installing
+`libpulse-dev`/`libx11-dev` (optional audio-in/X11-scope deps, still
+needed) but no Qt packages. Idempotent via `command -v multimon-ng`.
+Not yet live-verified on the Pi. Folded into CHANGELOG.md (same
+section).
+
 | # | Status | Effort | Item |
 |---|--------|--------|------|
 | — | Decide | S | Poller → roster? Should live neighbour polls also upsert nodes / write nb:-style rows (bump last_heard, name unknown pubkeys)? Currently repeater_status.json only, by design |
