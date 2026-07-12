@@ -131,7 +131,7 @@ This is a customized fork of upstream [KMX415/meshpoint](https://github.com/KMX4
 
 **Meshtastic 433 via serial.** A Heltec V3 or any Meshtastic-flashed node on `/dev/ttyUSB0` adds a fifth capture stream. Packets are decoded and displayed in the dashboard the same as 868 MHz Meshtastic packets.
 
-**RTL-SDR broadcast & utility radio listener.** Plug in a cheap RTL-SDR dongle and listen to real radio from the browser — FM broadcast, airband (AM), marine VHF/UHF, PMR446, 2 m / 70 cm ham, and anything else in ~24–1766 MHz. Server-side `rtl_fm` demodulates (a **Mode** selector for WFM / NFM / AM / USB / LSB, plus squelch, gain, and pre-encoder level) and streams MP3 to a browser `<audio>` player, while the SX1302 keeps sniffing LoRa uninterrupted (separate hardware). Two selectable radio faces — a **Digital** VFD-style readout with a segmented VU meter, and an **Analogue** slide-rule tuner with a swinging-needle VU gauge — and a real-time Web Audio level meter that dances with the audio. **RDS** on FM (via [`redsea`](https://github.com/windytan/redsea)): station name, scrolling RadioText / now-playing, program type (PTY), and a block-error-rate signal-quality meter. A preset stations picker with category tabs, search, and ★ favorites (Amsterdam FM, PMR446, marine, Schiphol airband, ham). See [RTL-SDR Radio Listener](#optional-rtl-sdr-radio-listener) for setup.
+**RTL-SDR broadcast & utility radio listener.** Plug in a cheap RTL-SDR dongle and listen to real radio from the browser — FM broadcast, airband (AM), marine VHF/UHF, PMR446, 2 m / 70 cm ham, and anything else in ~24–1766 MHz. Server-side `rtl_fm` demodulates (a **Mode** selector for WFM / NFM / AM / USB / LSB, plus squelch, gain, and pre-encoder level) and streams MP3 to a browser `<audio>` player, while the SX1302 keeps sniffing LoRa uninterrupted (separate hardware). Two selectable radio faces — a **Digital** VFD-style readout with a segmented VU meter, and an **Analogue** slide-rule tuner with a swinging-needle VU gauge — and a real-time Web Audio level meter that dances with the audio. **RDS** on FM (via [`redsea`](https://github.com/windytan/redsea)): station name, scrolling RadioText / now-playing, program type (PTY), and a block-error-rate signal-quality meter. A preset stations picker with category tabs, search, and ★ favorites (Amsterdam FM, PMR446, marine, Schiphol airband, ham). Two more tabs alongside Radio decode live pager traffic instead of streaming audio — **P2000** (Dutch emergency dispatch, FLEX) and **Pagers** (POCSAG512/1200/2400), each a fixed `rtl_fm | multimon-ng` pipeline with its own Start/Stop and a live decoded-message log; since the dongle can only be tuned to one frequency at a time, only one of Radio/P2000/Pagers can run at once. See [RTL-SDR Radio Listener](#optional-rtl-sdr-radio-listener) for setup.
 
 **Band spectrum view.** The concentrator module's onboard SX1261 sweeps the entire region band (EU868: 863–870 MHz in 100 kHz steps) every few minutes — without interrupting packet capture — and the RF Environment page draws the result as a live spectrum chart with every LoRaWAN, Meshtastic, and MeshCore channel position overlaid. See interferers (RFID readers, alarms) sharing your band at a glance. The Hardware page keeps the read-only table of the full 9-slot SX1302 channel plan.
 
@@ -262,6 +262,14 @@ Add an **RTL-SDR dongle** (RTL2832U + R820T/R860 — e.g. RTL-SDR Blog V3/V4, ~�
   sudo ninja install    # puts `redsea` on PATH
   ```
   RDS is decoded from the wide FM multiplex, so `rtl_fm` runs at 171 kHz and the stream is `tee`'d to both `redsea` and `ffmpeg` — no second dongle needed. Without `redsea` installed, everything else works; the RDS pills simply stay hidden.
+- **P2000 / Pagers (optional):** for the dashboard's P2000 (Dutch emergency dispatch, FLEX) and Pagers (POCSAG) tabs, also install [`multimon-ng`](https://github.com/EliasOenal/multimon-ng) — not packaged in Debian/Raspberry Pi OS either, so build from source:
+  ```bash
+  sudo apt install -y cmake libpulse-dev libx11-dev
+  git clone https://github.com/EliasOenal/multimon-ng.git
+  cd multimon-ng && cmake -S . -B build && cmake --build build --parallel 4
+  sudo cmake --install build
+  ```
+  Both `redsea` and `multimon-ng` are installed automatically by `scripts/install.sh` on a fresh Pi setup — this is only needed for a manual/non-installer setup. Since P2000/Pagers use the same dongle as the Radio tab, only one of the three can be active at a time; starting one while another is listening returns an error rather than silently stopping it.
 - **Blacklist the DVB-T driver** so the kernel doesn't claim the dongle as a TV tuner (the #1 "device not found" gotcha):
   ```bash
   echo 'blacklist dvb_usb_rtl28xxu' | sudo tee /etc/modprobe.d/rtl-sdr-blacklist.conf
@@ -423,6 +431,8 @@ FastAPI server on port 8080 (configurable via `dashboard.port` in `local.yaml`):
 | `POST /api/listener/tune` | Tune the RTL-SDR: frequency, mode, squelch, gain, level |
 | `POST /api/listener/stop` | Stop the RTL-SDR listener |
 | `GET /api/listener/stream` | Live MP3 audio stream for the browser player |
+| `GET /api/{p2000,pagers}/status` | Pager decoder state: running, frequency, decoded messages |
+| `POST /api/{p2000,pagers}/start` · `.../stop` | Start/stop the P2000 or Pagers decoder (only one of Radio/P2000/Pagers may run at a time) |
 | `GET /api/device/spectrum` | Latest band sweep from the SX1302 spectral scanner (median/peak per 100 kHz step) |
 | `POST /api/device/spectrum/sweep` | Trigger an on-demand band sweep (admin) |
 | `GET /api/topology/graph` | Mesh topology graph: nodes + edges from traceroutes, direct receptions, and neighbour imports |

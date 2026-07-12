@@ -29,7 +29,11 @@ import signal
 import time
 from typing import Optional
 
+from src.audio import sdr_registry
+
 logger = logging.getLogger(__name__)
+
+_SDR_OWNER = "radio"
 
 # Per-mode rtl_fm arguments.
 # Keep rtl_fm output rate (-r) explicitly aligned with ffmpeg input rate (-ar)
@@ -138,7 +142,9 @@ class RtlListener:
     ) -> None:
         """(Re)start the pipeline with new parameters.
 
-        Raises ValueError on bad input, RuntimeError if binaries are missing.
+        Raises ValueError on bad input, RuntimeError if binaries are missing
+        or the dongle is currently claimed by a pager listener (P2000/Pagers)
+        -- stop that one first (see src/audio/sdr_registry.py).
         """
         if mode not in _MODES:
             raise ValueError(f"unknown mode {mode!r}; one of {sorted(_MODES)}")
@@ -155,6 +161,7 @@ class RtlListener:
         async with self._lock:
             was_running = self._proc is not None
             await self._stop_locked()
+            sdr_registry.claim(_SDR_OWNER)
             self.frequency_hz = frequency_hz
             self.mode = mode
             self.squelch = max(0, int(squelch))
@@ -337,6 +344,7 @@ class RtlListener:
                     pass
                 await proc.wait()
             logger.info("RTL listener stopped")
+        sdr_registry.release(_SDR_OWNER)
 
     # ── background tasks ──────────────────────────────────────────
 
@@ -364,6 +372,7 @@ class RtlListener:
             )
             logger.warning("RTL listener pipeline ended: %s", self._last_error)
             self._proc = None
+            sdr_registry.release(_SDR_OWNER)
         for q in list(self._subscribers):
             q.put_nowait(b"")  # sentinel: stream over
 

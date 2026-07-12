@@ -1576,10 +1576,91 @@ already scoped correctly, left as-is). This feature is about as
 thoroughly live-verified as anything gets this session — real
 external tool, real screenshots, real data flowing end to end.
 
+Closed 2026-07-12: P2000/Pagers RTL-SDR tabs. User asked to
+"investigate first" — spawned a background agent to map the existing
+RTL-SDR listener architecture before designing anything, then verified
+its key claims directly (read `rtl_listener.py` myself) rather than
+trusting the report blindly. Findings that shaped the design: the FM
+listener already does a `rtl_fm | tee >(redsea) | ffmpeg` two-stage
+pipeline via asyncio subprocess with its own process group for clean
+`killpg` teardown (`src/audio/rtl_listener.py:258-284`) — the closest
+existing precedent, though P2000/Pagers are actually simpler (no
+ffmpeg stage, since there's no audio — multimon-ng's own stdout IS the
+decoded output). No existing WebSocket infra for this (the FM listener
+uses HTTP chunked audio + polling `/api/listener/status` every 500ms),
+so P2000/Pagers follow the same polling convention rather than new
+plumbing. Critically: **no concept existed of "only one thing can hold
+the dongle at a time"** — a real gap, since a single RTL-SDR can only
+tune one frequency for one process.
+
+Asked the user two design questions before building: (1) exclusivity
+model — chose **manual stop required** (starting one while another is
+active returns an error, not auto-stop); (2) navigation — chose
+**tabs inside the existing RTL-SDR page**, not new sidebar entries.
+Mid-build, user also corrected the exact pipeline commands they'd
+originally given: **removed `-a SCOPE`** from both P2000 and Pagers
+(it's for an X-window waterfall display we don't have on a headless
+service) — caught before I'd used it anywhere consequential.
+
+Built: `src/audio/sdr_registry.py` (new, tiny shared "who owns the
+dongle" claim/release registry — `claim()` no-ops for the same owner,
+raises `RuntimeError` for a different one, `release()` is a safe
+no-op if some other owner already claimed it since). Wired into the
+EXISTING `RtlListener.tune()`/`_stop_locked()`/`_read_loop()` (3
+integration points, `src/audio/rtl_listener.py:164,347,375`) so the FM
+listener respects the same registry, not just the new pager kinds.
+New `src/audio/pager_listener.py`: `PagerListener(kind)` parameterized
+class (kind = "p2000" or "pagers", nearly identical pipelines just
+different frequency + multimon-ng `-a` flags), mirrors
+`RtlListener`'s retry-on-busy-device pattern, in-memory `deque(maxlen=200)`
+message ring buffer, idle-watchdog auto-stop after 10 min of no status
+polling (matches the FM listener's `_IDLE_STOP_SECS` convention). New
+`src/api/routes/pager_routes.py` (two routers, `/api/p2000/*` and
+`/api/pagers/*`, both wrapping the same shared endpoint-builder
+function to avoid copy-paste — verified via stub test that each
+router's closures correctly bind to their OWN listener instance, not
+a late-binding bug where both would point at the same one). Wired into
+`server.py` (lifespan start/stop, route registration).
+
+**multimon-ng output parsing is UNVERIFIED against real hardware** —
+important caveat to carry forward. No RTL-SDR or multimon-ng on the
+Mac dev machine, so `_parse_line()`'s FLEX/POCSAG regexes were written
+from documented/expected multimon-ng output conventions, not tested
+against a real captured signal. Designed defensively: any line
+starting with a recognized protocol prefix (`FLEX:`/`POCSAG`) but not
+matching the expected field layout still gets surfaced as a raw
+"unknown" message rather than silently dropped, so a format mismatch
+degrades gracefully instead of losing real decoded pages. **Expect to
+need adjustment once tested live on the Pi with a real dongle and
+signal** — flagging this explicitly so it's not mistaken for
+something fully proven.
+
+Frontend: new `frontend/js/pager_panel.js` (`PagerPanel`, reused for
+both kinds — message log + Start/Stop button + status line, polling
+every 2s). `listener_panel.js` gained a small tab bar (Radio/P2000/
+Pagers) wrapping the EXISTING FM markup in a `data-tab="radio"` div
+(verified this doesn't break any of the existing `root.querySelector()`
+calls, since they still find the same IDs regardless of added nesting
+depth) plus two new empty tab-content divs mounted by `PagerPanel`
+instances; `show()`/`hide()` now delegate to whichever tab is active
+rather than always running the FM status poll.
+
+Verified before calling it done: registry claim/release/conflict
+logic (pure unit tests — same-owner no-op, different-owner blocks,
+stale release doesn't clear another's claim); the FLEX/POCSAG parser
+against constructed sample lines (correct field extraction, correctly
+ignores blank/banner lines); a full async lifecycle test using a
+stand-in shell pipeline in place of real `rtl_fm`/`multimon-ng`
+(spawn → parse → status poll → cross-listener blocking → clean
+teardown → registry release, all confirmed working end to end); the
+pager-routes closure-binding test above. All Python `ast.parse`-checked,
+all JS `node --check`ed. Not yet live-verified on the Pi — this is the
+first genuinely new RTL-SDR capability to ship this session without
+any live hardware test at all, given the constraints above.
+
 | # | Status | Effort | Item |
 |---|--------|--------|------|
 | — | Open | S | Prune or document the 6 kept-for-later duplicate API endpoints (packets/count+protocols+types, nodes/map+summary, telemetry/*) |
-| — | Open | M-L | RTL-SDR page gains P2000 and Pagers tabs alongside the existing Radio tab. Each is a fixed `rtl_fm`→`multimon-ng` pipeline (builds on this session's multimon-ng installer work): P2000 — `rtl_fm -f 169.65M -M fm -s 22050 -l 250 \| multimon-ng -a FLEX -a SCOPE -t raw /dev/stdin`; Pagers — `rtl_fm -f 172.45M -M fm -s 22050 -l 250 \| multimon-ng -a POCSAG512 -a POCSAG1200 -a POCSAG2400 -a SCOPE -t raw /dev/stdin`. Decoded messages should stream live to the web dashboard (new tab/panel per feed, not just a log file). User request 2026-07-12, not yet designed/built — needs a process-management approach (start/stop per tab, parse multimon-ng's stdout per decoder, push over the existing WebSocket feed or a new one). Bumped ahead of lower-effort items 2026-07-12 per effort-vs-win discussion: genuinely new capability + explicit user want outweighs the higher effort |
 | — | Open | M | Server-side downsample-across-range for the Repeater Trends chart — a fixed high limit (`hours=100000&limit=50000`) will eventually start truncating again as live polls keep growing the row count unbounded |
 | W14 | Open | M | Stray-frames table — log RF frames that fail all three decoders instead of dropping silently (upstream #80) |
 | W18 | Open | S-M | Mini RTL-SDR player widget — when the Radio/RTL-SDR listener is actively streaming, show a small persistent player (bottom-left of the sidebar/menu) with basic transport controls (stop, etc.) so the user doesn't have to navigate back to the Radio page just to stop playback |
@@ -1591,6 +1672,8 @@ external tool, real screenshots, real data flowing end to end.
 | — | Noted | — | Firmware flasher / companion version check (upstream #85/#59) — if flashing the 3 sticks becomes a pain |
 | — | Noted | — | Reticulum as 6th network on the spare Heltec V3 433 (upstream #11) — wildcard |
 | — | Open | S | Retest `scripts/install.sh` on a fresh microSD flash — exercises everything added this session in one shot (RTL-SDR, redsea, multimon-ng, fastfetch banner, section renumbering); first fresh-flash run already passed once, user wants to test again |
+| — | Retest | S | Metrics `require_auth`: confirm a valid session actually authenticates a `/metrics` scrape (only the "blocks with no credentials" half was tested live — 401 confirmed correct). Also consider whether a proper long-lived API-key mechanism is worth building instead of reusing short-lived dashboard session JWTs for this, since those expire and are awkward for an unattended Prometheus scrape config. User flagged 2026-07-12, deferred ("its ok for now") |
+| — | Retest | M | P2000/Pagers tabs: live-verify on the Pi with a real dongle. Priority checks: (1) does the `_parse_line()` FLEX/POCSAG regex actually match real multimon-ng output, or does everything fall through to the raw "unknown" fallback (or get silently dropped if the format differs more than expected)? (2) does the manual-stop-required exclusivity actually work in the browser (start Radio, try P2000, confirm a clear error appears instead of a silent failure)? (3) confirm `-a SCOPE` really is gone from both pipelines and nothing broke without it. Built entirely without live hardware access this round (no RTL-SDR/multimon-ng on the Mac dev machine) — this is the least-tested feature shipped this session |
 
 ## CURRENT WORKLIST v4 (2026-07-11 end of day — supersedes v2/v3 below; THE list to work off)
 

@@ -46,6 +46,7 @@ from src.api.routes import (
     hardware_config_routes,
     identity_routes,
     listener_routes,
+    pager_routes,
     lorawan_routes,
     meshtastic_routes,
     meshcore_routes,
@@ -77,6 +78,7 @@ from src.api.terminal import CommandCatalog, SessionManager
 from src.api.update import ReleaseChannelRegistry, UpdateApplier
 from src.api.update.rollback_state import resolve_rollback_state_path
 from src.api.upstream_client import UpstreamClient
+from src.audio.pager_listener import PagerListener
 from src.audio.rtl_listener import RtlListener
 from src.api.websocket_manager import WebSocketManager
 from src.config import AppConfig, SerialDeviceConfig, load_config, validate_activation
@@ -108,6 +110,8 @@ noise_floor_tracker = NoiseFloorTracker()
 _noise_floor_emitter_task = None
 _spectral_scan_service: SpectralScanService | None = None
 _rtl_listener: RtlListener | None = None
+_p2000_listener: PagerListener | None = None
+_pagers_listener: PagerListener | None = None
 _fan_controller_task = None
 _fan_controller = None
 _led_controller_task = None
@@ -333,14 +337,21 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
             channel_hash_resolver=channel_hash_resolver,
         )
         _init_dangerous_registry(pipeline)
-        global _rtl_listener
+        global _rtl_listener, _p2000_listener, _pagers_listener
         _rtl_listener = RtlListener()
         listener_routes.init_routes(_rtl_listener)
+        _p2000_listener = PagerListener("p2000")
+        _pagers_listener = PagerListener("pagers")
+        pager_routes.init_routes(_p2000_listener, _pagers_listener)
         print_banner(config, sources=pipeline.capture_coordinator.sources)
         logger.info("Meshpoint started -- listening for packets")
         yield
         if _rtl_listener is not None:
             await _rtl_listener.stop()
+        if _p2000_listener is not None:
+            await _p2000_listener.stop()
+        if _pagers_listener is not None:
+            await _pagers_listener.stop()
         if _spectral_scan_service is not None:
             await _spectral_scan_service.stop()
         if _noise_floor_emitter_task is not None:
@@ -426,6 +437,8 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     app.include_router(stats_routes.router, dependencies=protected)
     app.include_router(lorawan_routes.router, dependencies=protected)
     app.include_router(listener_routes.router, dependencies=protected)
+    app.include_router(pager_routes.p2000_router, dependencies=protected)
+    app.include_router(pager_routes.pagers_router, dependencies=protected)
     app.include_router(spectrum_routes.router, dependencies=protected)
     app.include_router(meshtastic_routes.router, dependencies=protected)
     app.include_router(meshcore_routes.router, dependencies=protected)

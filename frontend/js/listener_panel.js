@@ -367,6 +367,13 @@ class ListenerPanel {
         })();
         this._tunedCat = null;   // category index of the currently-tuned preset
         this._tunedKey = null;   // "freq|mode" of the currently-tuned preset
+        // P2000/Pagers tabs -- separate pipelines, same RTL-SDR dongle
+        // (see src/audio/sdr_registry.py), so only one of Radio/P2000/
+        // Pagers can be active at a time. Kept as sibling panels rather
+        // than folded into this already-large file.
+        this._activeTab = 'radio';
+        this._p2000Panel = window.PagerPanel ? new window.PagerPanel('/api/p2000', 'P2000') : null;
+        this._pagersPanel = window.PagerPanel ? new window.PagerPanel('/api/pagers', 'Pagers') : null;
     }
 
     _loadFavs() {
@@ -384,13 +391,45 @@ class ListenerPanel {
 
     show() {
         if (!this._mounted) { this._mount(); this._mounted = true; }
-        this._refreshStatus();
-        this._statusTimer = setInterval(() => this._refreshStatus(), 500);
+        this._showActiveTab();
     }
 
     hide() {
         clearInterval(this._statusTimer);
         this._statusTimer = null;
+        if (this._p2000Panel) this._p2000Panel.hide();
+        if (this._pagersPanel) this._pagersPanel.hide();
+    }
+
+    _showActiveTab() {
+        if (this._activeTab === 'p2000' && this._p2000Panel) {
+            this._p2000Panel.show();
+        } else if (this._activeTab === 'pagers' && this._pagersPanel) {
+            this._pagersPanel.show();
+        } else {
+            this._refreshStatus();
+            this._statusTimer = setInterval(() => this._refreshStatus(), 500);
+        }
+    }
+
+    _switchTab(tab) {
+        if (tab === this._activeTab) return;
+        clearInterval(this._statusTimer);
+        this._statusTimer = null;
+        if (this._activeTab === 'p2000' && this._p2000Panel) this._p2000Panel.hide();
+        if (this._activeTab === 'pagers' && this._pagersPanel) this._pagersPanel.hide();
+
+        this._activeTab = tab;
+        const root = document.getElementById('listener-panel');
+        if (root) {
+            root.querySelectorAll('.lsn-tab-content').forEach((el) => {
+                el.style.display = el.dataset.tab === tab ? '' : 'none';
+            });
+            root.querySelectorAll('.lsn-tabbar__btn').forEach((btn) => {
+                btn.classList.toggle('lsn-tabbar__btn--active', btn.dataset.tab === tab);
+            });
+        }
+        this._showActiveTab();
     }
 
     _mount() {
@@ -411,6 +450,13 @@ class ListenerPanel {
                 </div>
             </header>
 
+            <div class="lsn-tabbar" id="lsn-tabbar">
+                <button type="button" class="lsn-tabbar__btn lsn-tabbar__btn--active" data-tab="radio">Radio</button>
+                <button type="button" class="lsn-tabbar__btn" data-tab="p2000">P2000</button>
+                <button type="button" class="lsn-tabbar__btn" data-tab="pagers">Pagers</button>
+            </div>
+
+            <div class="lsn-tab-content" data-tab="radio">
             <section class="lsn-section">
                 <div class="panel lsn-radio">
                     <div class="panel__body lsn-radio__body">
@@ -479,7 +525,19 @@ class ListenerPanel {
                     </div>
                 </div>
             </section>
+            </div>
+
+            <div class="lsn-tab-content" data-tab="p2000" style="display:none" id="lsn-tab-p2000"></div>
+            <div class="lsn-tab-content" data-tab="pagers" style="display:none" id="lsn-tab-pagers"></div>
         `;
+
+        if (this._p2000Panel) this._p2000Panel.mount(root.querySelector('#lsn-tab-p2000'));
+        if (this._pagersPanel) this._pagersPanel.mount(root.querySelector('#lsn-tab-pagers'));
+
+        root.querySelector('#lsn-tabbar').addEventListener('click', (ev) => {
+            const btn = ev.target.closest('[data-tab]');
+            if (btn) this._switchTab(btn.dataset.tab);
+        });
 
         this._mountSkin(this._skinName);
 

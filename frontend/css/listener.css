@@ -39,6 +39,119 @@
     box-shadow: 0 0 6px rgba(52, 211, 153, 0.7);
 }
 
+/* ── Radio / P2000 / Pagers tab bar ──────────────────── */
+
+.lsn-tabbar {
+    display: flex;
+    gap: 4px;
+    padding: 0 clamp(16px, 3vw, 32px) 12px;
+}
+
+.lsn-tabbar__btn {
+    background: none;
+    border: 1px solid rgba(243, 244, 246, 0.15);
+    border-radius: 8px;
+    color: rgba(243, 244, 246, 0.6);
+    font-size: 13px;
+    padding: 6px 14px;
+    cursor: pointer;
+}
+
+.lsn-tabbar__btn:hover {
+    color: #f3f4f6;
+}
+
+.lsn-tabbar__btn--active {
+    background: rgba(52, 211, 153, 0.12);
+    border-color: rgba(52, 211, 153, 0.4);
+    color: #34d399;
+}
+
+/* ── P2000 / Pagers message log ───────────────────────── */
+
+.pager-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.pager-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: rgba(243, 244, 246, 0.6);
+}
+
+.pager-status__dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(243, 244, 246, 0.25);
+    flex-shrink: 0;
+}
+
+.pager-status__dot--on {
+    background: #34d399;
+    box-shadow: 0 0 6px rgba(52, 211, 153, 0.7);
+}
+
+.pager-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.pager-count {
+    color: rgba(243, 244, 246, 0.5);
+    font-weight: 400;
+    font-size: 12px;
+}
+
+.pager-log {
+    max-height: 60vh;
+    overflow-y: auto;
+    font-family: var(--font-mono, monospace);
+    font-size: 12.5px;
+}
+
+.pager-log__empty {
+    color: rgba(243, 244, 246, 0.4);
+    padding: 12px 0;
+}
+
+.pager-row {
+    display: flex;
+    gap: 10px;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(243, 244, 246, 0.06);
+    align-items: baseline;
+}
+
+.pager-row__time {
+    color: rgba(243, 244, 246, 0.4);
+    flex-shrink: 0;
+    width: 4.5em;
+}
+
+.pager-row__proto {
+    color: #34d399;
+    flex-shrink: 0;
+    width: 6em;
+}
+
+.pager-row__capcode {
+    color: rgba(243, 244, 246, 0.5);
+    flex-shrink: 0;
+    width: 5.5em;
+}
+
+.pager-row__msg {
+    color: #f3f4f6;
+    word-break: break-word;
+}
+
 /* ── Sections / controls ─────────────────────────────── */
 
 .lsn-section {

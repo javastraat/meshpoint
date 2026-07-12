@@ -41,6 +41,7 @@ First tagged release of the javastraat/meshpoint fork: LoRaWAN sniffing, multi-r
 - **Preset stations.** Favorites with pinning, category tabs, and search across Amsterdam FM, PMR446, marine VHF/UHF, Schiphol airband (true 8.33 kHz carriers), and ham presets; now-playing markers on tab and chip.
 - **Real-time VU meter.** Client-side Web Audio analyser (instantaneous RMS at ~60 fps with peak hold) instead of server-side loudness polling.
 - **Clean retunes.** Stop → settle → start pipeline with retry fixes the "Failed to open rtlsdr device #0" race on fast channel switches.
+- **P2000 and Pagers tabs.** Two new tabs alongside Radio, decoding live pager traffic instead of streaming audio: P2000 (Dutch emergency dispatch, FLEX on 169.65 MHz) and Pagers (POCSAG512/1200/2400 on 172.45 MHz), each a fixed `rtl_fm | multimon-ng` pipeline with its own Start/Stop button and a live-scrolling decoded message log (timestamp, protocol, capcode, message text). Since the RTL-SDR dongle can only be tuned to one frequency by one process at a time, only one of Radio/P2000/Pagers can be active at once — starting one while another is running returns a clear error rather than silently stopping it (stop the active one first). New `src/audio/pager_listener.py`, `src/audio/sdr_registry.py` (the shared "who owns the dongle" check), and `GET/POST /api/p2000/*` + `/api/pagers/*` endpoints.
 
 #### Roles and access
 
