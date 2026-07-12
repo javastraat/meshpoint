@@ -313,32 +313,14 @@ fi
 # stations, TPMS, remote sensors, etc.) from the RTL-SDR dongle --
 # wider device coverage than the P2000/Pagers/POCSAG multimon-ng
 # pipelines above, which only cover FLEX/POCSAG paging protocols.
-# Built from source (merbanan/rtl_433 upstream) via CMake, same
-# rationale as rtl-sdr/redsea/multimon-ng: no distro package tracks
-# upstream closely enough, and it links against the from-source
-# librtlsdr built in section 6 rather than a possibly-absent/older
-# apt package.
-#
-# Idempotent: skips the clone+build if the rtl_433 binary already
-# exists.
+# Installed via apt (unlike rtl-sdr/redsea/multimon-ng above, which
+# are built from source because their distro packages lag upstream
+# too far) -- the Raspberry Pi OS `rtl-433` package is small (~500 KB)
+# and current enough for this. --no-install-recommends skips the
+# optional soapysdr module packages, which nothing here uses.
 
-RTL433_BUILD_DIR="/opt/rtl_433"
-
-if command -v rtl_433 &>/dev/null; then
-    info "rtl_433 already installed, skipping build"
-else
-    info "Cloning and building rtl_433..."
-    rm -rf "$RTL433_BUILD_DIR"
-    git clone --depth 1 https://github.com/merbanan/rtl_433.git "$RTL433_BUILD_DIR"
-    mkdir -p "${RTL433_BUILD_DIR}/build"
-    (
-        cd "${RTL433_BUILD_DIR}/build"
-        cmake ../
-        make -j"$(nproc)"
-        make install
-        ldconfig
-    )
-fi
+info "Installing rtl_433..."
+apt-get install -y -qq --no-install-recommends rtl-433
 
 # ── 10. Build SX1302 HAL ──────────────────────────────────────────
 
