@@ -239,10 +239,17 @@ async def check_for_updates(
     )
     # Only refresh the sidebar badge's cache when this checked the same
     # thing the periodic background loop would (the current install's
-    # own tracked channel) -- a manual check against a different picker
-    # channel/custom branch shouldn't make the badge reflect THAT
-    # branch's status instead of the actually-installed one.
-    if req.channel_id is None and req.custom_branch is None:
+    # own tracked channel) -- a manual check against a genuinely
+    # different picker channel/custom branch shouldn't make the badge
+    # reflect THAT branch's status instead of the actually-installed
+    # one. NOTE: the dashboard's Check button always sends a concrete
+    # channel_id (never null -- it's whatever's selected in the
+    # picker), so comparing against None here would never match in
+    # practice; compare against the channel actually resolved for this
+    # install instead (channel_info is derived from the real installed
+    # branch regardless of what channel_id was requested).
+    is_own_channel = req.channel_id is None or req.channel_id == result.get("active_channel_id")
+    if is_own_channel and req.custom_branch is None:
         _last_periodic_check = result
     return result
 

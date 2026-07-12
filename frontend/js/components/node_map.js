@@ -317,7 +317,7 @@ class NodeMap {
     centerOnHome() {
         const device = this._lastDevice;
         if (device && device.latitude && device.longitude) {
-            this.centerOn(device.latitude, device.longitude, 13);
+            this.centerOn(device.latitude, device.longitude, 14);
         }
     }
 

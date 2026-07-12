@@ -213,6 +213,14 @@ class SidebarController {
     }
 
     _handleGroupToggle(event) {
+        // A badge inside the group toggle (e.g. the Settings group's
+        // "Update" pill) means "go straight to that page", not "expand
+        // the group" -- the badge itself is the more specific target.
+        const badge = event.target.closest('[data-badge-route]');
+        if (badge) {
+            this._router.navigate(badge.dataset.badgeRoute);
+            return;
+        }
         const group = event.currentTarget.closest('.sidebar__group');
         if (!group) return;
         const expanded = group.dataset.expanded === 'true';

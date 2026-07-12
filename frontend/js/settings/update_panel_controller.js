@@ -628,6 +628,11 @@ class UpdatePanelController {
             } else {
                 await this.refresh();
             }
+            // Either the page is about to fully reload (harmless no-op)
+            // or nothing else will tell the sidebar badge this just
+            // changed -- ask it directly instead of leaving it stale
+            // until its next scheduled poll.
+            window.updateCheckBadge?.refreshNow();
             this._syncRollbackButton();
         } else {
             const msg = typeof failureMessage === 'function'
