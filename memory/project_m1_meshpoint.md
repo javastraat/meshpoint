@@ -1111,10 +1111,70 @@ BW250 · SF11`, `Node ID: !09d406f4` (no Channel line — this stick's
 feature (CAPTURE SOURCES serial line + PROTOCOLS split + MESHTASTIC
 SERIAL section) is now fully closed and live-verified.
 
+Poller → roster decision, revisited 2026-07-12: researched in depth
+(background agent) — the live poll payload is pubkey-prefix + secs_ago
++ snr only (no name/position), confirmed via a real
+`repeater_status.json` paste (`secs_ago` up to 2,362,482s ≈ 27 days for
+older neighbours). Designed and briefly implemented a fix
+(`NodeRepository.upsert_from_neighbour_report()` — placeholder name =
+node_id, "newest wins" CASE on `last_heard` only, never touches
+`packet_count`, mirroring the existing offline `import_meshcore_db.py`
+pattern) and was about to wire it into `RepeaterPoller._poll_one` /
+`_build_repeater_poller` (`src/api/server.py:880-902`) when the user
+said to hold off — reverted the `NodeRepository` change cleanly
+(`git diff` confirmed clean). **Decision: still open, deferred again.**
+Neighbours remain topology-map-only via `repeater_status.json`, no
+`nodes` table writes. If revisited: the design above is ready to
+reimplement as-is — the open judgment call is specifically whether
+`last_heard`/"Active (15 min)" should ever reflect secondhand
+(repeater-reported) evidence vs. strictly direct/relay reception, not
+a technical blocker. User added a second, stronger reason after seeing
+the full Repeaters page (not just the card): a polled repeater can be
+a REMOTE site the user administers, not co-located with the Meshpoint
+box — its neighbours reflect its own local RF environment, which may
+be geographically unrelated to what Meshpoint's own antenna can hear.
+Merging that into the shared `nodes` table would conflate "nodes near
+this box" with "nodes near some other site," a category mismatch on
+top of the staleness/trust concerns already noted. Also: the
+Repeaters page already surfaces a neighbour *count* per repeater card
+(e.g. "Neighbours: 26") for monitoring purposes — the thing being
+deferred is only exploding that count into individually named/
+positioned roster entries, not neighbour visibility generally.
+
+Closed 2026-07-12: made that neighbour count clickable, as a
+display-only complement to the deferred decision above (no `nodes`
+table writes, just presenting what's already fetched). Backend:
+`meshcore_repeaters()` (`src/api/routes/meshcore_routes.py:42-71`) now
+also batch-resolves neighbour pubkey prefixes against the roster
+(reusing the existing `_repeater_names()` helper generically — it was
+never actually repeater-specific) and attaches a `name` field per
+neighbour, one query across ALL repeaters' neighbour lists combined
+(not per-neighbour, not per-repeater) — verified this doesn't mutate
+`RepeaterPoller.latest` (which gets persisted to `repeater_status.json`
+verbatim) by building new dicts rather than enriching in place;
+confirmed via a stubbed fastapi+aiosqlite unit test (no real deps on
+Mac) that the source poller state stayed untouched after a call.
+Frontend: new `frontend/js/neighbours_modal.js` (`NeighboursModal`,
+modeled on the existing `PacketDetailModal` overlay pattern, reusing
+its `.pdm-*` CSS classes rather than inventing new modal chrome) shows
+neighbours sorted freshest-first (lowest `secs_ago`), each row
+clickable into the standard node drawer when a name was resolved.
+`repeaters_tab.js`'s Neighbours row now carries a
+`data-rp-neighbours="<repeater key>"` attribute with ONE delegated
+click listener on `#rp-grid` (bound once in `_mount()`, survives the
+grid's `innerHTML` re-render every poll refresh — no per-card rebind
+needed). Also removed the per-card "polled Xm ago" footer (`rp-card__foot`,
+plus its now-dead CSS rule) per explicit user ask — redundant with the
+summary bar's "Oldest poll" stat once there's only one repeater
+configured. All JS syntax-checked with `node --check`; Python route
+change syntax + logic checked with a stubbed fastapi/aiosqlite unit
+test. Not yet live-verified on the Pi.
+
 | # | Status | Effort | Item |
 |---|--------|--------|------|
+| — | Open | S | Retest `scripts/install.sh` on a fresh microSD flash — exercises everything added this session in one shot (RTL-SDR, redsea, multimon-ng, fastfetch banner, section renumbering); first fresh-flash run already passed once, user wants to test again |
 | — | Open | S | Configuration audit: check every key in `config/default.yaml` (and by extension `local.yaml`) has a corresponding edit control in the web dashboard — user request 2026-07-12, flag any settings that are YAML-only today with no UI equivalent |
-| — | Decide | S | Poller → roster? Should live neighbour polls also upsert nodes / write nb:-style rows (bump last_heard, name unknown pubkeys)? Currently repeater_status.json only, by design |
+| — | Deferred | S | Poller → roster? Should live neighbour polls also upsert nodes / write nb:-style rows (bump last_heard, name unknown pubkeys)? Currently repeater_status.json only. Revisited 2026-07-12, design ready (see note above), user chose to hold off for now |
 | W14 | Open | M | Stray-frames table — log RF frames that fail all three decoders instead of dropping silently (upstream #80) |
 | — | Open | M | Server-side downsample-across-range for the Repeater Trends chart — a fixed high limit (`hours=100000&limit=50000`) will eventually start truncating again as live polls keep growing the row count unbounded |
 | W18 | Open | S-M | Mini RTL-SDR player widget — when the Radio/RTL-SDR listener is actively streaming, show a small persistent player (bottom-left of the sidebar/menu) with basic transport controls (stop, etc.) so the user doesn't have to navigate back to the Radio page just to stop playback |

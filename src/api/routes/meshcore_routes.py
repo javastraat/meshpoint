@@ -52,10 +52,34 @@ async def meshcore_repeaters():
         return {"available": False, "repeaters": []}
 
     names = await _repeater_names(list(_repeater_poller.latest.keys()))
+
+    # Resolve neighbour pubkey prefixes against the roster too, one batch
+    # query across all repeaters rather than N+1 -- lets the Repeaters
+    # tab show a name instead of a bare prefix for neighbours we already
+    # know from direct/relay reception elsewhere.
+    neighbour_keys: set[str] = set()
+    for entry in _repeater_poller.latest.values():
+        nb_list = (entry.get("neighbours") or {}).get("neighbours")
+        if isinstance(nb_list, list):
+            neighbour_keys.update(
+                n.get("pubkey") for n in nb_list if n.get("pubkey")
+            )
+    neighbour_names = await _repeater_names(list(neighbour_keys))
+
     reps = []
     for key, entry in _repeater_poller.latest.items():
         history = await _fetch_telemetry_history(key)
-        reps.append({**entry, "mesh_name": names.get(key), "history": history})
+        out = dict(entry)
+        nb_list = (entry.get("neighbours") or {}).get("neighbours")
+        if isinstance(nb_list, list):
+            out["neighbours"] = {
+                **entry["neighbours"],
+                "neighbours": [
+                    {**n, "name": neighbour_names.get(n.get("pubkey"))}
+                    for n in nb_list
+                ],
+            }
+        reps.append({**out, "mesh_name": names.get(key), "history": history})
     return {"available": True, "repeaters": reps}
 
 

@@ -60,6 +60,22 @@ class RepeatersTab {
         `;
         document.getElementById('rp-refresh-btn')
             ?.addEventListener('click', () => this._load());
+        // Delegated so it survives the grid's innerHTML re-render on
+        // every poll refresh, instead of re-binding per card each time.
+        document.getElementById('rp-grid')
+            ?.addEventListener('click', (e) => {
+                const trigger = e.target.closest('[data-rp-neighbours]');
+                if (trigger) this._openNeighbours(trigger.dataset.rpNeighbours);
+            });
+    }
+
+    _openNeighbours(key) {
+        const r = (this._lastReps || []).find((x) => x.key === key);
+        if (!r || !window.NeighboursModal) return;
+        const nbList = r.neighbours && Array.isArray(r.neighbours.neighbours)
+            ? r.neighbours.neighbours
+            : [];
+        window.NeighboursModal.show(r.mesh_name || r.name || r.key, nbList);
     }
 
     async _load() {
@@ -76,6 +92,7 @@ class RepeatersTab {
         const empty = document.getElementById('rp-empty');
         const summary = document.getElementById('rp-summary');
         if (!grid) return;
+        this._lastReps = reps;
 
         const polled = reps.filter((r) => r.status);
         const healthy = reps.filter((r) => r.ok).length;
@@ -147,12 +164,10 @@ class RepeatersTab {
         health.push(['Last SNR', s.last_snr != null ? `${s.last_snr} dB` : '--']);
         if (s.recv_errors != null) health.push(['Recv errors', this._num(s.recv_errors)]);
         const nbData = r.neighbours;
+        const nbList = nbData && Array.isArray(nbData.neighbours) ? nbData.neighbours : null;
         const nbCount = nbData
-            ? (nbData.neighbours_count != null
-                ? nbData.neighbours_count
-                : (Array.isArray(nbData.neighbours) ? nbData.neighbours.length : null))
+            ? (nbData.neighbours_count != null ? nbData.neighbours_count : (nbList ? nbList.length : null))
             : null;
-        if (nbCount != null) health.push(['Neighbours', this._num(nbCount)]);
 
         // Every LPP sensor reading (any channel / any sensor).
         const sensors = this._sensorRows(r.telemetry);
@@ -190,6 +205,13 @@ class RepeatersTab {
             ? rowsHtml(historyRows)
             : '<div class="rp-row"><span class="rp-row__k">No history</span><span class="rp-row__v">--</span></div>';
 
+        const neighboursRowHtml = nbCount != null
+            ? `<div class="rp-row rp-row--clickable" data-rp-neighbours="${this._esc(r.key)}">
+                 <span class="rp-row__k">Neighbours</span>
+                 <span class="rp-row__v rp-row__v--link">${this._num(nbCount)}</span>
+               </div>`
+            : '';
+
         return `
             <div class="rp-repeater">
                 <div class="rp-card ${stale ? 'rp-card--stale' : ''}">
@@ -199,8 +221,7 @@ class RepeatersTab {
                               title="${r.ok ? 'Reporting' : this._esc(r.error || 'stale')}"></span>
                     </div>
                     <div class="rp-card__id">!${this._esc(r.key)}</div>
-                    <div class="rp-card__rows">${rowsHtml(health)}</div>
-                    <div class="rp-card__foot">${stale ? 'stale · ' : ''}polled ${this._ago(r.updated_at)}</div>
+                    <div class="rp-card__rows">${rowsHtml(health)}${neighboursRowHtml}</div>
                 </div>
                 <div class="rp-card rp-card--sensors ${stale ? 'rp-card--stale' : ''}">
                     <div class="rp-card__head">

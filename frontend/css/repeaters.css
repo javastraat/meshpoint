@@ -140,6 +140,21 @@
     letter-spacing: 0.01em;
 }
 
+.rp-row--clickable {
+    cursor: pointer;
+    border-radius: 4px;
+    margin: 0 -6px;
+    padding: 2px 6px;
+}
+
+.rp-row--clickable:hover {
+    background: rgba(6, 182, 212, 0.08);
+}
+
+.rp-row__v--link {
+    color: var(--accent-cyan, #06b6d4);
+}
+
 .rp-card__section {
     margin: 12px 0 6px;
     padding-top: 8px;
@@ -147,14 +162,6 @@
     font-size: 0.66rem;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    color: var(--text-muted, #64748b);
-}
-
-.rp-card__foot {
-    margin-top: 12px;
-    padding-top: 8px;
-    border-top: 1px solid color-mix(in srgb, var(--border, #232a38) 74%, #3f516f 26%);
-    font-size: 0.7rem;
     color: var(--text-muted, #64748b);
 }
 
