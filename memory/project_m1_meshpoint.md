@@ -1374,29 +1374,47 @@ channel-ordering features (favorites+Fav filter, admin reorder) are
 now fully closed and live-verified.
 
 Closed 2026-07-12: "Farthest Direct Signal" imported-repeater bug.
-Root cause confirmed (background agent + my own direct verification):
 `_get_farthest_neighbour_direct()` (`src/api/routes/stats_routes.py:313-363`,
 the FALLBACK used when no genuinely-captured direct reception exists
-yet — the live path via `StatsReporter.record_farthest_direct()` was
-already fine) queried `neighbour_advert` packets by max distance with
-NO filter distinguishing Meshpoint's own captures from
-`scripts/import_meshcore_db.py`'s historical import. That importer
-(`import_meshcore_db.py:286-309`) hardcodes `hop_limit=0` (looks
-direct) and `capture_source='meshcore_db_import'` (a distinct,
-purpose-built tag, cleaner to filter on than the `packet_id` prefix)
-for every third-party neighbour observation it inserts — so an
-imported repeater 42 km away could outrank every packet the box
-actually heard itself. Fix: added `AND (p.capture_source IS NULL OR
-p.capture_source != 'meshcore_db_import')` to the WHERE clause
-(`stats_routes.py:323-324`-ish). Deliberately did NOT also exclude
-repeater-role nodes — repeaters can legitimately be heard directly,
-that's an orthogonal concern the user didn't actually ask to change.
-Verified with a real sqlite3 (not stubbed) test seeding three cases:
-a genuine direct reception, the imported-repeater case, and a legacy
-row with NULL `capture_source` (to catch the SQL NULL-comparison trap
-of a plain `!=` silently excluding NULLs too) — confirmed the fix
-excludes only the imported row and correctly keeps both others. Not
-yet live-verified on the Pi.
+yet — the live path via `StatsReporter.record_farthest_direct()` is
+separate and was already fine) queried `neighbour_advert` packets by
+max distance with no filter distinguishing Meshpoint's own captures
+from historical imports.
+
+First fix attempt was WRONG and caught live by the user pasting a
+fresh screenshot still showing "Zoetermeer Repeater" after the fix —
+they then had me inspect the actual production `concentrator.db`
+(copied it into the repo for me to query directly, since I can't SSH
+to the Pi). Background-agent research had reported the marker as
+`capture_source='meshcore_db_import'` (accurate for what CURRENT
+`scripts/import_meshcore_db.py` produces going forward), and I shipped
+a fix based on that alone. But direct SQL inspection of the real DB
+showed the actual 25 `neighbour_advert` rows all have `packet_id`
+prefixed `nb:` with `capture_source` BLANK (empty string, not even
+NULL) — from `import_contacts.py`, an OLDER script referenced only in
+a comment now (`scripts/survey_topology_data.py:11`, the actual file
+no longer exists in the repo, superseded by `import_meshcore_db.py`
+but its historical output was never re-imported in the new format).
+Lesson: a background agent reading current source code describes what
+the code WOULD do, not necessarily what's actually sitting in a
+long-lived production database — real data can predate the code that
+would generate it today. Corrected fix: WHERE clause now excludes
+BOTH markers — `capture_source != 'meshcore_db_import'` (current
+script, defense in depth) AND `packet_id NOT LIKE 'nb:%'` /
+`NOT LIKE 'meshcoredb:%'` (the actual historical marker, confirmed
+zero legitimate captured packets ever use either prefix). Verified
+directly against the real copied `concentrator.db`: old query matched
+25 rows (all 25 were `nb:`-prefixed imports), new query matches 0 —
+correct, since every neighbour_advert row in this box's actual
+database is an import, none are genuine direct MeshCore neighbour
+captures yet. Confirmed the frontend (`stats_tab.js:478-493`) already
+handles a null/absent `farthest_direct` gracefully (falls back to the
+existing `--` placeholder, same convention as the RSSI/SNR tiles) —
+no frontend change needed. Deliberately did NOT exclude repeater-role
+nodes — orthogonal concern, repeaters can legitimately be heard
+directly. Not yet re-verified live on the Pi (the DB copy confirms the
+query result, but the actual dashboard render hasn't been re-checked
+since this second fix).
 
 | # | Status | Effort | Item |
 |---|--------|--------|------|
