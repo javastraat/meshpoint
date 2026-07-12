@@ -219,8 +219,8 @@ else
 # userspace driver (rtl_fm, rtl_test, etc). Re-run scripts/install.sh
 # to restore this file if removed.
 blacklist dvb_usb_rtl28xxu
-blacklist rtl2832
-blacklist rtl2830
+blacklist rtl_2832
+blacklist rtl_2830
 _DVB_BLACKLIST
 fi
 # Also unload them right now if a dongle was already plugged in this
@@ -228,8 +228,8 @@ fi
 # Unload order matters: the usb bridge module depends on the
 # demodulator modules, so it must go first or -r fails with "in use".
 modprobe -r dvb_usb_rtl28xxu 2>/dev/null || true
-modprobe -r rtl2832 2>/dev/null || true
-modprobe -r rtl2830 2>/dev/null || true
+modprobe -r rtl_2832 2>/dev/null || true
+modprobe -r rtl_2830 2>/dev/null || true
 
 if ldconfig -p | grep -q librtlsdr; then
     info "librtlsdr already installed, skipping RTL-SDR build"

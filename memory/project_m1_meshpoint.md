@@ -986,11 +986,22 @@ the whole update-check feature — both added).
 
 Also closed 2026-07-12: installer RTL-SDR bits (`scripts/install.sh`
 section "3c"). Blacklists the kernel DVB-T stack — `dvb_usb_rtl28xxu`
-(usb bridge) plus `rtl2832`/`rtl2830` (demodulator modules it depends
-on, correct no-underscore kernel module names, not `rtl_2832`/`rtl_2830`)
-— into `/etc/modprobe.d/blacklist-rtlsdr-dvb.conf`, then `modprobe -r`
+(usb bridge) plus `rtl_2832`/`rtl_2830` (demodulator modules it depends
+on) — into `/etc/modprobe.d/blacklist-rtlsdr-dvb.conf`, then `modprobe -r`
 unloads them immediately in dependency order (bridge first) so a reboot
-isn't required to test. Then clones+builds `rtl-sdr` from source
+isn't required to test. Module spelling confirmed live 2026-07-12: user
+pasted `cat /etc/modprobe.d/raspi-blacklist.conf` from the actual Pi
+showing `blacklist rtl_2832` / `blacklist rtl_2830` (underscored) already
+present and presumably working — I'd initially "corrected" these to the
+no-underscore kernel-source spelling (`rtl2832`/`rtl2830`) from memory
+without verifying against the real device, which was wrong; matched the
+installer to the live-proven underscored spelling instead. Note: the
+existing `raspi-blacklist.conf` is a different file from the one this
+installer manages (`blacklist-rtlsdr-dvb.conf`) — likely a pre-existing
+manual setup on this box, predating this installer feature. Left it
+untouched (never SSH/modify the Pi unprompted); the two files coexisting
+is harmless since modprobe.d loads all `*.conf` files, just redundant.
+Then clones+builds `rtl-sdr` from source
 (osmocom upstream, `cmake -DINSTALL_UDEV_RULES=ON`) rather than
 `apt install rtl-sdr`, matching the SX1302 HAL build's from-source
 pattern and leaving room to swap in the RTL-SDR Blog fork later for the
