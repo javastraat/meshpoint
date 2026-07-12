@@ -205,7 +205,7 @@ class StatsTab {
                 <div class="stats-range-grid">
                     <div class="stats-range-card">
                         <div class="stats-range-card__header">Farthest Direct Signal</div>
-                        <div class="stats-range-card__desc">Received directly without relaying (0 hops)</div>
+                        <div class="stats-range-card__desc">Farthest node your antenna received directly, no relay hops (Meshtastic or MeshCore, whichever band — LoRaWAN never qualifies, this session)</div>
                         <div class="stats-range-card__value">
                             <span id="ss-direct-mi" class="stats-range-card__miles">--</span>
                             <span id="ss-direct-unit" class="stats-range-card__unit">mi</span>
@@ -225,7 +225,7 @@ class StatsTab {
                     </div>
                     <div class="stats-range-card">
                         <div class="stats-range-card__header">Farthest MeshCore Contact</div>
-                        <div class="stats-range-card__desc">Farthest contact with known position in MeshCore network</div>
+                        <div class="stats-range-card__desc">Farthest MeshCore node in your roster with a known position — not necessarily ever received directly, may include imported contacts</div>
                         <div class="stats-range-card__value">
                             <span id="ss-mc-mi" class="stats-range-card__miles">--</span>
                             <span id="ss-mc-unit" class="stats-range-card__unit"></span>
