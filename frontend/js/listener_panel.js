@@ -443,16 +443,6 @@ class ListenerPanel {
         root.innerHTML = `
             <header class="lsn-panel__head">
                 <h2 class="lsn-panel__title">Listener</h2>
-                <div class="lsn-head-right">
-                    <div class="lsn-skins" id="lsn-skins">
-                        <button type="button" data-skin="digital">Digital</button>
-                        <button type="button" data-skin="analogue">Analogue</button>
-                    </div>
-                    <div class="lsn-status" id="lsn-status">
-                        <span class="lsn-status__dot" id="lsn-status-dot"></span>
-                        <span id="lsn-status-text">idle</span>
-                    </div>
-                </div>
             </header>
 
             <div class="lsn-tabbar" id="lsn-tabbar">
@@ -465,6 +455,19 @@ class ListenerPanel {
             <div class="lsn-tab-content" data-tab="radio">
             <section class="lsn-section">
                 <div class="panel lsn-radio">
+                    <div class="panel__header">
+                        <span>Radio</span>
+                        <div class="lsn-head-right">
+                            <div class="lsn-skins" id="lsn-skins">
+                                <button type="button" data-skin="digital">Digital</button>
+                                <button type="button" data-skin="analogue">Analogue</button>
+                            </div>
+                            <div class="lsn-status" id="lsn-status">
+                                <span class="lsn-status__dot" id="lsn-status-dot"></span>
+                                <span id="lsn-status-text">idle</span>
+                            </div>
+                        </div>
+                    </div>
                     <div class="panel__body lsn-radio__body">
                         <div class="lsn-display" id="lsn-display"></div>
                         <audio id="lsn-audio" controls preload="none"></audio>
