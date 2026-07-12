@@ -66,6 +66,10 @@ _POCSAG_RE = re.compile(
     r"^(?P<proto>POCSAG\d+):\s*Address:\s*(?P<address>\d+)\s+Function:\s*(?P<function>\d+)"
     r"(?:\s+Alpha:\s*(?P<message>.*))?$"
 )
+# multimon-ng pads POCSAG alpha messages with literal "<NUL>" tokens
+# (confirmed on real captured output, 2026-07-12) -- strip trailing ones
+# for a clean display; they carry no message content.
+_TRAILING_NUL_RE = re.compile(r"(?:<NUL>)+\s*$")
 
 _KINDS = {
     "p2000": {
@@ -74,6 +78,10 @@ _KINDS = {
     },
     "pagers": {
         "frequency_hz": 172_450_000,
+        "multimon_args": ["-a", "POCSAG512", "-a", "POCSAG1200", "-a", "POCSAG2400"],
+    },
+    "pocsag": {
+        "frequency_hz": 439_987_500,
         "multimon_args": ["-a", "POCSAG512", "-a", "POCSAG1200", "-a", "POCSAG2400"],
     },
 }
@@ -94,10 +102,11 @@ def _parse_line(text: str) -> Optional[dict]:
         }
     m = _POCSAG_RE.match(text)
     if m:
+        message = _TRAILING_NUL_RE.sub("", (m.group("message") or "")).strip()
         return {
             "protocol": m.group("proto"),
             "capcode": m.group("address"),
-            "message": (m.group("message") or "").strip(),
+            "message": message,
             "raw": text,
             "received_at": now,
         }

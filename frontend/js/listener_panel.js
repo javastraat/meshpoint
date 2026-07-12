@@ -367,13 +367,14 @@ class ListenerPanel {
         })();
         this._tunedCat = null;   // category index of the currently-tuned preset
         this._tunedKey = null;   // "freq|mode" of the currently-tuned preset
-        // P2000/Pagers tabs -- separate pipelines, same RTL-SDR dongle
-        // (see src/audio/sdr_registry.py), so only one of Radio/P2000/
-        // Pagers can be active at a time. Kept as sibling panels rather
-        // than folded into this already-large file.
+        // P2000/Pagers/POCSAG tabs -- separate pipelines, same RTL-SDR
+        // dongle (see src/audio/sdr_registry.py), so only one of Radio/
+        // P2000/Pagers/POCSAG can be active at a time. Kept as sibling
+        // panels rather than folded into this already-large file.
         this._activeTab = 'radio';
         this._p2000Panel = window.PagerPanel ? new window.PagerPanel('p2000', '/api/p2000', 'P2000') : null;
         this._pagersPanel = window.PagerPanel ? new window.PagerPanel('pagers', '/api/pagers', 'Pagers') : null;
+        this._pocsagPanel = window.PagerPanel ? new window.PagerPanel('pocsag', '/api/pocsag', 'POCSAG') : null;
     }
 
     _loadFavs() {
@@ -399,6 +400,7 @@ class ListenerPanel {
         this._statusTimer = null;
         if (this._p2000Panel) this._p2000Panel.hide();
         if (this._pagersPanel) this._pagersPanel.hide();
+        if (this._pocsagPanel) this._pocsagPanel.hide();
     }
 
     _showActiveTab() {
@@ -406,6 +408,8 @@ class ListenerPanel {
             this._p2000Panel.show();
         } else if (this._activeTab === 'pagers' && this._pagersPanel) {
             this._pagersPanel.show();
+        } else if (this._activeTab === 'pocsag' && this._pocsagPanel) {
+            this._pocsagPanel.show();
         } else {
             this._refreshStatus();
             this._statusTimer = setInterval(() => this._refreshStatus(), 500);
@@ -418,6 +422,7 @@ class ListenerPanel {
         this._statusTimer = null;
         if (this._activeTab === 'p2000' && this._p2000Panel) this._p2000Panel.hide();
         if (this._activeTab === 'pagers' && this._pagersPanel) this._pagersPanel.hide();
+        if (this._activeTab === 'pocsag' && this._pocsagPanel) this._pocsagPanel.hide();
 
         this._activeTab = tab;
         const root = document.getElementById('listener-panel');
@@ -454,6 +459,7 @@ class ListenerPanel {
                 <button type="button" class="lsn-tabbar__btn lsn-tabbar__btn--active" data-tab="radio">Radio</button>
                 <button type="button" class="lsn-tabbar__btn" data-tab="p2000">P2000</button>
                 <button type="button" class="lsn-tabbar__btn" data-tab="pagers">Pagers</button>
+                <button type="button" class="lsn-tabbar__btn" data-tab="pocsag">POCSAG</button>
             </div>
 
             <div class="lsn-tab-content" data-tab="radio">
@@ -529,10 +535,12 @@ class ListenerPanel {
 
             <div class="lsn-tab-content" data-tab="p2000" style="display:none" id="lsn-tab-p2000"></div>
             <div class="lsn-tab-content" data-tab="pagers" style="display:none" id="lsn-tab-pagers"></div>
+            <div class="lsn-tab-content" data-tab="pocsag" style="display:none" id="lsn-tab-pocsag"></div>
         `;
 
         if (this._p2000Panel) this._p2000Panel.mount(root.querySelector('#lsn-tab-p2000'));
         if (this._pagersPanel) this._pagersPanel.mount(root.querySelector('#lsn-tab-pagers'));
+        if (this._pocsagPanel) this._pocsagPanel.mount(root.querySelector('#lsn-tab-pocsag'));
 
         root.querySelector('#lsn-tabbar').addEventListener('click', (ev) => {
             const btn = ev.target.closest('[data-tab]');
@@ -805,7 +813,7 @@ class ListenerPanel {
         } else {
             this._playing = false;
             if (busyOwner) {
-                const labels = { p2000: 'P2000', pagers: 'Pagers' };
+                const labels = { p2000: 'P2000', pagers: 'Pagers', pocsag: 'POCSAG' };
                 this._setStatus(false, `busy — in use by ${labels[busyOwner] || busyOwner}`);
             } else {
                 this._setStatus(false, st.last_error ? `idle — ${st.last_error}` : 'idle');

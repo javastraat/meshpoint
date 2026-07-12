@@ -10,7 +10,7 @@
  * rather than silently stopping the other one.
  */
 // Matches src/audio/sdr_registry.py's owner names.
-const _DONGLE_OWNER_LABELS = { radio: 'Radio', p2000: 'P2000', pagers: 'Pagers' };
+const _DONGLE_OWNER_LABELS = { radio: 'Radio', p2000: 'P2000', pagers: 'Pagers', pocsag: 'POCSAG' };
 
 class PagerPanel {
     constructor(kind, apiPrefix, title) {

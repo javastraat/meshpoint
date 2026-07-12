@@ -1679,6 +1679,35 @@ correctly shows `None` when free, the OTHER listener's kind while it's
 running, and clears back to `None` after stop. All syntax-checked.
 Not yet live-verified on the Pi (same caveat as the base feature).
 
+Closed 2026-07-12 (same day, later): added a fourth **POCSAG** tab —
+same POCSAG512/1200/2400 decoders as Pagers but on a separate
+439.9875 MHz band. User tested the exact command live on the Pi
+(`rtl_fm -f 439.9875M -M fm -s 22050 -l 250 | multimon-ng -a POCSAG512
+-a POCSAG1200 -a POCSAG2400 -t raw /dev/stdin`) and pasted the real
+captured terminal output — this **confirmed the `_POCSAG_RE` regex
+design from the P2000/Pagers build was correct** (first real-hardware
+validation of anything in that feature), but also revealed multimon-ng
+pads POCSAG alpha message text with literal `<NUL>` tokens
+(`POCSAG1200: Address: 2041152  Function: 3  Alpha:   Test
+message<NUL><NUL>`) that the original parser didn't strip. Added
+`_TRAILING_NUL_RE = re.compile(r"(?:<NUL>)+\s*$")` in
+`src/audio/pager_listener.py`, applied in `_parse_line()`'s POCSAG
+branch. Added the `"pocsag"` entry to `_KINDS`; expanded
+`src/api/routes/pager_routes.py` from 2 routers to 3 (same shared
+`_add_endpoints()` helper, re-verified via stub test that all three
+routers' closures bind to their own listener, not just the original
+two); wired a third `PagerListener("pocsag")` into `server.py`
+(lifespan start/stop, route registration). Frontend: added `pocsag:
+'POCSAG'` to `pager_panel.js`'s `_DONGLE_OWNER_LABELS`; added a 4th
+tab button/content div/`PagerPanel` instance to `listener_panel.js`
+and extended `_showActiveTab()`/`_switchTab()`/`hide()`/the Radio
+tab's own busy-label map to cover the `pocsag` case. All JS
+`node --check`ed, changelog re-parsed with `ChangelogParser.parse_file()`.
+CHANGELOG.md/README.md updated (feature bullet, setup section, API
+table). Same live-verification caveat as P2000/Pagers otherwise
+(exclusivity/UI flow not yet clicked through on the Pi) — see the
+retest row below, now covering all three pager tabs.
+
 | # | Status | Effort | Item |
 |---|--------|--------|------|
 | — | Open | S | Prune or document the 6 kept-for-later duplicate API endpoints (packets/count+protocols+types, nodes/map+summary, telemetry/*) |
@@ -1694,7 +1723,7 @@ Not yet live-verified on the Pi (same caveat as the base feature).
 | — | Noted | — | Reticulum as 6th network on the spare Heltec V3 433 (upstream #11) — wildcard |
 | — | Open | S | Retest `scripts/install.sh` on a fresh microSD flash — exercises everything added this session in one shot (RTL-SDR, redsea, multimon-ng, fastfetch banner, section renumbering); first fresh-flash run already passed once, user wants to test again |
 | — | Retest | S | Metrics `require_auth`: confirm a valid session actually authenticates a `/metrics` scrape (only the "blocks with no credentials" half was tested live — 401 confirmed correct). Also consider whether a proper long-lived API-key mechanism is worth building instead of reusing short-lived dashboard session JWTs for this, since those expire and are awkward for an unattended Prometheus scrape config. User flagged 2026-07-12, deferred ("its ok for now") |
-| — | Retest | M | P2000/Pagers tabs: live-verify on the Pi with a real dongle. Priority checks: (1) does the `_parse_line()` FLEX/POCSAG regex actually match real multimon-ng output, or does everything fall through to the raw "unknown" fallback (or get silently dropped if the format differs more than expected)? (2) does the manual-stop-required exclusivity actually work in the browser (start Radio, try P2000, confirm a clear error appears instead of a silent failure)? (3) confirm `-a SCOPE` really is gone from both pipelines and nothing broke without it. Built entirely without live hardware access this round (no RTL-SDR/multimon-ng on the Mac dev machine) — this is the least-tested feature shipped this session |
+| — | Retest | M | P2000/Pagers/POCSAG tabs: live-verify on the Pi with a real dongle. POCSAG's `_parse_line()` regex is now confirmed correct against real captured output (2026-07-12); FLEX (P2000) and the busy/exclusivity UI flow across all four tabs (Radio/P2000/Pagers/POCSAG) are still unverified live. Priority checks: (1) does FLEX actually match real multimon-ng output, or fall through to the raw "unknown" fallback? (2) does manual-stop-required exclusivity work correctly in the browser across all four tabs, confirming a clear error appears instead of a silent failure? (3) confirm `-a SCOPE` really is gone from every pipeline and nothing broke without it |
 
 ## CURRENT WORKLIST v4 (2026-07-11 end of day — supersedes v2/v3 below; THE list to work off)
 

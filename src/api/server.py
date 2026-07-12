@@ -112,6 +112,7 @@ _spectral_scan_service: SpectralScanService | None = None
 _rtl_listener: RtlListener | None = None
 _p2000_listener: PagerListener | None = None
 _pagers_listener: PagerListener | None = None
+_pocsag_listener: PagerListener | None = None
 _fan_controller_task = None
 _fan_controller = None
 _led_controller_task = None
@@ -337,12 +338,13 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
             channel_hash_resolver=channel_hash_resolver,
         )
         _init_dangerous_registry(pipeline)
-        global _rtl_listener, _p2000_listener, _pagers_listener
+        global _rtl_listener, _p2000_listener, _pagers_listener, _pocsag_listener
         _rtl_listener = RtlListener()
         listener_routes.init_routes(_rtl_listener)
         _p2000_listener = PagerListener("p2000")
         _pagers_listener = PagerListener("pagers")
-        pager_routes.init_routes(_p2000_listener, _pagers_listener)
+        _pocsag_listener = PagerListener("pocsag")
+        pager_routes.init_routes(_p2000_listener, _pagers_listener, _pocsag_listener)
         print_banner(config, sources=pipeline.capture_coordinator.sources)
         logger.info("Meshpoint started -- listening for packets")
         yield
@@ -352,6 +354,8 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
             await _p2000_listener.stop()
         if _pagers_listener is not None:
             await _pagers_listener.stop()
+        if _pocsag_listener is not None:
+            await _pocsag_listener.stop()
         if _spectral_scan_service is not None:
             await _spectral_scan_service.stop()
         if _noise_floor_emitter_task is not None:
@@ -439,6 +443,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     app.include_router(listener_routes.router, dependencies=protected)
     app.include_router(pager_routes.p2000_router, dependencies=protected)
     app.include_router(pager_routes.pagers_router, dependencies=protected)
+    app.include_router(pager_routes.pocsag_router, dependencies=protected)
     app.include_router(spectrum_routes.router, dependencies=protected)
     app.include_router(meshtastic_routes.router, dependencies=protected)
     app.include_router(meshcore_routes.router, dependencies=protected)
