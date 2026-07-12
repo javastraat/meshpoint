@@ -1168,25 +1168,86 @@ plus its now-dead CSS rule) per explicit user ask — redundant with the
 summary bar's "Oldest poll" stat once there's only one repeater
 configured. All JS syntax-checked with `node --check`; Python route
 change syntax + logic checked with a stubbed fastapi/aiosqlite unit
-test. Not yet live-verified on the Pi.
+test. LIVE-VERIFIED 2026-07-12 on the Pi: modal opened from the
+Neighbours row, listed all 26 neighbours freshest-first (37m ago down
+to 5d ago), several with roster-resolved names (NL-AMS-BA01-RE,
+AA-Rep-Mesh-01, Repeater Baarsjes, etc — real repeaters/nodes already
+known from direct/relay reception), and clicking a resolved neighbour
+correctly opened the node drawer (confirmed for !5fd2a0f85c57 /
+NL-AMS-BA01-RE, showing role REPEATER, protocol meshcore, full
+position/signal/metrics). This feature is fully closed.
+
+Priority order below is the recommended working order (discussed and
+agreed 2026-07-12) — install.sh retest deliberately kept at the bottom
+since it's on the user to run whenever ready, not a build task.
+
+Configuration audit done 2026-07-12 (background agent, cross-referenced
+all 19 `section_map` sections in `src/config.py:622-641` against every
+`frontend/js/configuration/*_card.js` + backing route). Full gaps (zero
+UI, YAML-only): **`repeater_poll`** (enabled/interval_minutes/whole
+repeater roster incl. passwords — matches this session's own poller
+work, highest priority since it's the one leaking credentials into
+YAML-only territory), **`metrics`** (enabled/require_auth Prometheus
+toggle, trivial 2-boolean win), **`dashboard`** (host/port/static_dir,
+lower urgency — changing your own web server's port from inside itself
+is awkward regardless of UI). Partial-coverage gaps worth a look:
+`mqtt.tls_ca_cert` (only gap in an otherwise complete card, blocks
+private/TLS broker CA config), `relay.serial_port`/`serial_baud`
+(needed to point relay at a real SX1262 device, API already accepts
+it). Everything else flagged was minor/edge-case (radio's
+tx_power_dbm/sync_word/preamble_length/spectrum_sweep_interval_seconds,
+three broadcast startup_delay_seconds fields, capture.concentrator_spi_device,
+meshtastic/meshcore default_key_b64, upstream.enabled — deliberately
+excluded by design per existing code comment, not a real gap). Not yet
+decided which (if any) to build — recorded here as the reference audit,
+revisit `repeater_poll` UI as the natural next pick given it already has
+a "Deferred" cousin item (poller → roster) tracked below.
+
+Closed 2026-07-12: Messages tab "monitor mode" (eye icon) UX fix. User
+report: "when opening page it doesnt show the chats i have to press
+the eye icon to show it." Root cause (background agent investigation):
+`frontend/js/messaging.js:13` `_monitorMode` defaulted to `false` and
+was never persisted (plain in-memory flag, unlike the map-view/
+node-sort-filter localStorage precedent elsewhere) — combined with
+this box being deployed as a repeater/observer (never itself a DM
+party), essentially all DM traffic it sees is classified `overheard`
+(`src/api/server.py:1284-1318` — tagged only when NEITHER source nor
+destination is this node) and hidden by design (privacy default: don't
+surface strangers' DMs unopted). Confirmed NOT a two-icon conflation —
+one eye icon, one `_monitorMode` flag, consistently applied to both the
+REST load (`messaging_contacts.js`) and live WebSocket routing
+(`messaging.js:193-199`). User's explicit fix choice (verbatim, "Other"
+answer to an AskUserQuestion offering persist-only / persist+default-on
+options): "when we go to the messaging tab (page) everything should be
+shown please" — i.e. always show everything on open, not a
+remembered-preference system. Implemented: `_monitorMode` now defaults
+`true` (was `false`), constructor comment explains why; the button's
+initial markup also gets `msg-icon-btn--active` class + "Monitor ON"
+title + `aria-pressed="true"` so the icon's visual state matches reality
+from first render (previously only updated on click). No persistence
+added — matches what the user actually asked for (always-show), not the
+persist-a-toggle option. `node --check` passed. Not yet live-verified on
+the Pi.
 
 | # | Status | Effort | Item |
 |---|--------|--------|------|
-| — | Open | S | Retest `scripts/install.sh` on a fresh microSD flash — exercises everything added this session in one shot (RTL-SDR, redsea, multimon-ng, fastfetch banner, section renumbering); first fresh-flash run already passed once, user wants to test again |
-| — | Open | S | Configuration audit: check every key in `config/default.yaml` (and by extension `local.yaml`) has a corresponding edit control in the web dashboard — user request 2026-07-12, flag any settings that are YAML-only today with no UI equivalent |
-| — | Deferred | S | Poller → roster? Should live neighbour polls also upsert nodes / write nb:-style rows (bump last_heard, name unknown pubkeys)? Currently repeater_status.json only. Revisited 2026-07-12, design ready (see note above), user chose to hold off for now |
-| W14 | Open | M | Stray-frames table — log RF frames that fail all three decoders instead of dropping silently (upstream #80) |
-| — | Open | M | Server-side downsample-across-range for the Repeater Trends chart — a fixed high limit (`hours=100000&limit=50000`) will eventually start truncating again as live polls keep growing the row count unbounded |
-| W18 | Open | S-M | Mini RTL-SDR player widget — when the Radio/RTL-SDR listener is actively streaming, show a small persistent player (bottom-left of the sidebar/menu) with basic transport controls (stop, etc.) so the user doesn't have to navigate back to the Radio page just to stop playback |
+| — | Open | S-M | `repeater_poll` config gets a dashboard UI — enable/disable, interval_minutes, and a repeaters roster editor (key/password/name per repeater). Currently the only YAML-only section with actual secrets (passwords) in it. From 2026-07-12 config audit |
+| — | Open | S | `metrics` config gets a dashboard toggle — enabled/require_auth for the Prometheus scrape endpoint. Trivial 2-boolean win. From 2026-07-12 config audit |
+| W20 | Open | S | Per-user channel display order, remembered per browser (localStorage, matching the existing node-map-view/node-sort-filter precedent) — let the user drag/reorder which channel appears first in the Channels UI instead of a fixed server-side order. User request 2026-07-12, added to wishlist, not yet built |
 | — | Open | S | Prune or document the 6 kept-for-later duplicate API endpoints (packets/count+protocols+types, nodes/map+summary, telemetry/*) |
-| W5 | Open | M-L | DAB+ listener mode via welle-cli — unlocks NPO Radio 5 (DAB-only) |
+| — | Open | M-L | RTL-SDR page gains P2000 and Pagers tabs alongside the existing Radio tab. Each is a fixed `rtl_fm`→`multimon-ng` pipeline (builds on this session's multimon-ng installer work): P2000 — `rtl_fm -f 169.65M -M fm -s 22050 -l 250 \| multimon-ng -a FLEX -a SCOPE -t raw /dev/stdin`; Pagers — `rtl_fm -f 172.45M -M fm -s 22050 -l 250 \| multimon-ng -a POCSAG512 -a POCSAG1200 -a POCSAG2400 -a SCOPE -t raw /dev/stdin`. Decoded messages should stream live to the web dashboard (new tab/panel per feed, not just a log file). User request 2026-07-12, not yet designed/built — needs a process-management approach (start/stop per tab, parse multimon-ng's stdout per decoder, push over the existing WebSocket feed or a new one). Bumped ahead of lower-effort items 2026-07-12 per effort-vs-win discussion: genuinely new capability + explicit user want outweighs the higher effort |
+| — | Open | M | Server-side downsample-across-range for the Repeater Trends chart — a fixed high limit (`hours=100000&limit=50000`) will eventually start truncating again as live polls keep growing the row count unbounded |
+| W14 | Open | M | Stray-frames table — log RF frames that fail all three decoders instead of dropping silently (upstream #80) |
+| W18 | Open | S-M | Mini RTL-SDR player widget — when the Radio/RTL-SDR listener is actively streaming, show a small persistent player (bottom-left of the sidebar/menu) with basic transport controls (stop, etc.) so the user doesn't have to navigate back to the Radio page just to stop playback |
 | W6 | Open | M-L | True-RF S-meter via pyrtlsdr — real dBm instead of post-demod audio loudness |
+| W5 | Open | M-L | DAB+ listener mode via welle-cli — unlocks NPO Radio 5 (DAB-only) |
 | W4 | Open | L | Light theme — tokenize the dark-first CSS, light map tiles, per-page contrast pass; topbar toggle already has a slot reserved |
+| — | Deferred | S | Poller → roster? Should live neighbour polls also upsert nodes / write nb:-style rows (bump last_heard, name unknown pubkeys)? Currently repeater_status.json only. Revisited 2026-07-12, design ready (see note above), user chose to hold off for now |
 | W2 | Parked | M | LoRaWAN key store + MIC verify/decrypt — trigger: you run your own LoRaWAN devices |
 | W11 | Parked | M | TTN uplink-only forwarder — trigger: TTN entanglement deemed worth it |
 | — | Noted | — | Firmware flasher / companion version check (upstream #85/#59) — if flashing the 3 sticks becomes a pain |
 | — | Noted | — | Reticulum as 6th network on the spare Heltec V3 433 (upstream #11) — wildcard |
-| W20 | Open | S | Per-user channel display order, remembered per browser (localStorage, matching the existing node-map-view/node-sort-filter precedent) — let the user drag/reorder which channel appears first in the Channels UI instead of a fixed server-side order. User request 2026-07-12, added to wishlist, not yet built |
+| — | Open | S | Retest `scripts/install.sh` on a fresh microSD flash — exercises everything added this session in one shot (RTL-SDR, redsea, multimon-ng, fastfetch banner, section renumbering); first fresh-flash run already passed once, user wants to test again |
 
 ## CURRENT WORKLIST v4 (2026-07-11 end of day — supersedes v2/v3 below; THE list to work off)
 

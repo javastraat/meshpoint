@@ -10,7 +10,11 @@ class MessagingPanel {
         this._contacts = null;
         this._chat = null;
         this._activeConvo = null;
-        this._monitorMode = false;
+        // Defaults to on: this box is typically a repeater/observer, not
+        // a node the operator personally DMs from, so nearly all DM
+        // traffic it sees is "overheard" -- leaving it off by default
+        // made the tab look empty on every visit.
+        this._monitorMode = true;
         this._txStatus = null;
     }
 
@@ -31,7 +35,7 @@ class MessagingPanel {
                             <span class="msg-sidebar__subtitle">Channels &amp; direct conversations</span>
                         </div>
                         <div class="msg-sidebar__actions">
-                            <button class="msg-icon-btn" id="msg-monitor-btn" type="button" title="Monitor: show overheard DMs" aria-label="Monitor mode">
+                            <button class="msg-icon-btn msg-icon-btn--active" id="msg-monitor-btn" type="button" title="Monitor ON: showing overheard DMs" aria-label="Monitor mode" aria-pressed="true">
                                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                     <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/>
                                     <circle cx="12" cy="12" r="2.5"/>
