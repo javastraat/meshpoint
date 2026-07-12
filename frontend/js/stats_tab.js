@@ -203,9 +203,9 @@ class StatsTab {
             <section class="stats-section">
                 <h2 class="stats-section__title">Range</h2>
                 <div class="stats-range-grid">
-                    <div class="stats-range-card">
+                    <div class="stats-range-card" title="Farthest node your antenna received directly, no relay hops (Meshtastic or MeshCore, whichever band — LoRaWAN never qualifies, this session)">
                         <div class="stats-range-card__header">Farthest Direct Signal</div>
-                        <div class="stats-range-card__desc">Farthest node your antenna received directly, no relay hops (Meshtastic or MeshCore, whichever band — LoRaWAN never qualifies, this session)</div>
+                        <div class="stats-range-card__desc">Farthest direct reception, no relay hops (Meshtastic or MeshCore)</div>
                         <div class="stats-range-card__value">
                             <span id="ss-direct-mi" class="stats-range-card__miles">--</span>
                             <span id="ss-direct-unit" class="stats-range-card__unit">mi</span>
@@ -223,9 +223,9 @@ class StatsTab {
                         <div id="ss-mesh-detail" class="stats-range-card__detail"></div>
                         <div class="stats-range-bar"><div id="ss-mesh-bar" class="stats-range-bar__fill stats-range-bar__fill--mesh"></div></div>
                     </div>
-                    <div class="stats-range-card">
+                    <div class="stats-range-card" title="Farthest MeshCore node in your roster with a known position — not necessarily ever received directly, may include imported contacts">
                         <div class="stats-range-card__header">Farthest MeshCore Contact</div>
-                        <div class="stats-range-card__desc">Farthest MeshCore node in your roster with a known position — not necessarily ever received directly, may include imported contacts</div>
+                        <div class="stats-range-card__desc">Farthest roster contact with known position — not necessarily heard directly</div>
                         <div class="stats-range-card__value">
                             <span id="ss-mc-mi" class="stats-range-card__miles">--</span>
                             <span id="ss-mc-unit" class="stats-range-card__unit"></span>
