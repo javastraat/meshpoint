@@ -1823,6 +1823,7 @@ raising anything file-local. Verified with `node --check`.
 | — | Open | S | Prune or document the 6 kept-for-later duplicate API endpoints (packets/count+protocols+types, nodes/map+summary, telemetry/*) |
 | — | Open | M | Server-side downsample-across-range for the Repeater Trends chart — a fixed high limit (`hours=100000&limit=50000`) will eventually start truncating again as live polls keep growing the row count unbounded |
 | W14 | DONE 2026-07-12 | M | **Stray Frames.** See closure paragraph below (built as an in-memory ring buffer, not a DB table, per user's explicit "test first" ask). |
+| — | Retest | S | Check the RF Environment → Stray Frames card again after it's had real runtime — LIVE-VERIFIED 2026-07-12 rendering correctly but still empty (0 frames) right after deploy/restart, which is expected and healthy, not yet a real read on actual volume. Revisit later: if it stays empty, decoders are catching effectively everything; if it fills up, look at what's actually in it and decide whether to graduate to a persisted table with a real retention cap (the original open question this ring-buffer-first approach was built to answer). |
 | W18 | Open | S-M | Mini RTL-SDR player widget — when the Radio/RTL-SDR listener is actively streaming, show a small persistent player (bottom-left of the sidebar/menu) with basic transport controls (stop, etc.) so the user doesn't have to navigate back to the Radio page just to stop playback |
 | W6 | Open | M-L | True-RF S-meter via pyrtlsdr — real dBm instead of post-demod audio loudness |
 | W5 | Open | M-L | DAB+ listener mode via welle-cli — unlocks NPO Radio 5 (DAB-only) |
@@ -1926,8 +1927,11 @@ Frames card's box below it — nothing to do with the new feature's own code, ju
 first thing on this page ever unlucky enough to expose the CSS bug. Fixed with a
 `.rf-histogram-empty[hidden] { display: none; }` override (higher specificity than the
 bare class rule, wins cleanly). Folded into the existing Stray Frames CHANGELOG bullet
-as a same-round adjacent fix. Not yet re-screenshotted after this specific fix, but the
-mechanism is well understood and the fix is minimal/targeted.
+as a same-round adjacent fix. **LIVE-VERIFIED 2026-07-12**: user re-screenshotted after
+pulling the fix — Channel histogram card now ends cleanly at its own bottom border, no
+more "No hardware scan yet" text bleeding into the Stray Frames card below it, which
+now renders as its own separate clean box (still empty — no stray frames captured yet,
+as expected right after restart).
 
 ## CURRENT WORKLIST v4 (2026-07-11 end of day — supersedes v2/v3 below; THE list to work off)
 
