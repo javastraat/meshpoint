@@ -1543,6 +1543,39 @@ Updates-subitem badges were dropped per user request") before fixing
 the wording — confirmed README.md and CHANGELOG.md were already
 correct/up to date, only CONFIGURATION.md had the stale description.
 
+Metrics config page (closed earlier this round): user's own "admin
+required even when logged in" concern this time turned out to be a
+false alarm — checked `identity_routes.py` and confirmed
+`"configuration.metrics"` WAS already correctly in `_ADMIN_SECTIONS`
+(the "3 places, not 2" lesson from the repeater-poll page held this
+time); likely just a deploy-timing question, resolved itself. Then
+**LIVE-VERIFIED end to end with a real Prometheus server**: user set
+one up specifically to test this feature. Walked through: `curl
+.../metrics` (confirmed all ~26 metrics render correctly with real
+live values — 1669 nodes, RSSI/SNR averages, relay stats, SX1302 CRC
+counters, etc), added a `meshpoint` scrape job to the user's real
+`prometheus.yml` (gave the full file back, not just a diff, since
+they asked), reload via lifecycle API failed ("Lifecycle API is not
+enabled") so used `systemctl restart prometheus` instead, then
+confirmed via a screenshot of Prometheus's own Status → Targets page:
+both `prometheus` (self) and `meshpoint` jobs showing `UP`, 69ms
+scrape latency. Ran a live query (`meshpoint_nodes_total` → `1669`,
+screenshot confirmed) proving the whole pipeline works. User chose
+`require_auth: false` for their test setup ("we turned it off on the
+web for testing") after I explained the JWT-expiry tradeoff. Docs:
+added a full "Available metrics" table (all ~26 metric names/types/
+descriptions, pulled directly from `metrics_routes.py`'s
+`_render_metrics()`, not guessed) and a "Connecting a Prometheus
+server" section (sample scrape config, reload/restart commands,
+verification query) to `docs/CONFIGURATION.md`'s Prometheus Metrics
+section; README's existing Prometheus bullet extended to mention the
+new Configuration → Metrics page and point to CONFIGURATION.md for
+the full reference (the `/metrics` endpoint itself is inherited from
+upstream, only the config PAGE is new this session — CHANGELOG bullet
+already scoped correctly, left as-is). This feature is about as
+thoroughly live-verified as anything gets this session — real
+external tool, real screenshots, real data flowing end to end.
+
 | # | Status | Effort | Item |
 |---|--------|--------|------|
 | — | Open | S | Prune or document the 6 kept-for-later duplicate API endpoints (packets/count+protocols+types, nodes/map+summary, telemetry/*) |

@@ -139,7 +139,7 @@ This is a customized fork of upstream [KMX415/meshpoint](https://github.com/KMX4
 
 **Backup and restore.** Download a timestamped archive of `local.yaml` and the full `data/` directory (SQLite hot snapshot, PKI keys) from Settings, and restore it after an SD failure or bad experiment — the box returns to the snapshot, even after a database wipe. Admin-only; the archive contains all secrets, so store it offline.
 
-**Operator tooling.** Click any packet-feed row for a full decode-metadata modal. KPI status strips on the Dashboard and RF tabs, and live MQTT broker health on the MQTT page. A **Quick Deploy QR** exports public channel parameters for field provisioning straight into the Meshtastic app (default key only — private PSKs never leave the box). Optional **Prometheus `/metrics`** endpoint with packet, node, relay, and system counters.
+**Operator tooling.** Click any packet-feed row for a full decode-metadata modal. KPI status strips on the Dashboard and RF tabs, and live MQTT broker health on the MQTT page. A **Quick Deploy QR** exports public channel parameters for field provisioning straight into the Meshtastic app (default key only — private PSKs never leave the box). Optional **Prometheus `/metrics`** endpoint with packet, node, relay, and system counters — configurable from **Configuration → Metrics** (enable + auth toggle apply immediately, no restart), full metric list and a sample scrape config in `docs/CONFIGURATION.md`.
 
 **Broadcast cadence controls.** Position and telemetry broadcast intervals are editable from the dashboard with live countdowns (off, or 5 min–24 h), independent of NodeInfo, applied hot without a restart.
 

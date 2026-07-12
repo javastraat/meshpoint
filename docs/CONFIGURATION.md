@@ -713,6 +713,64 @@ Exposes a `/metrics` endpoint in standard Prometheus text format (uptime, packet
 
 Edit both fields from **Configuration → Metrics**. Unlike most config pages, changes here apply immediately — `metrics_routes.py` reads the config fresh on every request, so no restart is needed.
 
+### Available metrics
+
+| Metric | Type | Description |
+|---|---|---|
+| `meshpoint_uptime_seconds` | gauge | Seconds since the metrics collector started |
+| `meshpoint_info{version,region}` | gauge | Build info (always `1`) |
+| `meshpoint_packets_session_total` | counter | Decoded packets since last heartbeat reset |
+| `meshpoint_packets_per_minute` | gauge | Session packet rate |
+| `meshpoint_protocol_packets_session_total{protocol}` | counter | Session packets by protocol (`meshtastic`/`meshcore`/`lorawan`) |
+| `meshpoint_rssi_average_dbm` | gauge | Average RSSI over session samples |
+| `meshpoint_snr_average_db` | gauge | Average SNR over session samples |
+| `meshpoint_packets_direct_session_total` | counter | Direct (0-hop) packets in session |
+| `meshpoint_packets_relayed_session_total` | counter | Relayed (1+ hop) packets in session |
+| `meshpoint_packets_database_total` | counter | Total packets stored in SQLite |
+| `meshpoint_packets_last_hour` | gauge | Packets received in the last hour |
+| `meshpoint_packets_last_minute` | gauge | Packets received in the last minute |
+| `meshpoint_rssi_recent_average_dbm` | gauge | Average RSSI over the 200 most recent packets |
+| `meshpoint_snr_recent_average_db` | gauge | Average SNR over the 200 most recent packets |
+| `meshpoint_nodes_total` | gauge | Known nodes in the local database |
+| `meshpoint_nodes_active_24h` | gauge | Nodes heard in the last 24 hours |
+| `meshpoint_noise_floor_dbm{source}` | gauge | Estimated noise floor (dBm) |
+| `meshpoint_noise_floor_stale` | gauge | `1` when the noise-floor estimate is stale |
+| `meshpoint_relay_enabled` | gauge | `1` when experimental relay is enabled |
+| `meshpoint_relay_relayed_total` | counter | Packets relayed since process start |
+| `meshpoint_relay_rejected_total{reason}` | counter | Packets rejected by relay filters, broken down by reason |
+| `meshpoint_relay_rate_per_minute` | gauge | Current relay rate |
+| `meshpoint_relay_rate_remaining` | gauge | Remaining relay capacity in the current window |
+| `meshpoint_relay_duty_usage_percent` | gauge | Aggregate relay duty usage (ToA estimate) |
+| `meshpoint_relay_duty_channel_usage_percent{channel}` | gauge | Per-channel relay duty usage (ToA estimate) |
+| `meshpoint_rx_crc_bad_total` | counter | SX1302 CRC_BAD frames since concentrator start |
+| `meshpoint_rx_no_crc_total` | counter | SX1302 NO_CRC frames since concentrator start |
+
+Any metric backed by a component that isn't running (e.g. no relay configured, no concentrator) is simply omitted from the response rather than reported as zero.
+
+### Connecting a Prometheus server
+
+Add a scrape job to your Prometheus server's own `prometheus.yml` (not Meshpoint's config) — alongside its default self-scrape job:
+
+```yaml
+scrape_configs:
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+        labels:
+          app: "prometheus"
+
+  - job_name: "meshpoint"
+    scrape_interval: 30s
+    static_configs:
+      - targets: ["192.168.2.189:8080"]   # your Pi's IP:port
+        labels:
+          app: "meshpoint"
+```
+
+Then reload Prometheus to pick up the change — either `curl -X POST http://localhost:9090/-/reload` (only works if Prometheus was started with `--web.enable-lifecycle`) or a plain service restart (`systemctl restart prometheus`, or the equivalent for however it's run). Check **Status → Targets** in the Prometheus UI for the `meshpoint` job showing `UP`, then query e.g. `meshpoint_nodes_total` or `rate(meshpoint_packets_database_total[5m])` to confirm data is flowing.
+
+If you leave `require_auth: true`, Prometheus needs to authenticate on every scrape — either the `Authorization: Bearer <session-jwt>` header, or nothing works and every scrape 401s. Since dashboard session tokens expire, this isn't practical for an unattended scrape config in most setups; `require_auth: false` is the realistic choice for actually running this, and the endpoint never exposes credentials or channel keys regardless.
+
 ---
 
 ## Device Identity
