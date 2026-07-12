@@ -372,8 +372,8 @@ class ListenerPanel {
         // Pagers can be active at a time. Kept as sibling panels rather
         // than folded into this already-large file.
         this._activeTab = 'radio';
-        this._p2000Panel = window.PagerPanel ? new window.PagerPanel('/api/p2000', 'P2000') : null;
-        this._pagersPanel = window.PagerPanel ? new window.PagerPanel('/api/pagers', 'Pagers') : null;
+        this._p2000Panel = window.PagerPanel ? new window.PagerPanel('p2000', '/api/p2000', 'P2000') : null;
+        this._pagersPanel = window.PagerPanel ? new window.PagerPanel('pagers', '/api/pagers', 'Pagers') : null;
     }
 
     _loadFavs() {
@@ -792,13 +792,24 @@ class ListenerPanel {
             }
         }
 
+        // Only P2000/Pagers can be "in the way" from Radio's point of view --
+        // dongle_owner === 'radio' just means we're the one running.
+        const busyOwner = (st.dongle_owner && st.dongle_owner !== 'radio') ? st.dongle_owner : null;
+        const tuneBtn = document.getElementById('lsn-tune-btn');
+        if (tuneBtn) tuneBtn.disabled = !!busyOwner;
+
         if (st.running) {
             const label = `${fmtFreq3(st.frequency_mhz)} MHz ${st.mode.toUpperCase()}`
                 + (st.listeners ? ` • ${st.listeners} listening` : '');
             this._setStatus(true, label);
         } else {
             this._playing = false;
-            this._setStatus(false, st.last_error ? `idle — ${st.last_error}` : 'idle');
+            if (busyOwner) {
+                const labels = { p2000: 'P2000', pagers: 'Pagers' };
+                this._setStatus(false, `busy — in use by ${labels[busyOwner] || busyOwner}`);
+            } else {
+                this._setStatus(false, st.last_error ? `idle — ${st.last_error}` : 'idle');
+            }
         }
     }
 

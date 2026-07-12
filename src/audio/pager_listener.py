@@ -169,6 +169,10 @@ class PagerListener:
             "message_count": len(self.messages),
             "messages": list(self.messages),
             "last_error": self._last_error,
+            # Who currently holds the shared RTL-SDR dongle (None = free,
+            # this kind, or the other listener) -- lets the frontend show
+            # "busy" instead of a bare "idle" when someone else has it.
+            "dongle_owner": sdr_registry.current_owner(),
         }
 
     # ── pipeline management (call with self._lock held) ──────────

@@ -9,9 +9,13 @@
  * another is active returns an error from the backend, shown inline
  * rather than silently stopping the other one.
  */
+// Matches src/audio/sdr_registry.py's owner names.
+const _DONGLE_OWNER_LABELS = { radio: 'Radio', p2000: 'P2000', pagers: 'Pagers' };
+
 class PagerPanel {
-    constructor(apiPrefix, title) {
-        this._apiPrefix = apiPrefix;  // '/api/p2000' or '/api/pagers'
+    constructor(kind, apiPrefix, title) {
+        this.kind = kind;              // 'p2000' or 'pagers' -- matches the registry
+        this._apiPrefix = apiPrefix;   // '/api/p2000' or '/api/pagers'
         this._title = title;
         this._root = null;
         this._statusTimer = null;
@@ -96,12 +100,27 @@ class PagerPanel {
     _render(status) {
         const dot = this._root.querySelector('[data-pager-dot]');
         const text = this._root.querySelector('[data-pager-status-text]');
+        const startBtn = this._root.querySelector('[data-pager-start]');
+        // Only the RTL-SDR dongle's ACTUAL owner can be "busy" from this
+        // tab's point of view -- if dongle_owner === our own kind, that's
+        // just us running, not something else in the way.
+        const busyOwner = (status.dongle_owner && status.dongle_owner !== this.kind)
+            ? status.dongle_owner : null;
+
         if (dot) dot.classList.toggle('pager-status__dot--on', !!status.running);
         if (text) {
-            text.textContent = status.running
-                ? `listening on ${status.frequency_mhz} MHz`
-                : (status.last_error ? `stopped -- ${status.last_error}` : 'idle');
+            if (status.running) {
+                text.textContent = `listening on ${status.frequency_mhz} MHz`;
+            } else if (busyOwner) {
+                text.textContent = `busy -- in use by ${_DONGLE_OWNER_LABELS[busyOwner] || busyOwner}`;
+            } else if (status.last_error) {
+                text.textContent = `stopped -- ${status.last_error}`;
+            } else {
+                text.textContent = 'idle';
+            }
         }
+        if (startBtn) startBtn.disabled = !!busyOwner;
+
         const countEl = this._root.querySelector('[data-pager-count]');
         if (countEl) countEl.textContent = status.message_count ? `(${status.message_count})` : '';
 

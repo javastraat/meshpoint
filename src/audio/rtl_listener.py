@@ -206,6 +206,11 @@ class RtlListener:
             "rds_bler": self.rds_bler,
             "listeners": len(self._subscribers),
             "last_error": self._last_error,
+            # Who currently holds the shared RTL-SDR dongle (None = free,
+            # "radio" = this listener, "p2000"/"pagers" = the other kind) --
+            # lets the frontend show "busy" instead of a bare "idle" when a
+            # sibling listener is the one actually holding the device.
+            "dongle_owner": sdr_registry.current_owner(),
         }
 
     # ── pipeline management (call with self._lock held) ──────────

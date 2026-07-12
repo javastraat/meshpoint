@@ -1658,6 +1658,27 @@ all JS `node --check`ed. Not yet live-verified on the Pi — this is the
 first genuinely new RTL-SDR capability to ship this session without
 any live hardware test at all, given the constraints above.
 
+Follow-up fix same round: user spotted from live screenshots that the
+Pagers tab said plain "idle" while P2000 was actively listening — a
+real gap, since `status()` only ever reported "is THIS listener
+running," never "is the dongle busy with something else." Added
+`dongle_owner: sdr_registry.current_owner()` to both
+`RtlListener.status()` and `PagerListener.status()`
+(`src/audio/rtl_listener.py`, `src/audio/pager_listener.py`) so every
+tab can see who actually holds the dongle, not just its own state.
+Frontend: `pager_panel.js`'s `PagerPanel` constructor gained a `kind`
+param (had only `apiPrefix`/`title` before — needed to distinguish
+"dongle_owner is ME" from "dongle_owner is someone else"); `_render()`
+now shows "busy -- in use by P2000/Pagers/Radio" and disables the
+Start button when a sibling holds it. Applied the identical treatment
+to the Radio tab's own status text and Tune button in
+`listener_panel.js` for symmetry — all three tabs now consistently
+show "busy" instead of a misleading bare "idle" whenever a sibling
+tab is active. Verified with a stub test: confirmed `dongle_owner`
+correctly shows `None` when free, the OTHER listener's kind while it's
+running, and clears back to `None` after stop. All syntax-checked.
+Not yet live-verified on the Pi (same caveat as the base feature).
+
 | # | Status | Effort | Item |
 |---|--------|--------|------|
 | — | Open | S | Prune or document the 6 kept-for-later duplicate API endpoints (packets/count+protocols+types, nodes/map+summary, telemetry/*) |
