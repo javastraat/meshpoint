@@ -56,6 +56,7 @@ _ADMIN_SECTIONS: tuple[str, ...] = (
     "configuration.mqtt",
     "configuration.gps",
     "configuration.advanced",
+    "configuration.peripherals",
     "settings",
     "settings.updates",
     "settings.auth",

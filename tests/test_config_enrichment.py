@@ -42,5 +42,35 @@ class EnrichConfigPayloadSerialTest(unittest.TestCase):
         self.assertIsInstance(enriched["capture"]["meshcore_usb"], list)
 
 
+class EnrichConfigPayloadHardwareTest(unittest.TestCase):
+    def test_defaults_are_enriched(self):
+        cfg = AppConfig()
+        enriched = enrich_config_payload(cfg, {})
+        self.assertEqual(enriched["hardware"]["fan"], {
+            "enabled": False, "gpio_pin": 13, "min_temp_c": 45.0,
+            "max_temp_c": 65.0, "min_duty": 0.35, "hysteresis_c": 5.0,
+            "poll_interval_s": 10.0,
+        })
+        self.assertEqual(enriched["hardware"]["led"], {
+            "enabled": False, "gpio_pin": 22, "activity_blink": True,
+        })
+        self.assertEqual(enriched["hardware"]["button"], {
+            "enabled": False, "gpio_pin": 27, "hold_time_s": 3.0,
+            "advert_cooldown_s": 30.0,
+        })
+
+    def test_custom_values_are_enriched(self):
+        cfg = AppConfig()
+        cfg.fan.enabled = True
+        cfg.fan.min_temp_c = 50.0
+        cfg.led.activity_blink = False
+        cfg.button.hold_time_s = 5.0
+        enriched = enrich_config_payload(cfg, {})
+        self.assertTrue(enriched["hardware"]["fan"]["enabled"])
+        self.assertEqual(enriched["hardware"]["fan"]["min_temp_c"], 50.0)
+        self.assertFalse(enriched["hardware"]["led"]["activity_blink"])
+        self.assertEqual(enriched["hardware"]["button"]["hold_time_s"], 5.0)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -4,7 +4,8 @@
  * Single responsibility: load ``/api/config`` once, mount the right
  * editable card into each Configuration subsection container, and
  * re-render every card on data changes. The subsections (Identity,
- * Radio, Channels, MeshCore, Serial, Transmit, MQTT, GPS, Advanced)
+ * Radio, Channels, MeshCore, Serial, Transmit, MQTT, GPS, Advanced,
+ * Peripherals)
  * all mount dedicated editable cards from ``frontend/js/configuration/``.
  * The observational read-only versions (``RadioIdentityCard``,
  * ``RadioConfigCard``, ``RadioChannels``, ``RadioCompanionCard``)
@@ -188,6 +189,14 @@ class ConfigurationPanel {
                 const card = new window.AdvancedConfigCard(api);
                 card.mount(host);
                 this._cards.set('advanced', card);
+            }
+        } else if (section === 'peripherals' && window.HardwareConfigCard) {
+            const host = document.getElementById('cfg-peripherals-panel');
+            if (host) {
+                host.innerHTML = '';
+                const card = new window.HardwareConfigCard(api);
+                card.mount(host);
+                this._cards.set('peripherals', card);
             }
         }
         this._mounted.add(section);

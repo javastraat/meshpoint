@@ -83,6 +83,31 @@ def enrich_config_payload(cfg: AppConfig, base: dict) -> dict:
         "update_interval_seconds": location.update_interval_seconds,
         "min_fix_quality": location.min_fix_quality,
     }
+    fan = cfg.fan
+    led = cfg.led
+    button = cfg.button
+    base["hardware"] = {
+        "fan": {
+            "enabled": fan.enabled,
+            "gpio_pin": fan.gpio_pin,
+            "min_temp_c": fan.min_temp_c,
+            "max_temp_c": fan.max_temp_c,
+            "min_duty": fan.min_duty,
+            "hysteresis_c": fan.hysteresis_c,
+            "poll_interval_s": fan.poll_interval_s,
+        },
+        "led": {
+            "enabled": led.enabled,
+            "gpio_pin": led.gpio_pin,
+            "activity_blink": led.activity_blink,
+        },
+        "button": {
+            "enabled": button.enabled,
+            "gpio_pin": button.gpio_pin,
+            "hold_time_s": button.hold_time_s,
+            "advert_cooldown_s": button.advert_cooldown_s,
+        },
+    }
     pos = cfg.transmit.position
     telem = cfg.transmit.telemetry
     if "transmit" in base:
