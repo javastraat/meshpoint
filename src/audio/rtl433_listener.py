@@ -113,7 +113,12 @@ class Rtl433Listener:
     # ── pipeline management (call with self._lock held) ──────────
 
     async def _start_locked(self) -> None:
-        cmd = ["rtl_433", "-F", "json"]
+        # -F log alongside -F json: without it, rtl_433 suppresses its own
+        # startup/device/error messages entirely ("Use "-F log" if you want
+        # any messages, warnings, and errors in the console") -- meaning a
+        # real fatal reason (device busy, PLL not locked, etc) would be
+        # silently thrown away instead of reaching _stderr_loop below.
+        cmd = ["rtl_433", "-F", "json", "-F", "log"]
         logger.info("rtl_433 listener starting: %s", " ".join(cmd))
         self._last_error = ""
         self._proc = await asyncio.create_subprocess_exec(
@@ -204,10 +209,15 @@ class Rtl433Listener:
                 self.messages.append(event)
         except asyncio.CancelledError:
             return
-        # EOF: process died on its own (dongle missing, crash, ...)
+        # EOF: process died on its own (dongle missing, crash, ...). Always
+        # note the exit code -- an earlier benign stderr line (e.g. rtl_433's
+        # own "-F log" hint, which contains "error" as a substring and so
+        # gets picked up by _ERROR_RE) must not mask that the process
+        # actually terminated.
         if self._proc is proc:
             rc = proc.returncode
-            self._last_error = self._last_error or f"process exited (code {rc})"
+            exit_note = f"process exited (code {rc})"
+            self._last_error = f"{self._last_error} -- {exit_note}" if self._last_error else exit_note
             logger.warning("rtl_433 listener ended: %s", self._last_error)
             self._proc = None
             sdr_registry.release(_OWNER)
