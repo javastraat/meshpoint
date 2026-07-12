@@ -1037,6 +1037,16 @@ needed) but no Qt packages. Idempotent via `command -v multimon-ng`.
 Not yet live-verified on the Pi. Folded into CHANGELOG.md (same
 section).
 
+Also closed 2026-07-12: installer section "20" appends `fastfetch` to
+`/home/pi/.bashrc` (user confirmed this exact path) so every login
+shell shows the system-info banner, matching what the user already
+sees when running `fastfetch` manually. Idempotent via `grep -qx
+fastfetch`. Also renumbered every install.sh section header
+sequentially 1-19 (previously had orphaned letter-suffixes like `2b`
+with no `2a`, `3b`/`3c`/`3d`/`3e` under a bare `3`) — comment-only,
+no behavior change. Not yet live-verified on the Pi. Folded into
+CHANGELOG.md (same section).
+
 | # | Status | Effort | Item |
 |---|--------|--------|------|
 | — | Decide | S | Poller → roster? Should live neighbour polls also upsert nodes / write nb:-style rows (bump last_heard, name unknown pubkeys)? Currently repeater_status.json only, by design |

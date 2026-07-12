@@ -695,6 +695,24 @@ info "Installing meshpoint CLI..."
 chmod +x "${MESHPOINT_DIR}/${CLI_SCRIPT}"
 ln -sf "${MESHPOINT_DIR}/${CLI_SCRIPT}" /usr/local/bin/meshpoint
 
+# ── 20. Add fastfetch login banner ────────────────────────────────
+#
+# Shows a system-info banner on every interactive login shell for the
+# `pi` user. Idempotent: skips if already present.
+
+PI_BASHRC="/home/pi/.bashrc"
+
+if [ -f "$PI_BASHRC" ]; then
+    if grep -qx "fastfetch" "$PI_BASHRC"; then
+        info "fastfetch login banner already configured"
+    else
+        info "Adding fastfetch login banner to ${PI_BASHRC}..."
+        echo "fastfetch" >> "$PI_BASHRC"
+    fi
+else
+    warn "${PI_BASHRC} not found, skipping fastfetch login banner"
+fi
+
 # ── Done ────────────────────────────────────────────────────────────
 
 echo ""
