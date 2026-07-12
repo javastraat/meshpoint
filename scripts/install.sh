@@ -107,7 +107,15 @@ apt-get install -y -qq \
     liblgpio-dev \
     libsqlite3-dev \
     ffmpeg \
-    i2c-tools
+    i2c-tools \
+    mc \
+    make \
+    htop \
+    btop \
+    fastfetch \
+    cmake \
+    libusb-1.0-0-dev \
+    build-essential
 
 # ── 2. Enable SPI ──────────────────────────────────────────────────
 
@@ -183,6 +191,61 @@ fi
 
 systemctl enable gpsd.socket 2>/dev/null || warn "Could not enable gpsd.socket"
 systemctl restart gpsd.socket 2>/dev/null || warn "Could not start gpsd.socket"
+
+# ── 3c. Install RTL-SDR support (USB SDR dongle, Radio tab listener) ─
+#
+# Two things a stock Raspberry Pi OS image is missing for an RTL-SDR
+# dongle to work: the kernel's own DVB driver claims the RTL2832U chip
+# before rtl-sdr's userspace tools can open it, and there's no rtl-sdr
+# package installed at all. Built from source (osmocom upstream) rather
+# than `apt install rtl-sdr`, matching what a from-source install lets
+# you swap in a vendor fork later (e.g. RTL-SDR Blog's own fork for
+# their V4/R828D dongle) without an apt package fighting it.
+#
+# Idempotent: skips the kernel blacklist if already present, skips the
+# clone+build if librtlsdr is already installed.
+
+RTLSDR_BUILD_DIR="/opt/rtl-sdr"
+DVB_BLACKLIST_FILE="/etc/modprobe.d/blacklist-rtlsdr-dvb.conf"
+
+info "Blacklisting the kernel DVB-T stack (conflicts with rtl-sdr userspace tools)..."
+if [ -f "$DVB_BLACKLIST_FILE" ] && grep -q '^blacklist dvb_usb_rtl28xxu' "$DVB_BLACKLIST_FILE"; then
+    info "DVB-T stack already blacklisted"
+else
+    cat > "$DVB_BLACKLIST_FILE" <<'_DVB_BLACKLIST'
+# Managed by Meshpoint installer. The kernel's DVB-T driver stack
+# (usb bridge + demodulator + tuner-support modules) claims the
+# RTL2832U chip on boot, which then can't be opened by rtl-sdr's own
+# userspace driver (rtl_fm, rtl_test, etc). Re-run scripts/install.sh
+# to restore this file if removed.
+blacklist dvb_usb_rtl28xxu
+blacklist rtl2832
+blacklist rtl2830
+_DVB_BLACKLIST
+fi
+# Also unload them right now if a dongle was already plugged in this
+# boot -- the blacklist file alone only takes effect on the NEXT boot.
+# Unload order matters: the usb bridge module depends on the
+# demodulator modules, so it must go first or -r fails with "in use".
+modprobe -r dvb_usb_rtl28xxu 2>/dev/null || true
+modprobe -r rtl2832 2>/dev/null || true
+modprobe -r rtl2830 2>/dev/null || true
+
+if ldconfig -p | grep -q librtlsdr; then
+    info "librtlsdr already installed, skipping RTL-SDR build"
+else
+    info "Cloning and building rtl-sdr..."
+    rm -rf "$RTLSDR_BUILD_DIR"
+    git clone --depth 1 git://git.osmocom.org/rtl-sdr.git "$RTLSDR_BUILD_DIR"
+    mkdir -p "${RTLSDR_BUILD_DIR}/build"
+    (
+        cd "${RTLSDR_BUILD_DIR}/build"
+        cmake ../ -DINSTALL_UDEV_RULES=ON
+        make -j"$(nproc)"
+        make install
+        ldconfig
+    )
+fi
 
 # ── 4. Build SX1302 HAL ───────────────────────────────────────────
 
@@ -449,13 +512,21 @@ info "Installing Meshpoint to ${MESHPOINT_DIR}..."
 mkdir -p "$MESHPOINT_DIR"
 
 rsync -a --exclude='venv' \
-         --exclude='.git' \
          --exclude='__pycache__' \
          --exclude='cdk.out' \
          --exclude='cloud/build' \
          --exclude='data' \
          --exclude='*.pyc' \
          "${SCRIPT_DIR}/" "$MESHPOINT_DIR/"
+
+# rsync -a --exclude='venv' \
+#          --exclude='.git' \
+#          --exclude='__pycache__' \
+#          --exclude='cdk.out' \
+#          --exclude='cloud/build' \
+#          --exclude='data' \
+#          --exclude='*.pyc' \
+#          "${SCRIPT_DIR}/" "$MESHPOINT_DIR/"
 
 # ── 5b. Remove stale compiled core modules from prior installs ─────
 # Releases before 0.7.0 shipped .cpython-*.so files alongside the
@@ -499,6 +570,9 @@ usermod -a -G spi,gpio,dialout,i2c meshpoint 2>/dev/null || true
 # inside the web terminal) work without sudo. This is the same group
 # Raspberry Pi OS uses to gate journal access for the `pi` user.
 usermod -a -G systemd-journal,adm meshpoint 2>/dev/null || true
+# Grant access to audio/video/plugdev for USB GPS and USB LoRa devices.
+usermod -a -G audio,video,plugdev meshpoint 2>/dev/null || true
+#
 # Whole tree to the service user (not just data/ and config/): plain-git
 # update checks need .git writable, and lgpio's fan-control pipe lands in
 # the WorkingDirectory itself. The service unit + post_update.sh re-apply

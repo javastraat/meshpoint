@@ -972,6 +972,54 @@ Meshtastic serial — live as `serial_433`; all three lines were stale until
 
 ---
 
+## CURRENT WORKLIST v5 (2026-07-12 end of day — supersedes v4 below; THE list to work off)
+
+Closed since v4: Configuration → Peripherals page (fan/LED/button editor,
+DONE), W17 GitHub update-check sidebar pill + all its follow-up fixes
+(channel_id guard, click-navigate, apply/rollback cache refresh, header
+placement, redundant-badge removal — DONE, live-verified), W19
+`scripts/edit_contact.py` (DONE, live-verified), node map Home button
+(placement/icon/zoom fixes — DONE, live-verified). All four folded into
+CHANGELOG.md + README.md + CONFIGURATION.md where warranted (checked
+systematically 2026-07-12, README was missing the Peripherals page and
+the whole update-check feature — both added).
+
+Also closed 2026-07-12: installer RTL-SDR bits (`scripts/install.sh`
+section "3c"). Blacklists the kernel DVB-T stack — `dvb_usb_rtl28xxu`
+(usb bridge) plus `rtl2832`/`rtl2830` (demodulator modules it depends
+on, correct no-underscore kernel module names, not `rtl_2832`/`rtl_2830`)
+— into `/etc/modprobe.d/blacklist-rtlsdr-dvb.conf`, then `modprobe -r`
+unloads them immediately in dependency order (bridge first) so a reboot
+isn't required to test. Then clones+builds `rtl-sdr` from source
+(osmocom upstream, `cmake -DINSTALL_UDEV_RULES=ON`) rather than
+`apt install rtl-sdr`, matching the SX1302 HAL build's from-source
+pattern and leaving room to swap in the RTL-SDR Blog fork later for the
+user's actual V4/R828D dongle without an apt package fighting it. Both
+steps idempotent (blacklist-file-exists check, `ldconfig -p | grep
+librtlsdr` check) — safe on upgrade re-runs. `meshpoint` user's
+`plugdev` group membership was already handled generically elsewhere
+in the installer (section 8, alongside audio/video for GPS/LoRa USB
+devices) — no separate udev-rule work needed since `-DINSTALL_UDEV_RULES=ON`
+has the rtl-sdr build install its own udev rules. Not yet live-verified
+on the Pi (Mac-side `bash -n` syntax check only). Folded into
+CHANGELOG.md (v0.7.7, Configuration and server section).
+
+| # | Status | Effort | Item |
+|---|--------|--------|------|
+| — | Decide | S | Poller → roster? Should live neighbour polls also upsert nodes / write nb:-style rows (bump last_heard, name unknown pubkeys)? Currently repeater_status.json only, by design |
+| W14 | Open | M | Stray-frames table — log RF frames that fail all three decoders instead of dropping silently (upstream #80) |
+| — | Open | M | Server-side downsample-across-range for the Repeater Trends chart — a fixed high limit (`hours=100000&limit=50000`) will eventually start truncating again as live polls keep growing the row count unbounded |
+| W18 | Open | S-M | Mini RTL-SDR player widget — when the Radio/RTL-SDR listener is actively streaming, show a small persistent player (bottom-left of the sidebar/menu) with basic transport controls (stop, etc.) so the user doesn't have to navigate back to the Radio page just to stop playback |
+| — | Open | S | Prune or document the 6 kept-for-later duplicate API endpoints (packets/count+protocols+types, nodes/map+summary, telemetry/*) |
+| W5 | Open | M-L | DAB+ listener mode via welle-cli — unlocks NPO Radio 5 (DAB-only) |
+| W6 | Open | M-L | True-RF S-meter via pyrtlsdr — real dBm instead of post-demod audio loudness |
+| W4 | Open | L | Light theme — tokenize the dark-first CSS, light map tiles, per-page contrast pass; topbar toggle already has a slot reserved |
+| W2 | Parked | M | LoRaWAN key store + MIC verify/decrypt — trigger: you run your own LoRaWAN devices |
+| W11 | Parked | M | TTN uplink-only forwarder — trigger: TTN entanglement deemed worth it |
+| — | Noted | — | Firmware flasher / companion version check (upstream #85/#59) — if flashing the 3 sticks becomes a pain |
+| — | Noted | — | Reticulum as 6th network on the spare Heltec V3 433 (upstream #11) — wildcard |
+| W20 | Open | S | Per-user channel display order, remembered per browser (localStorage, matching the existing node-map-view/node-sort-filter precedent) — let the user drag/reorder which channel appears first in the Channels UI instead of a fixed server-side order. User request 2026-07-12, added to wishlist, not yet built |
+
 ## CURRENT WORKLIST v4 (2026-07-11 end of day — supersedes v2/v3 below; THE list to work off)
 
 What's still open after the 2026-07-11 run, sorted in working order
