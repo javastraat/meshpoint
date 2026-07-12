@@ -1229,9 +1229,47 @@ added — matches what the user actually asked for (always-show), not the
 persist-a-toggle option. `node --check` passed. Not yet live-verified on
 the Pi.
 
+Closed 2026-07-12: `repeater_poll` config gets a dashboard UI —
+Configuration → Repeater Poll (named to avoid the same collision the
+"Hardware"→"Peripherals" rename fixed earlier: the top-level Radio
+group already has a read-only **Repeaters** status page). Backend:
+`src/api/routes/repeater_config_routes.py` (new) — `PUT
+/api/config/repeater-poll`, accepts enabled/interval_minutes/repeaters
+(each key/name/password/password_unchanged), merges by
+lowercased-key lookup against the existing roster so
+`password_unchanged=True` preserves whatever password is already on
+file (mirrors the MQTT broker password's dirty-tracking convention),
+saves via `save_section_to_yaml("repeater_poll", ...)`. Audit log
+params deliberately exclude the password value (only logs
+`repeater_keys`, never the secret). `config_enrichment.py` now also
+exposes `repeater_poll` in `GET /api/config` with `password_set: bool`
+per repeater instead of the real value — never sends a password back
+to the browser. Wired into `server.py` (import, `include_router`,
+`init_routes`). Frontend: new `frontend/js/configuration/
+repeater_poll_card.js` (`RepeaterPollConfigCard`, mirrors
+`serial_card.js`'s add/remove-row shape, up to 8 repeaters), wired into
+`configuration_panel.js`'s `_mountSection`, plus the sidebar nav link +
+section container in `index.html`, plus the route allowlist AND
+command palette entries in `app.js` (`configuration/repeater-poll` —
+easy to miss, there's a separate `allowedRoutes` array that silently
+blocks navigation if a route isn't listed there even with the DOM/JS
+otherwise wired correctly). Confirmed (per user's own question) that
+the top-level Repeaters nav item auto-reveals once a repeater is
+added and the service restarted — `_bootRepeatersPanel()` in
+`app.js:321-333` already re-checks `GET /api/meshcore/repeaters`'s
+`available` flag on every page load, no extra work needed for that
+interplay. Verified end-to-end with a stubbed fastapi/pydantic/jwt
+unit test (no real deps on Mac): confirmed no password leak in the GET
+payload, confirmed password preservation on unchanged edit + correct
+new-password set on a fresh entry, confirmed both values land
+correctly in a scratch local.yaml, confirmed audit log never contains
+either password. All JS `node --check`ed. Also updated README.md and
+CONFIGURATION.md to reflect dashboard-editability (previously said
+"repeater_poll: in local.yaml" as the only way). Not yet live-verified
+on the Pi.
+
 | # | Status | Effort | Item |
 |---|--------|--------|------|
-| — | Open | S-M | `repeater_poll` config gets a dashboard UI — enable/disable, interval_minutes, and a repeaters roster editor (key/password/name per repeater). Currently the only YAML-only section with actual secrets (passwords) in it. From 2026-07-12 config audit |
 | — | Open | S | `metrics` config gets a dashboard toggle — enabled/require_auth for the Prometheus scrape endpoint. Trivial 2-boolean win. From 2026-07-12 config audit |
 | W20 | Open | S | Per-user channel display order, remembered per browser (localStorage, matching the existing node-map-view/node-sort-filter precedent) — let the user drag/reorder which channel appears first in the Channels UI instead of a fixed server-side order. User request 2026-07-12, added to wishlist, not yet built |
 | — | Open | S | Prune or document the 6 kept-for-later duplicate API endpoints (packets/count+protocols+types, nodes/map+summary, telemetry/*) |

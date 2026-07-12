@@ -58,6 +58,7 @@ from src.api.routes import (
     nodes,
     packets,
     public_radar_routes,
+    repeater_config_routes,
     spectrum_routes,
     metrics_routes,
     rf_routes,
@@ -417,6 +418,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     app.include_router(gps_status.router, dependencies=protected)
     app.include_router(system_config_routes.router, dependencies=protected)
     app.include_router(hardware_config_routes.router, dependencies=protected)
+    app.include_router(repeater_config_routes.router, dependencies=protected)
     app.include_router(meshcore_config_routes.router, dependencies=protected)
     app.include_router(config_routes.router, dependencies=protected)
     app.include_router(stats_routes.router, dependencies=protected)
@@ -1563,6 +1565,7 @@ def _init_routes(
     gps_status.init_routes(location_source=coord.location_source)
     system_config_routes.init_routes(config=config)
     hardware_config_routes.init_routes(config=config)
+    repeater_config_routes.init_routes(config=config)
     meshcore_config_routes.init_routes(config=config, tx_service=tx_service)
     _dev_name = config.device.device_name or "meshpoint"
     lorawan_routes.init_routes(coord.packet_repo, device_name=_dev_name)

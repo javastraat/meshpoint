@@ -677,7 +677,9 @@ repeater_poll:
 
 MeshCore nodes advertise identity only — no battery/uptime like Meshtastic broadcasts — so a repeater's stats have to be *asked for*. When enabled, Meshpoint periodically queries each listed repeater via the companion's `req_status`/`req_telemetry` (the same calls `meshcore-cli` and the phone app make) and shows the results on a **Repeaters** page (Radio group in the sidebar, only visible when polling is configured): battery, uptime, airtime, packet counters, noise floor, and LPP sensors (temperature/humidity/pressure). The charted fields (voltage, temperature, humidity, uptime) also land in the telemetry table, so they flow into the node drawer chart and CSV export.
 
-This is **active two-way RF on a schedule** — the most chatty thing Meshpoint does — so it's off by default, polls sequentially with gaps, and only targets repeaters you have the login `password` for (required for `req_status`). Passwords stay in `local.yaml` and are never exposed by the API. Poll cadence is `interval_minutes` (floored at 1); the first poll runs ~45 s after startup once the contact roster has loaded.
+This is **active two-way RF on a schedule** — the most chatty thing Meshpoint does — so it's off by default, polls sequentially with gaps, and only targets repeaters you have the login `password` for (required for `req_status`). Passwords stay in `local.yaml` and are never exposed by the API. Poll cadence is `interval_minutes` (floored at 5 in the dashboard; the raw config value has no floor); the first poll runs ~45 s after startup once the contact roster has loaded.
+
+Edit all of this from **Configuration → Repeater Poll** — enable/disable, interval, and add/rename/remove repeaters (up to 8) without hand-editing `local.yaml`. Existing passwords are never sent back to the browser (the form only knows a password is *set*, not what it is); leave the password field blank when editing a repeater to keep its current password, or type a new one to replace it. Changes require a restart to take effect, same as the fan/LED/button peripherals.
 
 ---
 

@@ -113,6 +113,19 @@ def enrich_config_payload(cfg: AppConfig, base: dict) -> dict:
         "enabled": update_check.enabled,
         "interval_minutes": update_check.interval_minutes,
     }
+    repeater_poll = cfg.repeater_poll
+    base["repeater_poll"] = {
+        "enabled": repeater_poll.enabled,
+        "interval_minutes": repeater_poll.interval_minutes,
+        "repeaters": [
+            {
+                "key": r.key,
+                "name": r.name,
+                "password_set": bool((r.password or "").strip()),
+            }
+            for r in repeater_poll.repeaters
+        ],
+    }
     pos = cfg.transmit.position
     telem = cfg.transmit.telemetry
     if "transmit" in base:
