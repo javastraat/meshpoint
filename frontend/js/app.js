@@ -187,6 +187,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         else nodeMap.clearFocusLine();
     });
 
+    const mapHomeBtn = document.getElementById('map-home-btn');
+    if (mapHomeBtn) {
+        mapHomeBtn.addEventListener('click', () => nodeMap.centerOnHome());
+    }
+
     const mapExpandBtn = document.getElementById('map-expand-btn');
     const dashboard = document.querySelector('.dashboard');
     if (mapExpandBtn && dashboard) {

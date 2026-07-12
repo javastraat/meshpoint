@@ -311,6 +311,16 @@ class NodeMap {
         if (this._map) this._map.flyTo([lat, lng], zoom);
     }
 
+    /** Recenter on the Meshpoint's own configured location, on demand
+     * (the map-home-btn in the panel header) -- uses the same device
+     * position loadNodes() already cached, so no separate fetch needed. */
+    centerOnHome() {
+        const device = this._lastDevice;
+        if (device && device.latitude && device.longitude) {
+            this.centerOn(device.latitude, device.longitude, 13);
+        }
+    }
+
     invalidateSize() {
         if (this._map) this._map.invalidateSize();
     }
