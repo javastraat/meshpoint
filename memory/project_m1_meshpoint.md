@@ -1100,8 +1100,16 @@ stick (state, radio, channel, node ID), only prints when
 `cfg["serial"]` is non-empty. Verified with stub `ReportData` for both
 single-radio and split cases, and the new SQL queries verified
 directly against a throwaway in-memory sqlite3 DB (no aiosqlite on
-Mac) — both grouped-count queries returned correct results. Not yet
-live-verified on the Pi.
+Mac) — both grouped-count queries returned correct results.
+LIVE-VERIFIED 2026-07-12 on the Pi: PROTOCOLS shows two Meshtastic
+lines (1,677 pkts/171 nodes via concentrator · 869.525 MHz, 13
+pkts/1 node via serial_433 · 433.875 MHz), and MESHTASTIC SERIAL shows
+`serial_433: connected · Meshtastic 06f4`, `Radio: 433.875 MHz ·
+BW250 · SF11`, `Node ID: !09d406f4` (no Channel line — this stick's
+`channel_name` is empty on the real device, correctly skipped by the
+`if channel:` guard). This entire multi-radio Meshtastic reporting
+feature (CAPTURE SOURCES serial line + PROTOCOLS split + MESHTASTIC
+SERIAL section) is now fully closed and live-verified.
 
 | # | Status | Effort | Item |
 |---|--------|--------|------|
