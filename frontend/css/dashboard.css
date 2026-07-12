@@ -236,8 +236,16 @@ html, body {
     position: relative;
 }
 
-/* ---- Map expand button ---- */
+/* ---- Map header action buttons (home, expand) ---- */
+.panel__header-actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
 .map-expand-btn {
+    display: inline-flex;
+    align-items: center;
     background: none;
     border: none;
     color: var(--text-muted);
