@@ -122,17 +122,17 @@ apt-get install -y -qq \
     libx11-dev \
     build-essential
 
-# ── 2. Enable SPI ──────────────────────────────────────────────────
+# ── 2. Enable SPI ─────────────────────────────────────────────────
 
 info "Enabling SPI interface..."
 raspi-config nonint do_spi 0 2>/dev/null || warn "raspi-config SPI failed (may already be enabled)"
 
-# ── 2b. Enable I2C ────────────────────────────────────────────────
+# ── 3. Enable I2C ─────────────────────────────────────────────────
 
 info "Enabling I2C interface..."
 raspi-config nonint do_i2c 0 2>/dev/null || warn "raspi-config I2C failed (may already be enabled)"
 
-# ── 3. Enable UART for GPS ─────────────────────────────────────────
+# ── 4. Enable UART for GPS ────────────────────────────────────────
 
 info "Enabling UART hardware..."
 raspi-config nonint do_serial_hw 0 2>/dev/null || warn "raspi-config UART failed"
@@ -152,7 +152,7 @@ if [ -f "$BOOT_CONFIG" ]; then
     fi
 fi
 
-# ── 3b. Install gpsd for USB GPS receivers ─────────────────────────
+# ── 5. Install gpsd for USB GPS receivers ─────────────────────────
 #
 # Enables plug-and-play USB GPS sticks (u-blox 7/8 etc) without
 # changes to local.yaml. udev auto-attaches recognized devices to
@@ -197,7 +197,7 @@ fi
 systemctl enable gpsd.socket 2>/dev/null || warn "Could not enable gpsd.socket"
 systemctl restart gpsd.socket 2>/dev/null || warn "Could not start gpsd.socket"
 
-# ── 3c. Install RTL-SDR support (USB SDR dongle, Radio tab listener) ─
+# ── 6. Install RTL-SDR support (USB SDR dongle, Radio tab listener) ─
 #
 # Two things a stock Raspberry Pi OS image is missing for an RTL-SDR
 # dongle to work: the kernel's own DVB driver claims the RTL2832U chip
@@ -252,7 +252,7 @@ else
     )
 fi
 
-# ── 3d. Install redsea (RTL-SDR RDS decoder) ──────────────────────
+# ── 7. Install redsea (RTL-SDR RDS decoder) ───────────────────────
 #
 # Decodes RDS (station name, radio text, PI code) out of FM broadcast
 # capture, on top of the librtlsdr built in 3c. Built from source
@@ -279,7 +279,7 @@ else
     )
 fi
 
-# ── 3e. Install multimon-ng (RTL-SDR digital mode decoder) ────────
+# ── 8. Install multimon-ng (RTL-SDR digital mode decoder) ─────────
 #
 # Decodes POCSAG/AFSK/DTMF/etc out of demodulated audio, fed from
 # `rtl_fm` piped in. Built from source (EliasOenal/multimon-ng
@@ -307,7 +307,7 @@ else
     )
 fi
 
-# ── 4. Build SX1302 HAL ───────────────────────────────────────────
+# ── 9. Build SX1302 HAL ───────────────────────────────────────────
 
 if [ -f "/usr/local/lib/libloragw.so" ]; then
     info "libloragw.so already installed, skipping HAL build"
@@ -558,7 +558,7 @@ _HALCFG
     info "libloragw.so installed to /usr/local/lib/"
 fi
 
-# ── 4b. Apply TX sync word patch ─────────────────────────────────
+# ── 10. Apply TX sync word patch ──────────────────────────────────
 
 HAL_SRC="${HAL_BUILD_DIR}/libloragw/src/loragw_sx1302.c"
 if [ -f "$HAL_SRC" ]; then
@@ -566,7 +566,7 @@ if [ -f "$HAL_SRC" ]; then
     bash "${SCRIPT_DIR}/scripts/patch_hal.sh"
 fi
 
-# ── 5. Install Meshpoint application ──────────────────────────────
+# ── 11. Install Meshpoint application ─────────────────────────────
 
 info "Installing Meshpoint to ${MESHPOINT_DIR}..."
 mkdir -p "$MESHPOINT_DIR"
@@ -588,7 +588,7 @@ rsync -a --exclude='venv' \
 #          --exclude='*.pyc' \
 #          "${SCRIPT_DIR}/" "$MESHPOINT_DIR/"
 
-# ── 5b. Remove stale compiled core modules from prior installs ─────
+# ── 12. Remove stale compiled core modules from prior installs ───
 # Releases before 0.7.0 shipped .cpython-*.so files alongside the
 # .py source. Python prefers the .so at import time, so any leftover
 # binary would silently shadow the current source. rsync above does
@@ -600,7 +600,7 @@ if find "${MESHPOINT_DIR}/src" -name '*.cpython-*.so' -print -quit | grep -q .; 
     find "${MESHPOINT_DIR}/src" -name '*.cpython-*.so' -delete
 fi
 
-# ── 6. Python virtual environment ──────────────────────────────────
+# ── 13. Python virtual environment ────────────────────────────────
 
 info "Setting up Python virtual environment..."
 python3 -m venv "${MESHPOINT_DIR}/venv"
@@ -611,11 +611,11 @@ pip install -r "${MESHPOINT_DIR}/requirements.txt" -q
 pip install pyserial -q
 deactivate
 
-# ── 7. Create data directory ───────────────────────────────────────
+# ── 14. Create data directory ─────────────────────────────────────
 
 mkdir -p "${MESHPOINT_DIR}/data"
 
-# ── 8. Create meshpoint system user ────────────────────────────────
+# ── 15. Create meshpoint system user ──────────────────────────────
 
 if ! id -u meshpoint &>/dev/null; then
     info "Creating system user 'meshpoint'..."
@@ -665,14 +665,14 @@ info "Installing sudoers rule for service management..."
 cp "${MESHPOINT_DIR}/config/sudoers-meshpoint" /etc/sudoers.d/meshpoint
 chmod 440 /etc/sudoers.d/meshpoint
 
-# ── 9. Configure journald log rotation ─────────────────────────────
+# ── 16. Configure journald log rotation ───────────────────────────
 
 info "Configuring journald log limits (100M, 7-day retention)..."
 mkdir -p /etc/systemd/journald.conf.d
 cp "${MESHPOINT_DIR}/config/journald-meshpoint.conf" /etc/systemd/journald.conf.d/meshpoint.conf
 systemctl restart systemd-journald 2>/dev/null || warn "Could not restart journald"
 
-# ── 10. Install systemd service ────────────────────────────────────
+# ── 17. Install systemd service ───────────────────────────────────
 
 info "Installing systemd service..."
 cp "${MESHPOINT_DIR}/${SERVICE_FILE}" /etc/systemd/system/meshpoint.service
@@ -680,7 +680,7 @@ systemctl daemon-reload
 systemctl enable meshpoint
 info "Service enabled (will start after 'meshpoint setup')"
 
-# ── 11. Install network watchdog ───────────────────────────────────
+# ── 18. Install network watchdog ──────────────────────────────────
 
 info "Installing WiFi network watchdog..."
 cp "${MESHPOINT_DIR}/${WATCHDOG_SERVICE_FILE}" /etc/systemd/system/network-watchdog.service
@@ -689,7 +689,7 @@ systemctl enable network-watchdog
 systemctl start network-watchdog 2>/dev/null || warn "Could not start network-watchdog (will start on next boot)"
 info "Network watchdog enabled"
 
-# ── 12. Install CLI tool ───────────────────────────────────────────
+# ── 19. Install CLI tool ───────────────────────────────────────────
 
 info "Installing meshpoint CLI..."
 chmod +x "${MESHPOINT_DIR}/${CLI_SCRIPT}"
