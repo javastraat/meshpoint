@@ -32,6 +32,7 @@ CATEGORY_DIAGNOSTICS = "Diagnostics"
 CATEGORY_HARDWARE = "Hardware"
 CATEGORY_GIT = "Git"
 CATEGORY_NETWORK = "Network"
+CATEGORY_SETUP = "Setup"
 
 
 @dataclass(frozen=True)
@@ -146,6 +147,19 @@ DEFAULT_CATALOG: tuple[CommandEntry, ...] = (
         command="cd /opt/meshpoint && sudo git log -n 10 --oneline",
         category=CATEGORY_GIT,
         description="Last 10 commits on the install tree.",
+    ),
+    CommandEntry(
+        id="run-install-sh",
+        label="Run install.sh (upgrade software)",
+        command="cd /opt/meshpoint && sudo bash scripts/install.sh",
+        category=CATEGORY_SETUP,
+        description=(
+            "Re-run the installer to pick up new system packages a release "
+            "added (e.g. welle.io for DAB+). The dashboard's regular "
+            "'Apply update' intentionally skips this to stay fast -- run it "
+            "manually whenever release notes mention new system requirements."
+        ),
+        dangerous=True,
     ),
 )
 

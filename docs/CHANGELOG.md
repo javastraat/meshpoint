@@ -179,6 +179,7 @@ First tagged release of the javastraat/meshpoint fork: LoRaWAN sniffing, multi-r
 - **Quick Deploy QR.** Configuration → Channels exports public channel parameters as a scannable QR for field provisioning.
 - **Prometheus `/metrics`.** Optional scrape endpoint with packet, node, relay, and system counters.
 - **Channel hash map refresh.** Rebuild Meshtastic channel hashes after dashboard channel save so MQTT topics and decoders stay aligned. Fixes [#89](https://github.com/KMX415/meshpoint/issues/89).
+- **Terminal quick-command: "Run install.sh (upgrade software)".** The dashboard's "Apply update" (git pull + restart) intentionally skips the full installer to stay fast, so a release adding a new system dependency (e.g. `welle.io` for DAB+) previously needed an SSH session to install it -- users had no way to discover that step existed. New `Setup`-category entry in the Terminal tab's command catalog inserts `cd /opt/meshpoint && sudo bash scripts/install.sh` at the prompt (marked `dangerous`, same confirm-before-insert treatment as restarting the service); the Terminal itself is a full PTY already, so no new execution machinery was needed, just a discoverable button.
 
 #### Docs
 
