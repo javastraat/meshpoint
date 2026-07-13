@@ -610,7 +610,17 @@ fi
 HAL_SRC="${HAL_BUILD_DIR}/libloragw/src/loragw_sx1302.c"
 if [ -f "$HAL_SRC" ]; then
     info "Applying TX sync word patch..."
-    bash "${SCRIPT_DIR}/scripts/patch_hal.sh"
+    # MESHPOINT_INSTALL_IN_PROGRESS tells patch_hal.sh to skip its own
+    # "restart now" suggestion -- several install.sh sections still run
+    # after this one, and this whole script may itself be running inside
+    # the dashboard's web Terminal, whose PTY is a child process in
+    # meshpoint's own systemd cgroup. Acting on a restart suggestion this
+    # early kills that PTY (and the rest of this install run) before the
+    # remaining sections (sudoers, systemd service, watchdog, CLI tools)
+    # ever run -- a real SSH shell isn't in that cgroup and wouldn't be
+    # affected, which is why this only ever breaks the web Terminal.
+    # install.sh's own final banner is the one correctly-timed prompt.
+    MESHPOINT_INSTALL_IN_PROGRESS=1 bash "${SCRIPT_DIR}/scripts/patch_hal.sh"
 fi
 
 # ── 14. Install Meshpoint application ─────────────────────────────

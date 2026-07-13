@@ -122,4 +122,15 @@ gcc -shared -o libloragw/libloragw.so pic_obj/*.o -lrt -lm -lpthread
 cp libloragw/libloragw.so "$LIB_DEST"
 ldconfig
 
-info "Done. Restart meshpoint: sudo systemctl restart meshpoint"
+if [ "${MESHPOINT_INSTALL_IN_PROGRESS:-}" = "1" ]; then
+    # Called as a substep of install.sh, which has more sections left to
+    # run and prints its own single, correctly-timed restart prompt at
+    # the very end -- suggesting a restart here would be premature, and
+    # if acted on immediately would kill this install run (see
+    # install.sh's call site for why: web Terminal PTYs live in
+    # meshpoint's own systemd cgroup, so a mid-install restart kills the
+    # PTY along with everything left to install).
+    info "Done."
+else
+    info "Done. Restart meshpoint: sudo systemctl restart meshpoint"
+fi

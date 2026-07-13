@@ -36,7 +36,11 @@ if [[ -x "$PIP" && -f "$REQ" ]]; then
 fi
 
 log "Running post_update migrations"
-/bin/bash "${MESHPOINT_DIR}/scripts/post_update.sh"
+# post_update.sh may call patch_hal.sh; MESHPOINT_INSTALL_IN_PROGRESS
+# suppresses its "restart now" suggestion since we restart automatically
+# below regardless -- the suggestion would just be confusing noise here,
+# not a real prompt to act on.
+MESHPOINT_INSTALL_IN_PROGRESS=1 /bin/bash "${MESHPOINT_DIR}/scripts/post_update.sh"
 
 log "Restarting ${SERVICE}"
 /usr/bin/systemctl restart "${SERVICE}"
