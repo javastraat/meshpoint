@@ -7,7 +7,10 @@
       "Bash(python3 -c \"import ast; ast.parse\\(open\\('scripts/purge_meshcoredb_packets.py'\\).read\\(\\)\\); print\\('syntax OK'\\)\")",
       "Bash(python3 -c \"import ast; ast.parse\\(open\\('src/api/routes/config_routes.py'\\).read\\(\\)\\); print\\('syntax OK'\\)\")",
       "Bash(node --check frontend/js/configuration/meshcore_card.js)",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(xargs -I{} basename {})",
+      "Bash(python3 -c \"import ast; ast.parse\\(open\\('src/api/routes/meshcore_config_routes.py'\\).read\\(\\)\\); print\\('syntax OK'\\)\")",
+      "Bash(grep -n \"^| \\\\`.*meshcore\" README.md)"
     ]
   }
 }

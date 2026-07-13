@@ -461,6 +461,35 @@ select.cfg-field__input option:checked {
     color: var(--brand-amber, #ffb84d);
 }
 
+.cfg-mc-readout__check {
+    align-self: flex-start;
+    margin-top: 2px;
+    padding: 2px 0;
+    background: none;
+    border: none;
+    color: rgba(243, 244, 246, 0.5);
+    font-size: 10.5px;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.cfg-mc-readout__check:hover  { color: rgba(243, 244, 246, 0.8); }
+.cfg-mc-readout__check:disabled { opacity: 0.5; cursor: default; }
+
+.cfg-mc-readout__update-status {
+    font-size: 11px;
+    color: rgba(243, 244, 246, 0.5);
+}
+
+.cfg-mc-readout__update-status[data-kind="ok"]    { color: var(--accent-green, #00e5a0); }
+.cfg-mc-readout__update-status[data-kind="warn"]  { color: var(--accent-amber, #f59e0b); }
+.cfg-mc-readout__update-status[data-kind="error"] { color: #f87171; }
+
+.cfg-mc-readout__update-status a {
+    color: inherit;
+    text-decoration: underline;
+}
+
 /* MeshCore: channel save row + companion actions in a stable 2-column grid */
 .cfg-mc-toolbar {
     display: grid;

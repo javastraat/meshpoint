@@ -283,6 +283,10 @@ class MeshcoreConfigCard {
                 <div class="cfg-mc-readout" title="${this._esc(this._firmwareTitle(mc.device))}">
                     <span class="cfg-mc-readout__label">Firmware</span>
                     <span class="cfg-mc-readout__value">${this._fmtFirmware(mc.device)}</span>
+                    <button class="cfg-mc-readout__check" type="button" data-mc-firmware-check>
+                        Check for updates
+                    </button>
+                    <span class="cfg-mc-readout__update-status" data-mc-firmware-status></span>
                 </div>
             </div>
             <div class="cfg-mc-channels">
@@ -396,6 +400,48 @@ class MeshcoreConfigCard {
         const saveName = this._body.querySelector('[data-mc-name-save]');
         if (saveName) {
             saveName.addEventListener('click', () => this._saveCompanionName(saveName));
+        }
+
+        const firmwareCheck = this._body.querySelector('[data-mc-firmware-check]');
+        if (firmwareCheck) {
+            firmwareCheck.addEventListener('click', () => this._checkFirmwareUpdate(firmwareCheck));
+        }
+    }
+
+    async _checkFirmwareUpdate(button) {
+        const status = this._body.querySelector('[data-mc-firmware-status]');
+        button.disabled = true;
+        if (status) {
+            status.dataset.kind = '';
+            status.textContent = 'Checking…';
+        }
+        try {
+            const result = await this._api.get('/api/config/meshcore/firmware-check');
+            if (!status) return;
+            if (!result) {
+                status.dataset.kind = 'error';
+                status.textContent = 'Check failed';
+            } else if (result.error) {
+                status.dataset.kind = 'error';
+                status.textContent = result.error;
+            } else if (result.update_available) {
+                status.dataset.kind = 'warn';
+                // release_url always comes from GitHub's own API response, not
+                // user input -- but only allow http(s) schemes defensively,
+                // since HTML-escaping the text doesn't stop a javascript: URI
+                // from executing when the link is clicked.
+                const isSafeUrl = typeof result.release_url === 'string'
+                    && /^https?:\/\//i.test(result.release_url);
+                const link = isSafeUrl
+                    ? ` — <a href="${this._esc(result.release_url)}" target="_blank" rel="noopener">release notes</a>`
+                    : '';
+                status.innerHTML = `Update available: ${this._esc(result.latest_version || '?')}${link}`;
+            } else {
+                status.dataset.kind = 'ok';
+                status.textContent = 'Up to date';
+            }
+        } finally {
+            button.disabled = false;
         }
     }
 
