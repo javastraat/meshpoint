@@ -268,6 +268,30 @@ class MeshCoreTxClient:
                 )
                 if login is None:
                     out["error"] = "login failed or timed out"
+                    # A directed login uses the contact's cached out_path;
+                    # if the mesh's topology shifted since that path was
+                    # learned (a relay it went through rebooted, moved,
+                    # etc), every future attempt keeps retrying the same
+                    # dead route and times out identically forever, even
+                    # though the repeater is reachable and answering fine
+                    # over flood-routed traffic (adverts, other companions).
+                    # reset_path() clears out_path/out_path_len so the next
+                    # attempt (this poll's own retry, or the next round)
+                    # falls back to flood routing and can re-learn a fresh
+                    # path. Best-effort: a failure here shouldn't mask the
+                    # real login error above.
+                    try:
+                        await asyncio.wait_for(
+                            self._mc.commands.reset_path(key), timeout=10.0,
+                        )
+                        logger.info(
+                            "Reset cached routing path for repeater %s "
+                            "after login failure", key,
+                        )
+                    except Exception:
+                        logger.debug(
+                            "reset_path failed for %s", key, exc_info=True,
+                        )
                     return out
             status = await asyncio.wait_for(
                 self._mc.commands.req_status_sync(contact), timeout=25.0,
