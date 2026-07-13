@@ -857,24 +857,23 @@
 
 .dab-fav-chip { color: var(--accent-amber, #f59e0b); }
 
-.dab-channels {
-    display: flex;
+/* .lsn-tabbar's own padding is sized for the page-level tabbar (sits at
+   the content area's edge); override it here since this is nested inside
+   a panel that already has its own padding. */
+.dab-chantabs {
+    padding: 0 0 12px;
     flex-wrap: wrap;
-    gap: 8px;
 }
 
-.dab-channel--active {
-    border-color: var(--accent-green, #00e5a0);
-    color: var(--accent-green, #00e5a0);
+.dab-chantab-content {
+    min-height: 40px;
 }
 
 .dab-manual {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-top: 10px;
-    padding-top: 10px;
-    border-top: 1px solid rgba(243, 244, 246, 0.08);
+    margin-bottom: 12px;
 }
 
 .dab-manual__select {

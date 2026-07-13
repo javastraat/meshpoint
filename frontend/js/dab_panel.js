@@ -45,6 +45,10 @@ class DabPanel {
         this._lastStatus = null;
         this._tuning = false;
         this._nowPlayingTextCache = null;
+        // Sub-tabs within the DAB+ tab: 'favorites', 'manual', or a
+        // channel code. Starts on Favorites so there's something useful
+        // to see immediately rather than an empty tab needing a click.
+        this._activeChannelTab = 'favorites';
         // A favorite tune-and-play jumps to a channel that may not be the
         // one currently running, then has to wait for that specific
         // station's sid to show up in the progressively-decoded services
@@ -107,66 +111,170 @@ class DabPanel {
             </section>
             <section class="lsn-section">
                 <div class="panel">
-                    <div class="panel__header">Channel</div>
-                    <div class="panel__body">
-                        <div class="dab-favbar" data-dab-favbar>${this._renderFavBar()}</div>
-                        <div class="dab-channels" data-dab-channels>
-                            ${DAB_CHANNEL_PRESETS.map((c) => `
-                                <button type="button" class="terminal-button" data-dab-channel="${c.channel}">${c.label}</button>
-                            `).join('')}
-                            <button type="button" class="terminal-button" data-dab-stop>Stop</button>
-                        </div>
-                        <div class="dab-manual" data-dab-manual>
-                            <select class="dab-manual__select" data-dab-manual-select title="Manual channel entry">
-                                <option value="">Manual channel…</option>
-                                ${DAB_ALL_CHANNELS.map((ch) => `<option value="${ch}">${ch}</option>`).join('')}
-                            </select>
-                            <button type="button" class="terminal-button" data-dab-manual-tune>Tune</button>
-                        </div>
+                    <div class="panel__header">
+                        <span>Channel</span>
+                        <button type="button" class="terminal-button" data-dab-stop>Stop</button>
                     </div>
-                </div>
-            </section>
-            <section class="lsn-section">
-                <div class="panel">
-                    <div class="panel__header">Stations</div>
                     <div class="panel__body">
-                        <div class="dab-stations" data-dab-stations>
-                            <div class="pager-log__empty">Pick a channel above to scan for stations.</div>
+                        <div class="lsn-tabbar dab-chantabs" data-dab-chantabs>
+                            <button type="button" class="lsn-tabbar__btn lsn-tabbar__btn--active" data-chantab="favorites">★ Favorites</button>
+                            ${DAB_CHANNEL_PRESETS.map((c) => `
+                                <button type="button" class="lsn-tabbar__btn" data-chantab="${c.channel}" title="${c.label}">${c.channel}</button>
+                            `).join('')}
+                            <button type="button" class="lsn-tabbar__btn" data-chantab="manual">Manual…</button>
                         </div>
+                        <div class="dab-chantab-content" data-dab-chantab-content></div>
                     </div>
                 </div>
             </section>
         `;
         this._buildVuSegments();
-        root.querySelector('[data-dab-channels]').addEventListener('click', (ev) => {
-            const stopBtn = ev.target.closest('[data-dab-stop]');
-            if (stopBtn) { this._stopEnsemble(); return; }
-            const btn = ev.target.closest('[data-dab-channel]');
-            if (btn && !btn.disabled) { this._pendingPlay = null; this._tune(btn.dataset.dabChannel); }
+        root.querySelector('[data-dab-stop]').addEventListener('click', () => this._stopEnsemble());
+        root.querySelector('[data-dab-chantabs]').addEventListener('click', (ev) => {
+            const btn = ev.target.closest('[data-chantab]');
+            if (btn && !btn.disabled) this._switchChannelTab(btn.dataset.chantab);
         });
-        root.querySelector('[data-dab-manual-tune]').addEventListener('click', () => {
-            const sel = root.querySelector('[data-dab-manual-select]');
-            const channel = sel && sel.value;
-            if (channel) { this._pendingPlay = null; this._tune(channel); }
-        });
-        root.querySelector('[data-dab-favbar]').addEventListener('click', (ev) => {
-            const btn = ev.target.closest('[data-dab-fav-play]');
-            if (!btn) return;
-            const fav = this._loadFavs()[parseInt(btn.dataset.dabFavPlay, 10)];
-            if (fav) this._playFavorite(fav);
-        });
-        root.querySelector('[data-dab-stations]').addEventListener('click', (ev) => {
-            const favBtn = ev.target.closest('[data-dab-favtoggle]');
-            if (favBtn) {
+        root.querySelector('[data-dab-chantab-content]').addEventListener('click', (ev) => {
+            const favPlayBtn = ev.target.closest('[data-dab-fav-play]');
+            if (favPlayBtn) {
+                const fav = this._loadFavs()[parseInt(favPlayBtn.dataset.dabFavPlay, 10)];
+                if (fav) this._playFavorite(fav);
+                return;
+            }
+            const manualTuneBtn = ev.target.closest('[data-dab-manual-tune]');
+            if (manualTuneBtn) {
+                const sel = root.querySelector('[data-dab-manual-select]');
+                const channel = sel && sel.value;
+                if (channel) { this._pendingPlay = null; this._tune(channel); }
+                return;
+            }
+            const favToggle = ev.target.closest('[data-dab-favtoggle]');
+            if (favToggle) {
                 this._toggleFav({
-                    channel: favBtn.dataset.dabChannel,
-                    sid: favBtn.dataset.dabSid,
-                    label: favBtn.dataset.dabLabel,
+                    channel: favToggle.dataset.dabChannel,
+                    sid: favToggle.dataset.dabSid,
+                    label: favToggle.dataset.dabLabel,
                 });
                 return;
             }
-            const btn = ev.target.closest('[data-dab-play]');
-            if (btn) { this._pendingPlay = null; this._playOrStop(btn.dataset.dabPlay); }
+            const playBtn = ev.target.closest('[data-dab-play]');
+            if (playBtn) { this._pendingPlay = null; this._playOrStop(playBtn.dataset.dabPlay); }
+        });
+        this._renderChanTabContent();
+    }
+
+    /** Switch which sub-tab is shown. Clicking a real channel code behaves
+     * like the old preset buttons did -- tunes to it -- unless it's
+     * already the one actively running (avoid an unnecessary retune/
+     * restart just from re-viewing the same tab). Favorites/Manual are
+     * pure view switches with no tuning side effect of their own. */
+    _switchChannelTab(tab) {
+        this._activeChannelTab = tab;
+        const root = this._root;
+        if (root) {
+            root.querySelectorAll('[data-chantab]').forEach((btn) => {
+                btn.classList.toggle('lsn-tabbar__btn--active', btn.dataset.chantab === tab);
+            });
+        }
+        const isChannelCode = DAB_CHANNEL_PRESETS.some((c) => c.channel === tab);
+        if (isChannelCode) {
+            const st = this._lastStatus;
+            if (!(st && st.running && st.channel === tab)) {
+                this._pendingPlay = null;
+                this._tune(tab);
+            }
+        }
+        this._renderChanTabContent();
+    }
+
+    // Renders whichever sub-tab is active into the shared content
+    // container -- favorites chips, the manual channel picker, or a
+    // channel's station list (only ever one truly "live" at a time,
+    // since the dongle can only be tuned to one channel).
+    _renderChanTabContent() {
+        const el = this._root && this._root.querySelector('[data-dab-chantab-content]');
+        if (!el) return;
+        const tab = this._activeChannelTab;
+        const status = this._lastStatus;
+        const busyOwner = status && status.dongle_owner && status.dongle_owner !== 'dab'
+            ? status.dongle_owner : null;
+
+        if (tab === 'favorites') {
+            el.innerHTML = `<div class="dab-favbar" data-dab-favbar>${this._renderFavBar()}</div>`;
+            return;
+        }
+
+        if (tab === 'manual') {
+            // Build the select/button shell only once per tab-switch;
+            // poll-driven re-renders (every 2s) only touch the stations
+            // sub-container below it, so an open dropdown or in-progress
+            // pick survives a status refresh instead of getting wiped by
+            // a full innerHTML rebuild.
+            let manualEl = el.querySelector('[data-dab-manual]');
+            if (!manualEl) {
+                el.innerHTML = `
+                    <div class="dab-manual" data-dab-manual>
+                        <select class="dab-manual__select" data-dab-manual-select title="Manual channel entry">
+                            <option value="">Manual channel…</option>
+                            ${DAB_ALL_CHANNELS.map((ch) => `<option value="${ch}">${ch}</option>`).join('')}
+                        </select>
+                        <button type="button" class="terminal-button" data-dab-manual-tune>Tune</button>
+                    </div>
+                    <div data-dab-manual-stations></div>
+                `;
+            }
+            const sel = el.querySelector('[data-dab-manual-select]');
+            const tuneBtn = el.querySelector('[data-dab-manual-tune]');
+            if (sel) {
+                sel.disabled = !!busyOwner;
+                if (document.activeElement !== sel && status && status.running) {
+                    sel.value = status.channel || '';
+                }
+            }
+            if (tuneBtn) tuneBtn.disabled = !!busyOwner;
+            const stationsEl = el.querySelector('[data-dab-manual-stations]');
+            if (stationsEl) {
+                stationsEl.innerHTML = this._stationsSectionHtml(status, null);
+                this._afterStationsRender(stationsEl);
+            }
+            return;
+        }
+
+        // tab is a channel code
+        el.innerHTML = this._stationsSectionHtml(status, tab);
+        this._afterStationsRender(el);
+    }
+
+    // forChannel: null means "show whatever is currently tuned" (the
+    // Manual tab, which has no single channel identity of its own); a
+    // channel code means "only show if that's the one actually tuned".
+    _stationsSectionHtml(status, forChannel) {
+        if (!status || !status.running) {
+            return '<div class="pager-log__empty">Not tuned. Pick a channel above to scan for stations.</div>';
+        }
+        if (forChannel && status.channel !== forChannel) {
+            return `<div class="pager-log__empty">Tuning to ${this._esc(forChannel)}…</div>`;
+        }
+        const services = status.services || [];
+        if (!services.length) {
+            return '<div class="pager-log__empty">Scanning… stations appear as they decode.</div>';
+        }
+        return `<div class="dab-stations" data-dab-stations>${services.map((s) => this._stationRowHtml(s, status.channel)).join('')}</div>`;
+    }
+
+    // Marquee for any label/DLS text that overflows -- mirrors the Radio
+    // tab's RDS scroll logic (lsn-station__scroll/.scroll).
+    _afterStationsRender(container) {
+        container.querySelectorAll('[data-dab-scrolltext]').forEach((textEl) => {
+            const scroll = textEl.parentElement;
+            const overflow = scroll.scrollWidth - scroll.clientWidth;
+            textEl.classList.remove('scroll');
+            if (overflow > 8) {
+                textEl.style.setProperty('--scroll-dist', `-${overflow + 16}px`);
+                textEl.style.setProperty('--scroll-dur', `${Math.min(24, Math.max(6, (overflow + 16) / 22))}s`);
+                void textEl.offsetWidth;
+                textEl.classList.add('scroll');
+            }
         });
     }
 
@@ -228,10 +336,23 @@ class DabPanel {
      * (or the station isn't decoded yet), then auto-play the moment its
      * sid shows up in the progressively-filled station list. */
     async _playFavorite(fav) {
+        // Switch the view to this favorite's channel tab so its station
+        // list (and the played station's Stop state) is actually visible,
+        // rather than leaving the user looking at the Favorites tab while
+        // a different channel tunes in the background.
+        this._activeChannelTab = fav.channel;
+        const root = this._root;
+        if (root) {
+            root.querySelectorAll('[data-chantab]').forEach((btn) => {
+                btn.classList.toggle('lsn-tabbar__btn--active', btn.dataset.chantab === fav.channel);
+            });
+        }
         const st = this._lastStatus;
         if (st && st.running && st.channel === fav.channel) {
             const found = (st.services || []).find((s) => s.sid === fav.sid);
             if (found) { this._playOrStop(fav.sid); return; }
+            this._renderChanTabContent();
+            return;
         }
         this._pendingPlay = { channel: fav.channel, sid: fav.sid };
         this._pendingPlayAt = Date.now();
@@ -395,20 +516,10 @@ class DabPanel {
         this._lastStatus = status;
         const busyOwner = (status.dongle_owner && status.dongle_owner !== 'dab') ? status.dongle_owner : null;
 
-        root.querySelectorAll('[data-dab-channel]').forEach((btn) => {
-            btn.disabled = !!busyOwner;
-            btn.classList.toggle('dab-channel--active', status.running && status.channel === btn.dataset.dabChannel);
+        root.querySelectorAll('[data-chantab]').forEach((btn) => {
+            const isChannelCode = DAB_CHANNEL_PRESETS.some((c) => c.channel === btn.dataset.chantab);
+            if (isChannelCode) btn.disabled = !!busyOwner;
         });
-        const manualSelect = root.querySelector('[data-dab-manual-select]');
-        if (manualSelect) {
-            manualSelect.disabled = !!busyOwner;
-            // Only reflect the tuned channel if the user isn't mid-pick.
-            if (document.activeElement !== manualSelect) {
-                manualSelect.value = status.running ? (status.channel || '') : '';
-            }
-        }
-        const manualTuneBtn = root.querySelector('[data-dab-manual-tune]');
-        if (manualTuneBtn) manualTuneBtn.disabled = !!busyOwner;
 
         this._setLeds({ onair: status.running, tuning: this._tuning });
 
@@ -435,7 +546,7 @@ class DabPanel {
         }
 
         this._renderNowPlaying(status);
-        this._renderStations(status.services || [], status.running, status.channel);
+        this._renderChanTabContent();
         this._resolvePendingPlay(status);
     }
 
@@ -533,33 +644,6 @@ class DabPanel {
             this._pendingPlay = null;
             this._setStatus(true, `tuned to ${status.channel} — favorite station not found`);
         }
-    }
-
-    _renderStations(services, running, channel) {
-        const el = this._root && this._root.querySelector('[data-dab-stations]');
-        if (!el) return;
-        if (!running) {
-            el.innerHTML = '<div class="pager-log__empty">Pick a channel above to scan for stations.</div>';
-            return;
-        }
-        if (!services.length) {
-            el.innerHTML = '<div class="pager-log__empty">Scanning… stations appear as they decode.</div>';
-            return;
-        }
-        el.innerHTML = services.map((s) => this._stationRowHtml(s, channel)).join('');
-        // Marquee for any label/DLS text that overflows -- mirrors the
-        // Radio tab's RDS scroll logic (lsn-station__scroll/.scroll).
-        el.querySelectorAll('[data-dab-scrolltext]').forEach((textEl) => {
-            const scroll = textEl.parentElement;
-            const overflow = scroll.scrollWidth - scroll.clientWidth;
-            textEl.classList.remove('scroll');
-            if (overflow > 8) {
-                textEl.style.setProperty('--scroll-dist', `-${overflow + 16}px`);
-                textEl.style.setProperty('--scroll-dur', `${Math.min(24, Math.max(6, (overflow + 16) / 22))}s`);
-                void textEl.offsetWidth;
-                textEl.classList.add('scroll');
-            }
-        });
     }
 
     _stationRowHtml(s, channel) {
