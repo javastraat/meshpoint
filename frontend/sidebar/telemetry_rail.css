@@ -153,14 +153,27 @@
     box-shadow: 0 0 6px rgba(52, 211, 153, 0.7);
 }
 
-.telemetry-rail__player-text {
+/* Clips overflow; the text span inside marquees when it's too long to
+ * fit, using the same @keyframes lsn-marquee as the Radio page's own
+ * scrolling station text (frontend/css/listener.css) -- loaded
+ * globally, so reused here rather than duplicated. */
+.telemetry-rail__player-scroll {
+    flex: 1;
     min-width: 0;
     overflow: hidden;
-    text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.telemetry-rail__player-text {
+    display: inline-block;
+    will-change: transform;
     font-size: 0.65rem;
     letter-spacing: 0.03em;
     color: var(--sidebar-text);
+}
+
+.telemetry-rail__player-text.scroll {
+    animation: lsn-marquee var(--scroll-dur, 10s) linear infinite alternate;
 }
 
 .telemetry-rail__player-controls {

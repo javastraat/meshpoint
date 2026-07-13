@@ -1105,7 +1105,36 @@ with the stub harness using the literal real values from the
 screenshot (`rds_ps: 'SLAM!'`, `rds_rt: 'Onair: Joel Corry - Whisper'`)
 plus the RT-identical-to-PS dedup case -- all three produce the
 expected text. `node --check`ed, CHANGELOG bullet updated in place
-(parser-verified). Not yet re-verified live on the Pi after this fix.
+(parser-verified).
+
+**Same-session follow-up, user asked for scrolling**: after seeing the
+fuller "SLAM! — Onair: Bl…" text get cut off with a plain ellipsis in
+the narrow sidebar, user asked "can you scroll the rds in the sidebar
+widget?" -- i.e. marquee it like the Radio page's own station display
+already does, rather than just truncating. Reused the EXACT same
+`@keyframes lsn-marquee` already defined in `frontend/css/listener.css`
+(confirmed it's loaded globally via a `<link>` in `index.html`'s
+`<head>`, same as every other page's CSS, not lazy-loaded per-route --
+so referencing it from `telemetry_rail.css` needed no duplication, just
+one new rule pointing at the same keyframe name). Restructured the
+markup: `#telemetry-player-text` is now wrapped in a new
+`.telemetry-rail__player-scroll` clipping container (mirrors
+`.lsn-station__scroll`), and `_setPlayerText()` (new method in
+`telemetry_rail.js`) replicates `listener_panel.js`'s own
+`setStation()` measure-and-toggle approach exactly: skip if the text
+is unchanged from last poll (`_playerTextCache`, avoids re-triggering/
+flickering the animation every 5s tick when nothing changed), else
+measure `scrollWidth - clientWidth`, and if the overflow exceeds 8px
+set `--scroll-dist`/`--scroll-dur` custom properties and add the
+`scroll` class (force a reflow via `void textEl.offsetWidth` first,
+same trick the Radio page's own code already uses), otherwise clear
+both properties and remove the class. Verified with the stub harness
+extended to fake `scrollWidth`/`clientWidth`/`style.setProperty` on a
+parent/child pair: long overflowing text correctly triggers scrolling
+with the right computed distance/duration, an unchanged poll doesn't
+re-trigger (cache hit), and short text that fits stays static with no
+scroll class. `node --check`ed, CHANGELOG bullet updated in place
+(parser-verified). Not yet re-verified live on the Pi after either fix.
 
 ## CURRENT WORKLIST v5 (2026-07-12 end of day — supersedes v4 below; THE list to work off)
 

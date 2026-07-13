@@ -46,6 +46,7 @@ class SidebarTelemetryRail {
         this._muteBtn = rootEl.querySelector('#telemetry-player-mute');
         this._stopBtn = rootEl.querySelector('#telemetry-player-stop');
         this._playerTimer = null;
+        this._playerTextCache = null;
     }
 
     init() {
@@ -142,13 +143,35 @@ class SidebarTelemetryRail {
         } else {
             text = `${_fmtFreq(status.frequency_mhz)} MHz ${(status.mode || '').toUpperCase()}`;
         }
-        if (this._playerTextEl) {
-            this._playerTextEl.textContent = text;
-            this._playerTextEl.title = text;
-        }
+        this._setPlayerText(text);
 
         const audio = document.getElementById('lsn-audio');
         this._applyMuteIcon(!!(audio && audio.muted));
+    }
+
+    // Marquees the text when it's too long to fit -- same measure/toggle
+    // approach as listener_panel.js's own setStation() (DigitalSkin/
+    // AnalogueSkin), reusing its @keyframes lsn-marquee (listener.css,
+    // loaded globally) via the shared "scroll" class trigger.
+    _setPlayerText(text) {
+        const textEl = this._playerTextEl;
+        if (!textEl || this._playerTextCache === text) return;
+        this._playerTextCache = text;
+        textEl.textContent = text;
+        textEl.title = text;
+        textEl.classList.remove('scroll');
+        const scroll = textEl.parentElement;
+        if (!scroll) return;
+        const overflow = scroll.scrollWidth - scroll.clientWidth;
+        if (overflow > 8) {
+            textEl.style.setProperty('--scroll-dist', `-${overflow + 16}px`);
+            textEl.style.setProperty('--scroll-dur', `${Math.min(24, Math.max(6, (overflow + 16) / 22))}s`);
+            void textEl.offsetWidth;
+            textEl.classList.add('scroll');
+        } else {
+            textEl.style.removeProperty('--scroll-dist');
+            textEl.style.removeProperty('--scroll-dur');
+        }
     }
 
     _toggleMute() {

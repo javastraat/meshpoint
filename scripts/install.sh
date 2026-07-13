@@ -120,7 +120,8 @@ apt-get install -y -qq \
     libliquid-dev \
     libpulse-dev \
     libx11-dev \
-    build-essential
+    build-essential \
+    pipx
 
 # ── 2. Enable SPI ─────────────────────────────────────────────────
 
