@@ -323,13 +323,28 @@ async def meshcore_nodes():
 
 
 @router.get("/packets")
-async def meshcore_packets(limit: int = Query(100, ge=1, le=500)):
+async def meshcore_packets(
+    limit: int = Query(100, ge=1, le=500),
+    include_imported: bool = Query(
+        False,
+        description=(
+            "Include bulk-imported historical telemetry "
+            "(capture_source='meshcore_db_import'). Off by default -- a "
+            "single import_meshcore_db.py poll snapshot explodes into one "
+            "row per sensor channel (10+ rows sharing one timestamp), which "
+            "buries genuinely recent mesh activity in this feed. That data "
+            "is still fully available via the repeater's own "
+            "History/Trends cards and packet counts either way."
+        ),
+    ),
+):
     """Recent MeshCore packets, newest first."""
     if _packet_repo is None:
         raise HTTPException(503, "Routes not initialised")
 
+    import_filter = "" if include_imported else "AND capture_source != 'meshcore_db_import'"
     rows = await _packet_repo._db.fetch_all(
-        """
+        f"""
         SELECT packet_id, source_id, destination_id, packet_type,
                hop_limit, hop_start, channel_hash, want_ack, relay_node,
                rssi, snr,
@@ -337,6 +352,7 @@ async def meshcore_packets(limit: int = Query(100, ge=1, le=500)):
                decoded_payload, capture_source, timestamp
         FROM packets
         WHERE protocol = 'meshcore'
+        {import_filter}
         ORDER BY timestamp DESC
         LIMIT ?
         """,
