@@ -63,6 +63,16 @@ class RadioStatus:
     name: str = ""
 
 
+@dataclass
+class DeviceInfo:
+    """MeshCore companion firmware identity."""
+
+    firmware_version: str = ""
+    model: str = ""
+    build_date: str = ""
+    protocol_version: int = 0
+
+
 class MeshCoreTxClient:
     """Sends messages through a MeshCore companion node.
 
@@ -78,6 +88,7 @@ class MeshCoreTxClient:
         self._owned_connected = False
         self._source = None
         self._post_command_callback = None
+        self._device_info_cache: Optional[DeviceInfo] = None
 
     @property
     def _mc(self):
@@ -492,6 +503,57 @@ class MeshCoreTxClient:
         except Exception:
             logger.exception("Failed to read MeshCore radio info")
             return None
+
+    async def get_device_info(self) -> Optional[DeviceInfo]:
+        """Companion firmware version/model/build date.
+
+        Unlike get_radio_info() (a free read of the connect-time SELF_INFO
+        cache), this needs a real round-trip to the companion
+        (send_device_query()) -- firmware doesn't change at runtime, so
+        it's queried once per connection and cached rather than hitting
+        the device on every GET /api/config poll.
+
+        Payload shape confirmed against meshcore-cli's own 'ver' command
+        implementation (the meshcore python library's own docs don't
+        describe it): 'fw ver' (note the literal space, not a typo) is a
+        protocol-level integer always present; firmware reporting
+        fw ver >= 3 also includes human-readable 'ver' (version string),
+        'model', and 'fw_build' (build date). Older firmware only has the
+        bare 'fw ver' integer worth showing.
+        """
+        if self._device_info_cache is not None:
+            return self._device_info_cache
+        if not self.connected:
+            return None
+        try:
+            from meshcore import EventType
+        except Exception:
+            return None
+        try:
+            result = await asyncio.wait_for(
+                self._mc.commands.send_device_query(), timeout=10.0,
+            )
+        except Exception:
+            logger.debug("send_device_query failed", exc_info=True)
+            return None
+        if result is None or getattr(result, "type", None) == EventType.ERROR:
+            return None
+
+        payload = getattr(result, "payload", None) or {}
+        fw_ver = payload.get("fw ver")
+        if fw_ver is None:
+            return None
+        if fw_ver >= 3 and payload.get("ver"):
+            info = DeviceInfo(
+                firmware_version=str(payload.get("ver", "")),
+                model=str(payload.get("model", "")),
+                build_date=str(payload.get("fw_build", "")),
+                protocol_version=int(fw_ver),
+            )
+        else:
+            info = DeviceInfo(protocol_version=int(fw_ver))
+        self._device_info_cache = info
+        return info
 
     async def sync_channels(self, channel_keys: dict) -> None:
         """Sync configured channels to the companion device.

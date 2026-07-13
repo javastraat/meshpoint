@@ -195,6 +195,7 @@ async def get_config(claims: SessionClaims = Depends(require_auth)):
         "connected": False,
         "companion_name": "",
         "radio": {},
+        "device": {},
         "companion_expected": "meshcore_usb" in (_config.capture.sources or []),
         "status_note": "",
     }
@@ -211,6 +212,17 @@ async def get_config(claims: SessionClaims = Depends(require_auth)):
                         "bandwidth_khz": radio_info.bandwidth_khz,
                         "spreading_factor": radio_info.spreading_factor,
                         "tx_power": radio_info.tx_power,
+                    }
+            except Exception:
+                pass
+            try:
+                device_info = await mc_tx.get_device_info()
+                if device_info:
+                    mc_status["device"] = {
+                        "firmware_version": device_info.firmware_version,
+                        "model": device_info.model,
+                        "build_date": device_info.build_date,
+                        "protocol_version": device_info.protocol_version,
                     }
             except Exception:
                 pass

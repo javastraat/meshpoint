@@ -280,6 +280,10 @@ class MeshcoreConfigCard {
                     <span class="cfg-mc-readout__label">TX Power</span>
                     <span class="cfg-mc-readout__value">${this._fmtTxPower(radio.tx_power)}</span>
                 </div>
+                <div class="cfg-mc-readout" title="${this._esc(this._firmwareTitle(mc.device))}">
+                    <span class="cfg-mc-readout__label">Firmware</span>
+                    <span class="cfg-mc-readout__value">${this._fmtFirmware(mc.device)}</span>
+                </div>
             </div>
             <div class="cfg-mc-channels">
                 <table class="ch-table">
@@ -651,6 +655,23 @@ class MeshcoreConfigCard {
     _fmtBw(v)      { return v ? `${v} kHz` : '--'; }
     _fmtSf(v)      { return v ? `SF${v}` : '--'; }
     _fmtTxPower(v) { return v != null ? `${v} dBm` : '--'; }
+
+    _fmtFirmware(device) {
+        if (!device) return '--';
+        if (device.firmware_version) return device.firmware_version;
+        // Older companion firmware only reports the bare protocol version,
+        // no human-readable version string (see get_device_info()'s docstring).
+        if (device.protocol_version) return `protocol v${device.protocol_version}`;
+        return '--';
+    }
+
+    _firmwareTitle(device) {
+        if (!device || !device.firmware_version) return '';
+        const parts = [];
+        if (device.model) parts.push(device.model);
+        if (device.build_date) parts.push(`built ${device.build_date}`);
+        return parts.join(' · ');
+    }
 
     _esc(str) {
         const el = document.createElement('span');
