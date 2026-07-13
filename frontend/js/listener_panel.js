@@ -1025,14 +1025,17 @@ class ListenerPanel {
                    .trim();
     }
 
-    // One preset button, with a ☆/★ favorite toggle.
+    // One preset row, with a ☆/★ favorite toggle and the frequency shown
+    // on the right -- same row shape as the DAB+ tab's station list.
     _btn(label, freq, mode, catIndex, favs) {
         const key = `${freq}|${mode}`;
         const on = favs.has(key);
         const active = key === this._tunedKey ? ' lsn-preset--active' : '';
         return `<button type="button" class="${active.trim()}" data-freq="${freq}" data-mode="${mode}" data-cat="${catIndex}" data-label="${label}">`
              + `<span class="lsn-fav${on ? ' on' : ''}" data-fav title="Favorite">${on ? '★' : '☆'}</span>`
-             + `${label}</button>`;
+             + `<span class="lsn-preset-row__label">${label}</span>`
+             + `<span class="lsn-preset-row__freq">${freq} MHz</span>`
+             + `</button>`;
     }
 
     _repaintPresets() {

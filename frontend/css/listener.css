@@ -256,20 +256,42 @@
     margin-bottom: 8px;
 }
 
+/* List of rows (like the DAB+ tab's station list) rather than a wrapped
+   chip grid -- one preset per row: star, name, frequency. */
 .lsn-presets {
     display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
+    flex-direction: column;
+    gap: 6px;
 }
 
 .lsn-presets button {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 6px;
     color: rgba(243, 244, 246, 0.75);
-    font-size: 12px;
-    padding: 6px 12px;
+    font-size: 13px;
+    text-align: left;
+    padding: 8px 10px;
     cursor: pointer;
+}
+
+.lsn-preset-row__label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.lsn-preset-row__freq {
+    color: rgba(243, 244, 246, 0.45);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
 }
 
 .lsn-presets button:hover {
@@ -284,6 +306,10 @@
     background: var(--accent-cyan, #06b6d4);
     border-color: var(--accent-cyan, #06b6d4);
     box-shadow: var(--glow-cyan, 0 0 8px rgba(6, 182, 212, 0.6));
+}
+
+.lsn-presets button.lsn-preset--active .lsn-preset-row__freq {
+    color: rgba(4, 18, 26, 0.65);
 }
 
 /* ── Radio face (bezel / display / meter) ────────────── */
@@ -776,7 +802,7 @@
 .lsn-preset-tab {
     background: rgba(255, 255, 255, 0.04);
     border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 999px;
+    border-radius: 8px;
     color: rgba(243, 244, 246, 0.6);
     font-size: 12px;
     font-weight: 600;
