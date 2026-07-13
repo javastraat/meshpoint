@@ -14,20 +14,22 @@
  *
  * Hidden when the sidebar is in icon-only "rail" mode.
  *
- * Mini radio player: when the Radio/RTL-SDR FM listener is actively
- * tuned, the noise-floor block swaps out for a compact player (station
- * name or frequency, mute, stop) so you can control playback from any
- * page without navigating back to the Listener tab. Swaps back to the
- * noise floor the moment playback stops. Scoped to the Radio tab only
- * -- P2000/Pagers/POCSAG/RTL433 have no audio to control, and already
- * get their own sidebar "in use" badge (listener_badge.js). Polls
- * /api/listener/status independently (own 5s interval, same convention
- * as every other sidebar module) rather than sharing ListenerBadge's
- * poll -- decoupled, at the cost of one redundant request every 5s.
- * Mute toggles the actual <audio id="lsn-audio"> element's own client-
- * side volume directly (instant, no server round-trip) -- a different
- * knob from the Radio page's own Level slider, which is a server-side
- * pre-encode gain that requires a full retune to change.
+ * Mini radio player: when the Radio/RTL-SDR FM listener OR the DAB+
+ * listener is actively running, the noise-floor block swaps out for a
+ * compact player (station name/frequency, mute, stop) so you can control
+ * playback from any page without navigating back to the Listener tab.
+ * Swaps back to the noise floor the moment playback stops. Scoped to
+ * Radio/DAB+ only -- P2000/Pagers/POCSAG/RTL433 have no audio to
+ * control, and already get their own sidebar "in use" badge
+ * (listener_badge.js). Radio and DAB+ share one RTL-SDR dongle
+ * (src/audio/sdr_registry.py) so at most one is ever running -- polls
+ * both /api/listener/status and /api/dab/status independently (own 5s
+ * interval, same convention as every other sidebar module) and shows
+ * whichever one is actually running. Mute toggles the active <audio>
+ * element's own client-side volume directly (instant, no server round-
+ * trip) -- a different knob from the Radio page's own Level slider,
+ * which is a server-side pre-encode gain that requires a full retune to
+ * change.
  */
 class SidebarTelemetryRail {
     constructor(rootEl, dashboardWs) {
@@ -47,6 +49,10 @@ class SidebarTelemetryRail {
         this._stopBtn = rootEl.querySelector('#telemetry-player-stop');
         this._playerTimer = null;
         this._playerTextCache = null;
+        // Which listener the player is currently mirroring -- 'radio',
+        // 'dab', or null (neither running). Drives which <audio> element
+        // mute targets and which stop endpoint/panel the Stop button hits.
+        this._activeKind = null;
     }
 
     init() {
@@ -118,44 +124,78 @@ class SidebarTelemetryRail {
     }
 
     async _refreshPlayer() {
-        try {
-            const res = await fetch('/api/listener/status', { credentials: 'same-origin' });
-            if (!res.ok) return;
-            this._applyPlayer(await res.json());
-        } catch (_e) { /* swallow; next poll retries */ }
-    }
-
-    _applyPlayer(status) {
-        const active = !!status.running;
+        const [fmStatus, dabStatus] = await Promise.all([
+            this._fetchJson('/api/listener/status'),
+            this._fetchJson('/api/dab/status'),
+        ]);
         // This poll runs regardless of which page is showing, unlike
         // ListenerPanel's own poll (only active while the Listener route
         // is actually mounted) -- so it's the one place that can catch
         // "backend still running, but this page's <audio> element was
         // never (re)connected" after a reload on some other page.
-        if (window.listenerPanel) window.listenerPanel.syncAudioFromStatus(status);
+        if (fmStatus && window.listenerPanel) window.listenerPanel.syncAudioFromStatus(fmStatus);
+
+        if (fmStatus && fmStatus.running) {
+            this._applyPlayer('radio', fmStatus);
+        } else if (dabStatus && dabStatus.running) {
+            this._applyPlayer('dab', dabStatus);
+        } else {
+            this._applyPlayer(null, null);
+        }
+    }
+
+    async _fetchJson(url) {
+        try {
+            const res = await fetch(url, { credentials: 'same-origin' });
+            return res.ok ? await res.json() : null;
+        } catch (_e) {
+            return null; // transient network hiccup -- next poll retries
+        }
+    }
+
+    _applyPlayer(kind, status) {
+        this._activeKind = kind;
+        const active = !!kind;
         if (this._noiseChip) this._noiseChip.style.display = active ? 'none' : '';
         if (this._playerEl) this._playerEl.style.display = active ? '' : 'none';
         if (!active) return;
 
-        // Same priority order as listener_panel.js's own setStation()
-        // fallback chain: RDS station (+ RadioText) first, then whichever
-        // preset was tuned (now persisted server-side as station_label --
-        // see src/audio/rtl_listener.py -- so this is read straight off
-        // the same status payload rather than reaching into
-        // ListenerPanel's own instance), then bare frequency + mode.
-        const ps = (status.rds_ps || '').trim();
-        let text;
-        if (ps) {
-            const rt = (status.rds_rt || '').trim();
-            text = (rt && rt !== ps) ? `${ps} — ${rt}` : ps;
-        } else {
-            const preset = (status.station_label || '').trim();
-            text = preset || `${_fmtFreq(status.frequency_mhz)} MHz ${(status.mode || '').toUpperCase()}`;
-        }
+        const text = kind === 'radio' ? this._fmPlayerText(status) : this._dabPlayerText(status);
         this._setPlayerText(text);
 
-        const audio = document.getElementById('lsn-audio');
+        const audio = document.getElementById(kind === 'radio' ? 'lsn-audio' : 'dab-audio');
         this._applyMuteIcon(!!(audio && audio.muted));
+    }
+
+    // Same priority order as listener_panel.js's own setStation()
+    // fallback chain: RDS station (+ RadioText) first, then whichever
+    // preset was tuned (persisted server-side as station_label -- see
+    // src/audio/rtl_listener.py), then bare frequency + mode.
+    _fmPlayerText(status) {
+        const ps = (status.rds_ps || '').trim();
+        if (ps) {
+            const rt = (status.rds_rt || '').trim();
+            return (rt && rt !== ps) ? `${ps} — ${rt}` : ps;
+        }
+        const preset = (status.station_label || '').trim();
+        return preset || `${_fmtFreq(status.frequency_mhz)} MHz ${(status.mode || '').toUpperCase()}`;
+    }
+
+    // DAB+'s "tuned" and "what's playing" aren't the same thing server-
+    // side (an ensemble carries several stations at once, and different
+    // browser tabs could each be playing a different one) -- so the
+    // specific now-playing station/DLS text can only come from THIS
+    // browser's own DabPanel instance, not the shared /api/dab/status
+    // payload. Falls back to ensemble+channel when tuned but nothing
+    // picked yet (or DabPanel hasn't mounted, e.g. a reload on another
+    // page before ever visiting the DAB+ tab).
+    _dabPlayerText(status) {
+        const playing = window.dabPanel && window.dabPanel.getNowPlaying();
+        if (playing) {
+            return (playing.dls && playing.dls !== playing.label)
+                ? `${playing.label} — ${playing.dls}` : playing.label;
+        }
+        return `${status.ensemble_label || status.channel || 'DAB+'} (${status.channel || ''})`;
     }
 
     // Marquees the text when it's too long to fit -- same measure/toggle
@@ -184,7 +224,7 @@ class SidebarTelemetryRail {
     }
 
     _toggleMute() {
-        const audio = document.getElementById('lsn-audio');
+        const audio = document.getElementById(this._activeKind === 'dab' ? 'dab-audio' : 'lsn-audio');
         if (!audio) return;
         audio.muted = !audio.muted;
         this._applyMuteIcon(audio.muted);
@@ -203,7 +243,17 @@ class SidebarTelemetryRail {
 
     async _stopRadio() {
         try {
-            await fetch('/api/listener/stop', { method: 'POST', credentials: 'same-origin' });
+            if (this._activeKind === 'dab') {
+                // Goes through DabPanel's own stop path (not a bare POST)
+                // so its local playing-station state and <audio> element
+                // get cleared too, keeping the DAB+ tab in sync if visited
+                // afterward -- FM's single-pipeline model doesn't need
+                // this since there's no separate per-station client state.
+                if (window.dabPanel) await window.dabPanel.stopFromSidebar();
+                else await fetch('/api/dab/stop', { method: 'POST', credentials: 'same-origin' });
+            } else {
+                await fetch('/api/listener/stop', { method: 'POST', credentials: 'same-origin' });
+            }
         } catch (_e) { /* swallow; next poll reflects reality */ }
         this._refreshPlayer();
     }

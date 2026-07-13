@@ -868,21 +868,6 @@
     color: var(--accent-green, #00e5a0);
 }
 
-.dab-ensemble {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-top: 12px;
-    padding-top: 12px;
-    border-top: 1px solid rgba(243, 244, 246, 0.08);
-    font-size: 13px;
-}
-
-.dab-snr {
-    color: rgba(243, 244, 246, 0.55);
-    font-variant-numeric: tabular-nums;
-}
-
 .dab-stations {
     display: flex;
     flex-direction: column;

@@ -414,6 +414,9 @@ class ListenerPanel {
             ? new window.PagerPanel('rtl433', '/api/rtl433', 'RTL433', _rtl433RowHtml)
             : null;
         this._dabPanel = window.DabPanel ? new window.DabPanel() : null;
+        // Exposed so SidebarTelemetryRail's mini-player can show/control
+        // DAB+ playback too -- mirrors window.listenerPanel below.
+        if (this._dabPanel) window.dabPanel = this._dabPanel;
     }
 
     _loadFavs() {
@@ -519,11 +522,11 @@ class ListenerPanel {
 
             <div class="lsn-tabbar" id="lsn-tabbar">
                 <button type="button" class="lsn-tabbar__btn lsn-tabbar__btn--active" data-tab="radio">Radio</button>
+                <button type="button" class="lsn-tabbar__btn" data-tab="dab">DAB+</button>
                 <button type="button" class="lsn-tabbar__btn" data-tab="p2000">P2000</button>
                 <button type="button" class="lsn-tabbar__btn" data-tab="pagers">Pagers</button>
                 <button type="button" class="lsn-tabbar__btn" data-tab="pocsag">POCSAG</button>
                 <button type="button" class="lsn-tabbar__btn" data-tab="rtl433">RTL433</button>
-                <button type="button" class="lsn-tabbar__btn" data-tab="dab">DAB+</button>
             </div>
 
             <div class="lsn-tab-content" data-tab="radio">
@@ -610,18 +613,18 @@ class ListenerPanel {
             </section>
             </div>
 
+            <div class="lsn-tab-content" data-tab="dab" style="display:none" id="lsn-tab-dab"></div>
             <div class="lsn-tab-content" data-tab="p2000" style="display:none" id="lsn-tab-p2000"></div>
             <div class="lsn-tab-content" data-tab="pagers" style="display:none" id="lsn-tab-pagers"></div>
             <div class="lsn-tab-content" data-tab="pocsag" style="display:none" id="lsn-tab-pocsag"></div>
             <div class="lsn-tab-content" data-tab="rtl433" style="display:none" id="lsn-tab-rtl433"></div>
-            <div class="lsn-tab-content" data-tab="dab" style="display:none" id="lsn-tab-dab"></div>
         `;
 
+        if (this._dabPanel) this._dabPanel.mount(root.querySelector('#lsn-tab-dab'));
         if (this._p2000Panel) this._p2000Panel.mount(root.querySelector('#lsn-tab-p2000'));
         if (this._pagersPanel) this._pagersPanel.mount(root.querySelector('#lsn-tab-pagers'));
         if (this._pocsagPanel) this._pocsagPanel.mount(root.querySelector('#lsn-tab-pocsag'));
         if (this._rtl433Panel) this._rtl433Panel.mount(root.querySelector('#lsn-tab-rtl433'));
-        if (this._dabPanel) this._dabPanel.mount(root.querySelector('#lsn-tab-dab'));
 
         root.querySelector('#lsn-tabbar').addEventListener('click', (ev) => {
             const btn = ev.target.closest('[data-tab]');

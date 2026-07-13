@@ -280,7 +280,7 @@ Add an **RTL-SDR dongle** (RTL2832U + R820T/R860 — e.g. RTL-SDR Blog V3/V4, ~�
   ```bash
   sudo apt install -y --no-install-recommends welle.io
   ```
-  Not yet installed automatically by `scripts/install.sh` — a manual step on top of a fresh Pi setup for now. Confirm with `which welle-cli` after installing.
+  Installed automatically by `scripts/install.sh` on a fresh Pi setup (same rationale as RTL433 above — the apt package is small and current enough, no from-source build needed) — manual install only needed for a non-installer setup. Confirm with `which welle-cli` after installing.
 - **Blacklist the DVB-T driver** so the kernel doesn't claim the dongle as a TV tuner (the #1 "device not found" gotcha):
   ```bash
   echo 'blacklist dvb_usb_rtl28xxu' | sudo tee /etc/modprobe.d/rtl-sdr-blacklist.conf

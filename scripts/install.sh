@@ -323,6 +323,20 @@ fi
 info "Installing rtl_433..."
 apt-get install -y -qq --no-install-recommends rtl-433
 
+# ── 10. Install welle.io (DAB+ tab) ───────────────────────────────
+#
+# The Debian/Raspberry Pi OS `welle.io` package ships both the GUI
+# app and the headless `welle-cli` binary Meshpoint's DAB+ tab
+# actually drives (src/audio/dab_listener.py spawns
+# `welle-cli -c <channel> -w <port>` and talks to its embedded
+# webserver) -- confirmed live on this hardware, not assumed.
+# --no-install-recommends skips the Qt/QML GUI dependency chain that
+# only the GUI app needs (~87 MB installed otherwise); welle-cli
+# itself has no GUI dependencies.
+
+info "Installing welle.io (DAB+)..."
+apt-get install -y -qq --no-install-recommends welle.io
+
 # ── 11. Install Meshtastic and MeshCore CLI tools ─────────────────
 #
 # Optional command-line tools for poking at connected radios directly

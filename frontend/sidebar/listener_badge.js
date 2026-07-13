@@ -59,7 +59,7 @@ const LISTENER_BADGE_POLL_MS = 5000;
 
 // Matches src/audio/sdr_registry.py's owner names.
 const _LISTENER_OWNER_LABELS = {
-    radio: 'Radio', p2000: 'P2000', pagers: 'Pagers', pocsag: 'POCSAG', rtl433: 'RTL433',
+    radio: 'Radio', p2000: 'P2000', pagers: 'Pagers', pocsag: 'POCSAG', rtl433: 'RTL433', dab: 'DAB+',
 };
 
 window.ListenerBadge = ListenerBadge;
