@@ -111,6 +111,12 @@ class RtlListener:
         # Current tuning, reported via status()
         self.frequency_hz: int = 0
         self.mode: str = "nfm"
+        # User-chosen preset label (e.g. "Radio 10"), if any -- purely
+        # informational, stored so any consumer (sidebar mini-player,
+        # a page reload) can show it without stations that lack RDS
+        # falling back to a bare frequency. Empty for a manual
+        # frequency-only tune.
+        self.station_label: str = ""
         self.squelch: int = 0
         self.gain: Optional[float] = None  # None = tuner AGC
         # Pre-encoder audio level. rtl_fm runs hot; this tames it before the
@@ -139,6 +145,7 @@ class RtlListener:
         squelch: int = 0,
         gain: Optional[float] = None,
         volume: Optional[float] = None,
+        station_label: str = "",
     ) -> None:
         """(Re)start the pipeline with new parameters.
 
@@ -166,6 +173,7 @@ class RtlListener:
             self.mode = mode
             self.squelch = max(0, int(squelch))
             self.gain = gain
+            self.station_label = station_label
             if volume is not None:
                 self.volume = min(max(float(volume), MIN_VOLUME), MAX_VOLUME)
             # When retuning, the old rtl_fm may not have released the USB
@@ -179,6 +187,11 @@ class RtlListener:
     async def stop(self) -> None:
         async with self._lock:
             await self._stop_locked()
+            # Only a genuine user-initiated stop clears the label -- NOT
+            # _start_locked_retrying()'s internal mid-retry _stop_locked()
+            # calls, which would otherwise wipe out the label tune() just
+            # set before the pipeline even finished (re)starting.
+            self.station_label = ""
 
     def subscribe(self) -> asyncio.Queue[bytes]:
         q: asyncio.Queue[bytes] = asyncio.Queue(maxsize=_QUEUE_MAX_CHUNKS)
@@ -196,6 +209,7 @@ class RtlListener:
             "frequency_hz": self.frequency_hz,
             "frequency_mhz": round(self.frequency_hz / 1e6, 6),
             "mode": self.mode,
+            "station_label": self.station_label,
             "squelch": self.squelch,
             "gain": self.gain,
             "volume": self.volume,
@@ -486,6 +500,7 @@ class RtlListener:
                     )
                     async with self._lock:
                         await self._stop_locked()
+                        self.station_label = ""
                     return
         except asyncio.CancelledError:
             return

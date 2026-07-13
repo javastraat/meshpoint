@@ -1167,9 +1167,65 @@ states in sequence (preset shown when tuned with no RDS yet -> RDS
 takes over the instant it arrives, ignoring the now-stale preset label
 -> back to bare frequency when both are absent) -- matches the exact
 scenario from the screenshot. `node --check`ed both files, CHANGELOG
-bullet updated in place (parser-verified). Not yet re-verified live on
-the Pi after any of these three sidebar-player fixes (RDS+RT
-combination, marquee scrolling, preset-label fallback).
+bullet updated in place (parser-verified).
+
+**Same-session upgrade, "bigger fix" requested**: user explicitly asked
+"tell me first please" before choosing between the small fix just
+shipped (reach into `ListenerPanel._station` via a newly-exposed
+`window.listenerPanel`) and persisting the label server-side instead.
+Laid out concretely what the bigger fix touches (`TuneRequest` gains a
+field, `RtlListener` stores + returns it, `listener_panel.js` sends +
+restores it, `telemetry_rail.js` simplifies to read it straight off
+the shared status payload instead of reaching into another module) and
+what it actually buys (surviving a page reload for RDS-less stations
+specifically -- narrower than it sounds, since RDS already wins the
+priority fight whenever present on both the small and big fix). User
+said yes, build it.
+
+Built: `RtlListener` (`src/audio/rtl_listener.py`) gained
+`self.station_label: str = ""`, a new `station_label` param on
+`tune()`, and it in `status()`. Deliberately did NOT clear it inside
+the shared `_stop_locked()` helper -- that's called from three places
+(`tune()`'s own pre-restart teardown, `_start_locked_retrying()`'s
+mid-retry teardown, plus the two genuine-stop call sites) and clearing
+there would have wiped out the label `tune()` had JUST set, before the
+pipeline even finished (re)starting, on every retry. Instead added an
+explicit `self.station_label = ""` at the two call sites that actually
+mean "nothing is tuned anymore": the public `stop()` method and the
+idle-timeout auto-stop block. `TuneRequest`
+(`src/api/routes/listener_routes.py`) gained a `station_label: str =
+""` field, passed straight through to `tune()`. Frontend:
+`listener_panel.js`'s `_tune()` now sends `station_label: this._station
+|| ''` with every tune request (empty for a manual frequency-only
+tune, matching the existing reset-to-`''` behavior there already);
+`_applyStatus()` now syncs `this._station` FROM `st.station_label`
+whenever `st.running` is true, right at the top before anything else
+reads it -- restores the label on a fresh page load's very first
+status poll, and is a harmless no-op after a local preset click since
+tune()'s own response already echoes back the exact label just sent
+(no race). `telemetry_rail.js` simplified per the plan: reads
+`status.station_label` directly off the same payload it already
+polls, replacing the `window.listenerPanel._station` reach-in
+entirely; removed the now-unneeded `window.listenerPanel = panel`
+line from `app.js` that the small fix had added (avoiding leaving
+behind dead cross-module wiring once its one purpose was obsoleted).
+
+Verified with a stub harness patching `_start_locked_retrying`/
+`_start_locked` to avoid real subprocess spawning: (1) tune with a
+label -> status reflects it; (2) retune to a different preset ->
+label updates; (3) manual frequency-only tune -> label clears; (4)
+tune then stop -> label clears, running false. Also specifically
+targeted the edge case the "don't clear in `_stop_locked()`" design
+was protecting against: simulated a pipeline that dies on its first
+start attempt (triggering `_start_locked_retrying()`'s internal
+mid-retry `_stop_locked()` call) before succeeding on retry --
+confirmed `station_label` survives that internal teardown instead of
+being wiped before the retry even finishes. `ast.parse`-checked both
+Python files, `node --check`ed all three JS files. CHANGELOG/README
+updated (README's tune endpoint row now mentions the optional label).
+Not yet re-verified live on the Pi after any of these four sidebar-player
+fixes (RDS+RT combination, marquee scrolling, preset-label fallback,
+now server-persisted preset label).
 
 ## CURRENT WORKLIST v5 (2026-07-12 end of day — supersedes v4 below; THE list to work off)
 

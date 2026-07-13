@@ -433,7 +433,7 @@ FastAPI server on port 8080 (configurable via `dashboard.port` in `local.yaml`):
 | `GET /api/{lorawan,meshtastic,meshcore}/export/packets.csv` | Download all captured packets as CSV (LoRaWAN adds DevEUI/FCnt/FPort/MIC columns) |
 | `GET /api/lorawan/export/devices.csv` · `.../meshtastic/export/nodes.csv` · `.../meshcore/export/contacts.csv` | Download the device/node/contact census as CSV |
 | `GET /api/listener/status` | RTL-SDR listener state: frequency, mode, RDS (PS/RadioText/PTY/BLER), audio level |
-| `POST /api/listener/tune` | Tune the RTL-SDR: frequency, mode, squelch, gain, level |
+| `POST /api/listener/tune` | Tune the RTL-SDR: frequency, mode, squelch, gain, level, optional preset station label |
 | `POST /api/listener/stop` | Stop the RTL-SDR listener |
 | `GET /api/listener/stream` | Live MP3 audio stream for the browser player |
 | `GET /api/{p2000,pagers,pocsag,rtl433}/status` | Decoder state: running, frequency, decoded messages |

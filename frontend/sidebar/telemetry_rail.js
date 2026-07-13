@@ -132,18 +132,18 @@ class SidebarTelemetryRail {
         if (!active) return;
 
         // Same priority order as listener_panel.js's own setStation()
-        // fallback chain: RDS station (+ RadioText) first, then whatever
-        // preset the user picked (client-side only -- ListenerPanel
-        // never sends it to the backend, so read its instance directly;
-        // exposed globally in app.js's _bootListenerPanel() for exactly
-        // this), then bare frequency + mode.
+        // fallback chain: RDS station (+ RadioText) first, then whichever
+        // preset was tuned (now persisted server-side as station_label --
+        // see src/audio/rtl_listener.py -- so this is read straight off
+        // the same status payload rather than reaching into
+        // ListenerPanel's own instance), then bare frequency + mode.
         const ps = (status.rds_ps || '').trim();
         let text;
         if (ps) {
             const rt = (status.rds_rt || '').trim();
             text = (rt && rt !== ps) ? `${ps} — ${rt}` : ps;
         } else {
-            const preset = (window.listenerPanel && window.listenerPanel._station) || '';
+            const preset = (status.station_label || '').trim();
             text = preset || `${_fmtFreq(status.frequency_mhz)} MHz ${(status.mode || '').toUpperCase()}`;
         }
         this._setPlayerText(text);

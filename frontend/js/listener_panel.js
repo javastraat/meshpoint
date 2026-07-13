@@ -678,6 +678,7 @@ class ListenerPanel {
             mode: document.getElementById('lsn-mode').value,
             squelch: parseInt(document.getElementById('lsn-squelch').value, 10) || 0,
             volume: parseFloat(document.getElementById('lsn-volume').value) || ListenerPanel.DEFAULT_LEVEL,
+            station_label: this._station || '',
         };
         if (gainRaw !== '') body.gain = parseFloat(gainRaw);
 
@@ -805,6 +806,15 @@ class ListenerPanel {
 
     _applyStatus(st) {
         this._lastStatus = st;
+        // Sync the preset label from the backend (single source of truth
+        // now -- see src/audio/rtl_listener.py's station_label) so a page
+        // reload restores it instead of falling back to bare frequency
+        // for stations without RDS. Harmless to keep re-syncing after a
+        // local preset click too, since tune()'s own response already
+        // echoes back the exact label just sent.
+        if (st.running && typeof st.station_label === 'string') {
+            this._station = st.station_label;
+        }
         // Volume slider sync (skip while the user is dragging it).
         if (typeof st.volume === 'number') {
             const vol = document.getElementById('lsn-volume');

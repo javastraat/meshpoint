@@ -37,6 +37,9 @@ class TuneRequest(BaseModel):
         None, ge=0.05, le=1.5,
         description="pre-encoder level; omit to keep current",
     )
+    station_label: str = Field(
+        "", description="Preset name, if tuned via a preset; empty for a manual frequency tune",
+    )
 
 
 @router.get("/status")
@@ -58,6 +61,7 @@ async def listener_tune(req: TuneRequest):
             squelch=req.squelch,
             gain=req.gain,
             volume=req.volume,
+            station_label=req.station_label,
         )
     except ValueError as exc:
         raise HTTPException(422, str(exc))
