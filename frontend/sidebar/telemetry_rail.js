@@ -131,8 +131,21 @@ class SidebarTelemetryRail {
         if (!active) return;
 
         const ps = (status.rds_ps || '').trim();
-        const text = ps || `${_fmtFreq(status.frequency_mhz)} MHz ${(status.mode || '').toUpperCase()}`;
-        if (this._playerTextEl) this._playerTextEl.textContent = text;
+        let text;
+        if (ps) {
+            // Mirror listener_panel.js's own PS + RadioText combination
+            // (Digital/Analogue skin's setStation call) so the sidebar
+            // shows the same "station — now playing" text, not just the
+            // bare station name.
+            const rt = (status.rds_rt || '').trim();
+            text = (rt && rt !== ps) ? `${ps} — ${rt}` : ps;
+        } else {
+            text = `${_fmtFreq(status.frequency_mhz)} MHz ${(status.mode || '').toUpperCase()}`;
+        }
+        if (this._playerTextEl) {
+            this._playerTextEl.textContent = text;
+            this._playerTextEl.title = text;
+        }
 
         const audio = document.getElementById('lsn-audio');
         this._applyMuteIcon(!!(audio && audio.muted));

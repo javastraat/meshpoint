@@ -1085,8 +1085,27 @@ exercising `_applyPlayer()`'s swap logic in both directions, the
 RDS-vs-frequency-fallback text branch, `_toggleMute()`/`_applyMuteIcon()`'s
 icon-swap logic in both directions, and `_stopRadio()`'s fetch call --
 all confirmed correct. `node --check`ed. CHANGELOG/README updated
-(folded into the existing RTL-SDR listener bullets). Not yet
-live-verified on the Pi.
+(folded into the existing RTL-SDR listener bullets).
+
+**Bug found and fixed same round, first live look**: user deployed and
+screenshotted the real Radio tab tuned to 98.000 MHz with full RDS
+active (main page correctly showing "SLAM! — Onair: Joel Corry -
+Whisper") but the sidebar widget showed only the bare station name
+("SLAM!"), missing the RadioText/now-playing half entirely -- user
+flagged "no rds is shown" (meaning the fuller RDS text, not that RDS
+was completely absent, since the station name alone WAS present and
+correctly sourced from `rds_ps`). Root cause: `_applyPlayer()` only
+ever read `status.rds_ps`, never `status.rds_rt`, unlike
+`listener_panel.js`'s own `setStation()` call which combines both
+("PS — RT", skipping RT if identical to PS). Fixed to mirror that
+exact same combination logic; also added a `title` attribute with the
+full untruncated text, useful now that the combined string is longer
+and more likely to hit the sidebar's `text-overflow: ellipsis`. Verified
+with the stub harness using the literal real values from the
+screenshot (`rds_ps: 'SLAM!'`, `rds_rt: 'Onair: Joel Corry - Whisper'`)
+plus the RT-identical-to-PS dedup case -- all three produce the
+expected text. `node --check`ed, CHANGELOG bullet updated in place
+(parser-verified). Not yet re-verified live on the Pi after this fix.
 
 ## CURRENT WORKLIST v5 (2026-07-12 end of day — supersedes v4 below; THE list to work off)
 
