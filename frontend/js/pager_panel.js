@@ -122,7 +122,7 @@ class PagerPanel {
         }
         if (text) {
             if (status.running) {
-                text.textContent = `listening on ${status.frequency_mhz} MHz`;
+                text.textContent = `listening on ${Number(status.frequency_mhz).toFixed(4)} MHz`;
             } else if (busyOwner) {
                 text.textContent = `busy -- in use by ${_DONGLE_OWNER_LABELS[busyOwner] || busyOwner}`;
             } else if (status.last_error) {

@@ -9,8 +9,8 @@
  * shell (not a skin) so the Web Audio graph survives skin switches.
  */
 
-function fmtFreq3(mhz) {
-    return Number.isFinite(mhz) ? mhz.toFixed(3) : '--.---';
+function fmtFreq4(mhz) {
+    return Number.isFinite(mhz) ? mhz.toFixed(4) : '--.----';
 }
 
 // rtl_433's decoded field set varies wildly by device model (a
@@ -58,7 +58,7 @@ class DigitalSkin {
                       title="Tuning — switching frequency and restarting the receiver"><i></i>TUNING</span>
             </div>
             <div class="lsn-freq">
-                <span class="lsn-freq__num" data-freq>--.---</span>
+                <span class="lsn-freq__num" data-freq>--.----</span>
                 <span class="lsn-freq__unit">MHz</span>
             </div>
             <div class="lsn-station" data-station>
@@ -95,7 +95,7 @@ class DigitalSkin {
         this._stationTextCache = null;
     }
 
-    setFreq(freq) { this._el.freq.textContent = fmtFreq3(freq); }
+    setFreq(freq) { this._el.freq.textContent = fmtFreq4(freq); }
     setMode(mode) { if (mode) this._el.mode.textContent = String(mode).toUpperCase(); }
 
     setLeds({ onair, tuning }) {
@@ -203,7 +203,7 @@ class AnalogueSkin {
                         <span class="lsn-station__scroll">
                             <span class="lsn-station__text" data-stationtext>— — —</span>
                         </span>
-                        <div class="lsn-ana__freq"><span data-freq>--.---</span> <em>MHz</em></div>
+                        <div class="lsn-ana__freq"><span data-freq>--.----</span> <em>MHz</em></div>
                     </div>
                 </div>
             </div>
@@ -288,7 +288,7 @@ class AnalogueSkin {
     }
 
     setFreq(freq) {
-        this._el.freq.textContent = fmtFreq3(freq);
+        this._el.freq.textContent = fmtFreq4(freq);
         if (!Number.isFinite(freq)) return;
         const band = this._bandFor(freq);
         if (!this._curBand || band.min !== this._curBand.min || band.max !== this._curBand.max) {
@@ -686,7 +686,7 @@ class ListenerPanel {
         this._skin.setFreq(freq);
         this._skin.setMode(body.mode);
         this._skin.setLeds({ onair: true, tuning: true });
-        this._skin.setStation(this._station || `${fmtFreq3(freq)} MHz`, {});
+        this._skin.setStation(this._station || `${fmtFreq4(freq)} MHz`, {});
         this._setStatus(true, 'tuning…');
         try {
             const r = await fetch('/api/listener/tune', {
@@ -830,7 +830,7 @@ class ListenerPanel {
                 this._skin.setStation(text, { rds: true, pty: st.rds_pty });
             } else {
                 this._skin.setStation(
-                    this._station || (st.running ? `${fmtFreq3(freq)} MHz` : '— — —'), {});
+                    this._station || (st.running ? `${fmtFreq4(freq)} MHz` : '— — —'), {});
             }
             if (!this._vuFromWebAudio) {
                 const lvl = st.running && typeof st.audio_level === 'number'
@@ -846,7 +846,7 @@ class ListenerPanel {
         if (tuneBtn) tuneBtn.disabled = !!busyOwner;
 
         if (st.running) {
-            const label = `${fmtFreq3(st.frequency_mhz)} MHz ${st.mode.toUpperCase()}`
+            const label = `${fmtFreq4(st.frequency_mhz)} MHz ${st.mode.toUpperCase()}`
                 + (st.listeners ? ` • ${st.listeners} listening` : '');
             this._setStatus(true, label);
         } else {

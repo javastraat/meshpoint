@@ -972,6 +972,51 @@ Meshtastic serial — live as `serial_433`; all three lines were stale until
 
 ---
 
+## CURRENT WORKLIST v6 (2026-07-12 end of day — supersedes v5 below; THE list to work off)
+
+Closed since v5 (full narrative/build detail lives in the v5 section below,
+kept for history — this is just the summary): the whole RTL-SDR listener
+buildout — P2000/Pagers/POCSAG/RTL433 tabs (4 new dongle-sharing decoder
+tabs alongside Radio, `src/audio/pager_listener.py` + `src/audio/rtl433_listener.py`
++ `src/audio/sdr_registry.py`), the sidebar "dongle in use" green-dot badge
+(`frontend/sidebar/listener_badge.js`, including a same-day `POLL_MS`
+naming-collision bug fix), the Digital/Analogue skin toggle + status pill
+relocation into the Radio tab's own card (plus the follow-on uppercase/bold
+CSS-inheritance fix and red busy-dot addition), 24-hour time + column-width
+fixes on the pager/RTL433 message logs, `scripts/install.sh` gaining
+RTL-SDR/redsea/multimon-ng/rtl_433 sections (rtl_433 via apt, not
+from-source, after live-testing both approaches), and the RF Environment
+page's new Stray Frames card (W14) — built as an in-memory ring buffer on
+purpose, and after real runtime showed the volume is low enough that the
+user explicitly decided the ring buffer is sufficient (no persisted DB
+table needed, that open question is now closed).
+
+Also closed: a real incident where the RTL-SDR dongle got wedged at the
+USB/kernel level after heavy tab-cycling during testing (POCSAG/Radio/
+RTL433 all briefly failed) — diagnosed as hardware-level, not a code bug,
+and resolved by a full reboot. A genuine software bug found and fixed
+along the way: rtl_433 was silently discarding its own crash reason when
+run without `-F log`, now fixed so future failures are actually diagnosable.
+
+| # | Status | Effort | Item |
+|---|--------|--------|------|
+| — | Open | S | Prune or document the 6 kept-for-later duplicate API endpoints (packets/count+protocols+types, nodes/map+summary, telemetry/*) |
+| — | Open | M | Server-side downsample-across-range for the Repeater Trends chart — a fixed high limit (`hours=100000&limit=50000`) will eventually start truncating again as live polls keep growing the row count unbounded |
+| W18 | Open | S-M | Mini RTL-SDR player widget — when the Radio/RTL-SDR listener is actively streaming, show a small persistent player (bottom-left of the sidebar/menu) with basic transport controls (stop, etc.) so the user doesn't have to navigate back to the Radio page just to stop playback |
+| W6 | Open | M-L | True-RF S-meter via pyrtlsdr — real dBm instead of post-demod audio loudness |
+| W5 | Open | M-L | DAB+ listener mode via welle-cli — unlocks NPO Radio 5 (DAB-only) |
+| W4 | Open | L | Light theme — tokenize the dark-first CSS, light map tiles, per-page contrast pass; topbar toggle already has a slot reserved |
+| W2 | Parked | M | LoRaWAN key store + MIC verify/decrypt — trigger: you run your own LoRaWAN devices |
+| W11 | Parked | M | TTN uplink-only forwarder — trigger: TTN entanglement deemed worth it |
+| — | Noted | — | Firmware flasher / companion version check (upstream #85/#59) — if flashing the 3 sticks becomes a pain |
+| — | Noted | — | Reticulum as 6th network on the spare Heltec V3 433 (upstream #11) — wildcard |
+| — | Open | S | Retest `scripts/install.sh` on a fresh microSD flash (IS_UPGRADE=0 path — new `meshpoint` user creation, first-time systemd install, SPI/UART/I2C enablement, etc. — none exercised by the upgrade-mode run already done). Upgrade-mode path (IS_UPGRADE=1) is fully LIVE-VERIFIED (twice, including an idempotency-rebuild-after-removal test); still want a genuine fresh-flash run since it exercises a different code branch entirely |
+| — | Retest | S | Metrics `require_auth`: confirm a valid session actually authenticates a `/metrics` scrape (only the "blocks with no credentials" half was tested live — 401 confirmed correct). Also consider whether a proper long-lived API-key mechanism is worth building instead of reusing short-lived dashboard session JWTs for this, since those expire and are awkward for an unattended Prometheus scrape config. User flagged 2026-07-12, deferred ("its ok for now") |
+| — | Retest | XS | **P2000 (FLEX) parsing specifically** — narrowed 2026-07-12: user pointed out P2000/Pagers/POCSAG/RTL433 all share the identical `PagerListener`/`sdr_registry` plumbing (start/stop, busy detection, retry-on-busy-device), just different frequency + multimon-ng args, so proving POCSAG's pipeline live also proves that shared mechanism for all four. That's now done — see below. **Pagers is fully covered too** (identical POCSAG512/1200/2400 decoders to the POCSAG tab, just 172.45 vs 439.9875 MHz). The one genuine gap left: **P2000 decodes FLEX**, a completely separate multimon-ng protocol with its own regex (`_FLEX_RE`) that was flagged unverified against real hardware when built — POCSAG's confirmation doesn't touch that code path at all. Still needs an actual real FLEX/P2000 message sent through it to confirm the regex matches real multimon-ng output. |
+| — | DONE 2026-07-12 | — | Re-screenshot post-reboot: **POCSAG and RTL433 both LIVE-VERIFIED via screenshot** — POCSAG shows "listening on 439.988 MHz" with 3 real POCSAG1200 messages (including the original "Test message"), RTL433 shows "idle" (correctly stopped) with 120 real `Generic-Remote` events retained in the log from the earlier session. Confirms both tabs actually recovered cleanly after the reboot, not just verbal confirmation. Radio itself still not separately re-screenshotted (only POCSAG/RTL433 tabs were shown), but the shared-plumbing argument above covers it too. |
+| — | RESOLVED 2026-07-12 | — | The original "POCSAG shows no messages despite the pager physically receiving it" report was purely the wedged-dongle symptom, not a frequency mismatch. Confirmed by sending a genuinely fresh page after the reboot — screenshot shows a brand-new message ("this is a new test for meshpoint pocsag", 08:58:34, distinct from the earlier buffered "Test message" at 08:50:23) decoding correctly at 439.9875 MHz. Further confirmed by a THIRD screenshot showing multiple more real pages flowing in over several minutes (`pd2emc1`, two `XTIME=...` time-sync broadcasts, two `YYYYMMDDHHMMSS...` pages) at varying capcodes (224/208/8/216/200) — POCSAG is genuinely decoding real production traffic reliably, not a one-off fluke. 439.9875 MHz is confirmed the right frequency; no further action needed. |
+| — | DONE 2026-07-12 | XS | **Frequency display bumped to 4 decimal places everywhere on the Listener page.** User noticed while confirming POCSAG: the UI showed "listening on 439.988 MHz" when the actual tuned frequency is 439.9875 MHz — traced to `pager_listener.py`'s `status()` rounding to only 3 decimals server-side (`round(hz/1e6, 3)`), silently losing the real trailing `5` before the frontend ever saw it (pure display bug, the dongle was always tuned correctly to the exact `frequency_hz` the whole time). Bumped that rounding to 6 decimals (matching `rtl_listener.py`'s existing convention for the Radio/FM tab, which was already precise). Standardized display: renamed `listener_panel.js`'s `fmtFreq3()` → `fmtFreq4()` (`toFixed(3)` → `toFixed(4)`, all 5 call sites updated: Digital/Analogue skin frequency readouts, station label, Radio's own "listening on X MHz" line) and updated the two frequency placeholder strings (`--.---` → `--.----`) to match; `pager_panel.js`'s "listening on X MHz" line (shared by P2000/Pagers/POCSAG/RTL433) now explicitly formats with `Number(status.frequency_mhz).toFixed(4)` instead of interpolating the raw JSON number as-is. Verified: POCSAG now correctly reads `439.9875`, P2000/Pagers read `169.6500`/`172.4500` (trailing zeros now shown for consistency), RTL433 reads `433.9200`. `node --check`ed, `ast.parse`-checked, stub-verified the exact backend values for all three pager kinds. |
+
 ## CURRENT WORKLIST v5 (2026-07-12 end of day — supersedes v4 below; THE list to work off)
 
 Closed since v4: Configuration → Peripherals page (fan/LED/button editor,
@@ -1823,7 +1868,7 @@ raising anything file-local. Verified with `node --check`.
 | — | Open | S | Prune or document the 6 kept-for-later duplicate API endpoints (packets/count+protocols+types, nodes/map+summary, telemetry/*) |
 | — | Open | M | Server-side downsample-across-range for the Repeater Trends chart — a fixed high limit (`hours=100000&limit=50000`) will eventually start truncating again as live polls keep growing the row count unbounded |
 | W14 | DONE 2026-07-12 | M | **Stray Frames.** See closure paragraph below (built as an in-memory ring buffer, not a DB table, per user's explicit "test first" ask). |
-| — | Retest | S | Check the RF Environment → Stray Frames card again after it's had real runtime — LIVE-VERIFIED 2026-07-12 rendering correctly but still empty (0 frames) right after deploy/restart, which is expected and healthy, not yet a real read on actual volume. Revisit later: if it stays empty, decoders are catching effectively everything; if it fills up, look at what's actually in it and decide whether to graduate to a persisted table with a real retention cap (the original open question this ring-buffer-first approach was built to answer). |
+| — | DECIDED 2026-07-12 | — | **Stray Frames storage: ring buffer is enough, closed.** After real runtime (561 RF scans), card showed its first genuine entry — a 58-byte `meshtastic`-hinted frame from `concentrator` (-92.4 dBm / -6.0 dB SNR) that failed full decode, most likely an encrypted packet on a channel we don't have the key for (benign, not a bug). Volume this low (1 frame after hundreds of scans) doesn't justify a persisted DB table + retention cap — user explicitly decided the in-memory ring buffer (`deque(maxlen=500)`, resets on restart) is sufficient as-is. Closes the open question this feature was built to answer; no further action unless real-world volume changes materially later. |
 | W18 | Open | S-M | Mini RTL-SDR player widget — when the Radio/RTL-SDR listener is actively streaming, show a small persistent player (bottom-left of the sidebar/menu) with basic transport controls (stop, etc.) so the user doesn't have to navigate back to the Radio page just to stop playback |
 | W6 | Open | M-L | True-RF S-meter via pyrtlsdr — real dBm instead of post-demod audio loudness |
 | W5 | Open | M-L | DAB+ listener mode via welle-cli — unlocks NPO Radio 5 (DAB-only) |

@@ -174,7 +174,7 @@ class PagerListener:
             "kind": self.kind,
             "running": self.running,
             "frequency_hz": self._spec["frequency_hz"],
-            "frequency_mhz": round(self._spec["frequency_hz"] / 1e6, 3),
+            "frequency_mhz": round(self._spec["frequency_hz"] / 1e6, 6),
             "message_count": len(self.messages),
             "messages": list(self.messages),
             "last_error": self._last_error,
