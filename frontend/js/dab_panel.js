@@ -135,6 +135,12 @@ class DabPanel {
             if (btn && !btn.disabled) this._switchChannelTab(btn.dataset.chantab);
         });
         root.querySelector('[data-dab-chantab-content]').addEventListener('click', (ev) => {
+            const scanBtn = ev.target.closest('[data-dab-scan-channel]');
+            if (scanBtn) {
+                this._pendingPlay = null;
+                this._tune(scanBtn.dataset.dabScanChannel);
+                return;
+            }
             const favRemoveBtn = ev.target.closest('[data-dab-fav-remove]');
             if (favRemoveBtn) {
                 const fav = this._loadFavs()[parseInt(favRemoveBtn.dataset.dabFavRemove, 10)];
@@ -172,11 +178,10 @@ class DabPanel {
         this._renderChanTabContent();
     }
 
-    /** Switch which sub-tab is shown. Clicking a real channel code behaves
-     * like the old preset buttons did -- tunes to it -- unless it's
-     * already the one actively running (avoid an unnecessary retune/
-     * restart just from re-viewing the same tab). Favorites/Manual are
-     * pure view switches with no tuning side effect of their own. */
+    /** Switch which sub-tab is shown -- a pure view switch, no tuning side
+     * effect. Browsing a channel tab that isn't the one actually running
+     * shows a Scan prompt instead of silently interrupting whatever's
+     * currently playing; only pressing Scan/Rescan retunes. */
     _switchChannelTab(tab) {
         this._activeChannelTab = tab;
         const root = this._root;
@@ -184,14 +189,6 @@ class DabPanel {
             root.querySelectorAll('[data-chantab]').forEach((btn) => {
                 btn.classList.toggle('lsn-tabbar__btn--active', btn.dataset.chantab === tab);
             });
-        }
-        const isChannelCode = DAB_CHANNEL_PRESETS.some((c) => c.channel === tab);
-        if (isChannelCode) {
-            const st = this._lastStatus;
-            if (!(st && st.running && st.channel === tab)) {
-                this._pendingPlay = null;
-                this._tune(tab);
-            }
         }
         this._renderChanTabContent();
     }
@@ -257,19 +254,34 @@ class DabPanel {
 
     // forChannel: null means "show whatever is currently tuned" (the
     // Manual tab, which has no single channel identity of its own); a
-    // channel code means "only show if that's the one actually tuned".
+    // channel code means "only show if that's the one actually tuned" --
+    // otherwise browsing this tab is safe (no side effect) and shows a
+    // Scan prompt instead of silently interrupting the current station.
     _stationsSectionHtml(status, forChannel) {
+        const isActiveChannel = !forChannel || (status && status.running && status.channel === forChannel);
+
+        if (forChannel && !isActiveChannel) {
+            return `
+                <div class="dab-scan-prompt">
+                    <div class="pager-log__empty">Not currently tuned to ${this._esc(forChannel)}.</div>
+                    <button type="button" class="terminal-button" data-dab-scan-channel="${this._esc(forChannel)}">Scan ${this._esc(forChannel)}</button>
+                    <div class="dab-scan-note">Stops the current station and retunes to this channel.</div>
+                </div>
+            `;
+        }
+
         if (!status || !status.running) {
             return '<div class="pager-log__empty">Not tuned. Pick a channel above to scan for stations.</div>';
         }
-        if (forChannel && status.channel !== forChannel) {
-            return `<div class="pager-log__empty">Tuning to ${this._esc(forChannel)}…</div>`;
-        }
+
+        const rescan = forChannel
+            ? `<div class="dab-chan-actions"><button type="button" class="terminal-button" data-dab-scan-channel="${this._esc(forChannel)}">Rescan</button></div>`
+            : '';
         const services = status.services || [];
         if (!services.length) {
-            return '<div class="pager-log__empty">Scanning… stations appear as they decode.</div>';
+            return rescan + '<div class="pager-log__empty">Scanning… stations appear as they decode.</div>';
         }
-        return `<div class="dab-stations" data-dab-stations>${services.map((s) => this._stationRowHtml(s, status.channel)).join('')}</div>`;
+        return rescan + `<div class="dab-stations" data-dab-stations>${services.map((s) => this._stationRowHtml(s, status.channel)).join('')}</div>`;
     }
 
     // Marquee for any label/DLS text that overflows -- mirrors the Radio

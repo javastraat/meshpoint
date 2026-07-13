@@ -902,6 +902,28 @@
     gap: 6px;
 }
 
+/* Shown when browsing a channel tab that isn't the one actually tuned --
+   viewing is safe (no side effect); Scan is the one explicit action that
+   interrupts the current station. */
+.dab-scan-prompt {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 4px 0;
+}
+
+.dab-scan-note {
+    color: rgba(243, 244, 246, 0.45);
+    font-size: 12px;
+}
+
+.dab-chan-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 8px;
+}
+
 .dab-station-row {
     display: flex;
     align-items: center;
