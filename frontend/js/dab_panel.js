@@ -352,15 +352,27 @@ class DabPanel {
 
     // Same row shape as a channel tab's station list (star, scrolling
     // text, Play/Stop) so Favorites reads as just another station list
-    // instead of a different-looking chip grid.
+    // instead of a different-looking chip grid. A favorite only stores
+    // {channel, sid, label} in localStorage -- no RadioText/DLS, since
+    // that changes constantly and can't be saved statically -- but if
+    // this favorite happens to be on the channel currently tuned, its
+    // live label+DLS is already sitting in status.services, same data
+    // a channel tab's own station row uses.
     _favRowHtml(f, i) {
         const esc = this._esc.bind(this);
         const playing = this._playingSid === f.sid;
+        const status = this._lastStatus;
+        const live = (status && status.running && status.channel === f.channel)
+            ? (status.services || []).find((s) => s.sid === f.sid)
+            : null;
+        const label = live ? live.label : f.label;
+        const dls = live ? live.dls : '';
+        const text = (dls && dls !== label) ? `${f.channel} · ${label} — ${dls}` : `${f.channel} · ${label}`;
         return `
             <div class="dab-station-row">
                 <span class="lsn-fav on" data-dab-fav-remove="${i}" title="Remove favorite">★</span>
                 <span class="lsn-station__scroll dab-station-row__text">
-                    <span class="lsn-station__text" data-dab-scrolltext>${esc(f.channel)} · ${esc(f.label)}</span>
+                    <span class="lsn-station__text" data-dab-scrolltext>${esc(text)}</span>
                 </span>
                 <button type="button" class="terminal-button${playing ? ' dab-station-row__playing' : ''}"
                         data-dab-fav-play="${i}">${playing ? 'Stop' : 'Play'}</button>
