@@ -53,14 +53,20 @@ _ERROR_RE = re.compile(
 # that caught it (FLEX / POCSAG512 / POCSAG1200 / POCSAG2400). Exact
 # field layout can vary a little by multimon-ng version, so parsing is
 # best-effort: unmatched-but-recognized lines are still surfaced with
-# the raw text rather than silently dropped. UNVERIFIED against a real
-# captured signal as of writing (no RTL-SDR/multimon-ng on the Mac dev
-# machine) -- designed from documented multimon-ng output conventions;
-# expect to adjust these patterns after testing on the Pi with a real
-# dongle and signal.
+# the raw text rather than silently dropped.
+#
+# FLEX format confirmed against a real captured P2000 page (2026-07-13,
+# `rtl_fm -f 169.65M -M fm -s 22050 -l 250 | multimon-ng -a FLEX -t raw
+# /dev/stdin` run manually in a shell) -- it's pipe-delimited, NOT the
+# colon/space format originally guessed from documentation alone (no
+# RTL-SDR/multimon-ng on the Mac dev machine to test against at the time):
+#   FLEX|2026-07-13 18:51:53|1600/2/K/A|13.006|002029582 000120161 000120999|ALN|A1 13161 Heesterveld 1102 Amsterdam 67412
+# Field 5 (capcode) can list several space-separated addresses for the same
+# page (simulcast/alternate addressing) -- only the first is kept for the
+# compact capcode column; the full line is always preserved in `raw`.
 _FLEX_RE = re.compile(
-    r"^FLEX:\s*(?P<ts>\S+\s+\S+)\s+(?P<baud>\S+)/(?P<level>\d)/(?P<phase>\S)/(?P<cycle>\S)\s+"
-    r"(?P<frame>\d+)\s+\[(?P<capcode>\d+)\]\s+(?P<kind>\S+)\s+(?P<message>.*)$"
+    r"^FLEX\|(?P<ts>[^|]+)\|(?P<baud>[^/|]+)/(?P<level>\d)/(?P<phase>[^/|])/(?P<cycle>[^/|])\|"
+    r"(?P<frame>[^|]+)\|(?P<capcode>[^|]+)\|(?P<kind>[^|]+)\|(?P<message>.*)$"
 )
 _POCSAG_RE = re.compile(
     r"^(?P<proto>POCSAG\d+):\s*Address:\s*(?P<address>\d+)\s+Function:\s*(?P<function>\d+)"
@@ -95,7 +101,7 @@ def _parse_line(text: str) -> Optional[dict]:
     if m:
         return {
             "protocol": "FLEX",
-            "capcode": m.group("capcode"),
+            "capcode": m.group("capcode").split()[0],
             "message": m.group("message").strip(),
             "raw": text,
             "received_at": now,
@@ -110,7 +116,7 @@ def _parse_line(text: str) -> Optional[dict]:
             "raw": text,
             "received_at": now,
         }
-    if text.startswith(("FLEX:", "POCSAG")):
+    if text.startswith(("FLEX|", "FLEX:", "POCSAG")):
         # Recognized protocol prefix but didn't match the expected field
         # layout (version/format drift) -- still surface it raw rather
         # than silently dropping a real decoded page.
