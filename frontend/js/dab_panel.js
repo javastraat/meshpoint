@@ -25,6 +25,18 @@ const DAB_CHANNEL_PRESETS = [
     { channel: '8B', label: '8B · Noord-Holland/Flevo' },
 ];
 
+// Full Band III DAB channel raster (5A-13F, 38 channels; ETSI EN 300 401)
+// for the manual channel dropdown, alongside the curated presets above --
+// L-Band (LA-LW) isn't offered since the Netherlands doesn't use it.
+const DAB_ALL_CHANNELS = (() => {
+    const channels = [];
+    for (let n = 5; n <= 12; n++) {
+        for (const letter of ['A', 'B', 'C', 'D']) channels.push(`${n}${letter}`);
+    }
+    for (const letter of ['A', 'B', 'C', 'D', 'E', 'F']) channels.push(`13${letter}`);
+    return channels;
+})();
+
 class DabPanel {
     constructor() {
         this._root = null;
@@ -104,6 +116,13 @@ class DabPanel {
                             `).join('')}
                             <button type="button" class="terminal-button" data-dab-stop>Stop</button>
                         </div>
+                        <div class="dab-manual" data-dab-manual>
+                            <select class="dab-manual__select" data-dab-manual-select title="Manual channel entry">
+                                <option value="">Manual channel…</option>
+                                ${DAB_ALL_CHANNELS.map((ch) => `<option value="${ch}">${ch}</option>`).join('')}
+                            </select>
+                            <button type="button" class="terminal-button" data-dab-manual-tune>Tune</button>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -124,6 +143,11 @@ class DabPanel {
             if (stopBtn) { this._stopEnsemble(); return; }
             const btn = ev.target.closest('[data-dab-channel]');
             if (btn && !btn.disabled) { this._pendingPlay = null; this._tune(btn.dataset.dabChannel); }
+        });
+        root.querySelector('[data-dab-manual-tune]').addEventListener('click', () => {
+            const sel = root.querySelector('[data-dab-manual-select]');
+            const channel = sel && sel.value;
+            if (channel) { this._pendingPlay = null; this._tune(channel); }
         });
         root.querySelector('[data-dab-favbar]').addEventListener('click', (ev) => {
             const btn = ev.target.closest('[data-dab-fav-play]');
@@ -375,6 +399,16 @@ class DabPanel {
             btn.disabled = !!busyOwner;
             btn.classList.toggle('dab-channel--active', status.running && status.channel === btn.dataset.dabChannel);
         });
+        const manualSelect = root.querySelector('[data-dab-manual-select]');
+        if (manualSelect) {
+            manualSelect.disabled = !!busyOwner;
+            // Only reflect the tuned channel if the user isn't mid-pick.
+            if (document.activeElement !== manualSelect) {
+                manualSelect.value = status.running ? (status.channel || '') : '';
+            }
+        }
+        const manualTuneBtn = root.querySelector('[data-dab-manual-tune]');
+        if (manualTuneBtn) manualTuneBtn.disabled = !!busyOwner;
 
         this._setLeds({ onair: status.running, tuning: this._tuning });
 

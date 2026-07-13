@@ -868,6 +868,24 @@
     color: var(--accent-green, #00e5a0);
 }
 
+.dab-manual {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(243, 244, 246, 0.08);
+}
+
+.dab-manual__select {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(243, 244, 246, 0.15);
+    border-radius: 6px;
+    color: inherit;
+    font: inherit;
+    padding: 6px 10px;
+}
+
 .dab-stations {
     display: flex;
     flex-direction: column;
