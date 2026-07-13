@@ -842,21 +842,6 @@
 
 /* ── DAB+ tab: channel picker, ensemble readout, station list ────── */
 
-.dab-favbar {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-bottom: 10px;
-}
-
-.dab-favbar__empty {
-    color: rgba(243, 244, 246, 0.4);
-    font-size: 13px;
-    padding: 4px 0;
-}
-
-.dab-fav-chip { color: var(--accent-amber, #f59e0b); }
-
 /* .lsn-tabbar's own padding is sized for the page-level tabbar (sits at
    the content area's edge); override it here since this is nested inside
    a panel that already has its own padding. */

@@ -18,11 +18,11 @@ const _DAB_DONGLE_OWNER_LABELS = {
 // SALTO/FunX Amsterdam) was tried and dropped after decoding nothing
 // here; use the manual channel dropdown below for anything else.
 const DAB_CHANNEL_PRESETS = [
-    { channel: '12C', label: '12C · NPO (Radio 1/2/3FM/Klassiek/FunX…)' },
-    { channel: '11C', label: '11C · Commercial (SLAM!, 538, Qmusic, Sky, Radio 10…)' },
-    { channel: '9C', label: '9C · Throwback/hits (Sublime, KINK, Qmusic Foute Uur…)' },
-    { channel: '7D', label: '7D · MTVNL (KINK Distortion, ArrowClassicRock, Veronica 90s…)' },
-    { channel: '8B', label: '8B · Noord-Holland/Flevo (NH, Omroep Flevoland, SLAM!…)' },
+    { channel: '12C', name: 'NPO', label: '12C · NPO (Radio 1/2/3FM/Klassiek/FunX…)' },
+    { channel: '11C', name: 'Commercial', label: '11C · Commercial (SLAM!, 538, Qmusic, Sky, Radio 10…)' },
+    { channel: '9C', name: 'Throwback', label: '9C · Throwback/hits (Sublime, KINK, Qmusic Foute Uur…)' },
+    { channel: '7D', name: 'MTVNL', label: '7D · MTVNL (KINK Distortion, ArrowClassicRock, Veronica 90s…)' },
+    { channel: '8B', name: 'NH/Flevo', label: '8B · Noord-Holland/Flevo (NH, Omroep Flevoland, SLAM!…)' },
 ];
 
 // Full Band III DAB channel raster (5A-13F, 38 channels; ETSI EN 300 401)
@@ -119,7 +119,7 @@ class DabPanel {
                         <div class="lsn-tabbar dab-chantabs" data-dab-chantabs>
                             <button type="button" class="lsn-tabbar__btn lsn-tabbar__btn--active" data-chantab="favorites">★ Favorites</button>
                             ${DAB_CHANNEL_PRESETS.map((c) => `
-                                <button type="button" class="lsn-tabbar__btn" data-chantab="${c.channel}" title="${c.label}">${c.channel}</button>
+                                <button type="button" class="lsn-tabbar__btn" data-chantab="${c.channel}" title="${c.channel} — ${c.label}">${c.name}</button>
                             `).join('')}
                             <button type="button" class="lsn-tabbar__btn" data-chantab="manual">Manual…</button>
                         </div>
@@ -135,10 +135,19 @@ class DabPanel {
             if (btn && !btn.disabled) this._switchChannelTab(btn.dataset.chantab);
         });
         root.querySelector('[data-dab-chantab-content]').addEventListener('click', (ev) => {
+            const favRemoveBtn = ev.target.closest('[data-dab-fav-remove]');
+            if (favRemoveBtn) {
+                const fav = this._loadFavs()[parseInt(favRemoveBtn.dataset.dabFavRemove, 10)];
+                if (fav) this._toggleFav(fav); // already a favorite -> this removes it
+                return;
+            }
             const favPlayBtn = ev.target.closest('[data-dab-fav-play]');
             if (favPlayBtn) {
                 const fav = this._loadFavs()[parseInt(favPlayBtn.dataset.dabFavPlay, 10)];
-                if (fav) this._playFavorite(fav);
+                if (fav) {
+                    if (this._playingSid === fav.sid) this._playOrStop(fav.sid);
+                    else this._playFavorite(fav);
+                }
                 return;
             }
             const manualTuneBtn = ev.target.closest('[data-dab-manual-tune]');
@@ -200,7 +209,8 @@ class DabPanel {
             ? status.dongle_owner : null;
 
         if (tab === 'favorites') {
-            el.innerHTML = `<div class="dab-favbar" data-dab-favbar>${this._renderFavBar()}</div>`;
+            el.innerHTML = `<div data-dab-favbar>${this._renderFavBar()}</div>`;
+            this._afterStationsRender(el);
             return;
         }
 
@@ -323,13 +333,27 @@ class DabPanel {
     _renderFavBar() {
         const favs = this._loadFavs();
         if (!favs.length) {
-            return '<div class="dab-favbar__empty">No favorites yet — click the ☆ on any station to pin it here.</div>';
+            return '<div class="pager-log__empty">No favorites yet — click the ☆ on any station to pin it here.</div>';
         }
-        return favs.map((f, i) => `
-            <button type="button" class="terminal-button dab-fav-chip" data-dab-fav-play="${i}">
-                ★ ${this._esc(f.channel)} · ${this._esc(f.label)}
-            </button>
-        `).join('');
+        return `<div class="dab-stations">${favs.map((f, i) => this._favRowHtml(f, i)).join('')}</div>`;
+    }
+
+    // Same row shape as a channel tab's station list (star, scrolling
+    // text, Play/Stop) so Favorites reads as just another station list
+    // instead of a different-looking chip grid.
+    _favRowHtml(f, i) {
+        const esc = this._esc.bind(this);
+        const playing = this._playingSid === f.sid;
+        return `
+            <div class="dab-station-row">
+                <span class="lsn-fav on" data-dab-fav-remove="${i}" title="Remove favorite">★</span>
+                <span class="lsn-station__scroll dab-station-row__text">
+                    <span class="lsn-station__text" data-dab-scrolltext>${esc(f.channel)} · ${esc(f.label)}</span>
+                </span>
+                <button type="button" class="terminal-button${playing ? ' dab-station-row__playing' : ''}"
+                        data-dab-fav-play="${i}">${playing ? 'Stop' : 'Play'}</button>
+            </div>
+        `;
     }
 
     /** Jump straight to a favorite: tune its channel if not already there
@@ -668,17 +692,30 @@ class DabPanel {
 
     _repaintStationButtons() {
         const el = this._root && this._root.querySelector('[data-dab-stations]');
-        if (!el) return;
-        el.querySelectorAll('[data-dab-play]').forEach((btn) => {
-            const playing = this._playingSid === btn.dataset.dabPlay;
-            btn.textContent = playing ? 'Stop' : 'Play';
-            btn.classList.toggle('dab-station-row__playing', playing);
-        });
-        el.querySelectorAll('[data-dab-favtoggle]').forEach((star) => {
-            const isFav = this._isFav(star.dataset.dabChannel, star.dataset.dabSid);
-            star.textContent = isFav ? '★' : '☆';
-            star.classList.toggle('on', isFav);
-        });
+        if (el) {
+            el.querySelectorAll('[data-dab-play]').forEach((btn) => {
+                const playing = this._playingSid === btn.dataset.dabPlay;
+                btn.textContent = playing ? 'Stop' : 'Play';
+                btn.classList.toggle('dab-station-row__playing', playing);
+            });
+            el.querySelectorAll('[data-dab-favtoggle]').forEach((star) => {
+                const isFav = this._isFav(star.dataset.dabChannel, star.dataset.dabSid);
+                star.textContent = isFav ? '★' : '☆';
+                star.classList.toggle('on', isFav);
+            });
+        }
+        // Favorites tab's own Play/Stop buttons -- same playingSid check,
+        // different markup/attributes (data-dab-fav-play, not
+        // data-dab-play), so it needs its own pass.
+        const favBar = this._root && this._root.querySelector('[data-dab-favbar]');
+        if (favBar) {
+            favBar.querySelectorAll('[data-dab-fav-play]').forEach((btn) => {
+                const fav = this._loadFavs()[parseInt(btn.dataset.dabFavPlay, 10)];
+                const playing = !!fav && this._playingSid === fav.sid;
+                btn.textContent = playing ? 'Stop' : 'Play';
+                btn.classList.toggle('dab-station-row__playing', playing);
+            });
+        }
     }
 
     _setStatus(running, text, busy = false) {
