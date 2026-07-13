@@ -15,9 +15,16 @@ sdr_registry.py) -- if another listener is running, welle-cli will just
 fail to open the device for every channel.
 
 Usage:
-    python3 scripts/dab_channel_scan.py                  # all 38 channels
+    python3 scripts/dab_channel_scan.py                  # all 38 channels, 30s each
     python3 scripts/dab_channel_scan.py --channels 12C 11C 9C
-    python3 scripts/dab_channel_scan.py --timeout 30     # slower/weaker antenna
+    python3 scripts/dab_channel_scan.py --timeout 45     # slower/weaker antenna
+
+A "nothing" result on a full scan isn't always definitive: back-to-back
+channel switches can occasionally leave welle-cli unable to reopen the
+dongle in time even with the gap between channels, producing a false
+negative on an otherwise-good channel (seen live: 9C read "nothing" on
+a full run, then decoded 15 stations at SNR 7 dB when retested alone).
+Worth an isolated retest (--channels <X>) before writing a channel off.
 """
 
 from __future__ import annotations
@@ -36,7 +43,7 @@ ALL_CHANNELS = [f"{n}{letter}" for n in range(5, 13) for letter in "ABCD"] + [
 ]
 
 POLL_INTERVAL_SECONDS = 2.0
-DEVICE_SETTLE_SECONDS = 0.5
+DEVICE_SETTLE_SECONDS = 1.5
 
 
 def fetch_mux_json(port: int) -> Optional[dict]:
@@ -70,7 +77,7 @@ def scan_channel(channel: str, port: int, timeout: float) -> dict:
             stations = [
                 (s.get("label") or {}).get("label", "").strip()
                 for s in data.get("services", [])
-                if s.get("url_mp3")
+                if s.get("url_mp3") and (s.get("label") or {}).get("label", "").strip()
             ]
             if stations:
                 result["stations"] = stations
@@ -96,8 +103,8 @@ def main() -> int:
         help="specific channels to scan, e.g. --channels 12C 11C 9C (default: all 38 Band III channels)",
     )
     parser.add_argument(
-        "--timeout", type=float, default=20.0,
-        help="max seconds to wait per channel for sync + station decode (default: 20)",
+        "--timeout", type=float, default=30.0,
+        help="max seconds to wait per channel for sync + station decode (default: 30)",
     )
     parser.add_argument("--port", type=int, default=7979, help="welle-cli webserver port (default: 7979)")
     args = parser.parse_args()

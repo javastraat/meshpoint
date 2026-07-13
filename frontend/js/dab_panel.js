@@ -11,20 +11,18 @@ const _DAB_DONGLE_OWNER_LABELS = {
     radio: 'Radio', p2000: 'P2000', pagers: 'Pagers', pocsag: 'POCSAG', rtl433: 'RTL433', dab: 'DAB+',
 };
 
-// NL DAB+ ensembles for an Amsterdam-area antenna. 12C/11C/9C/7D are
-// confirmed nationwide (identical frequency + Ensemble ID across every
-// NL DAB scanner region, not just Amsterdam); 8B is the genuinely
-// local/provincial one for this area (NH/Omroep Flevoland). 6C (Radio
-// SALTO/FunX Amsterdam) was tried and dropped -- its channel/frequency
-// came from the Alkmaar scanner, a different transmitter site, and it
-// decoded nothing here; use the manual channel dropdown below to find
-// whichever local channel actually reaches this antenna.
+// NL DAB+ ensembles for an Amsterdam-area antenna. All 5 confirmed live
+// via scripts/dab_channel_scan.py's real full-channel scan on this exact
+// antenna (2026-07-13) -- labels reflect the actual decoded station
+// rosters, not guesses from another city's scanner data. 6C (Radio
+// SALTO/FunX Amsterdam) was tried and dropped after decoding nothing
+// here; use the manual channel dropdown below for anything else.
 const DAB_CHANNEL_PRESETS = [
-    { channel: '12C', label: '12C · NPO (national)' },
-    { channel: '11C', label: '11C · Commercial (SLAM!, 538, Qmusic, Sky…)' },
-    { channel: '9C', label: '9C · Sublime/KINK/Qmusic (national)' },
-    { channel: '7D', label: '7D · MTVNL' },
-    { channel: '8B', label: '8B · Noord-Holland/Flevo' },
+    { channel: '12C', label: '12C · NPO (Radio 1/2/3FM/Klassiek/FunX…)' },
+    { channel: '11C', label: '11C · Commercial (SLAM!, 538, Qmusic, Sky, Radio 10…)' },
+    { channel: '9C', label: '9C · Throwback/hits (Sublime, KINK, Qmusic Foute Uur…)' },
+    { channel: '7D', label: '7D · MTVNL (KINK Distortion, ArrowClassicRock, Veronica 90s…)' },
+    { channel: '8B', label: '8B · Noord-Holland/Flevo (NH, Omroep Flevoland, SLAM!…)' },
 ];
 
 // Full Band III DAB channel raster (5A-13F, 38 channels; ETSI EN 300 401)
