@@ -323,7 +323,24 @@ fi
 info "Installing rtl_433..."
 apt-get install -y -qq --no-install-recommends rtl-433
 
-# ── 10. Build SX1302 HAL ──────────────────────────────────────────
+# ── 10. Install Meshtastic and MeshCore CLI tools ─────────────────
+#
+# Optional command-line tools for poking at connected radios directly
+# from the shell -- not used by Meshpoint itself (which talks to them
+# via meshtastic-python/meshcore-python instead), just handy for admin
+# debugging on the Pi. meshtastic-cli via pip3 (needs
+# --break-system-packages since Debian's system Python is PEP
+# 668-protected); meshcore-cli via pipx (isolated venv per tool,
+# already installed as a system package in section 1).
+
+info "Installing Meshtastic CLI..."
+pip3 install --upgrade "meshtastic[cli]" --break-system-packages
+
+info "Installing MeshCore CLI..."
+pipx install meshcore-cli
+pipx ensurepath
+
+# ── 11. Build SX1302 HAL ──────────────────────────────────────────
 
 if [ -f "/usr/local/lib/libloragw.so" ]; then
     info "libloragw.so already installed, skipping HAL build"
@@ -574,7 +591,7 @@ _HALCFG
     info "libloragw.so installed to /usr/local/lib/"
 fi
 
-# ── 11. Apply TX sync word patch ──────────────────────────────────
+# ── 12. Apply TX sync word patch ──────────────────────────────────
 
 HAL_SRC="${HAL_BUILD_DIR}/libloragw/src/loragw_sx1302.c"
 if [ -f "$HAL_SRC" ]; then
@@ -582,7 +599,7 @@ if [ -f "$HAL_SRC" ]; then
     bash "${SCRIPT_DIR}/scripts/patch_hal.sh"
 fi
 
-# ── 12. Install Meshpoint application ─────────────────────────────
+# ── 13. Install Meshpoint application ─────────────────────────────
 
 info "Installing Meshpoint to ${MESHPOINT_DIR}..."
 mkdir -p "$MESHPOINT_DIR"
@@ -604,7 +621,7 @@ rsync -a --exclude='venv' \
 #          --exclude='*.pyc' \
 #          "${SCRIPT_DIR}/" "$MESHPOINT_DIR/"
 
-# ── 13. Remove stale compiled core modules from prior installs ───
+# ── 14. Remove stale compiled core modules from prior installs ───
 # Releases before 0.7.0 shipped .cpython-*.so files alongside the
 # .py source. Python prefers the .so at import time, so any leftover
 # binary would silently shadow the current source. rsync above does
@@ -616,7 +633,7 @@ if find "${MESHPOINT_DIR}/src" -name '*.cpython-*.so' -print -quit | grep -q .; 
     find "${MESHPOINT_DIR}/src" -name '*.cpython-*.so' -delete
 fi
 
-# ── 14. Python virtual environment ────────────────────────────────
+# ── 15. Python virtual environment ────────────────────────────────
 
 info "Setting up Python virtual environment..."
 python3 -m venv "${MESHPOINT_DIR}/venv"
@@ -627,11 +644,11 @@ pip install -r "${MESHPOINT_DIR}/requirements.txt" -q
 pip install pyserial -q
 deactivate
 
-# ── 15. Create data directory ─────────────────────────────────────
+# ── 16. Create data directory ─────────────────────────────────────
 
 mkdir -p "${MESHPOINT_DIR}/data"
 
-# ── 16. Create meshpoint system user ──────────────────────────────
+# ── 17. Create meshpoint system user ──────────────────────────────
 
 if ! id -u meshpoint &>/dev/null; then
     info "Creating system user 'meshpoint'..."
@@ -681,14 +698,14 @@ info "Installing sudoers rule for service management..."
 cp "${MESHPOINT_DIR}/config/sudoers-meshpoint" /etc/sudoers.d/meshpoint
 chmod 440 /etc/sudoers.d/meshpoint
 
-# ── 17. Configure journald log rotation ───────────────────────────
+# ── 18. Configure journald log rotation ───────────────────────────
 
 info "Configuring journald log limits (100M, 7-day retention)..."
 mkdir -p /etc/systemd/journald.conf.d
 cp "${MESHPOINT_DIR}/config/journald-meshpoint.conf" /etc/systemd/journald.conf.d/meshpoint.conf
 systemctl restart systemd-journald 2>/dev/null || warn "Could not restart journald"
 
-# ── 18. Install systemd service ───────────────────────────────────
+# ── 19. Install systemd service ───────────────────────────────────
 
 info "Installing systemd service..."
 cp "${MESHPOINT_DIR}/${SERVICE_FILE}" /etc/systemd/system/meshpoint.service
@@ -696,7 +713,7 @@ systemctl daemon-reload
 systemctl enable meshpoint
 info "Service enabled (will start after 'meshpoint setup')"
 
-# ── 19. Install network watchdog ──────────────────────────────────
+# ── 20. Install network watchdog ──────────────────────────────────
 
 info "Installing WiFi network watchdog..."
 cp "${MESHPOINT_DIR}/${WATCHDOG_SERVICE_FILE}" /etc/systemd/system/network-watchdog.service
@@ -705,13 +722,13 @@ systemctl enable network-watchdog
 systemctl start network-watchdog 2>/dev/null || warn "Could not start network-watchdog (will start on next boot)"
 info "Network watchdog enabled"
 
-# ── 20. Install CLI tool ───────────────────────────────────────────
+# ── 21. Install CLI tool ───────────────────────────────────────────
 
 info "Installing meshpoint CLI..."
 chmod +x "${MESHPOINT_DIR}/${CLI_SCRIPT}"
 ln -sf "${MESHPOINT_DIR}/${CLI_SCRIPT}" /usr/local/bin/meshpoint
 
-# ── 21. Add fastfetch login banner ────────────────────────────────
+# ── 22. Add fastfetch login banner ────────────────────────────────
 #
 # Shows a system-info banner on every interactive login shell for the
 # `pi` user. Idempotent: skips if already present.
