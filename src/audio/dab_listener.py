@@ -49,6 +49,10 @@ _ERROR_RE = re.compile(
     r"failed|error|cannot|could not|invalid|no supported|usb_",
     re.IGNORECASE,
 )
+# welle-cli's OFDM sync loop logs routine retry chatter ("Lost coarse
+# sync", "SyncOnPhase failed") on the way to a normal, successful lock --
+# not a real error, even though it matches _ERROR_RE's "failed"/"lost".
+_BENIGN_PREFIX_RE = re.compile(r"^ofdm-processor:", re.IGNORECASE)
 
 
 class DabListener:
@@ -111,6 +115,7 @@ class DabListener:
             self.ensemble_label = ""
             self.snr = 0.0
             self.services = []
+            self._last_error = ""
 
     def status(self) -> dict:
         return {
@@ -240,6 +245,8 @@ class DabListener:
                 if not text:
                     continue
                 logger.debug("welle-cli: %s", text)
+                if _BENIGN_PREFIX_RE.match(text):
+                    continue
                 if _ERROR_RE.search(text):
                     self._last_error = text
         except asyncio.CancelledError:
@@ -311,6 +318,7 @@ class DabListener:
                         self.ensemble_label = ""
                         self.snr = 0.0
                         self.services = []
+                        self._last_error = ""
                     return
         except asyncio.CancelledError:
             return
