@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c \"import ast; ast.parse\\(open\\('scripts/dedupe_meshcoredb_packets.py'\\).read\\(\\)\\); print\\('syntax OK'\\)\")",
+      "Bash(python3 scripts/dedupe_meshcoredb_packets.py --db-path /tmp/nonexistent_test.db --help)"
+    ]
+  }
+}
