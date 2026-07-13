@@ -559,14 +559,21 @@ class DabPanel {
 
         this._setLeds({ onair: status.running, tuning: this._tuning });
 
+        // Big slot shows the friendly ensemble name (more meaningful to a
+        // listener than a channel code) -- our own curated name if this
+        // is a known preset, else whatever real ensemble label welle-cli
+        // decoded (some, like 11C's literal "DAB+" or 9C's literal "9C",
+        // aren't descriptive at all, so the curated name is preferred
+        // whenever we have one). Small slot shows the channel code.
         const numEl = root.querySelector('[data-dab-channelnum]');
-        if (numEl) numEl.textContent = status.channel || '--';
         const ensembleEl = root.querySelector('[data-dab-ensemble]');
-        if (ensembleEl) {
-            ensembleEl.textContent = status.running
-                ? (status.ensemble_label || 'scanning…')
-                : '';
+        const preset = DAB_CHANNEL_PRESETS.find((c) => c.channel === status.channel);
+        if (numEl) {
+            numEl.textContent = status.running
+                ? (preset ? preset.name : (status.ensemble_label || status.channel || 'scanning…'))
+                : '--';
         }
+        if (ensembleEl) ensembleEl.textContent = status.running ? (status.channel || '') : '';
 
         if (status.running) {
             this._setStatus(true, `tuned to ${status.channel}`);

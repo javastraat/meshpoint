@@ -489,6 +489,13 @@
     color: rgba(95, 234, 255, 0.55);
 }
 
+/* DAB+ shows a friendly ensemble name here instead of a numeric readout;
+   names run longer than FM's frequency digits (e.g. "Commercial"), so a
+   smaller max size keeps them from overflowing at the base 64px clamp. */
+[data-dab-channelnum] {
+    font-size: clamp(26px, 6vw, 44px);
+}
+
 /* Segmented VU meter */
 .lsn-vu {
     display: flex;
