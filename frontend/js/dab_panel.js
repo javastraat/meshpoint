@@ -11,13 +11,18 @@ const _DAB_DONGLE_OWNER_LABELS = {
     radio: 'Radio', p2000: 'P2000', pagers: 'Pagers', pocsag: 'POCSAG', rtl433: 'RTL433', dab: 'DAB+',
 };
 
-// Amsterdam-area DAB+ ensembles (NL national/regional multiplexes).
+// NL DAB+ ensembles for an Amsterdam-area antenna. 12C/11C/9C/7D are
+// confirmed nationwide (identical frequency + Ensemble ID across every
+// NL DAB scanner region, not just Amsterdam); 6C/8B are the genuinely
+// local/provincial ones for this specific area (Radio SALTO and FunX
+// Amsterdam only show up on 6C; NH/Omroep Flevoland only on 8B).
 const DAB_CHANNEL_PRESETS = [
     { channel: '12C', label: '12C · NPO (national)' },
-    { channel: '11C', label: '11C · Commercial nationals' },
+    { channel: '11C', label: '11C · Commercial (SLAM!, 538, Qmusic, Sky…)' },
+    { channel: '9C', label: '9C · Sublime/KINK/Qmusic (national)' },
     { channel: '7D', label: '7D · MTVNL' },
-    { channel: '9C', label: '9C · Amsterdam/regional' },
-    { channel: '11A', label: '11A · Regional' },
+    { channel: '6C', label: '6C · Amsterdam (SALTO, FunX A\'dam)' },
+    { channel: '8B', label: '8B · Noord-Holland/Flevo' },
 ];
 
 class DabPanel {
