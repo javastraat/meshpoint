@@ -309,6 +309,7 @@ function _bootLoRaWANPanel(router) {
 function _bootListenerPanel(router) {
     if (!window.ListenerPanel) return;
     const panel = new window.ListenerPanel();
+    window.listenerPanel = panel;
     router.onRouteChange((route) => {
         if (route === 'listener') panel.show();
         else panel.hide();

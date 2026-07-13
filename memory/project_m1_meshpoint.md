@@ -1135,7 +1135,41 @@ parent/child pair: long overflowing text correctly triggers scrolling
 with the right computed distance/duration, an unchanged poll doesn't
 re-trigger (cache hit), and short text that fits stays static with no
 scroll class. `node --check`ed, CHANGELOG bullet updated in place
-(parser-verified). Not yet re-verified live on the Pi after either fix.
+(parser-verified).
+
+**Same-session follow-up, third gap found live**: user tuned to the
+"Radio 10" preset and screenshotted the sidebar showing bare
+"91.6000 MHz WFM" while the main Radio page correctly showed "Radio
+10" (the preset label, since this station has no RDS at all --
+confirmed by the user: "its because radio10 doesnt have rds"). Root
+cause: the preset label a user clicks lives ONLY in
+`ListenerPanel._station`, a private in-memory field on that one
+module, NEVER sent to the backend at all -- `/api/listener/status`
+only ever had `rds_ps`/`rds_rt` to work with, no concept of a
+user-chosen label. Presented two options before building (small:
+expose the instance and read the field directly; big: persist the
+label server-side via the tune request so it's a real single source
+of truth that survives reloads) -- user asked "what do you advise",
+recommended small (ships fast, no backend touch) with the honest
+caveat that this doesn't fix the underlying limitation that the label
+is ephemeral (a page reload loses it on the MAIN page too, today,
+independent of this fix -- not something this change introduces).
+User confirmed the exact priority order to use ("when rds comes in of
+course show rds, else preset and freq") -- exactly what `listener_panel.js`'s
+own `setStation()` fallback chain already does, so this just makes the
+sidebar consistent with logic that already existed. Built: one-line
+addition to `app.js`'s `_bootListenerPanel()` (`window.listenerPanel = panel`,
+matching the existing pattern for `window.telemetryRail`/
+`window.concentratorWS`); `telemetry_rail.js`'s `_applyPlayer()` now
+checks `window.listenerPanel._station` as the middle rung between RDS
+and bare frequency. Verified with the stub harness across all three
+states in sequence (preset shown when tuned with no RDS yet -> RDS
+takes over the instant it arrives, ignoring the now-stale preset label
+-> back to bare frequency when both are absent) -- matches the exact
+scenario from the screenshot. `node --check`ed both files, CHANGELOG
+bullet updated in place (parser-verified). Not yet re-verified live on
+the Pi after any of these three sidebar-player fixes (RDS+RT
+combination, marquee scrolling, preset-label fallback).
 
 ## CURRENT WORKLIST v5 (2026-07-12 end of day — supersedes v4 below; THE list to work off)
 

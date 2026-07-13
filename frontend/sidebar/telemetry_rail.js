@@ -131,17 +131,20 @@ class SidebarTelemetryRail {
         if (this._playerEl) this._playerEl.style.display = active ? '' : 'none';
         if (!active) return;
 
+        // Same priority order as listener_panel.js's own setStation()
+        // fallback chain: RDS station (+ RadioText) first, then whatever
+        // preset the user picked (client-side only -- ListenerPanel
+        // never sends it to the backend, so read its instance directly;
+        // exposed globally in app.js's _bootListenerPanel() for exactly
+        // this), then bare frequency + mode.
         const ps = (status.rds_ps || '').trim();
         let text;
         if (ps) {
-            // Mirror listener_panel.js's own PS + RadioText combination
-            // (Digital/Analogue skin's setStation call) so the sidebar
-            // shows the same "station — now playing" text, not just the
-            // bare station name.
             const rt = (status.rds_rt || '').trim();
             text = (rt && rt !== ps) ? `${ps} — ${rt}` : ps;
         } else {
-            text = `${_fmtFreq(status.frequency_mhz)} MHz ${(status.mode || '').toUpperCase()}`;
+            const preset = (window.listenerPanel && window.listenerPanel._station) || '';
+            text = preset || `${_fmtFreq(status.frequency_mhz)} MHz ${(status.mode || '').toUpperCase()}`;
         }
         this._setPlayerText(text);
 
