@@ -559,12 +559,19 @@ select.cfg-field__input option:checked {
     font-size: 13px;
 }
 
+.cfg-companion__offline-hint {
+    margin: 4px 0 0;
+    font-size: 12px;
+    color: rgba(243, 244, 246, 0.4);
+}
+
 .cfg-companion__remove {
     margin-left: auto;
     padding: 4px 10px;
     font-size: 12px;
     line-height: 1;
     flex-shrink: 0;
+}
 
 .cfg-quick-deploy {
     display: grid;

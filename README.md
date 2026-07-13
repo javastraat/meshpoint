@@ -75,6 +75,7 @@ This is a customized fork of upstream [KMX415/meshpoint](https://github.com/KMX4
 - **RF Environment works on the SenseCap M1** — upstream marks spectral scan unavailable on the M1; this fork's `sx1261_spi_path` support powers upstream's RF Environment tab with live hardware scans here (and its histogram's endless-page-growth bug is fixed).
 - **Concentrator channels card** — read-only table of all 9 SX1302 slots (frequency, BW, SF, sync word, protocol, RF chain, state), derived from the same channel-plan code the radio runs.
 - **Unified protocol cards** — "Meshtastic Configuration" (radio settings + channel list in one card) and a matching MeshCore Companion layout, which also shows the companion's firmware version alongside its frequency/bandwidth/SF/TX power readouts, with a "Check for updates" button comparing it against the latest `meshcore-dev/MeshCore` release on GitHub.
+- **Configuration → Serial shows live readouts per Meshtastic USB stick** — Node ID, name, region, SF, bandwidth, firmware version, and hardware model for each connected device, read straight from the stick itself.
 - **Node drawer recent packets** — every node shows its last 15 packets (time, type, RSSI/SNR).
 - **SNR distribution chart** on Stats next to the RSSI histogram; signal stats ignore implausible near-field readings (> −20 dBm).
 - **Relay tuning from the dashboard** — burst size and the min/max RSSI relay window are editable on Configuration → Transmit.

@@ -10,7 +10,9 @@
       "Bash(node -e ' *)",
       "Bash(xargs -I{} basename {})",
       "Bash(python3 -c \"import ast; ast.parse\\(open\\('src/api/routes/meshcore_config_routes.py'\\).read\\(\\)\\); print\\('syntax OK'\\)\")",
-      "Bash(grep -n \"^| \\\\`.*meshcore\" README.md)"
+      "Bash(grep -n \"^| \\\\`.*meshcore\" README.md)",
+      "Bash(python3 -c \"import ast; ast.parse\\(open\\('src/capture/serial_source.py'\\).read\\(\\)\\); print\\('syntax OK'\\)\")",
+      "Bash(node --check frontend/js/configuration/serial_card.js)"
     ]
   }
 }

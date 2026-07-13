@@ -62,6 +62,12 @@ class SerialConfigCard {
         const cap = config.capture || {};
         const devices = Array.isArray(cap.serial) ? cap.serial : [];
         const sources = cap.sources || [];
+        // Top-level config.serial is the LIVE status array (one entry per
+        // running SerialCaptureSource, keyed by `name` -- e.g. "serial_433"
+        // or bare "serial" with no label) -- a completely different thing
+        // from cap.serial (config.capture.serial) above despite the
+        // similar path, matching the API's own existing naming.
+        this._liveStatuses = Array.isArray(config.serial) ? config.serial : [];
 
         const enableEl = this._root.querySelector('[data-serial-enable]');
         if (enableEl) enableEl.checked = sources.includes('serial');
@@ -74,6 +80,11 @@ class SerialConfigCard {
         this._syncAddBtn();
     }
 
+    _liveStatusFor(label) {
+        const name = label ? `serial_${label}` : 'serial';
+        return (this._liveStatuses || []).find((s) => s.name === name) || null;
+    }
+
     _addDeviceRow(data = {}) {
         const idx = this._devicesEl.children.length;
         if (idx >= this._MAX_DEVICES) return;
@@ -81,6 +92,7 @@ class SerialConfigCard {
         const label = this._esc(data.label || '');
         const port = this._esc(data.serial_port || '');
         const baud = data.serial_baud != null ? data.serial_baud : 115200;
+        const live = this._liveStatusFor(data.label || '');
 
         const div = document.createElement('div');
         div.className = 'cfg-companion';
@@ -109,6 +121,7 @@ class SerialConfigCard {
                 <input class="cfg-field__input" type="number"
                        value="${baud}" data-device-baud>
             </label>
+            ${this._readoutsHtml(live)}
         `;
 
         div.querySelector('.cfg-companion__remove').addEventListener('click', () => {
@@ -167,6 +180,55 @@ class SerialConfigCard {
             status.dataset.kind = 'error';
             status.textContent = 'Save failed.';
         }
+    }
+
+    _readoutsHtml(live) {
+        if (!live || !live.connected) {
+            return `<p class="cfg-companion__offline-hint">Not connected.</p>`;
+        }
+        const nodeId = live.own_node_id_hex ? `!${live.own_node_id_hex}` : '--';
+        const name = live.long_name || live.short_name || '--';
+        const sf = live.spreading_factor ? `SF${live.spreading_factor}` : '--';
+        const bw = live.bandwidth_khz ? `${live.bandwidth_khz} kHz` : '--';
+        return `
+            <div class="cfg-mc-readouts">
+                <div class="cfg-mc-readout">
+                    <span class="cfg-mc-readout__label">Node ID</span>
+                    <span class="cfg-mc-readout__value">${this._esc(nodeId)}</span>
+                </div>
+                <div class="cfg-mc-readout">
+                    <span class="cfg-mc-readout__label">Name</span>
+                    <span class="cfg-mc-readout__value">${this._esc(name)}</span>
+                </div>
+                <div class="cfg-mc-readout">
+                    <span class="cfg-mc-readout__label">Region</span>
+                    <span class="cfg-mc-readout__value">${this._esc(live.region || '--')}</span>
+                </div>
+                <div class="cfg-mc-readout">
+                    <span class="cfg-mc-readout__label">SF</span>
+                    <span class="cfg-mc-readout__value">${sf}</span>
+                </div>
+                <div class="cfg-mc-readout">
+                    <span class="cfg-mc-readout__label">Bandwidth</span>
+                    <span class="cfg-mc-readout__value">${bw}</span>
+                </div>
+                <div class="cfg-mc-readout">
+                    <span class="cfg-mc-readout__label">Firmware</span>
+                    <span class="cfg-mc-readout__value">${this._esc(live.firmware_version || '--')}</span>
+                </div>
+                <div class="cfg-mc-readout">
+                    <span class="cfg-mc-readout__label">Hardware</span>
+                    <span class="cfg-mc-readout__value">${this._esc(this._fmtHwModel(live.hw_model))}</span>
+                </div>
+            </div>
+        `;
+    }
+
+    _fmtHwModel(v) {
+        if (!v) return '--';
+        return v.split('_')
+            .map((w) => (w.length <= 2 ? w : w[0] + w.slice(1).toLowerCase()))
+            .join(' ');
     }
 
     _esc(str) {

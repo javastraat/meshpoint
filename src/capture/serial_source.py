@@ -153,6 +153,7 @@ class SerialCaptureSource(CaptureSource):
             "spreading_factor": None, "bandwidth_khz": None, "coding_rate": None,
             "channel_name": None, "frequency_offset": 0.0, "override_frequency": 0.0,
             "own_node_num": None,
+            "firmware_version": None, "hw_model": None,
         }
         try:
             from meshtastic.protobuf import config_pb2
@@ -195,6 +196,30 @@ class SerialCaptureSource(CaptureSource):
             info["own_node_num"] = int(interface.myInfo.my_node_num)
         except Exception:
             logger.debug("Could not read own node number from serial interface", exc_info=True)
+        try:
+            # Unlike the fields above (all read from state the interface
+            # already caches from the initial connect handshake),
+            # firmware/hw model need an explicit admin-message round trip
+            # -- getMetadata() sends the request and blocks on its own
+            # ack/nak wait, then the response lands in interface.metadata
+            # as a side effect (same mechanism as MeshCore's
+            # send_device_query() in meshcore_tx_client.py, just
+            # meshtastic-python's synchronous equivalent). Called once
+            # here at connect time only, never repeated on every status
+            # poll. UNVERIFIED against a real serial stick as of writing
+            # (no Meshtastic hardware on the Mac dev machine) -- the
+            # field names (firmware_version, hw_model) are confirmed
+            # against the real meshtastic/protobufs DeviceMetadata
+            # message, but the exact getMetadata()/interface.metadata
+            # interaction hasn't been exercised live.
+            interface.localNode.getMetadata()
+            metadata = getattr(interface, "metadata", None)
+            if metadata:
+                info["firmware_version"] = metadata.firmware_version or None
+                from meshtastic.protobuf import mesh_pb2
+                info["hw_model"] = mesh_pb2.HardwareModel.Name(metadata.hw_model)
+        except Exception:
+            logger.debug("Could not read device metadata from serial interface", exc_info=True)
         return info
 
     @staticmethod
