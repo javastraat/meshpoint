@@ -151,13 +151,17 @@ DEFAULT_CATALOG: tuple[CommandEntry, ...] = (
     CommandEntry(
         id="run-install-sh",
         label="Run install.sh (upgrade software)",
-        command="cd /opt/meshpoint && sudo bash scripts/install.sh",
+        command="sudo /bin/bash /opt/meshpoint/scripts/install.sh",
         category=CATEGORY_SETUP,
         description=(
             "Re-run the installer to pick up new system packages a release "
             "added (e.g. welle.io for DAB+). The dashboard's regular "
             "'Apply update' intentionally skips this to stay fast -- run it "
-            "manually whenever release notes mention new system requirements."
+            "manually whenever release notes mention new system requirements. "
+            "Must match config/sudoers-meshpoint's NOPASSWD grant exactly "
+            "(absolute /bin/bash + absolute script path, no `cd` + relative "
+            "path) or sudo falls back to an interactive password prompt the "
+            "meshpoint service account can't answer."
         ),
         dangerous=True,
     ),
