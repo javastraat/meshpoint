@@ -279,10 +279,16 @@ class MeshCoreTxClient:
                     # attempt (this poll's own retry, or the next round)
                     # falls back to flood routing and can re-learn a fresh
                     # path. Best-effort: a failure here shouldn't mask the
-                    # real login error above.
+                    # real login error above. reset_path()'s destination
+                    # validation requires a FULL public key (or a contact
+                    # dict carrying one) -- passing the short `key` prefix
+                    # we use for lookups raises ValueError before it ever
+                    # reaches the device, so the resolved `contact` object
+                    # (which already carries the full public_key) is what
+                    # must be passed here, not `key` itself.
                     try:
                         await asyncio.wait_for(
-                            self._mc.commands.reset_path(key), timeout=10.0,
+                            self._mc.commands.reset_path(contact), timeout=10.0,
                         )
                         logger.info(
                             "Reset cached routing path for repeater %s "
