@@ -268,36 +268,6 @@ class MeshCoreTxClient:
                 )
                 if login is None:
                     out["error"] = "login failed or timed out"
-                    # A directed login uses the contact's cached out_path;
-                    # if the mesh's topology shifted since that path was
-                    # learned (a relay it went through rebooted, moved,
-                    # etc), every future attempt keeps retrying the same
-                    # dead route and times out identically forever, even
-                    # though the repeater is reachable and answering fine
-                    # over flood-routed traffic (adverts, other companions).
-                    # reset_path() clears out_path/out_path_len so the next
-                    # attempt (this poll's own retry, or the next round)
-                    # falls back to flood routing and can re-learn a fresh
-                    # path. Best-effort: a failure here shouldn't mask the
-                    # real login error above. reset_path()'s destination
-                    # validation requires a FULL public key (or a contact
-                    # dict carrying one) -- passing the short `key` prefix
-                    # we use for lookups raises ValueError before it ever
-                    # reaches the device, so the resolved `contact` object
-                    # (which already carries the full public_key) is what
-                    # must be passed here, not `key` itself.
-                    try:
-                        await asyncio.wait_for(
-                            self._mc.commands.reset_path(contact), timeout=10.0,
-                        )
-                        logger.info(
-                            "Reset cached routing path for repeater %s "
-                            "after login failure", key,
-                        )
-                    except Exception:
-                        logger.debug(
-                            "reset_path failed for %s", key, exc_info=True,
-                        )
                     return out
             status = await asyncio.wait_for(
                 self._mc.commands.req_status_sync(contact), timeout=25.0,
@@ -343,6 +313,40 @@ class MeshCoreTxClient:
             logger.exception("poll_repeater %s failed", key)
             out["error"] = str(exc)
         finally:
+            # A directed login (and everything chained after it here) is
+            # routed over the contact's cached out_path in the underlying
+            # meshcore library; if the mesh topology shifted since that
+            # path was learned (a relay it went through rebooted, moved,
+            # dropped out, etc), every future attempt keeps retrying the
+            # same dead route and times out identically forever, even
+            # though the repeater is reachable and answering fine over
+            # flood-routed traffic (adverts, other companions). Runs here
+            # rather than only on the explicit "login is None" branch
+            # above, since a wait_for() timing out anywhere in this
+            # sequence (login itself included) raises asyncio.TimeoutError
+            # past that check entirely into the outer handlers -- gating
+            # on out["error"] (any failure) covers every shape uniformly.
+            # reset_path() clears out_path/out_path_len so the next attempt
+            # (this poll's own retry, or the next round) falls back to
+            # flood routing and can re-learn a fresh path. Best-effort:
+            # a failure here must never mask the real error already set
+            # above. Needs the resolved `contact` object (carries the full
+            # public_key) -- reset_path()'s destination validation requires
+            # a full 32-byte key and raises on the short lookup `key`
+            # prefix used everywhere else in this function.
+            if password and out["error"] and contact is not None:
+                try:
+                    await asyncio.wait_for(
+                        self._mc.commands.reset_path(contact), timeout=10.0,
+                    )
+                    logger.info(
+                        "Reset cached routing path for repeater %s "
+                        "after poll failure (%s)", key, out["error"],
+                    )
+                except Exception:
+                    logger.debug(
+                        "reset_path failed for %s", key, exc_info=True,
+                    )
             await self._run_post_command()
         return out
 
