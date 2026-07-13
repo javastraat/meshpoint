@@ -1014,7 +1014,7 @@ run without `-F log`, now fixed so future failures are actually diagnosable.
 | — | Open | S | Retest `scripts/install.sh` on a fresh microSD flash (IS_UPGRADE=0 path — new `meshpoint` user creation, first-time systemd install, SPI/UART/I2C enablement, etc. — none exercised by the upgrade-mode run already done). Upgrade-mode path (IS_UPGRADE=1) is fully LIVE-VERIFIED (twice, including an idempotency-rebuild-after-removal test); still want a genuine fresh-flash run since it exercises a different code branch entirely — now also covers the new Meshtastic/MeshCore CLI tools section, not yet run at all |
 | — | Retest | S | Metrics `require_auth`: confirm a valid session actually authenticates a `/metrics` scrape (only the "blocks with no credentials" half was tested live — 401 confirmed correct). Also consider whether a proper long-lived API-key mechanism is worth building instead of reusing short-lived dashboard session JWTs for this, since those expire and are awkward for an unattended Prometheus scrape config. User flagged 2026-07-12, deferred ("its ok for now") |
 | — | Retest | XS | **P2000 (FLEX) parsing specifically** — narrowed 2026-07-12: user pointed out P2000/Pagers/POCSAG/RTL433 all share the identical `PagerListener`/`sdr_registry` plumbing (start/stop, busy detection, retry-on-busy-device), just different frequency + multimon-ng args, so proving POCSAG's pipeline live also proves that shared mechanism for all four. That's now done — see below. **Pagers is fully covered too** (identical POCSAG512/1200/2400 decoders to the POCSAG tab, just 172.45 vs 439.9875 MHz). The one genuine gap left: **P2000 decodes FLEX**, a completely separate multimon-ng protocol with its own regex (`_FLEX_RE`) that was flagged unverified against real hardware when built — POCSAG's confirmation doesn't touch that code path at all. Still needs an actual real FLEX/P2000 message sent through it to confirm the regex matches real multimon-ng output. |
-| — | Retest | S | Sidebar mini radio player (W18, just built) — tune Radio from any page and confirm the sidebar swaps from noise-floor to the player, station name/RDS shows correctly, mute actually silences the stream, stop actually stops it and swaps back to noise floor. Verified so far only via a hand-built DOM stub (no jsdom on the Mac dev machine, no live hardware) — needs a real click-through on the deployed Pi. |
+| — | Retest | S | Sidebar mini radio player (W18, just built) — tune Radio from any page and confirm the sidebar swaps from noise-floor to the player, station name/RDS shows correctly, mute actually silences the stream, stop actually stops it and swaps back to noise floor. **Also specifically retest the audio-reconnect fix**: tune Radio, navigate to Dashboard, press the topbar reload button, confirm real audio actually resumes (not just the UI looking like it's playing). Verified so far only via hand-built JS stubs (no jsdom, no live hardware, no real browser) — needs a real click-through on the deployed Pi. |
 | — | DONE 2026-07-12 | — | Re-screenshot post-reboot: **POCSAG and RTL433 both LIVE-VERIFIED via screenshot** — POCSAG shows "listening on 439.988 MHz" with 3 real POCSAG1200 messages (including the original "Test message"), RTL433 shows "idle" (correctly stopped) with 120 real `Generic-Remote` events retained in the log from the earlier session. Confirms both tabs actually recovered cleanly after the reboot, not just verbal confirmation. Radio itself still not separately re-screenshotted (only POCSAG/RTL433 tabs were shown), but the shared-plumbing argument above covers it too. |
 | — | RESOLVED 2026-07-12 | — | The original "POCSAG shows no messages despite the pager physically receiving it" report was purely the wedged-dongle symptom, not a frequency mismatch. Confirmed by sending a genuinely fresh page after the reboot — screenshot shows a brand-new message ("this is a new test for meshpoint pocsag", 08:58:34, distinct from the earlier buffered "Test message" at 08:50:23) decoding correctly at 439.9875 MHz. Further confirmed by a THIRD screenshot showing multiple more real pages flowing in over several minutes (`pd2emc1`, two `XTIME=...` time-sync broadcasts, two `YYYYMMDDHHMMSS...` pages) at varying capcodes (224/208/8/216/200) — POCSAG is genuinely decoding real production traffic reliably, not a one-off fluke. 439.9875 MHz is confirmed the right frequency; no further action needed. |
 | — | DONE 2026-07-12 | XS | **Frequency display bumped to 4 decimal places everywhere on the Listener page.** User noticed while confirming POCSAG: the UI showed "listening on 439.988 MHz" when the actual tuned frequency is 439.9875 MHz — traced to `pager_listener.py`'s `status()` rounding to only 3 decimals server-side (`round(hz/1e6, 3)`), silently losing the real trailing `5` before the frontend ever saw it (pure display bug, the dongle was always tuned correctly to the exact `frequency_hz` the whole time). Bumped that rounding to 6 decimals (matching `rtl_listener.py`'s existing convention for the Radio/FM tab, which was already precise). Standardized display: renamed `listener_panel.js`'s `fmtFreq3()` → `fmtFreq4()` (`toFixed(3)` → `toFixed(4)`, all 5 call sites updated: Digital/Analogue skin frequency readouts, station label, Radio's own "listening on X MHz" line) and updated the two frequency placeholder strings (`--.---` → `--.----`) to match; `pager_panel.js`'s "listening on X MHz" line (shared by P2000/Pagers/POCSAG/RTL433) now explicitly formats with `Number(status.frequency_mhz).toFixed(4)` instead of interpolating the raw JSON number as-is. Verified: POCSAG now correctly reads `439.9875`, P2000/Pagers read `169.6500`/`172.4500` (trailing zeros now shown for consistency), RTL433 reads `433.9200`. `node --check`ed, `ast.parse`-checked, stub-verified the exact backend values for all three pager kinds. **LIVE-VERIFIED 2026-07-12**: user briefly saw stale "169.65 MHz" (old cached `pager_panel.js`, same class of issue as the earlier `POLL_MS` sidebar-badge bug — confirmed `toFixed(4)` cannot itself drop trailing zeros), then confirmed "a reload helped" — screenshot shows the P2000 tab correctly reading "listening on 169.6500 MHz". |
@@ -1223,9 +1223,99 @@ confirmed `station_label` survives that internal teardown instead of
 being wiped before the retry even finishes. `ast.parse`-checked both
 Python files, `node --check`ed all three JS files. CHANGELOG/README
 updated (README's tune endpoint row now mentions the optional label).
-Not yet re-verified live on the Pi after any of these four sidebar-player
+
+**Same-session, real bug found from live use (not a screenshot this
+time -- user described the repro in words)**: "when starting radio its
+works, i goto dashboard still playing, do a reload seems to still play
+but it isnt" -- tuned Radio, navigated to Dashboard, pressed the
+topbar's reload button (confirmed via `topbar/topbar_actions.js`: a
+genuine `location.reload()`, not a partial/data-only refresh), and the
+sidebar kept showing the correct station name, green dot, and even an
+animated VU meter -- while no audio was actually playing. Root cause:
+`ON AIR`/VU/station-name are ALL driven purely by server-side status
+polling (`st.running`, `st.audio_level`), completely independent of
+whether the browser's own `<audio id="lsn-audio">` element actually
+has a stream attached -- and that element only ever gets a `src` set
+via `_startAudio()`, called ONLY from `_tune()`'s success path, never
+automatically just because status polling discovers `running: true`.
+A full `location.reload()` destroys the whole DOM/JS state (unlike
+route navigation, which just `display:none`s inactive sections) --
+the backend `RtlListener` process keeps running completely
+uninterrupted (nothing in this reload path ever calls `/api/listener
+/stop`), but the fresh page load starts with a blank, disconnected
+`<audio>` element. This bug pre-dates this whole session's sidebar
+work entirely -- reloading while already ON the Listener page had the
+exact same silent-audio problem before, just far less visible since
+nobody was mirroring "still playing" onto every other page. The new
+sidebar player made a latent bug much more noticeable, it didn't
+introduce one.
+
+First pass only partially fixed it: added `this._audioConnected`
+bookkeeping to `ListenerPanel` (`frontend/js/listener_panel.js`) and
+had `_applyStatus()` auto-call `_startAudio()` when it sees
+`st.running && !this._audioConnected`. Caught before calling it done,
+by re-tracing the user's EXACT repro: they reloaded while on
+Dashboard, not Listener -- and `_applyStatus()` only ever runs via
+`_refreshStatus()`'s poll, which is gated behind `show()`, which only
+fires when the router matches the `listener` route. Since they never
+revisited Listener this session, `ListenerPanel` never mounts, `#lsn-audio`
+doesn't even exist in the DOM, and the fix never fires. Needed a
+second piece that runs regardless of route: `SidebarTelemetryRail`'s
+own poll (`_refreshPlayer()`), which already runs continuously from
+app boot onward, completely independent of which page is showing.
+
+Second pass (the actual fix): new public method
+`ListenerPanel.syncAudioFromStatus(status)` -- mounts on demand (cheap,
+just builds hidden markup, no network calls) ONLY when
+`status.running` is true (so a session that never touches RTL-SDR at
+all never pays for building that page's DOM), starts audio if not
+already connected, and resets `_audioConnected` back to false when
+told the backend has stopped -- but only if already mounted, so a
+"never touched, not running" poll tick stays a true no-op. Re-exposed
+`window.listenerPanel = panel` in `app.js` (had JUST removed this same
+line last round when the station-label fix made it unnecessary --
+re-added now for a genuinely different reason: cross-page audio
+reconnect, not reading a display string). `SidebarTelemetryRail._applyPlayer()`
+now calls `window.listenerPanel.syncAudioFromStatus(status)`
+unconditionally at the top (not gated by `active`), specifically to
+correctly reset the flag even while parked on some other page when the
+backend legitimately stops -- guards against a real edge case: if the
+flag were only ever reset by `ListenerPanel`'s OWN poll (which isn't
+running while hidden), a stop-then-restart cycle happening entirely
+while the user was elsewhere would leave a stale `_audioConnected = true`
+that incorrectly skips reconnecting the next time it's discovered
+running again.
+
+Verified with a stub harness (patched `_mount()` to a no-op stub,
+faked `#lsn-audio` with a `play()` call counter) across five sequenced
+states: (1) never mounted + not running -> stays unmounted, zero mount
+calls; (2) running for the first time -> mounts, connects, one play()
+call; (3) still running on the next poll -> no duplicate reconnect,
+play() count unchanged; (4) stops -> `_audioConnected` correctly
+resets to false; (5) running again after that stop -> reconnects
+again, play() count increments a second time -- specifically proving
+the stale-flag edge case above is handled correctly. `node --check`ed
+all three JS files. CHANGELOG bullet updated in place (parser-verified).
+Not yet re-verified live on the Pi after any of these five sidebar-player
 fixes (RDS+RT combination, marquee scrolling, preset-label fallback,
-now server-persisted preset label).
+server-persisted preset label, cross-page audio reconnect) -- the
+reconnect fix in particular needs the EXACT repro (tune, navigate away,
+reload, confirm real audio resumes) re-tried live.
+
+Same-session, small icon swap: user's own screenshot showed the
+RTL-SDR sidebar nav item still using a headphones icon, left over from
+when this was just the single-purpose Radio/FM tab -- now misleading
+since 4 of 5 tabs (P2000/Pagers/POCSAG/RTL433) decode text, not audio.
+Asked "any suggestions? maybe antenna or usb dongle" -- advised antenna
+over USB dongle: reads as "receiving something over RF" generically
+(covers all five tabs, not just listening), and is visually distinct
+from Hardware's existing concentric-arc broadcast-wave icon and RF
+Environment's bar-chart icon (a dongle silhouette reads as a generic
+"device" icon at small sizes, less immediately identifiable). User
+agreed. Swapped the `frontend/index.html` sidebar icon to a simple
+mast + splayed dual arms + junction dot + base-stand path (matches the
+existing stroke-based icon convention exactly, no fill except the
+small solid junction dot). XML-validated the SVG snippet directly.
 
 ## CURRENT WORKLIST v5 (2026-07-12 end of day — supersedes v4 below; THE list to work off)
 

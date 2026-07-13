@@ -127,6 +127,12 @@ class SidebarTelemetryRail {
 
     _applyPlayer(status) {
         const active = !!status.running;
+        // This poll runs regardless of which page is showing, unlike
+        // ListenerPanel's own poll (only active while the Listener route
+        // is actually mounted) -- so it's the one place that can catch
+        // "backend still running, but this page's <audio> element was
+        // never (re)connected" after a reload on some other page.
+        if (window.listenerPanel) window.listenerPanel.syncAudioFromStatus(status);
         if (this._noiseChip) this._noiseChip.style.display = active ? 'none' : '';
         if (this._playerEl) this._playerEl.style.display = active ? '' : 'none';
         if (!active) return;

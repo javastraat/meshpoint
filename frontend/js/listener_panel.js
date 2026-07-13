@@ -369,6 +369,15 @@ class ListenerPanel {
         this._station = '';
         this._tuning = false;
         this._lastStatus = null;
+        // Whether THIS page's <audio> element currently has an active
+        // stream attached. Tracked separately from st.running (the
+        // backend's own state) because they can genuinely disagree: a
+        // fresh page load (or a plain browser reload) starts with an
+        // empty, disconnected <audio> element even though the backend
+        // pipeline may already be running from before -- _applyStatus()
+        // uses this to auto-reconnect rather than just mirroring
+        // st.running in the UI while silently playing nothing.
+        this._audioConnected = false;
         // Web Audio VU
         this._audioCtx = null;
         this._analyser = null;
@@ -422,6 +431,31 @@ class ListenerPanel {
     show() {
         if (!this._mounted) { this._mount(); this._mounted = true; }
         this._showActiveTab();
+    }
+
+    /**
+     * Reconcile audio connection state from a status object polled by
+     * something OTHER than this panel's own (route-gated) poll loop --
+     * specifically SidebarTelemetryRail, which polls /api/listener/status
+     * continuously regardless of which page is showing. Without this,
+     * reconnecting only happens once you actually visit the Listener
+     * page again: the <audio> element doesn't even exist until _mount()
+     * runs, which only happens via show(). Mounts on demand (cheap --
+     * just builds hidden markup, no network calls) so the very first
+     * external poll after a page load/reload can reconnect immediately
+     * even if the Listener tab is never visited this session.
+     */
+    syncAudioFromStatus(status) {
+        if (status.running) {
+            if (!this._mounted) { this._mount(); this._mounted = true; }
+            if (!this._audioConnected) this._startAudio();
+        } else if (this._mounted) {
+            // Only reset if we've ever mounted -- otherwise this is a
+            // no-op default anyway, and mounting just to set a flag
+            // would build the whole (hidden) Listener page's DOM for a
+            // session that never touched RTL-SDR at all.
+            this._audioConnected = false;
+        }
     }
 
     hide() {
@@ -732,6 +766,7 @@ class ListenerPanel {
     _startAudio() {
         const audio = document.getElementById('lsn-audio');
         if (!audio) return;
+        this._audioConnected = true;
         audio.src = '/api/listener/stream?t=' + Date.now();
         audio.play().catch(() => { /* user can press play manually */ });
         if (this._ensureAudioGraph()) this._startVuLoop();
@@ -739,6 +774,7 @@ class ListenerPanel {
 
     _stopAudio() {
         const audio = document.getElementById('lsn-audio');
+        this._audioConnected = false;
         if (!audio) return;
         audio.pause();
         audio.removeAttribute('src');
@@ -859,8 +895,16 @@ class ListenerPanel {
             const label = `${fmtFreq4(st.frequency_mhz)} MHz ${st.mode.toUpperCase()}`
                 + (st.listeners ? ` • ${st.listeners} listening` : '');
             this._setStatus(true, label);
+            this._playing = true;
+            // Backend is running but this page has no active audio
+            // connection yet (fresh page load, or a plain browser
+            // reload while the pipeline kept running from before) --
+            // reconnect rather than leaving the UI showing "on air"
+            // while actually silent.
+            if (!this._audioConnected) this._startAudio();
         } else {
             this._playing = false;
+            this._audioConnected = false;
             if (busyOwner) {
                 const labels = { p2000: 'P2000', pagers: 'Pagers', pocsag: 'POCSAG', rtl433: 'RTL433' };
                 this._setStatus(false, `busy — in use by ${labels[busyOwner] || busyOwner}`, true);

@@ -309,6 +309,11 @@ function _bootLoRaWANPanel(router) {
 function _bootListenerPanel(router) {
     if (!window.ListenerPanel) return;
     const panel = new window.ListenerPanel();
+    // Exposed so SidebarTelemetryRail can call syncAudioFromStatus() from
+    // its own route-independent poll -- reconnects the RTL-SDR audio
+    // stream on any page (not just after visiting Listener again) when
+    // the backend is already running from before a reload.
+    window.listenerPanel = panel;
     router.onRouteChange((route) => {
         if (route === 'listener') panel.show();
         else panel.hide();
