@@ -87,18 +87,18 @@ class DabPanel {
                                 <span class="lsn-led lsn-led--tune" data-dab-tuning
                                       title="Tuning — switching channel and restarting the receiver"><i></i>TUNING</span>
                             </div>
-                            <div class="lsn-freq">
-                                <span class="lsn-freq__num" data-dab-channelnum>--</span>
-                                <span class="lsn-freq__unit" data-dab-ensemble></span>
+                            <div class="lsn-freq dab-nowplaying-big">
+                                <span class="lsn-station__scroll">
+                                    <span class="lsn-station__text lsn-station__text--big" data-dab-nowplayingtext>— — —</span>
+                                </span>
                             </div>
                             <div class="lsn-station" data-dab-nowplaying>
                                 <span class="lsn-tag lsn-tag--qual" data-dab-snrtag
                                       title="Signal-to-noise ratio"></span>
                                 <span class="lsn-tag lsn-tag--pty" data-dab-ptytag
                                       title="Programme type"></span>
-                                <span class="lsn-station__scroll">
-                                    <span class="lsn-station__text" data-dab-nowplayingtext>— — —</span>
-                                </span>
+                                <span class="lsn-freq__unit dab-chan-tag" data-dab-chantag
+                                      title="Channel"></span>
                             </div>
                             <div class="lsn-vu" title="Audio level (real-time)">
                                 <span class="lsn-vu__label">VU</span>
@@ -559,21 +559,25 @@ class DabPanel {
 
         this._setLeds({ onair: status.running, tuning: this._tuning });
 
-        // Big slot shows the friendly ensemble name (more meaningful to a
-        // listener than a channel code) -- our own curated name if this
-        // is a known preset, else whatever real ensemble label welle-cli
-        // decoded (some, like 11C's literal "DAB+" or 9C's literal "9C",
-        // aren't descriptive at all, so the curated name is preferred
-        // whenever we have one). Small slot shows the channel code.
-        const numEl = root.querySelector('[data-dab-channelnum]');
-        const ensembleEl = root.querySelector('[data-dab-ensemble]');
-        const preset = DAB_CHANNEL_PRESETS.find((c) => c.channel === status.channel);
-        if (numEl) {
-            numEl.textContent = status.running
-                ? (preset ? preset.name : (status.ensemble_label || status.channel || 'scanning…'))
-                : '--';
+        // Small tag shows channel + a friendly name -- our own curated
+        // name if this is a known preset, else whatever real ensemble
+        // label welle-cli decoded (some, like 11C's literal "DAB+" or
+        // 9C's literal "9C", aren't descriptive at all, so the curated
+        // name is preferred whenever we have one). The big VFD slot is
+        // reserved for the now-playing station/RadioText instead -- that
+        // space was originally sized for the Radio tab's frequency
+        // digits, but a station name matters more to a listener here
+        // than which channel it happens to be on.
+        const chanTagEl = root.querySelector('[data-dab-chantag]');
+        if (chanTagEl) {
+            if (!status.running) {
+                chanTagEl.textContent = '';
+            } else {
+                const preset = DAB_CHANNEL_PRESETS.find((c) => c.channel === status.channel);
+                const name = preset ? preset.name : status.ensemble_label;
+                chanTagEl.textContent = name ? `${status.channel} · ${name}` : (status.channel || '');
+            }
         }
-        if (ensembleEl) ensembleEl.textContent = status.running ? (status.channel || '') : '';
 
         if (status.running) {
             this._setStatus(true, `tuned to ${status.channel}`);
@@ -593,7 +597,7 @@ class DabPanel {
         this._resolvePendingPlay(status);
     }
 
-    // Drives the VFD-style "now playing" tag row + SNR/PTY pills from
+    // Drives the big VFD "now playing" headline + SNR/PTY pills from
     // whichever station this browser session picked (this._playingSid) --
     // a purely client-side concept, since welle-cli can serve several
     // browser clients different stations from the same tuned ensemble at

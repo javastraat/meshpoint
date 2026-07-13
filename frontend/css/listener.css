@@ -489,11 +489,25 @@
     color: rgba(95, 234, 255, 0.55);
 }
 
-/* DAB+ shows a friendly ensemble name here instead of a numeric readout;
-   names run longer than FM's frequency digits (e.g. "Commercial"), so a
-   smaller max size keeps them from overflowing at the base 64px clamp. */
-[data-dab-channelnum] {
-    font-size: clamp(26px, 6vw, 44px);
+/* DAB+'s VFD readout is now-playing-first: the big slot shows the
+   station/RadioText (what a listener actually cares about), not a
+   channel code -- that space was originally sized for the Radio tab's
+   frequency digits, so a smaller/more flexible clamp keeps a full
+   "station — RadioText" line from overflowing (it can also marquee via
+   the existing .lsn-station__text/.scroll mechanics if it's long).
+   Channel + friendly name moved down into the small tag row instead. */
+.lsn-station__text--big {
+    font-family: var(--font-mono, monospace);
+    font-size: clamp(20px, 4.5vw, 32px);
+    font-weight: 700;
+    color: var(--accent-cyan, #5feaff);
+    text-shadow:
+        0 0 3px rgba(6, 182, 212, 0.45),
+        0 0 14px rgba(6, 182, 212, 0.2);
+}
+
+.dab-chan-tag {
+    margin-left: auto;
 }
 
 /* Segmented VU meter */
