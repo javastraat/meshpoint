@@ -336,12 +336,19 @@ class MeshCoreTxClient:
             # prefix used everywhere else in this function.
             if password and out["error"] and contact is not None:
                 try:
-                    await asyncio.wait_for(
+                    reset_result = await asyncio.wait_for(
                         self._mc.commands.reset_path(contact), timeout=10.0,
+                    )
+                    reset_event = (
+                        reset_result.type.value
+                        if hasattr(reset_result, "type")
+                        and hasattr(reset_result.type, "value")
+                        else str(reset_result)
                     )
                     logger.info(
                         "Reset cached routing path for repeater %s "
-                        "after poll failure (%s)", key, out["error"],
+                        "after poll failure (%s) -- device replied: %s",
+                        key, out["error"], reset_event,
                     )
                 except Exception:
                     logger.debug(
