@@ -413,6 +413,7 @@ class ListenerPanel {
         this._rtl433Panel = window.PagerPanel
             ? new window.PagerPanel('rtl433', '/api/rtl433', 'RTL433', _rtl433RowHtml)
             : null;
+        this._dabPanel = window.DabPanel ? new window.DabPanel() : null;
     }
 
     _loadFavs() {
@@ -465,6 +466,7 @@ class ListenerPanel {
         if (this._pagersPanel) this._pagersPanel.hide();
         if (this._pocsagPanel) this._pocsagPanel.hide();
         if (this._rtl433Panel) this._rtl433Panel.hide();
+        if (this._dabPanel) this._dabPanel.hide();
     }
 
     _showActiveTab() {
@@ -476,6 +478,8 @@ class ListenerPanel {
             this._pocsagPanel.show();
         } else if (this._activeTab === 'rtl433' && this._rtl433Panel) {
             this._rtl433Panel.show();
+        } else if (this._activeTab === 'dab' && this._dabPanel) {
+            this._dabPanel.show();
         } else {
             this._refreshStatus();
             this._statusTimer = setInterval(() => this._refreshStatus(), 500);
@@ -490,6 +494,7 @@ class ListenerPanel {
         if (this._activeTab === 'pagers' && this._pagersPanel) this._pagersPanel.hide();
         if (this._activeTab === 'pocsag' && this._pocsagPanel) this._pocsagPanel.hide();
         if (this._activeTab === 'rtl433' && this._rtl433Panel) this._rtl433Panel.hide();
+        if (this._activeTab === 'dab' && this._dabPanel) this._dabPanel.hide();
 
         this._activeTab = tab;
         const root = document.getElementById('listener-panel');
@@ -518,6 +523,7 @@ class ListenerPanel {
                 <button type="button" class="lsn-tabbar__btn" data-tab="pagers">Pagers</button>
                 <button type="button" class="lsn-tabbar__btn" data-tab="pocsag">POCSAG</button>
                 <button type="button" class="lsn-tabbar__btn" data-tab="rtl433">RTL433</button>
+                <button type="button" class="lsn-tabbar__btn" data-tab="dab">DAB+</button>
             </div>
 
             <div class="lsn-tab-content" data-tab="radio">
@@ -608,12 +614,14 @@ class ListenerPanel {
             <div class="lsn-tab-content" data-tab="pagers" style="display:none" id="lsn-tab-pagers"></div>
             <div class="lsn-tab-content" data-tab="pocsag" style="display:none" id="lsn-tab-pocsag"></div>
             <div class="lsn-tab-content" data-tab="rtl433" style="display:none" id="lsn-tab-rtl433"></div>
+            <div class="lsn-tab-content" data-tab="dab" style="display:none" id="lsn-tab-dab"></div>
         `;
 
         if (this._p2000Panel) this._p2000Panel.mount(root.querySelector('#lsn-tab-p2000'));
         if (this._pagersPanel) this._pagersPanel.mount(root.querySelector('#lsn-tab-pagers'));
         if (this._pocsagPanel) this._pocsagPanel.mount(root.querySelector('#lsn-tab-pocsag'));
         if (this._rtl433Panel) this._rtl433Panel.mount(root.querySelector('#lsn-tab-rtl433'));
+        if (this._dabPanel) this._dabPanel.mount(root.querySelector('#lsn-tab-dab'));
 
         root.querySelector('#lsn-tabbar').addEventListener('click', (ev) => {
             const btn = ev.target.closest('[data-tab]');
@@ -906,7 +914,7 @@ class ListenerPanel {
             this._playing = false;
             this._audioConnected = false;
             if (busyOwner) {
-                const labels = { p2000: 'P2000', pagers: 'Pagers', pocsag: 'POCSAG', rtl433: 'RTL433' };
+                const labels = { p2000: 'P2000', pagers: 'Pagers', pocsag: 'POCSAG', rtl433: 'RTL433', dab: 'DAB+' };
                 this._setStatus(false, `busy — in use by ${labels[busyOwner] || busyOwner}`, true);
             } else {
                 this._setStatus(false, st.last_error ? `idle — ${st.last_error}` : 'idle');

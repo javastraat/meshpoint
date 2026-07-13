@@ -14,7 +14,7 @@
  */
 // Matches src/audio/sdr_registry.py's owner names.
 const _DONGLE_OWNER_LABELS = {
-    radio: 'Radio', p2000: 'P2000', pagers: 'Pagers', pocsag: 'POCSAG', rtl433: 'RTL433',
+    radio: 'Radio', p2000: 'P2000', pagers: 'Pagers', pocsag: 'POCSAG', rtl433: 'RTL433', dab: 'DAB+',
 };
 
 class PagerPanel {

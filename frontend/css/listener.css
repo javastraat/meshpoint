@@ -840,3 +840,72 @@
     vertical-align: middle;
 }
 
+/* ── DAB+ tab: channel picker, ensemble readout, station list ────── */
+
+.dab-favbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.dab-favbar__empty {
+    color: rgba(243, 244, 246, 0.4);
+    font-size: 13px;
+    padding: 4px 0;
+}
+
+.dab-fav-chip { color: var(--accent-amber, #f59e0b); }
+
+.dab-channels {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.dab-channel--active {
+    border-color: var(--accent-green, #00e5a0);
+    color: var(--accent-green, #00e5a0);
+}
+
+.dab-ensemble {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(243, 244, 246, 0.08);
+    font-size: 13px;
+}
+
+.dab-snr {
+    color: rgba(243, 244, 246, 0.55);
+    font-variant-numeric: tabular-nums;
+}
+
+.dab-stations {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.dab-station-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 10px;
+    border: 1px solid rgba(243, 244, 246, 0.08);
+    border-radius: 6px;
+}
+
+.dab-station-row__text {
+    flex: 1;
+    min-width: 0;
+    font-size: 13px;
+}
+
+.dab-station-row__playing {
+    border-color: var(--accent-green, #00e5a0);
+    color: var(--accent-green, #00e5a0);
+}
+

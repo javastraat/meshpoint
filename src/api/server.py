@@ -39,6 +39,7 @@ from src.api.routes import (
     auth_config_routes,
     auth_routes,
     config_routes,
+    dab_routes,
     dangerous_routes,
     device,
     device_config_routes,
@@ -79,6 +80,7 @@ from src.api.terminal import CommandCatalog, SessionManager
 from src.api.update import ReleaseChannelRegistry, UpdateApplier
 from src.api.update.rollback_state import resolve_rollback_state_path
 from src.api.upstream_client import UpstreamClient
+from src.audio.dab_listener import DabListener
 from src.audio.pager_listener import PagerListener
 from src.audio.rtl433_listener import Rtl433Listener
 from src.audio.rtl_listener import RtlListener
@@ -116,6 +118,7 @@ _p2000_listener: PagerListener | None = None
 _pagers_listener: PagerListener | None = None
 _pocsag_listener: PagerListener | None = None
 _rtl433_listener: Rtl433Listener | None = None
+_dab_listener: DabListener | None = None
 _fan_controller_task = None
 _fan_controller = None
 _led_controller_task = None
@@ -341,7 +344,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
             channel_hash_resolver=channel_hash_resolver,
         )
         _init_dangerous_registry(pipeline)
-        global _rtl_listener, _p2000_listener, _pagers_listener, _pocsag_listener, _rtl433_listener
+        global _rtl_listener, _p2000_listener, _pagers_listener, _pocsag_listener, _rtl433_listener, _dab_listener
         _rtl_listener = RtlListener()
         listener_routes.init_routes(_rtl_listener)
         _p2000_listener = PagerListener("p2000")
@@ -350,6 +353,8 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
         pager_routes.init_routes(_p2000_listener, _pagers_listener, _pocsag_listener)
         _rtl433_listener = Rtl433Listener()
         rtl433_routes.init_routes(_rtl433_listener)
+        _dab_listener = DabListener()
+        dab_routes.init_routes(_dab_listener)
         print_banner(config, sources=pipeline.capture_coordinator.sources)
         logger.info("Meshpoint started -- listening for packets")
         yield
@@ -363,6 +368,8 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
             await _pocsag_listener.stop()
         if _rtl433_listener is not None:
             await _rtl433_listener.stop()
+        if _dab_listener is not None:
+            await _dab_listener.stop()
         if _spectral_scan_service is not None:
             await _spectral_scan_service.stop()
         if _noise_floor_emitter_task is not None:
@@ -452,6 +459,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     app.include_router(pager_routes.pagers_router, dependencies=protected)
     app.include_router(pager_routes.pocsag_router, dependencies=protected)
     app.include_router(rtl433_routes.router, dependencies=protected)
+    app.include_router(dab_routes.router, dependencies=protected)
     app.include_router(spectrum_routes.router, dependencies=protected)
     app.include_router(meshtastic_routes.router, dependencies=protected)
     app.include_router(meshcore_routes.router, dependencies=protected)
