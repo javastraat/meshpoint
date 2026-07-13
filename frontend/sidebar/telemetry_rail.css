@@ -122,6 +122,86 @@
     50%      { opacity: 1; }
 }
 
+/* Mini radio player -- swaps in for the noise-floor block while the
+ * Radio/RTL-SDR FM listener is actively tuned, swaps back on stop. */
+
+.telemetry-rail__player {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.4rem;
+    padding: 0.45rem 0.55rem;
+    border-radius: var(--radius-sm);
+    background: rgba(52, 211, 153, 0.06);
+    border: 1px solid rgba(52, 211, 153, 0.18);
+}
+
+.telemetry-rail__player-head {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+    font-family: var(--font-mono);
+}
+
+.telemetry-rail__player-dot {
+    flex: 0 0 auto;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #34d399;
+    box-shadow: 0 0 6px rgba(52, 211, 153, 0.7);
+}
+
+.telemetry-rail__player-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.65rem;
+    letter-spacing: 0.03em;
+    color: var(--sidebar-text);
+}
+
+.telemetry-rail__player-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    flex-shrink: 0;
+}
+
+.telemetry-rail__player-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.3rem;
+    height: 1.3rem;
+    padding: 0;
+    background: none;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--sidebar-text-muted);
+    cursor: pointer;
+    transition: color var(--motion-fast) var(--ease-out-expo),
+                background var(--motion-fast) var(--ease-out-expo);
+}
+
+.telemetry-rail__player-btn:hover,
+.telemetry-rail__player-btn:focus-visible {
+    color: var(--sidebar-text);
+    background: rgba(255, 255, 255, 0.06);
+    outline: none;
+}
+
+.telemetry-rail__player-btn[aria-pressed="true"] {
+    color: var(--accent-amber, #f59e0b);
+}
+
+.telemetry-rail__player-btn svg {
+    width: 0.85rem;
+    height: 0.85rem;
+}
+
 /* RF Environment — sits under the noise-floor sparkline */
 
 .telemetry-rail__rf-wrap {

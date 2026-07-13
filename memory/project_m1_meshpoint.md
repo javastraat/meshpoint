@@ -1002,7 +1002,7 @@ run without `-F log`, now fixed so future failures are actually diagnosable.
 |---|--------|--------|------|
 | — | Open | S | Prune or document the 6 kept-for-later duplicate API endpoints (packets/count+protocols+types, nodes/map+summary, telemetry/*) |
 | — | Open | M | Server-side downsample-across-range for the Repeater Trends chart — a fixed high limit (`hours=100000&limit=50000`) will eventually start truncating again as live polls keep growing the row count unbounded |
-| W18 | Open | S-M | Mini RTL-SDR player widget — when the Radio/RTL-SDR listener is actively streaming, show a small persistent player (bottom-left of the sidebar/menu) with basic transport controls (stop, etc.) so the user doesn't have to navigate back to the Radio page just to stop playback |
+| W18 | DONE 2026-07-12 | S-M | **Mini RTL-SDR player widget.** See closure paragraph below. |
 | W6 | Open | M-L | True-RF S-meter via pyrtlsdr — real dBm instead of post-demod audio loudness |
 | W5 | Open | M-L | DAB+ listener mode via welle-cli — unlocks NPO Radio 5 (DAB-only) |
 | W4 | Open | L | Light theme — tokenize the dark-first CSS, light map tiles, per-page contrast pass; topbar toggle already has a slot reserved |
@@ -1013,9 +1013,80 @@ run without `-F log`, now fixed so future failures are actually diagnosable.
 | — | Open | S | Retest `scripts/install.sh` on a fresh microSD flash (IS_UPGRADE=0 path — new `meshpoint` user creation, first-time systemd install, SPI/UART/I2C enablement, etc. — none exercised by the upgrade-mode run already done). Upgrade-mode path (IS_UPGRADE=1) is fully LIVE-VERIFIED (twice, including an idempotency-rebuild-after-removal test); still want a genuine fresh-flash run since it exercises a different code branch entirely |
 | — | Retest | S | Metrics `require_auth`: confirm a valid session actually authenticates a `/metrics` scrape (only the "blocks with no credentials" half was tested live — 401 confirmed correct). Also consider whether a proper long-lived API-key mechanism is worth building instead of reusing short-lived dashboard session JWTs for this, since those expire and are awkward for an unattended Prometheus scrape config. User flagged 2026-07-12, deferred ("its ok for now") |
 | — | Retest | XS | **P2000 (FLEX) parsing specifically** — narrowed 2026-07-12: user pointed out P2000/Pagers/POCSAG/RTL433 all share the identical `PagerListener`/`sdr_registry` plumbing (start/stop, busy detection, retry-on-busy-device), just different frequency + multimon-ng args, so proving POCSAG's pipeline live also proves that shared mechanism for all four. That's now done — see below. **Pagers is fully covered too** (identical POCSAG512/1200/2400 decoders to the POCSAG tab, just 172.45 vs 439.9875 MHz). The one genuine gap left: **P2000 decodes FLEX**, a completely separate multimon-ng protocol with its own regex (`_FLEX_RE`) that was flagged unverified against real hardware when built — POCSAG's confirmation doesn't touch that code path at all. Still needs an actual real FLEX/P2000 message sent through it to confirm the regex matches real multimon-ng output. |
+| — | Retest | S | Sidebar mini radio player (W18, just built) — tune Radio from any page and confirm the sidebar swaps from noise-floor to the player, station name/RDS shows correctly, mute actually silences the stream, stop actually stops it and swaps back to noise floor. Verified so far only via a hand-built DOM stub (no jsdom on the Mac dev machine, no live hardware) — needs a real click-through on the deployed Pi. |
 | — | DONE 2026-07-12 | — | Re-screenshot post-reboot: **POCSAG and RTL433 both LIVE-VERIFIED via screenshot** — POCSAG shows "listening on 439.988 MHz" with 3 real POCSAG1200 messages (including the original "Test message"), RTL433 shows "idle" (correctly stopped) with 120 real `Generic-Remote` events retained in the log from the earlier session. Confirms both tabs actually recovered cleanly after the reboot, not just verbal confirmation. Radio itself still not separately re-screenshotted (only POCSAG/RTL433 tabs were shown), but the shared-plumbing argument above covers it too. |
 | — | RESOLVED 2026-07-12 | — | The original "POCSAG shows no messages despite the pager physically receiving it" report was purely the wedged-dongle symptom, not a frequency mismatch. Confirmed by sending a genuinely fresh page after the reboot — screenshot shows a brand-new message ("this is a new test for meshpoint pocsag", 08:58:34, distinct from the earlier buffered "Test message" at 08:50:23) decoding correctly at 439.9875 MHz. Further confirmed by a THIRD screenshot showing multiple more real pages flowing in over several minutes (`pd2emc1`, two `XTIME=...` time-sync broadcasts, two `YYYYMMDDHHMMSS...` pages) at varying capcodes (224/208/8/216/200) — POCSAG is genuinely decoding real production traffic reliably, not a one-off fluke. 439.9875 MHz is confirmed the right frequency; no further action needed. |
 | — | DONE 2026-07-12 | XS | **Frequency display bumped to 4 decimal places everywhere on the Listener page.** User noticed while confirming POCSAG: the UI showed "listening on 439.988 MHz" when the actual tuned frequency is 439.9875 MHz — traced to `pager_listener.py`'s `status()` rounding to only 3 decimals server-side (`round(hz/1e6, 3)`), silently losing the real trailing `5` before the frontend ever saw it (pure display bug, the dongle was always tuned correctly to the exact `frequency_hz` the whole time). Bumped that rounding to 6 decimals (matching `rtl_listener.py`'s existing convention for the Radio/FM tab, which was already precise). Standardized display: renamed `listener_panel.js`'s `fmtFreq3()` → `fmtFreq4()` (`toFixed(3)` → `toFixed(4)`, all 5 call sites updated: Digital/Analogue skin frequency readouts, station label, Radio's own "listening on X MHz" line) and updated the two frequency placeholder strings (`--.---` → `--.----`) to match; `pager_panel.js`'s "listening on X MHz" line (shared by P2000/Pagers/POCSAG/RTL433) now explicitly formats with `Number(status.frequency_mhz).toFixed(4)` instead of interpolating the raw JSON number as-is. Verified: POCSAG now correctly reads `439.9875`, P2000/Pagers read `169.6500`/`172.4500` (trailing zeros now shown for consistency), RTL433 reads `433.9200`. `node --check`ed, `ast.parse`-checked, stub-verified the exact backend values for all three pager kinds. **LIVE-VERIFIED 2026-07-12**: user briefly saw stale "169.65 MHz" (old cached `pager_panel.js`, same class of issue as the earlier `POLL_MS` sidebar-badge bug — confirmed `toFixed(4)` cannot itself drop trailing zeros), then confirmed "a reload helped" — screenshot shows the P2000 tab correctly reading "listening on 169.6500 MHz". |
+
+Closed 2026-07-12: **W18, Mini RTL-SDR player widget**, following the
+"advise before building" pattern the user explicitly asked for
+("check and advise me dont so it yet"). Investigated the sidebar's
+existing telemetry region first: `SidebarTelemetryRail`
+(`frontend/sidebar/telemetry_rail.js`) already owns the exact visual
+slot (Uptime/Sessions/Noise-floor block, sitting right below the "Ops"
+nav group) the user was pointing at in their screenshot. Design
+converged over several rounds of clarification, each narrowing scope:
+(1) user proposed showing a player "above or even instead of" the
+noise-floor graph when Radio is tuned; (2) confirmed swap-not-stack
+("when radio stopped switch player back to noise floor"); (3) asked
+for a volume control and RDS; (4) agreed a compact mute toggle (not a
+slider) fits the narrow sidebar better; (5) the one real architecture
+question -- share `ListenerBadge`'s existing 5s poll of
+`/api/listener/status`, or run an independent one -- user asked "what
+do you advise", recommended independent (matches every other sidebar
+module's convention: `RadioTxBadge`/`UpdateCheckBadge`/`ListenerBadge`
+all poll independently; the extra redundant GET every 5s is
+negligible), user confirmed.
+
+Key finding during investigation that shaped the whole design:
+background audio playback across page navigation **already works,
+undesigned** -- `SidebarController._renderActive()` only toggles
+`display:none` on inactive route sections (never removes them from the
+DOM), and `ListenerPanel.hide()` never calls `_stopAudio()` either, so
+the `<audio id="lsn-audio">` element and its stream just keep playing
+in the background the moment you navigate away. Nobody built that on
+purpose; it simply falls out of the SPA's hide-via-CSS approach. This
+meant the sidebar player wasn't fighting against playback being torn
+down on navigation, and directly informed the volume design: rather
+than reusing the Radio page's own Level slider (a **server-side**
+pre-encode gain sent to `/api/listener/tune` -- changing it triggers a
+full pipeline retune, an audible glitch each time), the sidebar's mute
+toggle drives the `<audio>` element's own **client-side** `.volume`/
+`.muted` property directly -- instant, zero server round-trip, and
+correctly persists since the element itself never gets destroyed.
+Explicitly scoped to Radio only, not P2000/Pagers/POCSAG/RTL433 (no
+audio to control on those, and they already have the sidebar "in use"
+badge from earlier this session).
+
+No backend changes needed at all -- `/api/listener/status` already
+returns everything required (`running`, `frequency_mhz`, `mode`,
+`rds_ps`, etc). Built: new markup in `index.html`
+(`#telemetry-player`, initially `display:none`) as a sibling to the
+existing `.telemetry-rail__noise` block -- station dot, truncating
+station-name text, and two icon buttons (mute with two swappable
+Feather-style SVGs for on/off state, stop). Extended
+`SidebarTelemetryRail` directly (not a new module) with its own
+independent 5s poll (`_refreshPlayer()`/`_applyPlayer()`): when
+`status.running` is true, hides `.telemetry-rail__noise` and shows the
+player, text prefers `rds_ps` (trimmed) and falls back to
+`{freq} MHz {MODE}`; when false, swaps back. `_toggleMute()` flips
+`document.getElementById('lsn-audio').muted` directly and syncs the
+icon; `_applyPlayer()` also re-syncs the mute icon on every poll tick
+in case the audio was muted via the Radio page's own native
+`<audio controls>` UI instead. `_stopRadio()` POSTs to the existing
+`/api/listener/stop` and immediately re-polls for instant UI feedback
+rather than waiting for the next tick. New CSS in
+`telemetry_rail.css` (`.telemetry-rail__player*`), matching the
+noise-floor block's existing padding/border/font conventions, green
+dot + amber "pressed" mute state reusing colors already established
+elsewhere this session. Verified without live hardware (none on the
+Mac dev machine): a hand-built minimal DOM stub (no jsdom available)
+exercising `_applyPlayer()`'s swap logic in both directions, the
+RDS-vs-frequency-fallback text branch, `_toggleMute()`/`_applyMuteIcon()`'s
+icon-swap logic in both directions, and `_stopRadio()`'s fetch call --
+all confirmed correct. `node --check`ed. CHANGELOG/README updated
+(folded into the existing RTL-SDR listener bullets). Not yet
+live-verified on the Pi.
 
 ## CURRENT WORKLIST v5 (2026-07-12 end of day — supersedes v4 below; THE list to work off)
 
