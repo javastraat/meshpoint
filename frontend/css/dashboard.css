@@ -377,6 +377,12 @@ html, body {
 
 .node-search:focus { border-color: var(--accent-cyan); }
 
+.node-search:-webkit-autofill,
+.node-search:-webkit-autofill:focus {
+    -webkit-box-shadow: 0 0 0 1000px var(--bg-primary) inset;
+    -webkit-text-fill-color: var(--text-primary);
+}
+
 .node-search-clear {
     position: absolute;
     right: 0.3rem;
