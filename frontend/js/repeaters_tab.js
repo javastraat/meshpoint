@@ -123,13 +123,14 @@ class RepeatersTab {
         this._charts = this._charts || {};
         if (this._charts[r.key]) this._charts[r.key].destroy();
         try {
-            // Wide window + high limit to cover the full history. The
-            // query returns oldest-first, so a low limit would drop the
-            // most recent samples (incl. today's) -- keep it well above
-            // the imported+live sample count.
+            // Wide window to cover the full history -- the backend now
+            // buckets/averages into `limit` evenly-sized time windows
+            // server-side (see TelemetryRepository.get_history()), so
+            // this stays a sane chart-point target instead of the old
+            // "raw row cap high enough it never truncates" hack.
             const res = await fetch(
                 `/api/nodes/${encodeURIComponent(r.key)}/metrics_history`
-                + '?hours=100000&limit=50000',
+                + '?hours=100000&limit=1000',
             );
             if (!res.ok) return;
             const history = await res.json();
