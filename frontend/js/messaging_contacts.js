@@ -260,7 +260,7 @@ class MessagingContacts {
         el.innerHTML = `
             <div class="msg-convo__icon ${iconClass}">${iconText}</div>
             <div class="msg-convo__info">
-                <div class="msg-convo__name">${this._esc(displayName)} <span class="msg-convo__proto-badge msg-convo__proto-badge--${convo.protocol === 'meshcore' ? 'mc' : 'mt'}">${protoBadge}</span>${connBadgeHtml}</div>
+                <div class="msg-convo__name"><span class="msg-convo__name-text">${this._esc(displayName)}</span><span class="msg-convo__proto-badge msg-convo__proto-badge--${convo.protocol === 'meshcore' ? 'mc' : 'mt'}">${protoBadge}</span>${connBadgeHtml}</div>
                 <div class="msg-convo__preview">${this._esc(convo.last_message || '')}</div>
             </div>
             <div class="msg-convo__meta">

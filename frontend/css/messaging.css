@@ -278,10 +278,20 @@
     color: var(--msg-text);
     white-space: nowrap;
     overflow: hidden;
-    text-overflow: ellipsis;
     display: flex;
     align-items: center;
     gap: 6px;
+}
+
+/* The name itself is the only part allowed to shrink: a long node name
+   truncates with an ellipsis while the MC/MT and connection badges stay
+   fully visible (ellipsis on the flex CONTAINER above never applied to
+   its text; it just let long names crush the badge flex items). */
+.msg-convo__name-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
 }
 
 .msg-convo__preview {
