@@ -214,16 +214,56 @@ class NodeRepository:
         )
         return {row["source_id"]: row["capture_source"] for row in rows}
 
+    async def get_capture_sources_for_broadcasts(
+        self, node_ids: list[str]
+    ) -> dict[str, str]:
+        """Per-channel capture source for broadcast conversations: which
+        radio heard the latest RECEIVED message in each channel thread.
+
+        Packets don't carry a channel tag, but each stored message does
+        carry the packet_id it came from -- joining a channel's newest
+        received message back to its packet row gives the actual radio
+        that heard it. This replaced the protocol-wide lookup as the
+        primary signal because that one was actively misleading with two
+        same-protocol radios: every MeshCore channel's pill flipped in
+        unison to whichever companion heard the latest MeshCore packet
+        anywhere ("we cant find our channels back"). Channels with no
+        received messages yet are absent from the result; callers fall
+        back to the protocol-wide lookup below for those.
+        """
+        if not node_ids:
+            return {}
+        placeholders = ",".join("?" for _ in node_ids)
+        rows = await self._db.fetch_all(
+            f"""
+            SELECT node_id, capture_source
+            FROM (
+                SELECT m.node_id, p.capture_source,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY m.node_id
+                           ORDER BY m.timestamp DESC, p.timestamp DESC
+                       ) AS rn
+                FROM messages m
+                JOIN packets p
+                  ON p.packet_id = m.packet_id AND p.protocol = m.protocol
+                WHERE m.node_id IN ({placeholders})
+                  AND m.direction != 'sent'
+                  AND m.packet_id IS NOT NULL AND m.packet_id != ''
+            )
+            WHERE rn = 1
+            """,
+            tuple(node_ids),
+        )
+        return {row["node_id"]: row["capture_source"] for row in rows}
+
     async def get_latest_capture_sources_by_protocol(
         self, protocols: list[str]
     ) -> dict[str, str]:
         """Which capture source most recently received ANY packet of each
-        given protocol -- used for channel/broadcast conversations, which
-        (unlike a DM) aren't tied to a single source_id. Packets don't carry
-        a per-channel tag, so this is scoped to protocol only, not the exact
-        channel -- still useful (e.g. distinguishing "Concentrator" from
-        "433" when a protocol has more than one capture source), just not
-        as precise as the per-contact DM lookup above.
+        given protocol -- fallback for broadcast conversations that have no
+        received-message history yet (see get_capture_sources_for_broadcasts
+        above, the per-channel primary signal). Scoped to protocol only,
+        not the exact channel.
         """
         if not protocols:
             return {}

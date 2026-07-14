@@ -30,10 +30,25 @@
 
 /* ── Outer panel ────────────────────────────────────────────────── */
 
+/* Size the panel from its flex parent (.section, which already accounts
+   for the topbar) instead of guessing with 100vh math. The old
+   height: calc(100vh - 32px) ignored the ~48px topbar sharing the same
+   100vh overflow-hidden container, leaving the panel one topbar too
+   tall -- opening a conversation focus()es the compose input, which
+   auto-scrolled the clipped container and shoved BOTH headers (sidebar
+   "Messages" bar and the chat's name/badges header) permanently out of
+   view under the topbar, with no scrollbar to bring them back. */
+#messaging-panel {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
 .messaging {
     display: flex;
-    height: calc(100vh - 32px);
-    min-height: 480px;
+    flex: 1;
+    min-height: 0;
     margin: 16px clamp(12px, 2vw, 24px);
     background: var(--msg-bg);
     border: 1px solid var(--msg-border);

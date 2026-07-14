@@ -75,9 +75,11 @@
 /* ===== Messaging tab ===== */
 
 @media (max-width: 768px) {
+    /* Panel height now comes from its flex parent (see messaging.css's
+       #messaging-panel comment) -- the old calc(100vh - Npx) guesses
+       ignored the topbar and let the page scroll the headers away. */
     .messaging {
         flex-direction: column;
-        height: calc(100vh - 120px);
     }
     .msg-sidebar {
         width: 100%;
@@ -95,7 +97,6 @@
 }
 
 @media (max-width: 480px) {
-    .messaging { height: calc(100vh - 100px); }
     .msg-sidebar { max-height: 42%; }
     .msg-chat__header { padding: 0.5rem 0.75rem; }
     .msg-chat__messages { padding: 0.6rem; }

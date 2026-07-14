@@ -333,6 +333,11 @@ async def _enrich_conversations(conversations: list[dict]) -> list[dict]:
             for convo in conversations
             if convo.get("node_id", "") and not convo["node_id"].startswith("broadcast:")
         ]
+        broadcast_ids = [
+            convo.get("node_id", "")
+            for convo in conversations
+            if convo.get("node_id", "").startswith("broadcast:")
+        ]
         broadcast_protocols = sorted({
             convo.get("protocol", "")
             for convo in conversations
@@ -343,6 +348,16 @@ async def _enrich_conversations(conversations: list[dict]) -> list[dict]:
         except Exception:
             logger.debug("capture_source batch lookup failed", exc_info=True)
             sources = {}
+        # Per-channel first (which radio heard this channel's latest
+        # message); protocol-wide only as fallback for channels with no
+        # received messages yet.
+        try:
+            channel_sources = await _node_repo.get_capture_sources_for_broadcasts(
+                broadcast_ids
+            )
+        except Exception:
+            logger.debug("per-channel capture_source lookup failed", exc_info=True)
+            channel_sources = {}
         try:
             protocol_sources = await _node_repo.get_latest_capture_sources_by_protocol(
                 broadcast_protocols
@@ -353,7 +368,9 @@ async def _enrich_conversations(conversations: list[dict]) -> list[dict]:
         for convo in conversations:
             node_id = convo.get("node_id", "")
             if node_id.startswith("broadcast:"):
-                convo["capture_source"] = protocol_sources.get(convo.get("protocol", ""))
+                convo["capture_source"] = channel_sources.get(node_id) or (
+                    protocol_sources.get(convo.get("protocol", ""))
+                )
             else:
                 convo["capture_source"] = sources.get(node_id)
     return conversations
