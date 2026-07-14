@@ -61,6 +61,7 @@ class RadioStatus:
     coding_rate: int = 0
     tx_power: int = 0
     name: str = ""
+    public_key: str = ""
 
 
 @dataclass
@@ -499,6 +500,7 @@ class MeshCoreTxClient:
                 coding_rate=int(info.get("radio_cr", 0)),
                 tx_power=int(info.get("tx_power", 0)),
                 name=info.get("name", ""),
+                public_key=info.get("public_key", ""),
             )
         except Exception:
             logger.exception("Failed to read MeshCore radio info")

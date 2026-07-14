@@ -264,6 +264,10 @@ class MeshcoreConfigCard {
                 <p class="cfg-status" data-mc-name-status aria-live="polite"></p>
             </div>
             <div class="cfg-mc-readouts">
+                <div class="cfg-mc-readout" title="${this._esc(radio.public_key || '')}">
+                    <span class="cfg-mc-readout__label">Node ID</span>
+                    <span class="cfg-mc-readout__value">${this._fmtNodeId(radio.public_key)}</span>
+                </div>
                 <div class="cfg-mc-readout">
                     <span class="cfg-mc-readout__label">Frequency</span>
                     <span class="cfg-mc-readout__value">${this._fmtFreq(radio.frequency_mhz)}</span>
@@ -705,6 +709,10 @@ class MeshcoreConfigCard {
     _fmtBw(v)      { return v ? `${v} kHz` : '--'; }
     _fmtSf(v)      { return v ? `SF${v}` : '--'; }
     _fmtTxPower(v) { return v != null ? `${v} dBm` : '--'; }
+    // MeshCore's own node identity is a 64-char public key -- far too
+    // long for a tile, so show a short prefix (same visual weight as
+    // Meshtastic's 8-hex-char `!09d406f4` Node ID), full key on hover.
+    _fmtNodeId(v)  { return v ? `#${v.slice(0, 8)}` : '--'; }
 
     _fmtFirmware(device) {
         if (!device) return '--';

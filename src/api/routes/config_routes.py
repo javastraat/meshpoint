@@ -212,6 +212,7 @@ async def get_config(claims: SessionClaims = Depends(require_auth)):
                         "bandwidth_khz": radio_info.bandwidth_khz,
                         "spreading_factor": radio_info.spreading_factor,
                         "tx_power": radio_info.tx_power,
+                        "public_key": radio_info.public_key,
                     }
             except Exception:
                 pass
