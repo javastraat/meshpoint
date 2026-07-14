@@ -848,11 +848,20 @@ def _build_tx_service(
         meshcore_tx.set_source(mc_source)
         meshcore_tx.set_post_command_callback(mc_source.restart_auto_fetching)
 
-        async def _sync_channels_on_connect():
-            await meshcore_tx.sync_channels(config.meshcore.channel_keys)
-            await _reapply_companion_name(meshcore_tx, config)
+    # Channel keys are mesh-wide config, synced only through the primary
+    # (TX-bound) companion. Companion *name* is per-device though -- every
+    # configured companion gets its own reconnect callback re-applying its
+    # own configured name, not just the primary. set_connected_callback is
+    # a single slot per source, so the primary's callback must do both.
+    for _src in _find_meshcore_sources(coord):
+        _is_primary = _src is mc_source
 
-        mc_source.set_connected_callback(_sync_channels_on_connect)
+        async def _on_companion_connected(_src=_src, _is_primary=_is_primary):
+            if _is_primary:
+                await meshcore_tx.sync_channels(config.meshcore.channel_keys)
+            await _reapply_companion_name(_src, config, _is_primary)
+
+        _src.set_connected_callback(_on_companion_connected)
 
     wrapper = _get_concentrator_wrapper(coord)
     crypto = coord._crypto if hasattr(coord, "_crypto") else None
@@ -1113,39 +1122,68 @@ def _find_serial_sources(coord: PipelineCoordinator) -> list:
     ]
 
 
-async def _reapply_companion_name(meshcore_tx, config: AppConfig) -> None:
-    """Re-apply the configured companion name on every USB connect.
+def _companion_label(source) -> str:
+    """Extract a companion's own label from its capture-source name
+    (``meshcore_usb_868`` -> ``"868"``, bare ``meshcore_usb`` -> ``""``)."""
+    prefix = "meshcore_usb_"
+    return source.name[len(prefix):] if source.name.startswith(prefix) else ""
+
+
+def _desired_companion_name(source, config: AppConfig, is_primary: bool) -> str:
+    """This companion's configured advert name, if any.
+
+    Prefers its own per-entry ``MeshcoreUsbConfig.companion_name``
+    (matched by label); falls back to the legacy mesh-wide
+    ``meshcore.companion_name`` only for the primary companion, so
+    existing local.yaml files written before per-companion names existed
+    keep working unchanged.
+    """
+    label = _companion_label(source)
+    for entry in config.capture.meshcore_usb:
+        if (entry.label or "") == label:
+            if entry.companion_name:
+                return entry.companion_name.strip()
+            break
+    if is_primary:
+        return (config.meshcore.companion_name or "").strip()
+    return ""
+
+
+async def _reapply_companion_name(source, config: AppConfig, is_primary: bool) -> None:
+    """Re-apply one companion's configured name on every USB connect.
 
     Mirrors how ``sync_channels`` keeps user-configured channel keys in
-    sync across reconnects: when a user has set
-    ``meshcore.companion_name`` (via the Configuration -> MeshCore
-    card or hand-edited local.yaml), we want a freshly-flashed
-    companion or a hot-swap to land on that name without a manual
-    re-save.
+    sync across reconnects: when a user has set a companion's name (via
+    the Configuration -> MeshCore card or hand-edited local.yaml), we
+    want a freshly-flashed companion or a hot-swap to land on that name
+    without a manual re-save. Runs for every configured companion, not
+    just the primary -- each already holds its own connection.
 
     Failure is logged but never raises -- the channel sync that ran
-    first is more important to the user than the rename, and
-    sync_channels has already restored the runtime state we need.
+    first (for the primary) is more important to the user than the
+    rename, and sync_channels has already restored the runtime state we
+    need.
     """
-    desired = (config.meshcore.companion_name or "").strip()
+    desired = _desired_companion_name(source, config, is_primary)
     if not desired:
         return
 
-    if not meshcore_tx.connected:
+    if not source.connected:
         return
 
     try:
-        result = await meshcore_tx.set_companion_name(desired)
+        result = await source.set_companion_name(desired)
     except Exception:
-        logger.exception("companion_name re-apply on connect raised")
+        logger.exception("companion_name re-apply on connect raised for %s", source.name)
         return
 
     if result.success:
-        logger.info("Re-applied companion_name=%r on connect", desired)
+        logger.info("Re-applied companion_name=%r on connect for %s", desired, source.name)
     else:
         logger.warning(
-            "Failed to re-apply companion_name=%r on connect: %s",
+            "Failed to re-apply companion_name=%r on connect for %s: %s",
             desired,
+            source.name,
             result.error,
         )
 
@@ -1624,7 +1662,9 @@ def _init_routes(
     hardware_config_routes.init_routes(config=config)
     repeater_config_routes.init_routes(config=config)
     metrics_config_routes.init_routes(config=config)
-    meshcore_config_routes.init_routes(config=config, tx_service=tx_service)
+    meshcore_config_routes.init_routes(
+        config=config, tx_service=tx_service, meshcore_sources=_find_meshcore_sources(coord),
+    )
     serial_config_routes.init_routes(config=config)
     _dev_name = config.device.device_name or "meshpoint"
     lorawan_routes.init_routes(coord.packet_repo, device_name=_dev_name)

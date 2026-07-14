@@ -197,12 +197,18 @@ async def update_meshcore_companions(
     if _config is None:
         raise HTTPException(503, "Config not loaded")
 
+    # This form doesn't edit companion_name (that's the per-companion
+    # rename card's job) -- preserve each existing companion's own name by
+    # label match so replacing the list here doesn't silently wipe it.
+    old_names = {c.label: c.companion_name for c in _config.capture.meshcore_usb}
+
     new_companions = [
         MeshcoreUsbConfig(
             label=c.label,
             serial_port=c.serial_port.strip() if c.serial_port else None,
             baud_rate=c.baud_rate,
             auto_detect=c.auto_detect,
+            companion_name=old_names.get(c.label),
         )
         for c in req.companions
     ]
@@ -392,6 +398,7 @@ def _meshcore_usb_dict(mc_usb) -> dict:
         "baud_rate": mc_usb.baud_rate,
         "auto_detect": mc_usb.auto_detect,
         "label": mc_usb.label,
+        "companion_name": mc_usb.companion_name,
     }
 
 

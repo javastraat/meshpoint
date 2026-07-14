@@ -21,7 +21,13 @@ from typing import AsyncIterator, Optional
 from src.capture.base import CaptureSource
 from src.models.packet import Protocol, RawCapture
 from src.models.signal import SignalMetrics
-from src.transmit.meshcore_tx_client import read_device_info, read_radio_status
+from src.transmit.meshcore_tx_client import (
+    SendResult,
+    read_device_info,
+    read_radio_status,
+    send_companion_advert,
+    send_set_companion_name,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -452,6 +458,29 @@ class MeshcoreUsbCaptureSource(CaptureSource):
         if info is not None:
             self._device_info_cache = info
         return info
+
+    async def set_companion_name(self, name: str) -> SendResult:
+        """Rename THIS companion via its own connection.
+
+        Unlike MeshCoreTxClient.set_companion_name() (only ever the one
+        "primary" companion), this lets every configured companion be
+        renamed independently -- each already holds its own connection.
+        """
+        if not self.connected:
+            return SendResult(success=False, error="Not connected")
+        result = await send_set_companion_name(self._meshcore, name)
+        await self.restart_auto_fetching()
+        if result.success:
+            logger.info("MeshCore companion %r renamed to %r", self.name, (name or "").strip())
+        return result
+
+    async def send_advert(self, flood: bool = False) -> SendResult:
+        """Broadcast a node advertisement from THIS companion."""
+        if not self.connected:
+            return SendResult(success=False, error="Not connected")
+        result = await send_companion_advert(self._meshcore, flood=flood)
+        await self.restart_auto_fetching()
+        return result
 
     async def restart_auto_fetching(self) -> None:
         """Re-enable auto message fetching after TX operations."""

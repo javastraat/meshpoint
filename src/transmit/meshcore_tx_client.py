@@ -148,6 +148,95 @@ async def read_device_info(mc) -> Optional[DeviceInfo]:
     return DeviceInfo(protocol_version=int(fw_ver))
 
 
+async def send_set_companion_name(mc, name: str) -> SendResult:
+    """Rename a companion via CMD_SET_ADVERT_NAME (0x08) on a raw connection.
+
+    Standalone for the same reason as read_radio_status()/read_device_info()
+    above -- both the TX client's "primary" companion and each
+    MeshcoreUsbSource can rename their own companion without duplicating
+    this validation/parsing. Callers own the "connected" check and any
+    post-command callback (e.g. restarting auto_message_fetching); this
+    function only does the raw command + self_info cache update.
+    """
+    if mc is None:
+        return SendResult(success=False, error="Not connected")
+
+    cleaned = (name or "").strip()
+    if not cleaned:
+        return SendResult(success=False, error="Name must not be empty")
+    encoded_len = len(cleaned.encode("utf-8"))
+    if encoded_len > MAX_COMPANION_NAME_BYTES:
+        return SendResult(
+            success=False,
+            error=(
+                f"Name is {encoded_len} bytes (UTF-8); "
+                f"companion accepts at most {MAX_COMPANION_NAME_BYTES}."
+            ),
+        )
+
+    try:
+        from meshcore import EventType
+    except Exception:
+        return SendResult(success=False, error="meshcore library unavailable")
+
+    try:
+        result = await asyncio.wait_for(mc.commands.set_name(cleaned), timeout=10.0)
+    except asyncio.TimeoutError:
+        return SendResult(success=False, error="set_name timed out")
+    except Exception as exc:
+        logger.exception("MeshCore set_name failed")
+        return SendResult(success=False, error=str(exc))
+
+    if result.type == EventType.ERROR:
+        payload = getattr(result, "payload", None)
+        detail = ""
+        if isinstance(payload, dict):
+            detail = str(payload.get("reason") or payload.get("error") or payload)
+        elif payload is not None:
+            detail = str(payload)
+        error = f"Companion rejected name: {detail}" if detail else "Companion rejected name"
+        return SendResult(success=False, error=error)
+
+    # OK path: refresh self_info so callers see the new name immediately.
+    # The meshcore library does not expose a method to re-poll the
+    # device's identity (self_info is seeded once during connect's
+    # appstart handshake and never automatically refreshed). Since the
+    # firmware just acknowledged the rename via command_ok, we know the
+    # new name is what the device holds: mutate the cached dict directly.
+    try:
+        cache = getattr(mc, "self_info", None)
+        if isinstance(cache, dict):
+            cache["name"] = cleaned
+    except Exception:
+        logger.debug(
+            "send_set_companion_name: could not update self_info cache; "
+            "dashboard will lag by one reconnect cycle",
+            exc_info=True,
+        )
+    return SendResult(success=True)
+
+
+async def send_companion_advert(mc, flood: bool = False) -> SendResult:
+    """Broadcast a node advertisement over a raw meshcore connection.
+
+    Standalone for the same reason as send_set_companion_name() above.
+    """
+    if mc is None:
+        return SendResult(success=False, error="Not connected")
+    try:
+        result = await asyncio.wait_for(mc.commands.send_advert(flood=flood), timeout=10.0)
+        event_type = (
+            result.type.value if hasattr(result.type, "value") else str(result.type)
+        )
+        logger.info("MeshCore advert sent: %s", event_type)
+        return SendResult(success=True, event_type=event_type)
+    except asyncio.TimeoutError:
+        return SendResult(success=False, error="Advert timed out")
+    except Exception as exc:
+        logger.exception("MeshCore advert send failed")
+        return SendResult(success=False, error=str(exc))
+
+
 class MeshCoreTxClient:
     """Sends messages through a MeshCore companion node.
 
@@ -304,26 +393,9 @@ class MeshCoreTxClient:
         """Broadcast a node advertisement."""
         if not self.connected:
             return SendResult(success=False, error="Not connected")
-        try:
-            result = await asyncio.wait_for(
-                self._mc.commands.send_advert(flood=flood),
-                timeout=10.0,
-            )
-            event_type = (
-                result.type.value
-                if hasattr(result.type, "value")
-                else str(result.type)
-            )
-            logger.info("MeshCore advert sent: %s", event_type)
-            await self._run_post_command()
-            return SendResult(success=True, event_type=event_type)
-        except asyncio.TimeoutError:
-            await self._run_post_command()
-            return SendResult(success=False, error="Advert timed out")
-        except Exception as exc:
-            logger.exception("MeshCore advert send failed")
-            await self._run_post_command()
-            return SendResult(success=False, error=str(exc))
+        result = await send_companion_advert(self._mc, flood=flood)
+        await self._run_post_command()
+        return result
 
     async def poll_repeater(self, key: str, password: str = "") -> dict:
         """Login + req_status + req_telemetry for one repeater.
@@ -446,94 +518,18 @@ class MeshCoreTxClient:
     async def set_companion_name(self, name: str) -> SendResult:
         """Rename the USB companion via CMD_SET_ADVERT_NAME (0x08).
 
-        On OK we mutate the cached ``self_info["name"]`` so the
-        Configuration card, top-bar chip, and packet attribution all
-        reflect the rename without waiting for the next reconnect.
-        ``set_name`` itself only returns OK/ERROR; it does not emit a
-        fresh SELF_INFO, and meshcore 2.3.x exposes no public method to
-        re-poll the device (``self_info`` is seeded once during the
-        ``connect`` handshake's appstart and never auto-refreshed).
-        Updating the dict locally is safe because the firmware just
-        acknowledged the new name via ``command_ok``; the next
-        reconnect will reseed ``self_info`` from the device anyway.
-
-        Validation lives here so route handlers, future CLI callers,
-        and the ``meshcore.companion_name`` yaml-on-connect path all
-        use the same ceiling.
+        Validation/self_info-cache-update logic lives in the standalone
+        send_set_companion_name() so route handlers, future CLI callers,
+        and each MeshcoreUsbSource's own rename method all use the same
+        ceiling without duplicating it.
         """
         if not self.connected:
             return SendResult(success=False, error="Not connected")
-
-        cleaned = (name or "").strip()
-        if not cleaned:
-            return SendResult(success=False, error="Name must not be empty")
-        encoded_len = len(cleaned.encode("utf-8"))
-        if encoded_len > MAX_COMPANION_NAME_BYTES:
-            return SendResult(
-                success=False,
-                error=(
-                    f"Name is {encoded_len} bytes (UTF-8); "
-                    f"companion accepts at most {MAX_COMPANION_NAME_BYTES}."
-                ),
-            )
-
-        try:
-            from meshcore import EventType
-        except Exception:
-            return SendResult(success=False, error="meshcore library unavailable")
-
-        try:
-            result = await asyncio.wait_for(
-                self._mc.commands.set_name(cleaned),
-                timeout=10.0,
-            )
-        except asyncio.TimeoutError:
-            await self._run_post_command()
-            return SendResult(success=False, error="set_name timed out")
-        except Exception as exc:
-            logger.exception("MeshCore set_name failed")
-            await self._run_post_command()
-            return SendResult(success=False, error=str(exc))
-
-        if result.type == EventType.ERROR:
-            payload = getattr(result, "payload", None)
-            detail = ""
-            if isinstance(payload, dict):
-                detail = str(payload.get("reason") or payload.get("error") or payload)
-            elif payload is not None:
-                detail = str(payload)
-            error = f"Companion rejected name: {detail}" if detail else "Companion rejected name"
-            await self._run_post_command()
-            return SendResult(success=False, error=error)
-
-        # OK path: refresh self_info so callers see the new name immediately.
-        # The meshcore library does not expose a method to re-poll the
-        # device's identity (self_info is seeded once during connect's
-        # appstart handshake and never automatically refreshed). Since
-        # the firmware just acknowledged the rename via command_ok, we
-        # know the new name is what the device holds: mutate the cached
-        # dict directly so /api/config -> get_radio_info() returns the
-        # new value on the next dashboard refresh. The next reconnect
-        # will reseed self_info from the device anyway.
-        try:
-            cache = getattr(self._mc, "self_info", None)
-            if isinstance(cache, dict):
-                cache["name"] = cleaned
-        except Exception:
-            logger.debug(
-                "set_companion_name: could not update self_info cache; "
-                "dashboard will lag by one reconnect cycle",
-                exc_info=True,
-            )
-
-        event_type = (
-            result.type.value
-            if hasattr(result.type, "value")
-            else str(result.type)
-        )
-        logger.info("MeshCore companion renamed to %r (%s)", cleaned, event_type)
+        result = await send_set_companion_name(self._mc, name)
         await self._run_post_command()
-        return SendResult(success=True, event_type=event_type)
+        if result.success:
+            logger.info("MeshCore companion renamed to %r", (name or "").strip())
+        return result
 
     @staticmethod
     def _normalize_contact_payload(payload) -> list[dict]:

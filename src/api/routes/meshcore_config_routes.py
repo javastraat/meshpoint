@@ -34,6 +34,7 @@ router = APIRouter(prefix="/api/config/meshcore", tags=["config", "meshcore"])
 
 _config: AppConfig | None = None
 _tx_service = None
+_meshcore_sources: list = []
 
 # Manual/on-demand only -- no periodic background polling. Companion firmware
 # only changes when the device is physically reflashed, so there's no live
@@ -163,33 +164,90 @@ async def _check_firmware_update(current_version: str) -> dict:
     }
 
 
-def init_routes(config: AppConfig, tx_service=None) -> None:
+def init_routes(config: AppConfig, tx_service=None, meshcore_sources=None) -> None:
     """Wire module-level state at app startup.
 
-    ``tx_service`` is the same TxService instance used by the
-    Meshtastic-side config routes; we reach through its ``_meshcore_tx``
-    attribute so we share one companion handle across the whole API
-    rather than opening a second connection.
+    ``tx_service`` is kept for back-compat with any future TX-wide
+    (not per-companion) MeshCore config surface this module grows.
+    ``meshcore_sources`` is every configured companion's own capture
+    source (mirrors config_routes.py's identical list) -- rename and
+    advert both target a specific companion's own connection now,
+    rather than only the one "primary" companion the TX client is
+    bound to.
     """
-    global _config, _tx_service
+    global _config, _tx_service, _meshcore_sources
     _config = config
     _tx_service = tx_service
+    _meshcore_sources = meshcore_sources or []
 
 
-def _resolve_meshcore_tx():
-    """Return the live :class:`MeshCoreTxClient` or ``None`` if absent.
+def _resolve_companion_source(label: str):
+    """Find the configured companion source matching this label.
 
-    ``getattr`` is intentional: in test fixtures or when MeshCore TX is
-    disabled in config, ``_meshcore_tx`` may not exist on the
-    TxService.
+    Mirrors ``meshcore_card.js``'s own name reconstruction
+    (``meshcore_usb_<label>``, bare ``meshcore_usb`` when unlabeled).
     """
-    if _tx_service is None:
-        return None
-    return getattr(_tx_service, "_meshcore_tx", None)
+    name = f"meshcore_usb_{label}" if label else "meshcore_usb"
+    for src in _meshcore_sources:
+        if src.name == name:
+            return src
+    return None
+
+
+def _persist_companion_name(label: str, name: str) -> None:
+    """Save one companion's renamed identity to its own config entry.
+
+    Persists the FULL ``capture.meshcore_usb`` list (not just this
+    entry) since ``save_section_to_yaml`` replaces the whole section
+    value -- matching ``system_config_routes.py``'s identical
+    "persist the full list so other companions aren't lost" pattern.
+    Failure here is a soft error: the rename already stuck on the
+    companion's flash for the current session; only the on-reconnect
+    re-apply path is degraded until the user retries the save.
+    """
+    matched = False
+    for entry in _config.capture.meshcore_usb:
+        if (entry.label or "") == (label or ""):
+            entry.companion_name = name
+            matched = True
+            break
+    if not matched:
+        logger.warning(
+            "No meshcore_usb config entry matched label %r; "
+            "rename won't survive a reconnect until saved",
+            label,
+        )
+        return
+    try:
+        save_section_to_yaml("capture", {
+            "meshcore_usb": [
+                {
+                    "serial_port": e.serial_port,
+                    "baud_rate": e.baud_rate,
+                    "auto_detect": e.auto_detect,
+                    "label": e.label,
+                    "companion_name": e.companion_name,
+                }
+                for e in _config.capture.meshcore_usb
+            ],
+        })
+    except PermissionError as exc:
+        logger.warning(
+            "Renamed companion (label=%r) to %r but failed to persist to "
+            "local.yaml: %s. Reconnects will revert until saved.",
+            label, name, exc,
+        )
+    except Exception:
+        logger.exception(
+            "Renamed companion (label=%r) to %r but yaml persistence "
+            "failed; reconnects will revert until saved.",
+            label, name,
+        )
 
 
 class CompanionNameUpdate(BaseModel):
     name: str
+    label: str = ""
 
 
 @router.put("/companion-name")
@@ -197,13 +255,17 @@ async def update_companion_name(
     req: CompanionNameUpdate,
     _claims: SessionClaims = Depends(require_admin),
 ) -> dict:
-    """Rename the USB companion (CMD_SET_ADVERT_NAME).
+    """Rename one USB companion (CMD_SET_ADVERT_NAME).
 
-    Validation lives in :meth:`MeshCoreTxClient.set_companion_name`
-    (single source of truth shared with future CLI / yaml-on-connect
-    paths). Errors map to HTTP status codes as follows:
+    Takes ``label`` to target a specific companion (empty string for
+    the bare/unlabeled one) -- up to 4 companions can be configured,
+    each with its own independent identity, mirroring the firmware-check
+    endpoint's identical "target a specific device by its own known
+    state" shape. Validation lives in the shared
+    ``send_set_companion_name()`` helper. Errors map to HTTP status
+    codes as follows:
 
-    - 503 if the companion is not connected (so the dashboard can show
+    - 503 if that companion is not connected (so the dashboard can show
       a "plug in your companion" hint instead of a generic 400).
     - 400 for everything else: empty / whitespace name, oversize name,
       companion ERROR payload, set_name timeout, library missing.
@@ -216,49 +278,59 @@ async def update_companion_name(
     if _config is None:
         raise HTTPException(503, "Config not loaded")
 
-    mc_tx = _resolve_meshcore_tx()
-    if mc_tx is None or not mc_tx.connected:
+    source = _resolve_companion_source(req.label)
+    if source is None or not source.connected:
         raise HTTPException(503, "MeshCore companion not connected")
 
-    result = await mc_tx.set_companion_name(req.name)
+    result = await source.set_companion_name(req.name)
     if not result.success:
         logger.warning(
-            "Dashboard set_companion_name failed: %s", result.error
+            "Dashboard set_companion_name failed for %s: %s", source.name, result.error
         )
         raise HTTPException(400, result.error or "Companion rejected name")
 
     cleaned = (req.name or "").strip()
-    logger.info("MeshCore companion renamed to %r via dashboard", cleaned)
-
-    # Persist the desired name so the USB capture source re-applies it
-    # on the next connect (mirrors how channel_keys are re-synced).
-    # Failure here is a soft error: the rename already stuck on the
-    # companion's flash for the current session; only the on-reconnect
-    # re-apply path is degraded until the user retries the save (or
-    # edits local.yaml directly). Don't turn a successful rename into
-    # an error response just because we couldn't write yaml.
-    _config.meshcore.companion_name = cleaned
-    try:
-        save_section_to_yaml("meshcore", {"companion_name": cleaned})
-    except PermissionError as exc:
-        logger.warning(
-            "Renamed companion to %r but failed to persist to "
-            "local.yaml: %s. Reconnects will revert until saved.",
-            cleaned,
-            exc,
-        )
-    except Exception:
-        logger.exception(
-            "Renamed companion to %r but yaml persistence failed; "
-            "reconnects will revert until saved.",
-            cleaned,
-        )
+    logger.info("MeshCore companion %r renamed to %r via dashboard", source.name, cleaned)
+    _persist_companion_name(req.label, cleaned)
 
     event_type: Optional[str] = getattr(result, "event_type", None)
     return {
         "saved": True,
         "name": cleaned,
         "event_type": event_type,
+    }
+
+
+class CompanionAdvertRequest(BaseModel):
+    label: str = ""
+    flood: bool = False
+
+
+@router.post("/companion-advert")
+async def send_companion_advert_route(
+    req: CompanionAdvertRequest,
+    _claims: SessionClaims = Depends(require_admin),
+) -> dict:
+    """Send an advert from one specific USB companion.
+
+    Separate from the general ``POST /api/messages/advert`` (which
+    always targets whichever companion the TX client is bound to,
+    i.e. company[0]) -- this lets the per-companion rename card's
+    "send advert after save" actually target the companion that was
+    just renamed, not always the primary one.
+    """
+    if _config is None:
+        raise HTTPException(503, "Config not loaded")
+
+    source = _resolve_companion_source(req.label)
+    if source is None or not source.connected:
+        raise HTTPException(503, "MeshCore companion not connected")
+
+    result = await source.send_advert(flood=req.flood)
+    return {
+        "success": result.success,
+        "error": result.error or None,
+        "event_type": result.event_type or None,
     }
 
 

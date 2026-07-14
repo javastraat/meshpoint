@@ -45,6 +45,7 @@ def enrich_config_payload(cfg: AppConfig, base: dict) -> dict:
                 "baud_rate": c.baud_rate,
                 "auto_detect": c.auto_detect,
                 "label": c.label,
+                "companion_name": c.companion_name,
             }
             for c in companions
         ],
@@ -53,6 +54,7 @@ def enrich_config_payload(cfg: AppConfig, base: dict) -> dict:
             "baud_rate": mc_usb.baud_rate if mc_usb else 115200,
             "auto_detect": mc_usb.auto_detect if mc_usb else True,
             "label": mc_usb.label if mc_usb else "",
+            "companion_name": mc_usb.companion_name if mc_usb else None,
         },
         "serial": [
             {

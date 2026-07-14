@@ -2,11 +2,12 @@
  * Configuration → MeshCore card.
  *
  * Renders two cards: "USB capture sources" (one row per configured
- * companion, each with its own live radio/firmware readouts -- mirrors
- * SerialConfigCard's per-device layout) and "MeshCore Companion" (the
- * primary companion's editable name/advert settings plus the shared
- * channel-key table, since renames and channel sync only ever target
- * company[0], the one companion wired for sending).
+ * companion, each with its own live radio/firmware readouts AND its own
+ * editable name/advert controls -- mirrors SerialConfigCard's per-device
+ * layout, since every companion has an independent connection and
+ * identity) and "MeshCore Companion" (connection status plus the shared
+ * channel-key table, since MeshCore channels are mesh-wide config synced
+ * only through the primary/TX-bound companion, not per-device).
  */
 
 class MeshcoreConfigCard {
@@ -143,6 +144,7 @@ class MeshcoreConfigCard {
                 <input class="cfg-field__input" type="number"
                        value="${baud}" data-companion-baud>
             </label>
+            ${this._companionIdentityHtml(data, live)}
             ${this._companionReadoutsHtml(live)}
         `;
 
@@ -156,6 +158,13 @@ class MeshcoreConfigCard {
         if (firmwareCheck) {
             firmwareCheck.addEventListener('click', () => {
                 this._checkCompanionFirmwareUpdate(div, live.device.firmware_version);
+            });
+        }
+
+        const saveNameBtn = div.querySelector('[data-companion-name-save]');
+        if (saveNameBtn) {
+            saveNameBtn.addEventListener('click', () => {
+                this._saveCompanionName(div, data.label || '');
             });
         }
 
@@ -324,7 +333,6 @@ class MeshcoreConfigCard {
 
     _renderOnline(mc) {
         const name = this._esc(mc.companion_name || 'Connected');
-        const nameValue = this._esc(mc.companion_name || '');
         const publicKeyHex = this._esc(mc.public_key_hex || '8b3387e9c5cdea6ac9e5edbaa115cd72');
         const privateSet = new Set(mc.private_channels || []);
         const channelRows = this._buildChannelRows(mc.channel_keys || [], privateSet);
@@ -333,34 +341,6 @@ class MeshcoreConfigCard {
             <div class="cfg-mc-status">
                 <span class="cfg-mc-status__lamp" aria-hidden="true"></span>
                 <span class="cfg-mc-status__name">${name}</span>
-            </div>
-            <div class="cfg-mc-identity" data-mc-identity>
-                <label class="cfg-field cfg-field--inline">
-                    <span class="cfg-field__label">Companion name</span>
-                    <input class="cfg-field__input" type="text"
-                           data-mc-name maxlength="32"
-                           value="${nameValue}"
-                           placeholder="My Meshpoint"
-                           aria-describedby="mc-name-hint">
-                </label>
-                <p class="cfg-field__hint" id="mc-name-hint">
-                    Identity on the mesh is advert packets, so renaming
-                    only updates neighbors after the next advert. Send one
-                    automatically after save with the checkbox below.
-                </p>
-                <label class="cfg-field cfg-field--toggle">
-                    <input type="checkbox" data-mc-name-advert checked>
-                    <span class="cfg-field__label">
-                        Send advert after save
-                    </span>
-                </label>
-                <div class="cfg-card__actions">
-                    <button class="terminal-button terminal-button--primary"
-                            type="button" data-mc-name-save>
-                        Save Name
-                    </button>
-                </div>
-                <p class="cfg-status" data-mc-name-status aria-live="polite"></p>
             </div>
             <div class="cfg-mc-channels">
                 <table class="ch-table">
@@ -469,11 +449,6 @@ class MeshcoreConfigCard {
 
         const refresh = this._body.querySelector('[data-mc-refresh]');
         if (refresh) refresh.addEventListener('click', () => this._api.refresh());
-
-        const saveName = this._body.querySelector('[data-mc-name-save]');
-        if (saveName) {
-            saveName.addEventListener('click', () => this._saveCompanionName(saveName));
-        }
     }
 
     _wireChannelHandlers(scope) {
@@ -658,10 +633,41 @@ class MeshcoreConfigCard {
         }
     }
 
-    async _saveCompanionName(button) {
-        const input = this._body.querySelector('[data-mc-name]');
-        const advertEl = this._body.querySelector('[data-mc-name-advert]');
-        const status = this._body.querySelector('[data-mc-name-status]');
+    _companionIdentityHtml(data, live) {
+        const nameValue = this._esc(
+            data.companion_name || (live && live.radio && live.radio.name) || '',
+        );
+        return `
+            <div class="cfg-mc-identity" data-companion-identity>
+                <label class="cfg-field cfg-field--inline">
+                    <span class="cfg-field__label">Companion name</span>
+                    <input class="cfg-field__input" type="text"
+                           data-companion-name maxlength="32"
+                           value="${nameValue}"
+                           placeholder="My Meshpoint">
+                </label>
+                <label class="cfg-field cfg-field--toggle">
+                    <input type="checkbox" data-companion-name-advert checked>
+                    <span class="cfg-field__label">
+                        Send advert after save
+                    </span>
+                </label>
+                <div class="cfg-card__actions">
+                    <button class="terminal-button terminal-button--primary"
+                            type="button" data-companion-name-save>
+                        Save Name
+                    </button>
+                </div>
+                <p class="cfg-status" data-companion-name-status aria-live="polite"></p>
+            </div>
+        `;
+    }
+
+    async _saveCompanionName(companionDiv, label) {
+        const input = companionDiv.querySelector('[data-companion-name]');
+        const advertEl = companionDiv.querySelector('[data-companion-name-advert]');
+        const status = companionDiv.querySelector('[data-companion-name-status]');
+        const button = companionDiv.querySelector('[data-companion-name-save]');
         if (!input || !status) return;
 
         const value = (input.value || '').trim();
@@ -677,7 +683,7 @@ class MeshcoreConfigCard {
 
         const result = await this._api.put(
             '/api/config/meshcore/companion-name',
-            { name: value },
+            { name: value, label },
         );
 
         if (!result) {
@@ -698,11 +704,13 @@ class MeshcoreConfigCard {
         // advert packet, so a rename without a follow-up advert leaves
         // every neighbor seeing the old name until the next periodic
         // beacon (which on MeshCore is operator-driven, not automatic).
+        // Targets THIS companion specifically (not the general
+        // /api/messages/advert, which always hits the primary one).
         if (advertEl && advertEl.checked) {
             try {
                 const advertRes = await this._api.post(
-                    '/api/messages/advert',
-                    {},
+                    '/api/config/meshcore/companion-advert',
+                    { label },
                 );
                 if (advertRes && advertRes.success) {
                     this._api.toast('Advert sent');

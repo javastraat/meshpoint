@@ -102,9 +102,16 @@ class MeshcoreUsbConfig:
     baud_rate: int = 115200
     auto_detect: bool = True
     label: str = ""   # e.g. "868" or "433" — shown in logs and capture_source tag
+    # Desired advert name for THIS companion. Mirrors MeshcoreConfig.companion_name
+    # above, just per-device instead of mesh-wide -- each companion is a
+    # physically separate radio with its own identity. Re-applied on every
+    # connect by this companion's own capture source.
+    companion_name: Optional[str] = None
 
 
-_MESHCORE_USB_FIELDS: frozenset[str] = frozenset({"serial_port", "baud_rate", "auto_detect", "label"})
+_MESHCORE_USB_FIELDS: frozenset[str] = frozenset(
+    {"serial_port", "baud_rate", "auto_detect", "label", "companion_name"}
+)
 
 
 def _coerce_meshcore_usb(value) -> list[MeshcoreUsbConfig]:

@@ -404,33 +404,43 @@ meshcore:
 ```
 Any Channels listed in the YAML will show in the UI. Changes made in the UI will be written to the YAML config file and pushed to the USB Companion device. Additionally, all channels will be pushed to the USB Companion device upon Meshpoint startup. Up to 40 user channels (slots 1–40) can be configured; slot 0 is always Public.
 
-### MeshCore Companion Identity (v0.7.5+)
+### MeshCore Companion Identity (v0.7.5+, per-companion since v0.7.7)
 
-The USB companion's advert name is what neighbors see in their
-contact list and on the mesh. As of v0.7.5 the dashboard owns the
-rename path:
+Each USB companion's advert name is what neighbors see in their
+contact list and on the mesh. The dashboard owns the rename path,
+independently per companion:
 
-- **Configuration → MeshCore → Companion name** edits the input,
-  ticks "Send advert after save" (default on), and clicks
-  **Save Name**. The Meshpoint sends `CMD_SET_ADVERT_NAME` to the
-  companion (via `meshcore.commands.set_name`), persists the
-  cleaned name to `local.yaml` under `meshcore.companion_name`, and
-  optionally fires an advert so neighbors pick up the new name
-  immediately.
-- The configured name is **re-applied on every USB reconnect**.
-  Hot-swapping a freshly-flashed companion, or replacing a
-  failed unit, lands the new device on your configured name
-  without a manual re-save.
+- **Configuration → MeshCore → USB capture sources → (each
+  companion's own) Companion name** edits the input, ticks "Send
+  advert after save" (default on), and clicks **Save Name**. The
+  Meshpoint sends `CMD_SET_ADVERT_NAME` to *that* companion (via
+  its own `meshcore.commands.set_name`), persists the cleaned name
+  to `local.yaml` under that companion's own `capture.meshcore_usb`
+  entry, and optionally fires an advert from that same companion so
+  neighbors pick up the new name immediately.
+- Each companion's configured name is **re-applied on every USB
+  reconnect for that specific device**. Hot-swapping a
+  freshly-flashed companion, or replacing a failed unit, lands the
+  new device on your configured name without a manual re-save.
 
 ```yaml
-meshcore:
-  companion_name: "Mesh Lab East"    # optional. When set, re-applied on every USB reconnect.
+capture:
+  meshcore_usb:
+    - label: "868"
+      companion_name: "Mesh Lab East"   # optional, this companion only
+    - label: "433"
+      companion_name: "Mesh Lab West"   # optional, independent of the 868 one
 ```
 
-Leaving `companion_name` unset (the default) keeps the v0.7.4
-behavior: the Meshpoint trusts whatever name is on the
-companion's flash. Set it once from the dashboard; further
-reboots / unplug / replug events re-apply automatically.
+Leaving a companion's `companion_name` unset (the default) keeps the
+v0.7.4 behavior for that device: the Meshpoint trusts whatever name
+is on its flash. Set it once from the dashboard per companion;
+further reboots / unplug / replug events re-apply automatically.
+
+The older mesh-wide `meshcore.companion_name` field (pre-v0.7.7,
+singular) still works as a fallback for the *first* configured
+companion only, so existing `local.yaml` files keep working
+unchanged — but new setups should use the per-companion field above.
 
 Validation (shared between the dashboard and the on-connect
 re-apply path): the name is stripped of leading/trailing
@@ -961,7 +971,8 @@ meshtastic:            # Meshtastic protocol settings
 meshcore:              # MeshCore protocol settings
   default_key_b64: null
   channel_keys: {}
-  companion_name: null  # Optional. When set, re-applied on every USB reconnect.
+  companion_name: null  # Legacy, pre-v0.7.7: fallback name for the FIRST companion only.
+                        # New setups should use capture.meshcore_usb[i].companion_name below.
 
 capture:               # what packet sources to read from
   sources:
@@ -973,6 +984,7 @@ capture:               # what packet sources to read from
       baud_rate: 115200
       auto_detect: true
       label: ""
+      companion_name: null  # Optional, per-companion. When set, re-applied on every USB reconnect.
   serial_port: "/dev/ttyUSB0"   # single-stick `serial` source (legacy)
   serial_baud: 115200
   serial: []             # OR: list of devices for multiple Meshtastic USB sticks
