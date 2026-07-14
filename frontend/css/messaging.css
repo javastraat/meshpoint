@@ -305,6 +305,20 @@
 .msg-convo__proto-badge--mt { background: var(--msg-mt); }
 .msg-convo__proto-badge--mc { background: var(--msg-mc); }
 
+/* Which companion/stick this conversation was last heard through
+   (e.g. "433", "868", "Concentrator") -- quieter outline pill next to
+   the solid MC/MT protocol badge. */
+.msg-convo__conn-badge {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: var(--msg-text-dim);
+    border: 1px solid var(--msg-border-strong);
+    flex-shrink: 0;
+}
+
 .msg-convo__meta {
     text-align: right;
     flex-shrink: 0;

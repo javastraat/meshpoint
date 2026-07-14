@@ -234,6 +234,10 @@ class MessagingContacts {
             : convo.node_name || convo.node_id;
 
         const protoBadge = convo.protocol === 'meshcore' ? 'MC' : 'MT';
+        const connLabel = this._formatConnectionLabel(convo.capture_source);
+        const connBadgeHtml = connLabel
+            ? ` <span class="msg-convo__conn-badge" title="Heard via ${this._esc(convo.capture_source)}">${this._esc(connLabel)}</span>`
+            : '';
 
         const timeStr = convo.last_timestamp
             ? new Date(convo.last_timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
@@ -256,7 +260,7 @@ class MessagingContacts {
         el.innerHTML = `
             <div class="msg-convo__icon ${iconClass}">${iconText}</div>
             <div class="msg-convo__info">
-                <div class="msg-convo__name">${this._esc(displayName)} <span class="msg-convo__proto-badge msg-convo__proto-badge--${convo.protocol === 'meshcore' ? 'mc' : 'mt'}">${protoBadge}</span></div>
+                <div class="msg-convo__name">${this._esc(displayName)} <span class="msg-convo__proto-badge msg-convo__proto-badge--${convo.protocol === 'meshcore' ? 'mc' : 'mt'}">${protoBadge}</span>${connBadgeHtml}</div>
                 <div class="msg-convo__preview">${this._esc(convo.last_message || '')}</div>
             </div>
             <div class="msg-convo__meta">
@@ -359,6 +363,20 @@ class MessagingContacts {
         } catch (e) {
             console.error('Failed to delete conversation:', e);
         }
+    }
+
+    /** Keep in sync with MessagingChat._formatConnectionLabel -- same
+     * mapping, duplicated because these are separate classic scripts and
+     * the sidebar rows render independently of any open chat.
+     * "meshcore_usb_433" -> "433", "concentrator" -> "Concentrator",
+     * bare "meshcore_usb"/"serial" -> "USB", missing -> no badge. */
+    _formatConnectionLabel(captureSource) {
+        if (!captureSource) return '';
+        if (captureSource === 'concentrator') return 'Concentrator';
+        const match = captureSource.match(/_(\d+)$/);
+        if (match) return match[1];
+        if (captureSource === 'meshcore_usb' || captureSource === 'serial') return 'USB';
+        return captureSource;
     }
 
     _sortByRecent() {
