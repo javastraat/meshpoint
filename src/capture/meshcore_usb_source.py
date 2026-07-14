@@ -74,6 +74,15 @@ class MeshcoreUsbCaptureSource(CaptureSource):
     def is_running(self) -> bool:
         return self._running
 
+    @property
+    def connected(self) -> bool:
+        # Mirrors serial_source.py's identical public accessor -- without
+        # this, config_routes.py's getattr(src, "connected", False) found
+        # no such attribute (only the private self._connected existed) and
+        # silently defaulted to False for every companion, regardless of
+        # its real live state.
+        return self._connected
+
     async def start(self) -> None:
         port = await self._resolve_port()
         if port is None:
