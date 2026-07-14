@@ -208,6 +208,49 @@ Each entry's `label` tags its captured packets' `capture_source` as `serial_433`
 
 Configuration → Serial in the dashboard edits this list without hand-editing `local.yaml` — same add/remove/label UI as Configuration → MeshCore's companion editor, minus auto-detect (an empty port already means "let meshtastic-python auto-detect").
 
+### Serial Device Identity (v0.7.7+)
+
+Each Meshtastic USB stick's own long/short name can be renamed from
+the dashboard, per device — useful since these sticks have no
+Bluetooth, so the official Meshtastic app's usual rename path isn't
+available without unplugging the stick into a laptop.
+
+- **Configuration → Serial → (each device's own) Long name / Short
+  name** edits the inputs, ticks "Send advert after save" (default
+  on), and clicks **Save Name**. The Meshpoint sends an admin
+  `setOwner` message to *that* stick over its own serial connection,
+  persists the values to `local.yaml` under that device's own
+  `capture.serial` entry, and optionally sends a NodeInfo broadcast
+  from that same stick so neighbors pick up the new name immediately.
+- Unlike MeshCore's per-companion rename, there's no live
+  reconnect-hook to re-apply this if the stick is later swapped for a
+  factory-default replacement (`SerialCaptureSource` has no
+  auto-reconnect loop) — the persisted values are applied once, at
+  the **next service restart**. The rename itself still takes effect
+  immediately on the currently connected stick; only the
+  swap-a-different-stick-in-later case needs a restart.
+
+```yaml
+capture:
+  serial:
+    - label: "433"
+      long_name: "Field Node 433"    # optional, this stick only
+      short_name: "F433"             # optional, max 4 characters
+    - label: "868"
+      long_name: "Field Node 868"    # optional, independent of the 433 one
+```
+
+Leaving a device's `long_name`/`short_name` unset (the default) keeps
+whatever identity is already on the stick's own flash.
+
+Validation (shared between the dashboard and the connect-time
+apply): long name max 36 characters, short name max 4 characters —
+same ceilings as the dashboard's own concentrator Identity route.
+Both must be non-empty if provided; meshtastic-python's own
+`setOwner()` call would otherwise abort the whole request process on
+an empty name, so Meshpoint validates and rejects before ever
+reaching that call.
+
 ---
 
 ## Location (GPS) source

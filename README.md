@@ -76,6 +76,7 @@ This is a customized fork of upstream [KMX415/meshpoint](https://github.com/KMX4
 - **Concentrator channels card** — read-only table of all 9 SX1302 slots (frequency, BW, SF, sync word, protocol, RF chain, state), derived from the same channel-plan code the radio runs.
 - **Unified protocol cards** — "Meshtastic Configuration" (radio settings + channel list in one card) and a matching MeshCore layout.
 - **Configuration → Serial and → MeshCore show live readouts per USB device** — Node ID, frequency, bandwidth, SF, TX power, firmware version, and hardware model for each connected stick or companion, read straight from the device itself, with a "Check for updates" button per device comparing against the latest upstream firmware release on GitHub.
+- **Rename any USB stick or companion straight from the dashboard, per device** — no Bluetooth needed. Each Serial/MeshCore device row has its own name field(s), a "Send advert after save" checkbox, and a Save button, so multiple sticks/companions don't have to share one identity or need a laptop running the official Meshtastic app.
 - **Node drawer recent packets** — every node shows its last 15 packets (time, type, RSSI/SNR).
 - **SNR distribution chart** on Stats next to the RSSI histogram; signal stats ignore implausible near-field readings (> −20 dBm).
 - **Relay tuning from the dashboard** — burst size and the min/max RSSI relay window are editable on Configuration → Transmit.
@@ -433,7 +434,11 @@ FastAPI server on port 8080 (configurable via `dashboard.port` in `local.yaml`):
 | `PUT /api/config/telemetry` | Set telemetry broadcast interval (admin) |
 | `PUT /api/config/capture/meshcore-companions` | Replace full MeshCore companion list (max 4) |
 | `GET /api/config/meshcore/firmware-check?current_version=...` | Compare a companion's firmware against the latest `meshcore-dev/MeshCore` release (on-demand, cached 5 min) |
+| `PUT /api/config/meshcore/companion-name` | Rename one MeshCore companion (label-scoped) |
+| `POST /api/config/meshcore/companion-advert` | Send an advert from one specific MeshCore companion (label-scoped) |
 | `GET /api/config/serial/firmware-check?current_version=...` | Compare a Meshtastic USB stick's firmware against the latest `meshtastic/firmware` release (on-demand, cached 5 min) |
+| `PUT /api/config/serial/identity` | Rename one Meshtastic USB stick's long/short name (label-scoped) |
+| `POST /api/config/serial/advert` | Send a NodeInfo broadcast from one specific Meshtastic USB stick (label-scoped) |
 | `POST /api/messages/send` | Send a Meshtastic or MeshCore message |
 | `GET /api/messages/conversations` | Message history by conversation |
 | `GET /api/lorawan/devices` | LoRaWAN device list (frame count, RSSI, SF, first/last seen) |

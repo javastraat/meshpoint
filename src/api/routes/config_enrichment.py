@@ -61,6 +61,8 @@ def enrich_config_payload(cfg: AppConfig, base: dict) -> dict:
                 "serial_port": d.serial_port,
                 "serial_baud": d.serial_baud,
                 "label": d.label,
+                "long_name": d.long_name,
+                "short_name": d.short_name,
             }
             for d in capture.serial
         ],

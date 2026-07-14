@@ -156,9 +156,19 @@ class SerialDeviceConfig:
     serial_port: Optional[str] = None
     serial_baud: int = 115200
     label: str = ""   # e.g. "433" or "868" — shown in logs and capture_source tag
+    # Desired identity for THIS stick, applied once at connect (start()).
+    # Unlike MeshCore's companion_name, there's no reconnect-callback
+    # mechanism to re-apply this live (SerialCaptureSource has no
+    # auto-reconnect loop) -- a swapped-in replacement stick picks up
+    # these values on the next service restart, matching this card's
+    # existing "Requires a service restart after changes" convention.
+    long_name: Optional[str] = None
+    short_name: Optional[str] = None
 
 
-_SERIAL_DEVICE_FIELDS: frozenset[str] = frozenset({"serial_port", "serial_baud", "label"})
+_SERIAL_DEVICE_FIELDS: frozenset[str] = frozenset(
+    {"serial_port", "serial_baud", "label", "long_name", "short_name"}
+)
 
 
 def _coerce_serial_devices(value) -> list[SerialDeviceConfig]:

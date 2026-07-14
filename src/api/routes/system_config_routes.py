@@ -261,11 +261,22 @@ async def update_serial_devices(
     if _config is None:
         raise HTTPException(503, "Config not loaded")
 
+    # This form doesn't edit long_name/short_name (that's the per-device
+    # identity card's job) -- preserve each existing device's own
+    # configured identity by label match so replacing the list here
+    # doesn't silently wipe it (mirrors update_meshcore_companions'
+    # identical companion_name preservation fix).
+    old_identity = {
+        d.label: (d.long_name, d.short_name) for d in _config.capture.serial
+    }
+
     new_devices = [
         SerialDeviceConfig(
             label=d.label,
             serial_port=d.serial_port.strip() if d.serial_port else None,
             serial_baud=d.serial_baud,
+            long_name=old_identity.get(d.label, (None, None))[0],
+            short_name=old_identity.get(d.label, (None, None))[1],
         )
         for d in req.devices
     ]
@@ -407,4 +418,6 @@ def _serial_device_dict(dev) -> dict:
         "serial_port": dev.serial_port,
         "serial_baud": dev.serial_baud,
         "label": dev.label,
+        "long_name": dev.long_name,
+        "short_name": dev.short_name,
     }

@@ -33,6 +33,7 @@ def _add_serial_source(coordinator: PipelineCoordinator, config) -> None:
         coordinator.capture_coordinator.add_source(
             SerialCaptureSource(
                 port=dev.serial_port, baud=dev.serial_baud, label=dev.label,
+                long_name=dev.long_name, short_name=dev.short_name,
             )
         )
 

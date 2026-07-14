@@ -556,6 +556,7 @@ def _add_serial_source(coordinator: PipelineCoordinator, config: AppConfig):
         coordinator.capture_coordinator.add_source(
             SerialCaptureSource(
                 port=dev.serial_port, baud=dev.serial_baud, label=dev.label,
+                long_name=dev.long_name, short_name=dev.short_name,
             )
         )
 
@@ -1665,7 +1666,7 @@ def _init_routes(
     meshcore_config_routes.init_routes(
         config=config, tx_service=tx_service, meshcore_sources=_find_meshcore_sources(coord),
     )
-    serial_config_routes.init_routes(config=config)
+    serial_config_routes.init_routes(config=config, serial_sources=_find_serial_sources(coord))
     _dev_name = config.device.device_name or "meshpoint"
     lorawan_routes.init_routes(coord.packet_repo, device_name=_dev_name)
     meshtastic_routes.init_routes(

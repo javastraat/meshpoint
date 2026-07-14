@@ -19,7 +19,6 @@ class TopbarController {
         );
         this._meshcore = new TopbarMeshcoreChip(
             rootEl.querySelector('#topbar-meshcore-group'),
-            rootEl.querySelector('.topbar-meshcore'),
         );
         this._serial = new TopbarSerialChip(
             rootEl.querySelector('#topbar-serial-group'),

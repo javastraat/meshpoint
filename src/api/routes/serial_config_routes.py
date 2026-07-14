@@ -17,15 +17,19 @@ import time
 import urllib.request
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 
-from src.config import AppConfig
+from src.api.auth.dependencies import require_admin
+from src.api.auth.jwt_session import SessionClaims
+from src.config import AppConfig, save_section_to_yaml
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/config/serial", tags=["config", "serial"])
 
 _config: AppConfig | None = None
+_serial_sources: list = []
 
 # Manual/on-demand only -- same reasoning as meshcore_config_routes.py's
 # identical comment: firmware only changes when a stick is physically
@@ -144,9 +148,152 @@ async def _check_firmware_update(current_version: str) -> dict:
     }
 
 
-def init_routes(config: AppConfig) -> None:
-    global _config
+def init_routes(config: AppConfig, serial_sources=None) -> None:
+    global _config, _serial_sources
     _config = config
+    _serial_sources = serial_sources or []
+
+
+def _resolve_serial_source(label: str):
+    """Find the configured serial device source matching this label.
+
+    Mirrors ``serial_card.js``'s own name reconstruction
+    (``serial_<label>``, bare ``serial`` when unlabeled) -- same
+    pattern as meshcore_config_routes.py's ``_resolve_companion_source``.
+    """
+    name = f"serial_{label}" if label else "serial"
+    for src in _serial_sources:
+        if src.name == name:
+            return src
+    return None
+
+
+def _persist_serial_identity(label: str, long_name: Optional[str], short_name: Optional[str]) -> None:
+    """Save one device's renamed identity to its own config entry.
+
+    Persists the FULL ``capture.serial`` list (mirrors
+    meshcore_config_routes.py's ``_persist_companion_name`` -- same
+    "save_section_to_yaml replaces the whole section" reasoning).
+    Failure here is a soft error: the rename already stuck on the
+    stick's own flash for the current session; only the
+    apply-on-next-restart path is degraded until the user retries.
+    """
+    matched = False
+    for entry in _config.capture.serial:
+        if (entry.label or "") == (label or ""):
+            if long_name is not None:
+                entry.long_name = long_name
+            if short_name is not None:
+                entry.short_name = short_name
+            matched = True
+            break
+    if not matched:
+        logger.warning(
+            "No serial config entry matched label %r; "
+            "rename won't be re-applied on the next restart until saved",
+            label,
+        )
+        return
+    try:
+        save_section_to_yaml("capture", {
+            "serial": [
+                {
+                    "serial_port": e.serial_port,
+                    "serial_baud": e.serial_baud,
+                    "label": e.label,
+                    "long_name": e.long_name,
+                    "short_name": e.short_name,
+                }
+                for e in _config.capture.serial
+            ],
+        })
+    except PermissionError as exc:
+        logger.warning(
+            "Renamed serial device (label=%r) but failed to persist to "
+            "local.yaml: %s. Won't be re-applied on the next restart "
+            "until saved.",
+            label, exc,
+        )
+    except Exception:
+        logger.exception(
+            "Renamed serial device (label=%r) but yaml persistence "
+            "failed; won't be re-applied on the next restart until saved.",
+            label,
+        )
+
+
+class SerialIdentityUpdate(BaseModel):
+    label: str = ""
+    long_name: Optional[str] = None
+    short_name: Optional[str] = None
+
+
+@router.put("/identity")
+async def update_serial_identity(
+    req: SerialIdentityUpdate,
+    _claims: SessionClaims = Depends(require_admin),
+) -> dict:
+    """Rename one Meshtastic USB stick's own long/short name.
+
+    Takes ``label`` to target a specific device (empty string for the
+    bare/unlabeled one) -- up to 4 devices can be configured, each with
+    its own independent identity. Mirrors meshcore_config_routes.py's
+    ``/companion-name`` shape exactly.
+
+    Unlike MeshCore's companion rename, there's no live reconnect-callback
+    to re-apply this if the stick is later swapped for a blank
+    replacement -- the persisted value is only re-applied at the next
+    service start (``SerialCaptureSource`` has no auto-reconnect loop to
+    hook into). The live rename itself still takes effect immediately on
+    the currently connected stick.
+    """
+    if _config is None:
+        raise HTTPException(503, "Config not loaded")
+
+    source = _resolve_serial_source(req.label)
+    if source is None or not source.connected:
+        raise HTTPException(503, "Serial device not connected")
+
+    result = source.set_owner(req.long_name, req.short_name)
+    if not result["success"]:
+        logger.warning(
+            "Dashboard set_owner failed for %s: %s", source.name, result["error"],
+        )
+        raise HTTPException(400, result["error"] or "Device rejected identity change")
+
+    _persist_serial_identity(req.label, result.get("long_name"), result.get("short_name"))
+
+    return {
+        "saved": True,
+        "long_name": result.get("long_name"),
+        "short_name": result.get("short_name"),
+    }
+
+
+class SerialAdvertRequest(BaseModel):
+    label: str = ""
+
+
+@router.post("/advert")
+async def send_serial_advert_route(
+    req: SerialAdvertRequest,
+    _claims: SessionClaims = Depends(require_admin),
+) -> dict:
+    """Send a NodeInfo broadcast from one specific Meshtastic USB stick.
+
+    Mirrors meshcore_config_routes.py's ``/companion-advert`` -- lets the
+    per-device rename card's "send advert after save" target the exact
+    stick that was just renamed.
+    """
+    if _config is None:
+        raise HTTPException(503, "Config not loaded")
+
+    source = _resolve_serial_source(req.label)
+    if source is None or not source.connected:
+        raise HTTPException(503, "Serial device not connected")
+
+    success = source.send_nodeinfo()
+    return {"success": success, "error": None if success else "NodeInfo broadcast failed"}
 
 
 @router.get("/firmware-check")

@@ -1,13 +1,16 @@
 /**
  * Configuration → Serial (Meshtastic USB) card.
  *
- * Single responsibility: edit the list of Meshtastic USB serial
- * devices (T5 multi-stick support) so adding a second stick (e.g. one
- * on 433 MHz, one on 868 MHz) doesn't need hand-editing local.yaml.
- * Mirrors MeshcoreConfigCard's "USB capture sources" card -- same
- * shape, minus the auto-detect toggle: SerialDeviceConfig has no such
- * field, an empty serial port already means "let meshtastic-python
- * auto-detect".
+ * Edits the list of Meshtastic USB serial devices (T5 multi-stick
+ * support) so adding a second stick (e.g. one on 433 MHz, one on 868
+ * MHz) doesn't need hand-editing local.yaml. Each device row also gets
+ * its own live readouts plus editable long/short name + "Send advert
+ * after save" -- these sticks have no Bluetooth, so this is the only
+ * way to rename them without a laptop and a USB cable running the
+ * official Meshtastic app. Mirrors MeshcoreConfigCard's "USB capture
+ * sources" card -- same shape, minus the auto-detect toggle:
+ * SerialDeviceConfig has no such field, an empty serial port already
+ * means "let meshtastic-python auto-detect".
  */
 
 class SerialConfigCard {
@@ -121,6 +124,7 @@ class SerialConfigCard {
                 <input class="cfg-field__input" type="number"
                        value="${baud}" data-device-baud>
             </label>
+            ${this._identityHtml(data, live)}
             ${this._readoutsHtml(live)}
         `;
 
@@ -137,8 +141,110 @@ class SerialConfigCard {
             });
         }
 
+        const saveNameBtn = div.querySelector('[data-device-name-save]');
+        if (saveNameBtn) {
+            saveNameBtn.addEventListener('click', () => {
+                this._saveDeviceIdentity(div, data.label || '');
+            });
+        }
+
         this._devicesEl.appendChild(div);
         this._syncAddBtn();
+    }
+
+    _identityHtml(data, live) {
+        const longValue = this._esc(data.long_name || (live && live.long_name) || '');
+        const shortValue = this._esc(data.short_name || (live && live.short_name) || '');
+        return `
+            <div class="cfg-mc-identity" data-device-identity>
+                <label class="cfg-field cfg-field--inline">
+                    <span class="cfg-field__label">Long name</span>
+                    <input class="cfg-field__input" type="text"
+                           data-device-long-name maxlength="36"
+                           value="${longValue}"
+                           placeholder="My Meshpoint 433">
+                </label>
+                <label class="cfg-field cfg-field--inline cfg-field--narrow">
+                    <span class="cfg-field__label">Short name</span>
+                    <input class="cfg-field__input" type="text"
+                           data-device-short-name maxlength="4"
+                           value="${shortValue}"
+                           placeholder="M433">
+                </label>
+                <label class="cfg-field cfg-field--toggle">
+                    <input type="checkbox" data-device-advert checked>
+                    <span class="cfg-field__label">
+                        Send advert after save
+                    </span>
+                </label>
+                <div class="cfg-card__actions">
+                    <button class="terminal-button terminal-button--primary"
+                            type="button" data-device-name-save>
+                        Save Name
+                    </button>
+                </div>
+                <p class="cfg-status" data-device-name-status aria-live="polite"></p>
+            </div>
+        `;
+    }
+
+    async _saveDeviceIdentity(deviceDiv, label) {
+        const longInput = deviceDiv.querySelector('[data-device-long-name]');
+        const shortInput = deviceDiv.querySelector('[data-device-short-name]');
+        const advertEl = deviceDiv.querySelector('[data-device-advert]');
+        const status = deviceDiv.querySelector('[data-device-name-status]');
+        const button = deviceDiv.querySelector('[data-device-name-save]');
+        if (!longInput || !shortInput || !status) return;
+
+        const longValue = (longInput.value || '').trim();
+        const shortValue = (shortInput.value || '').trim();
+        if (!longValue && !shortValue) {
+            status.dataset.kind = 'error';
+            status.textContent = 'Enter a long name or short name.';
+            return;
+        }
+
+        button.disabled = true;
+        status.dataset.kind = 'pending';
+        status.textContent = 'Renaming device…';
+
+        // null (not empty string) for a blank field -- matches the
+        // backend's set_owner() "None means leave unchanged" semantics,
+        // so renaming just the long name doesn't force retyping short.
+        const result = await this._api.put('/api/config/serial/identity', {
+            label,
+            long_name: longValue || null,
+            short_name: shortValue || null,
+        });
+
+        if (!result) {
+            status.dataset.kind = 'error';
+            status.textContent = 'Save failed.';
+            button.disabled = false;
+            return;
+        }
+
+        status.dataset.kind = 'success';
+        status.textContent = 'Renamed.';
+        this._api.toast('Device renamed');
+
+        if (advertEl && advertEl.checked) {
+            try {
+                const advertRes = await this._api.post('/api/config/serial/advert', { label });
+                if (advertRes && advertRes.success) {
+                    this._api.toast('Advert sent');
+                } else if (advertRes) {
+                    this._api.toast(
+                        'Advert failed' + (advertRes.error ? `: ${advertRes.error}` : ''),
+                    );
+                }
+            } catch (_e) {
+                // Rename already applied live; advert failure is a soft error.
+            }
+        }
+
+        await this._api.refresh();
+        button.disabled = false;
     }
 
     async _checkFirmwareUpdate(deviceDiv, currentVersion) {

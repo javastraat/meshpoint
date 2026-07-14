@@ -28,10 +28,14 @@ class SerialCaptureSource(CaptureSource):
         port: Optional[str] = None,
         baud: int = 115200,
         label: str = "",
+        long_name: Optional[str] = None,
+        short_name: Optional[str] = None,
     ):
         self._port = port
         self._baud = baud
         self._label = label
+        self._desired_long_name = long_name
+        self._desired_short_name = short_name
         self._interface = None
         self._running = False
         self._connected = False
@@ -68,6 +72,13 @@ class SerialCaptureSource(CaptureSource):
         which is what the physical advert button wants: "this box is
         here" on the stick's band. Sync and cheap: meshtastic-python
         queues the frame to the radio's stream.
+
+        long_name/short_name come from self._radio_info (this source's
+        own cache, kept current by set_owner() immediately after a
+        successful rename) rather than re-querying
+        iface.getMyNodeInfo() -- so an advert sent right after a rename
+        announces the NEW name, not whatever the library's own node
+        cache happens to still hold.
         """
         iface = self._interface
         if iface is None or not self._running:
@@ -77,22 +88,90 @@ class SerialCaptureSource(CaptureSource):
 
             my = iface.getMyNodeInfo() or {}
             user_info = my.get("user") or {}
+            node_id = user_info.get("id") or ""
+            long_name = self._radio_info.get("long_name") or user_info.get("longName") or ""
+            short_name = self._radio_info.get("short_name") or user_info.get("shortName") or ""
             user = mesh_pb2.User()
-            user.id = user_info.get("id") or ""
-            user.long_name = user_info.get("longName") or ""
-            user.short_name = user_info.get("shortName") or ""
+            user.id = node_id
+            user.long_name = long_name
+            user.short_name = short_name
             iface.sendData(
                 user.SerializeToString(),
                 portNum=portnums_pb2.PortNum.NODEINFO_APP,
             )
             logger.info(
                 "%s: NodeInfo broadcast sent (%s)",
-                self.name, user_info.get("id") or "unknown id",
+                self.name, node_id or "unknown id",
             )
             return True
         except Exception:
             logger.exception("%s: NodeInfo broadcast failed", self.name)
             return False
+
+    def set_owner(self, long_name: Optional[str], short_name: Optional[str]) -> dict:
+        """Rename this stick's own Meshtastic identity (long/short name).
+
+        Uses meshtastic-python's Node.setOwner() -- an ADMIN_APP
+        AdminMessage, the same TX mechanism send_nodeinfo() rides on.
+        Pass None for a name to leave it unchanged (matches setOwner()'s
+        own None-means-skip convention).
+
+        CAUTION: meshtastic-python's setOwner() calls its own
+        our_exit() helper (print + sys.exit(1)) on an empty or
+        whitespace-only name -- a CLI-oriented escape hatch that would
+        kill this entire long-running server process if ever reached.
+        Both names are therefore validated and stripped BEFORE the
+        call (same 36/4-char ceilings as the dashboard's own concentrator
+        Identity route, config_routes.py's update_identity), and
+        SystemExit is caught defensively in case some other internal
+        path still raises it.
+        """
+        iface = self._interface
+        if iface is None or not self._connected:
+            return {"success": False, "error": "Not connected"}
+
+        long_clean = (long_name or "").strip() if long_name is not None else None
+        short_clean = (short_name or "").strip() if short_name is not None else None
+
+        if long_clean is not None:
+            if not long_clean:
+                return {"success": False, "error": "Long name must not be empty"}
+            if len(long_clean) > 36:
+                return {"success": False, "error": "Long name max 36 characters"}
+        if short_clean is not None:
+            if not short_clean:
+                return {"success": False, "error": "Short name must not be empty"}
+            if len(short_clean) > 4:
+                return {"success": False, "error": "Short name max 4 characters"}
+
+        try:
+            iface.localNode.setOwner(long_name=long_clean, short_name=short_clean)
+            iface.waitForAckNak()
+        except SystemExit:
+            logger.error(
+                "%s: setOwner unexpectedly hit sys.exit (should be unreachable "
+                "after validation above)", self.name,
+            )
+            return {"success": False, "error": "Internal error setting owner"}
+        except Exception as exc:
+            logger.exception("%s: setOwner failed", self.name)
+            return {"success": False, "error": str(exc)}
+
+        # Update our own cache immediately -- meshtastic-python's
+        # getMyNodeInfo()/nodesByNum isn't guaranteed to reflect a local
+        # rename until the device's own NodeInfo happens to round-trip
+        # back through the receive stream. Config-page readouts and any
+        # advert sent right after this call should show the new name
+        # right away, not lag behind.
+        if long_clean is not None:
+            self._radio_info["long_name"] = long_clean
+        if short_clean is not None:
+            self._radio_info["short_name"] = short_clean
+
+        logger.info(
+            "%s: renamed (long=%r short=%r)", self.name, long_clean, short_clean,
+        )
+        return {"success": True, "long_name": long_clean, "short_name": short_clean}
 
     async def start(self) -> None:
         try:
@@ -116,6 +195,19 @@ class SerialCaptureSource(CaptureSource):
                 self._radio_info.get("region"),
                 self._radio_info.get("channel_num"),
             )
+            if self._desired_long_name or self._desired_short_name:
+                # One-shot at connect only -- no reconnect loop exists for
+                # Serial to re-apply this on (unlike MeshCore's
+                # connected-callback), so a swapped-in replacement stick
+                # picks this up on the next service restart instead.
+                result = self.set_owner(self._desired_long_name, self._desired_short_name)
+                if result["success"]:
+                    logger.info("%s: applied configured identity on connect", self.name)
+                else:
+                    logger.warning(
+                        "%s: failed to apply configured identity on connect: %s",
+                        self.name, result["error"],
+                    )
         except ImportError:
             logger.error(
                 "meshtastic package not installed. "
