@@ -120,10 +120,17 @@ class MessageNameResolver:
         node_id = out.get("node_id", "")
         stored = (out.get("node_name") or "").strip()
         if node_id.startswith("broadcast:"):
+            # Always resolve the real per-message sender ID (stashes
+            # source_id on `out` as a side effect, used by the frontend
+            # to make the sender name clickable) -- independent of
+            # whether the stored name is already good enough to display,
+            # since most real messages already have one and previously
+            # skipped this lookup entirely, leaving source_id unset.
+            resolved_name = await self._resolve_broadcast_sender(out)
             if stored and stored.lower() != "broadcast":
                 out["node_name"] = stored
             else:
-                out["node_name"] = await self._resolve_broadcast_sender(out)
+                out["node_name"] = resolved_name
             return out
         out["node_name"] = await self.resolve(
             node_id,
