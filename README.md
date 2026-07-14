@@ -433,6 +433,7 @@ FastAPI server on port 8080 (configurable via `dashboard.port` in `local.yaml`):
 | `PUT /api/config/telemetry` | Set telemetry broadcast interval (admin) |
 | `PUT /api/config/capture/meshcore-companions` | Replace full MeshCore companion list (max 4) |
 | `GET /api/config/meshcore/firmware-check` | Compare companion firmware against the latest `meshcore-dev/MeshCore` release (on-demand, cached 5 min) |
+| `GET /api/config/serial/firmware-check?current_version=...` | Compare a Meshtastic USB stick's firmware against the latest `meshtastic/firmware` release (on-demand, cached 5 min) |
 | `POST /api/messages/send` | Send a Meshtastic or MeshCore message |
 | `GET /api/messages/conversations` | Message history by conversation |
 | `GET /api/lorawan/devices` | LoRaWAN device list (frame count, RSSI, SF, first/last seen) |
