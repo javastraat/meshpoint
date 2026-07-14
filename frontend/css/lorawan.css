@@ -321,45 +321,6 @@
     font-size: 13px;
 }
 
-/* ── Pagination ──────────────────────────────────────── */
-
-.lw-pagination {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    padding: 12px 16px;
-    border-top: 1px solid var(--border, #1e293b);
-}
-
-.lw-page-btn {
-    background: var(--card-bg, #111827);
-    border: 1px solid var(--border, #1e293b);
-    color: var(--text-secondary, #94a3b8);
-    padding: 4px 12px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 13px;
-    transition: color 0.15s, border-color 0.15s;
-}
-
-.lw-page-btn:hover:not(:disabled) {
-    color: #f1f5f9;
-    border-color: #94a3b8;
-}
-
-.lw-page-btn:disabled {
-    opacity: 0.3;
-    cursor: default;
-}
-
-.lw-page-info {
-    font-size: 12px;
-    color: var(--text-secondary, #94a3b8);
-    min-width: 90px;
-    text-align: center;
-}
-
 .mc-contact-row,
 .mt-node-row,
 .lw-device-row {

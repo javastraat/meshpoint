@@ -30,7 +30,8 @@
       "Bash(find / -maxdepth 4 -iname \"puppeteer\" -o -iname \"playwright\")",
       "Read(//private/tmp/**)",
       "Bash(node --check /Users/einstein/Software/meshpoint/frontend/js/lorawan_panel.js)",
-      "Bash(node --check /Users/einstein/Software/meshpoint/frontend/js/meshtastic_panel.js)"
+      "Bash(node --check /Users/einstein/Software/meshpoint/frontend/js/meshtastic_panel.js)",
+      "Bash(node --check /Users/einstein/Software/meshpoint/frontend/js/meshcore_panel.js)"
     ]
   }
 }

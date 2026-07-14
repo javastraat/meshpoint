@@ -22,8 +22,6 @@ class MeshCorePanel {
         this._mounted = false;
         this._nodeNames = {};
         this._allNodes = [];
-        this._page = 0;
-        this._pageSize = 50;
         let stored = null;
         try { stored = localStorage.getItem(MC_TAB_STORE_KEY); } catch (_) {}
         this._tab = stored === 'contacts' ? 'contacts' : 'packets';
@@ -151,11 +149,6 @@ class MeshCorePanel {
                                 No MeshCore contacts yet. Import contacts.json to populate.
                             </p>
                         </div>
-                        <div class="lw-pagination" id="mc-pagination" style="display:none">
-                            <button class="lw-page-btn" id="mc-page-prev">&#8249; Prev</button>
-                            <span class="lw-page-info" id="mc-page-info"></span>
-                            <button class="lw-page-btn" id="mc-page-next">Next &#8250;</button>
-                        </div>
                     </div>
                 </div>
             </section>
@@ -168,10 +161,6 @@ class MeshCorePanel {
                 const ds = this._tab === 'contacts' ? 'contacts' : 'packets';
                 window.location = `/api/meshcore/export/${ds}.csv`;
             });
-        document.getElementById('mc-page-prev')
-            ?.addEventListener('click', () => { this._page--; this._renderNodePage(); });
-        document.getElementById('mc-page-next')
-            ?.addEventListener('click', () => { this._page++; this._renderNodePage(); });
         root.querySelectorAll('[data-mc-tab]').forEach((btn) => {
             btn.addEventListener('click', () => this._setTab(btn.dataset.mcTab));
         });
@@ -253,7 +242,8 @@ class MeshCorePanel {
             if (!nodes.length) {
                 document.getElementById('mc-node-tbody').innerHTML = '';
                 if (empty) empty.style.display = '';
-                document.getElementById('mc-pagination').style.display = 'none';
+                const count = document.getElementById('mc-node-count');
+                if (count) count.textContent = '';
                 return;
             }
             if (empty) empty.style.display = 'none';
@@ -264,22 +254,14 @@ class MeshCorePanel {
             });
 
             this._allNodes = nodes;
-            this._page = 0;
-            this._renderNodePage();
+            this._renderNodes();
         } catch (_) {}
     }
 
-    _renderNodePage() {
-        const total = this._allNodes.length;
-        const pages = Math.ceil(total / this._pageSize);
-        this._page = Math.max(0, Math.min(this._page, pages - 1));
-
-        const start = this._page * this._pageSize;
-        const slice = this._allNodes.slice(start, start + this._pageSize);
-
+    _renderNodes() {
         const tbody = document.getElementById('mc-node-tbody');
         if (tbody) {
-            tbody.innerHTML = slice.map((n) => `
+            tbody.innerHTML = this._allNodes.map((n) => `
                 <tr data-node-id="${this._esc(n.node_id || '')}" class="mc-contact-row">
                     <td class="lw-time">${this._fmtTime(n.last_heard)}</td>
                     <td class="lw-id">${this._esc(n.node_id || '--')}</td>
@@ -293,17 +275,8 @@ class MeshCorePanel {
             `).join('');
         }
 
-        const pagination = document.getElementById('mc-pagination');
-        const info = document.getElementById('mc-page-info');
-        const prev = document.getElementById('mc-page-prev');
-        const next = document.getElementById('mc-page-next');
         const count = document.getElementById('mc-node-count');
-
-        if (pagination) pagination.style.display = pages > 1 ? '' : 'none';
-        if (info) info.textContent = `Page ${this._page + 1} of ${pages}`;
-        if (prev) prev.disabled = this._page === 0;
-        if (next) next.disabled = this._page >= pages - 1;
-        if (count) count.textContent = `(${total} total)`;
+        if (count) count.textContent = `(${this._allNodes.length} total)`;
     }
 
     async _loadPackets() {
