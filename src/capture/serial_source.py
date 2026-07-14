@@ -145,8 +145,22 @@ class SerialCaptureSource(CaptureSource):
                 return {"success": False, "error": "Short name max 4 characters"}
 
         try:
+            # No waitForAckNak() here, unlike get_device_metadata's
+            # request/response round trip: Node.setOwner()'s own source
+            # sets onResponse=None for the local node case (self ==
+            # self.iface.localNode) -- the library's own authors chose
+            # not to wait for an ack when renaming the directly-attached
+            # device, since sendData() already queues the write and
+            # nothing ever sets receivedAck/receivedNak for this path.
+            # An earlier version of this method DID call waitForAckNak()
+            # here, which -- since nothing was ever going to satisfy
+            # it -- blocked for its full 20s default timeout on every
+            # single rename, synchronously freezing the whole dashboard's
+            # asyncio event loop (this method has no executor wrapper)
+            # for that entire duration. Confirmed by reading the real
+            # meshtastic-python Timeout/waitForAckNak source before
+            # removing this, not guessed.
             iface.localNode.setOwner(long_name=long_clean, short_name=short_clean)
-            iface.waitForAckNak()
         except SystemExit:
             logger.error(
                 "%s: setOwner unexpectedly hit sys.exit (should be unreachable "
