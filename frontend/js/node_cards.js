@@ -24,9 +24,20 @@ class NodeCards {
         this._homeLon = null;
 
         const searchEl = document.getElementById('node-search');
+        const searchClearEl = document.getElementById('node-search-clear');
         if (searchEl) {
             searchEl.addEventListener('input', (e) => {
                 this._searchQuery = e.target.value.toLowerCase();
+                if (searchClearEl) searchClearEl.hidden = !e.target.value;
+                this._render();
+            });
+        }
+        if (searchClearEl && searchEl) {
+            searchClearEl.addEventListener('click', () => {
+                searchEl.value = '';
+                this._searchQuery = '';
+                searchClearEl.hidden = true;
+                searchEl.focus();
                 this._render();
             });
         }

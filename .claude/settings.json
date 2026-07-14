@@ -13,7 +13,22 @@
       "Bash(grep -n \"^| \\\\`.*meshcore\" README.md)",
       "Bash(python3 -c \"import ast; ast.parse\\(open\\('src/capture/serial_source.py'\\).read\\(\\)\\); print\\('syntax OK'\\)\")",
       "Bash(node --check frontend/js/configuration/serial_card.js)",
-      "Bash(grep -n \"particularly the \\\\`getMetadata\\(\\)\\\\`/\\\\`interface.metadata\\\\` mechanism\" /Users/einstein/Software/meshpoint/memory/project_m1_meshpoint.md)"
+      "Bash(grep -n \"particularly the \\\\`getMetadata\\(\\)\\\\`/\\\\`interface.metadata\\\\` mechanism\" /Users/einstein/Software/meshpoint/memory/project_m1_meshpoint.md)",
+      "Bash(awk '{ print length, NR }' /Users/einstein/Software/meshpoint/memory/project_m1_meshpoint.md)",
+      "Bash(grep -n \"stray \\\\`concentrator_backup\" /Users/einstein/Software/meshpoint/memory/project_m1_meshpoint.md)",
+      "Bash(git -C /Users/einstein/Software/meshpoint check-ignore -v concentrator.db)",
+      "Bash(git -C /Users/einstein/Software/meshpoint status --short concentrator.db)",
+      "Bash(node --check /Users/einstein/Software/meshpoint/frontend/js/node_cards.js)",
+      "Skill(run)",
+      "Skill(run:*)",
+      "Bash(python3 -c \"import http.server\")",
+      "Bash(node -e \"require.resolve\\('playwright'\\)\")",
+      "Bash(npx --no-install playwright --version)",
+      "Bash(python3 -c \"import playwright\")",
+      "Bash(node -e \"require.resolve\\('jsdom'\\)\")",
+      "Bash(npm ls *)",
+      "Bash(find / -maxdepth 4 -iname \"puppeteer\" -o -iname \"playwright\")",
+      "Read(//private/tmp/**)"
     ]
   }
 }

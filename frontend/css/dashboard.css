@@ -358,18 +358,38 @@ html, body {
 .node-pulse { animation: pulseRing 1.5s ease-out infinite; }
 
 /* ---- Node List ---- */
+.node-search-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
 .node-search {
     background: var(--bg-primary);
     color: var(--text-primary);
     border: 1px solid var(--border);
     border-radius: 4px;
-    padding: 0.2rem 0.5rem;
+    padding: 0.2rem 1.4rem 0.2rem 0.5rem;
     font-size: 0.7rem;
     outline: none;
     width: 120px;
 }
 
 .node-search:focus { border-color: var(--accent-cyan); }
+
+.node-search-clear {
+    position: absolute;
+    right: 0.3rem;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+}
+
+.node-search-clear:hover { color: var(--text-primary); }
 
 .node-item {
     padding: 0.5rem 0.75rem;

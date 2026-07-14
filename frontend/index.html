@@ -493,7 +493,10 @@
                             <div class="panel panel--nodes">
                                 <div class="panel__header">
                                     <span>Nodes</span>
-                                    <input type="text" id="node-search" class="node-search" placeholder="Search..." />
+                                    <div class="node-search-wrap">
+                                        <input type="text" id="node-search" class="node-search" placeholder="Search..." />
+                                        <button id="node-search-clear" class="node-search-clear" title="Clear search" hidden>&times;</button>
+                                    </div>
                                 </div>
                                 <div class="nc-controls" role="group" aria-label="Sort and filter nodes">
                                     <select id="node-sort" class="nc-controls__sort" aria-label="Sort nodes by">
