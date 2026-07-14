@@ -63,7 +63,12 @@ class TopbarMeshcoreChip {
 
         const lampState = !reachable ? 'reconnecting' : (connected ? 'online' : 'offline');
         const lamp = document.createElement('span');
-        lamp.className = 'topbar-meshcore__lamp';
+        // The state modifier class (not just the base class) is what
+        // the CSS actually keys the dot's color/blink animation off of
+        // (.topbar-meshcore__lamp--online .topbar-meshcore__dot etc,
+        // topbar.css:240-257) -- omitting it left every badge stuck on
+        // the CSS default (muted grey, no green/red/amber, no blink).
+        lamp.className = `topbar-meshcore__lamp topbar-meshcore__lamp--${lampState}`;
         lamp.setAttribute('role', 'status');
         lamp.setAttribute('aria-live', 'polite');
         const lampLabels = {
