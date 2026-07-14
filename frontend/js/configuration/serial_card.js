@@ -85,6 +85,7 @@ class SerialConfigCard {
     }
 
     render(config) {
+        this._portUsage = this._buildPortUsageMap(config);
         this._refreshSerialPortsList();
 
         const cap = config.capture || {};
@@ -113,23 +114,50 @@ class SerialConfigCard {
         return (this._liveStatuses || []).find((s) => s.name === name) || null;
     }
 
+    /** Maps every currently-configured serial_port value (across BOTH
+     * Serial devices AND MeshCore companions -- the same physical USB
+     * pool, so a port pinned by one protocol is just as "in use" from
+     * the other's perspective) to a human label, for the "already used
+     * by ..." warning in the port picker below. */
+    _buildPortUsageMap(config) {
+        const usage = {};
+        const cap = (config && config.capture) || {};
+        (Array.isArray(cap.serial) ? cap.serial : []).forEach((d) => {
+            if (d.serial_port) usage[d.serial_port] = d.label ? `Serial ${d.label}` : 'Serial';
+        });
+        (Array.isArray(cap.meshcore_usb) ? cap.meshcore_usb : []).forEach((c) => {
+            if (c.serial_port) usage[c.serial_port] = c.label ? `MeshCore ${c.label}` : 'MeshCore';
+        });
+        return usage;
+    }
+
     /** Populates the shared <datalist> so every "Serial port" input can
      * suggest currently-connected USB devices -- refreshed on every
      * render() (each dashboard poll) and via the "Rescan USB" button.
      * Shared with MeshcoreConfigCard's identical method/endpoint
      * (GET /api/config/serial-ports lists ALL USB-serial devices
      * regardless of protocol, since both cards pin from the same
-     * physical pool). Best-effort: silently no-ops if the enumeration
-     * endpoint is unavailable, leaving the field as a plain free-text
-     * input (the existing behavior). */
+     * physical pool). Any option already claimed by a configured
+     * companion/device (matched across all 3 possible name forms: raw
+     * device, by-id, by-path) gets an "already used by ..." suffix --
+     * still selectable (no way to disable one <option> in a native
+     * datalist, nor would we want to: the row showing its OWN
+     * currently-pinned port will also see this label, which is
+     * accurate, not a bug), just informative. Best-effort: silently
+     * no-ops if the enumeration endpoint is unavailable, leaving the
+     * field as a plain free-text input (the existing behavior). */
     async _refreshSerialPortsList() {
         const list = this._root.querySelector('#serial-ports-list');
         if (!list) return;
         const result = await this._api.get('/api/config/serial-ports');
         const ports = (result && Array.isArray(result.ports)) ? result.ports : [];
+        const usage = this._portUsage || {};
         list.innerHTML = ports.map((p) => {
             const devName = (p.device || '').split('/').pop();
-            const label = `${p.description || p.device}${devName ? ` (${devName})` : ''}`;
+            const base = `${p.description || p.device}${devName ? ` (${devName})` : ''}`;
+            const usedBy = [p.device, p.by_id, p.by_path].filter(Boolean)
+                .map((alias) => usage[alias]).find(Boolean);
+            const label = usedBy ? `${base} — already used by ${usedBy}` : base;
             return `<option value="${this._esc(p.stable_path)}" label="${this._esc(label)}"></option>`;
         }).join('');
     }
