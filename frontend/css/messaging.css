@@ -470,6 +470,20 @@
 .msg-chat__protocol-badge--mt { background: var(--msg-mt); }
 .msg-chat__protocol-badge--mc { background: var(--msg-mc); }
 
+.msg-chat__connection-badge {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    padding: 3px 8px;
+    border-radius: 999px;
+    color: var(--msg-text-dim);
+    background: transparent;
+    border: 1px solid var(--msg-border);
+}
+
+.msg-chat__connection-badge:empty,
+.msg-chat__connection-badge[hidden] { display: none; }
+
 .msg-chat__messages {
     flex: 1;
     overflow-y: auto;
