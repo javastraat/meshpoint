@@ -188,6 +188,7 @@
 .lw-table--mc-packets col.col-dst  { width: 120px; }
 .lw-table--mc-packets col.col-rssi { width: 92px;  }
 .lw-table--mc-packets col.col-snr  { width: 80px;  }
+.lw-table--mc-packets col.col-freq { width: 68px;  }
 .lw-table--mc-packets col.col-sf   { width: 52px;  }
 .lw-table--mc-packets col.col-hops { width: 56px;  }
 
@@ -212,6 +213,7 @@
 .lw-table--mt-packets col.col-dst  { width: 110px; }
 .lw-table--mt-packets col.col-rssi { width: 92px;  }
 .lw-table--mt-packets col.col-snr  { width: 80px;  }
+.lw-table--mt-packets col.col-freq { width: 68px;  }
 .lw-table--mt-packets col.col-sf   { width: 52px;  }
 .lw-table--mt-packets col.col-hops { width: 56px;  }
 

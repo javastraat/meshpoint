@@ -113,6 +113,7 @@ class MeshtasticPanel {
                                     <col class="col-dst">
                                     <col class="col-rssi">
                                     <col class="col-snr">
+                                    <col class="col-freq">
                                     <col class="col-sf">
                                     <col class="col-hops">
                                 </colgroup>
@@ -124,6 +125,7 @@ class MeshtasticPanel {
                                         <th>Dest</th>
                                         <th class="lw-r">RSSI</th>
                                         <th class="lw-r">SNR</th>
+                                        <th class="lw-r">Freq</th>
                                         <th class="lw-r">SF</th>
                                         <th class="lw-r">Hops</th>
                                     </tr>
@@ -334,11 +336,17 @@ class MeshtasticPanel {
                     <td class="lw-id">${this._fmtDest(p.destination_id)}</td>
                     <td class="lw-signal ${this._rssiClass(p.rssi)}">${this._fmtRssi(p.rssi)}</td>
                     <td class="lw-signal">${this._fmtSnr(p.snr)}</td>
+                    <td class="lw-num">${this._fmtFreq(p.frequency_mhz)}</td>
                     <td class="lw-num">${p.spreading_factor != null ? `SF${p.spreading_factor}` : '--'}</td>
                     <td class="lw-num">${p.hops != null ? p.hops : '--'}</td>
                 </tr>
             `).join('');
         } catch (_) {}
+    }
+
+    _fmtFreq(mhz) {
+        const n = Number(mhz);
+        return n ? n.toFixed(1) : '--';
     }
 
     _fmtNodeId(id) {
