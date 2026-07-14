@@ -319,9 +319,15 @@ fi
 # too far) -- the Raspberry Pi OS `rtl-433` package is small (~500 KB)
 # and current enough for this. --no-install-recommends skips the
 # optional soapysdr module packages, which nothing here uses.
+#
+# Idempotent: skips the apt install if the rtl_433 binary already exists.
 
-info "Installing rtl_433..."
-apt-get install -y -qq --no-install-recommends rtl-433
+if command -v rtl_433 &>/dev/null; then
+    info "rtl_433 already installed, skipping"
+else
+    info "Installing rtl_433..."
+    apt-get install -y -qq --no-install-recommends rtl-433
+fi
 
 # ── 10. Install welle.io (DAB+ tab) ───────────────────────────────
 #
@@ -333,9 +339,15 @@ apt-get install -y -qq --no-install-recommends rtl-433
 # --no-install-recommends skips the Qt/QML GUI dependency chain that
 # only the GUI app needs (~87 MB installed otherwise); welle-cli
 # itself has no GUI dependencies.
+#
+# Idempotent: skips the apt install if welle-cli already exists.
 
-info "Installing welle.io (DAB+)..."
-apt-get install -y -qq --no-install-recommends welle.io
+if command -v welle-cli &>/dev/null; then
+    info "welle.io (welle-cli) already installed, skipping"
+else
+    info "Installing welle.io (DAB+)..."
+    apt-get install -y -qq --no-install-recommends welle.io
+fi
 
 # ── 11. Install Meshtastic and MeshCore CLI tools ─────────────────
 #
@@ -346,13 +358,24 @@ apt-get install -y -qq --no-install-recommends welle.io
 # --break-system-packages since Debian's system Python is PEP
 # 668-protected); meshcore-cli via pipx (isolated venv per tool,
 # already installed as a system package in section 1).
+#
+# Idempotent: each tool skips its own install if its binary already
+# exists, same as sections 7-9 above.
 
-info "Installing Meshtastic CLI..."
-pip3 install --upgrade "meshtastic[cli]" --break-system-packages
+if command -v meshtastic &>/dev/null; then
+    info "Meshtastic CLI already installed, skipping"
+else
+    info "Installing Meshtastic CLI..."
+    pip3 install --upgrade "meshtastic[cli]" --break-system-packages
+fi
 
-info "Installing MeshCore CLI..."
-pipx install meshcore-cli
-pipx ensurepath
+if command -v meshcore-cli &>/dev/null; then
+    info "MeshCore CLI already installed, skipping"
+else
+    info "Installing MeshCore CLI..."
+    pipx install meshcore-cli
+    pipx ensurepath
+fi
 
 # ── 12. Build SX1302 HAL ──────────────────────────────────────────
 

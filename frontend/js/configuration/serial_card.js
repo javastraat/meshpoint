@@ -152,14 +152,29 @@ class SerialConfigCard {
         const result = await this._api.get('/api/config/serial-ports');
         const ports = (result && Array.isArray(result.ports)) ? result.ports : [];
         const usage = this._portUsage || {};
-        list.innerHTML = ports.map((p) => {
-            const devName = (p.device || '').split('/').pop();
-            const base = `${p.description || p.device}${devName ? ` (${devName})` : ''}`;
-            const usedBy = [p.device, p.by_id, p.by_path].filter(Boolean)
-                .map((alias) => usage[alias]).find(Boolean);
-            const label = usedBy ? `${base} — already used by ${usedBy}` : base;
-            return `<option value="${this._esc(p.stable_path)}" label="${this._esc(label)}"></option>`;
-        }).join('');
+        list.innerHTML = ports.map((p) => `
+            <option value="${this._esc(p.stable_path)}" label="${this._esc(this._portOptionLabel(p, usage))}"></option>
+        `).join('');
+    }
+
+    /** Native <datalist> popups truncate long labels with no CSS control
+     * over wrapping/width -- the important "used by ..." warning was
+     * getting cut off entirely when it came after a full USB descriptor
+     * string like "Silicon Labs CP2102 USB to UART Bridge Controller".
+     * Puts the short/critical bits first and drops the boilerplate
+     * "Silicon Labs .../USB to UART Bridge Controller" wording that's
+     * identical (and uninformative) across every CP210x device anyway. */
+    _portOptionLabel(p, usage) {
+        const devName = (p.device || '').split('/').pop();
+        const chip = (p.description || '')
+            .replace(/^Silicon Labs\s+/i, '')
+            .replace(/\s+USB to UART Bridge Controller.*$/i, '')
+            .trim() || p.description || p.device;
+        const usedBy = [p.device, p.by_id, p.by_path].filter(Boolean)
+            .map((alias) => usage[alias]).find(Boolean);
+        const parts = [devName, chip];
+        if (usedBy) parts.push(`used by ${usedBy}`);
+        return parts.filter(Boolean).join(' — ');
     }
 
     _addDeviceRow(data = {}) {
