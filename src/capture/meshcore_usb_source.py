@@ -26,6 +26,8 @@ from src.transmit.meshcore_tx_client import (
     read_device_info,
     read_radio_status,
     send_companion_advert,
+    send_mc_channel_message,
+    send_mc_direct_message,
     send_set_companion_name,
 )
 
@@ -479,6 +481,25 @@ class MeshcoreUsbCaptureSource(CaptureSource):
         if not self.connected:
             return SendResult(success=False, error="Not connected")
         result = await send_companion_advert(self._meshcore, flood=flood)
+        await self.restart_auto_fetching()
+        return result
+
+    async def send_direct_message(self, destination, text: str) -> SendResult:
+        """Send a direct message to a contact via THIS companion's own
+        connection -- lets a reply go out through whichever companion
+        actually has RF reach to the recipient, instead of always the
+        one "primary" companion TxService is otherwise bound to."""
+        if not self.connected:
+            return SendResult(success=False, error="Not connected")
+        result = await send_mc_direct_message(self._meshcore, destination, text)
+        await self.restart_auto_fetching()
+        return result
+
+    async def send_channel_message(self, channel: int, text: str) -> SendResult:
+        """Broadcast a message on a MeshCore channel via THIS companion."""
+        if not self.connected:
+            return SendResult(success=False, error="Not connected")
+        result = await send_mc_channel_message(self._meshcore, channel, text)
         await self.restart_auto_fetching()
         return result
 

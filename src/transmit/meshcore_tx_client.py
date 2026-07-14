@@ -237,6 +237,50 @@ async def send_companion_advert(mc, flood: bool = False) -> SendResult:
         return SendResult(success=False, error=str(exc))
 
 
+async def send_mc_channel_message(mc, channel: int, text: str) -> SendResult:
+    """Send a broadcast message on a MeshCore channel over a raw connection.
+
+    Standalone for the same reason as send_set_companion_name() above --
+    lets each companion source send on its own connection, not just the
+    one "primary" companion the TX client is bound to.
+    """
+    if mc is None:
+        return SendResult(success=False, error="Not connected")
+    try:
+        result = await asyncio.wait_for(mc.commands.send_chan_msg(channel, text), timeout=10.0)
+        event_type = (
+            result.type.value if hasattr(result.type, "value") else str(result.type)
+        )
+        logger.info("MeshCore channel %d message sent: %s", channel, event_type)
+        return SendResult(success=True, event_type=event_type)
+    except asyncio.TimeoutError:
+        return SendResult(success=False, error="Send timed out")
+    except Exception as exc:
+        logger.exception("MeshCore channel send failed")
+        return SendResult(success=False, error=str(exc))
+
+
+async def send_mc_direct_message(mc, destination, text: str) -> SendResult:
+    """Send a direct message to a MeshCore contact over a raw connection.
+
+    Standalone for the same reason as send_set_companion_name() above.
+    """
+    if mc is None:
+        return SendResult(success=False, error="Not connected")
+    try:
+        result = await asyncio.wait_for(mc.commands.send_msg(destination, text), timeout=10.0)
+        event_type = (
+            result.type.value if hasattr(result.type, "value") else str(result.type)
+        )
+        logger.info("MeshCore DM sent: %s", event_type)
+        return SendResult(success=True, event_type=event_type)
+    except asyncio.TimeoutError:
+        return SendResult(success=False, error="Send timed out")
+    except Exception as exc:
+        logger.exception("MeshCore DM send failed")
+        return SendResult(success=False, error=str(exc))
+
+
 class MeshCoreTxClient:
     """Sends messages through a MeshCore companion node.
 
@@ -339,28 +383,9 @@ class MeshCoreTxClient:
         """Send a broadcast message on a MeshCore channel."""
         if not self.connected:
             return SendResult(success=False, error="Not connected")
-        try:
-            result = await asyncio.wait_for(
-                self._mc.commands.send_chan_msg(channel, text),
-                timeout=10.0,
-            )
-            event_type = (
-                result.type.value
-                if hasattr(result.type, "value")
-                else str(result.type)
-            )
-            logger.info(
-                "MeshCore channel %d message sent: %s", channel, event_type
-            )
-            await self._run_post_command()
-            return SendResult(success=True, event_type=event_type)
-        except asyncio.TimeoutError:
-            await self._run_post_command()
-            return SendResult(success=False, error="Send timed out")
-        except Exception as exc:
-            logger.exception("MeshCore channel send failed")
-            await self._run_post_command()
-            return SendResult(success=False, error=str(exc))
+        result = await send_mc_channel_message(self._mc, channel, text)
+        await self._run_post_command()
+        return result
 
     async def send_direct_message(
         self, destination, text: str
@@ -368,26 +393,9 @@ class MeshCoreTxClient:
         """Send a direct message to a MeshCore contact."""
         if not self.connected:
             return SendResult(success=False, error="Not connected")
-        try:
-            result = await asyncio.wait_for(
-                self._mc.commands.send_msg(destination, text),
-                timeout=10.0,
-            )
-            event_type = (
-                result.type.value
-                if hasattr(result.type, "value")
-                else str(result.type)
-            )
-            logger.info("MeshCore DM sent: %s", event_type)
-            await self._run_post_command()
-            return SendResult(success=True, event_type=event_type)
-        except asyncio.TimeoutError:
-            await self._run_post_command()
-            return SendResult(success=False, error="Send timed out")
-        except Exception as exc:
-            logger.exception("MeshCore DM send failed")
-            await self._run_post_command()
-            return SendResult(success=False, error=str(exc))
+        result = await send_mc_direct_message(self._mc, destination, text)
+        await self._run_post_command()
+        return result
 
     async def send_advert(self, flood: bool = False) -> SendResult:
         """Broadcast a node advertisement."""

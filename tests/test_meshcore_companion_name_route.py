@@ -48,6 +48,7 @@ def _build_app() -> FastAPI:
 def _reset_module_state() -> None:
     mc_routes._config = None
     mc_routes._tx_service = None
+    mc_routes._meshcore_sources = []
 
 
 class TestCompanionNameEndpoint(unittest.TestCase):
@@ -56,11 +57,23 @@ class TestCompanionNameEndpoint(unittest.TestCase):
         _reset_module_state()
         self.app = _build_app()
         self.client = TestClient(self.app)
-        # Real-shape stub: routes mutate _config.meshcore.companion_name
-        # on success, so the test config needs to look enough like a
-        # real AppConfig for that attribute path to exist.
+        # Real-shape stub: the route persists the rename onto this
+        # companion's own capture.meshcore_usb[i] entry now (matched by
+        # label, "" for the bare/default companion these tests use),
+        # not the legacy singular meshcore.companion_name field.
         self._fake_config = SimpleNamespace(
-            meshcore=SimpleNamespace(companion_name=None)
+            meshcore=SimpleNamespace(companion_name=None),
+            capture=SimpleNamespace(
+                meshcore_usb=[
+                    SimpleNamespace(
+                        label="",
+                        serial_port=None,
+                        baud_rate=115200,
+                        auto_detect=True,
+                        companion_name=None,
+                    ),
+                ],
+            ),
         )
 
     def tearDown(self) -> None:
@@ -71,6 +84,13 @@ class TestCompanionNameEndpoint(unittest.TestCase):
         tx_service = MagicMock()
         tx_service._meshcore_tx = mc_tx
         mc_routes._tx_service = tx_service
+        # Route resolves the target companion via _meshcore_sources now
+        # (label-scoped, not the old singular _tx_service._meshcore_tx)
+        # -- .name must be a real string ("meshcore_usb", matching the
+        # request's default empty label) for _resolve_companion_source
+        # to find it.
+        mc_tx.name = "meshcore_usb"
+        mc_routes._meshcore_sources = [mc_tx]
 
     def test_503_when_config_not_loaded(self):
         # Simulate the very-early-startup window where init_routes has
@@ -126,10 +146,19 @@ class TestCompanionNameEndpoint(unittest.TestCase):
         self.assertEqual(body["event_type"], "OK")
         mc.set_companion_name.assert_awaited_once_with("  Mesh Lab East  ")
         # Cleaned (stripped) name lands in both the in-memory config
-        # and the persisted yaml so the on-connect re-apply has the
-        # right value next time the companion comes back online.
-        self.assertEqual(self._fake_config.meshcore.companion_name, "Mesh Lab East")
-        save.assert_called_once_with("meshcore", {"companion_name": "Mesh Lab East"})
+        # (this companion's own capture.meshcore_usb[i] entry, matched
+        # by label -- not the legacy singular meshcore.companion_name
+        # field) and the persisted yaml so the on-connect re-apply has
+        # the right value next time the companion comes back online.
+        self.assertEqual(
+            self._fake_config.capture.meshcore_usb[0].companion_name, "Mesh Lab East",
+        )
+        save.assert_called_once_with("capture", {
+            "meshcore_usb": [{
+                "serial_port": None, "baud_rate": 115200, "auto_detect": True,
+                "label": "", "companion_name": "Mesh Lab East",
+            }],
+        })
 
     def test_yaml_permission_error_does_not_fail_request(self):
         # If local.yaml is not writable, the rename already stuck on
@@ -156,7 +185,9 @@ class TestCompanionNameEndpoint(unittest.TestCase):
         self.assertTrue(res.json()["saved"])
         # In-memory copy still updates -- the yaml write is the only
         # thing that failed.
-        self.assertEqual(self._fake_config.meshcore.companion_name, "Mesh Lab East")
+        self.assertEqual(
+            self._fake_config.capture.meshcore_usb[0].companion_name, "Mesh Lab East",
+        )
 
     def test_400_when_companion_rejects(self):
         mc = MagicMock()

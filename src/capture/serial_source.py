@@ -108,6 +108,48 @@ class SerialCaptureSource(CaptureSource):
             logger.exception("%s: NodeInfo broadcast failed", self.name)
             return False
 
+    def send_text(
+        self,
+        text: str,
+        destination: int | str,
+        channel_index: int = 0,
+        want_ack: bool = False,
+    ) -> dict:
+        """Send a text message via THIS stick's own connection.
+
+        Lets a reply go out through whichever Meshtastic USB stick
+        actually has RF reach to the recipient, instead of always the
+        onboard concentrator -- a contact heard only via a 433 MHz USB
+        stick physically cannot receive a reply sent out on 868 MHz.
+        meshtastic-python's own sendText()/sendData() queue the packet
+        and return immediately (confirmed this session, same call
+        already used non-blocking by send_nodeinfo()/set_owner() above)
+        -- no executor wrapper needed.
+
+        Returns a plain dict, not TxService's SendResult dataclass:
+        that type lives a layer above capture sources, which shouldn't
+        depend on it.
+        """
+        iface = self._interface
+        if iface is None or not self._connected:
+            return {"success": False, "error": "Not connected", "packet_id": ""}
+        try:
+            sent = iface.sendText(
+                text,
+                destinationId=destination,
+                wantAck=want_ack,
+                channelIndex=channel_index,
+            )
+            packet_id = f"{sent.id:08x}" if sent is not None and hasattr(sent, "id") else ""
+            logger.info(
+                "%s: text message sent (dest=%s, id=%s)",
+                self.name, destination, packet_id or "unknown",
+            )
+            return {"success": True, "error": "", "packet_id": packet_id}
+        except Exception as exc:
+            logger.exception("%s: send_text failed", self.name)
+            return {"success": False, "error": str(exc), "packet_id": ""}
+
     def set_owner(self, long_name: Optional[str], short_name: Optional[str]) -> dict:
         """Rename this stick's own Meshtastic identity (long/short name).
 

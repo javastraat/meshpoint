@@ -318,12 +318,34 @@ async def _resolve_display_name(
 
 
 async def _enrich_conversations(conversations: list[dict]) -> list[dict]:
-    if _name_resolver is None:
-        return conversations
-    return [
-        await _name_resolver.apply_to_conversation_dict(convo)
-        for convo in conversations
-    ]
+    if _name_resolver is not None:
+        conversations = [
+            await _name_resolver.apply_to_conversation_dict(convo)
+            for convo in conversations
+        ]
+    if _node_repo is not None:
+        for convo in conversations:
+            convo["capture_source"] = await _latest_capture_source_for(
+                convo.get("node_id", "")
+            )
+    return conversations
+
+
+async def _latest_capture_source_for(node_id: str) -> Optional[str]:
+    """Which companion/USB stick most recently heard this contact --
+    shown as a small pill in the chat header so a multi-radio setup
+    (2+ MeshCore companions, 2+ Meshtastic sticks) can tell at a
+    glance which physical connection a conversation is actually on.
+    Broadcast/channel conversations aren't tied to one specific
+    connection the same way, so this is skipped for those.
+    """
+    if not node_id or node_id.startswith("broadcast:"):
+        return None
+    try:
+        return await _node_repo.get_latest_capture_source(node_id)
+    except Exception:
+        logger.debug("capture_source lookup failed for %s", node_id, exc_info=True)
+        return None
 
 
 async def _enrich_messages(messages: list[dict]) -> list[dict]:

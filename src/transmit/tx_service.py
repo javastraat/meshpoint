@@ -72,6 +72,9 @@ class TxService:
         primary_channel_name: str = "",
         device_id: Optional[str] = None,
         persist_derived_node_id: bool = True,
+        node_repo=None,
+        meshcore_sources: Optional[list] = None,
+        serial_sources: Optional[list] = None,
     ):
         self._wrapper = wrapper
         self._crypto = crypto
@@ -90,6 +93,17 @@ class TxService:
             self._persist_derived_node_id_if_needed()
         self._device_metrics_provider = None
         self._local_stats_provider = None
+        # Used to route a reply through whichever companion/USB stick
+        # actually has RF reach to the contact, instead of always the
+        # one "primary" radio -- node_repo looks up which capture
+        # source last heard a given contact; the source lists let that
+        # name be resolved to a live, connected source object. All
+        # optional and best-effort: if unavailable (e.g. test fixtures),
+        # sends simply fall back to the existing single-primary-radio
+        # behavior unchanged.
+        self._node_repo = node_repo
+        self._meshcore_sources = meshcore_sources or []
+        self._serial_sources = serial_sources or []
 
     @property
     def meshtastic_enabled(self) -> bool:
@@ -268,7 +282,38 @@ class TxService:
         channel: int,
         want_ack: bool,
     ) -> SendResult:
-        """Build and transmit a Meshtastic packet via the SX1261."""
+        """Build and transmit a Meshtastic packet via the SX1261
+        concentrator, or via a specific USB serial stick when the
+        destination was last heard through one instead."""
+        dest_int = self._resolve_destination(destination, Protocol.MESHTASTIC)
+
+        # Route through a specific USB stick when this contact was last
+        # heard via one -- a contact heard only on a 433 MHz stick
+        # physically cannot receive a reply sent on 868 MHz via the
+        # onboard concentrator. Gated on the general transmit toggle,
+        # not the concentrator-specific wrapper check below, since this
+        # path doesn't touch the concentrator at all. Broadcasts always
+        # go out via the concentrator unchanged (out of scope here,
+        # same as MeshCore's channel-message fan-out being a separate
+        # piece) -- serial sticks were previously capture-only anyway.
+        if (
+            self._config is not None
+            and self._config.enabled
+            and dest_int != BROADCAST_ADDR_MT
+        ):
+            serial_source = await self._resolve_serial_send_source(dest_int)
+            if serial_source is not None:
+                result = serial_source.send_text(
+                    text, dest_int, channel_index=channel, want_ack=want_ack,
+                )
+                return SendResult(
+                    success=result["success"],
+                    protocol="meshtastic",
+                    packet_id=result["packet_id"],
+                    timestamp=time.time(),
+                    error=result["error"],
+                )
+
         if not self.meshtastic_enabled:
             return SendResult(
                 success=False,
@@ -284,7 +329,6 @@ class TxService:
                 error="Packet builder unavailable",
             )
 
-        dest_int = self._resolve_destination(destination, Protocol.MESHTASTIC)
         packet_id = self._next_packet_id()
         channel_hash, channel_key = self._resolve_channel(channel)
         recipient_pubkey = None
@@ -762,7 +806,7 @@ class TxService:
     async def _send_meshcore(
         self, text: str, destination: int | str, channel: int
     ) -> SendResult:
-        """Send a message through the MeshCore companion."""
+        """Send a message through a MeshCore companion."""
         if not self.meshcore_enabled:
             return SendResult(
                 success=False,
@@ -777,13 +821,33 @@ class TxService:
         )
 
         if is_broadcast:
-            mc_result = await self._meshcore_tx.send_channel_message(
-                channel, text
-            )
+            # Channel keys are mesh-wide shared config (confirmed
+            # elsewhere this session) -- fan out to every connected
+            # companion so contacts on any configured band receive it,
+            # not just whichever one is "primary". Falls back to the
+            # singular client when no source list was wired in (e.g.
+            # older callers/test fixtures) or none are connected.
+            connected_sources = [
+                s for s in self._meshcore_sources if getattr(s, "connected", False)
+            ]
+            if connected_sources:
+                results = [
+                    await s.send_channel_message(channel, text)
+                    for s in connected_sources
+                ]
+                mc_result = next((r for r in results if r.success), results[0])
+            else:
+                mc_result = await self._meshcore_tx.send_channel_message(
+                    channel, text
+                )
         else:
-            mc_result = await self._meshcore_tx.send_direct_message(
-                destination, text
-            )
+            source = await self._resolve_meshcore_send_source(destination)
+            if source is not None:
+                mc_result = await source.send_direct_message(destination, text)
+            else:
+                mc_result = await self._meshcore_tx.send_direct_message(
+                    destination, text
+                )
 
         return SendResult(
             success=mc_result.success,
@@ -792,6 +856,60 @@ class TxService:
             timestamp=time.time(),
             error=mc_result.error,
         )
+
+    async def _resolve_meshcore_send_source(self, destination):
+        """Which companion should send a DM to *destination*.
+
+        Looks up which capture source most recently received a packet
+        FROM this contact (``node_repo.get_latest_capture_source``) so
+        the reply goes out over the same frequency the contact can
+        actually hear, instead of always the "primary" companion.
+        Returns None (caller falls back to the primary client
+        unchanged) when there's no node_repo/source list wired in, no
+        packet history for this contact yet (a brand-new conversation),
+        or the matched source isn't currently connected.
+        """
+        if not self._node_repo or not self._meshcore_sources:
+            return None
+        try:
+            lookup_id = str(destination).lower().lstrip("!")
+            source_name = await self._node_repo.get_latest_capture_source(lookup_id)
+        except Exception:
+            logger.debug("MeshCore send-source lookup failed", exc_info=True)
+            return None
+        if not source_name:
+            return None
+        for src in self._meshcore_sources:
+            if src.name == source_name and getattr(src, "connected", False):
+                return src
+        return None
+
+    async def _resolve_serial_send_source(self, dest_int: int):
+        """Which Meshtastic USB stick should send to *dest_int*.
+
+        Same reasoning as _resolve_meshcore_send_source() above, keyed
+        by Meshtastic's 8-hex-char node ID (matching packets.source_id's
+        stored format, meshtastic_decoder.py's f"{n:08x}") rather than
+        MeshCore's public-key prefix. Returns None (caller falls back
+        to the concentrator unchanged) when there's no node_repo/serial
+        source list wired in, no packet history for this node yet, the
+        matched source isn't connected, or the node was actually last
+        heard via the concentrator itself (nothing to route to).
+        """
+        if not self._node_repo or not self._serial_sources:
+            return None
+        try:
+            lookup_id = f"{dest_int:08x}"
+            source_name = await self._node_repo.get_latest_capture_source(lookup_id)
+        except Exception:
+            logger.debug("Serial send-source lookup failed", exc_info=True)
+            return None
+        if not source_name:
+            return None
+        for src in self._serial_sources:
+            if src.name == source_name and getattr(src, "connected", False):
+                return src
+        return None
 
     def _get_builder(self):
         """Lazy-load the Meshtastic packet builder."""

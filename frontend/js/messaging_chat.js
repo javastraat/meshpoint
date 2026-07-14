@@ -23,6 +23,7 @@ class MessagingChat {
         this._headerName.textContent = '';
         this._headerSubtitle.textContent = '';
         this._headerBadge.textContent = '';
+        this._connectionBadge.textContent = '';
         this._headerAvatar.textContent = '';
         this._headerAvatar.className = 'msg-chat__avatar';
         this._container.classList.add('msg-chat--empty');
@@ -46,6 +47,14 @@ class MessagingChat {
         this._headerBadge.textContent = proto;
         this._headerBadge.className = 'msg-chat__protocol-badge ' +
             (convo.protocol === 'meshcore' ? 'msg-chat__protocol-badge--mc' : 'msg-chat__protocol-badge--mt');
+
+        // Which specific companion/stick this contact was last heard
+        // through -- distinct from the protocol badge above, since a
+        // multi-radio setup (2+ MeshCore companions, 2+ Meshtastic
+        // sticks) can hear the SAME protocol on different bands.
+        const connectionLabel = this._formatConnectionLabel(convo.capture_source);
+        this._connectionBadge.textContent = connectionLabel;
+        this._connectionBadge.hidden = !connectionLabel;
 
         this._headerAvatar.textContent = isChannel ? '#' : this._initials(name);
         this._headerAvatar.className = 'msg-chat__avatar' + (
@@ -187,6 +196,20 @@ class MessagingChat {
         `;
     }
 
+    /** "meshcore_usb_433" -> "433", "serial_868" -> "868", bare
+     * "meshcore_usb"/"serial" -> "USB", "concentrator" -> "Concentrator",
+     * anything else shown as-is. Empty/missing capture_source (e.g. a
+     * brand-new conversation with no packet history yet, or a broadcast
+     * channel) hides the badge entirely rather than showing a blank pill. */
+    _formatConnectionLabel(captureSource) {
+        if (!captureSource) return '';
+        if (captureSource === 'concentrator') return 'Concentrator';
+        const match = captureSource.match(/_(\d+)$/);
+        if (match) return match[1];
+        if (captureSource === 'meshcore_usb' || captureSource === 'serial') return 'USB';
+        return captureSource;
+    }
+
     _initials(name) {
         if (!name) return '?';
         const trimmed = name.trim();
@@ -254,6 +277,7 @@ class MessagingChat {
                     <span class="msg-chat__subtitle"></span>
                 </div>
                 <span class="msg-chat__protocol-badge"></span>
+                <span class="msg-chat__connection-badge" title="Which USB companion/stick this contact was last heard through"></span>
             </div>
             <div class="msg-chat__messages"></div>
             <div class="msg-compose">
@@ -268,6 +292,7 @@ class MessagingChat {
         this._headerName = this._container.querySelector('.msg-chat__name');
         this._headerSubtitle = this._container.querySelector('.msg-chat__subtitle');
         this._headerBadge = this._container.querySelector('.msg-chat__protocol-badge');
+        this._connectionBadge = this._container.querySelector('.msg-chat__connection-badge');
         this._headerAvatar = this._container.querySelector('.msg-chat__avatar');
         this._messagesEl = this._container.querySelector('.msg-chat__messages');
         this._input = this._container.querySelector('.msg-compose__input');

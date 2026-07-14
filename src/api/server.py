@@ -878,6 +878,9 @@ def _build_tx_service(
         radio_config=config.radio,
         primary_channel_name=config.meshtastic.primary_channel_name,
         device_id=config.device.device_id,
+        node_repo=coord.node_repo,
+        meshcore_sources=_find_meshcore_sources(coord),
+        serial_sources=_find_serial_sources(coord),
     )
     logger.info(
         "Transmit service ready: MT=%s MC=%s",

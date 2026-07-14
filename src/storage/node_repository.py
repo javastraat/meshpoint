@@ -160,6 +160,28 @@ class NodeRepository:
             "protocols": {r["protocol"]: r["cnt"] for r in protocol_rows},
         }
 
+    async def get_latest_capture_source(self, source_id: str) -> Optional[str]:
+        """Which capture source (companion/stick/concentrator) most
+        recently received a packet FROM this node.
+
+        Used to route an outbound reply back through the same radio
+        that can actually reach this contact, instead of always the
+        one "primary" TX-bound radio -- a MeshCore contact heard only
+        via the 433 companion, or a Meshtastic contact heard only via
+        a 433 USB stick, physically cannot receive a reply sent out on
+        868 MHz. ``source_id`` is whatever shape that protocol's
+        decoder uses (MeshCore: public-key prefix; Meshtastic: 8-hex
+        node ID) -- same value already used as ``req.destination``
+        for a reply, so no extra lookup/translation is needed by
+        callers.
+        """
+        row = await self._db.fetch_one(
+            "SELECT capture_source FROM packets WHERE source_id = ? "
+            "ORDER BY timestamp DESC LIMIT 1",
+            (source_id,),
+        )
+        return row["capture_source"] if row else None
+
     async def get_all_with_signal(self, limit: int = 500) -> list[dict]:
         """Return nodes with latest signal and telemetry from joined tables."""
         rows = await self._db.fetch_all(

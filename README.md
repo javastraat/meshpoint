@@ -69,6 +69,7 @@ This is a customized fork of upstream [KMX415/meshpoint](https://github.com/KMX4
 - **Up to 4 MeshCore USB companions** plus a Meshtastic-433 serial source → 5 networks captured at once.
 - **MeshCore per-packet metadata** — frequency/SF read from the companion's radio config, hop count decoded from the MeshCore `path_len`, and each companion's packets labeled by source.
 - **Up to 40 MeshCore user channels** (slots 1–40, slot 0 stays Public) — raised from 7.
+- **Replies route back through the radio that can actually hear the contact** — on a multi-radio box, a DM reply to a contact heard only on a 433 MHz companion/stick now goes back out on 433, not always the one "primary" companion/concentrator; MeshCore channel broadcasts fan out to every connected companion. The chat header shows a small pill naming which specific companion/stick a conversation is on.
 
 **Hardware page & spectrum**
 - **Band spectrum card** — the concentrator module's onboard SX1261 companion chip (not a USB radio) sweeps the whole region band (100 kHz steps, EU868: 863–870 MHz) and draws a live spectrum chart with median + peak level and the LoRaWAN / Meshtastic / MeshCore channel positions overlaid; "Sweep now" button, hover readout, `GET /api/device/spectrum`. Requires `radio.sx1261_spi_path` (e.g. `/dev/spidev0.1`) in `local.yaml`; cadence via `radio.spectrum_sweep_interval_seconds`.

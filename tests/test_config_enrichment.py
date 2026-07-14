@@ -30,6 +30,7 @@ class EnrichConfigPayloadSerialTest(unittest.TestCase):
         self.assertEqual(len(serial), 2)
         self.assertEqual(serial[0], {
             "serial_port": "/dev/ttyUSB0", "serial_baud": 115200, "label": "433",
+            "long_name": None, "short_name": None,
         })
         self.assertEqual(serial[1]["label"], "868")
 
