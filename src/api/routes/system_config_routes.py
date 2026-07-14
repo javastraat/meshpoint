@@ -97,9 +97,15 @@ async def get_serial_ports(_claims: SessionClaims = Depends(require_auth)) -> di
     (often unprogrammed) vendor serial number -- confirmed on cheap
     CP210x clone boards, where ``/dev/serial/by-id/`` can only keep one
     symlink per unique name and silently drops the other device.
+
+    Filters to devices with a real USB VID/PID -- this card is
+    specifically for USB capture sources, and pyserial's enumeration
+    also returns the Pi's own onboard UARTs (``/dev/ttyAMA0``,
+    ``/dev/ttyS0``), which never carry a VID/PID and are never a
+    MeshCore/Meshtastic USB stick.
     """
     from src.hal.usb_classifier import list_serial_ports_with_stable_paths
-    ports = list_serial_ports_with_stable_paths()
+    ports = [p for p in list_serial_ports_with_stable_paths() if p.vid is not None]
     return {
         "ports": [
             {

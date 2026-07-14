@@ -43,6 +43,10 @@ class SerialConfigCard {
                         <button class="terminal-button" type="button" data-serial-add-device>
                             + Add device
                         </button>
+                        <button class="terminal-button" type="button" data-serial-rescan-usb
+                                title="Re-scan connected USB devices for the port picker below">
+                            ↻ Rescan USB
+                        </button>
                     </div>
                     <div class="cfg-card__actions">
                         <button class="terminal-button terminal-button--primary"
@@ -60,6 +64,24 @@ class SerialConfigCard {
             .addEventListener('click', () => this._addDeviceRow());
         this._root.querySelector('[data-serial-save]')
             .addEventListener('click', () => this._saveDevices());
+        this._root.querySelector('[data-serial-rescan-usb]')
+            .addEventListener('click', (e) => this._rescanUsb(e.currentTarget));
+    }
+
+    /** Manual re-scan for the port-picker datalist -- lets a user unplug
+     * one device, plug in another, and immediately see it in the
+     * dropdown without waiting for the next automatic dashboard poll or
+     * reloading the page. */
+    async _rescanUsb(button) {
+        const original = button.textContent;
+        button.disabled = true;
+        button.textContent = 'Scanning…';
+        try {
+            await this._refreshSerialPortsList();
+        } finally {
+            button.textContent = original;
+            button.disabled = false;
+        }
     }
 
     render(config) {
@@ -93,20 +115,23 @@ class SerialConfigCard {
 
     /** Populates the shared <datalist> so every "Serial port" input can
      * suggest currently-connected USB devices -- refreshed on every
-     * render() (each dashboard poll). Shared with MeshcoreConfigCard's
-     * identical method/endpoint (GET /api/config/serial-ports lists ALL
-     * USB-serial devices regardless of protocol, since both cards pin
-     * from the same physical pool). Best-effort: silently no-ops if the
-     * enumeration endpoint is unavailable, leaving the field as a plain
-     * free-text input (the existing behavior). */
+     * render() (each dashboard poll) and via the "Rescan USB" button.
+     * Shared with MeshcoreConfigCard's identical method/endpoint
+     * (GET /api/config/serial-ports lists ALL USB-serial devices
+     * regardless of protocol, since both cards pin from the same
+     * physical pool). Best-effort: silently no-ops if the enumeration
+     * endpoint is unavailable, leaving the field as a plain free-text
+     * input (the existing behavior). */
     async _refreshSerialPortsList() {
         const list = this._root.querySelector('#serial-ports-list');
         if (!list) return;
         const result = await this._api.get('/api/config/serial-ports');
         const ports = (result && Array.isArray(result.ports)) ? result.ports : [];
-        list.innerHTML = ports.map((p) => `
-            <option value="${this._esc(p.stable_path)}" label="${this._esc(p.description || p.device)}"></option>
-        `).join('');
+        list.innerHTML = ports.map((p) => {
+            const devName = (p.device || '').split('/').pop();
+            const label = `${p.description || p.device}${devName ? ` (${devName})` : ''}`;
+            return `<option value="${this._esc(p.stable_path)}" label="${this._esc(label)}"></option>`;
+        }).join('');
     }
 
     _addDeviceRow(data = {}) {

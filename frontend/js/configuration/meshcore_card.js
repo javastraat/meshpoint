@@ -41,6 +41,10 @@ class MeshcoreConfigCard {
                         <button class="terminal-button" type="button" data-mc-add-companion>
                             + Add companion
                         </button>
+                        <button class="terminal-button" type="button" data-mc-rescan-usb
+                                title="Re-scan connected USB devices for the port picker below">
+                            ↻ Rescan USB
+                        </button>
                     </div>
                     <div class="cfg-card__actions">
                         <button class="terminal-button terminal-button--primary"
@@ -71,6 +75,24 @@ class MeshcoreConfigCard {
             .addEventListener('click', () => this._addCompanionRow());
         this._root.querySelector('[data-mc-usb-save]')
             .addEventListener('click', () => this._saveCompanions());
+        this._root.querySelector('[data-mc-rescan-usb]')
+            .addEventListener('click', (e) => this._rescanUsb(e.currentTarget));
+    }
+
+    /** Manual re-scan for the port-picker datalist -- lets a user unplug
+     * one device, plug in another, and immediately see it in the
+     * dropdown without waiting for the next automatic dashboard poll or
+     * reloading the page. */
+    async _rescanUsb(button) {
+        const original = button.textContent;
+        button.disabled = true;
+        button.textContent = 'Scanning…';
+        try {
+            await this._refreshSerialPortsList();
+        } finally {
+            button.textContent = original;
+            button.disabled = false;
+        }
     }
 
     render(config) {
@@ -108,18 +130,21 @@ class MeshcoreConfigCard {
 
     /** Populates the shared <datalist> so every "Pinned serial port" input
      * can suggest currently-connected USB devices -- refreshed on every
-     * render() (each dashboard poll), so newly plugged devices show up
-     * without a manual reload. Best-effort: silently no-ops if the
-     * enumeration endpoint is unavailable, leaving the field as a plain
-     * free-text input (the existing behavior). */
+     * render() (each dashboard poll) and via the "Rescan USB" button, so
+     * newly plugged devices show up without a full page reload.
+     * Best-effort: silently no-ops if the enumeration endpoint is
+     * unavailable, leaving the field as a plain free-text input (the
+     * existing behavior). */
     async _refreshSerialPortsList() {
         const list = this._root.querySelector('#mc-serial-ports-list');
         if (!list) return;
         const result = await this._api.get('/api/config/serial-ports');
         const ports = (result && Array.isArray(result.ports)) ? result.ports : [];
-        list.innerHTML = ports.map((p) => `
-            <option value="${this._esc(p.stable_path)}" label="${this._esc(p.description || p.device)}"></option>
-        `).join('');
+        list.innerHTML = ports.map((p) => {
+            const devName = (p.device || '').split('/').pop();
+            const label = `${p.description || p.device}${devName ? ` (${devName})` : ''}`;
+            return `<option value="${this._esc(p.stable_path)}" label="${this._esc(label)}"></option>`;
+        }).join('');
     }
 
     _addCompanionRow(data = {}) {
