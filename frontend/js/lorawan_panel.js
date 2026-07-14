@@ -12,6 +12,7 @@ class LoRaWANPanel {
         this._refreshTimer = null;
         this._mounted = false;
         this._allDevices = [];
+        this._deviceSearchQuery = '';
         let storedTab = null;
         try { storedTab = localStorage.getItem(LW_TAB_STORE_KEY); } catch (_) {}
         this._tab = storedTab === 'devices' ? 'devices' : 'packets';
@@ -74,6 +75,12 @@ class LoRaWANPanel {
                                     data-lw-tab="devices">Devices</button>
                         </div>
                         <span class="lw-panel__limit" data-lw-suffix="packets">(last 100)</span>
+                        <div class="lw-search-wrap" data-lw-suffix="devices" hidden>
+                            <input type="text" id="lw-device-search" class="lw-search"
+                                   placeholder="Search..." autocomplete="off" spellcheck="false" />
+                            <button id="lw-device-search-clear" class="lw-search-clear"
+                                    title="Clear search" hidden>&times;</button>
+                        </div>
                     </div>
                     <div data-lw-view="packets">
                         <div class="panel__body lw-table-wrap">
@@ -170,6 +177,25 @@ class LoRaWANPanel {
             });
         }
 
+        const deviceSearchEl = document.getElementById('lw-device-search');
+        const deviceSearchClearEl = document.getElementById('lw-device-search-clear');
+        if (deviceSearchEl) {
+            deviceSearchEl.addEventListener('input', (e) => {
+                this._deviceSearchQuery = e.target.value.toLowerCase();
+                if (deviceSearchClearEl) deviceSearchClearEl.hidden = !e.target.value;
+                this._renderDevices();
+            });
+        }
+        if (deviceSearchClearEl && deviceSearchEl) {
+            deviceSearchClearEl.addEventListener('click', () => {
+                deviceSearchEl.value = '';
+                this._deviceSearchQuery = '';
+                deviceSearchClearEl.hidden = true;
+                deviceSearchEl.focus();
+                this._renderDevices();
+            });
+        }
+
         const deviceTbody = document.getElementById('lw-device-tbody');
         if (deviceTbody) {
             deviceTbody.addEventListener('click', (e) => {
@@ -242,34 +268,50 @@ class LoRaWANPanel {
         try {
             const r = await fetch('/api/lorawan/devices');
             if (!r.ok) return;
-            const devices = await r.json();
-            const tbody = document.getElementById('lw-device-tbody');
-            const empty = document.getElementById('lw-device-empty');
-            if (!tbody) return;
-
-            if (!devices.length) {
-                tbody.innerHTML = '';
-                if (empty) empty.style.display = '';
-                return;
-            }
-            if (empty) empty.style.display = 'none';
-
-            this._allDevices = devices;
-
-            tbody.innerHTML = devices.map((d) => `
-                <tr data-device-id="${this._esc(d.dev_eui || d.source_id || '')}" class="lw-device-row">
-                    <td class="lw-time">${this._fmtTime(d.last_seen)}</td>
-                    <td class="lw-time">${this._fmtTime(d.first_seen)}</td>
-                    <td class="lw-id">${this._fmtId(d)}</td>
-                    <td>${this._fmtType(d.packet_type)}</td>
-                    <td class="lw-num">${d.frame_count}</td>
-                    <td class="lw-signal ${this._rssiClass(d.last_rssi)}">${this._fmtRssi(d.last_rssi)}</td>
-                    <td class="lw-signal">${this._fmtSnr(d.last_snr)}</td>
-                    <td class="lw-num">${d.last_frequency_mhz != null ? d.last_frequency_mhz.toFixed(3) : '--'}</td>
-                    <td class="lw-num">${d.last_sf != null ? `SF${d.last_sf}` : '--'}</td>
-                </tr>
-            `).join('');
+            this._allDevices = await r.json();
+            this._renderDevices();
         } catch (_) {}
+    }
+
+    _renderDevices() {
+        const tbody = document.getElementById('lw-device-tbody');
+        const empty = document.getElementById('lw-device-empty');
+        if (!tbody) return;
+
+        let devices = this._allDevices;
+        if (this._deviceSearchQuery) {
+            devices = devices.filter((d) => {
+                const id = (d.dev_eui || d.source_id || '').toLowerCase();
+                const type = (d.packet_type || '').toLowerCase();
+                return id.includes(this._deviceSearchQuery) || type.includes(this._deviceSearchQuery);
+            });
+        }
+
+        if (!devices.length) {
+            tbody.innerHTML = '';
+            if (empty) {
+                empty.textContent = this._allDevices.length
+                    ? 'No devices match your search.'
+                    : 'No LoRaWAN devices heard yet.';
+                empty.style.display = '';
+            }
+            return;
+        }
+        if (empty) empty.style.display = 'none';
+
+        tbody.innerHTML = devices.map((d) => `
+            <tr data-device-id="${this._esc(d.dev_eui || d.source_id || '')}" class="lw-device-row">
+                <td class="lw-time">${this._fmtTime(d.last_seen)}</td>
+                <td class="lw-time">${this._fmtTime(d.first_seen)}</td>
+                <td class="lw-id">${this._fmtId(d)}</td>
+                <td>${this._fmtType(d.packet_type)}</td>
+                <td class="lw-num">${d.frame_count}</td>
+                <td class="lw-signal ${this._rssiClass(d.last_rssi)}">${this._fmtRssi(d.last_rssi)}</td>
+                <td class="lw-signal">${this._fmtSnr(d.last_snr)}</td>
+                <td class="lw-num">${d.last_frequency_mhz != null ? d.last_frequency_mhz.toFixed(3) : '--'}</td>
+                <td class="lw-num">${d.last_sf != null ? `SF${d.last_sf}` : '--'}</td>
+            </tr>
+        `).join('');
     }
 
     async _loadPackets() {

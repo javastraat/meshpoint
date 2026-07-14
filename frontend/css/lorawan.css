@@ -34,6 +34,46 @@
     margin-left: 8px;
 }
 
+.lw-search-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    margin-left: 8px;
+}
+
+.lw-search {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.2rem 1.4rem 0.2rem 0.5rem;
+    font-size: 0.7rem;
+    outline: none;
+    width: 120px;
+}
+
+.lw-search:focus { border-color: var(--accent-cyan); }
+
+.lw-search:-webkit-autofill,
+.lw-search:-webkit-autofill:focus {
+    -webkit-box-shadow: 0 0 0 1000px var(--bg-primary) inset;
+    -webkit-text-fill-color: var(--text-primary);
+}
+
+.lw-search-clear {
+    position: absolute;
+    right: 0.3rem;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+}
+
+.lw-search-clear:hover { color: var(--text-primary); }
+
 /* ── Stat cards ─────────────────────────────────────── */
 
 .lw-stats {

@@ -28,7 +28,8 @@
       "Bash(node -e \"require.resolve\\('jsdom'\\)\")",
       "Bash(npm ls *)",
       "Bash(find / -maxdepth 4 -iname \"puppeteer\" -o -iname \"playwright\")",
-      "Read(//private/tmp/**)"
+      "Read(//private/tmp/**)",
+      "Bash(node --check /Users/einstein/Software/meshpoint/frontend/js/lorawan_panel.js)"
     ]
   }
 }
