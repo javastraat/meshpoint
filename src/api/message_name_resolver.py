@@ -137,6 +137,7 @@ class MessageNameResolver:
         if pkt_id and self._packet_repo:
             src = await self._packet_repo.get_source_id_by_packet_id(pkt_id)
             if src:
+                message["source_id"] = src
                 return await self.resolve(
                     src,
                     message.get("protocol", ""),

@@ -41,6 +41,7 @@ class MessagingChat {
         const proto = convo.protocol === 'meshcore' ? 'MC' : 'MT';
 
         this._headerName.textContent = name;
+        this._headerName.classList.toggle('msg-chat__name--clickable', !isChannel);
         this._headerSubtitle.textContent = isChannel
             ? 'Public channel · all listeners on this PSK'
             : 'Direct message';
@@ -240,12 +241,7 @@ class MessagingChat {
         const statusText = msg.status && msg.status !== 'delivered' && msg.status !== 'read'
             ? ` · ${msg.status}` : '';
 
-        let senderHtml = '';
-        if (msg.direction === 'received') {
-            const name = this._receivedSenderLabel(msg);
-            if (name) senderHtml = `<div class="msg-bubble__sender">${this._esc(name)}</div>`;
-        }
-
+        const senderHtml = this._buildSenderHtml(msg);
         const signalHtml = this._buildSignalHtml(msg);
 
         bubble.innerHTML = `
@@ -255,6 +251,28 @@ class MessagingChat {
         `;
 
         this._messagesEl.appendChild(bubble);
+    }
+
+    _buildSenderHtml(msg) {
+        if (msg.direction !== 'received') return '';
+        const name = this._receivedSenderLabel(msg);
+        if (!name) return '';
+        const nid = this._senderNodeId(msg);
+        const attr = nid ? ` data-node-id="${this._esc(nid)}"` : '';
+        const cls = nid ? ' msg-bubble__sender--clickable' : '';
+        return `<div class="msg-bubble__sender${cls}"${attr}>${this._esc(name)}</div>`;
+    }
+
+    /** The real node ID behind a received message's sender label, or
+     * null if none is available to click through to. DMs: node_id IS
+     * the one contact. Channels: node_id is the channel/broadcast
+     * identifier, not a node -- the actual per-message sender's ID
+     * only arrives as source_id, resolved server-side from the
+     * packet (message_name_resolver.py's _resolve_broadcast_sender). */
+    _senderNodeId(msg) {
+        const nid = msg.node_id || '';
+        if (nid.startsWith('broadcast:')) return msg.source_id || null;
+        return nid || null;
     }
 
     _scrollToBottom() {
@@ -317,6 +335,19 @@ class MessagingChat {
                 this._loadOlderMessages();
             }
         });
+
+        this._headerName.addEventListener('click', () => {
+            if (!this._conversation || !window.nodeDrawer) return;
+            const isChannel = (this._conversation.node_id || '').startsWith('broadcast:');
+            if (isChannel) return;
+            window.nodeDrawer.open({ node_id: this._conversation.node_id });
+        });
+
+        this._messagesEl.addEventListener('click', (e) => {
+            const el = e.target.closest('.msg-bubble__sender[data-node-id]');
+            if (!el || !window.nodeDrawer) return;
+            window.nodeDrawer.open({ node_id: el.dataset.nodeId });
+        });
     }
 
     async _loadOlderMessages() {
@@ -377,12 +408,7 @@ class MessagingChat {
             ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
             : '';
         const signalHtml = this._buildSignalHtml(msg);
-
-        let senderHtml = '';
-        if (msg.direction === 'received') {
-            const name = this._receivedSenderLabel(msg);
-            if (name) senderHtml = `<div class="msg-bubble__sender">${this._esc(name)}</div>`;
-        }
+        const senderHtml = this._buildSenderHtml(msg);
 
         bubble.innerHTML = `
             ${senderHtml}
