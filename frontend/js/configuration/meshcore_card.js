@@ -166,10 +166,34 @@ class MeshcoreConfigCard {
         if (!list) return;
         const result = await this._api.get('/api/config/serial-ports');
         const ports = (result && Array.isArray(result.ports)) ? result.ports : [];
+        this._enumeratedPorts = ports;
         const usage = this._portUsage || {};
         list.innerHTML = ports.map((p) => `
             <option value="${this._esc(p.stable_path)}" label="${this._esc(this._portOptionLabel(p, usage))}"></option>
         `).join('');
+        // Ports arrive asynchronously, after rows may have already been
+        // built with no enumeration data yet -- refresh every row's
+        // "resolved to ttyUSBn" hint now that it's available.
+        this._companionsEl.querySelectorAll('[data-companion-port]').forEach((input) => {
+            this._updateResolvedPort(input);
+        });
+    }
+
+    /** A pinned by-path/by-id value is long and not something a user can
+     * eyeball as "which physical ttyUSBn is that" -- shows the
+     * underlying /dev/ttyUSBn next to the field once it's resolvable
+     * (matched against the enumerated ports' stable_path/by_id/by_path/
+     * device, whichever form the pinned value happens to be in), and
+     * clears it when the value doesn't currently resolve to anything
+     * connected (nothing to show, not a stale/wrong hint). */
+    _updateResolvedPort(input) {
+        const resolvedEl = input.parentElement.querySelector('[data-companion-port-resolved]');
+        if (!resolvedEl) return;
+        const value = (input.value || '').trim();
+        const match = value && (this._enumeratedPorts || []).find((p) =>
+            p.stable_path === value || p.by_id === value || p.by_path === value || p.device === value,
+        );
+        resolvedEl.textContent = (match && match.device && match.device !== value) ? `→ ${match.device}` : '';
     }
 
     /** Native <datalist> popups truncate long labels with no CSS control
@@ -228,6 +252,7 @@ class MeshcoreConfigCard {
                        placeholder="/dev/ttyACM0" value="${port}"
                        list="mc-serial-ports-list"
                        data-companion-port>
+                <span class="cfg-field__resolved" data-companion-port-resolved></span>
                 <span class="cfg-field__hint">
                     Pick a connected device below, or type a path. Prefer the
                     /dev/serial/by-path/... entries over plain /dev/ttyUSBn --
@@ -262,6 +287,12 @@ class MeshcoreConfigCard {
             saveNameBtn.addEventListener('click', () => {
                 this._saveCompanionName(div, data.label || '');
             });
+        }
+
+        const portInput = div.querySelector('[data-companion-port]');
+        if (portInput) {
+            portInput.addEventListener('input', () => this._updateResolvedPort(portInput));
+            this._updateResolvedPort(portInput);
         }
 
         this._companionsEl.appendChild(div);
