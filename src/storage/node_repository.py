@@ -182,6 +182,38 @@ class NodeRepository:
         )
         return row["capture_source"] if row else None
 
+    async def get_latest_capture_sources(
+        self, source_ids: list[str]
+    ) -> dict[str, str]:
+        """Batched form of get_latest_capture_source() for a whole list of
+        source_ids in one query -- the conversation list can have a dozen-plus
+        DM threads, and awaiting get_latest_capture_source() once per
+        conversation serializes that many round trips through the single
+        shared aiosqlite connection (aiosqlite runs everything through one
+        background-thread queue, so each await queues up behind live packet
+        capture writes too), which measurably slowed the Messages page down.
+        Missing/unknown source_ids are simply absent from the returned dict.
+        """
+        if not source_ids:
+            return {}
+        placeholders = ",".join("?" for _ in source_ids)
+        rows = await self._db.fetch_all(
+            f"""
+            SELECT source_id, capture_source
+            FROM (
+                SELECT source_id, capture_source,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY source_id ORDER BY timestamp DESC
+                       ) AS rn
+                FROM packets
+                WHERE source_id IN ({placeholders})
+            )
+            WHERE rn = 1
+            """,
+            tuple(source_ids),
+        )
+        return {row["source_id"]: row["capture_source"] for row in rows}
+
     async def get_all_with_signal(self, limit: int = 500) -> list[dict]:
         """Return nodes with latest signal and telemetry from joined tables."""
         rows = await self._db.fetch_all(

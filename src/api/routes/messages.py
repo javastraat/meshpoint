@@ -324,28 +324,23 @@ async def _enrich_conversations(conversations: list[dict]) -> list[dict]:
             for convo in conversations
         ]
     if _node_repo is not None:
+        # Batched: one query for every conversation's capture_source
+        # instead of one await per conversation (see
+        # get_latest_capture_sources()'s own docstring for why the
+        # N+1 form measurably slowed this page down).
+        dm_ids = [
+            convo.get("node_id", "")
+            for convo in conversations
+            if convo.get("node_id", "") and not convo["node_id"].startswith("broadcast:")
+        ]
+        try:
+            sources = await _node_repo.get_latest_capture_sources(dm_ids)
+        except Exception:
+            logger.debug("capture_source batch lookup failed", exc_info=True)
+            sources = {}
         for convo in conversations:
-            convo["capture_source"] = await _latest_capture_source_for(
-                convo.get("node_id", "")
-            )
+            convo["capture_source"] = sources.get(convo.get("node_id", ""))
     return conversations
-
-
-async def _latest_capture_source_for(node_id: str) -> Optional[str]:
-    """Which companion/USB stick most recently heard this contact --
-    shown as a small pill in the chat header so a multi-radio setup
-    (2+ MeshCore companions, 2+ Meshtastic sticks) can tell at a
-    glance which physical connection a conversation is actually on.
-    Broadcast/channel conversations aren't tied to one specific
-    connection the same way, so this is skipped for those.
-    """
-    if not node_id or node_id.startswith("broadcast:"):
-        return None
-    try:
-        return await _node_repo.get_latest_capture_source(node_id)
-    except Exception:
-        logger.debug("capture_source lookup failed for %s", node_id, exc_info=True)
-        return None
 
 
 async def _enrich_messages(messages: list[dict]) -> list[dict]:
