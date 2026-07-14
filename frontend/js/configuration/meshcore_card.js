@@ -288,6 +288,10 @@ class MeshcoreConfigCard {
                     </button>
                     <span class="cfg-mc-readout__update-status" data-mc-firmware-status></span>
                 </div>
+                <div class="cfg-mc-readout">
+                    <span class="cfg-mc-readout__label">Hardware</span>
+                    <span class="cfg-mc-readout__value">${this._esc((mc.device && mc.device.model) || '--')}</span>
+                </div>
             </div>
             <div class="cfg-mc-channels">
                 <table class="ch-table">
@@ -712,11 +716,10 @@ class MeshcoreConfigCard {
     }
 
     _firmwareTitle(device) {
-        if (!device || !device.firmware_version) return '';
-        const parts = [];
-        if (device.model) parts.push(device.model);
-        if (device.build_date) parts.push(`built ${device.build_date}`);
-        return parts.join(' · ');
+        // Model now has its own visible Hardware row below, so the
+        // tooltip here only needs build date.
+        if (!device || !device.firmware_version || !device.build_date) return '';
+        return `built ${device.build_date}`;
     }
 
     _esc(str) {

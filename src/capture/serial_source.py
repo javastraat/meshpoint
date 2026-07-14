@@ -154,6 +154,7 @@ class SerialCaptureSource(CaptureSource):
             "channel_name": None, "frequency_offset": 0.0, "override_frequency": 0.0,
             "own_node_num": None,
             "firmware_version": None, "hw_model": None,
+            "tx_power": None,
         }
         try:
             from meshtastic.protobuf import config_pb2
@@ -163,6 +164,8 @@ class SerialCaptureSource(CaptureSource):
             info["use_preset"] = bool(lora.use_preset)
             info["frequency_offset"] = float(lora.frequency_offset)
             info["override_frequency"] = float(lora.override_frequency)
+            if lora.tx_power:
+                info["tx_power"] = int(lora.tx_power)
             if lora.use_preset:
                 preset_name = config_pb2.Config.LoRaConfig.ModemPreset.Name(
                     lora.modem_preset,

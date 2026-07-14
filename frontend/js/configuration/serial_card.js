@@ -190,6 +190,8 @@ class SerialConfigCard {
         const name = live.long_name || live.short_name || '--';
         const sf = live.spreading_factor ? `SF${live.spreading_factor}` : '--';
         const bw = live.bandwidth_khz ? `${live.bandwidth_khz} kHz` : '--';
+        const freq = live.frequency_mhz ? `${live.frequency_mhz} MHz` : '--';
+        const txPower = (live.tx_power || live.tx_power === 0) ? `${live.tx_power} dBm` : '--';
         return `
             <div class="cfg-mc-readouts">
                 <div class="cfg-mc-readout">
@@ -199,6 +201,10 @@ class SerialConfigCard {
                 <div class="cfg-mc-readout">
                     <span class="cfg-mc-readout__label">Name</span>
                     <span class="cfg-mc-readout__value">${this._esc(name)}</span>
+                </div>
+                <div class="cfg-mc-readout">
+                    <span class="cfg-mc-readout__label">Frequency</span>
+                    <span class="cfg-mc-readout__value">${this._esc(freq)}</span>
                 </div>
                 <div class="cfg-mc-readout">
                     <span class="cfg-mc-readout__label">Region</span>
@@ -211,6 +217,10 @@ class SerialConfigCard {
                 <div class="cfg-mc-readout">
                     <span class="cfg-mc-readout__label">Bandwidth</span>
                     <span class="cfg-mc-readout__value">${bw}</span>
+                </div>
+                <div class="cfg-mc-readout">
+                    <span class="cfg-mc-readout__label">TX Power</span>
+                    <span class="cfg-mc-readout__value">${this._esc(txPower)}</span>
                 </div>
                 <div class="cfg-mc-readout">
                     <span class="cfg-mc-readout__label">Firmware</span>
