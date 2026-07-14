@@ -1083,6 +1083,21 @@ def _find_meshcore_source(coord: PipelineCoordinator):
     return None
 
 
+def _find_meshcore_sources(coord: PipelineCoordinator) -> list:
+    """All MeshCore USB companion capture sources, in configured order.
+
+    Unlike _find_meshcore_source() (singular, "primary" companion for
+    TX/status), this is every configured companion -- each one already
+    holds its own independent connection/self_info, so this is what
+    lets /api/config report genuinely per-companion readouts instead of
+    all rows echoing company[0]'s data.
+    """
+    return [
+        src for src in coord.capture_coordinator._sources
+        if src.name.startswith("meshcore_usb")
+    ]
+
+
 def _find_serial_sources(coord: PipelineCoordinator) -> list:
     """All Meshtastic USB serial capture sources, in configured order.
 
@@ -1596,6 +1611,7 @@ def _init_routes(
         identity=identity,
         channel_hash_resolver=channel_hash_resolver,
         serial_sources=_find_serial_sources(coord),
+        meshcore_sources=_find_meshcore_sources(coord),
     )
     mqtt_config_routes.init_routes(
         config=config,

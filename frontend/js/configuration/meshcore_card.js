@@ -1,14 +1,12 @@
 /**
  * Configuration → MeshCore card.
  *
- * Single responsibility: edit the MeshCore companion channel keys
- * (stored as hex to match the MeshCore native app format) and
- * surface the two on-demand companion actions, Send Advert and
- * Refresh. Companion radio readouts (frequency / bandwidth / SF /
- * TX power) are shown for context but are read-only here.
- *
- * The top-level Radio page renders the same readouts plus a
- * deep-link to this card per the v0.7.4 IA refactor.
+ * Renders two cards: "USB capture sources" (one row per configured
+ * companion, each with its own live radio/firmware readouts -- mirrors
+ * SerialConfigCard's per-device layout) and "MeshCore Companion" (the
+ * primary companion's editable name/advert settings plus the shared
+ * channel-key table, since renames and channel sync only ever target
+ * company[0], the one companion wired for sending).
  */
 
 class MeshcoreConfigCard {
@@ -77,6 +75,11 @@ class MeshcoreConfigCard {
         const cap = config.capture || {};
         const companions = Array.isArray(cap.meshcore_usb) ? cap.meshcore_usb : [];
         const sources = cap.sources || [];
+        const mc = (config && config.meshcore) || {};
+        // Per-companion live readouts (own connection/radio/device each) --
+        // unlike mc.radio/mc.device below, which only ever reflect
+        // company[0], the one companion wired for sending.
+        this._liveCompanions = Array.isArray(mc.companions) ? mc.companions : [];
 
         const enableEl = this._root.querySelector('[data-mc-usb-enable]');
         if (enableEl) enableEl.checked = sources.includes('meshcore_usb');
@@ -87,12 +90,16 @@ class MeshcoreConfigCard {
         list.forEach((c) => this._addCompanionRow(c));
         this._syncAddBtn();
 
-        const mc = (config && config.meshcore) || {};
         if (!mc.connected) {
             this._renderOffline(config);
             return;
         }
         this._renderOnline(mc);
+    }
+
+    _liveCompanionFor(label) {
+        const name = label ? `meshcore_usb_${label}` : 'meshcore_usb';
+        return (this._liveCompanions || []).find((c) => c.name === name) || null;
     }
 
     _addCompanionRow(data = {}) {
@@ -103,6 +110,7 @@ class MeshcoreConfigCard {
         const port     = this._esc(data.serial_port || '');
         const baud     = data.baud_rate != null ? data.baud_rate : 115200;
         const autodet  = data.auto_detect !== false;
+        const live     = this._liveCompanionFor(data.label || '');
 
         const div = document.createElement('div');
         div.className = 'cfg-companion';
@@ -135,6 +143,7 @@ class MeshcoreConfigCard {
                 <input class="cfg-field__input" type="number"
                        value="${baud}" data-companion-baud>
             </label>
+            ${this._companionReadoutsHtml(live)}
         `;
 
         div.querySelector('.cfg-companion__remove').addEventListener('click', () => {
@@ -143,8 +152,99 @@ class MeshcoreConfigCard {
             this._syncAddBtn();
         });
 
+        const firmwareCheck = div.querySelector('[data-companion-firmware-check]');
+        if (firmwareCheck) {
+            firmwareCheck.addEventListener('click', () => {
+                this._checkCompanionFirmwareUpdate(div, live.device.firmware_version);
+            });
+        }
+
         this._companionsEl.appendChild(div);
         this._syncAddBtn();
+    }
+
+    _companionReadoutsHtml(live) {
+        if (!live || !live.connected) {
+            return `<p class="cfg-companion__offline-hint">Not connected.</p>`;
+        }
+        const radio = live.radio || {};
+        const device = live.device || {};
+        return `
+            <div class="cfg-mc-readouts">
+                <div class="cfg-mc-readout" title="${this._esc(radio.public_key || '')}">
+                    <span class="cfg-mc-readout__label">Node ID</span>
+                    <span class="cfg-mc-readout__value">${this._fmtNodeId(radio.public_key)}</span>
+                </div>
+                <div class="cfg-mc-readout">
+                    <span class="cfg-mc-readout__label">Frequency</span>
+                    <span class="cfg-mc-readout__value">${this._fmtFreq(radio.frequency_mhz)}</span>
+                </div>
+                <div class="cfg-mc-readout">
+                    <span class="cfg-mc-readout__label">Bandwidth</span>
+                    <span class="cfg-mc-readout__value">${this._fmtBw(radio.bandwidth_khz)}</span>
+                </div>
+                <div class="cfg-mc-readout">
+                    <span class="cfg-mc-readout__label">SF</span>
+                    <span class="cfg-mc-readout__value">${this._fmtSf(radio.spreading_factor)}</span>
+                </div>
+                <div class="cfg-mc-readout">
+                    <span class="cfg-mc-readout__label">TX Power</span>
+                    <span class="cfg-mc-readout__value">${this._fmtTxPower(radio.tx_power)}</span>
+                </div>
+                <div class="cfg-mc-readout" title="${this._esc(this._firmwareTitle(device))}">
+                    <span class="cfg-mc-readout__label">Firmware</span>
+                    <span class="cfg-mc-readout__value">${this._fmtFirmware(device)}</span>
+                    ${device.firmware_version ? `
+                        <button class="cfg-mc-readout__check" type="button" data-companion-firmware-check>
+                            Check for updates
+                        </button>
+                        <span class="cfg-mc-readout__update-status" data-companion-firmware-status></span>
+                    ` : ''}
+                </div>
+                <div class="cfg-mc-readout">
+                    <span class="cfg-mc-readout__label">Hardware</span>
+                    <span class="cfg-mc-readout__value">${this._esc(device.model || '--')}</span>
+                </div>
+            </div>
+        `;
+    }
+
+    async _checkCompanionFirmwareUpdate(companionDiv, currentVersion) {
+        const button = companionDiv.querySelector('[data-companion-firmware-check]');
+        const status = companionDiv.querySelector('[data-companion-firmware-status]');
+        if (!button || !status || !currentVersion) return;
+        button.disabled = true;
+        status.dataset.kind = '';
+        status.textContent = 'Checking…';
+        try {
+            const result = await this._api.get(
+                `/api/config/meshcore/firmware-check?current_version=${encodeURIComponent(currentVersion)}`,
+            );
+            if (!result) {
+                status.dataset.kind = 'error';
+                status.textContent = 'Check failed';
+            } else if (result.error) {
+                status.dataset.kind = 'error';
+                status.textContent = result.error;
+            } else if (result.update_available) {
+                status.dataset.kind = 'warn';
+                // release_url always comes from GitHub's own API response, not
+                // user input -- but only allow http(s) schemes defensively,
+                // since HTML-escaping the text doesn't stop a javascript: URI
+                // from executing when the link is clicked.
+                const isSafeUrl = typeof result.release_url === 'string'
+                    && /^https?:\/\//i.test(result.release_url);
+                const link = isSafeUrl
+                    ? ` — <a href="${this._esc(result.release_url)}" target="_blank" rel="noopener">release notes</a>`
+                    : '';
+                status.innerHTML = `Update available: ${this._esc(result.latest_version || '?')}${link}`;
+            } else {
+                status.dataset.kind = 'ok';
+                status.textContent = 'Up to date';
+            }
+        } finally {
+            button.disabled = false;
+        }
     }
 
     _reindexCompanions() {
@@ -223,7 +323,6 @@ class MeshcoreConfigCard {
     }
 
     _renderOnline(mc) {
-        const radio = mc.radio || {};
         const name = this._esc(mc.companion_name || 'Connected');
         const nameValue = this._esc(mc.companion_name || '');
         const publicKeyHex = this._esc(mc.public_key_hex || '8b3387e9c5cdea6ac9e5edbaa115cd72');
@@ -262,40 +361,6 @@ class MeshcoreConfigCard {
                     </button>
                 </div>
                 <p class="cfg-status" data-mc-name-status aria-live="polite"></p>
-            </div>
-            <div class="cfg-mc-readouts">
-                <div class="cfg-mc-readout" title="${this._esc(radio.public_key || '')}">
-                    <span class="cfg-mc-readout__label">Node ID</span>
-                    <span class="cfg-mc-readout__value">${this._fmtNodeId(radio.public_key)}</span>
-                </div>
-                <div class="cfg-mc-readout">
-                    <span class="cfg-mc-readout__label">Frequency</span>
-                    <span class="cfg-mc-readout__value">${this._fmtFreq(radio.frequency_mhz)}</span>
-                </div>
-                <div class="cfg-mc-readout">
-                    <span class="cfg-mc-readout__label">Bandwidth</span>
-                    <span class="cfg-mc-readout__value">${this._fmtBw(radio.bandwidth_khz)}</span>
-                </div>
-                <div class="cfg-mc-readout">
-                    <span class="cfg-mc-readout__label">SF</span>
-                    <span class="cfg-mc-readout__value">${this._fmtSf(radio.spreading_factor)}</span>
-                </div>
-                <div class="cfg-mc-readout">
-                    <span class="cfg-mc-readout__label">TX Power</span>
-                    <span class="cfg-mc-readout__value">${this._fmtTxPower(radio.tx_power)}</span>
-                </div>
-                <div class="cfg-mc-readout" title="${this._esc(this._firmwareTitle(mc.device))}">
-                    <span class="cfg-mc-readout__label">Firmware</span>
-                    <span class="cfg-mc-readout__value">${this._fmtFirmware(mc.device)}</span>
-                    <button class="cfg-mc-readout__check" type="button" data-mc-firmware-check>
-                        Check for updates
-                    </button>
-                    <span class="cfg-mc-readout__update-status" data-mc-firmware-status></span>
-                </div>
-                <div class="cfg-mc-readout">
-                    <span class="cfg-mc-readout__label">Hardware</span>
-                    <span class="cfg-mc-readout__value">${this._esc((mc.device && mc.device.model) || '--')}</span>
-                </div>
             </div>
             <div class="cfg-mc-channels">
                 <table class="ch-table">
@@ -408,48 +473,6 @@ class MeshcoreConfigCard {
         const saveName = this._body.querySelector('[data-mc-name-save]');
         if (saveName) {
             saveName.addEventListener('click', () => this._saveCompanionName(saveName));
-        }
-
-        const firmwareCheck = this._body.querySelector('[data-mc-firmware-check]');
-        if (firmwareCheck) {
-            firmwareCheck.addEventListener('click', () => this._checkFirmwareUpdate(firmwareCheck));
-        }
-    }
-
-    async _checkFirmwareUpdate(button) {
-        const status = this._body.querySelector('[data-mc-firmware-status]');
-        button.disabled = true;
-        if (status) {
-            status.dataset.kind = '';
-            status.textContent = 'Checking…';
-        }
-        try {
-            const result = await this._api.get('/api/config/meshcore/firmware-check');
-            if (!status) return;
-            if (!result) {
-                status.dataset.kind = 'error';
-                status.textContent = 'Check failed';
-            } else if (result.error) {
-                status.dataset.kind = 'error';
-                status.textContent = result.error;
-            } else if (result.update_available) {
-                status.dataset.kind = 'warn';
-                // release_url always comes from GitHub's own API response, not
-                // user input -- but only allow http(s) schemes defensively,
-                // since HTML-escaping the text doesn't stop a javascript: URI
-                // from executing when the link is clicked.
-                const isSafeUrl = typeof result.release_url === 'string'
-                    && /^https?:\/\//i.test(result.release_url);
-                const link = isSafeUrl
-                    ? ` — <a href="${this._esc(result.release_url)}" target="_blank" rel="noopener">release notes</a>`
-                    : '';
-                status.innerHTML = `Update available: ${this._esc(result.latest_version || '?')}${link}`;
-            } else {
-                status.dataset.kind = 'ok';
-                status.textContent = 'Up to date';
-            }
-        } finally {
-            button.disabled = false;
         }
     }
 

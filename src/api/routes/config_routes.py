@@ -47,6 +47,7 @@ _tx_service = None
 _identity: DeviceIdentity | None = None
 _channel_hash_resolver = None
 _serial_sources: list = []
+_meshcore_sources: list = []
 
 
 def init_routes(
@@ -56,15 +57,17 @@ def init_routes(
     identity: DeviceIdentity | None = None,
     channel_hash_resolver=None,
     serial_sources: list | None = None,
+    meshcore_sources: list | None = None,
 ) -> None:
     global _config, _crypto, _tx_service, _identity, _channel_hash_resolver
-    global _serial_sources
+    global _serial_sources, _meshcore_sources
     _config = config
     _crypto = crypto
     _tx_service = tx_service
     _identity = identity
     _channel_hash_resolver = channel_hash_resolver
     _serial_sources = serial_sources or []
+    _meshcore_sources = meshcore_sources or []
 
 
 def _refresh_channel_hash_map() -> None:
@@ -170,6 +173,50 @@ def _serial_status_entry(src) -> dict:
     }
 
 
+async def _meshcore_companion_status_entry(src) -> dict:
+    """Live status for one MeshCore USB companion capture source.
+
+    Unlike _serial_status_entry() (sync -- every field there is a free
+    read of already-cached connect-time state), this is async: radio
+    info is a free SELF_INFO-cache read but device info needs a real
+    DEVICE_INFO round trip (cached per-connection after the first call,
+    see MeshcoreUsbCaptureSource.get_device_info()).
+    """
+    entry: dict = {
+        "name": src.name,
+        "connected": bool(getattr(src, "connected", False)),
+        "radio": {},
+        "device": {},
+    }
+    if not entry["connected"]:
+        return entry
+    try:
+        radio_info = await src.get_radio_info()
+        if radio_info:
+            entry["radio"] = {
+                "frequency_mhz": radio_info.frequency_mhz,
+                "bandwidth_khz": radio_info.bandwidth_khz,
+                "spreading_factor": radio_info.spreading_factor,
+                "tx_power": radio_info.tx_power,
+                "public_key": radio_info.public_key,
+                "name": radio_info.name,
+            }
+    except Exception:
+        logger.debug("Failed to read radio info for %s", src.name, exc_info=True)
+    try:
+        device_info = await src.get_device_info()
+        if device_info:
+            entry["device"] = {
+                "firmware_version": device_info.firmware_version,
+                "model": device_info.model,
+                "build_date": device_info.build_date,
+                "protocol_version": device_info.protocol_version,
+            }
+    except Exception:
+        logger.debug("Failed to read device info for %s", src.name, exc_info=True)
+    return entry
+
+
 @router.get("")
 async def get_config(claims: SessionClaims = Depends(require_auth)):
     """Full configuration summary for the Radio tab.
@@ -240,6 +287,15 @@ async def get_config(claims: SessionClaims = Depends(require_auth)):
     )
 
     serial_status = [_serial_status_entry(src) for src in _serial_sources]
+    # One entry per configured MeshCore companion (own connection, own
+    # radio/device readouts) -- unlike mc_status above, which only ever
+    # reflects company[0] (the single companion _tx_service._meshcore_tx
+    # is wired to for sending). Kept as a separate key rather than
+    # replacing mc_status so existing consumers of the singular shape
+    # (e.g. the Radio page's own MeshCore readout) don't break.
+    mc_status["companions"] = [
+        await _meshcore_companion_status_entry(src) for src in _meshcore_sources
+    ]
 
     duty_info = {"used_percent": 0.0, "remaining_ms": 0}
     if _tx_service and hasattr(_tx_service, "_duty"):

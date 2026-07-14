@@ -21,7 +21,7 @@ import time
 import urllib.request
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from src.api.auth.dependencies import require_admin
@@ -50,7 +50,14 @@ _SEMVER_RE = re.compile(r"v?(\d+)\.(\d+)\.(\d+)")
 # itself reports (e.g. 'v1.16.0-07a3ca9' from get_device_info()).
 _ASSET_HASH_RE = re.compile(r"-([a-f0-9]{7})(?:-merged)?\.bin$")
 _FIRMWARE_CHECK_CACHE_TTL_SECONDS = 300
-_firmware_check_cache: dict[str, object] = {"result": None, "expires": 0}
+# Caches only the shared GitHub fetch (latest_version/release_url), not a
+# full comparison result -- up to 4 companions can each be on different
+# firmware (mirrors serial_config_routes.py's identical reasoning), so the
+# per-companion update_available comparison is always computed fresh
+# against whichever current_version the caller passes.
+_release_cache: dict[str, object] = {
+    "latest_version": None, "release_url": None, "error": None, "expires": 0,
+}
 
 
 def _semver_and_hash(version_str: str) -> tuple[Optional[tuple[int, int, int]], Optional[str]]:
@@ -96,51 +103,64 @@ def _latest_release_version_string(release: dict) -> Optional[str]:
     return f"v{semver}"
 
 
-async def _check_firmware_update(current_version: str) -> dict:
+async def _get_latest_release_cached() -> dict:
     now = time.time()
-    cached = _firmware_check_cache["result"]
-    if cached and now < _firmware_check_cache["expires"]:
-        return cached
+    if _release_cache["expires"] > now and (
+        _release_cache["latest_version"] or _release_cache["error"]
+    ):
+        return _release_cache
 
     loop = asyncio.get_running_loop()
     release = await loop.run_in_executor(None, _fetch_latest_firmware_release_sync)
-
     if release is None:
-        result = {
+        _release_cache.update({
+            "latest_version": None, "release_url": None,
+            "error": "Could not reach GitHub", "expires": now + _FIRMWARE_CHECK_CACHE_TTL_SECONDS,
+        })
+    else:
+        _release_cache.update({
+            "latest_version": _latest_release_version_string(release),
+            "release_url": release.get("html_url"),
+            "error": None,
+            "expires": now + _FIRMWARE_CHECK_CACHE_TTL_SECONDS,
+        })
+    return _release_cache
+
+
+async def _check_firmware_update(current_version: str) -> dict:
+    cache = await _get_latest_release_cached()
+    if cache.get("error"):
+        return {
             "checked": True,
             "update_available": False,
             "current_version": current_version,
             "latest_version": None,
             "release_url": None,
-            "error": "Could not reach GitHub",
-        }
-    else:
-        latest_version = _latest_release_version_string(release)
-        current_semver, current_hash = _semver_and_hash(current_version)
-        latest_semver, latest_hash = _semver_and_hash(latest_version or "")
-
-        update_available = False
-        if latest_semver is not None and current_semver is not None:
-            if latest_semver > current_semver:
-                update_available = True
-            elif (
-                latest_semver == current_semver
-                and current_hash and latest_hash
-                and current_hash != latest_hash
-            ):
-                update_available = True
-
-        result = {
-            "checked": True,
-            "update_available": update_available,
-            "current_version": current_version,
-            "latest_version": latest_version,
-            "release_url": release.get("html_url"),
+            "error": cache["error"],
         }
 
-    _firmware_check_cache["result"] = result
-    _firmware_check_cache["expires"] = now + _FIRMWARE_CHECK_CACHE_TTL_SECONDS
-    return result
+    latest_version = cache.get("latest_version")
+    current_semver, current_hash = _semver_and_hash(current_version)
+    latest_semver, latest_hash = _semver_and_hash(latest_version or "")
+
+    update_available = False
+    if latest_semver is not None and current_semver is not None:
+        if latest_semver > current_semver:
+            update_available = True
+        elif (
+            latest_semver == current_semver
+            and current_hash and latest_hash
+            and current_hash != latest_hash
+        ):
+            update_available = True
+
+    return {
+        "checked": True,
+        "update_available": update_available,
+        "current_version": current_version,
+        "latest_version": latest_version,
+        "release_url": cache.get("release_url"),
+    }
 
 
 def init_routes(config: AppConfig, tx_service=None) -> None:
@@ -243,25 +263,22 @@ async def update_companion_name(
 
 
 @router.get("/firmware-check")
-async def check_companion_firmware() -> dict:
-    """On-demand check of the companion's firmware against the latest
+async def check_companion_firmware(
+    current_version: str = Query(..., min_length=1),
+) -> dict:
+    """On-demand check of one companion's firmware against the latest
     MeshCore GitHub release. Never runs automatically -- only when this
-    endpoint is actually called (i.e. the dashboard's Check button).
+    endpoint is actually called (the dashboard's Check button).
+
+    Takes ``current_version`` as a query param rather than resolving the
+    primary companion server-side (mirrors serial_config_routes.py's
+    identical reasoning): up to 4 companions can be configured, each
+    potentially on different firmware, and the frontend already has each
+    companion's own firmware_version rendered on the page.
 
     Read-only and side-effect-free, so unlike /companion-name this
     doesn't require admin -- any logged-in session can check.
     """
     if _config is None:
         raise HTTPException(503, "Config not loaded")
-
-    mc_tx = _resolve_meshcore_tx()
-    if mc_tx is None or not mc_tx.connected:
-        raise HTTPException(503, "MeshCore companion not connected")
-
-    device_info = await mc_tx.get_device_info()
-    if not device_info or not device_info.firmware_version:
-        raise HTTPException(
-            503, "Companion firmware version not available"
-        )
-
-    return await _check_firmware_update(device_info.firmware_version)
+    return await _check_firmware_update(current_version.strip())

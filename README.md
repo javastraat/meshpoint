@@ -74,8 +74,8 @@ This is a customized fork of upstream [KMX415/meshpoint](https://github.com/KMX4
 - **Band spectrum card** — the concentrator module's onboard SX1261 companion chip (not a USB radio) sweeps the whole region band (100 kHz steps, EU868: 863–870 MHz) and draws a live spectrum chart with median + peak level and the LoRaWAN / Meshtastic / MeshCore channel positions overlaid; "Sweep now" button, hover readout, `GET /api/device/spectrum`. Requires `radio.sx1261_spi_path` (e.g. `/dev/spidev0.1`) in `local.yaml`; cadence via `radio.spectrum_sweep_interval_seconds`.
 - **RF Environment works on the SenseCap M1** — upstream marks spectral scan unavailable on the M1; this fork's `sx1261_spi_path` support powers upstream's RF Environment tab with live hardware scans here (and its histogram's endless-page-growth bug is fixed).
 - **Concentrator channels card** — read-only table of all 9 SX1302 slots (frequency, BW, SF, sync word, protocol, RF chain, state), derived from the same channel-plan code the radio runs.
-- **Unified protocol cards** — "Meshtastic Configuration" (radio settings + channel list in one card) and a matching MeshCore Companion layout, which also shows the companion's firmware version alongside its frequency/bandwidth/SF/TX power readouts, with a "Check for updates" button comparing it against the latest `meshcore-dev/MeshCore` release on GitHub.
-- **Configuration → Serial shows live readouts per Meshtastic USB stick** — Node ID, name, region, SF, bandwidth, firmware version, and hardware model for each connected device, read straight from the stick itself.
+- **Unified protocol cards** — "Meshtastic Configuration" (radio settings + channel list in one card) and a matching MeshCore layout.
+- **Configuration → Serial and → MeshCore show live readouts per USB device** — Node ID, frequency, bandwidth, SF, TX power, firmware version, and hardware model for each connected stick or companion, read straight from the device itself, with a "Check for updates" button per device comparing against the latest upstream firmware release on GitHub.
 - **Node drawer recent packets** — every node shows its last 15 packets (time, type, RSSI/SNR).
 - **SNR distribution chart** on Stats next to the RSSI histogram; signal stats ignore implausible near-field readings (> −20 dBm).
 - **Relay tuning from the dashboard** — burst size and the min/max RSSI relay window are editable on Configuration → Transmit.
@@ -432,7 +432,7 @@ FastAPI server on port 8080 (configurable via `dashboard.port` in `local.yaml`):
 | `PUT /api/config/position` | Set position broadcast interval (admin) |
 | `PUT /api/config/telemetry` | Set telemetry broadcast interval (admin) |
 | `PUT /api/config/capture/meshcore-companions` | Replace full MeshCore companion list (max 4) |
-| `GET /api/config/meshcore/firmware-check` | Compare companion firmware against the latest `meshcore-dev/MeshCore` release (on-demand, cached 5 min) |
+| `GET /api/config/meshcore/firmware-check?current_version=...` | Compare a companion's firmware against the latest `meshcore-dev/MeshCore` release (on-demand, cached 5 min) |
 | `GET /api/config/serial/firmware-check?current_version=...` | Compare a Meshtastic USB stick's firmware against the latest `meshtastic/firmware` release (on-demand, cached 5 min) |
 | `POST /api/messages/send` | Send a Meshtastic or MeshCore message |
 | `GET /api/messages/conversations` | Message history by conversation |

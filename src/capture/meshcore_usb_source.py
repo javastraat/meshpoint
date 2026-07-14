@@ -21,6 +21,7 @@ from typing import AsyncIterator, Optional
 from src.capture.base import CaptureSource
 from src.models.packet import Protocol, RawCapture
 from src.models.signal import SignalMetrics
+from src.transmit.meshcore_tx_client import read_device_info, read_radio_status
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +61,10 @@ class MeshcoreUsbCaptureSource(CaptureSource):
         self._last_rf_signal: Optional[SignalMetrics] = None
         self._last_event_at: float = 0.0
         self._on_connected_callback = None
+        # Cached DEVICE_INFO round-trip result -- firmware doesn't change
+        # at runtime, mirrors MeshCoreTxClient's identical per-connection
+        # cache (see get_device_info() below).
+        self._device_info_cache = None
 
     @property
     def name(self) -> str:
@@ -414,6 +419,30 @@ class MeshcoreUsbCaptureSource(CaptureSource):
     def set_connected_callback(self, callback) -> None:
         """Register a coroutine called after every successful connection."""
         self._on_connected_callback = callback
+
+    async def get_radio_info(self):
+        """This companion's own radio parameters (frequency/bandwidth/SF/
+        TX power/name/public key), read from its own connection -- unlike
+        MeshCoreTxClient (wired to only one "primary" companion for
+        sending), every configured companion has one of these capture
+        source instances, so this is what makes per-companion status
+        possible (see config_routes.py's meshcore_companions list)."""
+        if not self._meshcore:
+            return None
+        return await read_radio_status(self._meshcore)
+
+    async def get_device_info(self):
+        """This companion's own firmware version/model/build date,
+        cached per connection since firmware doesn't change at runtime
+        (same reasoning as MeshCoreTxClient's identical cache)."""
+        if self._device_info_cache is not None:
+            return self._device_info_cache
+        if not self._meshcore:
+            return None
+        info = await read_device_info(self._meshcore)
+        if info is not None:
+            self._device_info_cache = info
+        return info
 
     async def restart_auto_fetching(self) -> None:
         """Re-enable auto message fetching after TX operations."""
