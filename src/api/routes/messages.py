@@ -333,13 +333,29 @@ async def _enrich_conversations(conversations: list[dict]) -> list[dict]:
             for convo in conversations
             if convo.get("node_id", "") and not convo["node_id"].startswith("broadcast:")
         ]
+        broadcast_protocols = sorted({
+            convo.get("protocol", "")
+            for convo in conversations
+            if convo.get("node_id", "").startswith("broadcast:") and convo.get("protocol")
+        })
         try:
             sources = await _node_repo.get_latest_capture_sources(dm_ids)
         except Exception:
             logger.debug("capture_source batch lookup failed", exc_info=True)
             sources = {}
+        try:
+            protocol_sources = await _node_repo.get_latest_capture_sources_by_protocol(
+                broadcast_protocols
+            )
+        except Exception:
+            logger.debug("capture_source-by-protocol lookup failed", exc_info=True)
+            protocol_sources = {}
         for convo in conversations:
-            convo["capture_source"] = sources.get(convo.get("node_id", ""))
+            node_id = convo.get("node_id", "")
+            if node_id.startswith("broadcast:"):
+                convo["capture_source"] = protocol_sources.get(convo.get("protocol", ""))
+            else:
+                convo["capture_source"] = sources.get(node_id)
     return conversations
 
 

@@ -214,6 +214,37 @@ class NodeRepository:
         )
         return {row["source_id"]: row["capture_source"] for row in rows}
 
+    async def get_latest_capture_sources_by_protocol(
+        self, protocols: list[str]
+    ) -> dict[str, str]:
+        """Which capture source most recently received ANY packet of each
+        given protocol -- used for channel/broadcast conversations, which
+        (unlike a DM) aren't tied to a single source_id. Packets don't carry
+        a per-channel tag, so this is scoped to protocol only, not the exact
+        channel -- still useful (e.g. distinguishing "Concentrator" from
+        "433" when a protocol has more than one capture source), just not
+        as precise as the per-contact DM lookup above.
+        """
+        if not protocols:
+            return {}
+        placeholders = ",".join("?" for _ in protocols)
+        rows = await self._db.fetch_all(
+            f"""
+            SELECT protocol, capture_source
+            FROM (
+                SELECT protocol, capture_source,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY protocol ORDER BY timestamp DESC
+                       ) AS rn
+                FROM packets
+                WHERE protocol IN ({placeholders})
+            )
+            WHERE rn = 1
+            """,
+            tuple(protocols),
+        )
+        return {row["protocol"]: row["capture_source"] for row in rows}
+
     async def get_all_with_signal(self, limit: int = 500) -> list[dict]:
         """Return nodes with latest signal and telemetry from joined tables."""
         rows = await self._db.fetch_all(

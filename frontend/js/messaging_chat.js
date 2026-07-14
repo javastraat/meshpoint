@@ -199,8 +199,12 @@ class MessagingChat {
     /** "meshcore_usb_433" -> "433", "serial_868" -> "868", bare
      * "meshcore_usb"/"serial" -> "USB", "concentrator" -> "Concentrator",
      * anything else shown as-is. Empty/missing capture_source (e.g. a
-     * brand-new conversation with no packet history yet, or a broadcast
-     * channel) hides the badge entirely rather than showing a blank pill. */
+     * brand-new conversation/channel with no packet history yet) hides
+     * the badge entirely rather than showing a blank pill. Channel
+     * conversations get this too now -- scoped to whichever capture
+     * source most recently heard that PROTOCOL, not the exact channel
+     * (packets aren't tagged per-channel), so it's a coarser signal than
+     * the per-contact DM case but still tells 868 and 433 apart. */
     _formatConnectionLabel(captureSource) {
         if (!captureSource) return '';
         if (captureSource === 'concentrator') return 'Concentrator';

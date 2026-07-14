@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -11,6 +12,17 @@ if TYPE_CHECKING:
     from src.transmit.meshcore_tx_client import MeshCoreTxClient
 
 logger = logging.getLogger(__name__)
+
+# How long a fetched MeshCore contact list stays good for. get_contacts()
+# is a live USB round trip to the physical companion (up to a 10s
+# timeout) -- resolving names for a conversation list or a 50-message
+# chat page calls into this once per item, so without a cache a single
+# page load can trigger dozens of hardware round trips back to back
+# (confirmed live: "10 sec to load the channels... 15 sec to load the
+# chats"). A short cache bounds it to roughly one round trip per page
+# load instead, while still refreshing often enough that a newly
+# adverted contact shows up quickly.
+_CONTACTS_CACHE_TTL_S = 10.0
 
 
 class MessageNameResolver:
@@ -25,6 +37,8 @@ class MessageNameResolver:
         self._node_repo = node_repo
         self._meshcore_tx = meshcore_tx
         self._packet_repo = packet_repo
+        self._contacts_cache: list[dict] = []
+        self._contacts_cache_at: float = 0.0
 
     async def resolve(
         self,
@@ -69,11 +83,18 @@ class MessageNameResolver:
             logger.debug("Meshtastic name lookup failed for %s", node_id, exc_info=True)
         return ""
 
+    async def _cached_contacts(self) -> list[dict]:
+        now = time.monotonic()
+        if now - self._contacts_cache_at > _CONTACTS_CACHE_TTL_S:
+            self._contacts_cache = await self._meshcore_tx.get_contacts()
+            self._contacts_cache_at = now
+        return self._contacts_cache
+
     async def _lookup_meshcore(self, node_id: str) -> str:
         if not self._meshcore_tx or not self._meshcore_tx.connected:
             return ""
         try:
-            mc_contacts = await self._meshcore_tx.get_contacts()
+            mc_contacts = await self._cached_contacts()
             nid_lower = node_id.lower()
             for contact in mc_contacts:
                 pk = contact.get("public_key", "").lower()
