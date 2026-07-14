@@ -36,6 +36,7 @@ class MeshcoreConfigCard {
                         <span class="cfg-field__label">Include meshcore_usb capture source</span>
                     </label>
                     <div class="cfg-companions" data-mc-companions></div>
+                    <datalist id="mc-serial-ports-list"></datalist>
                     <div class="cfg-companions__add-row">
                         <button class="terminal-button" type="button" data-mc-add-companion>
                             + Add companion
@@ -73,6 +74,8 @@ class MeshcoreConfigCard {
     }
 
     render(config) {
+        this._refreshSerialPortsList();
+
         const cap = config.capture || {};
         const companions = Array.isArray(cap.meshcore_usb) ? cap.meshcore_usb : [];
         const sources = cap.sources || [];
@@ -101,6 +104,22 @@ class MeshcoreConfigCard {
     _liveCompanionFor(label) {
         const name = label ? `meshcore_usb_${label}` : 'meshcore_usb';
         return (this._liveCompanions || []).find((c) => c.name === name) || null;
+    }
+
+    /** Populates the shared <datalist> so every "Pinned serial port" input
+     * can suggest currently-connected USB devices -- refreshed on every
+     * render() (each dashboard poll), so newly plugged devices show up
+     * without a manual reload. Best-effort: silently no-ops if the
+     * enumeration endpoint is unavailable, leaving the field as a plain
+     * free-text input (the existing behavior). */
+    async _refreshSerialPortsList() {
+        const list = this._root.querySelector('#mc-serial-ports-list');
+        if (!list) return;
+        const result = await this._api.get('/api/config/serial-ports');
+        const ports = (result && Array.isArray(result.ports)) ? result.ports : [];
+        list.innerHTML = ports.map((p) => `
+            <option value="${this._esc(p.stable_path)}" label="${this._esc(p.description || p.device)}"></option>
+        `).join('');
     }
 
     _addCompanionRow(data = {}) {
@@ -137,7 +156,14 @@ class MeshcoreConfigCard {
                 <span class="cfg-field__label">Pinned serial port</span>
                 <input class="cfg-field__input" type="text"
                        placeholder="/dev/ttyACM0" value="${port}"
+                       list="mc-serial-ports-list"
                        data-companion-port>
+                <span class="cfg-field__hint">
+                    Pick a connected device below, or type a path. Prefer the
+                    /dev/serial/by-path/... entries over plain /dev/ttyUSBn --
+                    those stay stable across reboots/replugs even when two
+                    boards share an identical USB serial number.
+                </span>
             </label>
             <label class="cfg-field cfg-field--narrow">
                 <span class="cfg-field__label">Baud rate</span>

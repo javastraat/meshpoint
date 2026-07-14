@@ -38,6 +38,7 @@ class SerialConfigCard {
                         <span class="cfg-field__label">Include serial capture source</span>
                     </label>
                     <div class="cfg-companions" data-serial-devices></div>
+                    <datalist id="serial-ports-list"></datalist>
                     <div class="cfg-companions__add-row">
                         <button class="terminal-button" type="button" data-serial-add-device>
                             + Add device
@@ -62,6 +63,8 @@ class SerialConfigCard {
     }
 
     render(config) {
+        this._refreshSerialPortsList();
+
         const cap = config.capture || {};
         const devices = Array.isArray(cap.serial) ? cap.serial : [];
         const sources = cap.sources || [];
@@ -86,6 +89,24 @@ class SerialConfigCard {
     _liveStatusFor(label) {
         const name = label ? `serial_${label}` : 'serial';
         return (this._liveStatuses || []).find((s) => s.name === name) || null;
+    }
+
+    /** Populates the shared <datalist> so every "Serial port" input can
+     * suggest currently-connected USB devices -- refreshed on every
+     * render() (each dashboard poll). Shared with MeshcoreConfigCard's
+     * identical method/endpoint (GET /api/config/serial-ports lists ALL
+     * USB-serial devices regardless of protocol, since both cards pin
+     * from the same physical pool). Best-effort: silently no-ops if the
+     * enumeration endpoint is unavailable, leaving the field as a plain
+     * free-text input (the existing behavior). */
+    async _refreshSerialPortsList() {
+        const list = this._root.querySelector('#serial-ports-list');
+        if (!list) return;
+        const result = await this._api.get('/api/config/serial-ports');
+        const ports = (result && Array.isArray(result.ports)) ? result.ports : [];
+        list.innerHTML = ports.map((p) => `
+            <option value="${this._esc(p.stable_path)}" label="${this._esc(p.description || p.device)}"></option>
+        `).join('');
     }
 
     _addDeviceRow(data = {}) {
@@ -117,7 +138,14 @@ class SerialConfigCard {
                 <span class="cfg-field__label">Serial port</span>
                 <input class="cfg-field__input" type="text"
                        placeholder="/dev/ttyUSB0 (blank = auto-detect)" value="${port}"
+                       list="serial-ports-list"
                        data-device-port>
+                <span class="cfg-field__hint">
+                    Pick a connected device below, or type a path. Prefer the
+                    /dev/serial/by-path/... entries over plain /dev/ttyUSBn --
+                    those stay stable across reboots/replugs even when two
+                    boards share an identical USB serial number.
+                </span>
             </label>
             <label class="cfg-field cfg-field--narrow">
                 <span class="cfg-field__label">Baud rate</span>

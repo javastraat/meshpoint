@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 
 from src.api.audit import AuditLogWriter
 from src.api.audit.dependencies import get_audit_writer
-from src.api.auth.dependencies import require_admin
+from src.api.auth.dependencies import require_admin, require_auth
 from src.api.auth.jwt_session import SessionClaims
 from src.config import AppConfig, save_section_to_yaml
 
@@ -79,6 +79,41 @@ class RelayUpdate(BaseModel):
 class RadioAdvancedUpdate(BaseModel):
     spectral_scan_interval_seconds: Optional[float] = Field(None, ge=0, le=3600)
     sx1261_spi_path: Optional[str] = None
+
+
+@router.get("/serial-ports")
+async def get_serial_ports(_claims: SessionClaims = Depends(require_auth)) -> dict:
+    """Enumerate connected USB-serial devices for the dashboard's port
+    picker (Configuration -> Serial / MeshCore's "Pinned serial port"
+    fields).
+
+    Read-only/no side effects, so unlike the save routes below this
+    doesn't require admin -- any logged-in session can list.
+
+    ``stable_path`` is the recommended value to pin: prefers
+    ``/dev/serial/by-path/...`` over the raw ``/dev/ttyUSBn`` (or
+    ``by-id`` when by-path is unavailable) since it stays unique per
+    physical USB port even when two boards share an identical
+    (often unprogrammed) vendor serial number -- confirmed on cheap
+    CP210x clone boards, where ``/dev/serial/by-id/`` can only keep one
+    symlink per unique name and silently drops the other device.
+    """
+    from src.hal.usb_classifier import list_serial_ports_with_stable_paths
+    ports = list_serial_ports_with_stable_paths()
+    return {
+        "ports": [
+            {
+                "device": p.device,
+                "stable_path": p.stable_path,
+                "by_id": p.by_id,
+                "by_path": p.by_path,
+                "description": p.description,
+                "vid": f"{p.vid:04x}" if p.vid is not None else None,
+                "pid": f"{p.pid:04x}" if p.pid is not None else None,
+            }
+            for p in ports
+        ],
+    }
 
 
 @router.put("/storage")

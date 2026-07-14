@@ -439,6 +439,7 @@ FastAPI server on port 8080 (configurable via `dashboard.port` in `local.yaml`):
 | `GET /api/config/serial/firmware-check?current_version=...` | Compare a Meshtastic USB stick's firmware against the latest `meshtastic/firmware` release (on-demand, cached 5 min) |
 | `PUT /api/config/serial/identity` | Rename one Meshtastic USB stick's long/short name (label-scoped) |
 | `POST /api/config/serial/advert` | Send a NodeInfo broadcast from one specific Meshtastic USB stick (label-scoped) |
+| `GET /api/config/serial-ports` | Enumerate connected USB-serial devices with a recommended stable path (by-path/by-id), for the port-picker dropdown |
 | `POST /api/messages/send` | Send a Meshtastic or MeshCore message |
 | `GET /api/messages/conversations` | Message history by conversation |
 | `GET /api/lorawan/devices` | LoRaWAN device list (frame count, RSSI, SF, first/last seen) |
