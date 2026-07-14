@@ -156,6 +156,12 @@ class MessagingContacts {
             last_message: existing ? existing.last_message : '',
             last_timestamp: existing ? existing.last_timestamp : '',
             unread_count: existing ? existing.unread_count : 0,
+            // The channels list itself comes from /api/messages/channels
+            // (pure config, no capture data) -- capture_source only exists
+            // on the enriched /api/messages/conversations rows, so without
+            // this copy the chat header's connection pill could never show
+            // for a channel, no matter what the API returned.
+            capture_source: existing ? existing.capture_source : null,
         };
     }
 
