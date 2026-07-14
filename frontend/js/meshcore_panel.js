@@ -22,6 +22,7 @@ class MeshCorePanel {
         this._mounted = false;
         this._nodeNames = {};
         this._allNodes = [];
+        this._nodeSearchQuery = '';
         let stored = null;
         try { stored = localStorage.getItem(MC_TAB_STORE_KEY); } catch (_) {}
         this._tab = stored === 'contacts' ? 'contacts' : 'packets';
@@ -82,7 +83,13 @@ class MeshCorePanel {
                                     data-mc-tab="contacts">Contacts</button>
                         </div>
                         <span class="lw-panel__limit" data-mc-suffix="packets">(last 100)</span>
-                        <span class="lw-panel__limit" id="mc-node-count" data-mc-suffix="contacts" hidden></span>
+                        <div class="lw-search-wrap" data-mc-suffix="contacts" hidden>
+                            <span class="lw-panel__limit" id="mc-node-count"></span>
+                            <input type="text" id="mc-node-search" class="lw-search"
+                                   placeholder="Search..." autocomplete="off" spellcheck="false" />
+                            <button id="mc-node-search-clear" class="lw-search-clear"
+                                    title="Clear search" hidden>&times;</button>
+                        </div>
                     </div>
                     <div data-mc-view="packets">
                         <div class="panel__body lw-table-wrap">
@@ -180,6 +187,25 @@ class MeshCorePanel {
             });
         }
 
+        const nodeSearchEl = document.getElementById('mc-node-search');
+        const nodeSearchClearEl = document.getElementById('mc-node-search-clear');
+        if (nodeSearchEl) {
+            nodeSearchEl.addEventListener('input', (e) => {
+                this._nodeSearchQuery = e.target.value.toLowerCase();
+                if (nodeSearchClearEl) nodeSearchClearEl.hidden = !e.target.value;
+                this._renderNodes();
+            });
+        }
+        if (nodeSearchClearEl && nodeSearchEl) {
+            nodeSearchClearEl.addEventListener('click', () => {
+                nodeSearchEl.value = '';
+                this._nodeSearchQuery = '';
+                nodeSearchClearEl.hidden = true;
+                nodeSearchEl.focus();
+                this._renderNodes();
+            });
+        }
+
         const nodeTbody = document.getElementById('mc-node-tbody');
         if (nodeTbody) {
             nodeTbody.addEventListener('click', (e) => {
@@ -237,16 +263,6 @@ class MeshCorePanel {
             const r = await fetch('/api/meshcore/nodes');
             if (!r.ok) return;
             const nodes = await r.json();
-            const empty = document.getElementById('mc-node-empty');
-
-            if (!nodes.length) {
-                document.getElementById('mc-node-tbody').innerHTML = '';
-                if (empty) empty.style.display = '';
-                const count = document.getElementById('mc-node-count');
-                if (count) count.textContent = '';
-                return;
-            }
-            if (empty) empty.style.display = 'none';
 
             this._nodeNames = {};
             nodes.forEach(n => {
@@ -260,8 +276,19 @@ class MeshCorePanel {
 
     _renderNodes() {
         const tbody = document.getElementById('mc-node-tbody');
+        const empty = document.getElementById('mc-node-empty');
+
+        let nodes = this._allNodes;
+        if (this._nodeSearchQuery) {
+            nodes = nodes.filter((n) => {
+                const name = (n.long_name || n.short_name || '').toLowerCase();
+                const id = (n.node_id || '').toLowerCase();
+                return name.includes(this._nodeSearchQuery) || id.includes(this._nodeSearchQuery);
+            });
+        }
+
         if (tbody) {
-            tbody.innerHTML = this._allNodes.map((n) => `
+            tbody.innerHTML = nodes.map((n) => `
                 <tr data-node-id="${this._esc(n.node_id || '')}" class="mc-contact-row">
                     <td class="lw-time">${this._fmtTime(n.last_heard)}</td>
                     <td class="lw-id">${this._esc(n.node_id || '--')}</td>
@@ -275,8 +302,25 @@ class MeshCorePanel {
             `).join('');
         }
 
+        if (empty) {
+            if (nodes.length) {
+                empty.style.display = 'none';
+            } else {
+                empty.textContent = (this._nodeSearchQuery && this._allNodes.length)
+                    ? 'No contacts match your search.'
+                    : 'No MeshCore contacts yet. Import contacts.json to populate.';
+                empty.style.display = '';
+            }
+        }
+
         const count = document.getElementById('mc-node-count');
-        if (count) count.textContent = `(${this._allNodes.length} total)`;
+        if (count) {
+            count.textContent = this._allNodes.length
+                ? (this._nodeSearchQuery
+                    ? `(${nodes.length} of ${this._allNodes.length})`
+                    : `(${this._allNodes.length} total)`)
+                : '';
+        }
     }
 
     async _loadPackets() {

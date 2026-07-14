@@ -76,6 +76,7 @@ class LoRaWANPanel {
                         </div>
                         <span class="lw-panel__limit" data-lw-suffix="packets">(last 100)</span>
                         <div class="lw-search-wrap" data-lw-suffix="devices" hidden>
+                            <span class="lw-panel__limit" id="lw-device-count"></span>
                             <input type="text" id="lw-device-search" class="lw-search"
                                    placeholder="Search..." autocomplete="off" spellcheck="false" />
                             <button id="lw-device-search-clear" class="lw-search-clear"
@@ -285,6 +286,15 @@ class LoRaWANPanel {
                 const type = (d.packet_type || '').toLowerCase();
                 return id.includes(this._deviceSearchQuery) || type.includes(this._deviceSearchQuery);
             });
+        }
+
+        const count = document.getElementById('lw-device-count');
+        if (count) {
+            count.textContent = this._allDevices.length
+                ? (this._deviceSearchQuery
+                    ? `(${devices.length} of ${this._allDevices.length})`
+                    : `(${this._allDevices.length} total)`)
+                : '';
         }
 
         if (!devices.length) {

@@ -104,6 +104,7 @@ class MeshtasticPanel {
                         </div>
                         <span class="lw-panel__limit" data-mt-suffix="packets">(last 100)</span>
                         <div class="lw-search-wrap" data-mt-suffix="nodes" hidden>
+                            <span class="lw-panel__limit" id="mt-node-count"></span>
                             <input type="text" id="mt-node-search" class="lw-search"
                                    placeholder="Search..." autocomplete="off" spellcheck="false" />
                             <button id="mt-node-search-clear" class="lw-search-clear"
@@ -326,6 +327,15 @@ class MeshtasticPanel {
                 const id = (n.node_id || '').toLowerCase();
                 return name.includes(this._nodeSearchQuery) || id.includes(this._nodeSearchQuery);
             });
+        }
+
+        const count = document.getElementById('mt-node-count');
+        if (count) {
+            count.textContent = this._allNodes.length
+                ? (this._nodeSearchQuery
+                    ? `(${nodes.length} of ${this._allNodes.length})`
+                    : `(${this._allNodes.length} total)`)
+                : '';
         }
 
         if (!nodes.length) {
