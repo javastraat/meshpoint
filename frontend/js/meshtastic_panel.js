@@ -45,6 +45,7 @@ class MeshtasticPanel {
         try { storedTab = localStorage.getItem(MT_TAB_STORE_KEY); } catch (_) {}
         this._tab = storedTab === 'nodes' ? 'nodes' : 'packets';
         this._allNodes = [];
+        this._nodeSearchQuery = '';
     }
 
     show() {
@@ -102,6 +103,12 @@ class MeshtasticPanel {
                                     data-mt-tab="nodes">Nodes</button>
                         </div>
                         <span class="lw-panel__limit" data-mt-suffix="packets">(last 100)</span>
+                        <div class="lw-search-wrap" data-mt-suffix="nodes" hidden>
+                            <input type="text" id="mt-node-search" class="lw-search"
+                                   placeholder="Search..." autocomplete="off" spellcheck="false" />
+                            <button id="mt-node-search-clear" class="lw-search-clear"
+                                    title="Clear search" hidden>&times;</button>
+                        </div>
                     </div>
                     <div data-mt-view="packets">
                         <div class="panel__body lw-table-wrap">
@@ -189,6 +196,25 @@ class MeshtasticPanel {
         });
         this._applyTab();
 
+        const nodeSearchEl = document.getElementById('mt-node-search');
+        const nodeSearchClearEl = document.getElementById('mt-node-search-clear');
+        if (nodeSearchEl) {
+            nodeSearchEl.addEventListener('input', (e) => {
+                this._nodeSearchQuery = e.target.value.toLowerCase();
+                if (nodeSearchClearEl) nodeSearchClearEl.hidden = !e.target.value;
+                this._renderNodes();
+            });
+        }
+        if (nodeSearchClearEl && nodeSearchEl) {
+            nodeSearchClearEl.addEventListener('click', () => {
+                nodeSearchEl.value = '';
+                this._nodeSearchQuery = '';
+                nodeSearchClearEl.hidden = true;
+                nodeSearchEl.focus();
+                this._renderNodes();
+            });
+        }
+
         const nodeTbody = document.getElementById('mt-node-tbody');
         if (nodeTbody) {
             nodeTbody.addEventListener('click', (e) => {
@@ -271,19 +297,10 @@ class MeshtasticPanel {
             const r = await fetch('/api/meshtastic/nodes');
             if (!r.ok) return;
             const nodes = await r.json();
-            const tbody = document.getElementById('mt-node-tbody');
-            const empty = document.getElementById('mt-node-empty');
-            if (!tbody) return;
-
-            if (!nodes.length) {
-                tbody.innerHTML = '';
-                if (empty) empty.style.display = '';
-                return;
-            }
-            if (empty) empty.style.display = 'none';
 
             // id -> display name, used by the packets feed (same
             // pattern as the MeshCore panel's _nodeNames/_fmtSrc).
+            // Built from the full list, independent of the search filter.
             this._nodeNames = {};
             nodes.forEach((n) => {
                 const name = (n.long_name || n.short_name || '').trim();
@@ -293,22 +310,50 @@ class MeshtasticPanel {
             });
 
             this._allNodes = nodes;
-
-            tbody.innerHTML = nodes.map((n) => `
-                <tr data-node-id="${this._esc(n.node_id || '')}" class="mt-node-row">
-                    <td class="lw-time">${this._fmtTime(n.last_heard)}</td>
-                    <td class="lw-id">${this._fmtNodeId(n.node_id)}</td>
-                    <td class="mt-name">${this._fmtName(n)}</td>
-                    <td class="mt-hw">${this._fmtHw(n.hardware_model)}</td>
-                    <td>${this._fmtRole(n.role)}</td>
-                    <td class="lw-signal ${this._rssiClass(n.latest_rssi)}">${this._fmtRssi(n.latest_rssi)}</td>
-                    <td class="lw-signal">${this._fmtSnr(n.latest_snr)}</td>
-                    <td class="lw-num">${n.latest_hops != null ? n.latest_hops : '--'}</td>
-                    <td class="lw-num">${this._fmtDist(n.latitude, n.longitude)}</td>
-                    <td class="lw-num">${n.packet_count ?? '--'}</td>
-                </tr>
-            `).join('');
+            this._renderNodes();
         } catch (_) {}
+    }
+
+    _renderNodes() {
+        const tbody = document.getElementById('mt-node-tbody');
+        const empty = document.getElementById('mt-node-empty');
+        if (!tbody) return;
+
+        let nodes = this._allNodes;
+        if (this._nodeSearchQuery) {
+            nodes = nodes.filter((n) => {
+                const name = (n.long_name || n.short_name || '').toLowerCase();
+                const id = (n.node_id || '').toLowerCase();
+                return name.includes(this._nodeSearchQuery) || id.includes(this._nodeSearchQuery);
+            });
+        }
+
+        if (!nodes.length) {
+            tbody.innerHTML = '';
+            if (empty) {
+                empty.textContent = this._allNodes.length
+                    ? 'No nodes match your search.'
+                    : 'No Meshtastic nodes heard yet.';
+                empty.style.display = '';
+            }
+            return;
+        }
+        if (empty) empty.style.display = 'none';
+
+        tbody.innerHTML = nodes.map((n) => `
+            <tr data-node-id="${this._esc(n.node_id || '')}" class="mt-node-row">
+                <td class="lw-time">${this._fmtTime(n.last_heard)}</td>
+                <td class="lw-id">${this._fmtNodeId(n.node_id)}</td>
+                <td class="mt-name">${this._fmtName(n)}</td>
+                <td class="mt-hw">${this._fmtHw(n.hardware_model)}</td>
+                <td>${this._fmtRole(n.role)}</td>
+                <td class="lw-signal ${this._rssiClass(n.latest_rssi)}">${this._fmtRssi(n.latest_rssi)}</td>
+                <td class="lw-signal">${this._fmtSnr(n.latest_snr)}</td>
+                <td class="lw-num">${n.latest_hops != null ? n.latest_hops : '--'}</td>
+                <td class="lw-num">${this._fmtDist(n.latitude, n.longitude)}</td>
+                <td class="lw-num">${n.packet_count ?? '--'}</td>
+            </tr>
+        `).join('');
     }
 
     async _loadPackets() {
