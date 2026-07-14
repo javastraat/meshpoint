@@ -604,10 +604,11 @@ When `enabled: false` the Meshpoint never opens an upstream connection and never
 storage:
   database_path: "data/concentrator.db"
   max_packets_retained: 100000
+  max_telemetry_retained: 100000
   cleanup_interval_seconds: 3600
 ```
 
-Packets are stored in a local SQLite database. Old packets are pruned automatically based on `max_packets_retained`.
+Packets and telemetry are stored in a local SQLite database. Old rows are pruned automatically once each table exceeds its cap (oldest-first) — `max_packets_retained` covers raw captured RF packets, `max_telemetry_retained` covers battery/voltage/temperature history (feeds the node drawer and Repeater Trends charts). Messages (DM/channel chat history) and the node roster are never auto-pruned. Both editable from Configuration → Advanced.
 
 ### Prometheus metrics (`/metrics`)
 
@@ -1094,6 +1095,7 @@ mqtt:                  # MQTT publishing (off by default)
 storage:               # local SQLite packet store
   database_path: "data/concentrator.db"
   max_packets_retained: 100000
+  max_telemetry_retained: 100000
   cleanup_interval_seconds: 3600
 
 metrics:               # Prometheus /metrics scrape (off by default)

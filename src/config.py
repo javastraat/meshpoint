@@ -226,6 +226,7 @@ class CaptureConfig:
 class StorageConfig:
     database_path: str = "data/concentrator.db"
     max_packets_retained: int = 100_000
+    max_telemetry_retained: int = 100_000
     cleanup_interval_seconds: int = 3600
 
 

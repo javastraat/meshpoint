@@ -25,6 +25,13 @@ class AdvancedConfigCard {
                             <span class="cfg-field__label">Max packets retained</span>
                             <input class="cfg-field__input" type="number" min="1000"
                                    max="10000000" data-storage-max>
+                            <span class="cfg-field__hint">Raw captured RF packets (Meshtastic/MeshCore/LoRaWAN).</span>
+                        </label>
+                        <label class="cfg-field">
+                            <span class="cfg-field__label">Max telemetry rows retained</span>
+                            <input class="cfg-field__input" type="number" min="1000"
+                                   max="10000000" data-storage-max-telemetry>
+                            <span class="cfg-field__hint">Battery/voltage/temperature history (node drawer and Repeater Trends charts).</span>
                         </label>
                         <label class="cfg-field">
                             <span class="cfg-field__label">Cleanup interval (seconds)</span>
@@ -75,6 +82,7 @@ class AdvancedConfigCard {
         const radioAdv = config.radio_advanced || {};
 
         this._setVal('[data-storage-max]', storage.max_packets_retained);
+        this._setVal('[data-storage-max-telemetry]', storage.max_telemetry_retained);
         this._setVal('[data-storage-cleanup]', storage.cleanup_interval_seconds);
         this._setVal('[data-radio-scan-interval]', radioAdv.spectral_scan_interval_seconds);
         this._setVal('[data-radio-sx1261]', radioAdv.sx1261_spi_path || '');
@@ -93,6 +101,9 @@ class AdvancedConfigCard {
         const result = await this._api.put('/api/config/storage', {
             max_packets_retained: Number(
                 this._root.querySelector('[data-storage-max]').value,
+            ),
+            max_telemetry_retained: Number(
+                this._root.querySelector('[data-storage-max-telemetry]').value,
             ),
             cleanup_interval_seconds: Number(
                 this._root.querySelector('[data-storage-cleanup]').value,
