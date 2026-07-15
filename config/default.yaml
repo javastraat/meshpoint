@@ -19,6 +19,11 @@ radio:
   # (one ~50 ms scan per 100 kHz step; a few seconds per sweep).
   # 0 disables automatic sweeps ("Sweep now" button still works).
   spectrum_sweep_interval_seconds: 300
+  # SPI device for the SX1261 companion radio used by spectral scan.
+  # Empty disables it (default; spectral scan stays unavailable). On
+  # RAK2287/RAK5146 this is usually unreachable from the Pi, but on the
+  # SenseCap M1 setting "/dev/spidev0.1" has been verified to work.
+  sx1261_spi_path: ""
 
 meshtastic:
   default_key_b64: "AQ=="
@@ -31,16 +36,36 @@ meshtastic:
 meshcore:
   default_key_b64: ""
   channel_keys: {}
+  # private_channels:
+  #   - "MyChannel"
+  private_channels: []
+  # Legacy, pre-v0.7.7: fallback advert name for the FIRST companion only.
+  # New setups should use capture.meshcore_usb[i].companion_name instead.
+  companion_name: null
 
 capture:
   sources: []
   serial_port: null
   serial_baud: 115200
   concentrator_spi_device: "/dev/spidev0.0"
+  # meshcore_usb is a list -- one entry per physical companion (up to 4).
+  # A single companion still just needs one entry; label/companion_name
+  # are optional and only matter once more than one is connected.
   meshcore_usb:
-    serial_port: null
-    baud_rate: 115200
-    auto_detect: true
+    - serial_port: null       # null + auto_detect finds /dev/ttyACM*/ttyUSB*
+      baud_rate: 115200
+      auto_detect: true
+      label: ""
+      companion_name: null   # optional, per-companion advert name
+  # serial is opt-in -- only needed for more than one Meshtastic USB stick
+  # (e.g. one on 433 MHz, one on 868 MHz). A single stick keeps using the
+  # legacy serial_port/serial_baud scalars above instead.
+  serial: []
+  # serial:
+  #   - serial_port: "/dev/ttyUSB0"
+  #     label: "433"
+  #   - serial_port: "/dev/ttyUSB1"
+  #     label: "868"
 
 storage:
   database_path: "data/concentrator.db"
@@ -54,6 +79,11 @@ dashboard:
   host: "0.0.0.0"
   port: 8080
   static_dir: "frontend"
+
+metrics:
+  # Prometheus-compatible /metrics scrape endpoint.
+  enabled: false
+  require_auth: true
 
 device:
   device_name: "Meshpoint"
@@ -130,12 +160,19 @@ mqtt:
   # `mqtt.region` is independent of `radio.region`: defaults to "US".
   topic_root: "msh"
   region: "US"
+  # Optional "!xxxxxxxx" override; blank uses an MD5 hash of device name.
+  gateway_id: null
   publish_channels:
     - "LongFast"
     - "MeshCore"
   publish_json: false
   location_precision: "exact"
   homeassistant_discovery: false
+  # Transport TLS is not implemented yet (plain TCP only) -- see CHANGELOG
+  # "Unreleased". Leave tls_enabled off and use plain port 1883 or a LAN
+  # broker without TLS until it lands.
+  tls_enabled: false
+  tls_ca_cert: ""
 
 location:
   # Where live GPS fixes come from (skyplot + optional mesh POSITION).

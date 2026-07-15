@@ -26,6 +26,10 @@ First tagged release of the javastraat/meshpoint fork: LoRaWAN sniffing, multi-r
 - **Search filter on the LoRaWAN Devices tab, now also on Meshtastic Nodes.** A search box (matching device ID/name or packet type) filters the list client-side, with a clear (×) button that appears once you've typed something; the query persists across the 15-second auto-refresh instead of resetting. Piloted on LoRaWAN first, then rolled onto the Meshtastic Nodes tab (matching node ID or name) — same `.lw-search` widget, no new CSS needed since both panels already share `lorawan.css`. MeshCore is next.
 - **Service channel RF chain fix.** ch8 now picks the correct radio chain from its frequency instead of hardcoded RF0.
 
+#### Setup wizard
+
+- **Setup wizard lets you skip upstreaming entirely.** The `[4/8] API key` step now asks "Upstream data to meshradar.io?" before prompting for a key; answering no writes `upstream.enabled: false` (no API key required) instead of forcing activation, while still preserving any previously-saved key so re-enabling later doesn't require re-entering it.
+
 #### Multi-radio capture (5 networks at once)
 
 - **Multiple MeshCore USB companions.** `capture.meshcore_usb` accepts a list (up to 4) with per-stick labels; packets carry `meshcore_usb_<label>` as capture source. New `PUT /api/config/capture/meshcore-companions` replaces the list atomically; the Configuration page grew a dynamic companion section.

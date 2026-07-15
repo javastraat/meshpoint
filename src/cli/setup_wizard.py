@@ -216,11 +216,22 @@ def _step_capture_source(config: dict, report: HardwareReport) -> None:
 
 
 def _step_api_key(config: dict, existing: dict | None = None) -> None:
-    """Prompt for the Meshradar API key (required, signature-verified)."""
+    """Ask whether to upstream data, then prompt for the API key (signature-verified) if so."""
     from src.activation import verify_license_key
 
     print("  [4/8] API key")
     print()
+
+    current_enabled = (existing or {}).get("upstream", {}).get("enabled", True)
+    print("        Meshpoint can upstream captured packets to meshradar.io")
+    print("        for cloud dashboards, mapping, and alerts.")
+    print()
+    if not _confirm("Upstream data to meshradar.io?", default_yes=current_enabled):
+        config["upstream"] = {"enabled": False}
+        print("        Upstreaming disabled. Re-run 'meshpoint setup' or edit")
+        print("        config/local.yaml to enable it later.")
+        print()
+        return
 
     current_key = (existing or {}).get("upstream", {}).get("auth_token")
     if current_key:
