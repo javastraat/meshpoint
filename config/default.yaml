@@ -1,8 +1,13 @@
 #
 # Configuration file for Meshpoint concentrator service.
 #
+# This file ships in version control with sane defaults for every setting
+# the app understands -- it's the reference for what's available. Put your
+# own overrides in config/local.yaml (gitignored); only list the keys you
+# want to change there, everything else falls back to what's here.
+#
 
-radio:
+radio:                   # LoRa radio settings (concentrator + onboard SX1261)
   region: "US"
   # Frequency: set frequency_mhz (explicit MHz) OR slot (Meshtastic 1-indexed
   # slot number). frequency_mhz wins if both are present. If neither is set,
@@ -25,7 +30,9 @@ radio:
   # SenseCap M1 setting "/dev/spidev0.1" has been verified to work.
   sx1261_spi_path: ""
 
-meshtastic:
+meshtastic:               # Meshtastic protocol settings
+  # Default channel PSK -- "AQ==" is Meshtastic's public "LongFast" default
+  # key, used to decrypt any channel not listed under channel_keys below.
   default_key_b64: "AQ=="
   primary_channel_name: "LongFast"
   # channel_keys:
@@ -33,8 +40,10 @@ meshtastic:
   #   SecretChat: "anotherBase64PSK=="
   channel_keys: {}
 
-meshcore:
-  default_key_b64: ""
+meshcore:                 # MeshCore protocol settings
+  # Blank trusts whatever key each channel already carries; MeshCore has
+  # no single "default public key" the way Meshtastic's LongFast does.
+  default_key_b64: "8b3387e9c5cdea6ac9e5edbaa115cd72"
   channel_keys: {}
   # private_channels:
   #   - "MyChannel"
@@ -43,8 +52,10 @@ meshcore:
   # New setups should use capture.meshcore_usb[i].companion_name instead.
   companion_name: null
 
-capture:
+capture:                  # what packet sources to read from
   sources: []
+  # Single-stick Meshtastic USB (legacy). Ignored once capture.serial below
+  # is non-empty.
   serial_port: null
   serial_baud: 115200
   concentrator_spi_device: "/dev/spidev0.0"
@@ -67,33 +78,38 @@ capture:
   #   - serial_port: "/dev/ttyUSB1"
   #     label: "868"
 
-storage:
+storage:                  # database retention and cleanup
   database_path: "data/concentrator.db"
+  # Oldest rows are pruned once a table exceeds this count.
   max_packets_retained: 100000
   max_telemetry_retained: 100000
+  # How often (seconds) the retention sweep runs.
   cleanup_interval_seconds: 3600
 
-dashboard:
+dashboard:                # web dashboard / API server
   # Web server bind address, read by src/serve.py (the systemd ExecStart).
   # Override in local.yaml; takes effect on service restart.
   host: "0.0.0.0"
   port: 8080
   static_dir: "frontend"
 
-metrics:
-  # Prometheus-compatible /metrics scrape endpoint.
+metrics:                  # Prometheus-compatible /metrics scrape endpoint
   enabled: false
   require_auth: true
 
-device:
+device:                   # this Meshpoint's identity and location (Meshradar fleet pin)
   device_name: "Meshpoint"
+  # Registered coordinates shown on the Meshradar map. Static by default;
+  # see location: below for live GPS instead.
   latitude: 0.0
   longitude: 0.0
   altitude: 25
   hardware_description: "RAK2287 + Raspberry Pi 4"
   firmware_version: "0.7.7"
+  # device_id: auto-generated UUID on first "meshpoint setup" run, then
+  # preserved across re-runs. Not normally hand-edited.
 
-relay:
+relay:                    # legacy USB-companion relay TX (superseded by transmit: below)
   enabled: false
   serial_port: null       # SX1262 relay radio, e.g. "/dev/ttyACM1"
   serial_baud: 115200
@@ -102,14 +118,17 @@ relay:
   min_relay_rssi: -110.0
   max_relay_rssi: -50.0
 
-upstream:
+upstream:                 # Meshradar cloud connection
   enabled: false
   url: "wss://api.meshradar.io"
   reconnect_interval_seconds: 10
-  buffer_max_size: 5000
+  buffer_max_size: 5000        # local buffer during disconnects
+  # API key from meshradar.io, set by "meshpoint setup". Required only
+  # when enabled: true above -- validate_activation() skips the check
+  # entirely when upstream is disabled.
   auth_token: null
 
-transmit:
+transmit:                 # native LoRa TX (Meshtastic via SX1302, MeshCore via USB companion)
   enabled: false
   node_id: null             # auto-generated 4-byte Meshtastic node ID
   tx_power_dbm: 14          # conservative default (dBm)
@@ -132,7 +151,7 @@ transmit:
     coordinate_source: "static"   # static | live (live needs gpsd/uart source)
     location_precision: "approximate"  # exact | approximate | none (live only)
 
-web_auth:
+web_auth:                 # dashboard admin/viewer authentication
   # First-run state: hashes are empty -> dashboard forces /setup.
   # After setup, the admin hash is written via the API and the JWT
   # secret is auto-generated. Rotating jwt_secret (e.g. via
@@ -146,7 +165,7 @@ web_auth:
   lockout_cooldown_minutes: 5
   session_version: 1
 
-mqtt:
+mqtt:                     # bridge captured packets to an MQTT broker (Meshtastic-compatible)
   enabled: false
   broker: "mqtt.meshtastic.org"
   port: 1883
@@ -174,7 +193,7 @@ mqtt:
   tls_enabled: false
   tls_ca_cert: ""
 
-location:
+location:                 # GPS / location source
   # Where live GPS fixes come from (skyplot + optional mesh POSITION).
   # Registered coordinates for Meshradar live in device.latitude/longitude
   # and are not overwritten by gpsd.
@@ -191,10 +210,10 @@ location:
   # Minimum acceptable fix mode: 0=any (incl. no-fix), 1=2D, 2=3D.
   min_fix_quality: 1
 
-fan:
-  # SenseCap M1 onboard fan (opt-in -- this hardware doesn't exist on
-  # RAK V2/Chameleon/DIY builds). PWM-driven from CPU temperature; pin
-  # confirmed via scripts/test_gpio_hardware.py fan-scan.
+fan:                      # SenseCap M1 onboard fan control
+  # Opt-in -- this hardware doesn't exist on RAK V2/Chameleon/DIY builds.
+  # PWM-driven from CPU temperature; pin confirmed via
+  # scripts/test_gpio_hardware.py fan-scan.
   enabled: false
   # BCM GPIO number. 13 is a hardware-PWM channel on the Pi 4 (BCM2711
   # PWM1) -- confirmed as this board's fan pin.
@@ -212,11 +231,10 @@ fan:
   # How often (seconds) to re-read CPU temp and adjust duty.
   poll_interval_s: 10.0
 
-led:
-  # SenseCap M1 onboard case LED (opt-in -- same rationale as fan:).
-  # Glanceable status: steady on = all capture sources healthy, brief
-  # off-flicker = packet captured, 1 Hz blink = a configured source is
-  # down, dark = service not running.
+led:                      # SenseCap M1 onboard case LED
+  # Opt-in -- same rationale as fan: above. Glanceable status: steady on
+  # = all capture sources healthy, brief off-flicker = packet captured,
+  # 1 Hz blink = a configured source is down, dark = service not running.
   enabled: false
   # BCM GPIO number; 22 confirmed as this board's LED via
   # scripts/test_gpio_hardware.py led.
@@ -225,7 +243,7 @@ led:
   # calm steady light that only signals health.
   activity_blink: true
 
-repeater_poll:
+repeater_poll:             # active polling of MeshCore repeaters you operate
   # Periodically query MeshCore repeaters you operate for their
   # status/telemetry (battery, uptime, airtime, packet counters, LPP
   # sensors) -- MeshCore nodes advertise identity only, so these stats
@@ -244,12 +262,12 @@ repeater_poll:
   #     name: "Repeatername"   # optional label; real advertised name used otherwise
   repeaters: []
 
-button:
-  # SenseCap M1 user button (opt-in -- same rationale as fan:/led:).
-  # Short press: advert on every TX-capable radio (concentrator
-  # Meshtastic NodeInfo, MeshCore companion advert, Meshtastic USB
-  # sticks), serialized 2s apart so the overlapping 868 signals don't
-  # collide. Long press: restart the meshpoint service.
+button:                   # SenseCap M1 user button
+  # Opt-in -- same rationale as fan:/led: above. Short press: advert on
+  # every TX-capable radio (concentrator Meshtastic NodeInfo, MeshCore
+  # companion advert, Meshtastic USB sticks), serialized 2s apart so the
+  # overlapping 868 signals don't collide. Long press: restart the
+  # meshpoint service.
   enabled: false
   # BCM GPIO number; 27 confirmed as this board's button via
   # scripts/test_gpio_hardware.py button-scan.
@@ -262,13 +280,12 @@ button:
   # a single long LED blink.
   advert_cooldown_s: 30.0
 
-update_check:
-  # Periodic background check for a newer version on GitHub -- reuses
-  # the exact same git-fetch + commits-behind logic as the "Check for
-  # updates" button on Settings -> Updates, so the sidebar badge and
-  # the button always agree. Server-side, not per-browser: every
-  # client sees the same state. On by default (read-only network
-  # check, low impact); disable if you'd rather only check manually.
+update_check:              # background check for a newer version on GitHub
+  # Reuses the exact same git-fetch + commits-behind logic as the "Check
+  # for updates" button on Settings -> Updates, so the sidebar badge and
+  # the button always agree. Server-side, not per-browser: every client
+  # sees the same state. On by default (read-only network check, low
+  # impact); disable if you'd rather only check manually.
   enabled: true
   # How often (minutes) to check. Floored at 5 minutes -- each check
   # is a real `git fetch`, not a cheap request.
