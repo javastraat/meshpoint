@@ -1020,12 +1020,50 @@ While forecasting when `max_telemetry_retained`(100k)/`max_packets_retained`(1M)
 
 Then a new idea from the user: clicking a node name inside a Messages thread should open the same node detail drawer the dashboard/protocol tables already use. Implemented in `messaging_chat.js`: chat header contact name clickable for DMs only (a channel's header is the channel, not a node), plus every received message's `.msg-bubble__sender` label clickable in both DMs and channels, calling the existing global `window.nodeDrawer.open({node_id})` (confirmed via `node_drawer.js` that passing just a bare `node_id` is fine — it renders a skeleton immediately then self-fetches full detail from `GET /api/nodes/{id}`, no need to pass a pre-fetched node object). DM sender IDs were trivial (`msg.node_id` IS the one contact, no backend change needed) but channel/broadcast messages needed one: the server already looked up a broadcast message's true sender via `packet_repo.get_source_id_by_packet_id()` purely to build its display name (`message_name_resolver.py`'s `_resolve_broadcast_sender`) and then discarded the ID — added `message["source_id"] = src` as a side effect so the frontend has a real ID to click through to. **Real bug found live by the user immediately after shipping**: DMs worked, channel names still weren't clickable — `_resolve_broadcast_sender()` (the only place setting `source_id`) was gated behind "no already-stored name", but real channel messages almost always already carry a resolved `node_name` from when they were stored, so the lookup (and `source_id`) was being skipped for the common case, only ever running for the rare unresolved-name fallback. Fixed by always running the resolution (still preferring the stored name for display when one exists) so `source_id` gets attached regardless of which name wins. Stub-verified both the original and the fixed version directly against `MessageNameResolver` with a fake `packet_repo` (no aiosqlite needed — this module has zero hard runtime DB imports, only `TYPE_CHECKING` ones) since the existing `tests/test_message_name_resolver.py` needs a real `DatabaseManager`/`aiosqlite` this Mac doesn't have; confirmed the exact real-world case (stored name present + packet_id present) now correctly yields both the stored display name AND the attached `source_id`. All JS `node --check`ed, all Python `py_compile`d and stub-tested; full pytest suite not re-run this round (no local venv, small additive-only changes, same known gap as the rest of this session). CHANGELOG bullets added for every sub-piece (clear-×, autofill fix, LoRaWAN search, Meshtastic search, MeshCore pagination removal, MeshCore search, the `[hidden]` CSS bug fix, the counts, node-drawer-from-Messages, and the source_id fix), all parser-verified. Not yet live-tested on the Pi for the search/pagination pieces; the node-drawer-from-Messages piece WAS live-verified by the user via screenshots (DM confirmed working immediately; channel bug caught and fixed same-session, not yet re-confirmed live after the fix).
 
+**Cross-channel routing investigation + concentrator TX sync word root cause (2026-07-15, MAJOR).**
+User: MT message sent on "Tech Inc" arrived in the LongFast thread; also
+"concentrator to tag never arrives". Full trace produced (findings F1-F6, see
+conversation deliverable). CONFIRMED + RESOLVED live: (a) ingress misbucket =
+`ChannelHashResolver.lookup()` silently falls back to channel 0 on unmapped
+hash (`channel_hash_resolver.py:52`) + the map at the time held hash 0xC9 for
+TechInc while the tag transmits 0x71 — user's 11:06 config change (name/PSK
+now `TechInc`/`YOVI...` which hashes to exactly 0x71, verified by replicating
+`compute_channel_hash` math) fixed the map `{8:0, 113:1}`; tag→dashboard
+TechInc thread confirmed by screenshot 11:16. (b) **concentrator→any-Meshtastic-node
+TX was NEVER receivable: TX LoRa sync word.** RX 0x2B is set via direct
+service-channel demodulator register writes (`set_syncword`, regs 932/933) but
+the TX modulator is programmed per-send inside stock `sx1302_send()`
+(`loragw_sx1302.c` "Syncword" block) which only knows 0x12 (private) / 0x34
+(public); with `lorawan_public=True` (needed for LoRaWAN RX) every TX went out
+0x34 — Meshtastic radios (0x2B) never demodulate it. All soft layers verified
+correct first via TX logs (hash 0x71, freq 869.525M, SF11/BW250, AES symmetric
+encrypt/decrypt, nonce fine). CRITICALLY: the pre-existing `scripts/patch_hal.sh`
+(earlier session) tried to fix this by capturing peaks inside
+`sx1302_lora_syncword()` — ineffective since lorawan_public=True makes that
+snapshot 0x34 (the RX fix bypasses that function). FIX SHIPPED 2026-07-15:
+`sx1302_set_tx_syncword()` exported override (SF7-12; SF5/6 keep 0x12) —
+patched BOTH `extra/sx1302_hal/.../loragw_sx1302.c` (vendored ref, + header
+decl) AND rewrote `patch_hal.sh` (restores stock from git when old
+`sx1302_tx_sw_peak1` patch detected, then injects; verified: script output
+byte-identical to hand-edited vendored copy, gcc -fsyntax-only clean, re-patch
+fails loudly); `post_update.sh` marker updated old→new so existing Pis
+auto-repatch (~2min compile); `sx1302_signatures.py` (guarded try/except for
+old .so), `sx1302_wrapper.py` `set_tx_syncword()` (loud warning if symbol
+missing), called after `set_syncword` in `concentrator_source.py:start` and
+server.py `_start_with_tx_gain`. py_compile + changelog parse OK. **Pi steps:
+git pull → `sudo /opt/meshpoint/scripts/patch_hal.sh` → restart → send from
+dashboard TechInc → tag should FINALLY receive.** Not yet run on Pi.
+
 | # | Status | Effort | Item |
 |---|--------|--------|------|
+| — | LIVE TEST PENDING (built 2026-07-15) | XS | **Concentrator TX sync word fix** — run `patch_hal.sh` on Pi, restart, verify dashboard→tag on TechInc AND LongFast both arrive. THE gating fix for all concentrator Meshtastic TX (messages, ACKs, nodeinfo, telemetry) — nothing sent via concentrator was ever received by any Meshtastic node until now |
+| — | Open (found 2026-07-15) | S | **F2: kill silent fallback-to-channel-0 in `ChannelHashResolver.lookup()`** — unmapped hashes should land in a visible `broadcast:meshtastic:unmapped:0xHH` bucket + per-packet log, never silently in LongFast (this masked the config mismatch for weeks) |
+| — | Open (found 2026-07-15) | S-M | **F1: 433 MT serial stick writes its channel-table INDEX into the hash byte** (`serial_source._reconstruct_raw` line ~589, `packet.get("channel")` is a slot index when the stick decrypted locally, a hash only when it couldn't) — decoder then treats it as channel_hash; will misroute the moment the 433 stick hears channel traffic. Fix: carry stick channel identity in pre_decoded (read full channel table at connect, map by NAME) |
+| — | Open (found 2026-07-15) | S | **F3: egress via serial stick passes dashboard channel index as the stick's slot index untranslated** (`tx_service.py:307` `send_text(channel_index=channel)`) — needs name-based slot translation + refusal when the stick lacks the channel |
+| — | Open (found 2026-07-15) | S | **F5-hardening: `ChannelHashResolver.rebuild()` pairs config names with `get_all_keys()` positionally** while TX pairs from `crypto._keys.items()` directly — two sources of truth that diverged in production (map 0xC9 vs TX 0x71). Rebuild should derive from `crypto._keys.items()` |
 | — | Open (identified 2026-07-14) | S | **Incremental auto-vacuum in the hourly cleanup loop** — nothing currently reclaims free pages after packet/telemetry pruning deletes; DB file will re-fragment over time exactly like it did before the 2026-07-14 manual VACUUM (23.7MB for 4.8MB live data, 78.8% free). Proposed: `PRAGMA auto_vacuum = INCREMENTAL` (needs one `VACUUM` to take effect on the existing DB) + periodic `PRAGMA incremental_vacuum(N)` in `coordinator.py`'s `_cleanup_loop()`. User has a manual `db-vacuum.sh` stopgap on the Pi (stop service → `python3 -c "...VACUUM..."` → start service) for now; not urgent |
 | — | Live test pending | XS | **Meshtastic reply-routing via the 433 USB stick** — last unverified piece from the TX-routing/pill arc (MeshCore side already confirmed live) |
 | — | DONE, live-verified 2026-07-15 | XS | **Server-side Trends-chart downsampling** — user screenshot of NL-AMS-R-PD2EMC repeater: Trends chart dense across the full Jun22-Jul15 range, x-axis reaches Jul15 19:08 (today, no truncation), History card confirms 9999 raw samples over that period w/ 5m-ago poll. Matches DB-copy verification exactly |
-| — | Wiring verified 2026-07-15, prune-firing not yet observed | XS | **Telemetry auto-pruning + new `max_telemetry_retained` field** — config round-trip confirmed live on Pi (100000→150000 via Configuration→Advanced→Storage, persisted correctly to `local.yaml`); `journalctl` clean (no errors). No "pruned N rows" log line yet — expected, since real telemetry count is still under any cap set so far and/or the hourly loop hasn't hit its first tick since last restart. Will self-confirm naturally once telemetry approaches the cap |
 | — | Open (requested 2026-07-14) | M-L | **Per-device channel management** — channel creator for serial Meshtastic sticks (concentrator-only today), and a channel list for the 433 MeshCore companion (today's list only syncs to the 868 primary). Needs a scoping pass first: mesh-wide sync-to-all vs. genuinely separate per-companion channel sets |
 | — | Open | M | **GUI-triggered DAB channel scan → persisted JSON presets** — let a scan run from the dashboard (background task, ~13-19 min) and write results to disk instead of hand-curating the preset array |
 | W6 | Open | M-L | **True-RF S-meter via pyrtlsdr** — real dBm instead of post-demod audio loudness |
@@ -1035,6 +1073,7 @@ Then a new idea from the user: clicking a node name inside a Messages thread sho
 | W2 | Parked | M | **LoRaWAN key store + MIC verify/decrypt** — trigger: you run your own LoRaWAN devices |
 | W11 | Parked | M | **TTN uplink-only forwarder** — trigger: TTN entanglement deemed worth it |
 | — | Retest | S | **Metrics `require_auth`** — only the "blocks with no credentials" half was live-tested (401 confirmed); need to confirm a valid session actually authenticates a scrape, and whether a long-lived API-key mechanism is worth building instead of short-lived session JWTs |
+| — | Wiring verified 2026-07-15, prune-firing not yet observed | XS | **Telemetry auto-pruning + new `max_telemetry_retained` field** — config round-trip confirmed live on Pi (100000→150000 via Configuration→Advanced→Storage, persisted correctly to `local.yaml`); `journalctl` clean (no errors). No "pruned N rows" log line yet — expected, since real telemetry count is still under any cap set so far and/or the hourly loop hasn't hit its first tick since last restart. Will self-confirm naturally once telemetry approaches the cap |
 | — | Noted | — | **Firmware flasher** (upstream #85/#59) — if flashing the 3 sticks becomes a pain; found the real flasher.meshcore.io repo, not yet investigated for integration |
 | — | Noted | — | **Reticulum as a 6th network** on the spare Heltec V3 433 (upstream #11) — wildcard idea |
 

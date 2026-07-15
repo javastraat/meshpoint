@@ -64,6 +64,15 @@ def apply_signatures(lib: ctypes.CDLL) -> None:
         ctypes.c_uint8,
     ]
 
+    try:
+        # Meshpoint patch symbol; absent from a libloragw.so built before
+        # the TX sync word override existed. SX1302Wrapper.set_tx_syncword
+        # handles the missing-symbol case with a loud warning.
+        lib.sx1302_set_tx_syncword.restype = ctypes.c_int
+        lib.sx1302_set_tx_syncword.argtypes = [ctypes.c_int16]
+    except AttributeError:
+        pass
+
     lib.lgw_txgain_setconf.restype = ctypes.c_int
     lib.lgw_txgain_setconf.argtypes = [
         ctypes.c_uint8,

@@ -211,6 +211,13 @@ int sx1302_lora_service_correlator_configure(struct lgw_conf_rxif_s * cfg);
 int sx1302_lora_syncword(bool public, uint8_t lora_service_sf);
 
 /**
+@brief Override the TX LoRa sync word for SF7-SF12 transmissions (Meshpoint patch)
+@param syncword  Sync word byte (e.g. 0x2B for Meshtastic), or -1 to restore stock public/private behavior
+@return LGW_REG_SUCCESS if success, LGW_REG_ERROR otherwise
+*/
+int sx1302_set_tx_syncword(int16_t syncword);
+
+/**
 @brief Configure the LoRa multi-SF modems
 @param radio_freq_hz    The center frequency of the RF chain (0 or 1)
 @return LGW_REG_SUCCESS if success, LGW_REG_ERROR otherwise

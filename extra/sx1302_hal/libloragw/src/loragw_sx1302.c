@@ -2395,6 +2395,30 @@ int sx1302_tx_configure(lgw_radio_type_t radio_type) {
 
 /* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
 
+/* TX LoRa sync word override (Meshpoint patch).
+
+   Stock sx1302_send() can only transmit two sync words: 0x12 (private,
+   lwan_public==false) or 0x34 (LoRaWAN public). Meshtastic radios use
+   0x2B, which the stock HAL cannot produce -- RX-side 0x2B reception is
+   handled separately via the service-channel demodulator registers, so
+   without this patch the concentrator can hear Meshtastic nodes but
+   nothing it transmits is ever demodulated by them.
+
+   When >= 0, the value is used as the TX sync word for SF7-SF12 LoRa
+   transmissions (PEAK1 = 2*(sw>>4), PEAK2 = 2*(sw&0xF), same nibble
+   derivation as sx1302_lora_syncword's RX side). SF5/SF6 keep the fixed
+   0x12 sync word their fine-sync path requires, matching stock behavior.
+   -1 (default) disables the override entirely. */
+static int16_t tx_syncword_override = -1;
+
+int sx1302_set_tx_syncword(int16_t syncword) {
+    if (syncword > 0xFF) {
+        return LGW_REG_ERROR;
+    }
+    tx_syncword_override = syncword;
+    return LGW_REG_SUCCESS;
+}
+
 int sx1302_send(lgw_radio_type_t radio_type, struct lgw_tx_gain_lut_s * tx_lut, bool lwan_public, struct lgw_conf_rxif_s * context_fsk, struct lgw_pkt_tx_s * pkt_data) {
     int err;
     uint32_t freq_reg, fdev_reg;
@@ -2596,7 +2620,19 @@ int sx1302_send(lgw_radio_type_t radio_type, struct lgw_tx_gain_lut_s * tx_lut, 
             CHECK_ERR(err);
 
             /* Syncword */
-            if ((lwan_public == false) || (pkt_data->datarate == DR_LORA_SF5) || (pkt_data->datarate == DR_LORA_SF6)) {
+            if ((pkt_data->datarate == DR_LORA_SF5) || (pkt_data->datarate == DR_LORA_SF6)) {
+                DEBUG_MSG("Setting LoRa syncword 0x12\n");
+                err = lgw_reg_w(SX1302_REG_TX_TOP_FRAME_SYNCH_0_PEAK1_POS(pkt_data->rf_chain), 2);
+                CHECK_ERR(err);
+                err = lgw_reg_w(SX1302_REG_TX_TOP_FRAME_SYNCH_1_PEAK2_POS(pkt_data->rf_chain), 4);
+                CHECK_ERR(err);
+            } else if (tx_syncword_override >= 0) {
+                DEBUG_PRINTF("Setting LoRa syncword override 0x%02X\n", tx_syncword_override);
+                err = lgw_reg_w(SX1302_REG_TX_TOP_FRAME_SYNCH_0_PEAK1_POS(pkt_data->rf_chain), ((tx_syncword_override >> 4) & 0x0F) * 2);
+                CHECK_ERR(err);
+                err = lgw_reg_w(SX1302_REG_TX_TOP_FRAME_SYNCH_1_PEAK2_POS(pkt_data->rf_chain), (tx_syncword_override & 0x0F) * 2);
+                CHECK_ERR(err);
+            } else if (lwan_public == false) {
                 DEBUG_MSG("Setting LoRa syncword 0x12\n");
                 err = lgw_reg_w(SX1302_REG_TX_TOP_FRAME_SYNCH_0_PEAK1_POS(pkt_data->rf_chain), 2);
                 CHECK_ERR(err);

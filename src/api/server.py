@@ -1046,6 +1046,7 @@ def _inject_tx_gain_into_source(coord: PipelineCoordinator) -> None:
         )
         conc_source._wrapper.start()
         conc_source._wrapper.set_syncword(conc_source._syncword)
+        conc_source._wrapper.set_tx_syncword(conc_source._syncword)
         conc_source._running = True
         logger.info(
             "Concentrator started with TX gain (syncword=0x%02X)",

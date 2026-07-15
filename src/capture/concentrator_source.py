@@ -108,6 +108,7 @@ class ConcentratorCaptureSource(CaptureSource):
 
         self._wrapper.start()
         self._wrapper.set_syncword(self._syncword)
+        self._wrapper.set_tx_syncword(self._syncword)
         self._running = True
         logger.info(
             "Concentrator capture started (syncword=0x%02X)",

@@ -338,6 +338,40 @@ class SX1302Wrapper:
                 syncword, peak1, peak2,
             )
 
+    def set_tx_syncword(self, syncword: int) -> None:
+        """Override the TX LoRa sync word (e.g. 0x2B for Meshtastic).
+
+        set_syncword() above only fixes RX: it programs the service-channel
+        DEMODULATOR registers. The TX modulator is programmed per-send inside
+        lgw_send(), where the stock HAL only knows LoRaWAN 0x34
+        (lorawan_public=True, our board config) or private 0x12 — so every
+        transmission went out with 0x34 and no Meshtastic radio (0x2B) could
+        ever demodulate it, even though reception worked. Requires the
+        sx1302_set_tx_syncword symbol from the patched HAL; on an older .so
+        this logs a loud warning and TX stays Meshtastic-deaf rather than
+        crashing.
+        """
+        if self._lib is None:
+            self.load()
+        try:
+            fn = self._lib.sx1302_set_tx_syncword
+        except AttributeError:
+            logger.warning(
+                "libloragw.so predates the TX sync word patch: concentrator "
+                "TX keeps LoRaWAN sync word 0x34 and Meshtastic nodes will "
+                "NOT receive anything it sends. Rebuild and reinstall the "
+                "patched sx1302_hal (extra/sx1302_hal) to fix TX."
+            )
+            return
+        result = fn(syncword)
+        if result != LGW_HAL_SUCCESS:
+            logger.warning("Failed to set TX sync word 0x%02X", syncword)
+        else:
+            logger.info(
+                "TX sync word override 0x%02X active (SF7-SF12 transmissions)",
+                syncword,
+            )
+
     # ── TX operations ───────────────────────────────────────────────
 
     def configure_tx_gain(

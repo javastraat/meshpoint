@@ -67,8 +67,12 @@ for grp in systemd-journal adm; do
 done
 
 # ── 4. HAL TX sync word patch (one-time, ~2 minutes if needed) ──────
+# Marker is the NEW explicit-setter patch (sx1302_set_tx_syncword); Pis
+# carrying only the old static-peaks patch (sx1302_tx_sw_peak1, which
+# silently transmitted LoRaWAN 0x34 once lorawan_public=True became the
+# board default) re-patch here automatically.
 if [ -f "$HAL_SRC" ]; then
-    if ! grep -q "PEAK1_POS.*sx1302_tx_sw_peak1" "$HAL_SRC"; then
+    if ! grep -q "sx1302_set_tx_syncword" "$HAL_SRC"; then
         info "TX sync word patch needed (this takes ~2 minutes)..."
         bash "${MESHPOINT_DIR}/scripts/patch_hal.sh"
         CHANGED=1
