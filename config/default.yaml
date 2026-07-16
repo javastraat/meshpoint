@@ -6,7 +6,6 @@
 # own overrides in config/local.yaml (gitignored); only list the keys you
 # want to change there, everything else falls back to what's here.
 #
-
 radio:                   # LoRa radio settings (concentrator + onboard SX1261)
   region: "US"
   # Frequency: set frequency_mhz (explicit MHz) OR slot (Meshtastic 1-indexed
