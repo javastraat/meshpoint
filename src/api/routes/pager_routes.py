@@ -12,8 +12,10 @@ from __future__ import annotations
 
 from typing import Callable, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from src.api.auth.dependencies import require_admin
+from src.api.auth.jwt_session import SessionClaims
 from src.audio.pager_listener import PagerListener
 
 p2000_router = APIRouter(prefix="/api/p2000", tags=["p2000"])
@@ -48,7 +50,7 @@ def _add_endpoints(router: APIRouter, get_listener: Callable[[], Optional[PagerL
         return listener.poll()
 
     @router.post("/start")
-    async def start():
+    async def start(_claims: SessionClaims = Depends(require_admin)):
         listener = get_listener()
         if listener is None:
             raise HTTPException(503, "Listener not initialised")
@@ -59,7 +61,7 @@ def _add_endpoints(router: APIRouter, get_listener: Callable[[], Optional[PagerL
         return listener.status()
 
     @router.post("/stop")
-    async def stop():
+    async def stop(_claims: SessionClaims = Depends(require_admin)):
         listener = get_listener()
         if listener is None:
             raise HTTPException(503, "Listener not initialised")

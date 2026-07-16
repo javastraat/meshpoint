@@ -76,6 +76,7 @@ First tagged release of the javastraat/meshpoint fork: LoRaWAN sniffing, multi-r
 - **Login page no longer prefills the username.** Both fields start empty on every visit.
 - **Role section lists match the real navigation.** The per-role section lists behind `/api/identity` now include the LoRaWAN, Meshtastic, MeshCore, and RTL-SDR listener sections for both roles, so future UI gating on those sections behaves correctly.
 - **Upstream's new write endpoints are admin-gated too.** The position and telemetry broadcast-interval PUTs merged from upstream v0.7.7 had no role check; they now require the admin session like every other write endpoint, and CI asserts the gate.
+- **SDR start/stop/tune endpoints are now admin-gated too.** A full endpoint audit found the DAB, rtl_433, generic RTL-SDR listener, and P2000/Pagers/POCSAG `start`/`stop`/`tune` routes had no role check beyond the router-level "logged in" floor, so any viewer session could retune the dongle or kill a running decoder. They now require the admin role, matching every other state-changing endpoint in the app; the read-only `status`/`stream` routes on the same listeners stay viewer-open.
 
 #### Hardware page and band spectrum
 

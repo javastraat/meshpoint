@@ -9,10 +9,12 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from src.api.auth.dependencies import require_admin
+from src.api.auth.jwt_session import SessionClaims
 from src.audio.rtl_listener import MAX_FREQ_HZ, MIN_FREQ_HZ, RtlListener
 
 router = APIRouter(prefix="/api/listener", tags=["listener"])
@@ -50,7 +52,10 @@ async def listener_status():
 
 
 @router.post("/tune")
-async def listener_tune(req: TuneRequest):
+async def listener_tune(
+    req: TuneRequest,
+    _claims: SessionClaims = Depends(require_admin),
+):
     """Start the pipeline, or retune if already running."""
     if _listener is None:
         raise HTTPException(503, "Listener not initialised")
@@ -71,7 +76,7 @@ async def listener_tune(req: TuneRequest):
 
 
 @router.post("/stop")
-async def listener_stop():
+async def listener_stop(_claims: SessionClaims = Depends(require_admin)):
     if _listener is None:
         raise HTTPException(503, "Listener not initialised")
     await _listener.stop()

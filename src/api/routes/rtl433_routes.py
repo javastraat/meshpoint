@@ -10,8 +10,10 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from src.api.auth.dependencies import require_admin
+from src.api.auth.jwt_session import SessionClaims
 from src.audio.rtl433_listener import Rtl433Listener
 
 router = APIRouter(prefix="/api/rtl433", tags=["rtl433"])
@@ -37,7 +39,7 @@ async def status():
 
 
 @router.post("/start")
-async def start():
+async def start(_claims: SessionClaims = Depends(require_admin)):
     if _listener is None:
         raise HTTPException(503, "Listener not initialised")
     try:
@@ -48,7 +50,7 @@ async def start():
 
 
 @router.post("/stop")
-async def stop():
+async def stop(_claims: SessionClaims = Depends(require_admin)):
     if _listener is None:
         raise HTTPException(503, "Listener not initialised")
     await _listener.stop()

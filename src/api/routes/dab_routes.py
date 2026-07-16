@@ -10,10 +10,12 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from src.api.auth.dependencies import require_admin
+from src.api.auth.jwt_session import SessionClaims
 from src.audio.dab_listener import DabListener
 
 router = APIRouter(prefix="/api/dab", tags=["dab"])
@@ -46,7 +48,10 @@ async def dab_status():
 
 
 @router.post("/tune")
-async def dab_tune(req: TuneRequest):
+async def dab_tune(
+    req: TuneRequest,
+    _claims: SessionClaims = Depends(require_admin),
+):
     """Start welle-cli, or retune if already running."""
     if _listener is None:
         raise HTTPException(503, "Listener not initialised")
@@ -60,7 +65,7 @@ async def dab_tune(req: TuneRequest):
 
 
 @router.post("/stop")
-async def dab_stop():
+async def dab_stop(_claims: SessionClaims = Depends(require_admin)):
     if _listener is None:
         raise HTTPException(503, "Listener not initialised")
     await _listener.stop()
