@@ -66,6 +66,7 @@ class TopologyTab {
                         <button class="terminal-button" type="button" data-topo-zoom="in" title="Zoom in">+</button>
                         <button class="terminal-button" type="button" data-topo-fit title="Fit graph to view">Fit</button>
                         <button class="terminal-button" type="button" data-topo-refresh>Refresh</button>
+                        <button class="terminal-button" type="button" data-topo-export title="Export the current graph view as a PNG image">Export PNG</button>
                     </div>
                 </div>
                 <div class="topo-canvas-wrap">
@@ -94,8 +95,10 @@ class TopologyTab {
         this._tooltip = this.root.querySelector('.topo-tooltip');
         this._emptyEl = this.root.querySelector('.topo-empty');
         this._statsEl = this.root.querySelector('[data-topo-stats]');
+        this._exportBtn = this.root.querySelector('[data-topo-export]');
 
         this.root.querySelector('[data-topo-refresh]').addEventListener('click', () => this._load());
+        this.root.querySelector('[data-topo-export]').addEventListener('click', () => this._exportPng());
         this.root.querySelectorAll('[data-topo-zoom]').forEach((btn) => {
             btn.addEventListener('click', () => {
                 const zoomIn = btn.dataset.topoZoom === 'in';
@@ -166,6 +169,15 @@ class TopologyTab {
         });
         const onMap = this._mode === 'map';
         mapEl.hidden = !onMap;
+        if (this._exportBtn) {
+            // PNG export only makes sense for the hand-rolled canvas graph --
+            // Map mode is a separate Leaflet DOM layer, a different (and out
+            // of scope for now) export problem.
+            this._exportBtn.disabled = onMap;
+            this._exportBtn.title = onMap
+                ? 'Export PNG is only available in Graph mode'
+                : 'Export the current graph view as a PNG image';
+        }
         if (!onMap) {
             if (noteEl) noteEl.hidden = true;
             this._kick(0.1);
@@ -512,6 +524,42 @@ class TopologyTab {
         });
         ctx.globalAlpha = 1;
         ctx.restore();
+    }
+
+    // Snapshots the graph canvas as a downloadable PNG. Graph mode only --
+    // the legend/stats bar is a separate HTML element, not part of the
+    // canvas, so a caption bar with the same stats text + a timestamp is
+    // drawn onto the canvas right before capture, then the normal view is
+    // redrawn immediately after so the live graph isn't left with a
+    // permanent caption baked in.
+    _exportPng() {
+        if (this._mode === 'map' || !this._ctx || !this._canvas) return;
+        this._draw();
+        const ctx = this._ctx;
+        const w = this._w;
+        const h = this._h;
+        const barHeight = 26;
+        const statsText = this._statsEl ? this._statsEl.textContent : '';
+        const stamp = new Date().toLocaleString([], { hour12: false });
+
+        ctx.save();
+        ctx.fillStyle = 'rgba(10, 14, 20, 0.92)';
+        ctx.fillRect(0, h - barHeight, w, barHeight);
+        ctx.fillStyle = '#e6edf3';
+        ctx.font = '12px sans-serif';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(`Mesh Topology -- ${statsText} -- ${stamp}`, 10, h - barHeight / 2);
+        ctx.restore();
+
+        const dataUrl = this._canvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.href = dataUrl;
+        link.download = `meshpoint-topology-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.png`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+
+        this._draw(); // wipe the baked-in caption back off the live view
     }
 
     // ---- pointer interactions -------------------------------------------
