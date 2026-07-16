@@ -220,6 +220,7 @@ First tagged release of the javastraat/meshpoint fork: LoRaWAN sniffing, multi-r
 #### Docs
 
 - **Home Assistant cookbook.** `docs/HOME-ASSISTANT-COOKBOOK.md` for MQTT discovery and sensor wiring.
+- **Complete API endpoint reference.** A full route audit found the README's "Local API" table covered under half of the app's actual routes (whole feature areas like the self-update system, Terminal, and several config-write endpoints had zero documentation). New `docs/API-ENDPOINTS.md` lists every route with its required role (Public/Viewer/Admin); the README table stays as a curated highlights list and now links to it.
 
 ### v0.7.6 (June 2026)
 
