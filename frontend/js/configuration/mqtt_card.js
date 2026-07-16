@@ -269,10 +269,10 @@ class MqttConfigCard {
         }
 
         const since = data.connected_since
-            ? `since ${new Date(data.connected_since).toLocaleTimeString()}`
+            ? `since ${new Date(data.connected_since).toLocaleTimeString([], { hour12: false })}`
             : 'connected';
         const lastPub = data.last_publish_at
-            ? ` · last pub ${new Date(data.last_publish_at).toLocaleTimeString()}`
+            ? ` · last pub ${new Date(data.last_publish_at).toLocaleTimeString([], { hour12: false })}`
             : '';
         this._runtimeText.textContent =
             `${host}:${port} · ${since} · ${prefix} · ${pub} published · ${disc} drops${lastPub}`;

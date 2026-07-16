@@ -373,12 +373,12 @@ class PacketDetailModal {
 
     _formatTime(packet) {
         if (packet.rx_time) {
-            return new Date(packet.rx_time * 1000).toLocaleString();
+            return new Date(packet.rx_time * 1000).toLocaleString([], { hour12: false });
         }
         if (packet.timestamp) {
-            return new Date(packet.timestamp).toLocaleString();
+            return new Date(packet.timestamp).toLocaleString([], { hour12: false });
         }
-        return new Date().toLocaleString();
+        return new Date().toLocaleString([], { hour12: false });
     }
 
     _esc(str) {

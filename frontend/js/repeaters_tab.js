@@ -383,7 +383,7 @@ class RepeatersTab {
         if (!iso) return '--';
         try {
             const d = new Date(iso);
-            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
         } catch (_) {
             return '--';
         }
