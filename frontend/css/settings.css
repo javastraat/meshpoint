@@ -452,6 +452,16 @@ select.update-field__input option:checked {
     font-size: 11px;
     color: rgba(243, 244, 246, 0.55);
     min-height: 1.2em;
+    text-decoration: none;
+}
+
+.update-version__branch[href] {
+    cursor: pointer;
+}
+
+.update-version__branch[href]:hover {
+    color: rgba(243, 244, 246, 0.85);
+    text-decoration: underline;
 }
 
 .update-status {

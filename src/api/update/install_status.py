@@ -20,6 +20,7 @@ from src.api.update.rollback_state import (
     DEFAULT_ROLLBACK_STATE_PATH,
     read_rollback_state,
 )
+from src.remote.repo_source import github_raw_url, resolve_owner_repo
 from src.version import __version__
 
 logger = logging.getLogger(__name__)
@@ -215,10 +216,7 @@ def suggest_active_channel_for_install(
 
 
 def fetch_remote_version_sync(branch: str) -> Optional[str]:
-    url = (
-        "https://raw.githubusercontent.com/javastraat/meshpoint/"
-        f"{branch}/src/version.py"
-    )
+    url = github_raw_url(branch, "src/version.py")
     try:
         req = urllib.request.Request(url, method="GET")
         with urllib.request.urlopen(req, timeout=10) as resp:
@@ -518,6 +516,7 @@ def build_install_status_payload(
 
     return {
         "local_version": __version__,
+        "repo": resolve_owner_repo(),
         "install_branch": branch,
         "install_sha_short": sha,
         "remote_version": remote_version,

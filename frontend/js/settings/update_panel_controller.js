@@ -31,6 +31,7 @@ class UpdatePanelController {
         this.channelSelect = rootEl.querySelector('[data-update-channel]');
         this.customRow = rootEl.querySelector('[data-update-custom-row]');
         this.customInput = rootEl.querySelector('[data-update-custom-branch]');
+        this.customBranchList = rootEl.querySelector('[data-update-custom-branch-list]');
         this.checkBtn = rootEl.querySelector('[data-update-check]');
         this.applyBtn = rootEl.querySelector('[data-update-apply]');
         this.rollbackBtn = rootEl.querySelector('[data-update-rollback]');
@@ -62,6 +63,7 @@ class UpdatePanelController {
         this._installStatus = null;
         this._lastResult = null;
         this._releaseNotesToken = 0;
+        this._branchesLoaded = false;
     }
 
     /**
@@ -283,9 +285,16 @@ class UpdatePanelController {
         if (this.remoteBranchEl) {
             const branch = status.compare_branch || status.remote_branch || status.install_branch || '';
             const remoteSha = status.remote_sha_short || '';
-            let text = branch ? `origin/${branch}` : '';
-            if (remoteSha) text = text ? `${text} @ ${remoteSha}` : `@ ${remoteSha}`;
+            const repo = status.repo || '';
+            let text = repo || (branch ? `origin/${branch}` : '');
+            if (repo && branch) text = `${text} @ ${branch}`;
+            if (remoteSha) text = text ? `${text} (${remoteSha})` : `@ ${remoteSha}`;
             this.remoteBranchEl.textContent = text;
+            if (repo) {
+                this.remoteBranchEl.href = `https://github.com/${repo}`;
+            } else {
+                this.remoteBranchEl.removeAttribute('href');
+            }
         }
     }
 
@@ -457,11 +466,36 @@ class UpdatePanelController {
         if (this.customRow) {
             this.customRow.style.display = channel.tier === 'custom' ? '' : 'none';
         }
+        if (channel.tier === 'custom' && !this._branchesLoaded) {
+            this._loadBranches();
+        }
         if (!this._installStatus?.checked_at
             || this._installStatus?.compare_branch !== this._compareBranchForChannel(channel)) {
             this._renderSyncHint(null);
         }
         this._loadReleaseNotes(channel);
+    }
+
+    /** Populate the custom-branch datalist from this install's own resolved repo. */
+    async _loadBranches() {
+        if (!this.customBranchList) return;
+        try {
+            const response = await fetch('/api/update/branches', {
+                credentials: 'same-origin',
+            });
+            if (!response.ok) return;
+            const body = await response.json();
+            if (body.error || !Array.isArray(body.branches)) return;
+            this.customBranchList.textContent = '';
+            body.branches.forEach((name) => {
+                const option = document.createElement('option');
+                option.value = name;
+                this.customBranchList.appendChild(option);
+            });
+            this._branchesLoaded = true;
+        } catch (_e) {
+            // Leave the input as plain free-text entry; not worth surfacing an error for.
+        }
     }
 
     _compareBranchForChannel(channel) {

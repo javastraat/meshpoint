@@ -199,6 +199,7 @@ Only one of Radio / P2000 / Pagers / POCSAG / RTL433 / DAB+ may hold the RTL-SDR
 | GET | `/api/update/badge` | Admin | Sidebar "update available" badge state |
 | PUT | `/api/update/check-settings` | Admin | Enable/disable and set interval for periodic update checks |
 | GET | `/api/update/channels` | Admin | Available update channels (Stable/RC) |
+| GET | `/api/update/branches` | Admin | Branches on this install's resolved repo, for the custom-branch picker |
 | GET | `/api/update/install_status` | Admin | Progress of an in-flight install/apply |
 | POST | `/api/update/check` | Admin | Check GitHub for a newer version now |
 | GET | `/api/update/release_notes` | Admin | Parsed changelog for the installed/available version |

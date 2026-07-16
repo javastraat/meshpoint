@@ -685,13 +685,14 @@
                             <div class="update-version">
                                 <span class="update-version__label">Upstream</span>
                                 <span class="update-version__value" data-update-remote-version>--</span>
-                                <span class="update-version__branch" data-update-remote-branch></span>
+                                <a class="update-version__branch" data-update-remote-branch target="_blank" rel="noopener noreferrer"></a>
                             </div>
                         </div>
                         <p class="update-card__description" data-update-description></p>
                         <label class="update-field" data-update-custom-row style="display:none">
                             <span class="update-field__label">Custom branch</span>
-                            <input class="update-field__input" type="text" placeholder="e.g. feat/v0.7.5" data-update-custom-branch>
+                            <input class="update-field__input" type="text" placeholder="e.g. feat/v0.7.5" data-update-custom-branch list="update-custom-branch-list" autocomplete="off">
+                            <datalist id="update-custom-branch-list" data-update-custom-branch-list></datalist>
                         </label>
                         <p class="update-sync-status" data-update-sync-hint>
                             Select a channel, then check how far behind GitHub you are.

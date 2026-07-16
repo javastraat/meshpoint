@@ -119,6 +119,61 @@ class TestUpdateRoutes(unittest.TestCase):
         response = client.get("/api/update/channels")
         self.assertEqual(response.status_code, 401)
 
+    def test_branches_returns_sorted_names_with_main_first(self) -> None:
+        self.client.cookies.set("meshpoint_session", self.admin_token)
+        with mock.patch(
+            "src.api.routes.update_routes.resolve_owner_repo",
+            return_value="javastraat/meshpoint",
+        ), mock.patch(
+            "src.api.routes.update_routes._fetch_branch_names_sync",
+            return_value=["feat/v0.7.8", "main", "docs-fix"],
+        ) as fetch_mock:
+            response = self.client.get("/api/update/branches")
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["repo"], "javastraat/meshpoint")
+        self.assertEqual(body["branches"], ["main", "docs-fix", "feat/v0.7.8"])
+        self.assertIsNone(body["error"])
+        fetch_mock.assert_called_once_with("javastraat/meshpoint")
+
+    def test_branches_result_is_cached_across_requests(self) -> None:
+        self.client.cookies.set("meshpoint_session", self.admin_token)
+        with mock.patch(
+            "src.api.routes.update_routes.resolve_owner_repo",
+            return_value="javastraat/meshpoint",
+        ), mock.patch(
+            "src.api.routes.update_routes._fetch_branch_names_sync",
+            return_value=["main"],
+        ) as fetch_mock:
+            self.client.get("/api/update/branches")
+            self.client.get("/api/update/branches")
+        fetch_mock.assert_called_once()
+
+    def test_branches_reports_error_when_github_unreachable(self) -> None:
+        self.client.cookies.set("meshpoint_session", self.admin_token)
+        with mock.patch(
+            "src.api.routes.update_routes.resolve_owner_repo",
+            return_value="javastraat/meshpoint",
+        ), mock.patch(
+            "src.api.routes.update_routes._fetch_branch_names_sync",
+            return_value=None,
+        ):
+            response = self.client.get("/api/update/branches")
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["branches"], [])
+        self.assertEqual(body["error"], "Could not reach GitHub")
+
+    def test_branches_rejects_viewer(self) -> None:
+        self.client.cookies.set("meshpoint_session", self.viewer_token)
+        response = self.client.get("/api/update/branches")
+        self.assertEqual(response.status_code, 403)
+
+    def test_branches_rejects_anonymous(self) -> None:
+        client = TestClient(self.client.app)
+        response = client.get("/api/update/branches")
+        self.assertEqual(response.status_code, 401)
+
     def test_channels_rejects_viewer(self) -> None:
         self.client.cookies.set("meshpoint_session", self.viewer_token)
         response = self.client.get("/api/update/channels")

@@ -19,9 +19,12 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import time
+import urllib.request
 from collections.abc import AsyncIterator
 from dataclasses import asdict
 from pathlib import Path
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
@@ -43,6 +46,7 @@ from src.api.update.release_notes import (
     select_preview_section,
 )
 from src.config import AppConfig, save_section_to_yaml
+from src.remote.repo_source import resolve_owner_repo
 from src.version import __version__ as INSTALLED_VERSION
 
 logger = logging.getLogger(__name__)
@@ -60,6 +64,11 @@ _last_periodic_check: dict | None = None
 # interval so a bad config value (or a hand-edited yaml) can't turn
 # this into a tight loop hammering GitHub.
 MIN_CHECK_INTERVAL_MINUTES = 5
+
+# Manual/on-demand only, same reasoning as serial_config_routes.py's
+# firmware-release cache -- branches don't change often enough to poll.
+_BRANCHES_CACHE_TTL_SECONDS = 300
+_branches_cache: dict[str, object] = {"branches": None, "error": None, "expires": 0}
 
 
 def init_routes(
@@ -86,6 +95,7 @@ def reset_routes() -> None:
     _rollback_state_path = Path("/opt/meshpoint/data/update_rollback.json")
     _config = None
     _last_periodic_check = None
+    _branches_cache.update({"branches": None, "error": None, "expires": 0})
 
 
 async def _run_and_cache_check(log_context: str = "Periodic") -> None:
@@ -226,6 +236,58 @@ class CheckUpdatesRequest(BaseModel):
 
     channel_id: str | None = Field(default=None, max_length=64)
     custom_branch: str | None = Field(default=None, max_length=200)
+
+
+def _fetch_branch_names_sync(owner_repo: str) -> Optional[list[str]]:
+    url = f"https://api.github.com/repos/{owner_repo}/branches?per_page=100"
+    try:
+        req = urllib.request.Request(
+            url, headers={"Accept": "application/vnd.github+json"},
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            branches = json.loads(resp.read().decode())
+        return [b["name"] for b in branches if b.get("name")]
+    except Exception:
+        logger.debug("Failed to fetch branches for %s", owner_repo, exc_info=True)
+        return None
+
+
+async def _get_branches_cached(owner_repo: str) -> dict:
+    now = time.time()
+    if _branches_cache["expires"] > now and (
+        _branches_cache["branches"] is not None or _branches_cache["error"]
+    ):
+        return _branches_cache
+
+    loop = asyncio.get_running_loop()
+    names = await loop.run_in_executor(None, _fetch_branch_names_sync, owner_repo)
+    if names is None:
+        _branches_cache.update({
+            "branches": None, "error": "Could not reach GitHub",
+            "expires": now + _BRANCHES_CACHE_TTL_SECONDS,
+        })
+    else:
+        # main/master first (the common default branch), then the rest alphabetically.
+        names.sort(key=lambda n: (n not in ("main", "master"), n))
+        _branches_cache.update({
+            "branches": names, "error": None,
+            "expires": now + _BRANCHES_CACHE_TTL_SECONDS,
+        })
+    return _branches_cache
+
+
+@router.get("/branches")
+async def list_branches(
+    _claims: SessionClaims = Depends(require_admin),
+) -> dict:
+    """Branches on this install's own resolved repo, for the custom-branch picker."""
+    owner_repo = resolve_owner_repo()
+    cached = await _get_branches_cached(owner_repo)
+    return {
+        "repo": owner_repo,
+        "branches": cached["branches"] or [],
+        "error": cached["error"],
+    }
 
 
 @router.get("/channels")

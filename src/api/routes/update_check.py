@@ -11,15 +11,13 @@ import urllib.request
 
 from fastapi import APIRouter
 
+from src.remote.repo_source import github_raw_url
 from src.version import __version__
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/device", tags=["device"])
 
-_VERSION_URL = (
-    "https://raw.githubusercontent.com/javastraat/meshpoint/main/src/version.py"
-)
 _VERSION_RE = re.compile(r'__version__\s*=\s*["\']([^"\']+)["\']')
 _CACHE_TTL_SECONDS = 300
 
@@ -32,7 +30,7 @@ def _parse_version(version_str: str) -> tuple[int, ...]:
 
 def _fetch_remote_version_sync() -> str | None:
     try:
-        req = urllib.request.Request(_VERSION_URL, method="GET")
+        req = urllib.request.Request(github_raw_url("main", "src/version.py"), method="GET")
         with urllib.request.urlopen(req, timeout=10) as resp:
             text = resp.read().decode()
             match = _VERSION_RE.search(text)

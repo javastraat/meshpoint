@@ -188,6 +188,24 @@ class TestBuildInstallStatusPayload(unittest.TestCase):
         self.assertEqual(payload["remote_branch"], "feat/v0.7.8")
         self.assertFalse(payload["update_available"])
 
+    def test_payload_includes_resolved_repo(self) -> None:
+        runner = _FakeGitRunner(branch="main")
+        with mock.patch(
+            "src.api.update.install_status.fetch_remote_version_sync",
+            return_value=None,
+        ):
+            with mock.patch(
+                "src.api.update.install_status.resolve_owner_repo",
+                return_value="javastraat/meshpoint",
+            ):
+                payload = build_install_status_payload(
+                    registry=ReleaseChannelRegistry(),
+                    repo_path="/opt/meshpoint",
+                    runner=runner,
+                    use_sudo=False,
+                )
+        self.assertEqual(payload["repo"], "javastraat/meshpoint")
+
     def test_main_on_075_payload_keeps_picker_on_stable(self) -> None:
         runner = _FakeGitRunner(branch="main", sha="56d4f7c")
         with mock.patch(
