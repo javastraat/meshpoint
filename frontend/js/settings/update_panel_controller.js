@@ -31,7 +31,7 @@ class UpdatePanelController {
         this.channelSelect = rootEl.querySelector('[data-update-channel]');
         this.customRow = rootEl.querySelector('[data-update-custom-row]');
         this.customInput = rootEl.querySelector('[data-update-custom-branch]');
-        this.customBranchList = rootEl.querySelector('[data-update-custom-branch-list]');
+        this.branchSelect = rootEl.querySelector('[data-update-branch-select]');
         this.checkBtn = rootEl.querySelector('[data-update-check]');
         this.applyBtn = rootEl.querySelector('[data-update-apply]');
         this.rollbackBtn = rootEl.querySelector('[data-update-rollback]');
@@ -80,6 +80,7 @@ class UpdatePanelController {
 
     bind() {
         this.channelSelect?.addEventListener('change', () => this._onChannelChanged());
+        this.branchSelect?.addEventListener('change', () => this._onBranchSelectChanged());
         this.checkBtn?.addEventListener('click', () => this._checkForUpdates());
         this.applyBtn?.addEventListener('click', () => this._apply());
         this.rollbackBtn?.addEventListener('click', () => this._rollback());
@@ -466,8 +467,9 @@ class UpdatePanelController {
         if (this.customRow) {
             this.customRow.style.display = channel.tier === 'custom' ? '' : 'none';
         }
-        if (channel.tier === 'custom' && !this._branchesLoaded) {
-            this._loadBranches();
+        if (channel.tier === 'custom') {
+            this._syncCustomBranchInputVisibility();
+            if (!this._branchesLoaded) this._loadBranches();
         }
         if (!this._installStatus?.checked_at
             || this._installStatus?.compare_branch !== this._compareBranchForChannel(channel)) {
@@ -476,26 +478,54 @@ class UpdatePanelController {
         this._loadReleaseNotes(channel);
     }
 
-    /** Populate the custom-branch datalist from this install's own resolved repo. */
+    /** Populate the branch dropdown from this install's own resolved repo. */
     async _loadBranches() {
-        if (!this.customBranchList) return;
+        if (!this.branchSelect) return;
         try {
             const response = await fetch('/api/update/branches', {
                 credentials: 'same-origin',
             });
             if (!response.ok) return;
             const body = await response.json();
-            if (body.error || !Array.isArray(body.branches)) return;
-            this.customBranchList.textContent = '';
+            if (body.error || !Array.isArray(body.branches) || !body.branches.length) return;
+
+            const currentValue = (this.customInput?.value || '').trim();
+            this.branchSelect.textContent = '';
             body.branches.forEach((name) => {
                 const option = document.createElement('option');
                 option.value = name;
-                this.customBranchList.appendChild(option);
+                option.textContent = name;
+                this.branchSelect.appendChild(option);
             });
+            const customOption = document.createElement('option');
+            customOption.value = '__custom__';
+            customOption.textContent = 'Custom (type below)';
+            this.branchSelect.appendChild(customOption);
+
+            this.branchSelect.value = body.branches.includes(currentValue)
+                ? currentValue : '__custom__';
+            this._syncCustomBranchInputVisibility();
             this._branchesLoaded = true;
         } catch (_e) {
-            // Leave the input as plain free-text entry; not worth surfacing an error for.
+            // Leave the picker in its plain-text fallback state; not worth surfacing an error for.
         }
+    }
+
+    _onBranchSelectChanged() {
+        if (!this.branchSelect || !this.customInput) return;
+        if (this.branchSelect.value === '__custom__') {
+            this.customInput.focus();
+        } else {
+            this.customInput.value = this.branchSelect.value;
+        }
+        this._syncCustomBranchInputVisibility();
+    }
+
+    /** The text input is only for typing a branch not in the dropdown. */
+    _syncCustomBranchInputVisibility() {
+        if (!this.customInput) return;
+        const isCustom = !this.branchSelect || this.branchSelect.value === '__custom__';
+        this.customInput.hidden = !isCustom;
     }
 
     _compareBranchForChannel(channel) {
