@@ -1506,6 +1506,32 @@ stale "fixed" claim for something that got reverted a few hours later.
 
 ---
 
+### 2026-07-18: install.sh gets mDNS (Avahi)
+
+User asked where to add Avahi (`apt install avahi-daemon avahi-utils` +
+`systemctl enable --now avahi-daemon`) so the Pi is reachable as
+`meshpoint.local` instead of needing its IP -- useful right after a
+fresh flash and for the HA integration's setup step. Added as new
+Section 22 in `scripts/install.sh`, between "Install network watchdog"
+(21) and "Install CLI tool" (renumbered 22->23, fastfetch banner
+23->24) -- placed there rather than near Section 1's system packages to
+keep the renumbering diff small (2 headers vs. ~20) while still grouping
+it with the other core networking/reliability section rather than the
+hardware-specific radio sections. Idempotent, matching the established
+sections-9-11 convention (skip the apt install if `avahi-daemon` binary
+already exists; `enable --now` is safe to re-run regardless). Note left
+in the script comment: this publishes `<hostname>.local`, not literally
+"meshpoint.local" unless the Pi's hostname is actually set to
+"meshpoint" -- didn't change the hostname itself, that's a separate,
+more invasive change (affects SSH known_hosts, other services) not
+asked for. `bash -n` clean, confirmed no other references to the old
+section numbers anywhere else in the repo. CHANGELOG bullet added
+alongside the other installer entries (lgpio deps, RTL-SDR setup,
+redsea) it now sits next to. **Not yet run on a real Pi** -- next
+install/upgrade run is the real test.
+
+---
+
 ## CURRENT WORKLIST v8 (2026-07-16 — supersedes v7 below; THE list to work off)
 
 Closed since v7 (full detail in the v7 section below, kept for history):

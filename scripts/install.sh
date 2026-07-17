@@ -769,13 +769,34 @@ systemctl enable network-watchdog
 systemctl start network-watchdog 2>/dev/null || warn "Could not start network-watchdog (will start on next boot)"
 info "Network watchdog enabled"
 
-# ── 22. Install CLI tool ───────────────────────────────────────────
+# ── 22. Install mDNS (Avahi) for meshpoint.local discovery ────────
+#
+# Lets the Pi be reached as meshpoint.local (or <hostname>.local) on
+# the LAN without knowing its IP -- useful right after a fresh flash
+# before a static IP/DHCP reservation is set up, and for the Home
+# Assistant integration's setup step (enter host/IP) when the user
+# doesn't know the IP yet either.
+#
+# Idempotent: skips the apt install if avahi-daemon is already present;
+# enable --now is safe to re-run either way (systemd no-ops if already
+# enabled and running).
+
+if command -v avahi-daemon &>/dev/null; then
+    info "avahi-daemon already installed, skipping"
+else
+    info "Installing mDNS (Avahi) for meshpoint.local discovery..."
+    apt-get install -y -qq avahi-daemon avahi-utils
+fi
+
+systemctl enable --now avahi-daemon
+
+# ── 23. Install CLI tool ───────────────────────────────────────────
 
 info "Installing meshpoint CLI..."
 chmod +x "${MESHPOINT_DIR}/${CLI_SCRIPT}"
 ln -sf "${MESHPOINT_DIR}/${CLI_SCRIPT}" /usr/local/bin/meshpoint
 
-# ── 23. Add fastfetch login banner ────────────────────────────────
+# ── 24. Add fastfetch login banner ────────────────────────────────
 #
 # Shows a system-info banner on every interactive login shell for the
 # `pi` user. Idempotent: skips if already present.
