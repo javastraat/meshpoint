@@ -189,9 +189,11 @@ class MetricsConfigCard {
     }
 
     async _revokeKey(id, label) {
-        if (!window.confirm(`Revoke API key "${label}"? Anything using it will stop working immediately.`)) {
-            return;
-        }
+        const confirmed = await this._confirm({
+            label: `Revoke "${label}"`,
+            description: 'Anything using this key (a Home Assistant sensor, a Prometheus scrape config, etc.) will stop working immediately.',
+        });
+        if (!confirmed) return;
 
         const status = this._root.querySelector('[data-metrics-keys-status]');
         status.dataset.kind = 'pending';
@@ -266,6 +268,18 @@ class MetricsConfigCard {
         const el = document.createElement('span');
         el.textContent = str || '';
         return el.innerHTML;
+    }
+
+    /**
+     * In-app confirmation dialog (replaces the browser's native
+     * ``window.confirm`` popup). Uses the shared confirmModal helper;
+     * falls back to native confirm if that script failed to load.
+     */
+    _confirm({ label, description }) {
+        if (window.confirmModal) {
+            return window.confirmModal({ label, description });
+        }
+        return Promise.resolve(window.confirm(`${label}\n\n${description}`));
     }
 }
 

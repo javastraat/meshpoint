@@ -1019,9 +1019,15 @@ config round-trips through `save_section_to_yaml` + `_apply_yaml` correctly;
 header/non-Bearer scheme; full `create_metrics_api_key` → yaml persist →
 reload → `revoke_metrics_api_key` → yaml persist → reload cycle confirmed
 end-to-end via `asyncio.run`, including 404 on revoking an unknown id.
-`node --check` on both touched JS files; CSS brace-balance check. Not yet
-live-tested against a real browser or the actual Pi (per usual — dev
-happens on the Mac, user deploys).
+`node --check` on both touched JS files; CSS brace-balance check.
+
+**Live-verified on the Pi same day** (user deployed + restarted, ran the
+curl checks): unauthenticated `/metrics` → 401; generated a key from the
+dashboard UI, `Authorization: Bearer <key>` → 200 with real Prometheus body;
+`local.yaml` on disk showed only `key_hash` (hex), never the raw key;
+revoked the key from the UI → same curl immediately → 401 again, and
+`api_keys: []` in `local.yaml`. Full round trip confirmed working exactly
+as designed.
 
 ---
 
