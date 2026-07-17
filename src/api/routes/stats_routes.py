@@ -80,15 +80,16 @@ async def stats_summary():
     direct_relayed = await _get_direct_relayed_counts()
     farthest_mesh = await _get_farthest_via_mesh()
     farthest_meshcore = await _get_farthest_meshcore_contact()
-    farthest_neighbour = await _get_farthest_neighbour_direct()
+    farthest_direct_db = await _get_farthest_direct_reception()
 
     device_ctx = _get_device_context()
     first_pkt = await _get_first_packet_time()
 
     live_report = dict(report)
-    # farthest_direct: use neighbour_advert as fallback when live reporter has nothing
-    if not live_report.get("farthest_direct") and farthest_neighbour:
-        live_report["farthest_direct"] = farthest_neighbour
+    # farthest_direct: fall back to the persisted DB record (any protocol)
+    # when the live session accumulator hasn't seen a direct packet yet
+    if not live_report.get("farthest_direct") and farthest_direct_db:
+        live_report["farthest_direct"] = farthest_direct_db
     # Expose all-time DB totals alongside session (live reporter) counts so the
     # frontend can toggle between them. Session data stays in live.protocols /
     # live.packet_types; all-time goes in separate keys.
@@ -311,8 +312,24 @@ async def _get_farthest_meshcore_contact() -> dict | None:
     return best
 
 
-async def _get_farthest_neighbour_direct() -> dict | None:
-    """Farthest node heard directly via MeshCore neighbour advertisements."""
+async def _get_farthest_direct_reception() -> dict | None:
+    """Farthest node ever heard directly (0 hops), across every protocol.
+
+    DB-backed fallback for when the live StatsReporter accumulator has
+    nothing yet -- e.g. right after a restart, before this session has
+    re-heard anything directly. Unlike the live value, this reflects the
+    node's most distant *historical* direct contact, persisted regardless
+    of restarts -- the same "direct" definition node_repository.py's
+    Dashboard DIRECT filter uses (hop_start == 0, or a hop_start whose
+    hops are fully unconsumed: hop_start == hop_limit).
+
+    Previously restricted to ``packet_type = 'neighbour_advert'``
+    (MeshCore-only), which meant a Meshtastic node reached directly could
+    never appear here regardless of distance or recency -- only a fresh
+    live reception in the current session would ever populate "Farthest
+    Direct Signal" for it. Broadened to match on hop count instead of
+    packet type, so it covers direct receptions on any protocol.
+    """
     if not _packet_repo or not _node_repo:
         return None
 
@@ -321,7 +338,7 @@ async def _get_farthest_neighbour_direct() -> dict | None:
         SELECT p.source_id, p.snr, n.long_name, n.latitude, n.longitude
         FROM packets p
         JOIN nodes n ON p.source_id = n.node_id
-        WHERE p.packet_type = 'neighbour_advert'
+        WHERE (p.hop_start = 0 OR (p.hop_start > 0 AND p.hop_start = p.hop_limit))
           AND n.latitude IS NOT NULL AND n.longitude IS NOT NULL
           AND (p.capture_source IS NULL OR p.capture_source != 'meshcore_db_import')
           AND p.packet_id NOT LIKE 'nb:%'

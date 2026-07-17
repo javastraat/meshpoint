@@ -1405,6 +1405,61 @@ live.
 
 ---
 
+### 2026-07-17 (same day, follow-on): Fixed "Farthest Direct Signal" MeshCore-only fallback bug
+
+User spotted a real discrepancy from live screenshots: Dashboard's Nodes
+panel correctly showed `DK_3700_ROENNE_N` (716 km) tagged DIRECT, but the
+Stats page's "Farthest Direct Signal" card showed "--". User's own guess
+("was stats only after a reboot seeing in memory?") was exactly right.
+Sent an Explore subagent to trace the full path before touching any code
+(this is Meshpoint's own app, not the HA integration -- different
+codebase area, wanted certainty before editing).
+
+Root cause, confirmed via `src/analytics/stats_reporter.py` +
+`src/api/routes/stats_routes.py` + `src/storage/node_repository.py`:
+- The LIVE figure (`StatsReporter._farthest_direct_miles`) is a pure
+  in-memory session accumulator, reset on every restart, only updated
+  from packets actually decoded live in the current run -- protocol-
+  agnostic by design (`record_farthest_direct()` is called generically
+  from `coordinator.py:381` for every packet, any protocol).
+- The Dashboard's DIRECT tab (`node_repository.py:288-323`) is a full
+  historical DB query on each node's most recent packet -- persists
+  across restarts, needs only one direct packet ever.
+- The bug: the DB-backed *fallback* for when the live figure is empty
+  (`_get_farthest_neighbour_direct()`, meant to cover exactly this gap)
+  was hardcoded to `packet_type = 'neighbour_advert'` -- MeshCore-only.
+  A Meshtastic direct contact could never satisfy it, at any distance,
+  ever, regardless of how long Meshpoint had been running. Notably, the
+  existing subtitle text (added 2026-07-1x, see CHANGELOG) already
+  *claimed* this stat covers "every protocol/band" -- the fallback
+  quietly didn't live up to that promise.
+
+Fixed: renamed to `_get_farthest_direct_reception()`, query now matches
+on hop count (`hop_start = 0 OR hop_start = hop_limit`) instead of
+packet type -- the same "direct" definition `node_repository.py` already
+uses -- so it covers any protocol. Kept the existing import-marker
+exclusions (`capture_source != 'meshcore_db_import'`, `nb:`/`meshcoredb:`
+packet_id prefixes) since those apply just as much to a broadened query.
+
+Verification: `py_compile` clean. Ran the *actual* SQL text (not a
+reimplementation) against a real in-memory SQLite DB (stdlib `sqlite3`,
+no aiosqlite needed for this synchronous check) with rows built to
+mirror the exact reported scenario -- a Meshtastic direct packet
+(the DK_3700_ROENNE_N case), a MeshCore neighbour_advert direct packet
+(prior working case, checked for regression), a relayed packet, an
+imported/synthetic row, and a hop_start=0 (no hop info) packet. All five
+came back correctly classified: Meshtastic direct now matches (the fix),
+MeshCore direct still matches (no regression), relayed and imported rows
+still excluded, hop_start=0 still counts as direct. This is a stronger
+verification than prior stub tests this session since it's the literal
+SQL running against a real database engine, not mocked logic. **Not yet
+confirmed against the user's live database** -- the next time Meshpoint
+restarts (or `/api/stats/summary` is hit fresh) on the real Pi, "Farthest
+Direct Signal" should show DK_3700_ROENNE_N until something farther is
+heard live.
+
+---
+
 ## CURRENT WORKLIST v8 (2026-07-16 — supersedes v7 below; THE list to work off)
 
 Closed since v7 (full detail in the v7 section below, kept for history):
@@ -1426,6 +1481,7 @@ Upstream card links the real repo, Custom-branch is a real dropdown).
 | Open | L | **Light theme** — tokenize the dark-first CSS, light map tiles, per-page contrast pass (topbar toggle already has a slot reserved) |
 | Open | S | **Retest `install.sh` on a fresh microSD flash** — the new-install path (new user, first systemd install, SPI/UART/I2C) has never been exercised, only upgrades |
 | Open | S | **Prune or document the 6 duplicate API endpoints** (packets/count+protocols+types, nodes/map+summary, telemetry/*) |
+| Open | XS | **Live-verify the "Farthest Direct Signal" MeshCore-only fallback fix** — `_get_farthest_direct_reception()` (renamed/fixed 2026-07-17, was `_get_farthest_neighbour_direct()`) verified against a real in-memory SQLite DB with synthetic rows matching the exact reported bug, but not yet against the actual production database. Next restart or fresh `/api/stats/summary` load should show `DK_3700_ROENNE_N` (716 km) as Farthest Direct Signal until something farther is heard live — confirm it actually does |
 | ~~Retest~~ DONE 2026-07-17 | S | ~~Metrics `require_auth`~~ — long-lived API-key mechanism built (named, revocable, `/metrics`-scoped, hash-only storage) and live-verified end-to-end on the Pi: 401 unauthed, 200 with a valid key, revoke → 401 again, `local.yaml` never holds the raw key. See the 2026-07-17 write-up above |
 | Open | XS | **PR Meshpoint's brand icon/logo to `home-assistant/brands`** — without this, the HA integration shows "icon not available" in Add Integration's brand picker. Assets already cropped and staged at `homeassistant/brands/meshpoint/` (icon.png/icon@2x.png/logo.png/logo@2x.png, 256/512px, cut from `MP_logo.png`) with submission steps in that folder's README — user explicitly deferred the actual fork+PR to home-assistant/brands (external repo, wanted to decide timing themselves) |
 | ~~Open~~ DONE 2026-07-17 | M | ~~Live-test the Home Assistant integration + Lovelace card on a real HA instance~~ — both fully live-verified same day. Integration: config flow completed, device page showed every dynamic sensor correctly (protocol splits, node/packet counts, noise floor, packet rate). Card: `meshpoint-card.js` rendered correctly too, once a real bug was found and fixed along the way -- see the "Card debugging" write-up below (real cause was a stale HA frontend *service worker* caching an earlier 404, not the file placement or the card code; confirmed via curl 200 vs browser 404 on the identical URL, then incognito rendering correctly). Screenshot showed status header (online dot + node count chip), stats grid, and Protocols section all matching the intended design exactly |
