@@ -1458,6 +1458,52 @@ restarts (or `/api/stats/summary` is hit fresh) on the real Pi, "Farthest
 Direct Signal" should show DK_3700_ROENNE_N until something farther is
 heard live.
 
+**Round 2, same day, a few hours later**: user flagged a different node
+on the live Stats page ("i dont know maybe this is heard by repeater and
+then repeated this is no good") showing as Farthest Direct Signal at
+**743 km with a strong clean SNR (13.5 dB)** -- physically implausible
+for a genuine no-relay LoRa/MeshCore contact. This is the fix from round
+1 actually working (correctly picking up a DB row with hop_start=0/
+hop_limit=0 that isn't restricted by packet_type anymore) but surfacing
+that the underlying premise was wrong: **hop_start=0 is not a reliable
+signal of "genuinely heard directly."** Sent another Explore subagent to
+check the live repeater-neighbour-poll insertion code
+(`src/transmit/repeater_poller.py:204` ->
+`PacketRepository.insert_neighbour_report()`,
+`src/storage/packet_repository.py:178-206`) specifically to see whether
+*that* path's rows would also pass the broadened hop-count filter --
+confirmed they do (those rows never set hop_start/hop_limit, so both
+default to the table's `DEFAULT 0`, `src/storage/database.py:34-35`) and
+were ONLY ever excluded from the old query by a completely separate,
+coincidental convention: `capture_source` left `NULL` and
+`packet_id` always prefixed `nb:`. In other words, "hop_start=0 means
+direct" only held true in practice because of an unrelated packet_id
+naming convention protecting it, not because the hop fields themselves
+are trustworthy -- there's no guarantee some OTHER packet path doesn't
+also default to 0/0 without that same protective naming (the 743 km row
+itself had a real, non-import `capture_source='meshcore_usb_868'` per
+the subagent's DB check, yet the distance is still implausible -- exact
+mechanism for how that specific row got its hop fields wasn't chased
+further once the deeper problem was clear).
+
+**Decision: reverted entirely rather than add more special-casing.**
+Removed the DB fallback function and its call site completely --
+"Farthest Direct Signal" is back to purely `StatsReporter`'s live,
+in-memory, real-time-hop-accounting value, same as it was before round 1
+ever started. User's framing was the right call: "can we maybe do it
+like it was before, just session based?" -- after two rounds of finding
+new ways a persisted-DB fallback for this specific stat produces
+misleading results, the conclusion is that this stat is fundamentally
+suited to being session-only, not something to keep patching with
+tighter WHERE clauses. The other two Range cards (Farthest via
+Meshtastic, Farthest MeshCore Contact) stay DB-backed/persisted as
+before -- neither claims "no relay hops," so neither depends on hop
+metadata being trustworthy the way this one did. `py_compile` clean,
+confirmed zero remaining references to the removed function anywhere in
+the codebase. Also updated the round-1 CHANGELOG bullet in place (same
+day, still uncommitted) to describe the full arc rather than leave a
+stale "fixed" claim for something that got reverted a few hours later.
+
 ---
 
 ## CURRENT WORKLIST v8 (2026-07-16 — supersedes v7 below; THE list to work off)
@@ -1481,7 +1527,7 @@ Upstream card links the real repo, Custom-branch is a real dropdown).
 | Open | L | **Light theme** — tokenize the dark-first CSS, light map tiles, per-page contrast pass (topbar toggle already has a slot reserved) |
 | Open | S | **Retest `install.sh` on a fresh microSD flash** — the new-install path (new user, first systemd install, SPI/UART/I2C) has never been exercised, only upgrades |
 | Open | S | **Prune or document the 6 duplicate API endpoints** (packets/count+protocols+types, nodes/map+summary, telemetry/*) |
-| Open | XS | **Live-verify the "Farthest Direct Signal" MeshCore-only fallback fix** — `_get_farthest_direct_reception()` (renamed/fixed 2026-07-17, was `_get_farthest_neighbour_direct()`) verified against a real in-memory SQLite DB with synthetic rows matching the exact reported bug, but not yet against the actual production database. Next restart or fresh `/api/stats/summary` load should show `DK_3700_ROENNE_N` (716 km) as Farthest Direct Signal until something farther is heard live — confirm it actually does |
+| ~~Open~~ SUPERSEDED same day 2026-07-17 | — | ~~Live-verify the "Farthest Direct Signal" MeshCore-only fallback fix~~ — the DB-fallback approach itself got reverted a few hours later, see the "Farthest Direct Signal, round 2" write-up below. Nothing to live-verify; the stat is session-only now, no fallback query to test |
 | ~~Retest~~ DONE 2026-07-17 | S | ~~Metrics `require_auth`~~ — long-lived API-key mechanism built (named, revocable, `/metrics`-scoped, hash-only storage) and live-verified end-to-end on the Pi: 401 unauthed, 200 with a valid key, revoke → 401 again, `local.yaml` never holds the raw key. See the 2026-07-17 write-up above |
 | Open | XS | **PR Meshpoint's brand icon/logo to `home-assistant/brands`** — without this, the HA integration shows "icon not available" in Add Integration's brand picker. Assets already cropped and staged at `homeassistant/brands/meshpoint/` (icon.png/icon@2x.png/logo.png/logo@2x.png, 256/512px, cut from `MP_logo.png`) with submission steps in that folder's README — user explicitly deferred the actual fork+PR to home-assistant/brands (external repo, wanted to decide timing themselves) |
 | ~~Open~~ DONE 2026-07-17 | M | ~~Live-test the Home Assistant integration + Lovelace card on a real HA instance~~ — both fully live-verified same day. Integration: config flow completed, device page showed every dynamic sensor correctly (protocol splits, node/packet counts, noise floor, packet rate). Card: `meshpoint-card.js` rendered correctly too, once a real bug was found and fixed along the way -- see the "Card debugging" write-up below (real cause was a stale HA frontend *service worker* caching an earlier 404, not the file placement or the card code; confirmed via curl 200 vs browser 404 on the identical URL, then incognito rendering correctly). Screenshot showed status header (online dot + node count chip), stats grid, and Protocols section all matching the intended design exactly |
