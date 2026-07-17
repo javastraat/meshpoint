@@ -53,9 +53,17 @@ Once added, **Settings → Devices & Services → Meshpoint** shows every sensor
 
 This integration lives in a subdirectory of the main Meshpoint repo rather than its own repo. Adding `https://github.com/javastraat/meshpoint` as a HACS custom repository (category "Integration") may not pick up the subdirectory correctly — manual installation above is the reliable path for now.
 
-## 4. Install the Lovelace card (optional)
+## 4. Install the Lovelace cards (optional)
 
-`www/meshpoint-card.js` is a self-contained custom card (no build step, no framework) that groups one Meshpoint device's entities into a status header, stats grid, and Protocols/Signal/Relay sections, with a "More" grid for anything not yet in its lookup table — so a metric the integration surfaces later still shows up, unstyled, without the card needing an update either.
+`www/meshpoint-card.js` is one self-contained file (no build step, no framework) that registers **three** card types — with ~140 entities across the three polled endpoints, one card became an unreadable wall of tiles, so it's split by concern instead:
+
+| Card type | Shows |
+|---|---|
+| `custom:meshpoint-card` | Status — online, node count, uptime, packet rate, protocol split, signal, relay. The at-a-glance one. |
+| `custom:meshpoint-health-card` | Host health — CPU, memory, disk, temperature, fan. |
+| `custom:meshpoint-insights-card` | Insights — best signal ever, farthest contact, node role distribution. |
+
+Each pulls in only the entities that belong to it; anything not yet in its lookup table still shows up in a "More" grid on the right card, grouped by source — so a metric the integration surfaces later never gets silently dropped. Raw hardware-model codes and the packet-type breakdown are deliberately left out of all three (not meaningful as tiles; still available as plain entities if you want to build your own).
 
 1. Copy `www/meshpoint-card.js` into `<ha-config>/www/meshpoint-card.js` — same methods as step 2 above (File editor, Samba, scp). It must land directly in `www/`, not a subfolder — `/local/` maps to that exact directory.
 2. **Verify it's actually being served** before touching Lovelace at all:
@@ -66,14 +74,14 @@ This integration lives in a subdirectory of the main Meshpoint repo rather than 
 3. **Settings → Dashboards → ⋮ → Resources → + Add Resource**
    - URL: `/local/meshpoint-card.js`
    - Resource type: **JavaScript Module**
-4. Edit any dashboard → Add Card → search "Meshpoint Card", or add manually as YAML:
+4. Edit any dashboard → Add Card → search "Meshpoint" (all three show up), or add manually as YAML — swap `type` for whichever of the three you want:
    ```yaml
    type: custom:meshpoint-card
    entity: sensor.meshpoint_<...>_uptime
    ```
-   Any one Meshpoint sensor works for `entity` — find one via **Developer Tools → States**, filter "meshpoint", copy any entity ID. The card looks up its sibling entities from the same device automatically. (Or use `device_id: <id>` instead — that ID is the last segment of the device page's URL.)
+   Any one Meshpoint sensor works for `entity`, on any of the three card types — find one via **Developer Tools → States**, filter "meshpoint", copy any entity ID. Each card looks up its sibling entities from the same device automatically. (Or use `device_id: <id>` instead — that ID is the last segment of the device page's URL.) Add all three as separate cards if you want everything.
 
-No visual card editor yet — YAML config only for this first version.
+No visual card editor yet — YAML config only for this first version. Updating an already-installed `meshpoint-card.js` to a newer version needs a Python-style restart-free refresh from the browser (it's just a static file), but the JS resource can be cached hard by the browser — if a change doesn't seem to take effect, see the cache troubleshooting below before assuming something's broken.
 
 ## Troubleshooting
 

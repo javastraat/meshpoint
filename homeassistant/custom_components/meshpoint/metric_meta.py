@@ -245,4 +245,13 @@ METRIC_META: dict[str, MetricMeta] = {
     "stats_farthest_meshcore_node_name": MetricMeta(
         "Farthest MeshCore Contact Name", icon="mdi:map-marker-distance",
     ),
+    "stats_network_roles_client": MetricMeta("Client Nodes", icon="mdi:radio-handheld"),
+    "stats_network_roles_router": MetricMeta("Router Nodes", icon="mdi:router-wireless"),
+    "stats_network_roles_repeater": MetricMeta("Repeater Nodes", icon="mdi:antenna"),
+    "stats_network_roles_client_mute": MetricMeta(
+        "Client (Mute) Nodes", icon="mdi:radio-handheld-off",
+    ),
+    "stats_network_nodes_with_position": MetricMeta(
+        "Nodes With Position", icon="mdi:map-marker-radius",
+    ),
 }

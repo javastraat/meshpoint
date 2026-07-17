@@ -1217,6 +1217,48 @@ first integration build got.
 
 ---
 
+### 2026-07-17 (same day, follow-on): Split the Meshpoint card into 3
+
+With ~140 entities now live across all three polled endpoints, user asked
+to either fix the grouping or split into multiple cards, and for a
+recommendation. Advised splitting -- one card mixing mesh stats, host
+health, and historical records was heading toward an unreadable wall of
+tiles, and separate purpose-built cards let a user add only what they
+care about (matches the "let HA's own mechanisms handle choice" pattern
+already used for entities). Implemented as **one resource file
+registering three custom elements** rather than three separate files to
+install -- `meshpoint-card` (status, existing, refined), new
+`meshpoint-health-card` (CPU/RAM/disk/temp/fan), new
+`meshpoint-insights-card` (best signal ever, farthest contact, node role
+distribution). Deliberately excluded from all three: raw hardware-model
+codes and the 14-way packet-type breakdown -- not meaningful as
+individual tiles, still exist as plain entities for anyone building their
+own automation.
+
+Refactored into a shared `MeshpointCardBase` (config/hass wiring, entity
+collection, tile/section rendering, CSS) with each card type as a thin
+subclass providing its own curated name-set and body layout. New
+`classifyEntity(name)` routes each entity to the right card: curated
+names matched by exact set membership; uncurated (fallback-named)
+`device_`/`stats_` entities route via their prefix word (still present
+in fallback names since the collision fix earlier today deliberately
+kept it); anything else (bare /metrics names) defaults to the status
+card, preserving original behavior. Added 5 more curated `metric_meta.py`
+entries (node role distribution + nodes-with-position) for the insights
+card.
+
+Verification: `node --check`; `py_compile` on the metric_meta.py addition
+plus a re-run of the earlier collision-safety stub test (47 curated
+entries now, still zero duplicate names); a new logic test evaluated
+`classifyEntity()` against 15 cases built from the user's actual live
+data dump (all pass, including real names like "Stats Network Hw Models
+43" and "Device Fan Previous Duty Percent"). **Not yet rendered in a real
+dashboard** -- same caveat as the original card build, the actual visual
+layout/grouping is unverified beyond the classification logic until the
+user installs the updated file and reloads.
+
+---
+
 ## CURRENT WORKLIST v8 (2026-07-16 — supersedes v7 below; THE list to work off)
 
 Closed since v7 (full detail in the v7 section below, kept for history):
@@ -1242,6 +1284,7 @@ Upstream card links the real repo, Custom-branch is a real dropdown).
 | Open | XS | **PR Meshpoint's brand icon/logo to `home-assistant/brands`** — without this, the HA integration shows "icon not available" in Add Integration's brand picker. Assets already cropped and staged at `homeassistant/brands/meshpoint/` (icon.png/icon@2x.png/logo.png/logo@2x.png, 256/512px, cut from `MP_logo.png`) with submission steps in that folder's README — user explicitly deferred the actual fork+PR to home-assistant/brands (external repo, wanted to decide timing themselves) |
 | ~~Open~~ DONE 2026-07-17 | M | ~~Live-test the Home Assistant integration + Lovelace card on a real HA instance~~ — both fully live-verified same day. Integration: config flow completed, device page showed every dynamic sensor correctly (protocol splits, node/packet counts, noise floor, packet rate). Card: `meshpoint-card.js` rendered correctly too, once a real bug was found and fixed along the way -- see the "Card debugging" write-up below (real cause was a stale HA frontend *service worker* caching an earlier 404, not the file placement or the card code; confirmed via curl 200 vs browser 404 on the identical URL, then incognito rendering correctly). Screenshot showed status header (online dot + node count chip), stats grid, and Protocols section all matching the intended design exactly |
 | ~~Open~~ DONE 2026-07-17 | M | ~~Live-test the widened API key scope + new HA sensors on the real Pi/HA~~ — live-tested same day, both endpoints worked first try (all ~140 sensors from `/metrics` + `/api/device/metrics` + `/api/stats/summary` populated on the HA device page). **Found a real bug from the live data**: `MetricMeta.fallback()`'s `device_`/`stats_` prefix-stripping (added same day, to make uncurated names prettier) caused genuine name collisions — `meshpoint_relay_enabled` (curated: "Relay Enabled") and `stats_relay_enabled` (fallback, prefix stripped: also "Relay Enabled") showed as two visually-identical entities with different states; same for `..._relay_rate_remaining`. Root cause: `/api/stats/summary`'s relay block duplicates several `/metrics` concepts under different key names, and stripping the source prefix erased the only thing keeping them apart. Fixed by keeping `device_`/`stats_` prefixes in fallback names (only `meshpoint_` still strips, since that namespace doesn't collide with itself) — verified via a stubbed import of `metric_meta.py` that the two previously-colliding pairs are now distinct ("Relay Enabled" vs "Stats Relay Enabled") and that no two curated `METRIC_META` entries share a name either. Also fixed a minor cosmetic issue spotted in the same data: `Uptime`/`System Uptime` showed as "281.00 s" instead of "281 s" — added `suggested_display_precision=0` (new `MetricMeta` field, wired through `sensor.py`'s `_attr_suggested_display_precision`) to both. **Re-verified against a live HA reload same day**: user copied the fixed files, restarted HA (a browser refresh alone doesn't reload Python `custom_components`, unlike the JS card), and pasted a fresh full sensor dump confirming both fixes -- "Relay Enabled" now shows exactly once under Diagnostic (the curated one), "Stats Relay Enabled" once under regular Sensors (the fallback one), and both Uptime sensors show clean integers with no `.00`. Fully closed, no further action needed |
+| Open | S | **Live-test the 3-way Meshpoint card split** — `meshpoint-card.js` rewritten same day 2026-07-17 into three registered card types (status/health/insights) sharing one base class; classification logic (`classifyEntity`) unit-tested against real entity names from the user's live data, but the actual rendered layout of all three has never been seen in a real dashboard. Need: install the updated file, add all three card types, confirm each shows the right entities in the right sections and nothing lands in an unexpected card |
 | Wiring verified, not yet fired | XS | **Telemetry auto-pruning + `max_telemetry_retained` field** — config round-trip confirmed live on Pi; no "pruned N rows" log line yet since real telemetry count is still under any cap set so far. Will self-confirm naturally once telemetry approaches the cap |
 | Parked | M | **LoRaWAN key store + MIC verify/decrypt** — trigger: you run your own LoRaWAN devices |
 | Parked | M | **TTN uplink-only forwarder** — trigger: TTN entanglement deemed worth it |
