@@ -1101,6 +1101,30 @@ a real dashboard**, so the actual grouping/matching-by-name logic and CSS
 layout are unverified beyond syntax. No visual card editor yet, YAML config
 only.
 
+**Card debugging, same day, live**: integration went in cleanly (device
+page showed every dynamic sensor correctly on first try). Card did not --
+"Custom element doesn't exist: meshpoint-card" in the card-config dialog,
+and it wasn't even showing up in the "By card" search. Root-caused in
+stages: (1) confirmed the resource was registered as a JS module in
+Settings -> Resources; (2) `curl`ing the resource URL directly from the Mac
+returned real 404 the first time -- traced to the file needing to exist at
+`<ha-config>/www/meshpoint-card.js` specifically (`/local/` maps to that
+exact folder, not a nested path); user's File Editor add-on confirmed the
+file WAS there once corrected; (3) after that fix, **curl returned 200 with
+real content but the browser still 404'd on the identical URL**, even after
+a manual hard-refresh + cache clear. Real cause: Home Assistant's frontend
+is a PWA with a service worker that caches static assets INDEPENDENTLY of
+normal browser cache/hard-refresh -- it had cached the earlier 404 response
+for that exact URL and kept serving it. Confirmed via incognito (no
+persisted service worker there) rendering the card correctly first try; fix
+for the main profile is DevTools -> Application -> Service Workers ->
+Unregister, plus Storage -> Clear site data. **Lesson for next time a
+custom HA resource "isn't loading" despite the file being confirmed present
+server-side**: check for this service-worker-cached-404 pattern (curl
+200 + browser 404 on the same URL is the tell) before assuming it's a code
+or file-placement bug -- cost real back-and-forth here before landing on
+the actual cause.
+
 ---
 
 ## CURRENT WORKLIST v8 (2026-07-16 — supersedes v7 below; THE list to work off)
@@ -1124,7 +1148,9 @@ Upstream card links the real repo, Custom-branch is a real dropdown).
 | Open | L | **Light theme** — tokenize the dark-first CSS, light map tiles, per-page contrast pass (topbar toggle already has a slot reserved) |
 | Open | S | **Retest `install.sh` on a fresh microSD flash** — the new-install path (new user, first systemd install, SPI/UART/I2C) has never been exercised, only upgrades |
 | Open | S | **Prune or document the 6 duplicate API endpoints** (packets/count+protocols+types, nodes/map+summary, telemetry/*) |
-| Retest | S | **Metrics `require_auth`** — only the "blocks with no credentials" half was live-tested (401 confirmed); need to confirm a valid session actually authenticates a scrape, and whether a long-lived API-key mechanism is worth building instead of short-lived session JWTs |
+| ~~Retest~~ DONE 2026-07-17 | S | ~~Metrics `require_auth`~~ — long-lived API-key mechanism built (named, revocable, `/metrics`-scoped, hash-only storage) and live-verified end-to-end on the Pi: 401 unauthed, 200 with a valid key, revoke → 401 again, `local.yaml` never holds the raw key. See the 2026-07-17 write-up above |
+| Open | XS | **PR Meshpoint's brand icon/logo to `home-assistant/brands`** — without this, the HA integration shows "icon not available" in Add Integration's brand picker. Assets already cropped and staged at `homeassistant/brands/meshpoint/` (icon.png/icon@2x.png/logo.png/logo@2x.png, 256/512px, cut from `MP_logo.png`) with submission steps in that folder's README — user explicitly deferred the actual fork+PR to home-assistant/brands (external repo, wanted to decide timing themselves) |
+| ~~Open~~ DONE 2026-07-17 | M | ~~Live-test the Home Assistant integration + Lovelace card on a real HA instance~~ — both fully live-verified same day. Integration: config flow completed, device page showed every dynamic sensor correctly (protocol splits, node/packet counts, noise floor, packet rate). Card: `meshpoint-card.js` rendered correctly too, once a real bug was found and fixed along the way -- see the "Card debugging" write-up below (real cause was a stale HA frontend *service worker* caching an earlier 404, not the file placement or the card code; confirmed via curl 200 vs browser 404 on the identical URL, then incognito rendering correctly). Screenshot showed status header (online dot + node count chip), stats grid, and Protocols section all matching the intended design exactly |
 | Wiring verified, not yet fired | XS | **Telemetry auto-pruning + `max_telemetry_retained` field** — config round-trip confirmed live on Pi; no "pruned N rows" log line yet since real telemetry count is still under any cap set so far. Will self-confirm naturally once telemetry approaches the cap |
 | Parked | M | **LoRaWAN key store + MIC verify/decrypt** — trigger: you run your own LoRaWAN devices |
 | Parked | M | **TTN uplink-only forwarder** — trigger: TTN entanglement deemed worth it |
