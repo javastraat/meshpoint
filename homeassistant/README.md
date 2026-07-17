@@ -55,15 +55,16 @@ This integration lives in a subdirectory of the main Meshpoint repo rather than 
 
 ## 4. Install the Lovelace cards (optional)
 
-`www/meshpoint-card.js` is one self-contained file (no build step, no framework) that registers **three** card types — with ~140 entities across the three polled endpoints, one card became an unreadable wall of tiles, so it's split by concern instead:
+`www/meshpoint-card.js` is one self-contained file (no build step, no framework) that registers **four** card types — with ~140 entities across the three polled endpoints, one card became an unreadable wall of tiles, so it's split by concern instead:
 
 | Card type | Shows |
 |---|---|
 | `custom:meshpoint-card` | Status — online, node count, uptime, packet rate, protocol split, signal, relay. The at-a-glance one. |
-| `custom:meshpoint-health-card` | Host health — CPU, memory, disk, temperature, fan. |
+| `custom:meshpoint-health-card` | Host health, plain tiles — CPU, memory, disk, temperature, fan. |
+| `custom:meshpoint-host-gauges-card` | Host health, same data as above but as color-coded SVG ring gauges (green/amber/red by severity) — the fancy one. |
 | `custom:meshpoint-insights-card` | Insights — best signal ever, farthest contact, node role distribution. |
 
-Each pulls in only the entities that belong to it; anything not yet in its lookup table still shows up in a "More" grid on the right card, grouped by source — so a metric the integration surfaces later never gets silently dropped. Raw hardware-model codes and the packet-type breakdown are deliberately left out of all three (not meaningful as tiles; still available as plain entities if you want to build your own).
+Each pulls in only the entities that belong to it; anything not yet in its lookup table still shows up in a "More" grid on the right card, grouped by source — so a metric the integration surfaces later never gets silently dropped (the gauges card doesn't have a "More" grid — it's a fixed set of gauges by design, uncurated host metrics still show up on the plain health card). Raw hardware-model codes and the packet-type breakdown are deliberately left out of all four (not meaningful as tiles; still available as plain entities if you want to build your own).
 
 1. Copy `www/meshpoint-card.js` into `<ha-config>/www/meshpoint-card.js` — same methods as step 2 above (File editor, Samba, scp). It must land directly in `www/`, not a subfolder — `/local/` maps to that exact directory.
 2. **Verify it's actually being served** before touching Lovelace at all:
@@ -74,12 +75,12 @@ Each pulls in only the entities that belong to it; anything not yet in its looku
 3. **Settings → Dashboards → ⋮ → Resources → + Add Resource**
    - URL: `/local/meshpoint-card.js`
    - Resource type: **JavaScript Module**
-4. Edit any dashboard → Add Card → search "Meshpoint" (all three show up), or add manually as YAML — swap `type` for whichever of the three you want:
+4. Edit any dashboard → Add Card → search "Meshpoint" (all four show up), or add manually as YAML — swap `type` for whichever of the four you want:
    ```yaml
    type: custom:meshpoint-card
    entity: sensor.meshpoint_<...>_uptime
    ```
-   Any one Meshpoint sensor works for `entity`, on any of the three card types — find one via **Developer Tools → States**, filter "meshpoint", copy any entity ID. Each card looks up its sibling entities from the same device automatically. (Or use `device_id: <id>` instead — that ID is the last segment of the device page's URL.) Add all three as separate cards if you want everything.
+   Any one Meshpoint sensor works for `entity`, on any of the four card types — find one via **Developer Tools → States**, filter "meshpoint", copy any entity ID. Each card looks up its sibling entities from the same device automatically. (Or use `device_id: <id>` instead — that ID is the last segment of the device page's URL.) Add multiple as separate cards if you want everything (pick either health card, not usually both).
 
 No visual card editor yet — YAML config only for this first version. Updating an already-installed `meshpoint-card.js` to a newer version needs a Python-style restart-free refresh from the browser (it's just a static file), but the JS resource can be cached hard by the browser — if a change doesn't seem to take effect, see the cache troubleshooting below before assuming something's broken.
 

@@ -1259,6 +1259,63 @@ user installs the updated file and reloads.
 
 ---
 
+### 2026-07-17 (same day, follow-on): 4th card -- HACS attempt + host gauges card
+
+User tried adding this repo as a HACS custom repository (category
+"Dashboard"/Plugin, URL with `/homeassistant/www/` appended) -- got
+"Repository structure for main is not compliant." Confirmed the
+uncertainty flagged in the README: HACS's Plugin/Integration categories
+both expect their content at the true repo root (or a root-level `dist/`
+for Plugin), not nested in a subdirectory, and the "Repository" field
+doesn't accept a subpath-appended URL at all. Discussed 3 options (manual
+install only / auto-mirror homeassistant/ to a separate repo via a
+GitHub Action / genuinely separate repo like meshcore-ha+meshcore-card
+are). User chose manual-for-now, auto-mirror as a maybe-later -- explicit
+decision, not yet built.
+
+Then asked for a 4th card: same host-health data as the plain
+`meshpoint-health-card`, but "really cool" with gauges since CPU/mem/disk
+are naturally 0-100%. Built `meshpoint-host-gauges-card` -- hand-rolled
+SVG progress rings (stroke-dashoffset technique, not arc-path trig, so no
+degenerate case at 0%/100%), color-coded green/amber/red by severity
+threshold, CPU/Memory/Disk as gauges plus a 4th CPU-temperature gauge
+(mapped onto a 0-90C scale purely for the ring's sizing/color, real °C
+still shown as the value), Memory/Disk sub-lines show "used / total",
+footer tiles for Fan Duty + System Uptime. Deliberately did NOT reuse
+Home Assistant's internal `<ha-gauge>` element (used by HA core's own
+built-in Gauge card) despite it being the "obvious" shortcut -- it's an
+implementation detail of HA core, not a stable custom-card API, could
+change/vanish across HA versions with no warning; the hand-rolled SVG is
+fully self-contained and verifiable without a live HA instance. Refactored
+gauge/ring/severity-color helpers onto the shared `MeshpointCardBase` so
+future cards can reuse them too. Added 2 more curated `metric_meta.py`
+entries (`device_memory_total_mb`/`device_disk_total_gb` -- "Memory
+Total"/"Disk Total", needed for the used/total sub-lines) -- 49 curated
+entries now, still collision-free.
+
+Verification (deeper than the previous two card iterations, specifically
+because SVG math is easy to get subtly wrong): loaded the actual card
+file into a real V8 context via Node's `vm.runInThisContext` (plain
+`eval()` doesn't leak top-level `class` declarations out to be
+testable -- learned that the hard way mid-session) with a minimal
+HTMLElement/document/customElements stub, then exercised the real,
+unstubbed `_ringSvg()`/`_severityColor()` methods directly: circumference
+math confirmed via extracted `stroke-dashoffset` values (0% -> offset ==
+full circumference i.e. empty ring, 100% -> offset == 0 i.e. full ring,
+50% -> offset == exactly half), out-of-range inputs (150%, -20%) clamp
+without throwing, and severity color thresholds return the right CSS var
+at low/mid/high percentages. Also rendered the full gauge card's
+`_renderBody()` against realistic entity data (values lifted from the
+user's actual live dump) and against a deliberately partial dataset (only
+one metric present) to confirm missing data never leaks the literal
+string "undefined" into the DOM. `node --check` and `py_compile` both
+clean. **Not yet rendered in a real dashboard** -- same standing caveat as
+every card iteration this session; the math and render logic are solid,
+the actual visual result (ring sizing, color contrast in dark/light
+theme, layout at different card widths) is unverified until installed.
+
+---
+
 ## CURRENT WORKLIST v8 (2026-07-16 — supersedes v7 below; THE list to work off)
 
 Closed since v7 (full detail in the v7 section below, kept for history):
@@ -1284,7 +1341,7 @@ Upstream card links the real repo, Custom-branch is a real dropdown).
 | Open | XS | **PR Meshpoint's brand icon/logo to `home-assistant/brands`** — without this, the HA integration shows "icon not available" in Add Integration's brand picker. Assets already cropped and staged at `homeassistant/brands/meshpoint/` (icon.png/icon@2x.png/logo.png/logo@2x.png, 256/512px, cut from `MP_logo.png`) with submission steps in that folder's README — user explicitly deferred the actual fork+PR to home-assistant/brands (external repo, wanted to decide timing themselves) |
 | ~~Open~~ DONE 2026-07-17 | M | ~~Live-test the Home Assistant integration + Lovelace card on a real HA instance~~ — both fully live-verified same day. Integration: config flow completed, device page showed every dynamic sensor correctly (protocol splits, node/packet counts, noise floor, packet rate). Card: `meshpoint-card.js` rendered correctly too, once a real bug was found and fixed along the way -- see the "Card debugging" write-up below (real cause was a stale HA frontend *service worker* caching an earlier 404, not the file placement or the card code; confirmed via curl 200 vs browser 404 on the identical URL, then incognito rendering correctly). Screenshot showed status header (online dot + node count chip), stats grid, and Protocols section all matching the intended design exactly |
 | ~~Open~~ DONE 2026-07-17 | M | ~~Live-test the widened API key scope + new HA sensors on the real Pi/HA~~ — live-tested same day, both endpoints worked first try (all ~140 sensors from `/metrics` + `/api/device/metrics` + `/api/stats/summary` populated on the HA device page). **Found a real bug from the live data**: `MetricMeta.fallback()`'s `device_`/`stats_` prefix-stripping (added same day, to make uncurated names prettier) caused genuine name collisions — `meshpoint_relay_enabled` (curated: "Relay Enabled") and `stats_relay_enabled` (fallback, prefix stripped: also "Relay Enabled") showed as two visually-identical entities with different states; same for `..._relay_rate_remaining`. Root cause: `/api/stats/summary`'s relay block duplicates several `/metrics` concepts under different key names, and stripping the source prefix erased the only thing keeping them apart. Fixed by keeping `device_`/`stats_` prefixes in fallback names (only `meshpoint_` still strips, since that namespace doesn't collide with itself) — verified via a stubbed import of `metric_meta.py` that the two previously-colliding pairs are now distinct ("Relay Enabled" vs "Stats Relay Enabled") and that no two curated `METRIC_META` entries share a name either. Also fixed a minor cosmetic issue spotted in the same data: `Uptime`/`System Uptime` showed as "281.00 s" instead of "281 s" — added `suggested_display_precision=0` (new `MetricMeta` field, wired through `sensor.py`'s `_attr_suggested_display_precision`) to both. **Re-verified against a live HA reload same day**: user copied the fixed files, restarted HA (a browser refresh alone doesn't reload Python `custom_components`, unlike the JS card), and pasted a fresh full sensor dump confirming both fixes -- "Relay Enabled" now shows exactly once under Diagnostic (the curated one), "Stats Relay Enabled" once under regular Sensors (the fallback one), and both Uptime sensors show clean integers with no `.00`. Fully closed, no further action needed |
-| Open | S | **Live-test the 3-way Meshpoint card split** — `meshpoint-card.js` rewritten same day 2026-07-17 into three registered card types (status/health/insights) sharing one base class; classification logic (`classifyEntity`) unit-tested against real entity names from the user's live data, but the actual rendered layout of all three has never been seen in a real dashboard. Need: install the updated file, add all three card types, confirm each shows the right entities in the right sections and nothing lands in an unexpected card |
+| Open | S | **Live-test the 4-way Meshpoint card split (status/health/host-gauges/insights)** — `meshpoint-card.js` rewritten same day 2026-07-17 into four registered card types sharing one base class; classification logic (`classifyEntity`) and the new gauge card's ring math/severity colors/full render both unit-tested (via a real V8 context, not just string checks) against real entity names and values from the user's live data, but nothing has been seen in an actual dashboard yet. Need: install the updated file, add all four card types, confirm each shows the right entities in the right sections/gauges, and specifically check the gauge card's visual sizing and color contrast in whatever HA theme the user runs |
 | Wiring verified, not yet fired | XS | **Telemetry auto-pruning + `max_telemetry_retained` field** — config round-trip confirmed live on Pi; no "pruned N rows" log line yet since real telemetry count is still under any cap set so far. Will self-confirm naturally once telemetry approaches the cap |
 | Parked | M | **LoRaWAN key store + MIC verify/decrypt** — trigger: you run your own LoRaWAN devices |
 | Parked | M | **TTN uplink-only forwarder** — trigger: TTN entanglement deemed worth it |

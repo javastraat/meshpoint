@@ -189,6 +189,12 @@ METRIC_META: dict[str, MetricMeta] = {
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
+    "device_memory_total_mb": MetricMeta(
+        "Memory Total",
+        unit="MB",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
     "device_disk_percent": MetricMeta(
         "Disk Usage",
         unit=PERCENTAGE,
@@ -198,6 +204,12 @@ METRIC_META: dict[str, MetricMeta] = {
     ),
     "device_disk_used_gb": MetricMeta(
         "Disk Used",
+        unit="GB",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    "device_disk_total_gb": MetricMeta(
+        "Disk Total",
         unit="GB",
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,

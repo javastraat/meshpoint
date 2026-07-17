@@ -1,18 +1,32 @@
 /**
  * Meshpoint cards.
  *
- * Three self-contained custom elements from one file, no build step, no
+ * Four self-contained custom elements from one file, no build step, no
  * framework dependency -- matches the plain-JS style the rest of
  * Meshpoint's own dashboard frontend uses (frontend/js/*.js). One
  * resource install (www/meshpoint-card.js + a Lovelace resource entry)
- * gives you three card types to pick from in Add Card:
+ * gives you four card types to pick from in Add Card:
  *
- *   custom:meshpoint-card           Status -- online, node count, uptime,
- *                                   packet rate, protocol split, signal,
- *                                   relay. The at-a-glance one.
- *   custom:meshpoint-health-card    Host health -- CPU/RAM/disk/temp/fan.
- *   custom:meshpoint-insights-card  Records -- best signal ever, farthest
- *                                   contact, node role distribution.
+ *   custom:meshpoint-card             Status -- online, node count,
+ *                                     uptime, packet rate, protocol
+ *                                     split, signal, relay. The
+ *                                     at-a-glance one.
+ *   custom:meshpoint-health-card      Host health, plain tiles --
+ *                                     CPU/RAM/disk/temp/fan.
+ *   custom:meshpoint-host-gauges-card Host health, same data as above but
+ *                                     as color-coded SVG ring gauges
+ *                                     (green/amber/red by severity) --
+ *                                     the fancy one.
+ *   custom:meshpoint-insights-card    Records -- best signal ever,
+ *                                     farthest contact, node role
+ *                                     distribution.
+ *
+ * The gauge card is pure hand-rolled SVG (a stroke-dashoffset progress
+ * ring, the standard technique -- no arc-path trig, no degenerate cases
+ * at 0%/100%) rather than reusing Home Assistant's internal <ha-gauge>
+ * element: that component is an implementation detail of HA core's
+ * built-in Gauge card, not a stable API for custom cards, and could
+ * change or vanish across HA versions without notice.
  *
  * Split into three instead of one mega-card because the integration now
  * polls three Meshpoint endpoints (~140 entities total) -- mixing mesh
@@ -62,8 +76,8 @@ const STATUS_SECTIONS = {
 
 const HEALTH_SECTIONS = {
     main: new Set([
-        'CPU Usage', 'CPU Temperature', 'Memory Usage', 'Memory Used',
-        'Disk Usage', 'Disk Used', 'System Uptime', 'Fan Duty',
+        'CPU Usage', 'CPU Temperature', 'Memory Usage', 'Memory Used', 'Memory Total',
+        'Disk Usage', 'Disk Used', 'Disk Total', 'System Uptime', 'Fan Duty',
     ]),
 };
 
@@ -262,6 +276,56 @@ class MeshpointCardBase extends HTMLElement {
         return div.innerHTML;
     }
 
+    /** Green/amber/red by severity. ``pct`` is 0-100. */
+    _severityColor(pct, thresholds = { warn: 60, danger: 85 }) {
+        if (pct === undefined) return 'var(--disabled-text-color, #9e9e9e)';
+        if (pct >= thresholds.danger) return 'var(--error-color, #db4437)';
+        if (pct >= thresholds.warn) return 'var(--warning-color, #ff9800)';
+        return 'var(--success-color, #43a047)';
+    }
+
+    /**
+     * SVG progress ring via stroke-dashoffset -- the standard technique,
+     * no arc-path trigonometry and no degenerate case at 0%/100% the way
+     * a hand-computed arc `<path>` would have.
+     */
+    _ringSvg(pct, color, size = 96, strokeWidth = 10) {
+        const r = (size - strokeWidth) / 2;
+        const c = size / 2;
+        const circumference = 2 * Math.PI * r;
+        const clamped = Math.max(0, Math.min(100, pct || 0));
+        const offset = circumference * (1 - clamped / 100);
+        return `
+            <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" class="mp-ring">
+                <circle cx="${c}" cy="${c}" r="${r}" fill="none"
+                        stroke="var(--divider-color)" stroke-width="${strokeWidth}" />
+                <circle cx="${c}" cy="${c}" r="${r}" fill="none"
+                        stroke="${color}" stroke-width="${strokeWidth}" stroke-linecap="round"
+                        stroke-dasharray="${circumference}" stroke-dashoffset="${offset}"
+                        transform="rotate(-90 ${c} ${c})" class="mp-ring__progress" />
+            </svg>
+        `;
+    }
+
+    /** One ring gauge with a centered value, a label, and an optional
+     * secondary line (e.g. "280 / 1845 MB") below it. */
+    _gauge({ label, value, unit, pct, thresholds, sub }) {
+        const color = this._severityColor(pct, thresholds);
+        const displayValue = value === undefined ? '--' : `${formatNumber(value)}${unit || ''}`;
+        return `
+            <div class="mp-gauge">
+                <div class="mp-gauge__ring-wrap">
+                    ${this._ringSvg(pct, color)}
+                    <div class="mp-gauge__center">
+                        <div class="mp-gauge__value">${this._esc(displayValue)}</div>
+                    </div>
+                </div>
+                <div class="mp-gauge__label">${this._esc(label)}</div>
+                ${sub ? `<div class="mp-gauge__sub">${this._esc(sub)}</div>` : ''}
+            </div>
+        `;
+    }
+
     _style() {
         return `
             ha-card { padding: 0; }
@@ -350,6 +414,56 @@ class MeshpointCardBase extends HTMLElement {
                 color: var(--secondary-text-color);
                 opacity: 0.8;
             }
+            .mp-gauge-row {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 18px;
+                justify-content: space-around;
+            }
+            .mp-gauge {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                width: 104px;
+            }
+            .mp-gauge__ring-wrap {
+                position: relative;
+                width: 96px;
+                height: 96px;
+            }
+            .mp-gauge__ring-wrap svg {
+                display: block;
+            }
+            .mp-ring__progress {
+                transition: stroke-dashoffset 0.6s ease, stroke 0.6s ease;
+            }
+            .mp-gauge__center {
+                position: absolute;
+                inset: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            .mp-gauge__value {
+                font-size: 1.05em;
+                font-weight: 700;
+                color: var(--primary-text-color);
+            }
+            .mp-gauge__label {
+                margin-top: 8px;
+                font-size: 0.78em;
+                font-weight: 600;
+                color: var(--secondary-text-color);
+                text-transform: uppercase;
+                letter-spacing: 0.04em;
+            }
+            .mp-gauge__sub {
+                font-size: 0.68em;
+                color: var(--secondary-text-color);
+                opacity: 0.8;
+                margin-top: 2px;
+                text-align: center;
+            }
         `;
     }
 }
@@ -429,6 +543,80 @@ class MeshpointHealthCard extends MeshpointCardBase {
     }
 }
 
+/**
+ * Same data and same `health` classification as MeshpointHealthCard,
+ * just rendered as color-coded ring gauges instead of plain tiles --
+ * "one plain, one fancy" for the same underlying entities.
+ */
+class MeshpointHostGaugesCard extends MeshpointCardBase {
+    _kind = 'health';
+
+    _cardLabel() {
+        return 'Meshpoint host gauges';
+    }
+
+    _renderBody(items) {
+        const byName = new Map(items.map((i) => [i.name, i]));
+        const num = (name) => {
+            const item = byName.get(name);
+            if (!item || item.state === undefined) return undefined;
+            const n = Number(item.state);
+            return Number.isFinite(n) ? n : undefined;
+        };
+
+        const cpuPct = num('CPU Usage');
+        const memPct = num('Memory Usage');
+        const diskPct = num('Disk Usage');
+        const temp = num('CPU Temperature');
+        const memUsed = num('Memory Used');
+        const memTotal = num('Memory Total');
+        const diskUsed = num('Disk Used');
+        const diskTotal = num('Disk Total');
+        const fanDuty = num('Fan Duty');
+        const uptime = num('System Uptime');
+
+        // Temperature has no natural 0-100 scale -- map onto one (0-90C,
+        // typical SBC range) purely to size/color the ring; the displayed
+        // value is still the real °C, not the mapped percentage.
+        const tempPct = temp === undefined ? undefined : (temp / 90) * 100;
+
+        const gauges = [];
+        if (cpuPct !== undefined) {
+            gauges.push(this._gauge({ label: 'CPU', value: cpuPct, unit: '%', pct: cpuPct }));
+        }
+        if (memPct !== undefined) {
+            gauges.push(this._gauge({
+                label: 'Memory', value: memPct, unit: '%', pct: memPct,
+                sub: memUsed !== undefined && memTotal !== undefined
+                    ? `${formatNumber(memUsed)} / ${formatNumber(memTotal)} MB` : undefined,
+            }));
+        }
+        if (diskPct !== undefined) {
+            gauges.push(this._gauge({
+                label: 'Disk', value: diskPct, unit: '%', pct: diskPct,
+                sub: diskUsed !== undefined && diskTotal !== undefined
+                    ? `${formatNumber(diskUsed)} / ${formatNumber(diskTotal)} GB` : undefined,
+            }));
+        }
+        if (temp !== undefined) {
+            gauges.push(this._gauge({
+                label: 'CPU Temp', value: temp, unit: '°C', pct: tempPct,
+                thresholds: { warn: 61, danger: 78 }, // roughly 55C / 70C on the 0-90C scale
+            }));
+        }
+
+        const footerTiles = [];
+        if (fanDuty !== undefined) footerTiles.push({ label: 'Fan Duty', value: `${formatNumber(fanDuty)}%` });
+        if (uptime !== undefined) footerTiles.push({ label: 'System Uptime', value: formatUptime(uptime) });
+
+        return `
+            <div class="mp-title">Meshpoint Host</div>
+            <div class="mp-gauge-row">${gauges.join('')}</div>
+            ${footerTiles.length ? this._section('', this._tileRow(footerTiles)) : ''}
+        `;
+    }
+}
+
 class MeshpointInsightsCard extends MeshpointCardBase {
     _kind = 'insights';
 
@@ -458,6 +646,7 @@ class MeshpointInsightsCard extends MeshpointCardBase {
 
 customElements.define('meshpoint-card', MeshpointStatusCard);
 customElements.define('meshpoint-health-card', MeshpointHealthCard);
+customElements.define('meshpoint-host-gauges-card', MeshpointHostGaugesCard);
 customElements.define('meshpoint-insights-card', MeshpointInsightsCard);
 
 window.customCards = window.customCards || [];
@@ -470,7 +659,12 @@ window.customCards.push(
     {
         type: 'meshpoint-health-card',
         name: 'Meshpoint Host Health',
-        description: 'Meshpoint host system health: CPU, memory, disk, temperature, fan.',
+        description: 'Meshpoint host system health: CPU, memory, disk, temperature, fan (plain tiles).',
+    },
+    {
+        type: 'meshpoint-host-gauges-card',
+        name: 'Meshpoint Host Gauges',
+        description: 'Meshpoint host system health as color-coded ring gauges: CPU, memory, disk, temperature.',
     },
     {
         type: 'meshpoint-insights-card',
