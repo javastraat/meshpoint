@@ -13,3 +13,4 @@ DEFAULT_SCAN_INTERVAL = 60
 # pulled out of the parsed metrics dict and attached as device info instead
 # of becoming an entity.
 INFO_METRIC = "meshpoint_info"
+
