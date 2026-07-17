@@ -1,0 +1,24 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to Meshpoint",
+        "description": "Enter your Meshpoint gateway's address. If \"Require authentication\" is on under Meshpoint's Configuration → Metrics, also generate an API key there (scoped to /metrics only) and paste it below.",
+        "data": {
+          "host": "Host or IP address",
+          "port": "Port",
+          "api_key": "API key (leave blank if authentication is off)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not reach Meshpoint at that address.",
+      "invalid_auth": "Meshpoint rejected the API key.",
+      "metrics_disabled": "The /metrics endpoint is disabled — enable it in Meshpoint's Configuration → Metrics page first.",
+      "unknown": "Unexpected error."
+    },
+    "abort": {
+      "already_configured": "This Meshpoint gateway is already configured."
+    }
+  }
+}

@@ -1029,6 +1029,61 @@ revoked the key from the UI → same curl immediately → 401 again, and
 `api_keys: []` in `local.yaml`. Full round trip confirmed working exactly
 as designed.
 
+### 2026-07-17 (same day, follow-on): Home Assistant integration (`homeassistant/`)
+
+After the API-key work above, user asked to check `meshcore-dev/meshcore-ha`
+(cloned to scratchpad for reference) as inspiration for "a Meshpoint
+integration with a nice card." Turned out to be a from-scratch ~14k-line
+HACS integration that talks *directly* to a MeshCore radio over USB/BLE/TCP
+(via `meshcore-py`) — not a Meshpoint client, would fight Meshpoint's own
+`meshcore_usb` source for the same port if installed. Useful only as scale
+context and as the source of the "separate companion Lovelace card repo"
+pattern. User confirmed explicitly: wants a real HA integration (config
+flow: host + API key), NOT per-node/per-contact entities ("2k contacts as
+sensors no thanks haha") — aggregate `/metrics` stats only, which is a much
+smaller build than meshcore-ha.
+
+Built at `homeassistant/custom_components/meshpoint/` **inside this repo**
+(user explicitly said not a separate folder/repo, after an initial attempt
+at a sibling `meshpoint-ha/` directory got corrected). Design: `prometheus.py`
+is a pure, dependency-free Prometheus text parser (no HA imports, unit
+testable standalone) — labeled series get flattened into suffixed keys
+(`meshpoint_protocol_packets_session_total_meshtastic`), the special
+`meshpoint_info{version,region}` series is pulled out as device info
+instead of becoming a sensor. `coordinator.py` (DataUpdateCoordinator) polls
+`/metrics` with the Bearer API key from today's earlier work; 401 triggers
+`ConfigEntryAuthFailed`, 404 (endpoint disabled) becomes a clear
+`UpdateFailed` message. `sensor.py` creates entities **dynamically** from
+whatever keys the coordinator returns — no fixed sensor list, so a metric
+Meshpoint adds later shows up automatically (generic title-cased name via
+`MetricMeta.fallback()` until `metric_meta.py` is curated for it).
+`config_flow.py` validates host/port/key by actually polling before
+creating the entry. One HA device per Meshpoint gateway (sw_version/model
+from the info block), matching the "nice card" ask via HA's own device page
+rather than a custom Lovelace card.
+
+Verification (Mac, no `homeassistant`/`aiohttp`/`voluptuous` installed):
+`py_compile`d all 7 Python files (compiles fine since it's bytecode-only,
+doesn't execute imports). All 4 JSON files (`manifest.json`, `hacs.json`,
+`strings.json`, `translations/en.json`) parse. 8 unit tests for
+`prometheus.py` written and run directly (pytest itself isn't installed
+either, so executed via a manual test-function runner rather than
+`pytest` — real command is `python3 -m pytest homeassistant/tests/` once a
+venv has it) — covers unlabeled/labeled/negative-float/bare-and-labeled-
+coexisting/info-extraction/comments/malformed-line/non-numeric-value, all
+pass. **Not yet installed on a real Home Assistant instance** — config
+flow, coordinator, and entity platform are unverified against actual HA
+runtime behavior (only syntax-checked), since that requires a real HA
+install this session had no access to. HACS distribution is uncertain too:
+the integration lives in a subdirectory (`homeassistant/`) of this repo
+rather than at repo root, which HACS's custom-repository flow may not
+handle automatically — manual install (copy `custom_components/meshpoint`
+into HA's config dir) is documented as the reliable fallback in
+`homeassistant/README.md`. Not changelogged in `docs/CHANGELOG.md` (same
+reasoning as [[scripts-not-changelogged]]: doesn't ship with the Pi app or
+`src/version.py` releases) but does get a README mention (unlike scripts)
+since it's a real user-facing companion product, not a dev-only tool.
+
 ---
 
 ## CURRENT WORKLIST v8 (2026-07-16 — supersedes v7 below; THE list to work off)

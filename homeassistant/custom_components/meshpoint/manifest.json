@@ -1,0 +1,11 @@
+{
+  "domain": "meshpoint",
+  "name": "Meshpoint",
+  "codeowners": ["@javastraat"],
+  "config_flow": true,
+  "documentation": "https://github.com/javastraat/meshpoint-ha",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/javastraat/meshpoint-ha/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}
