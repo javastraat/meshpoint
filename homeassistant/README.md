@@ -61,7 +61,7 @@ This integration lives in a subdirectory of the main Meshpoint repo rather than 
 |---|---|
 | `custom:meshpoint-card` | Status — online, node count, uptime, packet rate, protocol split, signal, relay. The at-a-glance one. |
 | `custom:meshpoint-health-card` | Host health, plain tiles — CPU, memory, disk, temperature, fan. |
-| `custom:meshpoint-host-gauges-card` | Host health, same data as above but as color-coded SVG ring gauges (green/amber/red by severity) — the fancy one. |
+| `custom:meshpoint-host-gauges-card` | Host health, same data as above but as color-coded SVG gauges (green/amber/red by severity) with icons — CPU/Memory/Temperature as rings, Disk as a filled used/free pie. The fancy one. |
 | `custom:meshpoint-insights-card` | Insights — best signal ever, farthest contact, node role distribution. |
 
 Each pulls in only the entities that belong to it; anything not yet in its lookup table still shows up in a "More" grid on the right card, grouped by source — so a metric the integration surfaces later never gets silently dropped (the gauges card doesn't have a "More" grid — it's a fixed set of gauges by design, uncurated host metrics still show up on the plain health card). Raw hardware-model codes and the packet-type breakdown are deliberately left out of all four (not meaningful as tiles; still available as plain entities if you want to build your own).

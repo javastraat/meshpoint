@@ -253,7 +253,7 @@ class MeshpointCardBase extends HTMLElement {
                 (t) => `
                     <div class="mp-tile">
                         <div class="mp-tile__value">${this._esc(t.value)}</div>
-                        <div class="mp-tile__label">${this._esc(t.label)}</div>
+                        <div class="mp-tile__label">${this._iconHtml(t.icon)}${this._esc(t.label)}</div>
                     </div>
                 `
             )
@@ -309,7 +309,7 @@ class MeshpointCardBase extends HTMLElement {
 
     /** One ring gauge with a centered value, a label, and an optional
      * secondary line (e.g. "280 / 1845 MB") below it. */
-    _gauge({ label, value, unit, pct, thresholds, sub }) {
+    _gauge({ label, value, unit, pct, thresholds, sub, icon }) {
         const color = this._severityColor(pct, thresholds);
         const displayValue = value === undefined ? '--' : `${formatNumber(value)}${unit || ''}`;
         return `
@@ -320,10 +320,79 @@ class MeshpointCardBase extends HTMLElement {
                         <div class="mp-gauge__value">${this._esc(displayValue)}</div>
                     </div>
                 </div>
-                <div class="mp-gauge__label">${this._esc(label)}</div>
+                <div class="mp-gauge__label">${this._iconHtml(icon)}${this._esc(label)}</div>
                 ${sub ? `<div class="mp-gauge__sub">${this._esc(sub)}</div>` : ''}
             </div>
         `;
+    }
+
+    /**
+     * Filled two-segment pie (used/free) via SVG path wedges -- a
+     * different technique from the ring's stroke-dashoffset trick,
+     * since a true pie needs filled regions, not a stroked circle. Full
+     * angle range is special-cased at the 0%/100% extremes (a
+     * degenerate arc where start==end draws nothing, same class of bug
+     * the ring's dashoffset approach avoids by construction).
+     */
+    _pieSlicePath(cx, cy, r, startAngle, endAngle) {
+        const toXY = (angle) => {
+            const rad = ((angle - 90) * Math.PI) / 180;
+            return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+        };
+        const start = toXY(startAngle);
+        const end = toXY(endAngle);
+        const largeArc = endAngle - startAngle > 180 ? 1 : 0;
+        return `M ${cx} ${cy} L ${start.x} ${start.y} A ${r} ${r} 0 ${largeArc} 1 ${end.x} ${end.y} Z`;
+    }
+
+    _pieSvg(usedPct, usedColor, freeColor, size = 96) {
+        const r = size / 2 - 2;
+        const c = size / 2;
+        const clamped = Math.max(0, Math.min(100, usedPct || 0));
+        const usedAngle = 360 * (clamped / 100);
+
+        let slices;
+        if (clamped <= 0.05) {
+            slices = `<circle cx="${c}" cy="${c}" r="${r}" fill="${freeColor}" />`;
+        } else if (clamped >= 99.95) {
+            slices = `<circle cx="${c}" cy="${c}" r="${r}" fill="${usedColor}" />`;
+        } else {
+            slices = `
+                <path d="${this._pieSlicePath(c, c, r, usedAngle, 360)}" fill="${freeColor}" />
+                <path d="${this._pieSlicePath(c, c, r, 0, usedAngle)}" fill="${usedColor}" />
+            `;
+        }
+        // Inner cutout in the card's own background color -- turns the
+        // solid pie into a donut so overlaid center text stays legible
+        // against any theme/color combination, without per-slice
+        // inner-radius math.
+        const innerR = r * 0.55;
+        const cutout = `<circle cx="${c}" cy="${c}" r="${innerR}" class="mp-pie__cutout" />`;
+        return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" class="mp-pie">${slices}${cutout}</svg>`;
+    }
+
+    /** Pie-chart counterpart to _gauge() -- same tile shape, filled
+     * used/free wedges instead of a progress ring. */
+    _pieGauge({ label, value, unit, pct, thresholds, sub, icon }) {
+        const usedColor = this._severityColor(pct, thresholds);
+        const freeColor = 'var(--divider-color)';
+        const displayValue = value === undefined ? '--' : `${formatNumber(value)}${unit || ''}`;
+        return `
+            <div class="mp-gauge">
+                <div class="mp-gauge__ring-wrap">
+                    ${this._pieSvg(pct, usedColor, freeColor)}
+                    <div class="mp-gauge__center mp-gauge__center--pie">
+                        <div class="mp-gauge__value">${this._esc(displayValue)}</div>
+                    </div>
+                </div>
+                <div class="mp-gauge__label">${this._iconHtml(icon)}${this._esc(label)}</div>
+                ${sub ? `<div class="mp-gauge__sub">${this._esc(sub)}</div>` : ''}
+            </div>
+        `;
+    }
+
+    _iconHtml(icon) {
+        return icon ? `<ha-icon icon="${this._esc(icon)}" class="mp-icon"></ha-icon>` : '';
     }
 
     _style() {
@@ -464,6 +533,17 @@ class MeshpointCardBase extends HTMLElement {
                 margin-top: 2px;
                 text-align: center;
             }
+            .mp-icon {
+                --mdc-icon-size: 14px;
+                width: 14px;
+                height: 14px;
+                margin-right: 4px;
+                vertical-align: -2px;
+                color: var(--secondary-text-color);
+            }
+            .mp-pie__cutout {
+                fill: var(--ha-card-background, var(--card-background-color, #1c1c1c));
+            }
         `;
     }
 }
@@ -582,32 +662,40 @@ class MeshpointHostGaugesCard extends MeshpointCardBase {
 
         const gauges = [];
         if (cpuPct !== undefined) {
-            gauges.push(this._gauge({ label: 'CPU', value: cpuPct, unit: '%', pct: cpuPct }));
+            gauges.push(this._gauge({
+                label: 'CPU', value: cpuPct, unit: '%', pct: cpuPct, icon: 'mdi:cpu-64-bit',
+            }));
         }
         if (memPct !== undefined) {
             gauges.push(this._gauge({
-                label: 'Memory', value: memPct, unit: '%', pct: memPct,
+                label: 'Memory', value: memPct, unit: '%', pct: memPct, icon: 'mdi:memory',
                 sub: memUsed !== undefined && memTotal !== undefined
                     ? `${formatNumber(memUsed)} / ${formatNumber(memTotal)} MB` : undefined,
             }));
         }
         if (diskPct !== undefined) {
-            gauges.push(this._gauge({
-                label: 'Disk', value: diskPct, unit: '%', pct: diskPct,
+            // Pie instead of ring for Disk specifically -- visual variety,
+            // and "used slice of a whole" reads naturally for storage.
+            gauges.push(this._pieGauge({
+                label: 'Disk', value: diskPct, unit: '%', pct: diskPct, icon: 'mdi:harddisk',
                 sub: diskUsed !== undefined && diskTotal !== undefined
                     ? `${formatNumber(diskUsed)} / ${formatNumber(diskTotal)} GB` : undefined,
             }));
         }
         if (temp !== undefined) {
             gauges.push(this._gauge({
-                label: 'CPU Temp', value: temp, unit: '°C', pct: tempPct,
+                label: 'CPU Temp', value: temp, unit: '°C', pct: tempPct, icon: 'mdi:thermometer',
                 thresholds: { warn: 61, danger: 78 }, // roughly 55C / 70C on the 0-90C scale
             }));
         }
 
         const footerTiles = [];
-        if (fanDuty !== undefined) footerTiles.push({ label: 'Fan Duty', value: `${formatNumber(fanDuty)}%` });
-        if (uptime !== undefined) footerTiles.push({ label: 'System Uptime', value: formatUptime(uptime) });
+        if (fanDuty !== undefined) {
+            footerTiles.push({ label: 'Fan Duty', value: `${formatNumber(fanDuty)}%`, icon: 'mdi:fan' });
+        }
+        if (uptime !== undefined) {
+            footerTiles.push({ label: 'System Uptime', value: formatUptime(uptime), icon: 'mdi:clock-outline' });
+        }
 
         return `
             <div class="mp-title">Meshpoint Host</div>

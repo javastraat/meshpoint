@@ -1316,6 +1316,55 @@ theme, layout at different card widths) is unverified until installed.
 
 ---
 
+### 2026-07-17 (same day, follow-on): Gauge card polish -- icons + disk pie chart
+
+User shared a screenshot of a much richer "System Monitor" style HA
+dashboard (icons, sparkline history graphs, a hardware-info tile, a pie
+chart) asking for something like it. Split into 3 buckets by actual cost
+before building anything: icons + a disk pie chart (cheap, same SVG
+techniques already in hand) vs. sparkline history graphs (a real new
+feature -- Meshpoint's API only reports current values, no history, so
+this would mean the card fetching HA's own recorder/history API
+per-entity, genuinely new async logic) vs. a hardware-info tile (blocked
+outright -- Meshpoint's `/api/device/metrics` doesn't report board
+model/RAM type at all, and this fork runs on several different boards so
+nothing could be safely hardcoded either). Asked which via
+AskUserQuestion; user picked icons + pie chart only.
+
+Added `<ha-icon icon="mdi:...">` to every gauge and footer tile on
+`meshpoint-host-gauges-card` (cpu-64-bit / memory / harddisk /
+thermometer / fan / clock-outline). Deliberately used `<ha-icon>` despite
+having just avoided `<ha-gauge>` for being "an internal HA component, not
+a stable API" -- different risk profile: `<ha-icon>` is used in nearly
+every HA UI element and virtually every custom card in the ecosystem,
+about as close to a de-facto stable primitive as HA internals get, versus
+`<ha-gauge>` being one specific card's own implementation detail.
+
+Swapped Disk from a ring to a real filled two-segment pie (used/free) --
+new `_pieSlicePath()`/`_pieSvg()` on the shared base, genuinely different
+technique from the ring's stroke-dashoffset trick since a pie needs
+filled wedge regions, not a stroked circle: computes wedge boundary
+points via polar-to-cartesian and an SVG arc path, same 0%/100%
+degenerate-case special-casing philosophy as the ring (plain full circle
+at the extremes rather than a zero-length arc). Added an inner "cutout"
+circle in the card's own background color so the centered value text
+stays legible against an arbitrary colorful pie fill/theme, without
+needing real per-slice inner-radius math -- turns it into a donut
+visually as a side effect.
+
+Verification went a step further than the ring gauges: not just "does it
+render," but checked the actual wedge geometry lands where expected --
+for a 90-degree slice from the top, confirmed the computed boundary point
+sits exactly at the 3-o'clock position `(cx+r, cy)`, not just that a path
+string got produced. Also verified 0%/100% render as plain circles (no
+degenerate zero-length arc), 50% produces exactly two `<path>` wedges,
+icon HTML renders correctly and is empty-string (not a broken tag) when
+no icon is given, and the full card render carries all four expected
+`mdi:*` icon names with zero stray "undefined" text. `node --check`
+clean. **Still not rendered in a real dashboard** -- same standing caveat.
+
+---
+
 ## CURRENT WORKLIST v8 (2026-07-16 — supersedes v7 below; THE list to work off)
 
 Closed since v7 (full detail in the v7 section below, kept for history):
