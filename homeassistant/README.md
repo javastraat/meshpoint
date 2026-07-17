@@ -4,42 +4,100 @@ A read-only Home Assistant integration for [Meshpoint](https://github.com/javast
 
 Entities are created dynamically from whatever `/metrics` returns, so a metric Meshpoint adds in a future release shows up automatically — no integration update required, just possibly a generic name until `metric_meta.py` is updated for it.
 
-## Setup
+## 1. On the Meshpoint dashboard
 
-1. On the Meshpoint dashboard: **Configuration → Metrics**
-   - Enable "Enable /metrics endpoint"
-   - If "Require authentication" is on, generate an API key (give it a label like "Home Assistant") and copy it — it's shown once
-2. In Home Assistant: **Settings → Devices & Services → + Add Integration → Meshpoint**
-3. Enter the Meshpoint gateway's host/IP, port (default `8080`), and the API key from step 1 (leave blank if authentication is off)
+**Configuration → Metrics:**
 
-## Installation
+1. Enable "Enable /metrics endpoint"
+2. If "Require authentication" is on, generate an API key (label it something like "Home Assistant") and copy it now — it's shown once, only its hash is stored afterward
 
-### Manual
+## 2. Install the integration files on Home Assistant
 
-Copy `custom_components/meshpoint` into your Home Assistant config's `custom_components/` directory, then restart Home Assistant.
+The integration needs to land at `<ha-config>/custom_components/meshpoint/` — `<ha-config>` is the folder containing your `configuration.yaml`, not this repo. How you get files there depends on your HA setup; pick whichever you have:
 
-### HACS (custom repository)
+- **File editor / Studio Code Server add-on** (HA OS/Supervised) — open the add-on from the sidebar, create the folder `custom_components/meshpoint` at the root (same level as `configuration.yaml`), and upload or paste in every file from this repo's `homeassistant/custom_components/meshpoint/` (including the `translations/` subfolder)
+- **Samba share add-on** — mount it from your Mac/PC, copy `homeassistant/custom_components/meshpoint` straight into `\\<ha-ip>\config\custom_components\`
+- **scp / SSH** (Container or Core installs) — `scp -r homeassistant/custom_components/meshpoint user@ha-host:/path/to/config/custom_components/`
 
-This integration lives in a subdirectory of the main Meshpoint repo rather than its own repo. Add `https://github.com/javastraat/meshpoint` as a HACS custom repository, category "Integration" — if HACS doesn't pick up the subdirectory automatically, manual installation above is the reliable path for now.
+**Verify before restarting** — the folder should look like:
+```
+<ha-config>/custom_components/meshpoint/__init__.py
+<ha-config>/custom_components/meshpoint/manifest.json
+<ha-config>/custom_components/meshpoint/config_flow.py
+<ha-config>/custom_components/meshpoint/coordinator.py
+<ha-config>/custom_components/meshpoint/sensor.py
+<ha-config>/custom_components/meshpoint/metric_meta.py
+<ha-config>/custom_components/meshpoint/prometheus.py
+<ha-config>/custom_components/meshpoint/const.py
+<ha-config>/custom_components/meshpoint/strings.json
+<ha-config>/custom_components/meshpoint/translations/en.json
+```
+A common mistake is copying the whole `homeassistant/` folder from this repo (preserving its own `custom_components/meshpoint/...` nesting) instead of just its *contents* — check the paths above match exactly, no extra nesting.
 
-## Lovelace card (optional)
+Then: **restart Home Assistant** (Settings → System → Restart).
 
-`www/meshpoint-card.js` is a self-contained custom card (no build step, no framework) that groups one Meshpoint device's entities into a status header, stats grid, protocol/signal/relay sections, and a "More" grid for anything not yet in its lookup table — so a metric the integration surfaces later still shows up, unstyled, without the card needing an update either.
+## 3. Add the integration
 
-**Install:**
+**Settings → Devices & Services → + Add Integration → search "Meshpoint"**
 
-1. Copy `www/meshpoint-card.js` into your Home Assistant config's `www/` directory (creates `<config>/www/meshpoint-card.js`, served at `/local/meshpoint-card.js`)
-2. Settings → Dashboards → ⋮ → Resources → **+ Add Resource**
+- Host/IP of the Meshpoint gateway
+- Port (default `8080`)
+- The API key from step 1 (leave blank if "Require authentication" is off)
+
+It validates by actually polling `/metrics` before saving — a wrong host or key is caught immediately with a clear error, not a silently-broken device.
+
+Once added, **Settings → Devices & Services → Meshpoint** shows every sensor on one device page.
+
+### HACS instead of manual?
+
+This integration lives in a subdirectory of the main Meshpoint repo rather than its own repo. Adding `https://github.com/javastraat/meshpoint` as a HACS custom repository (category "Integration") may not pick up the subdirectory correctly — manual installation above is the reliable path for now.
+
+## 4. Install the Lovelace card (optional)
+
+`www/meshpoint-card.js` is a self-contained custom card (no build step, no framework) that groups one Meshpoint device's entities into a status header, stats grid, and Protocols/Signal/Relay sections, with a "More" grid for anything not yet in its lookup table — so a metric the integration surfaces later still shows up, unstyled, without the card needing an update either.
+
+1. Copy `www/meshpoint-card.js` into `<ha-config>/www/meshpoint-card.js` — same methods as step 2 above (File editor, Samba, scp). It must land directly in `www/`, not a subfolder — `/local/` maps to that exact directory.
+2. **Verify it's actually being served** before touching Lovelace at all:
+   ```
+   curl http://<ha-ip>:8123/local/meshpoint-card.js
+   ```
+   You should see the real JS source. A 404 here means the file isn't where HA expects it — fix that first, nothing downstream will work otherwise.
+3. **Settings → Dashboards → ⋮ → Resources → + Add Resource**
    - URL: `/local/meshpoint-card.js`
-   - Resource type: JavaScript Module
-3. Edit any dashboard → Add Card → search "Meshpoint Card", or add manually as YAML:
+   - Resource type: **JavaScript Module**
+4. Edit any dashboard → Add Card → search "Meshpoint Card", or add manually as YAML:
    ```yaml
    type: custom:meshpoint-card
-   entity: sensor.meshpoint_<...>_uptime   # any one Meshpoint sensor -- the card finds the rest via its device
+   entity: sensor.meshpoint_<...>_uptime
    ```
-   (Find an entity ID from the Meshpoint device page — any sensor on it works, the card looks up its sibling entities from there.)
+   Any one Meshpoint sensor works for `entity` — find one via **Developer Tools → States**, filter "meshpoint", copy any entity ID. The card looks up its sibling entities from the same device automatically. (Or use `device_id: <id>` instead — that ID is the last segment of the device page's URL.)
 
 No visual card editor yet — YAML config only for this first version.
+
+## Troubleshooting
+
+### "icon not available" in the Add Integration picker
+
+Cosmetic only, not a bug. Home Assistant's brand icons come from the centralized [home-assistant/brands](https://github.com/home-assistant/brands) repo, looked up by domain name — a custom integration can't bundle its own icon for that specific screen. Assets are staged at `homeassistant/brands/meshpoint/` in this repo, ready for submission whenever someone gets around to the PR; until then it's just a gray placeholder, everything still works.
+
+### Config flow fails immediately
+
+The error tells you which:
+- **"Could not reach Meshpoint at that address"** — wrong host/port, or `/metrics` isn't reachable from HA over the network (firewall, wrong subnet)
+- **"Meshpoint rejected the API key"** — key was revoked, mistyped, or belongs to a different Meshpoint
+- **"/metrics endpoint is disabled"** — reachable, but Configuration → Metrics → "Enable /metrics endpoint" is off on the Meshpoint side
+
+### Card shows "Custom element doesn't exist: meshpoint-card" / "Custom element not found"
+
+Work through these in order — each rules out a layer:
+
+1. **Confirm the file is actually served**: `curl http://<ha-ip>:8123/local/meshpoint-card.js` from any machine. A 404 means the file isn't at `<ha-config>/www/meshpoint-card.js` — go back to step 4.1 above and check for extra nesting (`www/homeassistant/www/...` is a common mistake if the whole repo folder got copied instead of just its contents).
+2. **If curl returns 200 but the browser still fails** — this is a browser caching problem, not a real error. Confirmed on Chrome specifically taking real effort to shake loose:
+   - A plain hard-refresh (Cmd/Ctrl+Shift+R) is usually **not enough** — Home Assistant's frontend is a PWA with a service worker that can keep serving a cached 404 independently of normal browser cache.
+   - Clearing all site data (`chrome://settings/content/all` → find the HA host → Delete) is **also sometimes not enough**.
+   - What reliably works: DevTools (F12) → **Network** tab → check **"Disable cache"** → also check Application → Service Workers → **"Bypass for network"** if present → then hard-reload with DevTools still open.
+3. **Works in Incognito/Private browsing but not your normal profile, even after the above?** That's the signature of a browser extension (ad blocker, privacy/script blocker) interfering — incognito runs with extensions off by default. Try `chrome://extensions` → disable all → reload; re-enable one at a time to find the culprit.
+4. Confirmed working across Chrome, Safari, and iOS Safari using this integration in practice — if none of the above resolves it, check the Console tab (F12) for the actual failed request and paste the error.
 
 ## What it does not do
 

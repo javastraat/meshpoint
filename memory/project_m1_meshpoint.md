@@ -1116,14 +1116,23 @@ a manual hard-refresh + cache clear. Real cause: Home Assistant's frontend
 is a PWA with a service worker that caches static assets INDEPENDENTLY of
 normal browser cache/hard-refresh -- it had cached the earlier 404 response
 for that exact URL and kept serving it. Confirmed via incognito (no
-persisted service worker there) rendering the card correctly first try; fix
-for the main profile is DevTools -> Application -> Service Workers ->
-Unregister, plus Storage -> Clear site data. **Lesson for next time a
-custom HA resource "isn't loading" despite the file being confirmed present
-server-side**: check for this service-worker-cached-404 pattern (curl
-200 + browser 404 on the same URL is the tell) before assuming it's a code
-or file-placement bug -- cost real back-and-forth here before landing on
-the actual cause.
+persisted service worker there) rendering the card correctly first try.
+
+**Turned out to be a longer saga than expected, on Chrome specifically**:
+neither a plain hard-refresh, nor DevTools Unregister-the-service-worker,
+nor even clearing 3.9GB of full site data actually fixed Chrome (Safari/
+iOS/incognito all worked throughout). What actually worked: DevTools ->
+Network tab -> check "Disable cache", plus Application -> Service Workers
+-> "Bypass for network" if present, THEN hard-reload with DevTools still
+open. **Lesson for next time a custom HA resource "isn't loading" despite
+the file being confirmed present server-side (curl 200, browser 404/"not
+found" on the identical URL)**: don't stop at Unregister + Clear Site
+Data if that doesn't fix it -- the DevTools "Disable cache" + "Bypass for
+network" + hard-reload-while-open combo is the more reliable fix, go
+straight there. Also worth checking early: does incognito work but the
+normal profile doesn't? That's the signature of a browser extension
+(ad/privacy/script blocker) interfering, not caching -- try disabling all
+extensions before assuming it's cache-related.
 
 ---
 
