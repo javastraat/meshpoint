@@ -7,6 +7,7 @@ naming, GPS configuration, and generates config/local.yaml.
 from __future__ import annotations
 
 import os
+import re
 import socket
 import sys
 import uuid
@@ -282,7 +283,86 @@ def _step_device_name(config: dict, existing: dict | None = None) -> None:
 
     config.setdefault("device", {})["device_name"] = name
     print(f"        Named: {name}")
+
+    if not existing:
+        _step_set_hostname(name)
+
     print()
+
+
+def _step_set_hostname(device_name: str) -> None:
+    """Offer to set the system hostname to match the device name, so
+    the box is reachable as <hostname>.local via mDNS (scripts/
+    install.sh installs Avahi for this). Fresh installs only -- the
+    caller only invokes this when ``existing`` config was empty; never
+    rename a box already in use, already bookmarked by hostname, or
+    already scripted around.
+    """
+    if sys.platform != "linux":
+        return
+
+    slug = _slugify_hostname(device_name)
+    current = socket.gethostname().split(".")[0]
+    if slug == current:
+        return
+
+    print()
+    if not _confirm(
+        f'Also set the system hostname to "{slug}" '
+        f"(reachable as {slug}.local on the LAN)?",
+        default_yes=True,
+    ):
+        return
+
+    import subprocess
+
+    try:
+        subprocess.run(["sudo", "hostnamectl", "set-hostname", slug], check=True)
+        _update_etc_hosts(current, slug)
+        print(f"        Hostname set to {slug} — reachable as {slug}.local")
+        print("        Existing SSH sessions stay connected; new ones need")
+        print(f"        {slug}.local or the IP, not the old hostname.")
+    except (subprocess.CalledProcessError, FileNotFoundError, PermissionError) as exc:
+        print(f"        Could not set hostname: {exc}")
+        print("        Continuing with the device name only (cosmetic, in Meshpoint's own UI).")
+
+
+def _update_etc_hosts(old_hostname: str, new_hostname: str) -> None:
+    """Update the 127.0.1.1 entry in /etc/hosts to match the new
+    hostname. ``hostnamectl set-hostname`` alone doesn't touch this --
+    a stale entry pointing at the old name causes "sudo: unable to
+    resolve host" warnings on every future command.
+    """
+    hosts_path = Path("/etc/hosts")
+    try:
+        lines = hosts_path.read_text().splitlines(keepends=True)
+    except OSError:
+        return
+
+    updated = []
+    found = False
+    for line in lines:
+        if line.strip().startswith("127.0.1.1") and old_hostname in line:
+            updated.append(f"127.0.1.1\t{new_hostname}\n")
+            found = True
+        else:
+            updated.append(line)
+    if not found:
+        updated.append(f"127.0.1.1\t{new_hostname}\n")
+
+    try:
+        hosts_path.write_text("".join(updated))
+    except OSError:
+        pass
+
+
+def _slugify_hostname(name: str) -> str:
+    """Turn a free-form device name into a valid Linux hostname label
+    (RFC 1123: lowercase letters/digits/hyphens, no leading/trailing
+    hyphen, max 63 chars)."""
+    slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+    slug = re.sub(r"-{2,}", "-", slug)
+    return slug[:63] or "meshpoint"
 
 
 def _step_location(

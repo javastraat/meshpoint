@@ -29,6 +29,7 @@ First tagged release of the javastraat/meshpoint fork: LoRaWAN sniffing, multi-r
 #### Setup wizard
 
 - **Setup wizard lets you skip upstreaming entirely.** The `[4/8] API key` step now asks "Upstream data to meshradar.io?" before prompting for a key; answering no writes `upstream.enabled: false` (no API key required) instead of forcing activation, while still preserving any previously-saved key so re-enabling later doesn't require re-entering it.
+- **Setup wizard can set the system hostname to match the device name.** Right after choosing a device name (`[5/8]`), on a fresh install (never on a re-run/upgrade — an existing box already has bookmarks, scripts, and SSH history tied to its hostname) the wizard offers to also set the Linux hostname to match, slugified to a valid form (lowercase, hyphens, 63-char cap) — so the box becomes reachable at `<name>.local` via the mDNS support `scripts/install.sh` now sets up. Runs `sudo hostnamectl set-hostname` and updates `/etc/hosts`' `127.0.1.1` entry to match (hostnamectl alone doesn't touch it, leaving a stale entry that causes "sudo: unable to resolve host" warnings otherwise); skipped automatically if the slug already matches the current hostname, and any failure (e.g. no privilege) is caught and logged without aborting the rest of setup.
 
 #### Multi-radio capture (5 networks at once)
 

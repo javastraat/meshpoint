@@ -1532,6 +1532,61 @@ install/upgrade run is the real test.
 
 ---
 
+### 2026-07-18 (same day, follow-on): setup wizard sets the hostname too
+
+Follow-on from the mDNS/Avahi install.sh addition -- user asked whether
+it's worth also prompting for a hostname, confirmed neither install.sh
+nor the wizard did anything with the actual Linux hostname today (only
+a cosmetic `device.device_name` config field exists, whose *default* is
+seeded from `socket.gethostname()` but never writes back). Recommended
+doing it in `meshpoint setup` (interactive, where prompts already live)
+rather than install.sh (unattended root script), fresh-installs-only
+(never rename a box already bookmarked/scripted around), and the user
+confirmed that's exactly the scope they wanted.
+
+Wired into the existing `[5/8] Device name` step
+(`src/cli/setup_wizard.py`) rather than adding a whole new numbered
+step -- keeps the wizard's "8 steps" framing intact and reads naturally
+as a follow-up to naming the device. New `_step_set_hostname()`, called
+only when `existing` config was empty (the wizard's own established
+fresh-vs-upgrade signal, already used throughout `run_setup()`);
+slugifies the device name into a valid RFC 1123 hostname label
+(`_slugify_hostname()` -- lowercase, hyphens, 63-char cap, verified
+against the actual emoji-prefixed contact name from earlier this session
+as a real-world case), skips the prompt entirely if the slug already
+matches the current hostname, and on accept runs `hostnamectl` +
+patches `/etc/hosts`' `127.0.1.1` line (`_update_etc_hosts()` --
+hostnamectl alone doesn't touch this, a stale entry causes "sudo:
+unable to resolve host" warnings afterward). **User caught a real
+mistake before it shipped**: my first version ran plain `hostnamectl`
+without `sudo`, but the file's own existing `reboot` call
+(`subprocess.run(["sudo", "reboot"], ...)`, line ~437) already
+establishes the convention of an explicit `sudo` prefix regardless of
+whether the parent process happens to already be root -- fixed to
+match (`["sudo", "hostnamectl", "set-hostname", slug]`).
+
+Verification: `py_compile` clean. Slugify tested against 6 cases
+including empty-string and 100-char inputs. `/etc/hosts` update tested
+against real temp files for all 3 branches (existing 127.0.1.1 line
+replaced in place with other lines preserved, missing line appended,
+missing/unreadable file handled without raising). Full control-flow
+tested via mocks for all 7 branches: non-Linux bail, slug-already-
+matches bail, user-declines no-op, happy path (verified the exact
+`sudo hostnamectl` argv and the `/etc/hosts` call), hostnamectl failure
+caught without crashing the wizard, and -- the most safety-critical
+pair -- confirmed `_step_device_name` calls `_step_set_hostname` on a
+fresh install (`existing={}`) but never does on a re-run
+(`existing={"device": {...}}`). One real bug caught mid-test-writing
+too: my first control-flow test run "passed" cases for the wrong
+reason (forgot to mock `sys.platform` as `'linux'` while testing on
+this Mac, so every case was silently hitting the non-Linux early-return
+instead of exercising the actual logic) -- caught by a assertion that
+should have been trivially true actually failing, not by inspection.
+**Not yet run on a real Pi** -- next `meshpoint setup` run is the real
+test, same standing caveat as the mDNS install.sh section itself.
+
+---
+
 ## CURRENT WORKLIST v8 (2026-07-16 — supersedes v7 below; THE list to work off)
 
 Closed since v7 (full detail in the v7 section below, kept for history):
