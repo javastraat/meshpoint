@@ -72,6 +72,7 @@ class MeshpointSensor(CoordinatorEntity[MeshpointDataUpdateCoordinator], SensorE
         self._attr_state_class = meta.state_class
         self._attr_icon = meta.icon
         self._attr_entity_category = meta.entity_category
+        self._attr_suggested_display_precision = meta.suggested_display_precision
 
     @property
     def native_value(self) -> float | int | str | None:

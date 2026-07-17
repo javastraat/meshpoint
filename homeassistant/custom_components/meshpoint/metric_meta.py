@@ -19,7 +19,7 @@ from typing import Optional
 from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfTemperature, UnitOfTime
 
-_KNOWN_PREFIXES = ("meshpoint_", "device_", "stats_")
+_STRIPPED_PREFIXES = ("meshpoint_",)
 
 
 @dataclass(frozen=True)
@@ -30,11 +30,25 @@ class MetricMeta:
     state_class: Optional[str] = None
     icon: Optional[str] = None
     entity_category: Optional[str] = None
+    suggested_display_precision: Optional[int] = None
 
     @classmethod
     def fallback(cls, key: str) -> "MetricMeta":
+        """Derive a readable name for an uncurated key.
+
+        Only the ``meshpoint_`` prefix is stripped (that namespace is
+        already unique). ``device_``/``stats_`` prefixes are deliberately
+        KEPT -- those two JSON sources often duplicate a concept
+        /metrics already has under a different key (e.g. both a
+        ``meshpoint_relay_enabled`` and a ``stats_relay_enabled`` can
+        exist); stripping the prefix there previously produced two
+        different entities both displayed as plain "Relay Enabled",
+        indistinguishable in the UI. Keeping the prefix ("Stats Relay
+        Enabled") guarantees no collision with a curated /metrics name
+        or between the two JSON sources themselves.
+        """
         label = key
-        for prefix in _KNOWN_PREFIXES:
+        for prefix in _STRIPPED_PREFIXES:
             if label.startswith(prefix):
                 label = label[len(prefix):]
                 break
@@ -49,6 +63,7 @@ METRIC_META: dict[str, MetricMeta] = {
         device_class=SensorDeviceClass.DURATION,
         icon="mdi:timer-outline",
         entity_category=EntityCategory.DIAGNOSTIC,
+        suggested_display_precision=0,
     ),
     "meshpoint_packets_session_total": MetricMeta(
         "Session Packets",
@@ -199,6 +214,7 @@ METRIC_META: dict[str, MetricMeta] = {
         device_class=SensorDeviceClass.DURATION,
         icon="mdi:clock-outline",
         entity_category=EntityCategory.DIAGNOSTIC,
+        suggested_display_precision=0,
     ),
     "device_fan_duty_percent": MetricMeta(
         "Fan Duty",
