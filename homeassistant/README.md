@@ -44,10 +44,13 @@ Then: **restart Home Assistant** (Settings → System → Restart).
 - Host/IP of the Meshpoint gateway
 - Port (default `8080`)
 - The API key from step 1 (leave blank if "Require authentication" is off)
+- Poll interval in seconds (default `60`, 15–3600 allowed)
 
 It validates by actually polling `/metrics` before saving — a wrong host or key is caught immediately with a clear error, not a silently-broken device.
 
 Once added, **Settings → Devices & Services → Meshpoint** shows every sensor on one device page.
+
+**Changing the poll interval later** doesn't need re-adding the integration: **Settings → Devices & Services → Meshpoint → Configure** (host/port/API key aren't editable there — removing and re-adding the integration is how to change those).
 
 ### HACS instead of manual?
 

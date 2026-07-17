@@ -1,10 +1,14 @@
 """Config flow for the Meshpoint integration.
 
-Single step: host, port, and an optional API key (generated from
-Meshpoint's Configuration -> Metrics -> API keys panel). Validates by
-actually polling /metrics before letting the entry be created, so a
-typo'd host or a wrong key is caught at setup time, not as a silently
-unavailable device afterward.
+Single step: host, port, an optional API key (generated from Meshpoint's
+Configuration -> Metrics -> API keys panel), and the poll interval.
+Validates by actually polling /metrics before letting the entry be
+created, so a typo'd host or a wrong key is caught at setup time, not as
+a silently unavailable device afterward.
+
+The poll interval can also be changed later without re-adding the
+integration, via the Options flow (Settings -> Devices & Services ->
+Meshpoint -> Configure).
 """
 
 from __future__ import annotations
@@ -16,19 +20,32 @@ import aiohttp
 import voluptuous as vol
 
 from homeassistant import config_entries
-from homeassistant.const import CONF_HOST, CONF_PORT
+from homeassistant.const import CONF_HOST, CONF_PORT, CONF_SCAN_INTERVAL
+from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .const import CONF_API_KEY, DEFAULT_PORT, DOMAIN
+from .const import (
+    CONF_API_KEY,
+    DEFAULT_PORT,
+    DEFAULT_SCAN_INTERVAL,
+    DOMAIN,
+    MAX_SCAN_INTERVAL,
+    MIN_SCAN_INTERVAL,
+)
 
 _LOGGER = logging.getLogger(__name__)
+
+_SCAN_INTERVAL_VALIDATOR = vol.All(
+    vol.Coerce(int), vol.Range(min=MIN_SCAN_INTERVAL, max=MAX_SCAN_INTERVAL)
+)
 
 STEP_USER_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_HOST): str,
         vol.Optional(CONF_PORT, default=DEFAULT_PORT): int,
         vol.Optional(CONF_API_KEY, default=""): str,
+        vol.Optional(CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL): _SCAN_INTERVAL_VALIDATOR,
     }
 )
 
@@ -99,3 +116,39 @@ class MeshpointConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="user", data_schema=STEP_USER_SCHEMA, errors=errors
         )
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(
+        config_entry: config_entries.ConfigEntry,
+    ) -> "MeshpointOptionsFlow":
+        return MeshpointOptionsFlow(config_entry)
+
+
+class MeshpointOptionsFlow(config_entries.OptionsFlow):
+    """Lets the poll interval be changed after setup without re-adding
+    the integration (Settings -> Devices & Services -> Meshpoint ->
+    Configure). Host/port/API key stay edit-once -- reconfiguring those
+    means removing and re-adding the integration, same as most simple
+    HA integrations.
+    """
+
+    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
+        self._config_entry = config_entry
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        if user_input is not None:
+            return self.async_create_entry(title="", data=user_input)
+
+        current = self._config_entry.options.get(
+            CONF_SCAN_INTERVAL,
+            self._config_entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
+        )
+        schema = vol.Schema(
+            {
+                vol.Optional(CONF_SCAN_INTERVAL, default=current): _SCAN_INTERVAL_VALIDATOR,
+            }
+        )
+        return self.async_show_form(step_id="init", data_schema=schema)

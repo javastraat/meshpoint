@@ -1365,6 +1365,46 @@ clean. **Still not rendered in a real dashboard** -- same standing caveat.
 
 ---
 
+### 2026-07-17 (same day, follow-on): Configurable poll interval
+
+User asked how often the HA integration polls (was hardcoded 60s,
+`DEFAULT_SCAN_INTERVAL` in const.py, no UI to change it) and then asked
+for it to be configurable both at initial setup AND changeable later
+without re-adding the integration. Added `scan_interval` (15-3600s,
+`vol.Range`-validated) to the config flow's schema, plus a proper HA
+Options Flow (`MeshpointOptionsFlow`, reached via Settings -> Devices &
+Services -> Meshpoint -> Configure) scoped to just that one field --
+host/port/API key deliberately stay edit-once (remove+re-add), matching
+how most simple HA integrations handle reconfiguration rather than
+building a full re-edit-everything options UI. `__init__.py`'s new
+`_scan_interval(entry)` helper reads `entry.options` first, falling back
+to `entry.data` (the initial-setup value), falling back to the constant
+default -- so Configure changes take priority once set. Changing options
+triggers `hass.config_entries.async_reload()` via a registered update
+listener (simplest correct way to get the coordinator's
+`update_interval` to actually pick up a new value -- a full reload is
+cheap for a read-only polling integration like this one). Manifest
+bumped to 0.3.0.
+
+Verification, same "can't install real HA here" constraint as every
+other piece of this integration: stubbed just enough of
+`homeassistant`/`voluptuous`/`aiohttp` to import the real
+`config_flow.py` and exercise the actual `_SCAN_INTERVAL_VALIDATOR`
+(accepts in-range int and string-from-form input via `Coerce`, rejects
+below 15 and above 3600). For `__init__.py`'s `_scan_interval()` fallback
+logic, regex-extracted the real function source out of the shipped file
+and `exec`'d it in isolation with a fake config-entry object (rather than
+hand-retyping the logic into a test, which would verify the test's
+understanding, not the actual code) -- confirmed default-when-neither-set,
+data-value-when-no-options, and options-overrides-data, all correct.
+`py_compile` and JSON validity clean on all touched files. **Not yet
+tested against real HA** -- the Options Flow UI itself (whether
+Configure actually shows the right current value pre-filled, whether the
+reload genuinely applies a new interval) has never been exercised
+live.
+
+---
+
 ## CURRENT WORKLIST v8 (2026-07-16 — supersedes v7 below; THE list to work off)
 
 Closed since v7 (full detail in the v7 section below, kept for history):

@@ -7,7 +7,8 @@
         "data": {
           "host": "Host or IP address",
           "port": "Port",
-          "api_key": "API key (leave blank if authentication is off)"
+          "api_key": "API key (leave blank if authentication is off)",
+          "scan_interval": "Poll interval (seconds)"
         }
       }
     },
@@ -19,6 +20,17 @@
     },
     "abort": {
       "already_configured": "This Meshpoint gateway is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Meshpoint options",
+        "description": "Change how often Home Assistant polls this Meshpoint gateway. Host, port, and API key can't be changed here -- remove and re-add the integration for those.",
+        "data": {
+          "scan_interval": "Poll interval (seconds)"
+        }
+      }
     }
   }
 }

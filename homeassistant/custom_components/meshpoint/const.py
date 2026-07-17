@@ -8,6 +8,8 @@ CONF_API_KEY = "api_key"
 
 DEFAULT_PORT = 8080
 DEFAULT_SCAN_INTERVAL = 60
+MIN_SCAN_INTERVAL = 15
+MAX_SCAN_INTERVAL = 3600
 
 # Metric keys that describe the box itself rather than a sensor value --
 # pulled out of the parsed metrics dict and attached as device info instead
