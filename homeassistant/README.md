@@ -22,6 +22,25 @@ Copy `custom_components/meshpoint` into your Home Assistant config's `custom_com
 
 This integration lives in a subdirectory of the main Meshpoint repo rather than its own repo. Add `https://github.com/javastraat/meshpoint` as a HACS custom repository, category "Integration" — if HACS doesn't pick up the subdirectory automatically, manual installation above is the reliable path for now.
 
+## Lovelace card (optional)
+
+`www/meshpoint-card.js` is a self-contained custom card (no build step, no framework) that groups one Meshpoint device's entities into a status header, stats grid, protocol/signal/relay sections, and a "More" grid for anything not yet in its lookup table — so a metric the integration surfaces later still shows up, unstyled, without the card needing an update either.
+
+**Install:**
+
+1. Copy `www/meshpoint-card.js` into your Home Assistant config's `www/` directory (creates `<config>/www/meshpoint-card.js`, served at `/local/meshpoint-card.js`)
+2. Settings → Dashboards → ⋮ → Resources → **+ Add Resource**
+   - URL: `/local/meshpoint-card.js`
+   - Resource type: JavaScript Module
+3. Edit any dashboard → Add Card → search "Meshpoint Card", or add manually as YAML:
+   ```yaml
+   type: custom:meshpoint-card
+   entity: sensor.meshpoint_<...>_uptime   # any one Meshpoint sensor -- the card finds the rest via its device
+   ```
+   (Find an entity ID from the Meshpoint device page — any sensor on it works, the card looks up its sibling entities from there.)
+
+No visual card editor yet — YAML config only for this first version.
+
 ## What it does not do
 
 - No per-node or per-contact sensors (Meshpoint can track thousands of mesh nodes; this integration reports counts and rates, not one entity per node)

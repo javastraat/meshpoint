@@ -1084,6 +1084,23 @@ reasoning as [[scripts-not-changelogged]]: doesn't ship with the Pi app or
 `src/version.py` releases) but does get a README mention (unlike scripts)
 since it's a real user-facing companion product, not a dev-only tool.
 
+**Same-day follow-on**: user saw a MeshCore Lovelace-card screenshot
+(styled hub/repeater card, from the `meshcore-card` companion project) and
+asked for a Meshpoint equivalent. Built `homeassistant/www/meshpoint-card.js`
+— a single dependency-free custom element (no LitElement, matches
+Meshpoint's own frontend's plain-JS-class style), config takes any one
+Meshpoint `entity` id and resolves the rest of that device's entities via
+`hass.entities`, groups them by matching against known friendly names from
+`metric_meta.py` (header/stats/protocol/signal/relay/diagnostic buckets),
+with an automatic "More" grid for anything unrecognized -- same
+forward-compat property as the backend's dynamic sensor creation. Uses HA
+theme CSS variables (`var(--primary-text-color)` etc.) rather than a
+hardcoded dark palette, so it themes correctly instead of just copying the
+screenshot's fixed dark look. `node --check`ed only -- **never rendered in
+a real dashboard**, so the actual grouping/matching-by-name logic and CSS
+layout are unverified beyond syntax. No visual card editor yet, YAML config
+only.
+
 ---
 
 ## CURRENT WORKLIST v8 (2026-07-16 — supersedes v7 below; THE list to work off)
