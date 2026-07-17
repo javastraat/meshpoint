@@ -975,6 +975,56 @@ Meshtastic serial — live as `serial_433`; all three lines were stale until
 
 ---
 
+### 2026-07-17: Metrics API keys (Home Assistant integration follow-on)
+
+User explored a Meshpoint → Home Assistant integration. Path taken: zero-code
+`rest` sensor against `/metrics` first (verified live on the Pi — user pasted
+real curl output, 869.525/433.875 MHz nodes, ~9300 packets in DB). That
+surfaced that `/metrics` is unauthenticated by default and reachable to
+anyone on the LAN with no secret path (`/metrics` is the standard Prometheus
+convention, and the same port already serves the dashboard login page, so
+there's no obscurity to lean on) — user pushed back on "just firewall it,"
+wanted a real API-key gate instead, then asked for **multiple named keys**
+scoped only to `/metrics` (not general dashboard access — asked directly,
+user chose metrics-only over "any read-only route" to keep the change small
+and the attack surface minimal), managed from Configuration → Metrics (user
+explicitly said not the Auth page, since scope is metrics-only).
+
+Built: `MetricsApiKey` dataclass (`src/config.py`) — id/label/key_hash
+(SHA-256, raw key shown once, matches admin-password-hash precedent)/
+created_at/last_used_at, `metrics.api_keys: list[MetricsApiKey]`, yaml
+coercion mirroring `_coerce_repeaters`. `POST`/`DELETE
+/api/config/metrics/api-keys` (`metrics_config_routes.py`, admin-only,
+generates via `secrets.token_urlsafe(32)`, persists full list to
+`local.yaml` on every add/revoke). `metrics_routes.py`'s `/metrics` handler
+now accepts a matching `Authorization: Bearer <key>` (hashed + compared via
+`hmac.compare_digest`) as an alternative to session auth when
+`require_auth: true`; `last_used_at` updates in memory only (not persisted
+per-scrape, avoids SD card write amplification on a 15-60s scrape interval).
+`config_enrichment.py` exposes key metadata (id/label/created_at/
+last_used_at) to the frontend, never the hash. Frontend: new "API keys" card
+in `metrics_card.js` (generate with label → one-time reveal box with copy
+button, list with revoke buttons, confirm-before-revoke); `configuration_
+panel.js`'s shared `_buildApi()` gained a `delete` method (only get/put/post
+existed before, needed for the revoke endpoint). Docs: both `/metrics`
+sections in `CONFIGURATION.md` updated (there are two — one under Storage,
+one standalone `## Prometheus Metrics` — kept in sync rather than leaving
+the second stale) with an HA `rest` sensor example using the key.
+
+Verification (Mac, no fastapi/pydantic venv — followed the stub-with-
+`sys.modules` convention): `py_compile`d all 5 touched Python files. Stubbed
+`fastapi`/`pydantic`/`jwt` minimally, then exercised real, unstubbed code:
+config round-trips through `save_section_to_yaml` + `_apply_yaml` correctly;
+`_match_api_key()` matches the right key, rejects a wrong key/missing
+header/non-Bearer scheme; full `create_metrics_api_key` → yaml persist →
+reload → `revoke_metrics_api_key` → yaml persist → reload cycle confirmed
+end-to-end via `asyncio.run`, including 404 on revoking an unknown id.
+`node --check` on both touched JS files; CSS brace-balance check. Not yet
+live-tested against a real browser or the actual Pi (per usual — dev
+happens on the Mac, user deploys).
+
+---
+
 ## CURRENT WORKLIST v8 (2026-07-16 — supersedes v7 below; THE list to work off)
 
 Closed since v7 (full detail in the v7 section below, kept for history):

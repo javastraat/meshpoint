@@ -235,6 +235,7 @@ class ConfigurationPanel {
             get: (url) => self._request('GET', url, undefined),
             put: (url, body) => self._request('PUT', url, body),
             post: (url, body) => self._request('POST', url, body),
+            delete: (url) => self._request('DELETE', url, undefined),
             refresh: () => self._loadConfig().then(() => self._renderAll()),
             toast: (msg) => self._toast(msg),
             signalRestart: (msg) => self._toast(

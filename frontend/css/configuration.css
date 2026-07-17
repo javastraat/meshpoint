@@ -588,6 +588,42 @@ select.cfg-field__input option:checked {
     flex-shrink: 0;
 }
 
+.cfg-metrics-key-add {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin: 12px 0 4px;
+    flex-wrap: wrap;
+}
+
+.cfg-metrics-key-add input {
+    flex: 1;
+    max-width: 260px;
+}
+
+.cfg-reveal {
+    background: rgba(68, 211, 154, 0.08);
+    border: 1px solid rgba(68, 211, 154, 0.35);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin: 12px 0;
+}
+
+.cfg-reveal__row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-top: 8px;
+    flex-wrap: wrap;
+}
+
+.cfg-reveal__row input {
+    flex: 1;
+    min-width: 200px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+}
+
 .cfg-quick-deploy {
     display: grid;
     grid-template-columns: auto 1fr;

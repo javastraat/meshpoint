@@ -618,6 +618,7 @@ Optional Prometheus text scrape endpoint for LAN monitoring. **Off by default** 
 metrics:
   enabled: false
   require_auth: true    # when false, /metrics is open on the LAN (use firewall rules)
+  api_keys: []           # managed from Configuration -> Metrics, not hand-edited
 ```
 
 When `metrics.enabled: true`, Prometheus (or any scraper) can poll:
@@ -639,7 +640,28 @@ scrape_configs:
     metrics_path: /metrics
 ```
 
-When `require_auth: true`, configure your scraper to send the dashboard session cookie or Bearer JWT (same as other protected API routes).
+**API keys (for `require_auth: true`).** A logged-in browser session or a session Bearer JWT both work, but neither suits an unattended scraper — sessions are short-lived and expire. Instead, generate a named key from **Configuration → Metrics → API keys**: give it a label (e.g. "Home Assistant"), click *Generate key*, and copy the raw value shown — it's never shown again, only its hash is stored. Each key is scoped to `/metrics` only; it cannot reach any other dashboard API route. Revoke a key any time from the same panel; revocation takes effect immediately, no restart.
+
+Send it as a standard bearer token:
+
+```
+Authorization: Bearer <key>
+```
+
+Example Home Assistant `configuration.yaml` `rest` sensor using a key:
+
+```yaml
+rest:
+  - resource: http://192.168.1.50:8080/metrics
+    scan_interval: 60
+    headers:
+      Authorization: !secret meshpoint_metrics_key   # "Bearer <key>"
+    sensor:
+      - name: "Meshpoint Nodes Total"
+        value_template: "{{ (value | regex_findall('meshpoint_nodes_total (\\d+)'))[0] }}"
+```
+
+(`secrets.yaml`: `meshpoint_metrics_key: "Bearer <key>"`.)
 
 ---
 
@@ -765,9 +787,9 @@ metrics:
 
 Exposes a `/metrics` endpoint in standard Prometheus text format (uptime, packet counts by protocol, RSSI/SNR averages, node counts). Purely passive — Meshpoint never sends this anywhere; a Prometheus server you run elsewhere would *scrape* (periodically fetch) this URL on its own schedule.
 
-`require_auth` gates the endpoint behind the same session auth as the rest of the dashboard — either the browser's session cookie, or an `Authorization: Bearer <token>` header. Since these are short-lived login session tokens rather than a long-lived API key, this is awkward for an unattended Prometheus scrape config to use in practice. Turning `require_auth` off makes the endpoint fully open to anyone who can reach it on the network; it only ever exposes aggregate stats, never credentials or channel keys.
+`require_auth` gates the endpoint behind the browser's session cookie, a session `Authorization: Bearer <jwt>` header, **or** a named API key generated from Configuration → Metrics — those are the long-lived credential for unattended scrapers (Home Assistant, Prometheus) that a login session can't provide. Each key is scoped to `/metrics` only and is revocable individually. Turning `require_auth` off instead makes the endpoint fully open to anyone who can reach it on the network; it only ever exposes aggregate stats, never credentials or channel keys. See [Prometheus metrics (`/metrics`)](#prometheus-metrics-metrics) above for the API key workflow and an example Home Assistant sensor.
 
-Edit both fields from **Configuration → Metrics**. Unlike most config pages, changes here apply immediately — `metrics_routes.py` reads the config fresh on every request, so no restart is needed.
+Edit both fields, and manage API keys, from **Configuration → Metrics**. Unlike most config pages, changes here apply immediately — `metrics_routes.py` reads the config fresh on every request, so no restart is needed.
 
 ### Available metrics
 

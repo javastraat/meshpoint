@@ -135,6 +135,15 @@ def enrich_config_payload(cfg: AppConfig, base: dict) -> dict:
     base["metrics"] = {
         "enabled": metrics.enabled,
         "require_auth": metrics.require_auth,
+        "api_keys": [
+            {
+                "id": k.id,
+                "label": k.label,
+                "created_at": k.created_at,
+                "last_used_at": k.last_used_at,
+            }
+            for k in metrics.api_keys
+        ],
     }
     pos = cfg.transmit.position
     telem = cfg.transmit.telemetry

@@ -210,6 +210,22 @@ def _coerce_repeaters(value) -> list["RepeaterConfig"]:
     return []
 
 
+_METRICS_API_KEY_FIELDS = {"id", "label", "key_hash", "created_at", "last_used_at"}
+
+
+def _coerce_metrics_api_keys(value) -> list["MetricsApiKey"]:
+    """Parse ``metrics.api_keys`` (list of {id, label, key_hash, created_at, last_used_at})."""
+    def _from_dict(d: dict) -> "MetricsApiKey":
+        return MetricsApiKey(
+            **{k: v for k, v in d.items() if k in _METRICS_API_KEY_FIELDS}
+        )
+
+    if isinstance(value, list):
+        out = [_from_dict(d) for d in value if isinstance(d, dict)]
+        return [k for k in out if k.id and k.key_hash]
+    return []
+
+
 @dataclass
 class CaptureConfig:
     sources: list[str] = field(default_factory=lambda: ["mock"])
@@ -231,11 +247,27 @@ class StorageConfig:
 
 
 @dataclass
+class MetricsApiKey:
+    """A named, revocable bearer credential scoped to /metrics only.
+
+    ``key_hash`` is a SHA-256 hex digest -- the raw key is shown to the
+    user exactly once at creation time and never stored or logged.
+    """
+
+    id: str
+    label: str
+    key_hash: str
+    created_at: str
+    last_used_at: Optional[str] = None
+
+
+@dataclass
 class MetricsConfig:
     """Prometheus-compatible /metrics scrape endpoint (PR 09)."""
 
     enabled: bool = False
     require_auth: bool = True
+    api_keys: list[MetricsApiKey] = field(default_factory=list)
 
 
 @dataclass
@@ -636,6 +668,11 @@ def _apply_yaml(cfg: AppConfig, path: Path) -> None:
     rp_raw = raw.get("repeater_poll")
     if isinstance(rp_raw, dict) and "repeaters" in rp_raw:
         cfg.repeater_poll.repeaters = _coerce_repeaters(rp_raw.pop("repeaters"))
+    # metrics.api_keys is a list-of-dicts; pop it before the generic merge
+    # so _merge_dataclass doesn't store raw dicts.
+    metrics_raw = raw.get("metrics")
+    if isinstance(metrics_raw, dict) and "api_keys" in metrics_raw:
+        cfg.metrics.api_keys = _coerce_metrics_api_keys(metrics_raw.pop("api_keys"))
 
     section_map = {
         "radio": cfg.radio,
