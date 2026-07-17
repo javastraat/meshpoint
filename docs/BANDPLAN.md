@@ -8,6 +8,16 @@ Meshtastic radio's own frequency-slot selection — see
 [RADIO-CONFIG-EXPLAINED.md](RADIO-CONFIG-EXPLAINED.md) for that (a Meshtastic
 node's own TX frequency, US slot map, custom frequency slots).
 
+Two CSVs alongside this file, generated directly from the source (not
+hand-transcribed) so they can't silently drift from the code:
+
+- [`bandplan-channels.csv`](bandplan-channels.csv) — all 9 channels × 6
+  regions (54 rows): frequency, bandwidth, spreading factor, protocol, RF
+  chain, sync word, enabled.
+- [`bandplan-sx1261-sweep.csv`](bandplan-sx1261-sweep.csv) — the SX1261
+  companion chip's band-sweep range per region (see
+  [SX1261 spectral scan](#sx1261-spectral-scan--band-sweep) below).
+
 ## Hardware shape
 
 Every plan configures the same physical layout:
@@ -22,6 +32,15 @@ Every plan configures the same physical layout:
   bandwidth (125/250/500 kHz), one spreading factor at a time. This is the
   channel a region's Meshtastic default (e.g. LongFast, SF11/250 kHz) runs on.
 - 1 FSK channel (not used by Meshpoint).
+
+**RF chain assignment isn't fixed per channel index** — it's computed per
+channel at configure time (`sx1302_wrapper.py`'s `_configure_if_channels()`):
+`RF0 if channel_freq_hz <= radio_0_freq_hz + 500_000 else RF1`. In practice
+this splits each region's 8 multi-SF channels roughly 6/2 or evenly across
+the two chains depending on how close the primary sits to the band edge —
+see the `rf_chain` column in
+[`bandplan-channels.csv`](bandplan-channels.csv) for the exact split per
+region rather than assuming a fixed ch0–3/ch4–7 divide.
 
 ## Supported regions
 
@@ -142,6 +161,54 @@ of alternate Meshtastic presets or slots, despite what the unused
 `meshtastic_eu868_default()` docstring implies. See
 [`concentrator_source.py`](../src/capture/concentrator_source.py)'s
 `_MESHTASTIC_EU868_FREQS_HZ` comment for the same note in code.
+
+---
+
+## SX1261 spectral scan & band sweep
+
+The concentrator module's SX1261 companion chip (not a USB radio, not
+present/enabled on every board) is a **separate radio used only for RF power
+measurement, not packet demodulation**. It's what powers both RF Environment
+features:
+
+- **Noise floor** ([`src/api/telemetry/spectral_scan_service.py`](../src/api/telemetry/spectral_scan_service.py)) —
+  a spectral scan every `radio.spectral_scan_interval_seconds` (default 60s)
+  at whichever single frequency `radio.frequency_mhz` is currently configured
+  to (the region default unless overridden). This is what feeds the noise
+  floor sparkline continuously.
+- **Band sweep** (the RF Environment page's spectrum chart) — a scan across
+  *every* 100 kHz step spanning the region's full band, every
+  `radio.spectrum_sweep_interval_seconds` (default 300s, `0` disables
+  automatic sweeps though on-demand "Sweep now" still works). Uses the exact
+  same `ConcentratorChannelPlan.band_limits_hz(region)` table as the channel
+  plans above — `range(band_min, band_max + step, 100_000)`.
+
+| Region | Sweep range | Step | Points |
+|---|---|---|---|
+| `US` | 902.0 – 928.0 MHz | 100 kHz | 261 |
+| `EU_868` | 863.0 – 870.0 MHz | 100 kHz | 71 |
+| `ANZ` | 915.0 – 928.0 MHz | 100 kHz | 131 |
+| `IN` | 865.0 – 867.0 MHz | 100 kHz | 21 |
+| `KR` | 920.0 – 923.0 MHz | 100 kHz | 31 |
+| `SG_923` | 917.0 – 925.0 MHz | 100 kHz | 81 |
+
+(Full data: [`bandplan-sx1261-sweep.csv`](bandplan-sx1261-sweep.csv). The
+71-point `EU_868` figure matches the code's own comment in
+`spectral_scan_service.py` — "a 71-point EU868 sweep takes a few seconds.")
+
+**Requires `radio.sx1261_spi_path` to be set** (e.g. `/dev/spidev0.1`) —
+without it, `_configure_sx1261_for_spectral_scan()` never runs
+`lgw_sx1261_setconf`, `spectral_scan_supported` stays `False`, and *both*
+features above are unavailable — noise floor falls back to a packet-derived
+estimate (`rssi - snr` on received packets) instead, and the sweep can't run
+at all. This is a single physical chip on the concentrator module, so
+`sx1261_spi_path` isn't per-region — only the sweep's frequency *range*
+changes with region, not whether the chip itself works.
+
+Each scan (noise-floor or one point of a sweep) briefly pauses RX on the
+scanned channel for ~50 ms — invisible against normal packet-loss variance
+at these intervals, but why scans are serialized one-at-a-time rather than
+run concurrently.
 
 ## A table you might see disagree: `src/radio/presets.py`
 

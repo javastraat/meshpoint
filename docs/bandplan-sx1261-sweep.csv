@@ -1,0 +1,7 @@
+region;sweep_start_mhz;sweep_end_mhz;step_khz;point_count;uses_sx1261;requires_config
+US;902.0;928.0;100;261;TRUE;radio.sx1261_spi_path must be set
+EU_868;863.0;870.0;100;71;TRUE;radio.sx1261_spi_path must be set
+ANZ;915.0;928.0;100;131;TRUE;radio.sx1261_spi_path must be set
+IN;865.0;867.0;100;21;TRUE;radio.sx1261_spi_path must be set
+KR;920.0;923.0;100;31;TRUE;radio.sx1261_spi_path must be set
+SG_923;917.0;925.0;100;81;TRUE;radio.sx1261_spi_path must be set

@@ -1,0 +1,55 @@
+region;channel;role;frequency_mhz;bandwidth_khz;spreading_factor;protocol;rf_chain;sync_word;enabled
+US;ch0;multi_sf;906.2;125;SF5-12;LoRaWAN;RF0;0x34;TRUE
+US;ch1;multi_sf;906.4;125;SF5-12;LoRaWAN;RF0;0x34;TRUE
+US;ch2;multi_sf;906.6;125;SF5-12;LoRaWAN;RF0;0x34;TRUE
+US;ch3;multi_sf;906.8;125;SF5-12;LoRaWAN;RF0;0x34;TRUE
+US;ch4;multi_sf;907.0;125;SF5-12;LoRaWAN;RF0;0x34;TRUE
+US;ch5;multi_sf;907.2;125;SF5-12;LoRaWAN;RF0;0x34;TRUE
+US;ch6;multi_sf;907.4;125;SF5-12;LoRaWAN;RF1;0x34;TRUE
+US;ch7;multi_sf;907.6;125;SF5-12;LoRaWAN;RF1;0x34;TRUE
+US;ch8;single_sf (service);906.875;250;11;Meshtastic;RF0;0x2B;TRUE
+EU_868;ch0;multi_sf;867.9;125;SF5-12;LoRaWAN;RF0;0x34;TRUE
+EU_868;ch1;multi_sf;868.1;125;SF5-12;LoRaWAN;RF0;0x34;TRUE
+EU_868;ch2;multi_sf;868.3;125;SF5-12;LoRaWAN;RF0;0x34;TRUE
+EU_868;ch3;multi_sf;868.5;125;SF5-12;LoRaWAN;RF0;0x34;TRUE
+EU_868;ch4;multi_sf;868.7;125;SF5-12;LoRaWAN;RF0;0x34;TRUE
+EU_868;ch5;multi_sf;869.525;125;;disabled;RF1;;FALSE
+EU_868;ch6;multi_sf;869.525;125;;disabled;RF1;;FALSE
+EU_868;ch7;multi_sf;869.525;125;;disabled;RF1;;FALSE
+EU_868;ch8;single_sf (service);869.525;250;11;Meshtastic;RF1;0x2B;TRUE
+ANZ;ch0;multi_sf;919.2;125;SF5-12;LoRaWAN;RF0;0x34;TRUE
+ANZ;ch1;multi_sf;919.4;125;SF5-12;LoRaWAN;RF0;0x34;TRUE
+ANZ;ch2;multi_sf;919.6;125;SF5-12;LoRaWAN;RF0;0x34;TRUE
+ANZ;ch3;multi_sf;919.8;125;SF5-12;LoRaWAN;RF0;0x34;TRUE
+ANZ;ch4;multi_sf;920.0;125;SF5-12;LoRaWAN;RF0;0x34;TRUE
+ANZ;ch5;multi_sf;920.2;125;SF5-12;LoRaWAN;RF0;0x34;TRUE
+ANZ;ch6;multi_sf;920.4;125;SF5-12;LoRaWAN;RF1;0x34;TRUE
+ANZ;ch7;multi_sf;920.6;125;SF5-12;LoRaWAN;RF1;0x34;TRUE
+ANZ;ch8;single_sf (service);919.875;250;11;Meshtastic;RF0;0x2B;TRUE
+IN;ch0;multi_sf;865.2;125;SF5-12;LoRaWAN;RF0;0x34;TRUE
+IN;ch1;multi_sf;865.4;125;SF5-12;LoRaWAN;RF0;0x34;TRUE
+IN;ch2;multi_sf;865.6;125;SF5-12;LoRaWAN;RF0;0x34;TRUE
+IN;ch3;multi_sf;865.8;125;SF5-12;LoRaWAN;RF0;0x34;TRUE
+IN;ch4;multi_sf;866.0;125;SF5-12;LoRaWAN;RF0;0x34;TRUE
+IN;ch5;multi_sf;866.2;125;SF5-12;LoRaWAN;RF0;0x34;TRUE
+IN;ch6;multi_sf;866.4;125;SF5-12;LoRaWAN;RF1;0x34;TRUE
+IN;ch7;multi_sf;866.6;125;SF5-12;LoRaWAN;RF1;0x34;TRUE
+IN;ch8;single_sf (service);865.875;250;11;Meshtastic;RF0;0x2B;TRUE
+KR;ch0;multi_sf;921.8;125;SF5-12;LoRaWAN;RF0;0x34;TRUE
+KR;ch1;multi_sf;922.0;125;SF5-12;LoRaWAN;RF0;0x34;TRUE
+KR;ch2;multi_sf;922.2;125;SF5-12;LoRaWAN;RF0;0x34;TRUE
+KR;ch3;multi_sf;922.4;125;SF5-12;LoRaWAN;RF0;0x34;TRUE
+KR;ch4;multi_sf;922.6;125;SF5-12;LoRaWAN;RF0;0x34;TRUE
+KR;ch5;multi_sf;922.8;125;SF5-12;LoRaWAN;RF0;0x34;TRUE
+KR;ch6;multi_sf;922.4;125;;disabled;RF0;;FALSE
+KR;ch7;multi_sf;922.4;125;;disabled;RF0;;FALSE
+KR;ch8;single_sf (service);922.875;250;11;Meshtastic;RF0;0x2B;TRUE
+SG_923;ch0;multi_sf;917.2;125;SF5-12;LoRaWAN;RF0;0x34;TRUE
+SG_923;ch1;multi_sf;917.4;125;SF5-12;LoRaWAN;RF0;0x34;TRUE
+SG_923;ch2;multi_sf;917.6;125;SF5-12;LoRaWAN;RF0;0x34;TRUE
+SG_923;ch3;multi_sf;917.8;125;SF5-12;LoRaWAN;RF0;0x34;TRUE
+SG_923;ch4;multi_sf;918.0;125;SF5-12;LoRaWAN;RF0;0x34;TRUE
+SG_923;ch5;multi_sf;918.2;125;SF5-12;LoRaWAN;RF0;0x34;TRUE
+SG_923;ch6;multi_sf;918.4;125;SF5-12;LoRaWAN;RF1;0x34;TRUE
+SG_923;ch7;multi_sf;918.6;125;SF5-12;LoRaWAN;RF1;0x34;TRUE
+SG_923;ch8;single_sf (service);917.875;250;11;Meshtastic;RF0;0x2B;TRUE
