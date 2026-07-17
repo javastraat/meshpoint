@@ -74,10 +74,14 @@ class MeshpointSensor(CoordinatorEntity[MeshpointDataUpdateCoordinator], SensorE
         self._attr_entity_category = meta.entity_category
 
     @property
-    def native_value(self) -> float | int | None:
+    def native_value(self) -> float | int | str | None:
         value = (self.coordinator.data or {}).get(self._metric_key)
         if value is None:
             return None
+        if not isinstance(value, (int, float)):
+            # device/stats endpoints can surface plain strings (node
+            # names, region codes, timestamps) alongside numeric metrics.
+            return value
         # Prometheus values are always floats on the wire; render whole
         # numbers (packet counts, node counts) without a trailing ".0".
         return int(value) if value == int(value) else value

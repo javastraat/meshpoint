@@ -1,15 +1,15 @@
 # Meshpoint for Home Assistant
 
-A read-only Home Assistant integration for [Meshpoint](https://github.com/javastraat/meshpoint). Polls a Meshpoint gateway's `/metrics` endpoint and exposes its aggregate stats as sensors — uptime, packet rates, node counts, RSSI/SNR averages, relay stats. No per-node or per-contact entities; this is a status integration, not a mesh client (see [meshcore-ha](https://github.com/meshcore-dev/meshcore-ha) if you want that).
+A read-only Home Assistant integration for [Meshpoint](https://github.com/javastraat/meshpoint). Polls three of a Meshpoint gateway's status endpoints and exposes the result as sensors on one device — mesh stats (uptime, packet rates, node counts, RSSI/SNR averages, relay stats), host health (CPU/RAM/disk/temperature/fan), and richer stats-page data (best signal ever, farthest contact, node role/hardware-model distribution). No per-node or per-contact entities; this is a status integration, not a mesh client (see [meshcore-ha](https://github.com/meshcore-dev/meshcore-ha) if you want that).
 
-Entities are created dynamically from whatever `/metrics` returns, so a metric Meshpoint adds in a future release shows up automatically — no integration update required, just possibly a generic name until `metric_meta.py` is updated for it.
+Entities are created dynamically from whatever those endpoints return, so a metric Meshpoint adds in a future release shows up automatically — no integration update required, just possibly a generic name until `metric_meta.py` is updated for it. The two extra endpoints beyond `/metrics` are polled best-effort: an older Meshpoint (or a key minted before this was added) just won't produce those sensors, `/metrics` alone still works fully.
 
 ## 1. On the Meshpoint dashboard
 
 **Configuration → Metrics:**
 
 1. Enable "Enable /metrics endpoint"
-2. If "Require authentication" is on, generate an API key (label it something like "Home Assistant") and copy it now — it's shown once, only its hash is stored afterward
+2. If "Require authentication" is on, generate an API key (label it something like "Home Assistant") and copy it now — it's shown once, only its hash is stored afterward. The key grants read-only access to `/metrics`, `/api/device/metrics`, and `/api/stats/summary` — everything this integration polls, nothing else.
 
 ## 2. Install the integration files on Home Assistant
 
@@ -28,6 +28,7 @@ The integration needs to land at `<ha-config>/custom_components/meshpoint/` — 
 <ha-config>/custom_components/meshpoint/sensor.py
 <ha-config>/custom_components/meshpoint/metric_meta.py
 <ha-config>/custom_components/meshpoint/prometheus.py
+<ha-config>/custom_components/meshpoint/json_flatten.py
 <ha-config>/custom_components/meshpoint/const.py
 <ha-config>/custom_components/meshpoint/strings.json
 <ha-config>/custom_components/meshpoint/translations/en.json
@@ -102,12 +103,12 @@ Work through these in order — each rules out a layer:
 ## What it does not do
 
 - No per-node or per-contact sensors (Meshpoint can track thousands of mesh nodes; this integration reports counts and rates, not one entity per node)
-- No control of Meshpoint or the mesh (read-only, matches the `/metrics` API key's scope — it cannot reach any other Meshpoint API route)
+- No control of Meshpoint or the mesh (read-only, matches the API key's scope — it can reach three status routes, `/metrics` + `/api/device/metrics` + `/api/stats/summary`, and nothing that mutates config, controls the mesh, or reads message/node content)
 - No messaging, map upload, or radio configuration — that's Meshpoint's own dashboard
 
 ## Development
 
-Pure-Python parsing logic (`prometheus.py`) has no Home Assistant imports and can be unit tested standalone:
+Pure-Python parsing logic (`prometheus.py` for `/metrics`, `json_flatten.py` for the two JSON endpoints) has no Home Assistant imports and can be unit tested standalone:
 
 ```bash
 python3 -m pytest homeassistant/tests/

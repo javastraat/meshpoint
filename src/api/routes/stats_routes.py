@@ -9,8 +9,9 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from src.api.auth.metrics_api_key import require_session_or_metrics_key
 from src.analytics.network_mapper import NetworkMapper
 from src.analytics.signal_analyzer import SignalAnalyzer
 from src.analytics.stats_reporter import StatsReporter
@@ -56,7 +57,7 @@ def init_routes(
     _start_time = datetime.now(timezone.utc)
 
 
-@router.get("/summary")
+@router.get("/summary", dependencies=[Depends(require_session_or_metrics_key)])
 async def stats_summary():
     """Comprehensive stats for the local Stats tab."""
     report = _stats_reporter.build_report() if _stats_reporter else {}

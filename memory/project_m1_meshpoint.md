@@ -1136,6 +1136,87 @@ extensions before assuming it's cache-related.
 
 ---
 
+### 2026-07-17 (same day, follow-on): API key scope widened to 2 more routes + HA integration polls all 3
+
+User asked "so we can get more data from meshpoint" after I'd mentioned
+`/api/device/metrics` (host CPU/RAM/disk/temp/fan) and `/api/stats/summary`
+(best signal ever, farthest contact, role/hw-model distribution) as data
+the metrics API key deliberately couldn't reach yet (scoped metrics-only
+per the earlier decision). Discussed UX first: considered a config-flow
+"which endpoints" picker, decided against it -- HA's own per-entity
+Disable is the standard mechanism for "I don't want this sensor," no need
+to duplicate it with custom selection UI. Landed on: always poll all
+three if reachable, best-effort (skip a failed/401 bonus endpoint rather
+than failing the whole update), let users disable individual entities
+normally.
+
+**Backend** (`src/`): both routes were previously blanket-protected via
+`app.include_router(..., dependencies=protected)` in `server.py` --
+`system_metrics.router` (2 routes: `/api/device/metrics` AND
+`/api/device/thermals`) and `stats_routes.router` (1 route,
+`/api/stats/summary`). Removed the blanket `dependencies=protected` from
+both router includes and added explicit per-route deps instead, so only
+the two intended routes gained the API-key alternative --
+`/api/device/thermals` deliberately stays session-only (explicit
+`Depends(require_auth)` added directly, no scope creep there). New shared
+`src/api/auth/metrics_api_key.py` (`match_metrics_api_key`,
+`require_session_or_metrics_key`, `init_metrics_api_key`/
+`reset_metrics_api_key`) -- extracted from what used to be
+`metrics_routes.py`'s own private `_match_api_key`, now the single source
+every route consults so `/metrics`, `/api/device/metrics`, and
+`/api/stats/summary` share one implementation and one config object
+(`config.metrics.api_keys`) -- `metrics_routes.py` refactored to call the
+shared module instead of its own copy.
+
+**Home Assistant integration**: new `json_flatten.py` (pure Python, no HA
+imports, mirrors `prometheus.py`'s testability) recursively flattens the
+two JSON endpoints into the same flat-dict shape `sensor.py` already
+consumes -- dicts recurse joined by `_`, lists skipped entirely (avoids
+noisy indexed sensors for histogram-shaped data), `None` skipped, three
+known-noisy branches (`rssi_distribution`, `snr_distribution`,
+`traffic_timeline`) skipped outright via an explicit skip-list rather than
+a cardinality heuristic. `coordinator.py` now fetches all three endpoints
+per cycle, merges with `device_`/`stats_` prefixes (collision-proof
+against the already-unique `meshpoint_*` Prometheus keys), and treats the
+two bonus endpoints as best-effort -- a non-200 or JSON-decode failure on
+either just skips that source for the cycle rather than raising
+`UpdateFailed`, so an older Meshpoint (or a key minted before this change)
+still gets a fully working integration from `/metrics` alone. **Found and
+fixed a real bug while wiring this up**: `sensor.py`'s `native_value` did
+`int(value) if value == int(value) else value` unconditionally -- fine
+for Prometheus's always-numeric values, but the two new JSON sources
+surface genuine strings (node names, region codes, an ISO timestamp) and
+`int("EU_868")` would have raised `ValueError`, crashing that entity's
+state. Fixed to check `isinstance(value, (int, float))` first. Added
+~15 curated `metric_meta.py` entries for the clearly-new, non-duplicate
+fields (device health metrics; `stats_first_packet_time`,
+`stats_signal_best_rssi/snr`, `stats_farthest_mesh/meshcore_*`) --
+deliberately did NOT curate the fields that just duplicate `/metrics` data
+(`stats_network_total_nodes` etc.) since the fallback-named entity is
+fine and the user can disable if unwanted. Also made
+`MetricMeta.fallback()` strip `device_`/`stats_` prefixes too (previously
+only stripped `meshpoint_`), so uncurated future fields from either source
+still get a reasonably clean default name. Manifest version bumped to
+`0.2.0` (independent of Meshpoint's own version -- user asked whether
+these should track together, advised no: separate deployables, separate
+release cadence, semver on its own merits) -- deferred a stray
+`meshpoint-ha` (the earlier, corrected-away separate-repo name) reference
+in `manifest.json`'s `documentation`/`issue_tracker` URLs, fixed to point
+at this repo instead.
+
+Verification: 20/20 unit tests pass (8 existing prometheus.py + 12 new
+json_flatten.py, run via the same manual-runner trick since pytest isn't
+installed on the Mac). Backend: `py_compile`d all 5 touched files; stub-
+tested `require_session_or_metrics_key` directly (valid key allowed +
+`last_used_at` stamped, wrong key + no session -> 401, no auth at all ->
+401). All JSON files valid. `ChangelogParser` still parses. **Not yet
+live-tested on the real Pi or a real HA instance** -- this is API-surface
+and parsing-logic verification only; the actual "does HA now show CPU temp
+and farthest-contact sensors" question needs a real round-trip like the
+first integration build got.
+
+---
+
 ## CURRENT WORKLIST v8 (2026-07-16 — supersedes v7 below; THE list to work off)
 
 Closed since v7 (full detail in the v7 section below, kept for history):
@@ -1160,6 +1241,7 @@ Upstream card links the real repo, Custom-branch is a real dropdown).
 | ~~Retest~~ DONE 2026-07-17 | S | ~~Metrics `require_auth`~~ — long-lived API-key mechanism built (named, revocable, `/metrics`-scoped, hash-only storage) and live-verified end-to-end on the Pi: 401 unauthed, 200 with a valid key, revoke → 401 again, `local.yaml` never holds the raw key. See the 2026-07-17 write-up above |
 | Open | XS | **PR Meshpoint's brand icon/logo to `home-assistant/brands`** — without this, the HA integration shows "icon not available" in Add Integration's brand picker. Assets already cropped and staged at `homeassistant/brands/meshpoint/` (icon.png/icon@2x.png/logo.png/logo@2x.png, 256/512px, cut from `MP_logo.png`) with submission steps in that folder's README — user explicitly deferred the actual fork+PR to home-assistant/brands (external repo, wanted to decide timing themselves) |
 | ~~Open~~ DONE 2026-07-17 | M | ~~Live-test the Home Assistant integration + Lovelace card on a real HA instance~~ — both fully live-verified same day. Integration: config flow completed, device page showed every dynamic sensor correctly (protocol splits, node/packet counts, noise floor, packet rate). Card: `meshpoint-card.js` rendered correctly too, once a real bug was found and fixed along the way -- see the "Card debugging" write-up below (real cause was a stale HA frontend *service worker* caching an earlier 404, not the file placement or the card code; confirmed via curl 200 vs browser 404 on the identical URL, then incognito rendering correctly). Screenshot showed status header (online dot + node count chip), stats grid, and Protocols section all matching the intended design exactly |
+| Open | M | **Live-test the widened API key scope + new HA sensors on the real Pi/HA** — built and unit-tested same day 2026-07-17 (backend: `/api/device/metrics` + `/api/stats/summary` now accept the same metrics API key via new shared `src/api/auth/metrics_api_key.py`; HA side: `json_flatten.py` + coordinator polls all 3 endpoints, new `metric_meta.py` entries for CPU/RAM/disk/temp/fan and best-signal/farthest-contact fields). Never run against the real Pi or a real HA reload -- need to confirm the two new routes actually 200 with an existing key (not just the stub test), and that the new sensors (CPU Temperature, Farthest Relayed Contact, etc.) actually appear and look right in HA, same as the first integration build's live-test round |
 | Wiring verified, not yet fired | XS | **Telemetry auto-pruning + `max_telemetry_retained` field** — config round-trip confirmed live on Pi; no "pruned N rows" log line yet since real telemetry count is still under any cap set so far. Will self-confirm naturally once telemetry approaches the cap |
 | Parked | M | **LoRaWAN key store + MIC verify/decrypt** — trigger: you run your own LoRaWAN devices |
 | Parked | M | **TTN uplink-only forwarder** — trigger: TTN entanglement deemed worth it |

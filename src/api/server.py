@@ -19,6 +19,7 @@ from src.api.auth import dependencies as auth_deps
 from src.api.auth.auth_bootstrap import AuthSubsystem, build_auth_subsystem
 from src.api.auth.dependencies import SESSION_COOKIE_NAME, require_auth
 from src.api.auth.jwt_session import JwtSessionService
+from src.api.auth.metrics_api_key import init_metrics_api_key
 from src.api.auth.ws_guard import WS_AUTH_CLOSE_CODE, authenticate_websocket
 from src.api.dangerous import DangerousActionRegistry
 from src.api.dangerous.handlers import (
@@ -437,7 +438,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     app.include_router(packets.router, dependencies=protected)
     app.include_router(analytics.router, dependencies=protected)
     app.include_router(device.router, dependencies=protected)
-    app.include_router(system_metrics.router, dependencies=protected)
+    app.include_router(system_metrics.router)
     app.include_router(update_check.router, dependencies=protected)
     app.include_router(messages.router, dependencies=protected)
     app.include_router(nodeinfo_routes.router, dependencies=protected)
@@ -454,7 +455,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     app.include_router(meshcore_config_routes.router, dependencies=protected)
     app.include_router(serial_config_routes.router, dependencies=protected)
     app.include_router(config_routes.router, dependencies=protected)
-    app.include_router(stats_routes.router, dependencies=protected)
+    app.include_router(stats_routes.router)
     app.include_router(lorawan_routes.router, dependencies=protected)
     app.include_router(listener_routes.router, dependencies=protected)
     app.include_router(pager_routes.p2000_router, dependencies=protected)
@@ -1593,6 +1594,7 @@ def _init_routes(
         node_repo=coord.node_repo,
         packet_repo=coord.packet_repo,
     )
+    init_metrics_api_key(config.metrics)
     metrics_routes.init_routes(
         metrics_config=config.metrics,
         stats_reporter=coord.stats_reporter,

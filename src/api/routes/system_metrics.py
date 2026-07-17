@@ -6,7 +6,10 @@ import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+
+from src.api.auth.dependencies import require_auth
+from src.api.auth.metrics_api_key import require_session_or_metrics_key
 
 if TYPE_CHECKING:
     from src.hardware.fan_control import FanController
@@ -52,7 +55,7 @@ def _read_uptime_seconds() -> float:
         return 0.0
 
 
-@router.get("/metrics")
+@router.get("/metrics", dependencies=[Depends(require_session_or_metrics_key)])
 async def system_metrics():
     import psutil
 
@@ -83,7 +86,7 @@ async def system_metrics():
     }
 
 
-@router.get("/thermals")
+@router.get("/thermals", dependencies=[Depends(require_auth)])
 async def thermals():
     """CPU temperature + fan duty history for the Hardware Thermals chart.
 

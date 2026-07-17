@@ -7,12 +7,13 @@
  * every request, so toggling either field takes effect immediately,
  * no service restart needed.
  *
- * Also manages named, revocable API keys scoped only to /metrics --
- * lets an unattended scraper (Home Assistant, Prometheus) authenticate
- * with a static `Authorization: Bearer <key>` header instead of a
- * short-lived dashboard session. Each key's raw value is shown exactly
- * once at creation time; only its hash is ever stored or returned
- * afterward.
+ * Also manages named, revocable API keys scoped to /metrics,
+ * /api/device/metrics, and /api/stats/summary -- a small fixed
+ * allowlist, not general dashboard access -- letting an unattended
+ * scraper (Home Assistant, Prometheus) authenticate with a static
+ * `Authorization: Bearer <key>` header instead of a short-lived
+ * dashboard session. Each key's raw value is shown exactly once at
+ * creation time; only its hash is ever stored or returned afterward.
  */
 
 class MetricsConfigCard {
@@ -67,11 +68,13 @@ class MetricsConfigCard {
                     <header class="cfg-card__head">
                         <h3 class="cfg-card__title">API keys</h3>
                         <p class="cfg-card__hint">
-                            Named, revocable bearer keys scoped <strong>only</strong> to
-                            <code>/metrics</code> -- they cannot reach anything else in
-                            the dashboard API. Use one per consumer (e.g. "Home
-                            Assistant", "Prometheus") so you can revoke individually.
-                            Send as <code>Authorization: Bearer &lt;key&gt;</code>.
+                            Named, revocable bearer keys scoped to <code>/metrics</code>,
+                            <code>/api/device/metrics</code>, and
+                            <code>/api/stats/summary</code> -- read-only status data,
+                            never config, control, messages, or node content. Use one
+                            per consumer (e.g. "Home Assistant", "Prometheus") so you
+                            can revoke individually. Send as
+                            <code>Authorization: Bearer &lt;key&gt;</code>.
                         </p>
                     </header>
                     <div class="cfg-companions" data-metrics-keys></div>

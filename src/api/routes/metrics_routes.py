@@ -5,8 +5,6 @@ Zero-dependency text exposition format. Disabled by default via
 """
 from __future__ import annotations
 
-import hashlib
-import hmac
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
@@ -75,13 +73,9 @@ async def prometheus_metrics(
         raise HTTPException(status_code=404, detail="metrics disabled")
 
     if _config.require_auth:
-        matched_key = _match_api_key(authorization)
-        if matched_key is not None:
-            matched_key.last_used_at = datetime.now(timezone.utc).isoformat()
-        else:
-            from src.api.auth.dependencies import require_auth
+        from src.api.auth.metrics_api_key import require_session_or_metrics_key
 
-            await require_auth(request, authorization)
+        await require_session_or_metrics_key(request, authorization)
 
     body = await _render_metrics()
     return PlainTextResponse(
@@ -275,27 +269,6 @@ async def _render_metrics() -> str:
         )
 
     return writer.render()
-
-
-def _match_api_key(authorization: str | None):
-    """Check ``Authorization: Bearer <key>`` against configured metrics
-    API keys. Returns the matched ``MetricsApiKey`` (so the caller can
-    stamp ``last_used_at``), or ``None``.
-
-    ``last_used_at`` is updated in memory only, not persisted to
-    local.yaml on every scrape -- avoids write amplification on the
-    Pi's SD card for what's typically a 15-60s scrape interval.
-    """
-    if _config is None or not authorization or not authorization.startswith("Bearer "):
-        return None
-    presented = authorization[len("Bearer "):].strip()
-    if not presented:
-        return None
-    presented_hash = hashlib.sha256(presented.encode()).hexdigest()
-    for key in _config.api_keys:
-        if hmac.compare_digest(presented_hash, key.key_hash):
-            return key
-    return None
 
 
 def _uptime_seconds() -> int:

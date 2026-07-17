@@ -3,9 +3,9 @@
   "name": "Meshpoint",
   "codeowners": ["@javastraat"],
   "config_flow": true,
-  "documentation": "https://github.com/javastraat/meshpoint-ha",
+  "documentation": "https://github.com/javastraat/meshpoint/tree/main/homeassistant",
   "iot_class": "local_polling",
-  "issue_tracker": "https://github.com/javastraat/meshpoint-ha/issues",
+  "issue_tracker": "https://github.com/javastraat/meshpoint/issues",
   "requirements": [],
-  "version": "0.1.0"
+  "version": "0.2.0"
 }

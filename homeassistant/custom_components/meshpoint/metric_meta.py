@@ -1,9 +1,14 @@
-"""Friendly display metadata for known Meshpoint /metrics series.
+"""Friendly display metadata for known Meshpoint metric/stat series.
+
+Covers keys from all three sources the coordinator polls: ``/metrics``
+(bare ``meshpoint_*`` names), and the two JSON endpoints flattened with a
+``device_``/``stats_`` prefix (system health, and richer stats-page data
+like farthest contact and all-time best signal).
 
 Anything not listed here still becomes a sensor -- ``MetricMeta.fallback()``
 derives a readable name from the raw key. This means a metric Meshpoint
-adds to /metrics later shows up automatically, just without a curated
-name/unit/icon until this table is updated for it.
+adds later shows up automatically, just without a curated name/unit/icon
+until this table is updated for it.
 """
 
 from __future__ import annotations
@@ -12,7 +17,9 @@ from dataclasses import dataclass
 from typing import Optional
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
-from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfTime
+from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfTemperature, UnitOfTime
+
+_KNOWN_PREFIXES = ("meshpoint_", "device_", "stats_")
 
 
 @dataclass(frozen=True)
@@ -27,8 +34,10 @@ class MetricMeta:
     @classmethod
     def fallback(cls, key: str) -> "MetricMeta":
         label = key
-        if label.startswith("meshpoint_"):
-            label = label[len("meshpoint_"):]
+        for prefix in _KNOWN_PREFIXES:
+            if label.startswith(prefix):
+                label = label[len(prefix):]
+                break
         label = label.replace("_", " ").strip().title()
         return cls(name=label or key)
 
@@ -142,5 +151,82 @@ METRIC_META: dict[str, MetricMeta] = {
         "No-CRC Frames",
         state_class=SensorStateClass.TOTAL_INCREASING,
         entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+
+    # --- /api/device/metrics (host health -- CPU/RAM/disk/temp/fan) ---
+    "device_cpu_percent": MetricMeta(
+        "CPU Usage",
+        unit=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:cpu-64-bit",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    "device_memory_percent": MetricMeta(
+        "Memory Usage",
+        unit=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:memory",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    "device_memory_used_mb": MetricMeta(
+        "Memory Used",
+        unit="MB",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    "device_disk_percent": MetricMeta(
+        "Disk Usage",
+        unit=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:harddisk",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    "device_disk_used_gb": MetricMeta(
+        "Disk Used",
+        unit="GB",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    "device_cpu_temp_c": MetricMeta(
+        "CPU Temperature",
+        unit=UnitOfTemperature.CELSIUS,
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    "device_system_uptime_seconds": MetricMeta(
+        "System Uptime",
+        unit=UnitOfTime.SECONDS,
+        device_class=SensorDeviceClass.DURATION,
+        icon="mdi:clock-outline",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    "device_fan_duty_percent": MetricMeta(
+        "Fan Duty",
+        unit=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:fan",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+
+    # --- /api/stats/summary (richer stats-page data) ---
+    "stats_first_packet_time": MetricMeta(
+        "First Packet Ever Heard", icon="mdi:clock-start",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    "stats_signal_best_rssi": MetricMeta(
+        "Best RSSI Ever", unit="dBm", device_class=SensorDeviceClass.SIGNAL_STRENGTH,
+    ),
+    "stats_signal_best_snr": MetricMeta("Best SNR Ever", unit="dB"),
+    "stats_farthest_mesh_miles": MetricMeta(
+        "Farthest Relayed Contact", unit="mi", icon="mdi:map-marker-distance",
+    ),
+    "stats_farthest_mesh_node_name": MetricMeta(
+        "Farthest Relayed Contact Name", icon="mdi:map-marker-distance",
+    ),
+    "stats_farthest_meshcore_miles": MetricMeta(
+        "Farthest MeshCore Contact", unit="mi", icon="mdi:map-marker-distance",
+    ),
+    "stats_farthest_meshcore_node_name": MetricMeta(
+        "Farthest MeshCore Contact Name", icon="mdi:map-marker-distance",
     ),
 }

@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Connect to Meshpoint",
-        "description": "Enter your Meshpoint gateway's address. If \"Require authentication\" is on under Meshpoint's Configuration → Metrics, also generate an API key there (scoped to /metrics only) and paste it below.",
+        "description": "Enter your Meshpoint gateway's address. If \"Require authentication\" is on under Meshpoint's Configuration → Metrics, also generate an API key there and paste it below. That key grants read-only access to three status endpoints (packet/node stats, system health, and the richer stats-page data) -- never write access, never mesh/node data.",
         "data": {
           "host": "Host or IP address",
           "port": "Port",
