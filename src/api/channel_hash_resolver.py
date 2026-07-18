@@ -28,7 +28,28 @@ class ChannelHashResolver:
         primary_channel_name: str,
         channel_keys: dict[str, str],
     ) -> None:
-        """Rebuild the hash map from live crypto keys and config names."""
+        """Rebuild the hash map from live crypto keys and config names.
+
+        Looks up each channel's key by NAME directly in
+        ``crypto._keys`` rather than by position in
+        ``crypto.get_all_keys()`` -- the same self-consistent
+        name-and-key-together principle ``tx_service._resolve_channel``
+        already follows, just via a dict lookup instead of also
+        iterating ``crypto._keys`` itself (which mixes in MeshCore's
+        channel keys too, see ``coordinator._setup_channel_keys`` --
+        iterating it directly here would mis-hash MeshCore's keys as
+        if they were extra Meshtastic channel indices). The previous
+        positional pairing (index N in ``channel_keys`` paired with
+        index N in ``get_all_keys()``) assumed those two independently
+        populated collections always stayed in the same order, which
+        this method is not itself responsible for guaranteeing -- and
+        which, per the worklist, once diverged in production: the
+        resolver's inbound hash map and TX's own outbound hash
+        computation disagreed about which hash belonged to which
+        channel index for the exact same config (0xC9 vs 0x71). A
+        name-keyed lookup makes that class of divergence structurally
+        impossible regardless of either collection's insertion order.
+        """
         self._hash_to_index.clear()
         self._warned_hashes.clear()
 
@@ -42,9 +63,10 @@ class ChannelHashResolver:
         self._hash_to_index[primary_hash] = 0
 
         for index, ch_name in enumerate(channel_keys.keys(), start=1):
-            if index >= len(all_keys):
-                break
-            ch_hash = crypto.compute_channel_hash(ch_name, all_keys[index])
+            key = crypto._keys.get(ch_name)
+            if key is None:
+                continue
+            ch_hash = crypto.compute_channel_hash(ch_name, key)
             self._hash_to_index[ch_hash] = index
 
         logger.info("Channel hash map: %s", self._hash_to_index)

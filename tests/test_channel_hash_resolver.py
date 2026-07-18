@@ -58,6 +58,55 @@ class TestChannelHashResolver(unittest.TestCase):
         self.assertEqual(self.resolver.lookup(primary_hash), 0)
         self.assertEqual(self.resolver.lookup(private_hash), 1)
 
+    def test_rebuild_is_immune_to_crypto_keys_ordering_drift(self) -> None:
+        """F5-hardening: rebuild() must look up each channel's key by
+        NAME in crypto._keys, not by POSITION in crypto.get_all_keys().
+        This reproduces the exact divergence confirmed in production
+        (resolver's map vs TX's own hash computation disagreeing about
+        which hash belongs to which index, 0xC9 vs 0x71) -- crypto._keys
+        populated in one order (e.g. by coordinator._setup_channel_keys
+        at startup) while the config's channel_keys dict handed to
+        rebuild() lists the same channels in a different order (e.g.
+        after a live PUT /api/config/channels reorder). A positional
+        pairing would silently compute the wrong channel's hash for a
+        given index; a name-keyed lookup cannot."""
+        self.crypto.add_channel_key("Zulu", PRIVATE_PSK_B64)
+        self.crypto.add_channel_key("Alpha", "AQ==")
+
+        # channel_keys dict lists them in the OPPOSITE order to how
+        # they were added to crypto -- exactly the drift scenario.
+        self.resolver.rebuild(
+            self.crypto, "LongFast", {"Alpha": "AQ==", "Zulu": PRIVATE_PSK_B64},
+        )
+
+        alpha_hash = self.crypto.compute_channel_hash(
+            "Alpha", self.crypto._keys["Alpha"]
+        )
+        zulu_hash = self.crypto.compute_channel_hash(
+            "Zulu", self.crypto._keys["Zulu"]
+        )
+        self.assertEqual(self.resolver.lookup(alpha_hash), 1)
+        self.assertEqual(self.resolver.lookup(zulu_hash), 2)
+
+    def test_rebuild_excludes_keys_not_in_the_meshtastic_channel_list(self) -> None:
+        """crypto._keys is shared storage for BOTH Meshtastic and
+        MeshCore channel keys (coordinator._setup_channel_keys adds
+        both into the same CryptoService instance) -- rebuild() must
+        only map hashes for channels actually present in the passed
+        Meshtastic channel_keys dict, never every key crypto happens
+        to hold, or a MeshCore channel key would get mis-hashed in as
+        if it were an extra Meshtastic channel index."""
+        self.crypto.add_channel_key("BayMesh", PRIVATE_PSK_B64)
+        self.crypto.add_channel_key("McPublic", PRIVATE_PSK_B64)  # MeshCore's
+
+        self.resolver.rebuild(self.crypto, "LongFast", {"BayMesh": PRIVATE_PSK_B64})
+
+        self.assertEqual(len(self.resolver.mapping), 2)  # primary + BayMesh only
+        mc_hash = self.crypto.compute_channel_hash(
+            "McPublic", self.crypto._keys["McPublic"]
+        )
+        self.assertIsNone(self.resolver.lookup(mc_hash))
+
     def test_unknown_hash_returns_none_and_warns_once(self) -> None:
         """Unmapped hashes must never silently fall back to channel 0
         (LongFast) -- that masked a real config mismatch for weeks by
