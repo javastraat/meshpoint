@@ -313,8 +313,32 @@ class TxService:
         ):
             serial_source = await self._resolve_serial_send_source(dest_int)
             if serial_source is not None:
+                # `channel` is Meshpoint's OWN configured channel index
+                # (0=primary, 1+=channel_keys order) -- it has no
+                # relationship to this stick's own channel table, a
+                # separate physical node with its own, independently
+                # ordered channel list. Translate by NAME and refuse to
+                # send rather than passing the raw index through and
+                # risking transmission on whatever unrelated channel
+                # happens to sit at that slot on the stick (see F3 in
+                # the worklist).
+                channel_name = self._channel_name_for_index(channel)
+                stick_channel_index = serial_source.resolve_channel_index(
+                    channel_name
+                )
+                if stick_channel_index is None:
+                    return SendResult(
+                        success=False,
+                        protocol="meshtastic",
+                        error=(
+                            f"{serial_source.name} has no channel named "
+                            f"'{channel_name}' -- refusing to send on a "
+                            "possibly-wrong channel"
+                        ),
+                    )
                 result = serial_source.send_text(
-                    text, dest_int, channel_index=channel, want_ack=want_ack,
+                    text, dest_int,
+                    channel_index=stick_channel_index, want_ack=want_ack,
                 )
                 return SendResult(
                     success=result["success"],
@@ -1088,6 +1112,26 @@ class TxService:
             value = secrets.randbits(32)
             if value not in RESERVED_NODE_IDS:
                 return value
+
+    def _channel_name_for_index(self, channel: int) -> str:
+        """Meshpoint's own channel name for a dashboard channel index.
+
+        Same name resolution as ``_resolve_channel`` below, minus the
+        hash computation -- used to translate a channel by NAME for a
+        USB serial stick's own, independently-numbered channel table
+        (see ``resolve_channel_index`` / F3 in the worklist). Falls
+        back to the modem preset's display name when the primary
+        channel's own name is blank, mirroring firmware's own
+        Channels::getName() convention (same fallback
+        SerialCaptureSource._read_channel_table uses on the stick side,
+        so both ends agree on a name for the common blank-primary
+        case).
+        """
+        if channel != 0 and self._crypto is not None:
+            channel_keys = list(self._crypto._keys.items())
+            if channel - 1 < len(channel_keys):
+                return channel_keys[channel - 1][0]
+        return self._primary_channel_name or self._get_preset_name()
 
     def _resolve_channel(self, channel: int) -> tuple[int, bytes | None]:
         """Resolve channel index to (hash, encryption_key).

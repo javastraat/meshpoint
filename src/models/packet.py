@@ -98,6 +98,15 @@ class Packet:
     # one recomputed from our own channel name (see tx_service
     # echo_hash).
     matched_channel_index: Optional[int] = None
+    # Channel name reported by a capture source that decoded this
+    # packet locally using its OWN channel table (e.g. a Meshtastic
+    # USB stick) rather than Meshpoint's own crypto_service pass. The
+    # source's local channel INDEX has no relationship to Meshpoint's
+    # own channel numbering or to the real over-the-air channel_hash,
+    # so it must never be treated as either -- routing by this name
+    # instead is the only thing that's actually meaningful here (see
+    # SerialCaptureSource._build_pre_decoded / F1 in the worklist).
+    remote_channel_name: Optional[str] = None
 
     signal: Optional[SignalMetrics] = None
     capture_source: str = "unknown"

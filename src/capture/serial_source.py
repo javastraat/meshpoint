@@ -344,6 +344,13 @@ class SerialCaptureSource(CaptureSource):
         except Exception:
             logger.debug("Could not read primary channel name from serial interface", exc_info=True)
         try:
+            info["channel_table"] = SerialCaptureSource._read_channel_table(
+                interface, info.get("modem_preset")
+            )
+        except Exception:
+            logger.debug("Could not read channel table from serial interface", exc_info=True)
+            info["channel_table"] = {}
+        try:
             info["own_node_num"] = int(interface.myInfo.my_node_num)
         except Exception:
             logger.debug("Could not read own node number from serial interface", exc_info=True)
@@ -388,6 +395,62 @@ class SerialCaptureSource(CaptureSource):
         for ch in channels:
             if ch.role == channel_pb2.Channel.Role.PRIMARY:
                 return ch.settings.name
+        return None
+
+    @staticmethod
+    def _read_channel_table(
+        interface, modem_preset_name: Optional[str] = None
+    ) -> dict:
+        """This stick's own channel-table index -> name mapping.
+
+        Needed because a received MeshPacket's ``.channel`` field is
+        THIS STICK'S local channel-table index when it decoded the
+        packet locally (mesh_interface.py sets ``meshPacket.channel =
+        channelIndex`` symmetrically on send) -- it has no relationship
+        to Meshpoint's own channel numbering or to the real over-the-air
+        channel_hash byte. Resolving it to a NAME here is what lets
+        ``_build_pre_decoded`` route by something actually meaningful
+        instead of a index that only makes sense on this one stick (see
+        F1 in the worklist).
+
+        Blank primary-channel names fall back to the modem preset's
+        display name, mirroring firmware's own Channels::getName()
+        convention (same reasoning as ``_read_primary_channel_name``).
+        Blank secondary-channel names are skipped entirely -- there's
+        no equivalent fallback for those, and guessing risks silently
+        routing traffic to the wrong bucket, the exact failure mode
+        this fix exists to eliminate.
+        """
+        from meshtastic.protobuf import channel_pb2
+        table: dict[int, str] = {}
+        channels = getattr(interface.localNode, "channels", None) or []
+        for ch in channels:
+            if ch.role == channel_pb2.Channel.Role.DISABLED:
+                continue
+            name = ch.settings.name
+            if not name and ch.role == channel_pb2.Channel.Role.PRIMARY:
+                name = modem_preset_name
+            if name:
+                table[ch.index] = name
+        return table
+
+    def resolve_channel_index(self, name: str) -> Optional[int]:
+        """This stick's own channel-table index for ``name``, or None
+        if it has no channel configured under that exact name.
+
+        Used when sending a reply through this stick: the dashboard's
+        own channel index has no relationship to this stick's channel
+        table (a separate physical node with its own, independently
+        ordered channel list) -- translating by name, and refusing to
+        send at all when there's no match, replaces the previous
+        behavior of passing Meshpoint's index straight through as if
+        the two numberings were interchangeable (see F3 in the
+        worklist).
+        """
+        table = self._radio_info.get("channel_table") or {}
+        for idx, ch_name in table.items():
+            if ch_name == name:
+                return idx
         return None
 
     async def stop(self) -> None:
@@ -522,8 +585,7 @@ class SerialCaptureSource(CaptureSource):
             pre_decoded=self._build_pre_decoded(packet),
         )
 
-    @staticmethod
-    def _build_pre_decoded(packet: dict) -> Optional[dict]:
+    def _build_pre_decoded(self, packet: dict) -> Optional[dict]:
         """Portnum + inner payload when meshtastic-python decrypted this
         packet locally with the connected radio's own key.
 
@@ -536,6 +598,12 @@ class SerialCaptureSource(CaptureSource):
         the dict the whole time. Portnum names/encoding verified against
         the installed meshtastic.protobuf.portnums_pb2 (MessageToDict
         emits the enum NAME string and base64-encodes payload bytes).
+
+        Also resolves ``packet["channel"]`` (this stick's own local
+        channel-table index for locally-decoded packets, see F1 in the
+        worklist) to a channel NAME via the connect-time channel table,
+        so the caller can route by name instead of misreading a local
+        index as if it were the real over-the-air channel_hash.
         """
         decoded = packet.get("decoded")
         if not isinstance(decoded, dict):
@@ -557,11 +625,17 @@ class SerialCaptureSource(CaptureSource):
             logger.debug("Could not base64-decode decoded.payload", exc_info=True)
             payload = b""
 
-        return {
+        result = {
             "portnum": portnum,
             "payload": payload,
             "request_id": decoded.get("requestId", 0),
         }
+        channel_idx = packet.get("channel")
+        if channel_idx is not None:
+            channel_name = self._radio_info.get("channel_table", {}).get(channel_idx)
+            if channel_name:
+                result["channel_name"] = channel_name
+        return result
 
     @staticmethod
     def _reconstruct_raw(packet: dict) -> bytes:
@@ -570,6 +644,19 @@ class SerialCaptureSource(CaptureSource):
         When the meshtastic library provides already-decoded data
         without raw bytes, we reconstruct the header so the pipeline
         can process it. The payload portion will be empty/encrypted.
+
+        ``packet["channel"]`` means two different things depending on
+        whether this stick decrypted the packet locally: for a
+        genuinely undecryptable packet (only "encrypted" set) it's the
+        real on-air channel_hash byte; for a locally-decoded one
+        (mesh_interface.py sets ``meshPacket.channel = channelIndex``
+        symmetrically on send) it's this stick's own local channel
+        INDEX, unrelated to any real hash. Stuffed into the header's
+        hash-byte position either way for a structurally valid frame,
+        but callers must not trust it for the locally-decoded case --
+        ``_build_pre_decoded`` resolves the real channel NAME instead
+        (see F1 in the worklist), which routing should prefer whenever
+        it's present.
         """
         import struct
 

@@ -149,9 +149,12 @@ class BuildPreDecodedTest(unittest.TestCase):
     base64 payload decode against the actual portnums_pb2 descriptor.
     """
 
+    def setUp(self):
+        self.source = SerialCaptureSource(port="/dev/ttyUSB1", label="433")
+
     def test_known_portnum_resolves_and_decodes_payload(self):
         payload = base64.b64encode(b"\x01\x02\x03").decode()
-        pre = SerialCaptureSource._build_pre_decoded({
+        pre = self.source._build_pre_decoded({
             "decoded": {"portnum": "TELEMETRY_APP", "payload": payload, "requestId": 7},
         })
         self.assertIsNotNone(pre)
@@ -160,18 +163,124 @@ class BuildPreDecodedTest(unittest.TestCase):
         self.assertEqual(pre["request_id"], 7)
 
     def test_unrecognized_portnum_name_returns_none(self):
-        pre = SerialCaptureSource._build_pre_decoded({
+        pre = self.source._build_pre_decoded({
             "decoded": {"portnum": "NOT_A_REAL_PORTNUM_XYZ", "payload": ""},
         })
         self.assertIsNone(pre)
 
     def test_missing_payload_yields_empty_bytes_not_error(self):
-        pre = SerialCaptureSource._build_pre_decoded({
+        pre = self.source._build_pre_decoded({
             "decoded": {"portnum": "NODEINFO_APP"},
         })
         self.assertIsNotNone(pre)
         self.assertEqual(pre["payload"], b"")
         self.assertEqual(pre["request_id"], 0)
+
+    def test_resolves_channel_index_to_name_via_channel_table(self):
+        # F1: packet["channel"] is THIS STICK's own local channel-table
+        # index for a locally-decoded packet (mesh_interface.py sets
+        # meshPacket.channel = channelIndex symmetrically on send) --
+        # not the real on-air channel_hash. _build_pre_decoded must
+        # resolve it to a NAME via the connect-time channel table
+        # rather than let a caller mistake the bare index for a hash.
+        self.source._radio_info["channel_table"] = {0: "LongFast", 2: "PD2EMC"}
+        pre = self.source._build_pre_decoded({
+            "decoded": {"portnum": "TEXT_MESSAGE_APP", "payload": ""},
+            "channel": 2,
+        })
+        self.assertEqual(pre["channel_name"], "PD2EMC")
+
+    def test_unresolvable_channel_index_omits_channel_name(self):
+        # No channel_table entry for this index (e.g. handshake never
+        # populated it, or the stick has fewer channels than this
+        # index implies) -- must not fabricate a name, and must not
+        # raise either.
+        self.source._radio_info["channel_table"] = {0: "LongFast"}
+        pre = self.source._build_pre_decoded({
+            "decoded": {"portnum": "TEXT_MESSAGE_APP", "payload": ""},
+            "channel": 5,
+        })
+        self.assertIsNotNone(pre)
+        self.assertNotIn("channel_name", pre)
+
+
+class ReadChannelTableTest(unittest.TestCase):
+    """F1: index -> name mapping for a stick's own channel table, read
+    at connect time so a locally-decoded packet's bare channel index
+    can be resolved to something meaningful instead of being mistaken
+    for a real over-the-air channel_hash."""
+
+    @staticmethod
+    def _channel(index, role, name):
+        ch = MagicMock()
+        ch.index = index
+        ch.role = role
+        ch.settings.name = name
+        return ch
+
+    def test_builds_index_to_name_map_skipping_disabled(self):
+        R = channel_pb2.Channel.Role
+        channels = [
+            self._channel(0, R.PRIMARY, "Home"),
+            self._channel(1, R.SECONDARY, "BayMesh"),
+            self._channel(2, R.DISABLED, "Unused"),
+        ]
+        iface = MagicMock()
+        iface.localNode.channels = channels
+
+        table = SerialCaptureSource._read_channel_table(iface, modem_preset_name="LongFast")
+
+        self.assertEqual(table, {0: "Home", 1: "BayMesh"})
+
+    def test_blank_primary_name_falls_back_to_modem_preset(self):
+        # Mirrors firmware's own Channels::getName() convention (same
+        # fallback _read_primary_channel_name's docstring documents)
+        # -- the common stock-setup case where the primary channel's
+        # own name is left blank.
+        R = channel_pb2.Channel.Role
+        channels = [self._channel(0, R.PRIMARY, "")]
+        iface = MagicMock()
+        iface.localNode.channels = channels
+
+        table = SerialCaptureSource._read_channel_table(iface, modem_preset_name="LongFast")
+
+        self.assertEqual(table, {0: "LongFast"})
+
+    def test_blank_secondary_name_is_skipped_not_guessed(self):
+        R = channel_pb2.Channel.Role
+        channels = [
+            self._channel(0, R.PRIMARY, "Home"),
+            self._channel(1, R.SECONDARY, ""),
+        ]
+        iface = MagicMock()
+        iface.localNode.channels = channels
+
+        table = SerialCaptureSource._read_channel_table(iface, modem_preset_name="LongFast")
+
+        self.assertEqual(table, {0: "Home"})
+
+
+class ResolveChannelIndexTest(unittest.TestCase):
+    """F3: translating Meshpoint's own channel name to THIS stick's own
+    channel-table index for an outbound reply, refusing rather than
+    guessing when the stick has no channel by that name."""
+
+    def test_finds_index_for_known_name(self):
+        source = SerialCaptureSource(port="/dev/ttyUSB1", label="433")
+        source._radio_info["channel_table"] = {0: "LongFast", 2: "PD2EMC"}
+
+        self.assertEqual(source.resolve_channel_index("PD2EMC"), 2)
+
+    def test_returns_none_for_unknown_name(self):
+        source = SerialCaptureSource(port="/dev/ttyUSB1", label="433")
+        source._radio_info["channel_table"] = {0: "LongFast"}
+
+        self.assertIsNone(source.resolve_channel_index("SomeOtherChannel"))
+
+    def test_returns_none_when_channel_table_never_populated(self):
+        source = SerialCaptureSource(port="/dev/ttyUSB1", label="433")
+
+        self.assertIsNone(source.resolve_channel_index("LongFast"))
 
 
 if __name__ == "__main__":

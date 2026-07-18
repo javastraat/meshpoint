@@ -1331,6 +1331,18 @@ def _setup_message_interception(
     except Exception:
         logger.debug("Failed to build channel hash map", exc_info=True)
 
+    # Name -> Meshpoint channel index, for packets a capture source
+    # already decoded locally using its OWN channel table (a
+    # Meshtastic USB stick) and reported by NAME rather than a real
+    # channel_hash (see Packet.remote_channel_name / F1 in the
+    # worklist). Same index convention as channel_hash_resolver: 0 is
+    # always the primary channel.
+    name_to_channel_index: dict[str, int] = {}
+    if config.meshtastic.primary_channel_name:
+        name_to_channel_index[config.meshtastic.primary_channel_name] = 0
+    for _i, _name in enumerate(config.meshtastic.channel_keys.keys(), start=1):
+        name_to_channel_index[_name] = _i
+
     async def _refresh_mc_contacts() -> None:
         if not meshcore_tx or not meshcore_tx.connected:
             logger.debug("MC contact refresh skipped: not connected")
@@ -1407,6 +1419,25 @@ def _setup_message_interception(
             if packet.protocol == Protocol.MESHCORE:
                 ch_idx = packet.channel_hash or 0
                 node_id = f"broadcast:{packet.protocol.value}:{ch_idx}"
+            elif packet.remote_channel_name:
+                # A capture source (Meshtastic USB stick) decoded this
+                # locally and told us which of ITS OWN channels it was
+                # on, by name -- packet.channel_hash is NOT trustworthy
+                # here (it may hold that stick's local channel INDEX,
+                # not a real hash, see F1). Route by name instead: if
+                # it matches one of Meshpoint's own configured channel
+                # names, file it under that channel's normal
+                # conversation; otherwise give it its own clearly
+                # labeled bucket rather than guessing at a hash-based
+                # or index-based match that could silently misroute.
+                _idx = name_to_channel_index.get(packet.remote_channel_name)
+                if _idx is not None:
+                    node_id = f"broadcast:{packet.protocol.value}:{_idx}"
+                else:
+                    node_id = (
+                        f"broadcast:{packet.protocol.value}:named:"
+                        f"{packet.remote_channel_name}"
+                    )
             else:
                 ch_idx = channel_hash_resolver.lookup(packet.channel_hash)
                 if ch_idx is None and packet.matched_channel_index is not None:

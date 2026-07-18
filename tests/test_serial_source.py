@@ -194,17 +194,20 @@ class BuildPreDecodedEarlyExitTest(unittest.TestCase):
     test_serial_radio_handshake.py instead, alongside this module's
     other real-library-dependent tests."""
 
+    def setUp(self):
+        self.source = SerialCaptureSource(port="/dev/ttyUSB1", label="433")
+
     def test_no_decoded_key_returns_none(self):
-        self.assertIsNone(SerialCaptureSource._build_pre_decoded({"raw": "aa"}))
+        self.assertIsNone(self.source._build_pre_decoded({"raw": "aa"}))
 
     def test_decoded_not_a_dict_returns_none(self):
         self.assertIsNone(
-            SerialCaptureSource._build_pre_decoded({"decoded": "not-a-dict"})
+            self.source._build_pre_decoded({"decoded": "not-a-dict"})
         )
 
     def test_decoded_missing_portnum_returns_none(self):
         self.assertIsNone(
-            SerialCaptureSource._build_pre_decoded({"decoded": {"payload": "AQI="}})
+            self.source._build_pre_decoded({"decoded": {"payload": "AQI="}})
         )
 
 

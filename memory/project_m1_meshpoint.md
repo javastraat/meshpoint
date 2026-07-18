@@ -1809,9 +1809,106 @@ locally (missing pycryptodome, pre-existing Mac limitation, not a
 regression -- confirmed by checking they fail identically on the
 unmodified `test_meshtastic_decoder_header_validity.py` too).
 
-**Not yet live-tested** -- needs a real reply sent from the
-"Different Channel Name" conversation on the actual mesh, confirming
-the Tag receives it on its own "PD2EMC" channel rather than LongFast.
+**Live-tested and confirmed 2026-07-20.** User sent "hoi je kanaal naam
+staat verkeerd" from the "Different Channel Name" conversation
+("PD2EMC Meshtastic Tag", subtitle "Same key, different channel name
+on their side · replies still work"). Screenshot of the actual
+Meshtastic app on the Tag confirms the reply arrived in its own
+"PD2EMC" channel thread (index 2 on the Tag's side) as a normal
+received message from "PD2EMC Meshpoint (!c3ecf862)" -- not LongFast,
+unlike the earlier `convo.channel || 0` bug this replaces. Dashboard
+side shows the sent bubble correctly filed in the same "Different
+Channel Name" thread. CI also confirmed green after pushing (the
+`test_rebuild_after_crypto_refresh_updates_private_index` fix took).
+F2 and all three of its live-test-discovered follow-on bugs are now
+fully closed, end to end: backend hash resolution, sidebar
+visibility, send-safety, and now a real working reply via the matched
+key + echoed hash. The one loose end from this arc: the "Unmapped"
+sidebar section still has stale pre-fix conversations from before this
+session (e.g. the "Oh?" one at 14:09) -- expected, since reclassifying
+to "keyed:" only happens for packets decoded after the fix deployed,
+not retroactively for historical rows. Not a bug, no action needed.
+
+---
+
+### 2026-07-20: F1 + F3 -- the 433 serial stick's own channel-index/hash confusion, same category of bug as F2
+
+With F2 fully closed, moved to F1/F3 -- both about the 433 MHz
+Meshtastic USB stick treating its own local channel-table INDEX and
+Meshpoint's channel numbering as interchangeable with a real
+over-the-air channel_hash, when neither actually is.
+
+Investigated properly before touching code, since the worklist's F1
+note ("index when decrypted locally, hash when not") was written in an
+earlier session and needed confirming, not just trusted. meshtastic
+2.7.8 IS pip-installed on the Mac (unlike pycryptodome/fastapi), so
+this could be checked against the real library instead of guessing:
+`mesh_interface.py:569` does `meshPacket.channel = channelIndex` on
+send, confirming `.channel` genuinely is a local channel-table index in
+that direction. `channel_pb2.Channel` has a real `.index` field (not
+just list position), and `node.py` already has a built-in
+`getChannelByName()` helper returning the Channel object by name,
+which is exactly the reverse-lookup F3 needs. `serial_source.py`'s
+`_reconstruct_raw` stuffs `packet.get("channel")` straight into the raw
+frame's hash-byte position unconditionally, so a locally-decoded
+packet's small index (0, 1, 2...) flows all the way to
+`Packet.channel_hash`, which `on_text_packet` then treats as a real
+hash -- misrouting to a spurious "unmapped" bucket at best, or
+silently colliding with an unrelated real channel whose genuine hash
+happens to equal that small number at worst.
+
+Fixed both directions:
+- **F1 (inbound):** `serial_source.py` gained `_read_channel_table()`
+  (index -> name for every channel, read at connect time via
+  `interface.localNode.channels`; blank primary-channel names fall back
+  to the modem preset's display name, mirroring firmware's own
+  `Channels::getName()` convention -- same reasoning
+  `_read_primary_channel_name` already used, just extended to the full
+  table and all roles, skipping DISABLED and blank SECONDARY names
+  rather than guessing). `_build_pre_decoded` (converted from
+  staticmethod to instance method to reach `self._radio_info`) resolves
+  `packet["channel"]` to a name via this table and adds it as
+  `pre_decoded["channel_name"]`. New `Packet.remote_channel_name` field
+  carries it through `meshtastic_decoder.py`'s pre_decoded branch.
+  `server.py`'s `on_text_packet` checks this FIRST, before the
+  hash-based `channel_hash_resolver` path: if the name matches one of
+  Meshpoint's own configured channels, routes to that channel's normal
+  conversation; otherwise a new `broadcast:meshtastic:named:{name}`
+  bucket, distinct from `:unmapped:`/`:keyed:` so it's never confused
+  with a hash-based routing decision.
+- **F3 (outbound):** new `SerialCaptureSource.resolve_channel_index(name)`
+  reverse-looks-up the same channel table built for F1. `tx_service.py`
+  gained `_channel_name_for_index()` (same name resolution as the
+  existing `_resolve_channel()`, minus the hash math, with the same
+  blank-primary/preset-name fallback so both ends agree on a name for
+  the common case) and the serial-send branch in `_send_meshtastic` now
+  translates Meshpoint's channel index to a name, asks the connected
+  stick for ITS OWN index for that name, and refuses to send (clear
+  error naming the stick and the missing channel) rather than passing
+  Meshpoint's raw index through if the stick has no channel by that
+  name at all.
+
+Verification: existing `_build_pre_decoded` callers in
+`test_serial_source.py`/`test_serial_radio_handshake.py` needed
+updating for the staticmethod -> instance method change (were calling
+it unbound on the class) -- fixed, all pass. New tests: `_read_channel_table`
+against real `meshtastic.protobuf.channel_pb2` types (disabled-skip,
+blank-primary-fallback, blank-secondary-skip), `resolve_channel_index`,
+`_build_pre_decoded`'s name resolution/non-resolution, and
+`TestSerialSendChannelTranslation` in `test_tx_service.py` (translates
+and sends on the stick's own index, refuses when absent, primary
+channel case) -- all real code, real meshtastic protobuf types, no
+guessing. `on_text_packet`'s new routing branch verified via the same
+regex-extraction-and-exec technique the original F2 fix established
+for this exact function (heavy fastapi/coordinator closure, not worth
+mocking wholesale) -- 6 cases covering name-matches-configured,
+name-doesn't-match, and regression checks that the F2 hash/keyed/unmapped
+paths and the MeshCore path are all untouched. Full local suite run
+(96 passing, 5 pre-existing pycryptodome/fastapi/aiosqlite import
+errors unrelated to this change, same class of Mac-only gap as always).
+**Not yet live-tested** -- needs the actual 433 stick to hear channel
+traffic (inbound) and a reply sent through it (outbound) to confirm on
+real hardware.
 
 ---
 
@@ -1825,9 +1922,9 @@ Upstream card links the real repo, Custom-branch is a real dropdown).
 
 | Status | Effort | Item |
 |--------|--------|------|
-| ~~Open~~ Backend + sidebar + reply-encryption all live-verified 2026-07-19; echo-hash reply upgrade built 2026-07-20, not yet live-tested | S | ~~F2: kill silent fallback-to-channel-0 in `ChannelHashResolver.lookup()`~~ — `lookup()` now returns `None` for an unmapped hash instead of silently `0`; `server.py`'s `on_text_packet` routes it to its own `broadcast:meshtastic:unmapped:0xHH` conversation. **Backend fully live-confirmed**: real test on the mesh (same PSK, "Home" vs "PD2EMC" different names) produced the exact expected log sequence -- decrypted=True, then the "Unmapped Meshtastic channel_hash=0x6e" warning. Live-testing surfaced two follow-on bugs, both fixed and live-confirmed: (1) the sidebar only ever rendered configured channels + non-broadcast DMs, so the unmapped conversation was invisible -- fixed with a new sidebar section; (2) replying used `convo.channel || 0` (no `Conversation` has a `channel` field), so replies silently went out on LongFast -- fixed by disabling reply for genuinely unmapped conversations. Since then, upgraded further: `meshtastic_decoder.py` now records which configured key decrypted a "different channel name, same PSK" packet (`Packet.matched_channel_index`), `on_text_packet` routes those to a `keyed:{index}:0x{hash}` bucket, and `tx_service.send_text`'s new `echo_hash` param lets a reply encrypt with the correct key while stamping the sender's own hash byte -- so these conversations are now actually repliable (sidebar section "Different Channel Name") instead of permanently disabled. Full detail + verification in the 2026-07-19/07-20 narrative entries above. **Not yet live-tested**: needs a real reply sent from a "Different Channel Name" conversation confirming the Tag receives it on its own channel, not LongFast |
-| Open | S-M | **F1: 433 MT serial stick writes its channel-table INDEX into the hash byte** (`serial_source._reconstruct_raw` line ~589, `packet.get("channel")` is a slot index when the stick decrypted locally, a hash only when it couldn't) — decoder then treats it as channel_hash; will misroute the moment the 433 stick hears channel traffic. Fix: carry stick channel identity in pre_decoded (read full channel table at connect, map by NAME) |
-| Open | S | **F3: egress via serial stick passes dashboard channel index as the stick's slot index untranslated** (`tx_service.py:307` `send_text(channel_index=channel)`) — needs name-based slot translation + refusal when the stick lacks the channel |
+| ~~Closed 2026-07-20~~ | S | ~~F2: kill silent fallback-to-channel-0 in `ChannelHashResolver.lookup()`~~ — `lookup()` now returns `None` for an unmapped hash instead of silently `0`; `server.py`'s `on_text_packet` routes it to its own `broadcast:meshtastic:unmapped:0xHH` conversation. **Fully live-confirmed end to end**, including three follow-on bugs live-testing surfaced along the way, all fixed: (1) sidebar not rendering the unmapped bucket at all, (2) replies silently going out on LongFast (`convo.channel || 0`), (3) upgraded further so replies to a "different channel name, same PSK" conversation actually work correctly instead of just being disabled -- `meshtastic_decoder.py` records which configured key decrypted the packet (`Packet.matched_channel_index`), `on_text_packet` routes those to a `keyed:{index}:0x{hash}` bucket, `tx_service.send_text`'s `echo_hash` param encrypts with the right key while stamping the sender's own hash byte. **2026-07-20: live-tested and confirmed** -- a reply sent from the "Different Channel Name" conversation arrived correctly in the Tag's own "PD2EMC" channel thread (not LongFast), confirmed via screenshot of the real Meshtastic app. CI green. Full detail in the 2026-07-19/07-20 narrative entries above |
+| ~~Open~~ Built 2026-07-20, not yet live-tested | S-M | ~~F1: 433 MT serial stick writes its channel-table INDEX into the hash byte~~ — `serial_source.py` now reads the stick's own channel table at connect (`_read_channel_table`, index→name, blank-primary falls back to modem preset name like firmware does), resolves `packet["channel"]` to a NAME in `_build_pre_decoded` (new `Packet.remote_channel_name` field), and `on_text_packet` routes by that name first — into the matching Meshpoint channel if the names line up, else a clearly labeled `broadcast:meshtastic:named:{name}` bucket — instead of ever trusting the bare index as a real channel_hash. Unit-tested against the real `meshtastic` protobuf types (installed on the Mac, unlike pycryptodome/fastapi) plus a regex-extraction exec of the real `on_text_packet` routing block, all passing. **Not yet live-tested** on the actual 433 stick |
+| ~~Open~~ Built 2026-07-20, not yet live-tested | S | ~~F3: egress via serial stick passes dashboard channel index as the stick's slot index untranslated~~ — `tx_service.py`'s serial-send path now resolves Meshpoint's own channel index to its NAME (`_channel_name_for_index`, same blank-primary/preset-name fallback as the receive side) and asks the stick for its OWN index via that name (`SerialCaptureSource.resolve_channel_index`, built from the same channel table F1 added); refuses to send with a clear error if the stick has no channel by that name, instead of guessing. Unit-tested (translation, refusal, primary-channel case). **Not yet live-tested** on the actual 433 stick |
 | Open | S | **F5-hardening: `ChannelHashResolver.rebuild()` pairs config names with `get_all_keys()` positionally** while TX pairs from `crypto._keys.items()` directly — two sources of truth that diverged in production (map 0xC9 vs TX 0x71). Rebuild should derive from `crypto._keys.items()` |
 | Open | S | **Incremental auto-vacuum in the hourly cleanup loop** — nothing currently reclaims free pages after packet/telemetry pruning deletes; DB file will re-fragment over time exactly like it did before the 2026-07-14 manual VACUUM. Proposed: `PRAGMA auto_vacuum = INCREMENTAL` + periodic `PRAGMA incremental_vacuum(N)` in `coordinator.py`'s `_cleanup_loop()`. User has a manual `db-vacuum.sh` stopgap on the Pi for now; not urgent |
 | Open | M-L | **Per-device channel management** — channel creator for serial Meshtastic sticks (concentrator-only today), and a channel list for the 433 MeshCore companion (today's list only syncs to the 868 primary). Needs a scoping pass first: mesh-wide sync-to-all vs. genuinely separate per-companion channel sets |

@@ -51,6 +51,7 @@ class MeshtasticDecoder:
         decrypted = False
         raw_app_payload: Optional[bytes] = None
         request_id = 0
+        remote_channel_name: Optional[str] = None
 
         if pre_decoded is not None:
             # Already decrypted upstream (e.g. meshtastic-python's serial
@@ -64,6 +65,7 @@ class MeshtasticDecoder:
             )
             raw_app_payload = pre_decoded.get("payload") or None
             request_id = pre_decoded.get("request_id", 0)
+            remote_channel_name = pre_decoded.get("channel_name")
             if decoded_payload is not None:
                 decrypted = True
 
@@ -185,6 +187,7 @@ class MeshtasticDecoder:
             raw_radio_packet=bytes(raw_bytes),
             decrypted=decrypted,
             matched_channel_index=matched_channel_index,
+            remote_channel_name=remote_channel_name,
             signal=signal,
             timestamp=datetime.now(timezone.utc),
         )
