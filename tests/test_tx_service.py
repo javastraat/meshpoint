@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from src.config import TransmitConfig
 from src.models.packet import Protocol
@@ -236,6 +236,63 @@ class TestPersistDerivedNodeId(unittest.TestCase):
             )
         self.assertEqual(svc.node_id_source, "derived")
         self.assertNotEqual(svc.source_node_id, 0)
+
+
+class TestEchoHashOverride(unittest.IsolatedAsyncioTestCase):
+    """Replying to a "keyed" conversation (see server.py's on_text_packet)
+    must encrypt with the key resolved for the given channel index but
+    stamp the packet with the sender's own hash byte, not one recomputed
+    from our local channel name -- otherwise their radio's hash-based
+    channel filter silently drops the reply."""
+
+    def _build_tx_service(self):
+        tx = TxService()
+        tx._config = Mock(enabled=True, hop_limit=3, tx_power_dbm=17)
+        tx._crypto = Mock()
+        tx._wrapper = Mock()
+        tx._wrapper.send = Mock(return_value=0)
+        tx._wrapper.get_tx_status = Mock(return_value=2)
+        tx._wrapper.get_time_on_air = Mock(return_value=100)
+        tx._resolve_channel = Mock(return_value=(0x2C, b"the-real-channel-key"))
+
+        builder = Mock()
+        builder.build_text_message = Mock(return_value=b"packet-bytes")
+        tx._get_builder = Mock(return_value=builder)
+
+        hal_packet = Mock(
+            freq_hz=906875000, bandwidth=0, datarate=11, coderate=1,
+            rf_power=17, preamble=16, no_crc=False, no_header=False,
+            invert_pol=False, size=10,
+        )
+        tx._build_hal_packet = Mock(return_value=hal_packet)
+        return tx, builder
+
+    async def test_echo_hash_overrides_recomputed_hash(self):
+        tx, builder = self._build_tx_service()
+
+        result = await tx._send_meshtastic(
+            "hi", BROADCAST_ADDR_MT, channel=2, want_ack=False, echo_hash=0x6E,
+        )
+
+        self.assertTrue(result.success)
+        kwargs = builder.build_text_message.call_args.kwargs
+        self.assertEqual(kwargs["channel_hash"], 0x6E)
+        self.assertEqual(kwargs["channel_key"], b"the-real-channel-key")
+
+    async def test_no_echo_hash_keeps_recomputed_hash(self):
+        """Normal channel replies (no echo_hash) are unaffected: the
+        hash _resolve_channel computed for our own channel name/key is
+        used as-is."""
+        tx, builder = self._build_tx_service()
+
+        result = await tx._send_meshtastic(
+            "hi", BROADCAST_ADDR_MT, channel=2, want_ack=False, echo_hash=None,
+        )
+
+        self.assertTrue(result.success)
+        kwargs = builder.build_text_message.call_args.kwargs
+        self.assertEqual(kwargs["channel_hash"], 0x2C)
+        self.assertEqual(kwargs["channel_key"], b"the-real-channel-key")
 
 
 if __name__ == "__main__":

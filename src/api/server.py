@@ -1409,7 +1409,20 @@ def _setup_message_interception(
                 node_id = f"broadcast:{packet.protocol.value}:{ch_idx}"
             else:
                 ch_idx = channel_hash_resolver.lookup(packet.channel_hash)
-                if ch_idx is None:
+                if ch_idx is None and packet.matched_channel_index is not None:
+                    # Hash doesn't match any locally-computed name+key
+                    # combo, but the packet still decrypted with one of
+                    # our configured keys -- the remote side just named
+                    # the channel differently. Encode the matched local
+                    # key index and the original hash byte so a reply
+                    # can encrypt with the right key while echoing back
+                    # the hash the remote expects (see tx_service
+                    # echo_hash / _resolve_node_id).
+                    node_id = (
+                        f"broadcast:{packet.protocol.value}:keyed:"
+                        f"{packet.matched_channel_index}:0x{packet.channel_hash:02x}"
+                    )
+                elif ch_idx is None:
                     # Unmapped hash -- its own distinct, visible
                     # conversation bucket instead of silently blending
                     # into channel 0/LongFast (see ChannelHashResolver.lookup).

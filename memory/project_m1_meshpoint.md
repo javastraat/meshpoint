@@ -1701,6 +1701,120 @@ test" messages in it.
 
 ---
 
+### 2026-07-19/07-20 (same thread, third and fourth bugs): send-blocking fix live-confirmed, then upgraded to an actual working reply
+
+Live-tested the "Unmapped" sidebar fix (previous entry): both test
+messages appeared correctly. User then tried replying from that
+conversation -- it received fine but "on the tag they cam into lf"
+(the Meshtastic Tag saw the reply arrive on LongFast, not on the
+shared "Home"/"PD2EMC" channel). Root cause:
+`frontend/js/messaging.js`'s `_onSendMessage` built the send request
+with `channel: convo.channel || 0`, and no `Conversation` object
+(confirmed against `message_repository.py`) has a `channel` field --
+every reply from any conversation in this bucket silently fell back to
+channel 0. Same failure shape F2 fixed on receive, just moved to send.
+
+First fix (shipped, live-confirmed via screenshot): disabled the
+compose input/Send button entirely in `messaging_chat.js` whenever
+`node_id` contains `:unmapped:`, with header subtitle "Unmapped channel
+hash -- no local channel matches, can't reply" and a matching
+placeholder. Simple and safe, but the user pushed back with the right
+question: *since Meshpoint already knows which local key decrypted
+this traffic, can't it use that key to actually send a working reply
+instead of just refusing?*
+
+Investigated rather than just disabling further. Two things confirmed
+by reading (not guessing):
+- `compute_channel_hash()` in `crypto_service.py` is a lossy one-way
+  XOR digest (`XOR(name bytes) XOR XOR(expanded key bytes)`, one byte
+  out). Knowing the key does **not** let you recover the remote's
+  channel name from the hash -- many names XOR to the same byte. So
+  "show the channel name they used" is impossible; the plan settled on
+  echoing back their raw hash byte instead, which doesn't require
+  knowing the name at all.
+- `meshtastic_decoder.py`'s brute-force decrypt loop (the one that
+  already runs whenever a packet's hash doesn't match any locally
+  computed name+key combo) tries every configured key in
+  `crypto.get_all_keys()` order and stops at the first one that
+  decrypts successfully -- it just threw away *which* key won.
+  `tx_service.py`'s existing `_resolve_channel_by_hash()` (used for
+  routing-ACK/traceroute/telemetry auto-replies) has the identical
+  blind spot from the other direction: it tries to find a matching key
+  by *recomputing* each key's hash from OUR channel name and checking
+  equality against the captured hash -- which by construction can
+  never succeed in exactly this scenario (their name differs from
+  ours). Matching by decrypt-success, not by hash-recompute, is the
+  only thing that actually works here.
+
+Implemented across the stack:
+- `src/models/packet.py`: new `Packet.matched_channel_index` field --
+  the `get_all_keys()` index (0=primary, 1+=channel_keys in insertion
+  order, same convention `ChannelHashResolver` already uses) of the key
+  that decrypted this packet, set even when the hash doesn't match.
+- `src/decode/meshtastic_decoder.py`: the brute-force loop now
+  captures `key_index` via `enumerate()` and passes it through to the
+  `Packet` constructor as `matched_channel_index`.
+- `src/api/server.py`'s `on_text_packet`: when the hash is unmapped
+  but `matched_channel_index` is set, routes to
+  `broadcast:meshtastic:keyed:{index}:0x{hash}` instead of the plain
+  `:unmapped:0xHH` bucket -- encodes both which local key to reply
+  with and the exact hash byte to echo back.
+- `src/transmit/tx_service.py`: `send_text`/`_send_meshtastic` gained
+  an `echo_hash` param. When set, it overrides the `channel_hash`
+  `_resolve_channel()` would have recomputed from our own channel
+  name, while keeping the `channel_key` it resolved (the correct PSK)
+  -- so the outgoing packet is encrypted correctly but stamped with
+  the hash the remote's own radio expects for its channel table entry.
+- `src/api/routes/messages.py`: `SendRequest` gained `echo_hash`;
+  `_resolve_node_id()` builds the same `keyed:{channel}:0x{hash}`
+  node_id for the sent message when `echo_hash` is present, so the
+  reply lands in the same conversation thread instead of the plain
+  channel-index one.
+- Frontend: `messaging_chat.js` now distinguishes a repliable "keyed"
+  conversation (regex on `node_id`) from a genuinely unrepliable
+  "unmapped" one -- only the latter disables the input. `messaging.js`
+  parses the same pattern to build `{channel, echo_hash}` in the send
+  request instead of the broken `convo.channel || 0`.
+  `messaging_contacts.js` splits the old single "Unmapped" sidebar
+  section into "Different Channel Name" (keyed, repliable) and
+  "Unmapped" (no key matches at all, still disabled).
+
+Also fixed in the same pass: CI failed on `main` after the send-block
+commit (`test_rebuild_after_crypto_refresh_updates_private_index`) --
+a third resolver test asserting the pre-F2 `lookup(unmapped) == 0`
+contract that got missed when the other two were updated. Changed to
+`assertIsNone`.
+
+Verification (no fastapi/pycryptodome on the Mac, per usual): `node
+--check` clean on all three touched JS files. New
+`tests/test_meshtastic_decoder_matched_channel_index.py` duck-types
+the crypto interface (no real AES needed) and confirms the real,
+unmodified `decode()` loop picks the right key index (0, 1, "no match"
+cases) -- ran locally via a `Crypto.Cipher.AES` stub injected into
+`sys.modules` (same technique as always; the committed test imports
+normally and will run for real in CI where pycryptodome exists). New
+`TestEchoHashOverride` in `tests/test_tx_service.py` mocks the
+wrapper/builder/HAL and confirms `_send_meshtastic` passes the echoed
+hash (not the recomputed one) to `build_text_message` when `echo_hash`
+is set, and the normal recomputed hash otherwise -- both pass. Full
+`test_tx_service.py` (33 tests) and the non-pycryptodome-dependent
+Packet-construction tests (`test_meshtastic_inbound_handler`,
+`test_meshtastic_mesh_participant`* , `test_native_relay`,
+`test_meshtastic_transmitter_relay`) all still pass -- confirmed every
+existing `Packet(...)` call site anywhere in the repo uses keyword
+args, so inserting the new `matched_channel_index` field mid-dataclass
+couldn't silently shift any positional argument.
+*mesh_participant/meshtastic_decoder-dependent modules fail to import
+locally (missing pycryptodome, pre-existing Mac limitation, not a
+regression -- confirmed by checking they fail identically on the
+unmodified `test_meshtastic_decoder_header_validity.py` too).
+
+**Not yet live-tested** -- needs a real reply sent from the
+"Different Channel Name" conversation on the actual mesh, confirming
+the Tag receives it on its own "PD2EMC" channel rather than LongFast.
+
+---
+
 ## CURRENT WORKLIST v8 (2026-07-16 — supersedes v7 below; THE list to work off)
 
 Closed since v7 (full detail in the v7 section below, kept for history):
@@ -1711,7 +1825,7 @@ Upstream card links the real repo, Custom-branch is a real dropdown).
 
 | Status | Effort | Item |
 |--------|--------|------|
-| ~~Open~~ Backend live-verified 2026-07-19, frontend fix pending re-test | S | ~~F2: kill silent fallback-to-channel-0 in `ChannelHashResolver.lookup()`~~ — `lookup()` now returns `None` for an unmapped hash instead of silently `0`; `server.py`'s `on_text_packet` routes it to its own `broadcast:meshtastic:unmapped:0xHH` conversation. **Backend fully live-confirmed**: real test on the mesh (same PSK, "Home" vs "PD2EMC" different names) produced the exact expected log sequence -- decrypted=True, then the "Unmapped Meshtastic channel_hash=0x6e" warning. But the message was invisible in the dashboard -- traced to a SECOND bug, purely frontend: `messaging_contacts.js`'s sidebar only ever rendered configured channels + non-broadcast DMs, no path existed for "broadcast conversation not in the configured list." Fixed with a new "Unmapped" sidebar section; verified via a real V8 context with a dataset mirroring the exact live scenario (all render checks pass, zero regression to existing channels/DMs) but **not yet reloaded against the actual browser** -- the exact test packets (hash 0x6e, "Test 123"/"Another test") already exist in the DB from this session, so simply refreshing the dashboard with the fix deployed should show them now |
+| ~~Open~~ Backend + sidebar + reply-encryption all live-verified 2026-07-19; echo-hash reply upgrade built 2026-07-20, not yet live-tested | S | ~~F2: kill silent fallback-to-channel-0 in `ChannelHashResolver.lookup()`~~ — `lookup()` now returns `None` for an unmapped hash instead of silently `0`; `server.py`'s `on_text_packet` routes it to its own `broadcast:meshtastic:unmapped:0xHH` conversation. **Backend fully live-confirmed**: real test on the mesh (same PSK, "Home" vs "PD2EMC" different names) produced the exact expected log sequence -- decrypted=True, then the "Unmapped Meshtastic channel_hash=0x6e" warning. Live-testing surfaced two follow-on bugs, both fixed and live-confirmed: (1) the sidebar only ever rendered configured channels + non-broadcast DMs, so the unmapped conversation was invisible -- fixed with a new sidebar section; (2) replying used `convo.channel || 0` (no `Conversation` has a `channel` field), so replies silently went out on LongFast -- fixed by disabling reply for genuinely unmapped conversations. Since then, upgraded further: `meshtastic_decoder.py` now records which configured key decrypted a "different channel name, same PSK" packet (`Packet.matched_channel_index`), `on_text_packet` routes those to a `keyed:{index}:0x{hash}` bucket, and `tx_service.send_text`'s new `echo_hash` param lets a reply encrypt with the correct key while stamping the sender's own hash byte -- so these conversations are now actually repliable (sidebar section "Different Channel Name") instead of permanently disabled. Full detail + verification in the 2026-07-19/07-20 narrative entries above. **Not yet live-tested**: needs a real reply sent from a "Different Channel Name" conversation confirming the Tag receives it on its own channel, not LongFast |
 | Open | S-M | **F1: 433 MT serial stick writes its channel-table INDEX into the hash byte** (`serial_source._reconstruct_raw` line ~589, `packet.get("channel")` is a slot index when the stick decrypted locally, a hash only when it couldn't) — decoder then treats it as channel_hash; will misroute the moment the 433 stick hears channel traffic. Fix: carry stick channel identity in pre_decoded (read full channel table at connect, map by NAME) |
 | Open | S | **F3: egress via serial stick passes dashboard channel index as the stick's slot index untranslated** (`tx_service.py:307` `send_text(channel_index=channel)`) — needs name-based slot translation + refusal when the stick lacks the channel |
 | Open | S | **F5-hardening: `ChannelHashResolver.rebuild()` pairs config names with `get_all_keys()` positionally** while TX pairs from `crypto._keys.items()` directly — two sources of truth that diverged in production (map 0xC9 vs TX 0x71). Rebuild should derive from `crypto._keys.items()` |

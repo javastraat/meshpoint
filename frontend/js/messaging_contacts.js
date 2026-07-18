@@ -108,10 +108,31 @@ class MessagingContacts {
         // and correctly kept OUT of a real channel's history -- exactly
         // the kind of quiet data loss F2 was trying to eliminate.
         const knownChannelIds = new Set(this._channels.map(ch => ch.node_id));
-        const unmappedConvos = (this._filter === 'all'
+        const otherBroadcastConvos = (this._filter === 'all'
             ? this._conversations
             : this._conversations.filter(c => c.protocol === this._filter)
         ).filter(c => c.is_broadcast && !knownChannelIds.has(c.node_id));
+
+        // "keyed:" traffic decrypts fine with one of our configured
+        // keys but under a channel name the remote side typed
+        // differently (see server.py's on_text_packet) -- repliable,
+        // unlike a true "unmapped" hash where no key matches at all.
+        const isKeyed = (nodeId) => /:keyed:\d+:0x[0-9a-f]+$/i.test(nodeId || '');
+        const keyedConvos = otherBroadcastConvos.filter(c => isKeyed(c.node_id));
+        const unmappedConvos = otherBroadcastConvos.filter(c => !isKeyed(c.node_id));
+
+        if (keyedConvos.length > 0) {
+            const label = document.createElement('div');
+            label.className = 'msg-sidebar__section-label';
+            label.textContent = 'Different Channel Name';
+            label.title = 'Same PSK as one of your configured channels, but the sender named the channel differently -- replies encrypt with the matching key and echo their hash back.';
+            this._listEl.appendChild(label);
+
+            keyedConvos.forEach(convo => {
+                const el = this._buildConvoEl(convo);
+                this._listEl.appendChild(el);
+            });
+        }
 
         if (unmappedConvos.length > 0) {
             const label = document.createElement('div');
@@ -146,7 +167,7 @@ class MessagingContacts {
             });
         }
 
-        if (filteredChannels.length === 0 && unmappedConvos.length === 0 && dmConvos.length === 0) {
+        if (filteredChannels.length === 0 && keyedConvos.length === 0 && unmappedConvos.length === 0 && dmConvos.length === 0) {
             const emptyMsg = this._filter === 'fav'
                 ? 'No favorited channels yet -- click the star on a channel to pin it here.'
                 : 'No conversations yet';

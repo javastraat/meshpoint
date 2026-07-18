@@ -137,8 +137,9 @@ class MeshtasticDecoder:
                     self._our_node_id,
                 )
 
+        matched_channel_index: Optional[int] = None
         if not decrypted and pre_decoded is None:
-            for key in self._crypto.get_all_keys():
+            for key_index, key in enumerate(self._crypto.get_all_keys()):
                 decrypted_bytes = self._crypto.decrypt_meshtastic(
                     encrypted_payload,
                     header["packet_id"],
@@ -152,6 +153,7 @@ class MeshtasticDecoder:
                 )
                 if decoded_payload is not None:
                     decrypted = True
+                    matched_channel_index = key_index
                     break
 
         if not decrypted and encrypted_payload:
@@ -182,6 +184,7 @@ class MeshtasticDecoder:
             raw_app_payload=raw_app_payload,
             raw_radio_packet=bytes(raw_bytes),
             decrypted=decrypted,
+            matched_channel_index=matched_channel_index,
             signal=signal,
             timestamp=datetime.now(timezone.utc),
         )

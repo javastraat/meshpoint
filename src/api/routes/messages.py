@@ -61,6 +61,11 @@ class SendRequest(BaseModel):
     protocol: str = "meshtastic"
     channel: int = 0
     want_ack: bool = False
+    # Set only for replies to a "keyed" conversation (see server.py's
+    # on_text_packet): the remote side decrypts with our channel key
+    # under a different channel name, so a reply must echo their raw
+    # hash byte instead of one recomputed from our own channel name.
+    echo_hash: Optional[int] = None
 
 
 @router.post("/send")
@@ -84,9 +89,10 @@ async def send_message(
         protocol=req.protocol,
         channel=req.channel,
         want_ack=req.want_ack,
+        echo_hash=req.echo_hash,
     )
 
-    node_id = _resolve_node_id(req.destination, req.protocol, req.channel)
+    node_id = _resolve_node_id(req.destination, req.protocol, req.channel, req.echo_hash)
     node_name = await _resolve_display_name(node_id, req.protocol)
 
     if result.success:
@@ -301,10 +307,15 @@ def _is_hex_only(s: str) -> bool:
 
 
 def _resolve_node_id(
-    destination: str, protocol: str, channel: int
+    destination: str, protocol: str, channel: int, echo_hash: Optional[int] = None
 ) -> str:
     dest_lower = destination.lower()
     if dest_lower in ("broadcast", "all", "0", "ffffffff", "ffff"):
+        if echo_hash is not None:
+            # Keep the sent message in the same "keyed" conversation
+            # the user was replying to (see on_text_packet) rather
+            # than filing it under the plain channel-index thread.
+            return f"broadcast:{protocol}:keyed:{channel}:0x{echo_hash:02x}"
         return f"broadcast:{protocol}:{channel}"
     return destination
 

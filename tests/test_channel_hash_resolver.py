@@ -82,7 +82,7 @@ class TestChannelHashResolver(unittest.TestCase):
             "BayMesh", self.crypto.get_all_keys()[1]
         )
         self.assertEqual(self.resolver.lookup(private_hash), 1)
-        self.assertEqual(self.resolver.lookup(private_hash_before), 0)
+        self.assertIsNone(self.resolver.lookup(private_hash_before))
 
 
 class TestChannelHashResolverPutChannels(unittest.TestCase):

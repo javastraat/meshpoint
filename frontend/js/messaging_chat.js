@@ -38,27 +38,29 @@ class MessagingChat {
 
         const name = convo.node_name || convo.node_id || '';
         const isChannel = (convo.node_id || '').startsWith('broadcast:');
-        // An "unmapped" bucket (see ChannelHashResolver.lookup) has no
-        // corresponding local channel index -- Meshpoint doesn't know
-        // which configured channel, if any, this traffic actually
-        // belongs to. There is no channel number a reply could correctly
-        // go out on, so replying must be disabled here rather than
-        // guessing: messaging.js's send path falls back to
-        // `convo.channel || 0` when a conversation has no real channel
-        // field (true for every conversation in this bucket), which
-        // would otherwise silently transmit the reply on channel 0
-        // (LongFast) -- the exact silent-wrong-channel failure mode F2
-        // eliminated on the receive side, just moved to send instead.
-        const isUnmapped = (convo.node_id || '').includes(':unmapped:');
+        // A "keyed" bucket (see server.py's on_text_packet) is traffic
+        // that decrypted fine with one of our configured keys but
+        // carries a hash that doesn't match any locally-computed
+        // name+key combo -- the remote side just named the channel
+        // differently. We know exactly which key to reply with, so
+        // this IS repliable (messaging.js routes the send through the
+        // matched key index + echoes back the original hash byte).
+        // A plain "unmapped" bucket, by contrast, has no matching key
+        // at all -- there's no channel number a reply could correctly
+        // go out on, so replying stays disabled there.
+        const isKeyed = /:keyed:\d+:0x[0-9a-f]+$/i.test(convo.node_id || '');
+        const isUnmapped = !isKeyed && (convo.node_id || '').includes(':unmapped:');
         const proto = convo.protocol === 'meshcore' ? 'MC' : 'MT';
 
         this._headerName.textContent = name;
         this._headerName.classList.toggle('msg-chat__name--clickable', !isChannel);
         this._headerSubtitle.textContent = isUnmapped
             ? "Unmapped channel hash — no local channel matches, can't reply"
-            : isChannel
-                ? 'Public channel · all listeners on this PSK'
-                : 'Direct message';
+            : isKeyed
+                ? 'Same key, different channel name on their side · replies still work'
+                : isChannel
+                    ? 'Public channel · all listeners on this PSK'
+                    : 'Direct message';
         this._headerBadge.textContent = proto;
         this._headerBadge.className = 'msg-chat__protocol-badge ' +
             (convo.protocol === 'meshcore' ? 'msg-chat__protocol-badge--mc' : 'msg-chat__protocol-badge--mt');

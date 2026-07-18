@@ -162,11 +162,20 @@ class TxService:
         protocol: str = "meshtastic",
         channel: int = 0,
         want_ack: bool = False,
+        echo_hash: int | None = None,
     ) -> SendResult:
-        """Send a text message over the specified protocol."""
+        """Send a text message over the specified protocol.
+
+        ``echo_hash``, when set, stamps the outgoing packet with this
+        exact hash byte instead of one recomputed from our own channel
+        name for ``channel`` -- used when replying to a conversation
+        that decrypts with our key under a channel name the remote
+        side typed differently, so their radio's hash-based channel
+        lookup still matches (see Packet.matched_channel_index).
+        """
         if protocol.lower() in ("meshtastic", "mt"):
             return await self._send_meshtastic(
-                text, destination, channel, want_ack
+                text, destination, channel, want_ack, echo_hash
             )
         elif protocol.lower() in ("meshcore", "mc"):
             return await self._send_meshcore(text, destination, channel)
@@ -281,6 +290,7 @@ class TxService:
         destination: int | str,
         channel: int,
         want_ack: bool,
+        echo_hash: int | None = None,
     ) -> SendResult:
         """Build and transmit a Meshtastic packet via the SX1261
         concentrator, or via a specific USB serial stick when the
@@ -331,6 +341,14 @@ class TxService:
 
         packet_id = self._next_packet_id()
         channel_hash, channel_key = self._resolve_channel(channel)
+        if echo_hash is not None:
+            # Encrypt with the key resolved for `channel` (this IS the
+            # right PSK) but stamp the packet with the remote's own
+            # hash byte instead of the one computed from our channel
+            # name -- their radio filters inbound packets by hash, so
+            # a hash we invented for our own channel name would be
+            # silently ignored on their end.
+            channel_hash = echo_hash
         recipient_pubkey = None
         if dest_int != BROADCAST_ADDR_MT and self._crypto is not None:
             recipient_pubkey = self._crypto.lookup_public_key(dest_int)
