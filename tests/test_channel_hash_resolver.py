@@ -58,11 +58,16 @@ class TestChannelHashResolver(unittest.TestCase):
         self.assertEqual(self.resolver.lookup(primary_hash), 0)
         self.assertEqual(self.resolver.lookup(private_hash), 1)
 
-    def test_unknown_hash_defaults_to_zero_and_warns_once(self) -> None:
+    def test_unknown_hash_returns_none_and_warns_once(self) -> None:
+        """Unmapped hashes must never silently fall back to channel 0
+        (LongFast) -- that masked a real config mismatch for weeks by
+        blending unmapped traffic invisibly into LongFast's own
+        history. Callers route a None result to their own distinct,
+        visible bucket instead (see on_text_packet in server.py)."""
         self.resolver.rebuild(self.crypto, "LongFast", {})
         with patch.object(resolver_module.logger, "warning") as warn:
-            self.assertEqual(self.resolver.lookup(0xAB), 0)
-            self.assertEqual(self.resolver.lookup(0xAB), 0)
+            self.assertIsNone(self.resolver.lookup(0xAB))
+            self.assertIsNone(self.resolver.lookup(0xAB))
             warn.assert_called_once()
 
     def test_rebuild_after_crypto_refresh_updates_private_index(self) -> None:
@@ -106,7 +111,8 @@ class TestChannelHashResolverPutChannels(unittest.TestCase):
         private_hash = self.crypto.compute_channel_hash(
             "BayMesh", self.crypto.get_all_keys()[0]
         )
-        self.assertEqual(self.resolver.lookup(private_hash), 0)
+        # Not configured yet -- must be unmapped, not silently channel 0.
+        self.assertIsNone(self.resolver.lookup(private_hash))
 
         response = self.client.put(
             "/api/config/channels",

@@ -49,19 +49,31 @@ class ChannelHashResolver:
 
         logger.info("Channel hash map: %s", self._hash_to_index)
 
-    def lookup(self, channel_hash: int) -> int:
-        """Return dashboard channel index for a packet header hash."""
+    def lookup(self, channel_hash: int) -> int | None:
+        """Return dashboard channel index for a packet header hash, or
+        ``None`` if this hash isn't in the current map.
+
+        Never silently defaults to channel 0 (LongFast). That used to
+        happen here and it masked a real config mismatch for weeks --
+        an unmapped hash's traffic blended invisibly into LongFast's
+        own message history, indistinguishable from genuine LongFast
+        packets. Callers must route a ``None`` result to their own
+        distinct, visible bucket instead (see ``on_text_packet`` in
+        ``server.py``, which builds a ``broadcast:meshtastic:unmapped:
+        0xHH`` conversation id per unique hash).
+        """
         mapped = self._hash_to_index.get(channel_hash)
         if mapped is not None:
             return mapped
         if channel_hash not in self._warned_hashes:
             self._warned_hashes.add(channel_hash)
             logger.warning(
-                "Unmapped Meshtastic channel_hash=0x%02x; "
-                "routing broadcast to channel 0",
+                "Unmapped Meshtastic channel_hash=0x%02x; routing to a "
+                "distinct 'unmapped' bucket instead of silently "
+                "blending into channel 0/LongFast",
                 channel_hash,
             )
-        return 0
+        return None
 
     @property
     def mapping(self) -> dict[int, int]:

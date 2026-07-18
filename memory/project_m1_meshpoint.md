@@ -1587,6 +1587,59 @@ test, same standing caveat as the mDNS install.sh section itself.
 
 ---
 
+### 2026-07-19: F2 fixed -- unmapped channel hashes get their own bucket
+
+User asked to work off the v8 worklist; picked F2 first (smallest,
+self-contained). `ChannelHashResolver.lookup()` used to fall back to
+channel index 0 for any unmapped `channel_hash` -- meaning unmapped
+traffic blended invisibly into LongFast's own history, indistinguishable
+from real LongFast packets. This is exactly what "masked a config
+mismatch for weeks" per the original worklist note.
+
+Traced the one real call site (`server.py`'s `on_text_packet`,
+`node_id = f"broadcast:{packet.protocol.value}:{ch_idx}"`) and confirmed
+before touching anything: `get_conversations()` does `GROUP BY node_id`
+(`message_repository.py`), so any distinct node_id string becomes its
+own sidebar conversation automatically -- no schema change needed, just
+need to stop constructing an node_id indistinguishable from real
+LongFast. Also confirmed the conversation-detail route
+(`GET /conversation/{node_id:path}`) takes the full node_id as a path
+param, so extra colons in the new format work with zero further changes,
+and that `message_repo.save_received()`'s separate `channel` int column
+was never wired to `ch_idx` in the first place (always defaults to 0
+regardless) -- not something this fix needed to touch.
+
+Changed `lookup()` to return `int | None` (`None` for unmapped, was
+previously always `int`, silently `0`). Updated the one call site: unmapped
+now builds `broadcast:meshtastic:unmapped:0xHH` instead of
+`broadcast:meshtastic:0`. Kept the existing warn-once-per-unique-hash
+throttle for the log line rather than literally logging every single
+packet (which the original worklist phrasing said) -- reasoned that the
+DB-visible bucket is what actually surfaces the mismatch, and warning on
+every packet of an ongoing unmapped-channel conversation risked real log
+spam; flagged this deliberate deviation rather than silently doing
+something different from what was written down.
+
+Verification: updated the two existing unit tests that asserted the old
+`lookup(unmapped) == 0` contract (`test_channel_hash_resolver.py`) to
+expect `None` instead. Since neither `fastapi` nor `pycryptodome` are
+installed on the Mac, ran real (non-rewritten) logic two ways: (1)
+`ChannelHashResolver` itself imported and exercised directly with a
+minimal fake crypto object (no need for real AES, `rebuild()`/`lookup()`
+don't care) -- confirmed mapped hashes still resolve correctly and an
+unmapped one now returns `None` idempotently; (2) the exact edited
+`server.py` block extracted via regex (not hand-copied) and `exec`'d
+with fake `Packet`/`Protocol`/resolver objects -- confirmed the real
+shipped code builds `broadcast:meshtastic:1` for a mapped hash,
+`broadcast:meshtastic:unmapped:0x4a` for an unmapped one, and leaves the
+MeshCore branch (`channel_hash or 0`, unaffected by this fix) untouched.
+`py_compile` clean on all three touched files. **Not yet live-tested**
+-- needs a real unmapped-hash packet on the actual mesh (e.g. temporarily
+misconfigure a channel name/PSK) to confirm the sidebar actually shows
+the new bucket as its own conversation.
+
+---
+
 ## CURRENT WORKLIST v8 (2026-07-16 — supersedes v7 below; THE list to work off)
 
 Closed since v7 (full detail in the v7 section below, kept for history):
@@ -1597,7 +1650,7 @@ Upstream card links the real repo, Custom-branch is a real dropdown).
 
 | Status | Effort | Item |
 |--------|--------|------|
-| Open | S | **F2: kill silent fallback-to-channel-0 in `ChannelHashResolver.lookup()`** — unmapped hashes should land in a visible `broadcast:meshtastic:unmapped:0xHH` bucket + per-packet log, never silently in LongFast (this masked a config mismatch for weeks) |
+| ~~Open~~ FIXED 2026-07-19, live test pending | S | ~~F2: kill silent fallback-to-channel-0 in `ChannelHashResolver.lookup()`~~ — `lookup()` now returns `None` for an unmapped hash instead of silently `0`; `server.py`'s `on_text_packet` routes it to its own `broadcast:meshtastic:unmapped:0xHH` conversation (works automatically via `get_conversations()`'s `GROUP BY node_id`, no schema change). Kept the existing warn-once-per-hash log throttle rather than literally per-packet (deliberate deviation from the original note -- the DB-visible bucket is what actually surfaces the mismatch; per-packet logging risked spam on an ongoing unmapped channel). Verified via real (non-rewritten) code: `ChannelHashResolver` exercised directly with a fake crypto object, and the exact edited `server.py` block extracted via regex and exec'd with fake packet/protocol objects -- both confirm correct behavior. Not yet seen against a real unmapped-hash packet on the mesh |
 | Open | S-M | **F1: 433 MT serial stick writes its channel-table INDEX into the hash byte** (`serial_source._reconstruct_raw` line ~589, `packet.get("channel")` is a slot index when the stick decrypted locally, a hash only when it couldn't) — decoder then treats it as channel_hash; will misroute the moment the 433 stick hears channel traffic. Fix: carry stick channel identity in pre_decoded (read full channel table at connect, map by NAME) |
 | Open | S | **F3: egress via serial stick passes dashboard channel index as the stick's slot index untranslated** (`tx_service.py:307` `send_text(channel_index=channel)`) — needs name-based slot translation + refusal when the stick lacks the channel |
 | Open | S | **F5-hardening: `ChannelHashResolver.rebuild()` pairs config names with `get_all_keys()` positionally** while TX pairs from `crypto._keys.items()` directly — two sources of truth that diverged in production (map 0xC9 vs TX 0x71). Rebuild should derive from `crypto._keys.items()` |
@@ -1620,6 +1673,8 @@ Upstream card links the real repo, Custom-branch is a real dropdown).
 | Noted | — | **Firmware flasher** (upstream #85/#59) — if flashing the 3 sticks becomes a pain; found the real flasher.meshcore.io repo, not yet investigated for integration |
 | Noted | — | **Reticulum as a 6th network** on the spare Heltec V3 433 (upstream #11) — wildcard idea |
 | Live test pending | XS | **Meshtastic reply-routing via the 433 USB stick** — last unverified piece from the TX-routing/pill arc (MeshCore side already confirmed live) |
+| ~~Live test pending~~ FULLY DONE 2026-07-19 | XS | ~~mDNS (Avahi) install.sh section~~ — first confirmed the underlying mechanism by hand (`ping sensecap.local` resolved clean, 11-13ms, 0% loss), then user ran `sudo scripts/install.sh` for real (upgrade mode, v0.7.7) and the new Section 22 fired correctly mid-run: `[INFO] avahi-daemon already installed, skipping` — the idempotency guard detected the hand-installed package and skipped reinstalling, exactly as designed. Full upgrade completed cleanly end-to-end (system packages, HAL rebuild, sudoers, systemd service, network watchdog, CLI, fastfetch banner all reported success, no errors). Both the mechanism and the script wrapper around it are now proven on real hardware |
+| Live test pending | S | **Setup wizard hostname-setting step** (2026-07-18) — offers to set the system hostname to match the device name on fresh installs only (`meshpoint setup`'s `[5/8]` step), via `sudo hostnamectl` + `/etc/hosts` patch. Slugify/`/etc/hosts`-update/control-flow logic all unit-tested with mocks, but never run against a real fresh install |
 
 ---
 
