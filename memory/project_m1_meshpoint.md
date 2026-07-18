@@ -1640,6 +1640,67 @@ the new bucket as its own conversation.
 
 ---
 
+### 2026-07-19 (same session, follow-on): F2's real live test found a second bug -- sidebar silently dropped the unmapped bucket
+
+After the backend fix (previous entry), live-tested on the real mesh.
+First attempt (a genuinely undecryptable "no matching key" packet) didn't
+exercise the fix at all -- explained why (on_text_packet bails at
+`if not text: return` before ever reaching the channel-hash lookup, since
+there's no decrypted text to route). Correct test needs the OTHER
+scenario: same PSK configured under two different channel names (user set
+up "Home" on Meshpoint vs "PD2EMC" on a Meshtastic Tag, both channel
+index 2, identical key) -- decrypts fine (same key) but hash differs
+(computed from name+key together, confirmed via `compute_channel_hash()`
+in `crypto_service.py`).
+
+Log confirmed the backend worked exactly as designed:
+`type=text ... decrypted=True "Test 123"` immediately followed by
+`WARNING channel_hash_resolver: Unmapped Meshtastic channel_hash=0x6e;
+routing to a distinct 'unmapped' bucket...` -- the hash map log line just
+before it (`{8: 0, 113: 1, 44: 2}`) confirmed "Home" computed to `0x2c`,
+genuinely different from the packet's `0x6e`. But the message never
+appeared anywhere in the dashboard's Messages UI -- "Home" stayed on its
+old message, no new conversation appeared anywhere, despite the backend
+log proving the routing decision happened correctly.
+
+Root cause, found in `frontend/js/messaging_contacts.js`'s `render()`:
+the "Channels" section renders **exclusively** from `this._channels`
+(the static `/api/messages/channels` config list), and "Direct Messages"
+explicitly filters `!c.is_broadcast`. A broadcast conversation that's
+neither a configured channel NOR a DM -- exactly what an unmapped bucket
+is -- fell into neither section and rendered nowhere at all. The backend
+fix was completely correct; the frontend simply never had a rendering
+path for "broadcast conversation that exists in `/api/messages/
+conversations` but isn't in the configured channel list." This is a
+second, genuinely separate bug in the same feature, not a failure of the
+backend work.
+
+Fixed: added a third sidebar section, "Unmapped," computed as broadcast
+conversations whose `node_id` isn't in the known-channel-id set,
+rendered between "Channels" and "Direct Messages" via the same
+`_buildConvoEl()` used for DMs (conversation rows from `/conversations`
+already have every field `_buildConvoEl` needs, confirmed by checking how
+`dmConvos` already uses raw rows the same way, no `_channelToConvo`
+enrichment needed).
+
+Verification: `node --check` clean. Loaded the real file into an actual
+V8 context (`vm.runInThisContext`, same technique proven necessary
+earlier this session -- plain `eval` doesn't leak top-level `class`
+declarations) with a realistic dataset mirroring the exact live scenario
+(3 configured channels, a DM, and the new unmapped conversation) and
+called the real unmodified `render()` method: confirmed all three
+section labels render in the right order ("Channels", "Unmapped",
+"Direct Messages"), the unmapped bucket now renders exactly once (not
+duplicated into another section), and all 3 configured channels + the DM
+still render with zero regression. **Not yet re-tested against the real
+Pi/browser** -- the previous live-test session already produced the
+exact packet needed (hash `0x6e`, "Home" vs "PD2EMC"); next step is
+simply reloading the dashboard with this fix deployed and confirming the
+"Unmapped" section now actually appears with the "Test 123"/"Another
+test" messages in it.
+
+---
+
 ## CURRENT WORKLIST v8 (2026-07-16 — supersedes v7 below; THE list to work off)
 
 Closed since v7 (full detail in the v7 section below, kept for history):
@@ -1650,7 +1711,7 @@ Upstream card links the real repo, Custom-branch is a real dropdown).
 
 | Status | Effort | Item |
 |--------|--------|------|
-| ~~Open~~ FIXED 2026-07-19, live test pending | S | ~~F2: kill silent fallback-to-channel-0 in `ChannelHashResolver.lookup()`~~ — `lookup()` now returns `None` for an unmapped hash instead of silently `0`; `server.py`'s `on_text_packet` routes it to its own `broadcast:meshtastic:unmapped:0xHH` conversation (works automatically via `get_conversations()`'s `GROUP BY node_id`, no schema change). Kept the existing warn-once-per-hash log throttle rather than literally per-packet (deliberate deviation from the original note -- the DB-visible bucket is what actually surfaces the mismatch; per-packet logging risked spam on an ongoing unmapped channel). Verified via real (non-rewritten) code: `ChannelHashResolver` exercised directly with a fake crypto object, and the exact edited `server.py` block extracted via regex and exec'd with fake packet/protocol objects -- both confirm correct behavior. Not yet seen against a real unmapped-hash packet on the mesh |
+| ~~Open~~ Backend live-verified 2026-07-19, frontend fix pending re-test | S | ~~F2: kill silent fallback-to-channel-0 in `ChannelHashResolver.lookup()`~~ — `lookup()` now returns `None` for an unmapped hash instead of silently `0`; `server.py`'s `on_text_packet` routes it to its own `broadcast:meshtastic:unmapped:0xHH` conversation. **Backend fully live-confirmed**: real test on the mesh (same PSK, "Home" vs "PD2EMC" different names) produced the exact expected log sequence -- decrypted=True, then the "Unmapped Meshtastic channel_hash=0x6e" warning. But the message was invisible in the dashboard -- traced to a SECOND bug, purely frontend: `messaging_contacts.js`'s sidebar only ever rendered configured channels + non-broadcast DMs, no path existed for "broadcast conversation not in the configured list." Fixed with a new "Unmapped" sidebar section; verified via a real V8 context with a dataset mirroring the exact live scenario (all render checks pass, zero regression to existing channels/DMs) but **not yet reloaded against the actual browser** -- the exact test packets (hash 0x6e, "Test 123"/"Another test") already exist in the DB from this session, so simply refreshing the dashboard with the fix deployed should show them now |
 | Open | S-M | **F1: 433 MT serial stick writes its channel-table INDEX into the hash byte** (`serial_source._reconstruct_raw` line ~589, `packet.get("channel")` is a slot index when the stick decrypted locally, a hash only when it couldn't) — decoder then treats it as channel_hash; will misroute the moment the 433 stick hears channel traffic. Fix: carry stick channel identity in pre_decoded (read full channel table at connect, map by NAME) |
 | Open | S | **F3: egress via serial stick passes dashboard channel index as the stick's slot index untranslated** (`tx_service.py:307` `send_text(channel_index=channel)`) — needs name-based slot translation + refusal when the stick lacks the channel |
 | Open | S | **F5-hardening: `ChannelHashResolver.rebuild()` pairs config names with `get_all_keys()` positionally** while TX pairs from `crypto._keys.items()` directly — two sources of truth that diverged in production (map 0xC9 vs TX 0x71). Rebuild should derive from `crypto._keys.items()` |
