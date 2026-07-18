@@ -1912,6 +1912,66 @@ real hardware.
 
 ---
 
+### 2026-07-20 (same day, F2 arc continued): fourth live-test bug -- conversation name regressed to raw node_id after a successful reply
+
+User live-tested the echo-hash reply feature further (sent "hoi" into
+the already-working "PD2EMC Meshtastic Tag" / keyed:2:0x6e thread) and
+reported the header/sidebar title flipped from the sender's name to
+the literal string "broadcast:meshtastic:keyed:2:0x6e" -- "before 868
+showed nice the tag name now its broadcast". Routing itself was fine
+(same thread, same key, reply sent correctly per the subtitle) -- this
+was a display-only regression.
+
+Traced to `MessageRepository.get_conversations()`
+(`message_repository.py`): `GROUP BY node_id` with a bare `node_name`
+column lets SQLite pick that value from whichever row is chronologically
+latest. `message_name_resolver.py`'s `resolve()` correctly returns ""
+for a `broadcast:` node_id with no fallback (a legitimate design choice
+-- there's no channel config to name it from), and
+`routes/messages.py`'s `send_message()` calls exactly that with no
+fallback for a sent message, so every SENT reply into one of these
+buckets saves `node_name=""`. Received messages get their name from a
+DIFFERENT path (`server.py`'s `on_text_packet` resolves the PACKET'S
+OWN SENDER's advertised NodeInfo long_name via `packet.source_id`,
+independent of the broadcast node_id) -- that's where "PD2EMC
+Meshtastic Tag" originally came from. So: as long as the latest message
+in the thread was a RECEIVED one, the name showed correctly; the
+moment a SENT reply became the newest row, the bare-column GROUP BY
+picked up its blank `node_name` instead, and the frontend's
+`convo.node_name || convo.node_id` fell back to the raw node_id. This
+was never reachable before this session, since replying into these
+buckets was either impossible (before F2) or disabled (the interim
+send-blocking fix) until the echo-hash feature made real, successful
+replies possible for the first time today.
+
+Fixed with a correlated subquery: `node_name` is now selected as
+"the latest node_name for this node_id where node_name != ''"
+independent of which row's `text`/`timestamp` supplies the
+last-message preview -- so the display name sticks to the last known
+good name instead of blanking out the moment a nameless (sent) row
+becomes newest.
+
+Verification: validated the exact SQL directly against Python's stdlib
+`sqlite3` (not a simulation -- the literal query string from the
+committed code) with a dataset mirroring the exact live scenario
+(2 received messages with the sender's name, 2 sent replies with blank
+names, sent message chronologically last) -- confirms `node_name`
+stays "PD2EMC Meshtastic Tag" while `text` still correctly shows "hoi"
+(the real latest message) as the preview. `DatabaseManager` needs
+`aiosqlite` (not installed on the Mac) to test through the real async
+wrapper, but it's a thin asyncio pass-through over the same stdlib
+sqlite3 engine with `Row` semantics identical to what was validated
+directly, so this is high-confidence, not guessed. Added
+`test_conversation_name_sticks_after_a_reply_with_no_sender_name` to
+`tests/test_message_repository.py` (same `DatabaseManager(":memory:")`
+pattern the rest of that file already uses) for CI to run for real.
+
+**Not yet live-tested** -- needs a page refresh/reload on the real
+dashboard to confirm the title shows the sender's name again after
+this fix deploys.
+
+---
+
 ## CURRENT WORKLIST v8 (2026-07-16 — supersedes v7 below; THE list to work off)
 
 Closed since v7 (full detail in the v7 section below, kept for history):

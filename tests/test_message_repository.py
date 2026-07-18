@@ -143,6 +143,35 @@ class TestMessageRepository(unittest.TestCase):
         self.assertNotIn("rssi", d)
         self.assertNotIn("snr", d)
 
+    def test_conversation_name_sticks_after_a_reply_with_no_sender_name(self):
+        # A "keyed"/"unmapped"/"named" broadcast bucket (see F1/F2 in
+        # the worklist) has no configured channel entry to fall back
+        # on -- its display name comes entirely from message history,
+        # resolved server-side to the SENDER's own advertised name
+        # (there's no "sender" to name for a message we sent, so those
+        # rows correctly save node_name=""). Before this fix, a bare
+        # GROUP BY picked node_name from whichever row happened to be
+        # newest -- so the moment a reply (blank node_name) became the
+        # latest message, the whole conversation's name regressed to
+        # the raw node_id, even though a real name was known moments
+        # earlier. The fix prefers the latest NON-BLANK node_name
+        # regardless of which row is chronologically newest.
+        node_id = "broadcast:meshtastic:keyed:2:0x6e"
+        _run(self.repo.save_received(
+            text="Test 123", node_id=node_id,
+            node_name="PD2EMC Meshtastic Tag", protocol="meshtastic",
+        ))
+        _run(self.repo.save_sent(
+            text="hoi je kanaal naam staat verkeerd", node_id=node_id,
+            node_name="", protocol="meshtastic",
+        ))
+
+        convos = _run(self.repo.get_conversations())
+
+        convo = next(c for c in convos if c.node_id == node_id)
+        self.assertEqual(convo.node_name, "PD2EMC Meshtastic Tag")
+        self.assertEqual(convo.last_message, "hoi je kanaal naam staat verkeerd")
+
     def test_broadcast_node_constants(self):
         self.assertEqual(BROADCAST_NODE_MT, "broadcast:meshtastic")
         self.assertEqual(BROADCAST_NODE_MC, "broadcast:meshcore")
