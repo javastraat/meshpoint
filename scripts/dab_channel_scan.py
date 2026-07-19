@@ -36,6 +36,7 @@ import subprocess
 import sys
 import time
 import urllib.request
+from datetime import datetime, timezone
 from typing import Optional
 
 ALL_CHANNELS = [f"{n}{letter}" for n in range(5, 13) for letter in "ABCD"] + [
@@ -107,6 +108,10 @@ def main() -> int:
         help="max seconds to wait per channel for sync + station decode (default: 30)",
     )
     parser.add_argument("--port", type=int, default=7979, help="welle-cli webserver port (default: 7979)")
+    parser.add_argument(
+        "--output", "-o", default="dab_channel_scan.json",
+        help="write scan results to this JSON file (default: dab_channel_scan.json)",
+    )
     args = parser.parse_args()
 
     if shutil.which("welle-cli") is None:
@@ -117,10 +122,12 @@ def main() -> int:
     print(f"Scanning {total} channel(s), up to {args.timeout:.0f}s each "
           f"(~{total * args.timeout / 60:.0f} min worst case)...\n")
 
+    all_results = []
     hits = []
     for i, channel in enumerate(args.channels, 1):
         print(f"[{i}/{total}] {channel} ...", end=" ", flush=True)
         result = scan_channel(channel, args.port, args.timeout)
+        all_results.append(result)
         if result["ensemble"] or result["stations"]:
             print(f"FOUND: {result['ensemble']!r} (SNR {result['snr']:.1f} dB) -- {len(result['stations'])} station(s)")
             hits.append(result)
@@ -136,6 +143,15 @@ def main() -> int:
         print(f"\n{r['channel']} -- {r['ensemble']} (SNR {r['snr']:.1f} dB)")
         for s in r["stations"]:
             print(f"    - {s}")
+
+    payload = {
+        "scanned_at": datetime.now(timezone.utc).isoformat(),
+        "timeout_seconds": args.timeout,
+        "channels": all_results,
+    }
+    with open(args.output, "w") as f:
+        json.dump(payload, f, indent=2)
+    print(f"\nResults written to {args.output}")
 
     return 0
 
