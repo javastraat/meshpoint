@@ -344,7 +344,18 @@ class DabPanel {
             : '';
         const services = status.services || [];
         if (!services.length) {
-            return rescan + '<div class="pager-log__empty">Scanning… stations appear as they decode.</div>';
+            // Still decoding -- rather than blanking to just "Scanning…",
+            // keep showing the known-from-last-scan names (disabled, no
+            // sid to act on yet) so the list doesn't visually empty out
+            // for the several seconds welle-cli needs to lock and start
+            // handing out real services; each row swaps to the live,
+            // clickable one as soon as it actually decodes.
+            const preset = status.channel ? this._channelPresets.find((c) => c.channel === status.channel) : null;
+            const presetStations = (preset && preset.stations) || [];
+            const pending = presetStations.length
+                ? `<div class="dab-stations" data-dab-stations>${presetStations.map((name) => this._pendingStationRowHtml(name)).join('')}</div>`
+                : '';
+            return rescan + '<div class="pager-log__empty">Scanning… stations appear as they decode.</div>' + pending;
         }
         return rescan + `<div class="dab-stations" data-dab-stations>${services.map((s) => this._stationRowHtml(s, status.channel)).join('')}</div>`;
     }
@@ -392,15 +403,27 @@ class DabPanel {
         catch (_e) { /* ignore */ }
     }
 
-    _isFav(channel, sid) {
-        return this._loadFavs().some((f) => f.channel === channel && f.sid === sid);
+    // A station picked from a channel's scan-preset list (not yet tuned)
+    // has no sid yet, so a favorite added from there is stored with
+    // sid: null and matched by name instead -- falls back to a name match
+    // whenever either side lacks a sid, so a favorite added before ever
+    // tuning is still recognized once decoded live (and vice versa)
+    // instead of creating a second, duplicate entry.
+    _favMatches(f, channel, sid, label) {
+        if (f.channel !== channel) return false;
+        if (sid && f.sid && f.sid === sid) return true;
+        return this._normalizeLabel(f.label) === this._normalizeLabel(label);
+    }
+
+    _isFav(channel, sid, label) {
+        return this._loadFavs().some((f) => this._favMatches(f, channel, sid, label));
     }
 
     _toggleFav({ channel, sid, label }) {
         const favs = this._loadFavs();
-        const idx = favs.findIndex((f) => f.channel === channel && f.sid === sid);
+        const idx = favs.findIndex((f) => this._favMatches(f, channel, sid, label));
         if (idx >= 0) favs.splice(idx, 1);
-        else favs.push({ channel, sid, label });
+        else favs.push({ channel, sid: sid || null, label });
         this._saveFavs(favs);
         const bar = this._root && this._root.querySelector('[data-dab-favbar]');
         if (bar) bar.innerHTML = this._renderFavBar();
@@ -425,11 +448,17 @@ class DabPanel {
     // a channel tab's own station row uses.
     _favRowHtml(f, i) {
         const esc = this._esc.bind(this);
-        const playing = this._playingSid === f.sid;
         const status = this._lastStatus;
         const live = (status && status.running && status.channel === f.channel)
-            ? (status.services || []).find((s) => s.sid === f.sid)
+            ? (status.services || []).find((s) => (
+                f.sid ? s.sid === f.sid : this._normalizeLabel(s.label) === this._normalizeLabel(f.label)
+            ))
             : null;
+        // A favorite added before ever tuning has no sid, so "is this the
+        // one currently playing" has to go through the live-resolved sid
+        // once it's found, not the (possibly still null) stored one.
+        const effectiveSid = live ? live.sid : f.sid;
+        const playing = effectiveSid != null && this._playingSid === effectiveSid;
         const label = live ? live.label : f.label;
         const dls = live ? live.dls : '';
         const text = (dls && dls !== label) ? `${f.channel} · ${label} — ${dls}` : `${f.channel} · ${label}`;
@@ -462,12 +491,14 @@ class DabPanel {
         }
         const st = this._lastStatus;
         if (st && st.running && st.channel === fav.channel) {
-            const found = (st.services || []).find((s) => s.sid === fav.sid);
-            if (found) { this._playOrStop(fav.sid); return; }
+            const found = (st.services || []).find((s) => (
+                fav.sid ? s.sid === fav.sid : this._normalizeLabel(s.label) === this._normalizeLabel(fav.label)
+            ));
+            if (found) { this._playOrStop(found.sid); return; }
             this._renderChanTabContent();
             return;
         }
-        this._pendingPlay = { channel: fav.channel, sid: fav.sid };
+        this._pendingPlay = { channel: fav.channel, sid: fav.sid, label: fav.label };
         this._pendingPlayAt = Date.now();
         await this._tune(fav.channel);
     }
@@ -782,7 +813,7 @@ class DabPanel {
     _stationRowHtml(s, channel) {
         const esc = this._esc.bind(this);
         const playing = this._playingSid === s.sid;
-        const isFav = this._isFav(channel, s.sid);
+        const isFav = this._isFav(channel, s.sid, s.label);
         const text = (s.dls && s.dls !== s.label) ? `${s.label} — ${s.dls}` : s.label;
         return `
             <div class="dab-station-row">
@@ -800,18 +831,40 @@ class DabPanel {
     }
 
     // A station known from the last scan, on a channel not currently
-    // tuned -- no sid available yet (welle-cli only hands those out once
-    // actually decoding), so no star/Stop state here, just a Play button
-    // that tunes in and auto-plays this station by name once it decodes.
+    // tuned -- no sid available yet (welle-cli only hands one out once
+    // actually decoding), so the star here stores/matches by name instead
+    // (see _favMatches); Play has no Stop state to reflect since nothing
+    // on this channel can be playing yet.
     _presetStationRowHtml(name, channel) {
         const esc = this._esc.bind(this);
+        const isFav = this._isFav(channel, null, name);
         return `
             <div class="dab-station-row">
+                <span class="lsn-fav${isFav ? ' on' : ''}" data-dab-favtoggle title="Favorite"
+                      data-dab-channel="${esc(channel)}" data-dab-sid="" data-dab-label="${esc(name)}">
+                    ${isFav ? '★' : '☆'}
+                </span>
                 <span class="lsn-station__scroll dab-station-row__text">
                     <span class="lsn-station__text" data-dab-scrolltext>${esc(name)}</span>
                 </span>
                 <button type="button" class="terminal-button"
                         data-dab-preset-play="${esc(name)}" data-dab-preset-channel="${esc(channel)}">Play</button>
+            </div>
+        `;
+    }
+
+    // A known-from-last-scan station shown while the channel is tuned but
+    // welle-cli hasn't decoded it (back) yet -- purely a placeholder, so
+    // no star/Play interactivity, just a dimmed row that gets replaced by
+    // the real, clickable one once it actually decodes.
+    _pendingStationRowHtml(name) {
+        const esc = this._esc.bind(this);
+        return `
+            <div class="dab-station-row dab-station-row--pending">
+                <span class="lsn-station__scroll dab-station-row__text">
+                    <span class="lsn-station__text" data-dab-scrolltext>${esc(name)}</span>
+                </span>
+                <button type="button" class="terminal-button" disabled>Play</button>
             </div>
         `;
     }
@@ -825,7 +878,7 @@ class DabPanel {
                 btn.classList.toggle('dab-station-row__playing', playing);
             });
             el.querySelectorAll('[data-dab-favtoggle]').forEach((star) => {
-                const isFav = this._isFav(star.dataset.dabChannel, star.dataset.dabSid);
+                const isFav = this._isFav(star.dataset.dabChannel, star.dataset.dabSid, star.dataset.dabLabel);
                 star.textContent = isFav ? '★' : '☆';
                 star.classList.toggle('on', isFav);
             });
@@ -835,9 +888,17 @@ class DabPanel {
         // data-dab-play), so it needs its own pass.
         const favBar = this._root && this._root.querySelector('[data-dab-favbar]');
         if (favBar) {
+            const status = this._lastStatus;
             favBar.querySelectorAll('[data-dab-fav-play]').forEach((btn) => {
                 const fav = this._loadFavs()[parseInt(btn.dataset.dabFavPlay, 10)];
-                const playing = !!fav && this._playingSid === fav.sid;
+                if (!fav) return;
+                const live = (status && status.running && status.channel === fav.channel)
+                    ? (status.services || []).find((s) => (
+                        fav.sid ? s.sid === fav.sid : this._normalizeLabel(s.label) === this._normalizeLabel(fav.label)
+                    ))
+                    : null;
+                const effectiveSid = live ? live.sid : fav.sid;
+                const playing = effectiveSid != null && this._playingSid === effectiveSid;
                 btn.textContent = playing ? 'Stop' : 'Play';
                 btn.classList.toggle('dab-station-row__playing', playing);
             });

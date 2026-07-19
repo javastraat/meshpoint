@@ -969,6 +969,13 @@
     color: var(--accent-green, #00e5a0);
 }
 
+/* Known-from-last-scan station shown while welle-cli is still decoding --
+   a placeholder, not yet actionable, so it reads as "coming soon" rather
+   than a real, clickable row. */
+.dab-station-row--pending {
+    opacity: 0.5;
+}
+
 /* ── DAB+ Config tab ──────────────────────────────────── */
 
 .dabcfg-header {
