@@ -19,6 +19,13 @@ Usage:
     python3 scripts/dab_channel_scan.py --channels 12C 11C 9C
     python3 scripts/dab_channel_scan.py --timeout 45     # slower/weaker antenna
 
+Results merge into --output by default: rerunning against a single channel
+(or any subset) only updates those channels' entries in the existing JSON
+file, leaving every other previously-scanned channel untouched -- so a
+full station list can be built up across several smaller runs instead of
+one long one. Pass --new to discard whatever's already in --output and
+start from a clean file instead.
+
 A "nothing" result on a full scan isn't always definitive: back-to-back
 channel switches can occasionally leave welle-cli unable to reopen the
 dongle in time even with the gap between channels, producing a false
@@ -59,6 +66,15 @@ ENSEMBLE_LABEL_OVERRIDES = {"DAB+": "Commercial"}
 # Surface a placeholder that makes it obvious a name still needs to be set,
 # rather than showing the redundant channel code as if it were a real name.
 NO_LABEL_PLACEHOLDER = "{channel} (no name broadcast -- set label in config)"
+
+
+def channel_sort_key(channel: str) -> int:
+    """Sort by raster position (5A, 5B, ... 13F) instead of plain string order,
+    where e.g. "10A" would otherwise sort before "5A". Unknown codes sort last."""
+    try:
+        return ALL_CHANNELS.index(channel)
+    except ValueError:
+        return len(ALL_CHANNELS)
 
 
 def strip_channel_code(label: str, channel: str) -> str:
@@ -143,7 +159,12 @@ def main() -> int:
     parser.add_argument("--port", type=int, default=7979, help="welle-cli webserver port (default: 7979)")
     parser.add_argument(
         "--output", "-o", default="/opt/meshpoint/config/dab_channel_scan.json",
-        help="write scan results to this JSON file (default: /opt/meshpoint/config/dab_channel_scan.json)",
+        help="write scan results to this JSON file, merging into it by default (default: "
+             "/opt/meshpoint/config/dab_channel_scan.json)",
+    )
+    parser.add_argument(
+        "--new", action="store_true",
+        help="discard whatever's already in --output instead of merging into it",
     )
     args = parser.parse_args()
 
@@ -155,11 +176,13 @@ def main() -> int:
     print(f"Scanning {total} channel(s), up to {args.timeout:.0f}s each "
           f"(~{total * args.timeout / 60:.0f} min worst case)...\n")
 
+    scan_time = datetime.now(timezone.utc).isoformat()
     all_results = []
     hits = []
     for i, channel in enumerate(args.channels, 1):
         print(f"[{i}/{total}] {channel} ...", end=" ", flush=True)
         result = scan_channel(channel, args.port, args.timeout)
+        result["scanned_at"] = scan_time
         all_results.append(result)
         if result["ensemble"] or result["stations"]:
             print(f"FOUND: {result['ensemble']!r} (SNR {result['snr']:.1f} dB) -- {len(result['stations'])} station(s)")
@@ -177,17 +200,34 @@ def main() -> int:
         for s in r["stations"]:
             print(f"    - {s}")
 
+    merged_by_channel = {}
+    if not args.new and os.path.exists(args.output):
+        try:
+            with open(args.output) as f:
+                existing = json.load(f)
+            for c in existing.get("channels", []):
+                merged_by_channel[c["channel"]] = c
+        except (OSError, ValueError, KeyError) as e:
+            print(f"Warning: couldn't read existing {args.output} ({e}) -- starting fresh", file=sys.stderr)
+    for r in all_results:
+        merged_by_channel[r["channel"]] = r
+    merged_channels = sorted(merged_by_channel.values(), key=lambda r: channel_sort_key(r["channel"]))
+
     payload = {
-        "scanned_at": datetime.now(timezone.utc).isoformat(),
+        "last_run_at": scan_time,
         "timeout_seconds": args.timeout,
-        "channels": all_results,
+        "channels": merged_channels,
     }
     output_dir = os.path.dirname(args.output)
     if output_dir:
         os.makedirs(output_dir, exist_ok=True)
     with open(args.output, "w") as f:
         json.dump(payload, f, indent=2)
-    print(f"\nResults written to {args.output}")
+    if len(merged_channels) > len(all_results):
+        print(f"\nResults merged into {args.output} ({len(merged_channels)} channels total, "
+              f"{len(all_results)} scanned this run)")
+    else:
+        print(f"\nResults written to {args.output}")
 
     return 0
 
