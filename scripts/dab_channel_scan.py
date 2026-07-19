@@ -46,6 +46,12 @@ ALL_CHANNELS = [f"{n}{letter}" for n in range(5, 13) for letter in "ABCD"] + [
 POLL_INTERVAL_SECONDS = 2.0
 DEVICE_SETTLE_SECONDS = 1.5
 
+# Some ensembles broadcast a generic label instead of a real name (seen on
+# 11C, the Dutch commercial-radio multiplex, which identifies itself as
+# literally "DAB+") -- override with something actually useful for picking
+# a channel from the results.
+ENSEMBLE_LABEL_OVERRIDES = {"DAB+": "Commercial"}
+
 
 def fetch_mux_json(port: int) -> Optional[dict]:
     try:
@@ -94,6 +100,8 @@ def scan_channel(channel: str, port: int, timeout: float) -> dict:
             proc.kill()
             proc.wait()
         time.sleep(DEVICE_SETTLE_SECONDS)  # let the dongle release before the next channel
+    if result["ensemble"] in ENSEMBLE_LABEL_OVERRIDES:
+        result["ensemble"] = ENSEMBLE_LABEL_OVERRIDES[result["ensemble"]]
     return result
 
 
