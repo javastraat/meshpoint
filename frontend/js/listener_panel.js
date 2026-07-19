@@ -417,6 +417,10 @@ class ListenerPanel {
         // Exposed so SidebarTelemetryRail's mini-player can show/control
         // DAB+ playback too -- mirrors window.listenerPanel below.
         if (this._dabPanel) window.dabPanel = this._dabPanel;
+        // Read-only tab over scripts/dab_channel_scan.py's JSON output --
+        // doesn't touch the dongle, so it isn't part of the exclusivity
+        // dance the other five tabs do.
+        this._dabConfigPanel = window.DabConfigPanel ? new window.DabConfigPanel() : null;
     }
 
     _loadFavs() {
@@ -470,6 +474,7 @@ class ListenerPanel {
         if (this._pocsagPanel) this._pocsagPanel.hide();
         if (this._rtl433Panel) this._rtl433Panel.hide();
         if (this._dabPanel) this._dabPanel.hide();
+        if (this._dabConfigPanel) this._dabConfigPanel.hide();
     }
 
     _showActiveTab() {
@@ -483,6 +488,8 @@ class ListenerPanel {
             this._rtl433Panel.show();
         } else if (this._activeTab === 'dab' && this._dabPanel) {
             this._dabPanel.show();
+        } else if (this._activeTab === 'dabconfig' && this._dabConfigPanel) {
+            this._dabConfigPanel.show();
         } else {
             this._refreshStatus();
             this._statusTimer = setInterval(() => this._refreshStatus(), 500);
@@ -498,6 +505,7 @@ class ListenerPanel {
         if (this._activeTab === 'pocsag' && this._pocsagPanel) this._pocsagPanel.hide();
         if (this._activeTab === 'rtl433' && this._rtl433Panel) this._rtl433Panel.hide();
         if (this._activeTab === 'dab' && this._dabPanel) this._dabPanel.hide();
+        if (this._activeTab === 'dabconfig' && this._dabConfigPanel) this._dabConfigPanel.hide();
 
         this._activeTab = tab;
         const root = document.getElementById('listener-panel');
@@ -527,6 +535,7 @@ class ListenerPanel {
                 <button type="button" class="lsn-tabbar__btn" data-tab="pagers">Pagers</button>
                 <button type="button" class="lsn-tabbar__btn" data-tab="pocsag">POCSAG</button>
                 <button type="button" class="lsn-tabbar__btn" data-tab="rtl433">RTL433</button>
+                <button type="button" class="lsn-tabbar__btn" data-tab="dabconfig">DAB+ Config</button>
             </div>
 
             <div class="lsn-tab-content" data-tab="radio">
@@ -618,6 +627,7 @@ class ListenerPanel {
             <div class="lsn-tab-content" data-tab="pagers" style="display:none" id="lsn-tab-pagers"></div>
             <div class="lsn-tab-content" data-tab="pocsag" style="display:none" id="lsn-tab-pocsag"></div>
             <div class="lsn-tab-content" data-tab="rtl433" style="display:none" id="lsn-tab-rtl433"></div>
+            <div class="lsn-tab-content" data-tab="dabconfig" style="display:none" id="lsn-tab-dabconfig"></div>
         `;
 
         if (this._dabPanel) this._dabPanel.mount(root.querySelector('#lsn-tab-dab'));
@@ -625,6 +635,7 @@ class ListenerPanel {
         if (this._pagersPanel) this._pagersPanel.mount(root.querySelector('#lsn-tab-pagers'));
         if (this._pocsagPanel) this._pocsagPanel.mount(root.querySelector('#lsn-tab-pocsag'));
         if (this._rtl433Panel) this._rtl433Panel.mount(root.querySelector('#lsn-tab-rtl433'));
+        if (this._dabConfigPanel) this._dabConfigPanel.mount(root.querySelector('#lsn-tab-dabconfig'));
 
         root.querySelector('#lsn-tabbar').addEventListener('click', (ev) => {
             const btn = ev.target.closest('[data-tab]');

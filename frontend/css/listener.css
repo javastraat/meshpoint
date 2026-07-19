@@ -962,3 +962,103 @@
     color: var(--accent-green, #00e5a0);
 }
 
+/* ── DAB+ Config tab ──────────────────────────────────── */
+
+.dabcfg-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.dabcfg-hint {
+    color: rgba(243, 244, 246, 0.5);
+    font-size: 12.5px;
+    margin-bottom: 14px;
+    line-height: 1.5;
+}
+
+.dabcfg-hint code {
+    background: rgba(255, 255, 255, 0.06);
+    padding: 1px 5px;
+    border-radius: 4px;
+}
+
+.dabcfg-empty {
+    color: rgba(243, 244, 246, 0.45);
+    padding: 12px 0;
+}
+
+.dabcfg-meta {
+    color: rgba(243, 244, 246, 0.4);
+    font-size: 12px;
+    margin-bottom: 10px;
+}
+
+.dabcfg-row {
+    padding: 10px;
+    border: 1px solid rgba(243, 244, 246, 0.08);
+    border-radius: 6px;
+    margin-bottom: 8px;
+}
+
+.dabcfg-row__top {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.dabcfg-row__chan {
+    font-family: var(--font-mono, monospace);
+    color: #34d399;
+    flex-shrink: 0;
+    width: 3em;
+}
+
+.dabcfg-row__name {
+    flex: 1;
+    min-width: 10em;
+    font-size: 13px;
+}
+
+.dabcfg-row__input {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(243, 244, 246, 0.15);
+    border-radius: 4px;
+    color: #f3f4f6;
+    padding: 4px 8px;
+    font-size: 13px;
+}
+
+.dabcfg-row__badge {
+    color: rgba(243, 244, 246, 0.4);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border: 1px solid rgba(243, 244, 246, 0.2);
+    border-radius: 3px;
+    padding: 1px 4px;
+}
+
+.dabcfg-row__meta {
+    color: rgba(243, 244, 246, 0.4);
+    font-size: 11.5px;
+    flex-shrink: 0;
+}
+
+.dabcfg-row__actions {
+    flex-shrink: 0;
+    display: flex;
+    gap: 6px;
+}
+
+.dabcfg-row__stations {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(243, 244, 246, 0.06);
+    color: rgba(243, 244, 246, 0.5);
+    font-size: 12px;
+    line-height: 1.5;
+}
+

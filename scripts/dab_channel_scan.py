@@ -94,13 +94,19 @@ def merge_channel_result(existing: Optional[dict], new: dict) -> dict:
     for s in new["stations"]:
         if s not in merged_stations:
             merged_stations.append(s)
-    return {
+    # Start from a copy of the existing entry so any extra field the
+    # dashboard's DAB+ Config tab may have added (e.g. a user-set
+    # "custom_name" override) survives a rescan instead of being dropped
+    # by rebuilding the dict from only the fields this script knows about.
+    merged = dict(existing)
+    merged.update({
         "channel": new["channel"],
         "ensemble": new["ensemble"] or existing.get("ensemble", ""),
         "snr": new["snr"],
         "stations": merged_stations,
         "scanned_at": new["scanned_at"],
-    }
+    })
+    return merged
 
 
 def strip_channel_code(label: str, channel: str) -> str:

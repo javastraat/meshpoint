@@ -189,6 +189,8 @@ Only one of Radio / P2000 / Pagers / POCSAG / RTL433 / DAB+ may hold the RTL-SDR
 | POST | `/api/dab/tune` | Admin | Tune to a DAB+ channel/ensemble (e.g. `12C`) |
 | POST | `/api/dab/stop` | Admin | Stop the DAB+ listener |
 | GET | `/api/dab/stream/{sid}` | Viewer | Live MP3 audio stream for one DAB+ station, proxied from welle-cli |
+| GET | `/api/dab/scan-results` | Viewer | Channels found by `scripts/dab_channel_scan.py`, read from its JSON output |
+| PUT | `/api/dab/scan-results/{channel}/name` | Admin | Set (or, with an empty string, clear) a custom display name for a scanned channel |
 
 ---
 
