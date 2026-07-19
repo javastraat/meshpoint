@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -51,6 +52,19 @@ DEVICE_SETTLE_SECONDS = 1.5
 # literally "DAB+") -- override with something actually useful for picking
 # a channel from the results.
 ENSEMBLE_LABEL_OVERRIDES = {"DAB+": "Commercial"}
+
+
+def strip_channel_code(label: str, channel: str) -> str:
+    """Remove a redundant channel-code token from a decoded ensemble label.
+
+    Some ensembles bake their own channel code into the label (e.g. "8B
+    N-H / Flevo" on channel 8B) -- redundant since the channel is already
+    known, so strip it plus whatever separator punctuation is left dangling.
+    """
+    cleaned = re.sub(rf"\b{re.escape(channel)}\b", "", label, flags=re.IGNORECASE)
+    cleaned = re.sub(r"^[\s/\-·,]+|[\s/\-·,]+$", "", cleaned)
+    cleaned = re.sub(r"\s{2,}", " ", cleaned).strip()
+    return cleaned or label
 
 
 def fetch_mux_json(port: int) -> Optional[dict]:
@@ -100,6 +114,8 @@ def scan_channel(channel: str, port: int, timeout: float) -> dict:
             proc.kill()
             proc.wait()
         time.sleep(DEVICE_SETTLE_SECONDS)  # let the dongle release before the next channel
+    if result["ensemble"]:
+        result["ensemble"] = strip_channel_code(result["ensemble"], channel)
     if result["ensemble"] in ENSEMBLE_LABEL_OVERRIDES:
         result["ensemble"] = ENSEMBLE_LABEL_OVERRIDES[result["ensemble"]]
     return result
