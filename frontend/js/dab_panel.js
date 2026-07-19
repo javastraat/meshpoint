@@ -139,7 +139,13 @@ class DabPanel {
             if (favPlayBtn) {
                 const fav = this._loadFavs()[parseInt(favPlayBtn.dataset.dabFavPlay, 10)];
                 if (fav) {
-                    if (this._playingSid === fav.sid) this._playOrStop(fav.sid);
+                    const effectiveSid = this._favEffectiveSid(fav);
+                    // effectiveSid can be null for a favorite added straight
+                    // from the preset list (no sid decoded yet this
+                    // session) -- null always means "not playing", never
+                    // "playing nothing", so it must never match
+                    // this._playingSid's own null/idle state below.
+                    if (effectiveSid != null && this._playingSid === effectiveSid) this._playOrStop(effectiveSid);
                     else this._playFavorite(fav);
                 }
                 return;
@@ -419,6 +425,29 @@ class DabPanel {
         return this._loadFavs().some((f) => this._favMatches(f, channel, sid, label));
     }
 
+    // Resolves a favorite's live service entry, if its channel is the one
+    // currently tuned and welle-cli has decoded it -- matches by sid when
+    // known, else by name (a favorite added from the preset list before
+    // ever tuning starts life with sid: null).
+    _favLiveService(fav) {
+        const status = this._lastStatus;
+        if (!status || !status.running || status.channel !== fav.channel) return null;
+        return (status.services || []).find((s) => (
+            fav.sid ? s.sid === fav.sid : this._normalizeLabel(s.label) === this._normalizeLabel(fav.label)
+        )) || null;
+    }
+
+    // The sid to actually act on for this favorite right now: the live-
+    // decoded one if its channel is tuned and it's shown up, else
+    // whatever was stored (a real sid for an older favorite, or null for
+    // one added straight from the preset list and not yet decoded this
+    // session -- callers must treat null as "not currently playing",
+    // never compare it directly against this._playingSid's own idle null).
+    _favEffectiveSid(fav) {
+        const live = this._favLiveService(fav);
+        return live ? live.sid : fav.sid;
+    }
+
     _toggleFav({ channel, sid, label }) {
         const favs = this._loadFavs();
         const idx = favs.findIndex((f) => this._favMatches(f, channel, sid, label));
@@ -448,12 +477,7 @@ class DabPanel {
     // a channel tab's own station row uses.
     _favRowHtml(f, i) {
         const esc = this._esc.bind(this);
-        const status = this._lastStatus;
-        const live = (status && status.running && status.channel === f.channel)
-            ? (status.services || []).find((s) => (
-                f.sid ? s.sid === f.sid : this._normalizeLabel(s.label) === this._normalizeLabel(f.label)
-            ))
-            : null;
+        const live = this._favLiveService(f);
         // A favorite added before ever tuning has no sid, so "is this the
         // one currently playing" has to go through the live-resolved sid
         // once it's found, not the (possibly still null) stored one.
@@ -491,9 +515,7 @@ class DabPanel {
         }
         const st = this._lastStatus;
         if (st && st.running && st.channel === fav.channel) {
-            const found = (st.services || []).find((s) => (
-                fav.sid ? s.sid === fav.sid : this._normalizeLabel(s.label) === this._normalizeLabel(fav.label)
-            ));
+            const found = this._favLiveService(fav);
             if (found) { this._playOrStop(found.sid); return; }
             this._renderChanTabContent();
             return;
@@ -888,16 +910,10 @@ class DabPanel {
         // data-dab-play), so it needs its own pass.
         const favBar = this._root && this._root.querySelector('[data-dab-favbar]');
         if (favBar) {
-            const status = this._lastStatus;
             favBar.querySelectorAll('[data-dab-fav-play]').forEach((btn) => {
                 const fav = this._loadFavs()[parseInt(btn.dataset.dabFavPlay, 10)];
                 if (!fav) return;
-                const live = (status && status.running && status.channel === fav.channel)
-                    ? (status.services || []).find((s) => (
-                        fav.sid ? s.sid === fav.sid : this._normalizeLabel(s.label) === this._normalizeLabel(fav.label)
-                    ))
-                    : null;
-                const effectiveSid = live ? live.sid : fav.sid;
+                const effectiveSid = this._favEffectiveSid(fav);
                 const playing = effectiveSid != null && this._playingSid === effectiveSid;
                 btn.textContent = playing ? 'Stop' : 'Play';
                 btn.classList.toggle('dab-station-row__playing', playing);
