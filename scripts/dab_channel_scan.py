@@ -226,6 +226,7 @@ def main() -> int:
     scan_time = datetime.now(timezone.utc).isoformat()
     all_results = []
     hits = []
+    channel_summary = []
     for i, channel in enumerate(args.channels, 1):
         print(f"[{i}/{total}] {channel} ...", end=" ", flush=True)
         result = scan_channel(channel, args.port, args.timeout)
@@ -239,10 +240,15 @@ def main() -> int:
         previous = merged_by_channel.get(channel)
         merged = merge_channel_result(previous, result)
         merged_by_channel[channel] = merged
-        if result["ensemble"] or result["stations"]:
-            total_count = len(merged["stations"])
-            previous_stations = previous.get("stations", []) if previous else []
-            new_count = sum(1 for s in result["stations"] if s not in previous_stations)
+        found = bool(result["ensemble"] or result["stations"])
+        previous_stations = previous.get("stations", []) if previous else []
+        new_count = sum(1 for s in result["stations"] if s not in previous_stations) if found else 0
+        total_count = len(merged["stations"]) if found else 0
+        channel_summary.append({
+            "channel": channel, "ensemble": merged["ensemble"], "snr": result["snr"],
+            "found": found, "new": new_count, "total": total_count,
+        })
+        if found:
             if new_count == total_count:
                 print(f"FOUND: {result['ensemble']!r} (SNR {result['snr']:.1f} dB) -- {total_count} station(s)")
             else:
@@ -274,11 +280,26 @@ def main() -> int:
         os.makedirs(output_dir, exist_ok=True)
     with open(args.output, "w") as f:
         json.dump(payload, f, indent=2)
+    print("\n" + "=" * 60)
+    print("Summary:")
+    print("=" * 60)
+    for s in channel_summary:
+        if s["found"]:
+            new_note = f", {s['new']} new" if s["new"] != s["total"] else " (all new)"
+            print(f"  {s['channel']:<5} {s['ensemble']:<32} {s['total']:>3} on file{new_note}  (SNR {s['snr']:.1f} dB)")
+        else:
+            print(f"  {s['channel']:<5} nothing")
+    found_channels = sum(1 for s in channel_summary if s["found"])
+    total_new = sum(s["new"] for s in channel_summary)
+    total_on_file = sum(s["total"] for s in channel_summary)
+    print(f"\n{found_channels}/{total} channel(s) scanned this run found content: "
+          f"{total_new} new station(s), {total_on_file} total on file across those channels.")
+
     if len(merged_channels) > len(all_results):
-        print(f"\nResults merged into {args.output} ({len(merged_channels)} channels total, "
+        print(f"Results merged into {args.output} ({len(merged_channels)} channels total on file, "
               f"{len(all_results)} scanned this run)")
     else:
-        print(f"\nResults written to {args.output}")
+        print(f"Results written to {args.output}")
 
     return 0
 
