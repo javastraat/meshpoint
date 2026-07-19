@@ -77,6 +77,32 @@ def channel_sort_key(channel: str) -> int:
         return len(ALL_CHANNELS)
 
 
+def merge_channel_result(existing: Optional[dict], new: dict) -> dict:
+    """Combine a freshly scanned channel result with whatever's already on
+    file for it, additively -- a rescan should only ever add information
+    (new stations decoded, a channel that previously failed now locking),
+    never silently drop something already confirmed. A "nothing" rescan
+    (transient dongle hiccup, or the scan exiting early once it has *a*
+    station rather than waiting for all of them) leaves the existing entry
+    untouched instead of overwriting known-good data with a thinner result.
+    """
+    if existing is None:
+        return new
+    if not new["ensemble"] and not new["stations"]:
+        return existing
+    merged_stations = list(existing.get("stations", []))
+    for s in new["stations"]:
+        if s not in merged_stations:
+            merged_stations.append(s)
+    return {
+        "channel": new["channel"],
+        "ensemble": new["ensemble"] or existing.get("ensemble", ""),
+        "snr": new["snr"],
+        "stations": merged_stations,
+        "scanned_at": new["scanned_at"],
+    }
+
+
 def strip_channel_code(label: str, channel: str) -> str:
     """Remove a redundant channel-code token from a decoded ensemble label.
 
@@ -210,7 +236,7 @@ def main() -> int:
         except (OSError, ValueError, KeyError) as e:
             print(f"Warning: couldn't read existing {args.output} ({e}) -- starting fresh", file=sys.stderr)
     for r in all_results:
-        merged_by_channel[r["channel"]] = r
+        merged_by_channel[r["channel"]] = merge_channel_result(merged_by_channel.get(r["channel"]), r)
     merged_channels = sorted(merged_by_channel.values(), key=lambda r: channel_sort_key(r["channel"]))
 
     payload = {
