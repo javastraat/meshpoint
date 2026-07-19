@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -141,8 +142,8 @@ def main() -> int:
     )
     parser.add_argument("--port", type=int, default=7979, help="welle-cli webserver port (default: 7979)")
     parser.add_argument(
-        "--output", "-o", default="dab_channel_scan.json",
-        help="write scan results to this JSON file (default: dab_channel_scan.json)",
+        "--output", "-o", default="/opt/meshpoint/config/dab_channel_scan.json",
+        help="write scan results to this JSON file (default: /opt/meshpoint/config/dab_channel_scan.json)",
     )
     args = parser.parse_args()
 
@@ -181,6 +182,9 @@ def main() -> int:
         "timeout_seconds": args.timeout,
         "channels": all_results,
     }
+    output_dir = os.path.dirname(args.output)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
     with open(args.output, "w") as f:
         json.dump(payload, f, indent=2)
     print(f"\nResults written to {args.output}")
