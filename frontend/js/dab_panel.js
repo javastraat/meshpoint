@@ -110,6 +110,7 @@ class DabPanel {
                     </div>
                     <div class="panel__body">
                         <div class="lsn-tabbar dab-chantabs" data-dab-chantabs>${this._chanTabsHtml()}</div>
+                        <div class="dab-chanhint" data-dab-chanhint style="display:none"></div>
                         <div class="dab-chantab-content" data-dab-chantab-content></div>
                     </div>
                 </div>
@@ -182,26 +183,39 @@ class DabPanel {
         `;
     }
 
-    // Fetches once per mount (scan results only change when someone runs
-    // scripts/dab_channel_scan.py on the device, not continuously, so no
-    // polling here -- same reasoning as the DAB+ Config tab). A missing
-    // or unreadable scan-results file just means no channel tabs beyond
-    // Favorites/Manual, not an error shown to the user.
+    // Re-fetched on mount AND every time this tab becomes active (show())
+    // -- not continuous polling, but not a one-shot either, so a scan run
+    // on the device after the page was first loaded shows up next time
+    // this tab is opened instead of being stuck at whatever was true at
+    // mount time. A missing/unreadable scan-results file, or one with no
+    // channels yet, surfaces a clear hint telling the operator to scan.
     async _loadChannelPresets() {
+        let hint = '';
         try {
             const res = await fetch('/api/dab/scan-results');
-            if (!res.ok) { this._channelPresets = []; }
-            else {
+            if (!res.ok) {
+                this._channelPresets = [];
+                hint = 'No preset channels found — run scripts/dab_channel_scan.py on the device, then reopen this tab.';
+            } else {
                 const data = await res.json();
                 this._channelPresets = (data.channels || [])
                     .filter((c) => c.ensemble || (c.stations || []).length)
                     .map((c) => ({ channel: c.channel, name: c.custom_name || c.ensemble || c.channel }));
+                if (!this._channelPresets.length) {
+                    hint = 'No preset channels found — run scripts/dab_channel_scan.py on the device, then reopen this tab.';
+                }
             }
         } catch (_e) {
             this._channelPresets = [];
+            hint = 'No preset channels found — run scripts/dab_channel_scan.py on the device, then reopen this tab.';
         }
         const bar = this._root && this._root.querySelector('[data-dab-chantabs]');
         if (bar) bar.innerHTML = this._chanTabsHtml();
+        const hintEl = this._root && this._root.querySelector('[data-dab-chanhint]');
+        if (hintEl) {
+            hintEl.textContent = hint;
+            hintEl.style.display = hint ? '' : 'none';
+        }
     }
 
     /** Switch which sub-tab is shown -- a pure view switch, no tuning side
@@ -435,6 +449,7 @@ class DabPanel {
 
     show() {
         this._refresh();
+        this._loadChannelPresets();
         this._statusTimer = setInterval(() => this._refresh(), 2000);
     }
 

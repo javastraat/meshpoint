@@ -942,6 +942,12 @@
     margin-bottom: 8px;
 }
 
+.dab-chanhint {
+    color: rgba(243, 244, 246, 0.45);
+    font-size: 12px;
+    padding: 8px 0 0;
+}
+
 .dab-station-row {
     display: flex;
     align-items: center;
