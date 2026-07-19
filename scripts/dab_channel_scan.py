@@ -53,6 +53,12 @@ DEVICE_SETTLE_SECONDS = 1.5
 # a channel from the results.
 ENSEMBLE_LABEL_OVERRIDES = {"DAB+": "Commercial"}
 
+# Some ensembles broadcast no real name at all -- just their own channel
+# code (e.g. 9C's ensemble label decodes as literally "9C", nothing else).
+# Surface a placeholder that makes it obvious a name still needs to be set,
+# rather than showing the redundant channel code as if it were a real name.
+NO_LABEL_PLACEHOLDER = "{channel} (no name broadcast -- set label in config)"
+
 
 def strip_channel_code(label: str, channel: str) -> str:
     """Remove a redundant channel-code token from a decoded ensemble label.
@@ -60,11 +66,13 @@ def strip_channel_code(label: str, channel: str) -> str:
     Some ensembles bake their own channel code into the label (e.g. "8B
     N-H / Flevo" on channel 8B) -- redundant since the channel is already
     known, so strip it plus whatever separator punctuation is left dangling.
+    If nothing is left over (the label WAS just the channel code), fall
+    back to NO_LABEL_PLACEHOLDER instead of the now-empty/redundant string.
     """
     cleaned = re.sub(rf"\b{re.escape(channel)}\b", "", label, flags=re.IGNORECASE)
     cleaned = re.sub(r"^[\s/\-·,]+|[\s/\-·,]+$", "", cleaned)
     cleaned = re.sub(r"\s{2,}", " ", cleaned).strip()
-    return cleaned or label
+    return cleaned or NO_LABEL_PLACEHOLDER.format(channel=channel)
 
 
 def fetch_mux_json(port: int) -> Optional[dict]:
