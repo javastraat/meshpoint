@@ -11,20 +11,6 @@ const _DAB_DONGLE_OWNER_LABELS = {
     radio: 'Radio', p2000: 'P2000', pagers: 'Pagers', pocsag: 'POCSAG', rtl433: 'RTL433', dab: 'DAB+',
 };
 
-// NL DAB+ ensembles for an Amsterdam-area antenna. All 5 confirmed live
-// via scripts/dab_channel_scan.py's real full-channel scan on this exact
-// antenna (2026-07-13) -- labels reflect the actual decoded station
-// rosters, not guesses from another city's scanner data. 6C (Radio
-// SALTO/FunX Amsterdam) was tried and dropped after decoding nothing
-// here; use the manual channel dropdown below for anything else.
-const DAB_CHANNEL_PRESETS = [
-    { channel: '12C', name: 'NPO', label: '12C · NPO (Radio 1/2/3FM/Klassiek/FunX…)' },
-    { channel: '11C', name: 'Commercial', label: '11C · Commercial (SLAM!, 538, Qmusic, Sky, Radio 10…)' },
-    { channel: '9C', name: 'Throwback', label: '9C · Throwback/hits (Sublime, KINK, Qmusic Foute Uur…)' },
-    { channel: '7D', name: 'MTVNL', label: '7D · MTVNL (KINK Distortion, ArrowClassicRock, Veronica 90s…)' },
-    { channel: '8B', name: 'NH/Flevo', label: '8B · Noord-Holland/Flevo (NH, Omroep Flevoland, SLAM!…)' },
-];
-
 // Full Band III DAB channel raster (5A-13F, 38 channels; ETSI EN 300 401)
 // for the manual channel dropdown, alongside the curated presets above --
 // L-Band (LA-LW) isn't offered since the Netherlands doesn't use it.
@@ -49,6 +35,13 @@ class DabPanel {
         // channel code. Starts on Favorites so there's something useful
         // to see immediately rather than an empty tab needing a click.
         this._activeChannelTab = 'favorites';
+        // Channel tabs between Favorites and Manual -- loaded from
+        // scripts/dab_channel_scan.py's JSON output (GET /api/dab/scan-
+        // results) instead of a hardcoded list, so they reflect whatever
+        // this antenna actually found rather than one location's presets.
+        // { channel, name } per entry; name is the DAB+ Config tab's
+        // custom_name override when set, else the scanned ensemble label.
+        this._channelPresets = [];
         // A favorite tune-and-play jumps to a channel that may not be the
         // one currently running, then has to wait for that specific
         // station's sid to show up in the progressively-decoded services
@@ -116,13 +109,7 @@ class DabPanel {
                         <button type="button" class="terminal-button" data-dab-stop>Stop</button>
                     </div>
                     <div class="panel__body">
-                        <div class="lsn-tabbar dab-chantabs" data-dab-chantabs>
-                            <button type="button" class="lsn-tabbar__btn lsn-tabbar__btn--active" data-chantab="favorites">★ Favorites</button>
-                            ${DAB_CHANNEL_PRESETS.map((c) => `
-                                <button type="button" class="lsn-tabbar__btn" data-chantab="${c.channel}" title="${c.channel} — ${c.label}">${c.name}</button>
-                            `).join('')}
-                            <button type="button" class="lsn-tabbar__btn" data-chantab="manual">Manual…</button>
-                        </div>
+                        <div class="lsn-tabbar dab-chantabs" data-dab-chantabs>${this._chanTabsHtml()}</div>
                         <div class="dab-chantab-content" data-dab-chantab-content></div>
                     </div>
                 </div>
@@ -176,6 +163,45 @@ class DabPanel {
             if (playBtn) { this._pendingPlay = null; this._playOrStop(playBtn.dataset.dabPlay); }
         });
         this._renderChanTabContent();
+        this._loadChannelPresets();
+    }
+
+    // Builds the Favorites / <scanned channels> / Manual tabbar markup --
+    // used both for the initial mount and to refresh once scan results
+    // have loaded, so there's a single source of truth for this markup.
+    _chanTabsHtml() {
+        const active = this._activeChannelTab;
+        const esc = this._esc.bind(this);
+        return `
+            <button type="button" class="lsn-tabbar__btn${active === 'favorites' ? ' lsn-tabbar__btn--active' : ''}" data-chantab="favorites">★ Favorites</button>
+            ${this._channelPresets.map((c) => `
+                <button type="button" class="lsn-tabbar__btn${active === c.channel ? ' lsn-tabbar__btn--active' : ''}"
+                        data-chantab="${esc(c.channel)}" title="${esc(c.channel)} — ${esc(c.name)}">${esc(c.name)}</button>
+            `).join('')}
+            <button type="button" class="lsn-tabbar__btn${active === 'manual' ? ' lsn-tabbar__btn--active' : ''}" data-chantab="manual">Manual…</button>
+        `;
+    }
+
+    // Fetches once per mount (scan results only change when someone runs
+    // scripts/dab_channel_scan.py on the device, not continuously, so no
+    // polling here -- same reasoning as the DAB+ Config tab). A missing
+    // or unreadable scan-results file just means no channel tabs beyond
+    // Favorites/Manual, not an error shown to the user.
+    async _loadChannelPresets() {
+        try {
+            const res = await fetch('/api/dab/scan-results');
+            if (!res.ok) { this._channelPresets = []; }
+            else {
+                const data = await res.json();
+                this._channelPresets = (data.channels || [])
+                    .filter((c) => c.ensemble || (c.stations || []).length)
+                    .map((c) => ({ channel: c.channel, name: c.custom_name || c.ensemble || c.channel }));
+            }
+        } catch (_e) {
+            this._channelPresets = [];
+        }
+        const bar = this._root && this._root.querySelector('[data-dab-chantabs]');
+        if (bar) bar.innerHTML = this._chanTabsHtml();
     }
 
     /** Switch which sub-tab is shown -- a pure view switch, no tuning side
@@ -565,17 +591,17 @@ class DabPanel {
         const busyOwner = (status.dongle_owner && status.dongle_owner !== 'dab') ? status.dongle_owner : null;
 
         root.querySelectorAll('[data-chantab]').forEach((btn) => {
-            const isChannelCode = DAB_CHANNEL_PRESETS.some((c) => c.channel === btn.dataset.chantab);
+            const isChannelCode = this._channelPresets.some((c) => c.channel === btn.dataset.chantab);
             if (isChannelCode) btn.disabled = !!busyOwner;
         });
 
         this._setLeds({ onair: status.running, tuning: this._tuning });
 
-        // Small tag shows channel + a friendly name -- our own curated
-        // name if this is a known preset, else whatever real ensemble
-        // label welle-cli decoded (some, like 11C's literal "DAB+" or
-        // 9C's literal "9C", aren't descriptive at all, so the curated
-        // name is preferred whenever we have one). The big VFD slot is
+        // Small tag shows channel + a friendly name -- the scanned/custom
+        // name from this._channelPresets (itself sourced from GET
+        // /api/dab/scan-results, custom_name preferred over the raw
+        // ensemble label) if this is a known channel, else whatever real
+        // ensemble label welle-cli decoded live. The big VFD slot is
         // reserved for the now-playing station/RadioText instead -- that
         // space was originally sized for the Radio tab's frequency
         // digits, but a station name matters more to a listener here
@@ -585,7 +611,7 @@ class DabPanel {
             if (!status.running) {
                 chanTagEl.textContent = '';
             } else {
-                const preset = DAB_CHANNEL_PRESETS.find((c) => c.channel === status.channel);
+                const preset = this._channelPresets.find((c) => c.channel === status.channel);
                 const name = preset ? preset.name : status.ensemble_label;
                 chanTagEl.textContent = name ? `${status.channel} · ${name}` : (status.channel || '');
             }

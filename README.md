@@ -61,8 +61,8 @@ This is a customized fork of upstream [KMX415/meshpoint](https://github.com/KMX4
 - **RDS** on FM (via `redsea`): station name, scrolling RadioText / now-playing, program type (PTY), and a block-error-rate signal-quality meter.
 - **Preset stations picker** — category tabs, search across all presets, ★ favorites, and green "now playing" dots on the tuned channel and its category.
 - New `/api/listener/*` endpoints.
-- **DAB+ tab** via [`welle-cli`](https://github.com/AlbrechtL/welle.io) — pick a channel/ensemble (e.g. `12C` for the NPO nationals), then a station once it's decoded; ★ favorites jump straight to a channel + station in one click. New `/api/dab/*` endpoints.
-- **DAB+ Config tab** — shows every channel `scripts/dab_channel_scan.py` found on your antenna (name, SNR, station list), with an editable display-name override per channel.
+- **DAB+ tab** via [`welle-cli`](https://github.com/AlbrechtL/welle.io) — pick a channel/ensemble (e.g. `12C` for the NPO nationals), then a station once it's decoded; ★ favorites jump straight to a channel + station in one click. Channel tabs are populated from your own `scripts/dab_channel_scan.py` results, not a hardcoded list, so they match wherever your antenna actually is. New `/api/dab/*` endpoints.
+- **DAB+ Config tab** — shows every channel `scripts/dab_channel_scan.py` found on your antenna (name, SNR, station list), with an editable display-name override per channel that the DAB+ tab's channel picker also uses.
 
 **Expanded multi-protocol capture**
 - **LoRaWAN passive sniffing** — full MAC decoder (Join / Data / Rejoin), a dedicated LoRaWAN dashboard panel, and `/api/lorawan/*` endpoints, using the SX1302 "dual sync-word" trick (ch0–ch7 on LoRaWAN 0x34, ch8 on Meshtastic 0x2B).
