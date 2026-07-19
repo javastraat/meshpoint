@@ -91,6 +91,8 @@ def merge_channel_result(existing: Optional[dict], new: dict) -> dict:
     untouched instead of overwriting known-good data with a thinner result.
     """
     if existing is None:
+        new = dict(new)
+        new["stations"] = sorted(new["stations"], key=str.casefold)
         return new
     if not new["ensemble"] and not new["stations"]:
         return existing
@@ -98,6 +100,7 @@ def merge_channel_result(existing: Optional[dict], new: dict) -> dict:
     for s in new["stations"]:
         if s not in merged_stations:
             merged_stations.append(s)
+    merged_stations.sort(key=str.casefold)
     # Start from a copy of the existing entry so any extra field the
     # dashboard's DAB+ Config tab may have added (e.g. a user-set
     # "custom_name" override) survives a rescan instead of being dropped
@@ -212,6 +215,16 @@ def main() -> int:
     print(f"Scanning {total} channel(s), up to {args.timeout:.0f}s each "
           f"(~{total * args.timeout / 60:.0f} min worst case)...\n")
 
+    merged_by_channel = {}
+    if not args.new and os.path.exists(args.output):
+        try:
+            with open(args.output) as f:
+                existing = json.load(f)
+            for c in existing.get("channels", []):
+                merged_by_channel[c["channel"]] = c
+        except (OSError, ValueError, KeyError) as e:
+            print(f"Warning: couldn't read existing {args.output} ({e}) -- starting fresh", file=sys.stderr)
+
     scan_time = datetime.now(timezone.utc).isoformat()
     all_results = []
     hits = []
@@ -220,9 +233,24 @@ def main() -> int:
         result = scan_channel(channel, args.port, args.timeout)
         result["scanned_at"] = scan_time
         all_results.append(result)
+        # Merge immediately (rather than after the whole loop) so the
+        # per-channel line below can report the true on-file total --
+        # printing len(result["stations"]) here would silently undercount
+        # whenever a rescan finds fewer stations than a previous run
+        # already banked for this channel (merge is additive, never drops).
+        previous = merged_by_channel.get(channel)
+        merged = merge_channel_result(previous, result)
+        merged_by_channel[channel] = merged
         if result["ensemble"] or result["stations"]:
-            print(f"FOUND: {result['ensemble']!r} (SNR {result['snr']:.1f} dB) -- {len(result['stations'])} station(s)")
-            hits.append(result)
+            total_count = len(merged["stations"])
+            previous_stations = previous.get("stations", []) if previous else []
+            new_count = sum(1 for s in result["stations"] if s not in previous_stations)
+            if new_count == total_count:
+                print(f"FOUND: {result['ensemble']!r} (SNR {result['snr']:.1f} dB) -- {total_count} station(s)")
+            else:
+                print(f"FOUND: {result['ensemble']!r} (SNR {result['snr']:.1f} dB) -- "
+                      f"{total_count} station(s) on file ({new_count} new this run)")
+            hits.append(merged)
         else:
             print("nothing")
 
@@ -236,17 +264,6 @@ def main() -> int:
         for s in r["stations"]:
             print(f"    - {s}")
 
-    merged_by_channel = {}
-    if not args.new and os.path.exists(args.output):
-        try:
-            with open(args.output) as f:
-                existing = json.load(f)
-            for c in existing.get("channels", []):
-                merged_by_channel[c["channel"]] = c
-        except (OSError, ValueError, KeyError) as e:
-            print(f"Warning: couldn't read existing {args.output} ({e}) -- starting fresh", file=sys.stderr)
-    for r in all_results:
-        merged_by_channel[r["channel"]] = merge_channel_result(merged_by_channel.get(r["channel"]), r)
     merged_channels = sorted(merged_by_channel.values(), key=lambda r: channel_sort_key(r["channel"]))
 
     payload = {
