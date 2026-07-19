@@ -63,13 +63,11 @@ ENSEMBLE_LABEL_OVERRIDES = {"DAB+": "Commercial"}
 
 # Some ensembles broadcast no real name at all -- just their own channel
 # code (e.g. 9C's ensemble label decodes as literally "9C", nothing else).
-# Surface a neutral placeholder rather than the redundant channel code as
-# if it were a real name -- deliberately short and non-instructional (not
-# "...set label in config"): it shows up as-is in the dashboard's DAB+
-# Config tab and, when no custom_name override is set, as a DAB+ tab
-# button label too, where a long "go do X" sentence reads as confusing
-# instructions rather than a plain "this one has no name yet".
-NO_LABEL_PLACEHOLDER = "{channel} (unnamed)"
+# Surface a placeholder rather than the redundant channel code as if it
+# were a real name -- points at the DAB+ Config tab specifically (not just
+# "config" in the abstract), since that's where a custom_name override
+# actually gets set.
+NO_LABEL_PLACEHOLDER = "{channel} -- rename in Config tab"
 
 
 def channel_sort_key(channel: str) -> int:
