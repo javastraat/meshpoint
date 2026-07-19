@@ -32,7 +32,7 @@ CATEGORY_DIAGNOSTICS = "Diagnostics"
 CATEGORY_HARDWARE = "Hardware"
 CATEGORY_GIT = "Git"
 CATEGORY_NETWORK = "Network"
-CATEGORY_SETUP = "Setup"
+CATEGORY_DAB = "DAB+"
 
 
 @dataclass(frozen=True)
@@ -149,21 +149,41 @@ DEFAULT_CATALOG: tuple[CommandEntry, ...] = (
         description="Last 10 commits on the install tree.",
     ),
     CommandEntry(
-        id="run-install-sh",
-        label="Run install.sh (upgrade software)",
-        command="sudo /bin/bash /opt/meshpoint/scripts/install.sh",
-        category=CATEGORY_SETUP,
+        id="dab-scan-full",
+        label="DAB+ scan: full (default timeout)",
+        command="/opt/meshpoint/scripts/dab_channel_scan.py",
+        category=CATEGORY_DAB,
         description=(
-            "Re-run the installer to pick up new system packages a release "
-            "added (e.g. welle.io for DAB+). The dashboard's regular "
-            "'Apply update' intentionally skips this to stay fast -- run it "
-            "manually whenever release notes mention new system requirements. "
-            "Must match config/sudoers-meshpoint's NOPASSWD grant exactly "
-            "(absolute /bin/bash + absolute script path, no `cd` + relative "
-            "path) or sudo falls back to an interactive password prompt the "
-            "meshpoint service account can't answer."
+            "Scans all 38 Band III channels (5A-13F) at the default "
+            "30s/channel timeout (~19 min worst case), merging results "
+            "into config/dab_channel_scan.json. Stop any running Radio/"
+            "DAB+/P2000/Pagers/POCSAG/RTL433 tab first -- this script "
+            "drives welle-cli directly and has no awareness of the "
+            "dashboard's dongle-exclusivity lock."
         ),
-        dangerous=True,
+    ),
+    CommandEntry(
+        id="dab-scan-full-60s",
+        label="DAB+ scan: full (60s timeout)",
+        command="/opt/meshpoint/scripts/dab_channel_scan.py --timeout 60",
+        category=CATEGORY_DAB,
+        description=(
+            "Same full 38-channel scan, but a longer 60s/channel timeout "
+            "(~38 min worst case) for a weaker antenna or to cut down on "
+            "false negatives from back-to-back channel switching."
+        ),
+    ),
+    CommandEntry(
+        id="dab-scan-known-60s",
+        label="DAB+ scan: known channels (60s timeout)",
+        command="/opt/meshpoint/scripts/dab_channel_scan.py --channels 7D 8B 9C 11C 12C --timeout 60",
+        category=CATEGORY_DAB,
+        description=(
+            "Rescans just the 5 channels already confirmed live at this "
+            "antenna (MTVNL/N-H-Flevo/Throwback/Commercial/NPO) with a "
+            "longer 60s timeout -- much faster than a full scan when "
+            "you just want fresh station lists."
+        ),
     ),
 )
 
