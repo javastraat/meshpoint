@@ -59,21 +59,30 @@ class AdsbListener:
         self._lock = asyncio.Lock()
         self._last_error: str = ""
         self._last_poll_at: float = 0.0
+        self._metric: bool = True
         self.aircraft: list[dict] = []
 
     @property
     def running(self) -> bool:
         return self._proc is not None and self._proc.returncode is None
 
-    async def start(self) -> None:
+    async def start(self, metric: bool = True) -> None:
         """Raises RuntimeError if dump1090 is missing or the dongle is
-        currently claimed by another listener."""
+        currently claimed by another listener.
+
+        `metric` selects dump1090's own `--metric` flag (meters/km/h
+        instead of feet/knots in its output, including /data.json) --
+        stashed on self so status() can tell the frontend which unit
+        labels to render, and so a restart-while-running is a no-op that
+        keeps the previously-started process's actual units.
+        """
         if shutil.which("dump1090") is None:
             raise RuntimeError("dump1090 not found on PATH")
 
         async with self._lock:
             if self.running:
                 return  # already running, idempotent
+            self._metric = metric
             sdr_registry.claim(_OWNER)
             try:
                 await self._start_locked_retrying()
@@ -97,6 +106,7 @@ class AdsbListener:
             "aircraft_count": len(self.aircraft),
             "aircraft": self.aircraft,
             "last_error": self._last_error,
+            "metric": self._metric,
             # Who currently holds the shared RTL-SDR dongle (None = free,
             # "adsb" = this listener, or one of the sibling listeners' owner
             # names) -- lets the frontend show "busy" instead of "idle".
@@ -107,6 +117,8 @@ class AdsbListener:
 
     async def _start_locked(self) -> None:
         cmd = ["dump1090", "--net", "--net-http-port", str(_WEBSERVER_PORT)]
+        if self._metric:
+            cmd.append("--metric")
         logger.info("ADS-B listener starting: %s", " ".join(cmd))
         self._last_error = ""
         self._proc = await asyncio.create_subprocess_exec(

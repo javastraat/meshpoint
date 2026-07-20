@@ -36,6 +36,10 @@ class AdsbPanel {
                             <span data-adsb-status-text>idle</span>
                         </div>
                         <div class="pager-actions">
+                            <label class="adsb-metric-toggle">
+                                <input type="checkbox" data-adsb-metric checked>
+                                Metric units
+                            </label>
                             <button class="terminal-button" type="button" data-adsb-start>Start listening</button>
                             <button class="terminal-button" type="button" data-adsb-stop>Stop</button>
                         </div>
@@ -86,9 +90,14 @@ class AdsbPanel {
 
     async _start() {
         const btn = this._root.querySelector('[data-adsb-start]');
+        const metric = this._root.querySelector('[data-adsb-metric]').checked;
         btn.disabled = true;
         try {
-            const res = await fetch(`${this._apiPrefix}/start`, { method: 'POST' });
+            const res = await fetch(`${this._apiPrefix}/start`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ metric }),
+            });
             if (!res.ok) {
                 const err = await res.json().catch(() => ({}));
                 this._showError(err.detail || `HTTP ${res.status}`);
@@ -144,6 +153,14 @@ class AdsbPanel {
             }
         }
         if (startBtn) startBtn.disabled = !!busyOwner;
+        const metricCb = this._root.querySelector('[data-adsb-metric]');
+        if (metricCb) {
+            // Only meaningful before Start -- dump1090's units are fixed
+            // for the life of the process, so don't let the checkbox
+            // imply toggling it live would do anything.
+            metricCb.disabled = !!status.running || !!busyOwner;
+            if (status.running) metricCb.checked = !!status.metric;
+        }
 
         const countEl = this._root.querySelector('[data-adsb-count]');
         if (countEl) countEl.textContent = status.aircraft_count ? `(${status.aircraft_count})` : '';
@@ -155,14 +172,14 @@ class AdsbPanel {
             body.innerHTML = '<tr class="adsb-table__empty"><td colspan="9">No aircraft yet.</td></tr>';
             return;
         }
-        body.innerHTML = aircraft.map((a) => this._rowHtml(a)).join('');
+        body.innerHTML = aircraft.map((a) => this._rowHtml(a, !!status.metric)).join('');
     }
 
-    _rowHtml(a) {
+    _rowHtml(a, metric) {
         const pos = (a.lat != null && a.lon != null)
             ? `${a.lat.toFixed(3)}, ${a.lon.toFixed(3)}` : '';
-        const alt = a.altitude != null ? `${a.altitude} ft` : '';
-        const speed = a.speed != null ? `${a.speed} kt` : '';
+        const alt = a.altitude != null ? `${a.altitude} ${metric ? 'm' : 'ft'}` : '';
+        const speed = a.speed != null ? `${a.speed} ${metric ? 'km/h' : 'kt'}` : '';
         const track = a.track != null ? `${a.track}°` : '';
         return `
             <tr>

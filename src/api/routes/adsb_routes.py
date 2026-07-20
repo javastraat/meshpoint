@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 
 from src.api.auth.dependencies import require_admin
 from src.api.auth.jwt_session import SessionClaims
@@ -19,6 +20,13 @@ from src.audio.adsb_listener import AdsbListener
 router = APIRouter(prefix="/api/adsb", tags=["adsb"])
 
 _listener: Optional[AdsbListener] = None
+
+
+class StartRequest(BaseModel):
+    metric: bool = Field(
+        default=True,
+        description="Pass dump1090's --metric flag (meters/km/h instead of feet/knots)",
+    )
 
 
 def init_routes(listener: AdsbListener) -> None:
@@ -39,11 +47,14 @@ async def status():
 
 
 @router.post("/start")
-async def start(_claims: SessionClaims = Depends(require_admin)):
+async def start(
+    req: StartRequest = StartRequest(),
+    _claims: SessionClaims = Depends(require_admin),
+):
     if _listener is None:
         raise HTTPException(503, "Listener not initialised")
     try:
-        await _listener.start()
+        await _listener.start(metric=req.metric)
     except RuntimeError as exc:
         raise HTTPException(503, str(exc))
     return _listener.status()
