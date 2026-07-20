@@ -133,6 +133,9 @@ class AdsbMapModal {
             bounds.push([a.lat, a.lon]);
             const marker = L.marker([a.lat, a.lon], { icon: this._icon(a) }).addTo(this._layer);
             marker.bindTooltip(this._tooltipHtml(a, metric), { direction: 'top', offset: [0, -8] });
+            marker.on('click', () => {
+                if (window.AdsbFlightModal) window.AdsbFlightModal.show(a, metric);
+            });
         });
 
         if (bounds.length && !this._fitted) {

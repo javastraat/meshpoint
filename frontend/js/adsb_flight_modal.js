@@ -80,7 +80,14 @@ class AdsbFlightModal {
     }
 
     _onKeyDown(e) {
-        if (e.key === 'Escape') this.close();
+        // stopImmediatePropagation -- this modal can open on top of another
+        // (e.g. AdsbMapModal, when opened from a marker click), and both
+        // bind their own Escape handler to `document`; without this, one
+        // Escape press would close both instead of just the top one.
+        if (e.key === 'Escape') {
+            e.stopImmediatePropagation();
+            this.close();
+        }
     }
 
     _flightRows(a, metric) {
@@ -158,21 +165,53 @@ class AdsbFlightModal {
             const data = await res.json();
             const photo = (data.photos || [])[0];
             if (!photo) return this._replaceLayer(layer, [{ key: 'Photo', val: 'no photo found' }]);
-            const html = `
-                <div class="pdm-row">
-                    <a href="${this._esc(photo.link)}" target="_blank" rel="noopener noreferrer">
-                        <img class="adsb-photo" src="${this._esc(photo.thumbnail_large.src)}" alt="Aircraft photo" width="${photo.thumbnail_large.size.width}" height="${photo.thumbnail_large.size.height}">
-                    </a>
-                </div>
-                <div class="pdm-row">
-                    <span class="pdm-row__key">Credit:</span>
-                    <span class="pdm-row__val">${this._esc(photo.photographer || 'unknown')} · <a href="${this._esc(photo.link)}" target="_blank" rel="noopener noreferrer">planespotters.net</a></span>
-                </div>
-            `;
-            this._replaceLayer(layer, [{ html }]);
+            this._replaceLayer(layer, [{ el: this._photoRow(photo) }]);
         } catch (_e) {
             this._replaceLayer(layer, [{ key: 'Photo', val: 'lookup failed' }]);
         }
+    }
+
+    /**
+     * A hotlinked photo's thumbnail can fail to load in the browser even
+     * when the lookup itself succeeded (CDN hiccup, ad-blocker, extension)
+     * -- shown live: registration/route/credit all resolved but the <img>
+     * still came up broken. Built with real DOM nodes (not an HTML string)
+     * so an `error` listener can swap in a text fallback instead of
+     * leaving the ugly broken-image glyph on screen.
+     */
+    _photoRow(photo) {
+        const wrap = document.createElement('div');
+        wrap.className = 'pdm-row';
+
+        const link = document.createElement('a');
+        link.href = photo.link;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+
+        const img = document.createElement('img');
+        img.className = 'adsb-photo';
+        img.src = photo.thumbnail_large.src;
+        img.alt = 'Aircraft photo';
+        img.width = photo.thumbnail_large.size.width;
+        img.height = photo.thumbnail_large.size.height;
+        img.addEventListener('error', () => {
+            wrap.innerHTML = `<span class="pdm-row__val">Photo failed to load in this browser -- <a href="${this._esc(photo.link)}" target="_blank" rel="noopener noreferrer">view on planespotters.net</a></span>`;
+        }, { once: true });
+
+        link.appendChild(img);
+        wrap.appendChild(link);
+
+        const credit = document.createElement('div');
+        credit.className = 'pdm-row';
+        credit.innerHTML = `
+            <span class="pdm-row__key">Credit:</span>
+            <span class="pdm-row__val">${this._esc(photo.photographer || 'unknown')} · <a href="${this._esc(photo.link)}" target="_blank" rel="noopener noreferrer">planespotters.net</a></span>
+        `;
+
+        const group = document.createElement('div');
+        group.appendChild(wrap);
+        group.appendChild(credit);
+        return group;
     }
 
     _replaceLayer(layer, rows) {
@@ -180,7 +219,9 @@ class AdsbFlightModal {
         const rowsEl = layer.querySelector('.pdm-layer__rows');
         rowsEl.innerHTML = '';
         for (const row of rows) {
-            if (row.html) {
+            if (row.el) {
+                rowsEl.appendChild(row.el);
+            } else if (row.html) {
                 rowsEl.insertAdjacentHTML('beforeend', row.html);
             } else {
                 rowsEl.appendChild(this._row(row.key, row.val));
