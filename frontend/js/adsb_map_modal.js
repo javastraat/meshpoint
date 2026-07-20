@@ -26,6 +26,11 @@
  * (`this._trails`, keyed by hex) and reset whenever the modal closes --
  * same "only while open" scope as the map itself, since Leaflet gets torn
  * down and rebuilt fresh on every show().
+ *
+ * A contact drops off the MAP (not the Aircraft table) once it's gone
+ * MAP_STALE_HIDE_SECONDS without an update -- dump1090 itself only purges
+ * a contact from /data.json after 300s of total silence, which is far too
+ * long to keep plotting a dimmed ghost at its last known position.
  */
 class AdsbMapModal {
     constructor() {
@@ -129,7 +134,18 @@ class AdsbMapModal {
         const aircraft = status.aircraft || [];
         this._layer.clearLayers();
 
-        const placed = aircraft.filter((a) => a.lat != null && a.lon != null);
+        // dump1090 itself only purges a contact from /data.json after
+        // MODES_INTERACTIVE_DELETE_TTL (300s / 5 min) of total silence --
+        // far too long to keep plotting a dimmed "ghost" at its last known
+        // position. Stop showing a contact on the MAP once it's gone this
+        // long without an update -- matches MODES_INTERACTIVE_DISPLAY_TTL,
+        // the same 60s dump1090's own bundled interactive display uses to
+        // decide whether a contact is still worth showing. The Aircraft
+        // table is unaffected -- it keeps listing everything dump1090 still
+        // reports, stale or not.
+        const MAP_STALE_HIDE_SECONDS = 60;
+        const placed = aircraft.filter((a) => a.lat != null && a.lon != null
+            && (a.seen || 0) <= MAP_STALE_HIDE_SECONDS);
         const meta = this._overlay.querySelector('[data-adsb-map-meta]');
         if (meta) {
             meta.textContent = placed.length === aircraft.length
@@ -143,6 +159,12 @@ class AdsbMapModal {
         const seenHex = new Set(aircraft.map((a) => a.hex));
         for (const hex of this._trails.keys()) {
             if (!seenHex.has(hex)) this._trails.delete(hex);
+        }
+        // Also reset the trail for anything currently hidden for staleness,
+        // so if it reappears later it starts a fresh trail instead of
+        // drawing one long "teleport" line across the gap.
+        for (const a of aircraft) {
+            if ((a.seen || 0) > MAP_STALE_HIDE_SECONDS) this._trails.delete(a.hex);
         }
 
         const bounds = [];
