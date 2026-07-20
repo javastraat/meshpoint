@@ -11,15 +11,14 @@
  * if reused against a stale container, so the map is always rebuilt fresh
  * against a new <div> each time show() runs).
  *
- * The plane marker is a rotated "navigation arrow" (feather-icons style --
- * matches the sidebar's own stroke-based SVG icon language, see
- * frontend/index.html's .sidebar__icon svgs) pointed by `track`, not a
- * literal reuse of dump1090's bundled Google-Maps plane silhouette
- * (dump1090/public_html/planeObject.js `funcGetIcon`) since that's a
+ * The plane marker is a rotated plane-silhouette SVG (a standalone path,
+ * not a literal reuse of dump1090's bundled Google-Maps plane icon --
+ * dump1090/public_html/planeObject.js `funcGetIcon` builds a
  * `google.maps.Symbol` path string tied to the Google Maps API we don't
- * use here. What IS borrowed from planeObject.js: rotate-by-track, the
- * emergency squawk color convention (7500 hijack / 7600 radio failure /
- * 7700 general emergency), and its "stale after 15s unseen" dimming rule.
+ * use here) pointed by `track`. What IS borrowed from planeObject.js:
+ * rotate-by-track, the emergency squawk color convention (7500 hijack /
+ * 7600 radio failure / 7700 general emergency), and its "stale after 15s
+ * unseen" dimming rule.
  */
 class AdsbMapModal {
     constructor() {
@@ -151,15 +150,17 @@ class AdsbMapModal {
         else if (squawk === '7700') color = '#fbbf24'; // general emergency
         else if (stale) color = 'rgba(139, 154, 171, 0.6)';
         const rotation = a.track != null ? a.track : 0;
-        const html = `<svg viewBox="0 0 24 24" width="20" height="20" `
+        // Top-down plane silhouette (nose at 0deg/up), so rotating by
+        // `track` alone points it the right way -- no extra offset needed.
+        const html = `<svg viewBox="0 0 24 24" width="22" height="22" `
             + `style="transform: rotate(${rotation}deg)" fill="${color}" fill-opacity="0.9" `
-            + `stroke="${color}" stroke-width="1" stroke-linejoin="round">`
-            + `<polygon points="12 2 20 21 12 17 4 21"/></svg>`;
+            + `stroke="${color}" stroke-width="0.5" stroke-linejoin="round">`
+            + `<path d="M21,16V14L13,9V3.5C13,2.67 12.33,2 11.5,2C10.67,2 10,2.67 10,3.5V9L2,14V16L10,13.5V19L7.5,20.5V22L11.5,21L15.5,22V20.5L13,19V13.5L21,16Z"/></svg>`;
         return L.divIcon({
             html,
             className: 'adsb-marker',
-            iconSize: [20, 20],
-            iconAnchor: [10, 10],
+            iconSize: [22, 22],
+            iconAnchor: [11, 11],
         });
     }
 

@@ -42,7 +42,7 @@ class AdsbPanel {
                             </label>
                             <button class="terminal-button" type="button" data-adsb-start>Start listening</button>
                             <button class="terminal-button" type="button" data-adsb-stop>Stop</button>
-                            <button class="terminal-button" type="button" data-adsb-map title="Show aircraft on a map">
+                            <button class="terminal-button" type="button" data-adsb-map title="Show aircraft on a map" disabled>
                                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align: -2px; margin-right: 4px;">
                                     <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/>
                                     <line x1="8" y1="2" x2="8" y2="18"/>
@@ -160,7 +160,7 @@ class AdsbPanel {
                 text.textContent = 'idle';
             }
         }
-        if (startBtn) startBtn.disabled = !!busyOwner;
+        if (startBtn) startBtn.disabled = !!status.running || !!busyOwner;
         const metricCb = this._root.querySelector('[data-adsb-metric]');
         if (metricCb) {
             // Only meaningful before Start -- dump1090's units are fixed
@@ -172,6 +172,8 @@ class AdsbPanel {
 
         const countEl = this._root.querySelector('[data-adsb-count]');
         if (countEl) countEl.textContent = status.aircraft_count ? `(${status.aircraft_count})` : '';
+        const mapBtn = this._root.querySelector('[data-adsb-map]');
+        if (mapBtn) mapBtn.disabled = !status.aircraft_count;
 
         const body = this._root.querySelector('[data-adsb-body]');
         if (!body) return;

@@ -131,7 +131,7 @@ class PagerPanel {
                 text.textContent = 'idle';
             }
         }
-        if (startBtn) startBtn.disabled = !!busyOwner;
+        if (startBtn) startBtn.disabled = !!status.running || !!busyOwner;
 
         const countEl = this._root.querySelector('[data-pager-count]');
         if (countEl) countEl.textContent = status.message_count ? `(${status.message_count})` : '';
