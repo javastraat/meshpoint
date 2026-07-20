@@ -19,6 +19,13 @@
  * rotate-by-track, the emergency squawk color convention (7500 hijack /
  * 7600 radio failure / 7700 general emergency), and its "stale after 15s
  * unseen" dimming rule.
+ *
+ * Each aircraft also trails its last MAX_TRAIL_POINTS positions as a
+ * polyline in its own squawk color, so you can see where it's been, not
+ * just where it is right now. Trails are kept in-memory only
+ * (`this._trails`, keyed by hex) and reset whenever the modal closes --
+ * same "only while open" scope as the map itself, since Leaflet gets torn
+ * down and rebuilt fresh on every show().
  */
 class AdsbMapModal {
     constructor() {
@@ -27,6 +34,7 @@ class AdsbMapModal {
         this._layer = null;
         this._pollTimer = null;
         this._fitted = false;
+        this._trails = new Map();
         this._onKeyDown = this._onKeyDown.bind(this);
     }
 
@@ -80,6 +88,7 @@ class AdsbMapModal {
             this._layer = null;
         }
         this._fitted = false;
+        this._trails.clear();
         if (this._overlay) {
             this._overlay.remove();
             this._overlay = null;
@@ -128,10 +137,23 @@ class AdsbMapModal {
                 : `${placed.length} of ${aircraft.length} aircraft positioned`;
         }
 
+        // Drop trails for aircraft that have gone out of range entirely --
+        // keyed off the FULL snapshot (not just `placed`) so a contact that
+        // just briefly lost its position isn't wiped mid-trail.
+        const seenHex = new Set(aircraft.map((a) => a.hex));
+        for (const hex of this._trails.keys()) {
+            if (!seenHex.has(hex)) this._trails.delete(hex);
+        }
+
         const bounds = [];
         placed.forEach((a) => {
             bounds.push([a.lat, a.lon]);
-            const marker = L.marker([a.lat, a.lon], { icon: this._icon(a) }).addTo(this._layer);
+            const color = this._color(a);
+            const trail = this._updateTrail(a);
+            if (trail.length > 1) {
+                L.polyline(trail, { color, weight: 2, opacity: 0.55 }).addTo(this._layer);
+            }
+            const marker = L.marker([a.lat, a.lon], { icon: this._icon(a, color) }).addTo(this._layer);
             marker.bindTooltip(this._tooltipHtml(a, metric), { direction: 'top', offset: [0, -8] });
             marker.on('click', () => {
                 if (window.AdsbFlightModal) window.AdsbFlightModal.show(a, metric);
@@ -144,14 +166,33 @@ class AdsbMapModal {
         }
     }
 
-    _icon(a) {
+    /** Appends `a`'s current position to its trail (deduped, capped) and returns it. */
+    _updateTrail(a) {
+        const MAX_TRAIL_POINTS = 60; // ~2 minutes of history at the 2 s poll rate
+        let trail = this._trails.get(a.hex);
+        if (!trail) {
+            trail = [];
+            this._trails.set(a.hex, trail);
+        }
+        const last = trail[trail.length - 1];
+        if (!last || last[0] !== a.lat || last[1] !== a.lon) {
+            trail.push([a.lat, a.lon]);
+            if (trail.length > MAX_TRAIL_POINTS) trail.shift();
+        }
+        return trail;
+    }
+
+    _color(a) {
         const squawk = String(a.squawk || '');
         const stale = (a.seen || 0) > 15;
-        let color = '#22d3ee'; // accent-cyan -- normal aircraft
-        if (squawk === '7500') color = '#f87171'; // hijack
-        else if (squawk === '7600') color = '#60a5fa'; // radio failure
-        else if (squawk === '7700') color = '#fbbf24'; // general emergency
-        else if (stale) color = 'rgba(139, 154, 171, 0.6)';
+        if (squawk === '7500') return '#f87171'; // hijack
+        if (squawk === '7600') return '#60a5fa'; // radio failure
+        if (squawk === '7700') return '#fbbf24'; // general emergency
+        if (stale) return 'rgba(139, 154, 171, 0.6)';
+        return '#22d3ee'; // accent-cyan -- normal aircraft
+    }
+
+    _icon(a, color) {
         const rotation = a.track != null ? a.track : 0;
         // Top-down plane silhouette (nose at 0deg/up), so rotating by
         // `track` alone points it the right way -- no extra offset needed.
