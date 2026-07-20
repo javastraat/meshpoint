@@ -413,6 +413,7 @@ class ListenerPanel {
         this._rtl433Panel = window.PagerPanel
             ? new window.PagerPanel('rtl433', '/api/rtl433', 'RTL433', _rtl433RowHtml)
             : null;
+        this._adsbPanel = window.AdsbPanel ? new window.AdsbPanel() : null;
         this._dabPanel = window.DabPanel ? new window.DabPanel() : null;
         // Exposed so SidebarTelemetryRail's mini-player can show/control
         // DAB+ playback too -- mirrors window.listenerPanel below.
@@ -473,6 +474,7 @@ class ListenerPanel {
         if (this._pagersPanel) this._pagersPanel.hide();
         if (this._pocsagPanel) this._pocsagPanel.hide();
         if (this._rtl433Panel) this._rtl433Panel.hide();
+        if (this._adsbPanel) this._adsbPanel.hide();
         if (this._dabPanel) this._dabPanel.hide();
         if (this._dabConfigPanel) this._dabConfigPanel.hide();
     }
@@ -486,6 +488,8 @@ class ListenerPanel {
             this._pocsagPanel.show();
         } else if (this._activeTab === 'rtl433' && this._rtl433Panel) {
             this._rtl433Panel.show();
+        } else if (this._activeTab === 'adsb' && this._adsbPanel) {
+            this._adsbPanel.show();
         } else if (this._activeTab === 'dab' && this._dabPanel) {
             this._dabPanel.show();
         } else if (this._activeTab === 'dabconfig' && this._dabConfigPanel) {
@@ -504,6 +508,7 @@ class ListenerPanel {
         if (this._activeTab === 'pagers' && this._pagersPanel) this._pagersPanel.hide();
         if (this._activeTab === 'pocsag' && this._pocsagPanel) this._pocsagPanel.hide();
         if (this._activeTab === 'rtl433' && this._rtl433Panel) this._rtl433Panel.hide();
+        if (this._activeTab === 'adsb' && this._adsbPanel) this._adsbPanel.hide();
         if (this._activeTab === 'dab' && this._dabPanel) this._dabPanel.hide();
         if (this._activeTab === 'dabconfig' && this._dabConfigPanel) this._dabConfigPanel.hide();
 
@@ -535,6 +540,7 @@ class ListenerPanel {
                 <button type="button" class="lsn-tabbar__btn" data-tab="pagers">Pagers</button>
                 <button type="button" class="lsn-tabbar__btn" data-tab="pocsag">POCSAG</button>
                 <button type="button" class="lsn-tabbar__btn" data-tab="rtl433">RTL433</button>
+                <button type="button" class="lsn-tabbar__btn" data-tab="adsb">ADS-B</button>
                 <button type="button" class="lsn-tabbar__btn" data-tab="dabconfig">DAB+ Config</button>
             </div>
 
@@ -627,6 +633,7 @@ class ListenerPanel {
             <div class="lsn-tab-content" data-tab="pagers" style="display:none" id="lsn-tab-pagers"></div>
             <div class="lsn-tab-content" data-tab="pocsag" style="display:none" id="lsn-tab-pocsag"></div>
             <div class="lsn-tab-content" data-tab="rtl433" style="display:none" id="lsn-tab-rtl433"></div>
+            <div class="lsn-tab-content" data-tab="adsb" style="display:none" id="lsn-tab-adsb"></div>
             <div class="lsn-tab-content" data-tab="dabconfig" style="display:none" id="lsn-tab-dabconfig"></div>
         `;
 
@@ -635,6 +642,7 @@ class ListenerPanel {
         if (this._pagersPanel) this._pagersPanel.mount(root.querySelector('#lsn-tab-pagers'));
         if (this._pocsagPanel) this._pocsagPanel.mount(root.querySelector('#lsn-tab-pocsag'));
         if (this._rtl433Panel) this._rtl433Panel.mount(root.querySelector('#lsn-tab-rtl433'));
+        if (this._adsbPanel) this._adsbPanel.mount(root.querySelector('#lsn-tab-adsb'));
         if (this._dabConfigPanel) this._dabConfigPanel.mount(root.querySelector('#lsn-tab-dabconfig'));
 
         root.querySelector('#lsn-tabbar').addEventListener('click', (ev) => {
@@ -928,7 +936,7 @@ class ListenerPanel {
             this._playing = false;
             this._audioConnected = false;
             if (busyOwner) {
-                const labels = { p2000: 'P2000', pagers: 'Pagers', pocsag: 'POCSAG', rtl433: 'RTL433', dab: 'DAB+' };
+                const labels = { p2000: 'P2000', pagers: 'Pagers', pocsag: 'POCSAG', rtl433: 'RTL433', adsb: 'ADS-B', dab: 'DAB+' };
                 this._setStatus(false, `busy — in use by ${labels[busyOwner] || busyOwner}`, true);
             } else {
                 this._setStatus(false, st.last_error ? `idle — ${st.last_error}` : 'idle');
