@@ -22,6 +22,8 @@ class AdsbPanel {
         this._apiPrefix = '/api/adsb';
         this._root = null;
         this._statusTimer = null;
+        this._aircraft = [];
+        this._metric = true;
     }
 
     mount(root) {
@@ -84,6 +86,7 @@ class AdsbPanel {
         this._root.querySelector('[data-adsb-start]').addEventListener('click', () => this._start());
         this._root.querySelector('[data-adsb-stop]').addEventListener('click', () => this._stop());
         this._root.querySelector('[data-adsb-map]').addEventListener('click', () => window.AdsbMapModal.show());
+        this._root.querySelector('[data-adsb-body]').addEventListener('click', (e) => this._onRowClick(e));
     }
 
     show() {
@@ -178,11 +181,21 @@ class AdsbPanel {
         const body = this._root.querySelector('[data-adsb-body]');
         if (!body) return;
         const aircraft = status.aircraft || [];
+        this._aircraft = aircraft;
+        this._metric = !!status.metric;
         if (aircraft.length === 0) {
             body.innerHTML = '<tr class="adsb-table__empty"><td colspan="9">No aircraft yet.</td></tr>';
             return;
         }
         body.innerHTML = aircraft.map((a) => this._rowHtml(a, !!status.metric)).join('');
+    }
+
+    _onRowClick(e) {
+        const row = e.target.closest('tr[data-adsb-hex]');
+        if (!row || !window.AdsbFlightModal) return;
+        const hex = row.getAttribute('data-adsb-hex');
+        const aircraft = this._aircraft.find((a) => a.hex === hex);
+        if (aircraft) window.AdsbFlightModal.show(aircraft, this._metric);
     }
 
     _rowHtml(a, metric) {
@@ -192,7 +205,7 @@ class AdsbPanel {
         const speed = a.speed != null ? `${a.speed} ${metric ? 'km/h' : 'kt'}` : '';
         const track = a.track != null ? `${a.track}°` : '';
         return `
-            <tr>
+            <tr class="adsb-table__row" data-adsb-hex="${this._esc(a.hex || '')}">
                 <td class="adsb-table__hex">${this._esc(a.hex || '')}</td>
                 <td>${this._esc(a.flight || '')}</td>
                 <td>${this._esc(a.squawk || '')}</td>
