@@ -329,7 +329,34 @@ else
     apt-get install -y -qq --no-install-recommends rtl-433
 fi
 
-# ── 10. Install welle.io (DAB+ tab) ───────────────────────────────
+# ── 10. Install dump1090 (RTL-SDR ADS-B air traffic decoder) ─────
+#
+# Decodes 1090ES ADS-B squitters from aircraft transponders off the
+# RTL-SDR dongle, on top of the librtlsdr built in section 6. Built
+# from source (MalcolmRobb/dump1090 fork -- adds interactive mode and
+# network output on top of the original antirez/dump1090). Upstream's
+# Makefile has no `install` target, so the binaries are copied to
+# /usr/local/bin by hand after the build.
+#
+# Idempotent: skips the clone+build if the dump1090 binary already
+# exists.
+
+DUMP1090_BUILD_DIR="/opt/dump1090"
+
+if command -v dump1090 &>/dev/null; then
+    info "dump1090 already installed, skipping build"
+else
+    info "Cloning and building dump1090..."
+    rm -rf "$DUMP1090_BUILD_DIR"
+    git clone --depth 1 https://github.com/MalcolmRobb/dump1090.git "$DUMP1090_BUILD_DIR"
+    (
+        cd "$DUMP1090_BUILD_DIR"
+        make -j"$(nproc)"
+        install -m 755 dump1090 view1090 /usr/local/bin/
+    )
+fi
+
+# ── 11. Install welle.io (DAB+ tab) ───────────────────────────────
 #
 # The Debian/Raspberry Pi OS `welle.io` package ships both the GUI
 # app and the headless `welle-cli` binary Meshpoint's DAB+ tab
@@ -349,7 +376,7 @@ else
     apt-get install -y -qq --no-install-recommends welle.io
 fi
 
-# ── 11. Install Meshtastic and MeshCore CLI tools ─────────────────
+# ── 12. Install Meshtastic and MeshCore CLI tools ─────────────────
 #
 # Optional command-line tools for poking at connected radios directly
 # from the shell -- not used by Meshpoint itself (which talks to them
@@ -377,7 +404,7 @@ else
     pipx ensurepath
 fi
 
-# ── 12. Build SX1302 HAL ──────────────────────────────────────────
+# ── 13. Build SX1302 HAL ──────────────────────────────────────────
 
 if [ -f "/usr/local/lib/libloragw.so" ]; then
     info "libloragw.so already installed, skipping HAL build"
@@ -628,7 +655,7 @@ _HALCFG
     info "libloragw.so installed to /usr/local/lib/"
 fi
 
-# ── 13. Apply TX sync word patch ──────────────────────────────────
+# ── 14. Apply TX sync word patch ──────────────────────────────────
 
 HAL_SRC="${HAL_BUILD_DIR}/libloragw/src/loragw_sx1302.c"
 if [ -f "$HAL_SRC" ]; then
@@ -646,7 +673,7 @@ if [ -f "$HAL_SRC" ]; then
     MESHPOINT_INSTALL_IN_PROGRESS=1 bash "${SCRIPT_DIR}/scripts/patch_hal.sh"
 fi
 
-# ── 14. Install Meshpoint application ─────────────────────────────
+# ── 15. Install Meshpoint application ─────────────────────────────
 
 info "Installing Meshpoint to ${MESHPOINT_DIR}..."
 mkdir -p "$MESHPOINT_DIR"
@@ -668,7 +695,7 @@ rsync -a --exclude='venv' \
 #          --exclude='*.pyc' \
 #          "${SCRIPT_DIR}/" "$MESHPOINT_DIR/"
 
-# ── 15. Remove stale compiled core modules from prior installs ───
+# ── 16. Remove stale compiled core modules from prior installs ───
 # Releases before 0.7.0 shipped .cpython-*.so files alongside the
 # .py source. Python prefers the .so at import time, so any leftover
 # binary would silently shadow the current source. rsync above does
@@ -680,7 +707,7 @@ if find "${MESHPOINT_DIR}/src" -name '*.cpython-*.so' -print -quit | grep -q .; 
     find "${MESHPOINT_DIR}/src" -name '*.cpython-*.so' -delete
 fi
 
-# ── 16. Python virtual environment ────────────────────────────────
+# ── 17. Python virtual environment ────────────────────────────────
 
 info "Setting up Python virtual environment..."
 python3 -m venv "${MESHPOINT_DIR}/venv"
@@ -691,11 +718,11 @@ pip install -r "${MESHPOINT_DIR}/requirements.txt" -q
 pip install pyserial -q
 deactivate
 
-# ── 17. Create data directory ─────────────────────────────────────
+# ── 18. Create data directory ─────────────────────────────────────
 
 mkdir -p "${MESHPOINT_DIR}/data"
 
-# ── 18. Create meshpoint system user ──────────────────────────────
+# ── 19. Create meshpoint system user ──────────────────────────────
 
 if ! id -u meshpoint &>/dev/null; then
     info "Creating system user 'meshpoint'..."
@@ -745,14 +772,14 @@ info "Installing sudoers rule for service management..."
 cp "${MESHPOINT_DIR}/config/sudoers-meshpoint" /etc/sudoers.d/meshpoint
 chmod 440 /etc/sudoers.d/meshpoint
 
-# ── 19. Configure journald log rotation ───────────────────────────
+# ── 20. Configure journald log rotation ───────────────────────────
 
 info "Configuring journald log limits (100M, 7-day retention)..."
 mkdir -p /etc/systemd/journald.conf.d
 cp "${MESHPOINT_DIR}/config/journald-meshpoint.conf" /etc/systemd/journald.conf.d/meshpoint.conf
 systemctl restart systemd-journald 2>/dev/null || warn "Could not restart journald"
 
-# ── 20. Install systemd service ───────────────────────────────────
+# ── 21. Install systemd service ───────────────────────────────────
 
 info "Installing systemd service..."
 cp "${MESHPOINT_DIR}/${SERVICE_FILE}" /etc/systemd/system/meshpoint.service
@@ -760,7 +787,7 @@ systemctl daemon-reload
 systemctl enable meshpoint
 info "Service enabled (will start after 'meshpoint setup')"
 
-# ── 21. Install network watchdog ──────────────────────────────────
+# ── 22. Install network watchdog ──────────────────────────────────
 
 info "Installing WiFi network watchdog..."
 cp "${MESHPOINT_DIR}/${WATCHDOG_SERVICE_FILE}" /etc/systemd/system/network-watchdog.service
@@ -769,7 +796,7 @@ systemctl enable network-watchdog
 systemctl start network-watchdog 2>/dev/null || warn "Could not start network-watchdog (will start on next boot)"
 info "Network watchdog enabled"
 
-# ── 22. Install mDNS (Avahi) for meshpoint.local discovery ────────
+# ── 23. Install mDNS (Avahi) for meshpoint.local discovery ────────
 #
 # Lets the Pi be reached as meshpoint.local (or <hostname>.local) on
 # the LAN without knowing its IP -- useful right after a fresh flash
@@ -790,13 +817,13 @@ fi
 
 systemctl enable --now avahi-daemon
 
-# ── 23. Install CLI tool ───────────────────────────────────────────
+# ── 24. Install CLI tool ───────────────────────────────────────────
 
 info "Installing meshpoint CLI..."
 chmod +x "${MESHPOINT_DIR}/${CLI_SCRIPT}"
 ln -sf "${MESHPOINT_DIR}/${CLI_SCRIPT}" /usr/local/bin/meshpoint
 
-# ── 24. Add fastfetch login banner ────────────────────────────────
+# ── 25. Add fastfetch login banner ────────────────────────────────
 #
 # Shows a system-info banner on every interactive login shell for the
 # `pi` user. Idempotent: skips if already present.
