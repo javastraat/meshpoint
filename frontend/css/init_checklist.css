@@ -54,13 +54,13 @@
 }
 
 .init-checklist__row--done {
-    color: var(--accent-green, #00e5a0);
+    color: var(--accent-green);
     border-color: rgba(0, 229, 160, 0.18);
     background: rgba(0, 229, 160, 0.04);
 }
 
 .init-checklist__row--error {
-    color: var(--accent-red, #ef4444);
+    color: var(--accent-red);
     border-color: rgba(239, 68, 68, 0.3);
     background: rgba(239, 68, 68, 0.06);
 }

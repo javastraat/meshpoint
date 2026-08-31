@@ -7587,3 +7587,18 @@ radio_thermals_card, stats_tab replaced with `this._ink()` reads so first render
 is right too. Manual canvases: radio_spectrum_card + topology_tab now read tokens
 at draw and have a themechange->redraw listener. repeaters trends reuse
 NodeMetricsChart so covered. QR canvas is theme-neutral. Terminal already done.
+
+**Light theme -- final tokenization (2026-08-31)**: user's own audit one-liner
+crashed (hex-slice bug) then, fixed, surfaced 2 classes my line-anchored scans
+missed: (a) `var(--DEFINED_TOKEN, <hardcoded fallback>)` -- 283 across 24 files;
+dead code (token defined so fallback never fires) but reads as "hardcoded" ->
+stripped to `var(--token)`. (b) single-line `.sel { color: #ff6b6b }` status/badge
+text (error red / success green / lw-badge / mt-badge / topo-chip etc) -- 50
+across 18 files -> `var(--accent-red/green/cyan/amber/purple/blue)` by hue, so
+badge *text* picks up the theme's tuned (darker, readable-on-white) accent; the
+translucent `background:` tint on those badges stays a literal (fine on any bg).
+First color_accents.py run had a `color:` substring-match bug that also hit
+`border-color:` -- caught in review, reverted, redone with `(?<![-a-z])`.
+Post-pass audit: raw colour literals in component CSS 909 -> 280 (all
+accents/shadows/tints, intentionally theme-independent); NEUTRAL surface/text/
+border literals not tokenised = 0.

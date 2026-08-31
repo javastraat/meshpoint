@@ -16,9 +16,9 @@
 
 .topo-chip {
     background: transparent;
-    border: 1px solid var(--border, #253248);
+    border: 1px solid var(--border);
     border-radius: 999px;
-    color: var(--text-secondary, #8b98a9);
+    color: var(--text-secondary);
     font-family: var(--font-mono);
     font-size: 0.7rem;
     padding: 0.25rem 0.7rem;
@@ -29,8 +29,8 @@
 
 .topo-chip--active { opacity: 1; }
 .topo-chip--route.topo-chip--active { border-color: var(--accent-cyan); color: var(--accent-cyan); }
-.topo-chip--direct.topo-chip--active { border-color: var(--accent-green, #34d399); color: var(--accent-green, #34d399); }
-.topo-chip--neighbour.topo-chip--active { border-color: var(--accent-amber, #fbbf24); color: var(--accent-amber, #fbbf24); }
+.topo-chip--direct.topo-chip--active { border-color: var(--accent-green); color: var(--accent-green); }
+.topo-chip--neighbour.topo-chip--active { border-color: var(--accent-amber); color: var(--accent-amber); }
 
 .topo-canvas-wrap {
     position: relative;
@@ -76,9 +76,9 @@
     z-index: 3;
     padding: 0.3rem 0.7rem;
     background: var(--bg-card);
-    border: 1px solid var(--border, #253248);
+    border: 1px solid var(--border);
     border-radius: 999px;
-    color: var(--text-secondary, #8b98a9);
+    color: var(--text-secondary);
     font-size: 0.7rem;
     pointer-events: none;
 }
@@ -91,7 +91,7 @@
     max-width: 260px;
     padding: 0.45rem 0.6rem;
     background: var(--bg-card);
-    border: 1px solid var(--border, #253248);
+    border: 1px solid var(--border);
     border-radius: var(--radius);
     color: var(--text-primary);
     font-size: 0.72rem;
@@ -110,7 +110,7 @@
     justify-content: center;
     text-align: center;
     padding: 2rem;
-    color: var(--text-secondary, #8b98a9);
+    color: var(--text-secondary);
     font-size: 0.85rem;
 }
 
@@ -121,8 +121,8 @@
     flex-wrap: wrap;
     padding: 0.6rem 1rem 0.8rem;
     font-size: 0.7rem;
-    color: var(--text-secondary, #8b98a9);
-    border-top: 1px solid var(--border, #253248);
+    color: var(--text-secondary);
+    border-top: 1px solid var(--border);
 }
 
 .topo-legend__item { display: inline-flex; align-items: center; gap: 0.35rem; }
@@ -156,10 +156,10 @@
     display: inline-block;
 }
 
-.topo-dot--self { background: var(--accent-green, #34d399); }
-.topo-dot--anchor { background: transparent; border: 2px solid var(--accent-amber, #fbbf24); }
-.topo-dot--meshtastic { background: var(--accent-cyan, #22d3ee); }
-.topo-dot--meshcore { background: var(--accent-amber, #fbbf24); }
+.topo-dot--self { background: var(--accent-green); }
+.topo-dot--anchor { background: transparent; border: 2px solid var(--accent-amber); }
+.topo-dot--meshtastic { background: var(--accent-cyan); }
+.topo-dot--meshcore { background: var(--accent-amber); }
 
 @media (max-width: 720px) {
     .topo-canvas-wrap { height: 55vh; }

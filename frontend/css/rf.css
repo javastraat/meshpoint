@@ -15,20 +15,20 @@
 .rf-panel__title {
     margin: 0;
     font-size: 1.1rem;
-    color: var(--text-primary, #f1f5f9);
+    color: var(--text-primary);
 }
 
 .rf-panel__desc {
     margin: 0.35rem 0 0;
     font-size: 0.78rem;
-    color: var(--text-secondary, #94a3b8);
+    color: var(--text-secondary);
     max-width: 40rem;
 }
 
 .rf-panel__error {
     margin: 0.65rem 0 0;
     padding: 0.55rem 0.65rem;
-    border-radius: var(--radius-sm, 6px);
+    border-radius: var(--radius-sm);
     font-size: 0.75rem;
     color: var(--accent-red);
     background: rgba(239, 68, 68, 0.12);
@@ -51,9 +51,9 @@
 }
 
 .rf-card {
-    background: var(--bg-card, var(--bg-popover));
-    border: 1px solid var(--border, rgba(51, 65, 85, 0.8));
-    border-radius: var(--radius, 8px);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
     padding: 1rem;
 }
 
@@ -61,13 +61,13 @@
     margin: 0 0 0.35rem;
     font-size: 0.85rem;
     font-weight: 600;
-    color: var(--text-primary, #e2e8f0);
+    color: var(--text-primary);
 }
 
 .rf-card__hint {
     margin: 0 0 0.75rem;
     font-size: 0.72rem;
-    color: var(--text-secondary, #94a3b8);
+    color: var(--text-secondary);
 }
 
 .rf-readout {
@@ -82,12 +82,12 @@
     font-size: 1.6rem;
     font-weight: 600;
     font-variant-numeric: tabular-nums;
-    color: var(--text-primary, #f8fafc);
+    color: var(--text-primary);
 }
 
 .rf-readout__unit {
     font-size: 0.8rem;
-    color: var(--text-secondary, #94a3b8);
+    color: var(--text-secondary);
 }
 
 .rf-badge {
@@ -141,18 +141,18 @@
     grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
     gap: 0.5rem;
     font-size: 0.72rem;
-    color: var(--text-secondary, #94a3b8);
+    color: var(--text-secondary);
 }
 
 .rf-meta dt {
     margin: 0;
     font-weight: 500;
-    color: var(--text-muted, #64748b);
+    color: var(--text-muted);
 }
 
 .rf-meta dd {
     margin: 0.1rem 0 0;
-    color: var(--text-primary, #e2e8f0);
+    color: var(--text-primary);
 }
 
 .rf-histogram-wrap {
@@ -169,7 +169,7 @@
     justify-content: center;
     min-height: 180px;
     font-size: 0.8rem;
-    color: var(--text-secondary, #94a3b8);
+    color: var(--text-secondary);
     text-align: center;
     padding: 1rem;
 }
@@ -189,7 +189,7 @@
     gap: 0.75rem 1.25rem;
     margin-top: 0.75rem;
     font-size: 0.72rem;
-    color: var(--text-secondary, #94a3b8);
+    color: var(--text-secondary);
 }
 
 /* Fork band-spectrum card mounted on the RF Environment page. */
@@ -200,23 +200,23 @@
 .rf-stray-count {
     font-weight: 400;
     font-size: 0.72rem;
-    color: var(--text-secondary, #94a3b8);
+    color: var(--text-secondary);
 }
 
 .rf-stray-table {
     max-height: 50vh;
     overflow-y: auto;
-    font-family: var(--font-mono, monospace);
+    font-family: var(--font-mono);
     font-size: 0.72rem;
 }
 
 .rf-stray-empty {
-    color: var(--text-secondary, #94a3b8);
+    color: var(--text-secondary);
     padding: 0.75rem 0;
 }
 
 .rf-stray-row {
-    border-bottom: 1px solid var(--border, rgba(51, 65, 85, 0.8));
+    border-bottom: 1px solid var(--border);
 }
 
 .rf-stray-row summary {
@@ -234,13 +234,13 @@
 }
 
 .rf-stray-row__time {
-    color: var(--text-secondary, #94a3b8);
+    color: var(--text-secondary);
     flex-shrink: 0;
     width: 5.5em;
 }
 
 .rf-stray-row__source {
-    color: var(--text-primary, #e2e8f0);
+    color: var(--text-primary);
     flex-shrink: 0;
     width: 9em;
     overflow: hidden;
@@ -249,30 +249,30 @@
 }
 
 .rf-stray-row__hint {
-    color: var(--accent-amber, #f59e0b);
+    color: var(--accent-amber);
     flex-shrink: 0;
     width: 7em;
 }
 
 .rf-stray-row__size {
-    color: var(--text-secondary, #94a3b8);
+    color: var(--text-secondary);
     flex-shrink: 0;
     width: 4em;
 }
 
 .rf-stray-row__signal {
-    color: var(--text-secondary, #94a3b8);
+    color: var(--text-secondary);
     flex-shrink: 0;
     width: 9em;
 }
 
 .rf-stray-row__preview {
-    color: var(--text-primary, #e2e8f0);
+    color: var(--text-primary);
     word-break: break-all;
 }
 
 .rf-stray-row__hex {
     padding: 0 0 0.6rem 5.5em;
-    color: var(--text-secondary, #94a3b8);
+    color: var(--text-secondary);
     word-break: break-all;
 }

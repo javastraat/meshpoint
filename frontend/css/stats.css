@@ -16,7 +16,7 @@
 }
 
 .stats-panel__loading {
-    color: var(--text-secondary, #94a3b8);
+    color: var(--text-secondary);
     text-align: center;
     padding: 4rem;
     font-family: 'JetBrains Mono', monospace;
@@ -43,7 +43,7 @@
 
 .stats-hero__label {
     font-size: 15px;
-    color: var(--text-secondary, #94a3b8);
+    color: var(--text-secondary);
     margin-left: 10px;
 }
 
@@ -63,7 +63,7 @@
 
 .stats-hero__session-label {
     font-size: 15px;
-    color: var(--text-secondary, #94a3b8);
+    color: var(--text-secondary);
 }
 
 /* --- Top stat strip --- */
@@ -75,8 +75,8 @@
 }
 
 .stats-strip__card {
-    background: var(--card-bg, #111827);
-    border: 1px solid var(--border, #1e293b);
+    background: var(--card-bg);
+    border: 1px solid var(--border);
     border-radius: 12px;
     padding: 16px;
     display: flex;
@@ -88,12 +88,12 @@
     font-family: 'JetBrains Mono', monospace;
     font-size: 22px;
     font-weight: 700;
-    color: var(--text-primary, #f1f5f9);
+    color: var(--text-primary);
 }
 
 .stats-strip__label {
     font-size: 11px;
-    color: var(--text-secondary, #94a3b8);
+    color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.05em;
 }
@@ -163,8 +163,8 @@
 }
 
 .stats-signal-num {
-    background: var(--card-bg, #111827);
-    border: 1px solid var(--border, #1e293b);
+    background: var(--card-bg);
+    border: 1px solid var(--border);
     border-radius: 12px;
     padding: 14px;
     text-align: center;
@@ -172,7 +172,7 @@
 
 .stats-signal-num__label {
     font-size: 10px;
-    color: var(--text-secondary, #94a3b8);
+    color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.05em;
     margin-bottom: 4px;
@@ -193,8 +193,8 @@
 }
 
 .stats-card {
-    background: var(--card-bg, #111827);
-    border: 1px solid var(--border, #1e293b);
+    background: var(--card-bg);
+    border: 1px solid var(--border);
     border-radius: 12px;
     padding: 16px;
     min-height: 260px;
@@ -208,7 +208,7 @@
     font-family: 'JetBrains Mono', monospace;
     font-size: 12px;
     font-weight: 700;
-    color: var(--text-primary, #f1f5f9);
+    color: var(--text-primary);
     margin-bottom: 2px;
 }
 
@@ -232,15 +232,15 @@
 }
 
 .stats-range-card {
-    background: var(--card-bg, #111827);
-    border: 1px solid var(--border, #1e293b);
+    background: var(--card-bg);
+    border: 1px solid var(--border);
     border-radius: 12px;
     padding: 20px;
 }
 
 .stats-range-card__header {
     font-size: 12px;
-    color: var(--text-secondary, #94a3b8);
+    color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.05em;
     margin-bottom: 2px;
@@ -269,7 +269,7 @@
 
 .stats-range-card__unit {
     font-size: 14px;
-    color: var(--text-secondary, #94a3b8);
+    color: var(--text-secondary);
 }
 
 .stats-range-card__detail {
@@ -281,7 +281,7 @@
 
 .stats-range-bar {
     height: 6px;
-    background: var(--border, #1e293b);
+    background: var(--border);
     border-radius: 3px;
     overflow: hidden;
 }
@@ -304,8 +304,8 @@
 
 /* --- Protocol detail bar --- */
 .stats-proto-bars {
-    background: var(--card-bg, #111827);
-    border: 1px solid var(--border, #1e293b);
+    background: var(--card-bg);
+    border: 1px solid var(--border);
     border-radius: 12px;
     padding: 20px;
     display: flex;
@@ -322,7 +322,7 @@
 .stats-proto-name {
     font-family: 'JetBrains Mono', monospace;
     font-size: 13px;
-    color: var(--text-secondary, #94a3b8);
+    color: var(--text-secondary);
     width: 110px;
     text-align: right;
     flex-shrink: 0;
@@ -331,7 +331,7 @@
 .stats-proto-track {
     flex: 1;
     height: 8px;
-    background: var(--border, #1e293b);
+    background: var(--border);
     border-radius: 4px;
     overflow: hidden;
 }

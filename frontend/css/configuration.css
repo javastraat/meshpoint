@@ -46,7 +46,7 @@
 }
 
 .cfg-inline-link {
-    color: var(--accent-cyan, #22d3ee);
+    color: var(--accent-cyan);
     text-decoration: none;
 }
 
@@ -113,7 +113,7 @@
     font-weight: 600;
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: var(--text-muted, #9ca3af);
+    color: var(--text-muted);
 }
 
 .cfg-firmware-installed__version {
@@ -121,14 +121,14 @@
     font-size: 15px;
     font-weight: 600;
     line-height: 1.3;
-    color: var(--accent-cyan, #22d3ee);
+    color: var(--accent-cyan);
 }
 
 .cfg-firmware-installed__meta {
     font-family: 'JetBrains Mono', monospace;
     font-size: 12px;
     line-height: 1.3;
-    color: var(--text-secondary, #d1d5db);
+    color: var(--text-secondary);
 }
 
 /* Configuration -> Firmware's own fields (Version/Flavor/Board/Device) --
@@ -187,7 +187,7 @@
     display: block;
     font-size: 12px;
     font-family: 'JetBrains Mono', Menlo, monospace;
-    color: var(--accent-cyan, #22d3ee);
+    color: var(--accent-cyan);
     margin-top: 4px;
 }
 
@@ -206,7 +206,7 @@
 .cfg-field__hint--warn {
     display: block;
     margin-top: 4px;
-    color: var(--brand-amber, #ffb84d);
+    color: var(--brand-amber);
 }
 
 .cfg-field__hint--warn:empty {
@@ -216,7 +216,7 @@
 .cfg-field__hint code {
     font-family: 'JetBrains Mono', Menlo, monospace;
     font-size: 11px;
-    color: var(--brand-amber, #ffb84d);
+    color: var(--brand-amber);
 }
 
 .cfg-field__textarea {
@@ -244,7 +244,7 @@
 
 .cfg-field__input:focus {
     outline: none;
-    border-color: var(--brand-amber, #ffb84d);
+    border-color: var(--brand-amber);
     background: var(--overlay-med);
 }
 
@@ -256,13 +256,13 @@ select.cfg-field__input {
 }
 
 select.cfg-field__input option {
-    background-color: var(--bg-card, #1a1d27);
-    color: var(--text-primary, #f3f4f6);
+    background-color: var(--bg-card);
+    color: var(--text-primary);
 }
 
 select.cfg-field__input option:checked {
-    background-color: var(--accent-cyan, #06b6d4);
-    color: var(--bg-primary, #0d0f15);
+    background-color: var(--accent-cyan);
+    color: var(--bg-primary);
 }
 
 .cfg-fieldset {
@@ -294,8 +294,8 @@ select.cfg-field__input option:checked {
     min-height: 1.4em;
 }
 
-.cfg-status[data-kind="error"] { color: #ff6b6b; }
-.cfg-status[data-kind="success"] { color: #44d39a; }
+.cfg-status[data-kind="error"] { color: var(--accent-red); }
+.cfg-status[data-kind="success"] { color: var(--accent-green); }
 .cfg-status[data-kind="pending"] { color: var(--text-secondary); }
 
 /* Live compile/flash output (Configuration → POCSAG's "Companion firmware"
@@ -338,7 +338,7 @@ select.cfg-field__input option:checked {
 .cfg-preview__value {
     font-family: 'JetBrains Mono', Menlo, monospace;
     font-size: 13px;
-    color: var(--brand-amber, #ffb84d);
+    color: var(--brand-amber);
 }
 
 .cfg-note {
@@ -347,7 +347,7 @@ select.cfg-field__input option:checked {
     background: rgba(255, 184, 77, 0.08);
     border: 1px solid rgba(255, 184, 77, 0.2);
     border-radius: 8px;
-    color: var(--brand-amber, #ffb84d);
+    color: var(--brand-amber);
     font-size: 12px;
 }
 
@@ -423,7 +423,7 @@ select.cfg-field__input option:checked {
 }
 
 .cfg-radio input[type="radio"] {
-    accent-color: var(--brand-amber, #ffb84d);
+    accent-color: var(--brand-amber);
     margin: 0;
 }
 
@@ -452,8 +452,8 @@ select.cfg-field__input option:checked {
 
 .cfg-chip--selected {
     background: rgba(255, 184, 77, 0.18);
-    border-color: var(--brand-amber, #ffb84d);
-    color: var(--brand-amber, #ffb84d);
+    border-color: var(--brand-amber);
+    color: var(--brand-amber);
 }
 
 .cfg-chip--off {
@@ -462,7 +462,7 @@ select.cfg-field__input option:checked {
 }
 
 .cfg-chip--off.cfg-chip--selected {
-    color: var(--brand-amber, #ffb84d);
+    color: var(--brand-amber);
 }
 
 .cfg-btn--has-pending {
@@ -477,7 +477,7 @@ select.cfg-field__input option:checked {
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: var(--brand-amber, #ffb84d);
+    background: var(--brand-amber);
     animation: cfg-btn-pending-pulse 1.5s ease-in-out infinite;
 }
 
@@ -589,7 +589,7 @@ select.cfg-field__input option:checked {
 .cfg-mc-readout__value {
     font-family: 'JetBrains Mono', Menlo, monospace;
     font-size: 14px;
-    color: var(--brand-amber, #ffb84d);
+    color: var(--brand-amber);
 }
 
 /* A nested link (e.g. the DAPNET Web UI tile) has its own browser
@@ -621,9 +621,9 @@ select.cfg-field__input option:checked {
     color: var(--text-muted);
 }
 
-.cfg-mc-readout__update-status[data-kind="ok"]    { color: var(--accent-green, #00e5a0); }
-.cfg-mc-readout__update-status[data-kind="warn"]  { color: var(--accent-amber, #f59e0b); }
-.cfg-mc-readout__update-status[data-kind="error"] { color: #f87171; }
+.cfg-mc-readout__update-status[data-kind="ok"]    { color: var(--accent-green); }
+.cfg-mc-readout__update-status[data-kind="warn"]  { color: var(--accent-amber); }
+.cfg-mc-readout__update-status[data-kind="error"] { color: var(--accent-red); }
 
 .cfg-mc-readout__update-status a {
     color: inherit;

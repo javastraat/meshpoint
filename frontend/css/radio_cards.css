@@ -483,18 +483,18 @@
 
 .spectrum-btn {
     background: transparent;
-    border: 1px solid var(--border, #1e293b);
-    border-radius: var(--radius-sm, 4px);
-    color: var(--text-secondary, #94a3b8);
-    font-family: var(--font-mono, monospace);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
     font-size: 0.72rem;
     padding: 3px 10px;
     cursor: pointer;
 }
 
 .spectrum-btn:hover:not(:disabled) {
-    border-color: var(--accent-cyan, #06b6d4);
-    color: var(--accent-cyan, #06b6d4);
+    border-color: var(--accent-cyan);
+    color: var(--accent-cyan);
 }
 
 .spectrum-btn:disabled {
@@ -516,10 +516,10 @@
     position: absolute;
     pointer-events: none;
     background: var(--bg-inset);
-    border: 1px solid var(--border, #1e293b);
-    border-radius: var(--radius-sm, 4px);
-    color: var(--text-primary, #e2e8f0);
-    font-family: var(--font-mono, monospace);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
     font-size: 0.72rem;
     padding: 4px 8px;
     white-space: nowrap;
@@ -529,7 +529,7 @@
 .spectrum-empty {
     padding: 40px 16px;
     text-align: center;
-    color: var(--text-muted, #64748b);
+    color: var(--text-muted);
     font-size: 0.85rem;
 }
 
@@ -538,7 +538,7 @@
     flex-wrap: wrap;
     gap: 14px;
     margin-top: 8px;
-    color: var(--text-muted, #64748b);
+    color: var(--text-muted);
     font-size: 0.72rem;
 }
 
@@ -562,8 +562,8 @@
 /* ── Thermals card (CPU temp + fan duty history) ─────────────────── */
 
 .thermals-meta {
-    color: var(--text-muted, #64748b);
-    font-family: var(--font-mono, monospace);
+    color: var(--text-muted);
+    font-family: var(--font-mono);
     font-size: 0.75rem;
 }
 
@@ -572,7 +572,7 @@
 }
 
 .thermals-panel__label {
-    color: var(--text-muted, #64748b);
+    color: var(--text-muted);
     font-size: 0.68rem;
     text-transform: uppercase;
     letter-spacing: 0.06em;
@@ -590,6 +590,6 @@
 .thermals-empty {
     padding: 24px 16px;
     text-align: center;
-    color: var(--text-muted, #64748b);
+    color: var(--text-muted);
     font-size: 0.85rem;
 }

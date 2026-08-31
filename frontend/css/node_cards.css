@@ -20,8 +20,8 @@
 }
 
 .nc-controls__sort {
-    background: var(--bg-secondary, #0f172a);
-    color: var(--text-primary, #e2e8f0);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
     border: 1px solid var(--border);
     border-radius: 4px;
     font-size: 0.7rem;
@@ -56,7 +56,7 @@
 }
 
 .nc-pill:hover {
-    color: var(--text-primary, #e2e8f0);
+    color: var(--text-primary);
     border-color: rgba(6, 182, 212, 0.4);
 }
 
@@ -75,8 +75,8 @@
 
 .nc-pill--star.nc-pill--active {
     background: rgba(245, 158, 11, 0.18);
-    color: var(--accent-amber, #f59e0b);
-    border-color: var(--accent-amber, #f59e0b);
+    color: var(--accent-amber);
+    border-color: var(--accent-amber);
 }
 
 .nc-pill:focus-visible {
@@ -100,18 +100,18 @@
 }
 
 .nc-card__favorite:hover {
-    color: var(--accent-amber, #f59e0b);
+    color: var(--accent-amber);
     opacity: 1;
     transform: scale(1.1);
 }
 
 .nc-card__favorite--on {
-    color: var(--accent-amber, #f59e0b);
+    color: var(--accent-amber);
     opacity: 1;
 }
 
 .nc-card__favorite:focus-visible {
-    outline: 1px solid var(--accent-amber, #f59e0b);
+    outline: 1px solid var(--accent-amber);
     outline-offset: 1px;
 }
 
@@ -284,7 +284,7 @@
 }
 
 .nc-chip--band {
-    color: var(--accent-purple, #a78bfa);
+    color: var(--accent-purple);
     background: rgba(167, 139, 250, 0.1);
     font-size: 0.55rem;
     font-weight: 600;

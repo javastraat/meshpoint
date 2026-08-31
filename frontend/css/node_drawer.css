@@ -106,18 +106,18 @@
 }
 
 .nd-header__favorite:hover {
-    color: var(--accent-amber, #f59e0b);
+    color: var(--accent-amber);
     opacity: 1;
     transform: scale(1.1);
 }
 
 .nd-header__favorite--on {
-    color: var(--accent-amber, #f59e0b);
+    color: var(--accent-amber);
     opacity: 1;
 }
 
 .nd-header__favorite:focus-visible {
-    outline: 1px solid var(--accent-amber, #f59e0b);
+    outline: 1px solid var(--accent-amber);
     outline-offset: 1px;
 }
 

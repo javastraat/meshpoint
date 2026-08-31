@@ -86,7 +86,7 @@
         min-width: 0;
         max-height: 38%;
         border-right: none;
-        border-bottom: 1px solid var(--border, #2a2a4a);
+        border-bottom: 1px solid var(--border);
     }
     .msg-chat {
         width: 100%;

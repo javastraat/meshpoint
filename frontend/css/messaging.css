@@ -18,7 +18,7 @@
     --msg-bg-strip: #1a1d27;
     --msg-border: rgba(255, 255, 255, 0.08);
     --msg-border-strong: rgba(255, 255, 255, 0.14);
-    --msg-accent: var(--brand-amber, #ffb84d);
+    --msg-accent: var(--brand-amber);
     --msg-accent-soft: rgba(255, 184, 77, 0.18);
     --msg-text: #c0caf5;
     --msg-text-dim: rgba(192, 202, 245, 0.65);
@@ -397,12 +397,12 @@
 }
 
 .msg-convo__favorite:hover {
-    color: var(--accent-amber, #f59e0b);
+    color: var(--accent-amber);
     transform: scale(1.1);
 }
 
 .msg-convo__favorite--on {
-    color: var(--accent-amber, #f59e0b);
+    color: var(--accent-amber);
 }
 
 .msg-sidebar__section-label {
@@ -1062,5 +1062,5 @@
 .msg-notify__more {
     margin-top: 0.25rem;
     font-size: 0.72rem;
-    color: var(--text-secondary, #8b98a9);
+    color: var(--text-secondary);
 }

@@ -97,7 +97,7 @@
 }
 
 .r-readout-row__value[data-state="on"] {
-    color: var(--accent-green, #00e5a0);
+    color: var(--accent-green);
     font-family: var(--font-mono);
     font-weight: 600;
     text-shadow: 0 0 8px rgba(0, 229, 160, 0.25);
@@ -260,7 +260,7 @@
 }
 
 .ch-table__pill--on {
-    color: var(--accent-green, #00e5a0);
+    color: var(--accent-green);
     background: rgba(0, 229, 160, 0.08);
     border-color: rgba(0, 229, 160, 0.4);
 }

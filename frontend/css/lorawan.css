@@ -238,7 +238,7 @@
 .lw-id {
     font-family: 'JetBrains Mono', Menlo, monospace;
     font-size: 12px;
-    color: var(--brand-amber, #ffb84d);
+    color: var(--brand-amber);
     letter-spacing: 0.3px;
 }
 
@@ -262,9 +262,9 @@
     white-space: nowrap;
 }
 
-.lw-signal--good { color: #44d39a; }
-.lw-signal--ok   { color: var(--brand-amber, #ffb84d); }
-.lw-signal--weak { color: #ff6b6b; }
+.lw-signal--good { color: var(--accent-green); }
+.lw-signal--ok   { color: var(--brand-amber); }
+.lw-signal--weak { color: var(--accent-red); }
 
 /* ── Type badges ─────────────────────────────────────── */
 
@@ -279,15 +279,15 @@
     color: var(--text-secondary);
 }
 
-.lw-badge--join   { background: rgba(68, 211, 154, 0.15); color: #44d39a; }
-.lw-badge--data   { background: rgba(34, 211, 238, 0.15); color: #22d3ee; }
-.lw-badge--rejoin { background: rgba(255, 184, 77, 0.15);  color: var(--brand-amber, #ffb84d); }
+.lw-badge--join   { background: rgba(68, 211, 154, 0.15); color: var(--accent-green); }
+.lw-badge--data   { background: rgba(34, 211, 238, 0.15); color: var(--accent-cyan); }
+.lw-badge--rejoin { background: rgba(255, 184, 77, 0.15);  color: var(--brand-amber); }
 
 /* Overrides the type color above when a packet couldn't be decrypted
    (no session key for that DevAddr yet, or root keys not configured) --
    red is the "needs attention" signal across this dashboard, same idea
    as the RSSI danger color in _rssiClass(). */
-.lw-badge--undecrypted { background: rgba(248, 113, 113, 0.15); color: #f87171; }
+.lw-badge--undecrypted { background: rgba(248, 113, 113, 0.15); color: var(--accent-red); }
 
 /* ── Column widths — MeshCore nodes table ───────────── */
 
@@ -383,14 +383,14 @@
     color: var(--text-secondary);
 }
 
-.mt-badge--text        { background: rgba(34, 211, 238, 0.15); color: #22d3ee; }
-.mt-badge--position    { background: rgba(68, 211, 154, 0.15); color: #44d39a; }
-.mt-badge--telemetry   { background: rgba(139, 92, 246, 0.15); color: #a78bfa; }
-.mt-badge--nodeinfo    { background: rgba(255, 184, 77, 0.15);  color: var(--brand-amber, #ffb84d); }
-.mt-badge--encrypted   { background: rgba(239, 68, 68, 0.12);  color: #f87171; }
-.mt-badge--routing     { background: rgba(99, 102, 241, 0.15); color: #818cf8; }
-.mt-badge--traceroute  { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
-.mt-badge--neighborinfo { background: rgba(16, 185, 129, 0.12); color: #34d399; }
+.mt-badge--text        { background: rgba(34, 211, 238, 0.15); color: var(--accent-cyan); }
+.mt-badge--position    { background: rgba(68, 211, 154, 0.15); color: var(--accent-green); }
+.mt-badge--telemetry   { background: rgba(139, 92, 246, 0.15); color: var(--accent-purple); }
+.mt-badge--nodeinfo    { background: rgba(255, 184, 77, 0.15);  color: var(--brand-amber); }
+.mt-badge--encrypted   { background: rgba(239, 68, 68, 0.12);  color: var(--accent-red); }
+.mt-badge--routing     { background: rgba(99, 102, 241, 0.15); color: var(--accent-blue); }
+.mt-badge--traceroute  { background: rgba(245, 158, 11, 0.15); color: var(--accent-amber); }
+.mt-badge--neighborinfo { background: rgba(16, 185, 129, 0.12); color: var(--accent-green); }
 
 /* ── Empty state ─────────────────────────────────────── */
 
@@ -430,7 +430,7 @@
     text-transform: inherit;
     letter-spacing: inherit;
     font-weight: 600;
-    color: var(--text-muted, #64748b);
+    color: var(--text-muted);
     background: transparent;
     border: 1px solid transparent;
     border-radius: 999px;
@@ -439,11 +439,11 @@
 }
 
 .lw-tab:hover {
-    color: var(--text-primary, #e2e8f0);
+    color: var(--text-primary);
 }
 
 .lw-tab--active {
-    color: var(--accent-cyan, #22d3ee);
+    color: var(--accent-cyan);
     background: rgba(34, 211, 238, 0.08);
     border-color: rgba(34, 211, 238, 0.35);
 }

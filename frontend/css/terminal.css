@@ -15,7 +15,7 @@
     --term-bg-strip: #1a1d27;
     --term-border: rgba(255, 255, 255, 0.08);
     --term-border-strong: rgba(255, 255, 255, 0.14);
-    --term-accent: var(--brand-amber, #ffb84d);
+    --term-accent: var(--brand-amber);
     --term-accent-soft: rgba(255, 184, 77, 0.18);
     --term-danger: #f7768e;
     --term-success: #9ece6a;
@@ -584,7 +584,7 @@
 .danger-modal__backdrop {
     position: absolute;
     inset: 0;
-    background: rgba(0, 0, 0, 0);
+    background: transparent;
     transition: background 200ms ease;
 }
 

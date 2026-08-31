@@ -207,7 +207,7 @@
 }
 
 .telemetry-rail__player-btn[aria-pressed="true"] {
-    color: var(--accent-amber, #f59e0b);
+    color: var(--accent-amber);
 }
 
 .telemetry-rail__player-btn svg {

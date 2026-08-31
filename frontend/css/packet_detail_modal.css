@@ -14,8 +14,8 @@
 }
 
 .pdm-modal {
-    background: var(--bg-primary, #0f1419);
-    border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+    background: var(--bg-primary);
+    border: 1px solid var(--border-subtle);
     border-radius: 12px;
     width: min(640px, 100%);
     max-height: min(85vh, 720px);
@@ -31,27 +31,27 @@
     justify-content: space-between;
     gap: 0.75rem;
     padding: 0.85rem 1rem;
-    border-bottom: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+    border-bottom: 1px solid var(--border-subtle);
     flex-shrink: 0;
 }
 
 .pdm-modal__title {
     font-size: 0.9rem;
     font-weight: 600;
-    color: var(--text-primary, #e8edf2);
+    color: var(--text-primary);
     margin: 0;
 }
 
 .pdm-modal__meta {
     font-family: var(--font-mono);
     font-size: 0.65rem;
-    color: var(--text-secondary, #8b9aab);
+    color: var(--text-secondary);
 }
 
 .pdm-modal__close {
     background: none;
     border: none;
-    color: var(--text-secondary, #8b9aab);
+    color: var(--text-secondary);
     font-size: 1.35rem;
     line-height: 1;
     cursor: pointer;
@@ -60,7 +60,7 @@
 }
 
 .pdm-modal__close:hover {
-    color: var(--accent-cyan, #06b6d4);
+    color: var(--accent-cyan);
     background: rgba(6, 182, 212, 0.1);
 }
 
@@ -91,7 +91,7 @@
     grid-template-columns: 7.5rem 1fr;
     gap: 0.35rem 0.75rem;
     padding: 0.65rem 0;
-    border-bottom: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.06));
+    border-bottom: 1px solid var(--border-subtle);
     font-size: 0.78rem;
 }
 
@@ -101,7 +101,7 @@
 
 .pdm-layer__label {
     font-weight: 600;
-    color: var(--accent-cyan, #06b6d4);
+    color: var(--accent-cyan);
     font-size: 0.72rem;
     text-transform: uppercase;
     letter-spacing: 0.04em;
@@ -123,12 +123,12 @@
 }
 
 .pdm-row__key {
-    color: var(--text-secondary, #8b9aab);
+    color: var(--text-secondary);
     flex-shrink: 0;
 }
 
 .pdm-row__val {
-    color: var(--text-primary, #e8edf2);
+    color: var(--text-primary);
     font-family: var(--font-mono);
     font-size: 0.74rem;
     word-break: break-word;
@@ -147,15 +147,15 @@
     font-size: 0.74rem;
     white-space: pre-wrap;
     word-break: break-word;
-    color: var(--text-primary, #e8edf2);
+    color: var(--text-primary);
     margin: 0;
 }
 
 .pdm-expand {
     margin-top: 0.35rem;
     background: none;
-    border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.12));
-    color: var(--accent-cyan, #06b6d4);
+    border: 1px solid var(--border-subtle);
+    color: var(--accent-cyan);
     font-size: 0.68rem;
     padding: 0.2rem 0.5rem;
     border-radius: 6px;
@@ -191,7 +191,7 @@
     align-items: baseline;
     gap: 0.75rem;
     padding: 0.4rem 0;
-    border-bottom: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.06));
+    border-bottom: 1px solid var(--border-subtle);
 }
 
 .nbm-row:last-child {
@@ -214,12 +214,12 @@
 }
 
 .nbm-row__key {
-    color: var(--text-secondary, #8b9aab);
+    color: var(--text-secondary);
     font-size: 0.68rem;
 }
 
 .nbm-row__meta {
     flex-shrink: 0;
-    color: var(--text-secondary, #8b9aab);
+    color: var(--text-secondary);
     font-size: 0.7rem;
 }

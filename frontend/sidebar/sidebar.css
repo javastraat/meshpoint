@@ -207,17 +207,17 @@
 }
 
 .sidebar__logo-frame[data-state="online"] .sidebar__logo-pip {
-    background: var(--accent-green, #00e5a0);
+    background: var(--accent-green);
     box-shadow: 0 0 8px rgba(0, 229, 160, 0.7);
 }
 
 .sidebar__logo-frame[data-state="offline"] .sidebar__logo-pip {
-    background: var(--accent-red, #ef4444);
+    background: var(--accent-red);
     box-shadow: 0 0 8px rgba(239, 68, 68, 0.7);
 }
 
 .sidebar__logo-frame[data-state="connecting"] .sidebar__logo-pip {
-    background: var(--accent-amber, #f59e0b);
+    background: var(--accent-amber);
     animation: sidebar-logo-pip-blink 0.9s steps(2, end) infinite;
 }
 

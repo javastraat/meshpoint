@@ -9,7 +9,7 @@
     --auth-card-radius: 14px;
     --auth-input-bg: rgba(255, 255, 255, 0.05);
     --auth-input-border: rgba(255, 255, 255, 0.1);
-    --auth-accent: var(--brand-amber, #ffb84d);
+    --auth-accent: var(--brand-amber);
     --auth-danger: #ff6b6b;
     --auth-success: #44d39a;
     color: var(--text-primary);
@@ -245,14 +245,14 @@
 .auth-preset:hover {
     background: rgba(255, 184, 77, 0.08);
     border-color: rgba(255, 184, 77, 0.32);
-    color: var(--auth-accent, #ffb84d);
+    color: var(--auth-accent);
     transform: translateY(-1px);
 }
 
 .auth-preset--active {
     background: rgba(255, 184, 77, 0.18);
     border-color: rgba(255, 184, 77, 0.55);
-    color: var(--auth-accent, #ffb84d);
+    color: var(--auth-accent);
     box-shadow: 0 0 0 1px rgba(255, 184, 77, 0.18) inset;
 }
 
@@ -341,11 +341,11 @@
 }
 
 .update-card__description[data-tier="rc"] {
-    color: var(--brand-amber, #ffb84d);
+    color: var(--brand-amber);
 }
 
 .update-card__description[data-tier="experimental"] {
-    color: var(--accent-cyan, #4ecdc4);
+    color: var(--accent-cyan);
 }
 
 .update-card__description[data-tier="custom"] {
@@ -360,11 +360,11 @@
 }
 
 .update-sync-status[data-kind="behind"] {
-    color: var(--brand-amber, #ffb84d);
+    color: var(--brand-amber);
 }
 
 .update-sync-status[data-kind="ok"] {
-    color: var(--accent-green, #22c55e);
+    color: var(--accent-green);
 }
 
 .update-sync-status[data-kind="error"] {
@@ -470,8 +470,8 @@ select.update-field__input option:checked {
     min-height: 1.4em;
 }
 
-.update-status[data-kind="error"] { color: #ff6b6b; }
-.update-status[data-kind="success"] { color: #44d39a; }
+.update-status[data-kind="error"] { color: var(--accent-red); }
+.update-status[data-kind="success"] { color: var(--accent-green); }
 .update-status[data-kind="pending"] { color: var(--text-secondary); }
 
 .update-progress[hidden] {
@@ -504,7 +504,7 @@ select.update-field__input option:checked {
     font-size: 11px;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: var(--accent-cyan, #00e5ff);
+    color: var(--accent-cyan);
 }
 
 .update-progress__title {
@@ -538,14 +538,14 @@ select.update-field__input option:checked {
     height: 100%;
     width: 0%;
     border-radius: inherit;
-    background: var(--accent-cyan, #00e5ff);
+    background: var(--accent-cyan);
     transition: width 0.35s ease;
     box-shadow: 0 0 12px rgba(0, 229, 255, 0.35);
 }
 
 .update-progress__meter-fill--indeterminate {
     width: 40% !important;
-    background: linear-gradient(90deg, transparent, var(--accent-cyan, #00e5ff), transparent);
+    background: linear-gradient(90deg, transparent, var(--accent-cyan), transparent);
     animation: updateProgressIndeterminate 1.4s ease-in-out infinite;
 }
 
@@ -615,7 +615,7 @@ select.update-field__input option:checked {
 }
 
 .update-progress__step[data-status="active"] .update-progress__step-icon {
-    background: var(--accent-cyan, #00e5ff);
+    background: var(--accent-cyan);
     box-shadow: 0 0 10px rgba(0, 229, 255, 0.55);
     animation: updateProgressPulse 1s ease-in-out infinite;
 }
@@ -632,7 +632,7 @@ select.update-field__input option:checked {
 .update-progress__step-hint {
     margin-left: auto;
     font-size: 11px;
-    color: var(--accent-cyan, #00e5ff);
+    color: var(--accent-cyan);
     font-family: 'JetBrains Mono', monospace;
 }
 
@@ -865,7 +865,7 @@ select.update-field__input option:checked {
     background: none;
     border: none;
     padding: 0;
-    color: var(--accent-cyan, #22d3ee);
+    color: var(--accent-cyan);
     font: inherit;
     font-size: 12px;
     cursor: pointer;
@@ -873,7 +873,7 @@ select.update-field__input option:checked {
 }
 
 .update-release-notes__more:hover {
-    color: var(--text-primary, #e2e8f0);
+    color: var(--text-primary);
 }
 
 .rn-modal-overlay {
@@ -888,8 +888,8 @@ select.update-field__input option:checked {
 }
 
 .rn-modal {
-    background: var(--surface-1, var(--bg-inset));
-    border: 1px solid var(--border, #232a38);
+    background: var(--surface-1);
+    border: 1px solid var(--border);
     border-radius: 12px;
     width: min(760px, 100%);
     max-height: 84vh;
@@ -904,26 +904,26 @@ select.update-field__input option:checked {
     justify-content: space-between;
     gap: 12px;
     padding: 16px 20px;
-    border-bottom: 1px solid var(--border, #232a38);
+    border-bottom: 1px solid var(--border);
 }
 
 .rn-modal__title {
     margin: 0;
     font-size: 15px;
-    color: var(--text-primary, #e2e8f0);
+    color: var(--text-primary);
 }
 
 .rn-modal__close {
     background: none;
     border: none;
-    color: var(--text-muted, #64748b);
+    color: var(--text-muted);
     font-size: 22px;
     line-height: 1;
     cursor: pointer;
 }
 
 .rn-modal__close:hover {
-    color: var(--text-primary, #e2e8f0);
+    color: var(--text-primary);
 }
 
 .rn-modal__list {
@@ -1034,7 +1034,7 @@ select.update-field__input option:checked {
     border-radius: 10px;
     border: 1px solid rgba(245, 158, 11, 0.35);
     background: rgba(245, 158, 11, 0.08);
-    color: var(--accent-amber, #f59e0b);
+    color: var(--accent-amber);
     font-size: 13px;
 }
 
@@ -1133,8 +1133,8 @@ select.update-field__input option:checked {
     min-height: 1.2em;
 }
 
-.dangerous-card__result[data-kind="success"] { color: #44d39a; }
-.dangerous-card__result[data-kind="error"] { color: #ff6b6b; }
+.dangerous-card__result[data-kind="success"] { color: var(--accent-green); }
+.dangerous-card__result[data-kind="error"] { color: var(--accent-red); }
 .dangerous-card__result[data-kind="pending"] { color: var(--text-secondary); }
 
 .dangerous-panel__status {
@@ -1143,6 +1143,6 @@ select.update-field__input option:checked {
     min-height: 1.4em;
 }
 
-.dangerous-panel__status[data-kind="error"] { color: #ff6b6b; }
+.dangerous-panel__status[data-kind="error"] { color: var(--accent-red); }
 
 /* Commit timeline chrome lives in update_commits.css */

@@ -100,13 +100,13 @@
 }
 
 .gps-skyplot__sat--used .gps-skyplot__sat-shape {
-    fill: var(--accent-cyan, #22d3ee);
+    fill: var(--accent-cyan);
     stroke: var(--text-secondary);
     filter: drop-shadow(0 0 1.5px rgba(34, 211, 238, 0.7));
 }
 
 .gps-skyplot__sat--visible .gps-skyplot__sat-shape {
-    fill: var(--accent-amber, #f59e0b);
+    fill: var(--accent-amber);
     stroke: var(--text-muted);
 }
 
@@ -190,7 +190,7 @@
 }
 
 .gps-stats__lamp[data-mode="2"] .gps-stats__lamp-dot {
-    background: var(--accent-amber, #f59e0b);
+    background: var(--accent-amber);
     box-shadow: 0 0 6px rgba(245, 158, 11, 0.55);
 }
 
@@ -296,7 +296,7 @@
 
 .gps-source-chip:has(input:checked) {
     background: rgba(34, 211, 238, 0.18);
-    color: var(--accent-cyan, #22d3ee);
+    color: var(--accent-cyan);
     box-shadow: inset 0 0 0 1px rgba(34, 211, 238, 0.4);
 }
 

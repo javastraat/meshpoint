@@ -535,7 +535,7 @@ html, body {
     transition: background 0.15s;
 }
 
-.packet-table tbody tr:hover { background: var(--bg-card-hover, rgba(6, 182, 212, 0.04)); }
+.packet-table tbody tr:hover { background: var(--bg-card-hover); }
 
 .packet-table td {
     padding: 0.4rem 0.6rem;

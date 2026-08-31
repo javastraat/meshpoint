@@ -198,7 +198,7 @@
 .pager-log {
     max-height: 60vh;
     overflow-y: auto;
-    font-family: var(--font-mono, monospace);
+    font-family: var(--font-mono);
     font-size: 12.5px;
 }
 
@@ -247,7 +247,7 @@
 .adsb-table {
     width: 100%;
     border-collapse: collapse;
-    font-family: var(--font-mono, monospace);
+    font-family: var(--font-mono);
     font-size: 12.5px;
     white-space: nowrap;
 }
@@ -430,9 +430,9 @@
 .lsn-presets button.lsn-preset--active {
     color: #04121a;
     font-weight: 700;
-    background: var(--accent-cyan, #06b6d4);
-    border-color: var(--accent-cyan, #06b6d4);
-    box-shadow: var(--glow-cyan, 0 0 8px rgba(6, 182, 212, 0.6));
+    background: var(--accent-cyan);
+    border-color: var(--accent-cyan);
+    box-shadow: var(--glow-cyan);
 }
 
 .lsn-presets button.lsn-preset--active .lsn-preset-row__freq {
@@ -446,7 +446,7 @@
     background:
         radial-gradient(120% 80% at 50% -20%, rgba(6, 182, 212, 0.08), transparent 60%),
         var(--bg-inset);
-    border: 1px solid var(--border, #233049);
+    border: 1px solid var(--border);
     border-radius: 12px;
     box-shadow:
         inset 0 1px 0 rgba(255, 255, 255, 0.06),
@@ -490,30 +490,30 @@
 }
 
 .lsn-led--onair.on {
-    color: var(--accent-green, #00e5a0);
+    color: var(--accent-green);
 }
 .lsn-led--onair.on i {
-    background: var(--accent-green, #00e5a0);
-    box-shadow: var(--glow-green, 0 0 8px rgba(0, 229, 160, 0.7));
+    background: var(--accent-green);
+    box-shadow: var(--glow-green);
 }
 
 .lsn-led--tune.on {
-    color: var(--accent-amber, #f59e0b);
+    color: var(--accent-amber);
 }
 .lsn-led--tune.on i {
-    background: var(--accent-amber, #f59e0b);
-    box-shadow: var(--glow-amber, 0 0 8px rgba(245, 158, 11, 0.7));
+    background: var(--accent-amber);
+    box-shadow: var(--glow-amber);
     animation: lsn-blink 0.7s steps(1) infinite;
 }
 
 @keyframes lsn-blink { 50% { opacity: 0.25; } }
 
 .lsn-badge {
-    font-family: var(--font-mono, monospace);
+    font-family: var(--font-mono);
     font-size: 11px;
     font-weight: 700;
     letter-spacing: 1px;
-    color: var(--accent-cyan, #06b6d4);
+    color: var(--accent-cyan);
     border: 1px solid rgba(6, 182, 212, 0.4);
     border-radius: 4px;
     padding: 2px 8px;
@@ -535,7 +535,7 @@
 }
 
 .lsn-station--rds {
-    color: var(--accent-green, #5dffc1);
+    color: var(--accent-green);
 }
 
 /* Small RDS / PTY tags (kept fixed while the text scrolls). */
@@ -551,7 +551,7 @@
     color: #04121a;
 }
 
-.lsn-tag--rds { background: var(--accent-green, #00e5a0); }
+.lsn-tag--rds { background: var(--accent-green); }
 .lsn-tag--pty {
     background: transparent;
     color: var(--accent-green);
@@ -561,9 +561,9 @@
 
 /* RDS lock-quality pill: green = clean lock, amber = marginal, red = poor. */
 .lsn-tag--qual { font-variant-numeric: tabular-nums; }
-.lsn-tag--qual.q-good { background: var(--accent-green, #00e5a0); color: #04121a; }
-.lsn-tag--qual.q-mid  { background: var(--accent-amber, #f59e0b); color: #04121a; }
-.lsn-tag--qual.q-bad  { background: var(--accent-red, #ef4444); color: #fff; }
+.lsn-tag--qual.q-good { background: var(--accent-green); color: #04121a; }
+.lsn-tag--qual.q-mid  { background: var(--accent-amber); color: #04121a; }
+.lsn-tag--qual.q-bad  { background: var(--accent-red); color: #fff; }
 
 /* Scrolling container: clips overflow; the inner text marquees when long. */
 .lsn-station__scroll {
@@ -595,13 +595,13 @@
 }
 
 .lsn-freq__num {
-    font-family: var(--font-mono, monospace);
+    font-family: var(--font-mono);
     font-size: clamp(40px, 9vw, 64px);
     font-weight: 700;
     line-height: 1;
     letter-spacing: 1px;
     font-variant-numeric: tabular-nums;
-    color: var(--accent-cyan, #5feaff);
+    color: var(--accent-cyan);
     /* Softer, cleaner bloom (was heavier/blurrier). */
     text-shadow:
         0 0 3px rgba(6, 182, 212, 0.45),
@@ -609,7 +609,7 @@
 }
 
 .lsn-freq__unit {
-    font-family: var(--font-mono, monospace);
+    font-family: var(--font-mono);
     font-size: 14px;
     font-weight: 600;
     letter-spacing: 2px;
@@ -624,10 +624,10 @@
    the existing .lsn-station__text/.scroll mechanics if it's long).
    Channel + friendly name moved down into the small tag row instead. */
 .lsn-station__text--big {
-    font-family: var(--font-mono, monospace);
+    font-family: var(--font-mono);
     font-size: clamp(20px, 4.5vw, 32px);
     font-weight: 700;
-    color: var(--accent-cyan, #5feaff);
+    color: var(--accent-cyan);
     text-shadow:
         0 0 3px rgba(6, 182, 212, 0.45),
         0 0 14px rgba(6, 182, 212, 0.2);
@@ -664,9 +664,9 @@
     transition: background 0.12s linear, box-shadow 0.12s linear;
 }
 
-.lsn-vu__seg.on[data-zone="g"] { background: var(--accent-green, #00e5a0); box-shadow: 0 0 6px rgba(0, 229, 160, 0.5); }
-.lsn-vu__seg.on[data-zone="a"] { background: var(--accent-amber, #f59e0b); box-shadow: 0 0 6px rgba(245, 158, 11, 0.5); }
-.lsn-vu__seg.on[data-zone="r"] { background: var(--accent-red, #ef4444); box-shadow: 0 0 6px rgba(239, 68, 68, 0.6); }
+.lsn-vu__seg.on[data-zone="g"] { background: var(--accent-green); box-shadow: 0 0 6px rgba(0, 229, 160, 0.5); }
+.lsn-vu__seg.on[data-zone="a"] { background: var(--accent-amber); box-shadow: 0 0 6px rgba(245, 158, 11, 0.5); }
+.lsn-vu__seg.on[data-zone="r"] { background: var(--accent-red); box-shadow: 0 0 6px rgba(239, 68, 68, 0.6); }
 
 .lsn-vu__seg.peak {
     background: var(--text-secondary);
@@ -697,7 +697,7 @@
 
 .lsn-skins {
     display: inline-flex;
-    border: 1px solid var(--border, #233049);
+    border: 1px solid var(--border);
     border-radius: 6px;
     overflow: hidden;
 }
@@ -716,7 +716,7 @@
 
 .lsn-skins button:hover { color: var(--text-primary); }
 .lsn-skins button.active {
-    background: var(--accent-cyan, #06b6d4);
+    background: var(--accent-cyan);
     color: #04121a;
 }
 
@@ -739,11 +739,11 @@
 
 .lsn-ana__band {
     margin-left: auto;
-    font-family: var(--font-mono, monospace);
+    font-family: var(--font-mono);
     font-size: 11px;
     font-weight: 700;
     letter-spacing: 1px;
-    color: var(--accent-amber, #f59e0b);
+    color: var(--accent-amber);
     border: 1px solid rgba(245, 158, 11, 0.5);
     border-radius: 4px;
     padding: 2px 8px;
@@ -777,7 +777,7 @@
     position: absolute;
     top: 20px;
     transform: translateX(-50%);
-    font-family: var(--font-mono, monospace);
+    font-family: var(--font-mono);
     font-size: 10px;
     color: var(--accent-amber);
 }
@@ -789,13 +789,13 @@
     left: 50%;
     width: 2px;
     margin-left: -1px;
-    background: var(--accent-red, #ef4444);
+    background: var(--accent-red);
     box-shadow: 0 0 8px rgba(239, 68, 68, 0.9);
     transition: left 0.25s ease, background 0.3s ease, box-shadow 0.3s ease;
 }
 /* Pointer greens up when RDS locks cleanly (good BLER). */
 .lsn-ana__needle.locked {
-    background: var(--accent-green, #00e5a0);
+    background: var(--accent-green);
     box-shadow: 0 0 10px rgba(0, 229, 160, 0.95);
 }
 
@@ -807,19 +807,19 @@
     height: 6px;
     margin-left: -3px;
     border-radius: 50%;
-    background: var(--accent-cyan, #06b6d4);
+    background: var(--accent-cyan);
     box-shadow: 0 0 5px rgba(6, 182, 212, 0.8);
     cursor: help;
 }
 
 .lsn-ana__freq {
-    font-family: var(--font-mono, monospace);
+    font-family: var(--font-mono);
     font-size: clamp(28px, 6vw, 42px);
     font-weight: 700;
     line-height: 1;
     letter-spacing: 1px;
     font-variant-numeric: tabular-nums;
-    color: var(--accent-amber, #ffc857);
+    color: var(--accent-amber);
     text-shadow: 0 0 4px rgba(245, 158, 11, 0.5), 0 0 16px rgba(245, 158, 11, 0.25);
 }
 .lsn-ana__freq em {
@@ -861,9 +861,9 @@
     box-shadow: inset 0 0 12px rgba(255, 255, 255, 0.05);
 }
 .vz { fill: none; stroke-width: 5; stroke-linecap: round; }
-.vz-g { stroke: var(--accent-green, #00e5a0); }
-.vz-y { stroke: var(--accent-amber, #f59e0b); }
-.vz-r { stroke: var(--accent-red, #ef4444); }
+.vz-g { stroke: var(--accent-green); }
+.vz-y { stroke: var(--accent-amber); }
+.vz-r { stroke: var(--accent-red); }
 .lsn-ana__vutick { stroke: rgba(255, 214, 150, 0.4); stroke-width: 1; }
 .lsn-ana__vuhub { fill: rgba(255, 214, 150, 0.85); }
 .lsn-ana__vuneedle {
@@ -960,8 +960,8 @@
     border-color: rgba(56, 189, 248, 0.4);
 }
 .lsn-preset-tab.active {
-    background: var(--accent-cyan, #06b6d4);
-    border-color: var(--accent-cyan, #06b6d4);
+    background: var(--accent-cyan);
+    border-color: var(--accent-cyan);
     color: #04121a;
 }
 
@@ -979,13 +979,13 @@
     color: var(--text-muted);
     cursor: pointer;
 }
-.lsn-fav:hover { color: var(--accent-amber, #f59e0b); }
-.lsn-fav.on { color: var(--accent-amber, #f59e0b); }
+.lsn-fav:hover { color: var(--accent-amber); }
+.lsn-fav.on { color: var(--accent-amber); }
 /* Keep the star readable on a lit (tuned) preset chip. */
 .lsn-presets button.lsn-preset--active .lsn-fav { color: #04121a; }
 .lsn-presets button.lsn-preset--active .lsn-fav.on { color: #7a4f00; }
 
-.lsn-preset-tab--fav { color: var(--accent-amber, #f59e0b); }
+.lsn-preset-tab--fav { color: var(--accent-amber); }
 
 .lsn-preset-tab__dot {
     display: inline-block;
@@ -993,7 +993,7 @@
     height: 6px;
     margin-left: 6px;
     border-radius: 50%;
-    background: var(--accent-green, #00e5a0);
+    background: var(--accent-green);
     box-shadow: 0 0 5px rgba(0, 229, 160, 0.9);
     vertical-align: middle;
 }
@@ -1006,7 +1006,7 @@
     height: 6px;
     margin-left: 7px;
     border-radius: 50%;
-    background: var(--accent-green, #00e5a0);
+    background: var(--accent-green);
     box-shadow: 0 0 5px rgba(0, 229, 160, 0.95);
     vertical-align: middle;
 }
@@ -1092,8 +1092,8 @@
 }
 
 .dab-station-row__playing {
-    border-color: var(--accent-green, #00e5a0);
-    color: var(--accent-green, #00e5a0);
+    border-color: var(--accent-green);
+    color: var(--accent-green);
 }
 
 /* Known-from-last-scan station shown while welle-cli is still decoding --
@@ -1150,7 +1150,7 @@
 }
 
 .dabcfg-row__chan {
-    font-family: var(--font-mono, monospace);
+    font-family: var(--font-mono);
     color: var(--accent-green);
     flex-shrink: 0;
     width: 3em;
@@ -1237,7 +1237,7 @@
 }
 
 .dabcfg-scan-band__label {
-    font-family: var(--font-mono, monospace);
+    font-family: var(--font-mono);
     color: var(--text-muted);
     font-size: 11px;
     text-transform: uppercase;
@@ -1249,7 +1249,7 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    font-family: var(--font-mono, monospace);
+    font-family: var(--font-mono);
     font-size: 12.5px;
     color: var(--text-secondary);
     cursor: pointer;
