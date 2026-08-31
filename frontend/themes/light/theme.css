@@ -45,6 +45,7 @@ html[data-theme="light"] {
     --overlay-med: rgba(20, 28, 46, 0.08);
     --overlay-strong: rgba(20, 28, 46, 0.14);
     --hairline: rgba(20, 28, 46, 0.12);
+    --sunken: rgba(20, 28, 46, 0.035);
 
     --sidebar-bg: #ffffff;
     --sidebar-border: #d5dce6;

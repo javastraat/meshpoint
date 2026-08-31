@@ -35,6 +35,10 @@
     --border-subtle: var(--hairline);
     --bg-card-hover: var(--overlay-weak);
     --text: var(--text-primary);
+    /* Recessed inner block (nested config sub-panels, readout tiles,
+     * previews) -- spelled out as rgba(0,0,0,~0.2) in a lot of places,
+     * which turns muddy grey on a light card. */
+    --sunken: rgba(0, 0, 0, 0.2);
     --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
     --font-sans: 'Inter', -apple-system, sans-serif;
     --radius: 8px;
