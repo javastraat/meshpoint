@@ -43,41 +43,52 @@ def scan_themes(themes_dir: Path, plugin_themes_dir: Path | None = None) -> list
     Built-in themes come from *themes_dir* (``/themes/<id>/theme.css``);
     optional extra themes from *plugin_themes_dir*
     (``/plugins/themes/<id>/theme.css``). Each entry:
-    ``{"id", "label", "order", "icon", "css"}`` where ``css`` is the
-    browser URL for a non-empty ``theme.css`` or ``None``. Folders with a
+    ``{"id", "label", "order", "icon", "css", "source"}`` where ``css`` is
+    the browser URL for a non-empty ``theme.css`` or ``None`` and
+    ``source`` is ``"builtin"`` or ``"plugin"``. Folders with a
     missing/unparseable ``theme.json`` are skipped with a warning. A
     built-in id wins an id collision with a plugin theme; a plugin folder
-    can't claim ``dark``. Sorted by ``(order, label)``.
+    can't claim ``dark``. Sorted built-ins first (then by
+    ``(order, label)`` within each group).
     """
     themes: list[dict] = []
     seen: set[str] = set()
 
-    _scan_dir(themes_dir, "/themes", themes, seen)
+    _scan_dir(themes_dir, "/themes", "builtin", themes, seen)
     if plugin_themes_dir is not None:
         _scan_dir(
-            plugin_themes_dir, "/plugins/themes", themes, seen,
+            plugin_themes_dir, "/plugins/themes", "plugin", themes, seen,
             block={DEFAULT_THEME_ID},
         )
 
     if DEFAULT_THEME_ID not in seen:
         # The baseline is valid even without a folder on disk.
         themes.append(
-            {"id": DEFAULT_THEME_ID, "label": "Dark", "order": 0, "icon": "moon", "css": None}
+            {
+                "id": DEFAULT_THEME_ID, "label": "Dark", "order": 0,
+                "icon": "moon", "css": None, "source": "builtin",
+            }
         )
 
-    themes.sort(key=lambda t: (t["order"], t["label"].lower()))
+    # Built-ins always sort ahead of plugin themes, whatever their
+    # `order` -- so a drop-in can never jump the curated set in the
+    # picker. `order`/`label` only order within each group.
+    _rank = {"builtin": 0, "plugin": 1}
+    themes.sort(key=lambda t: (_rank[t["source"]], t["order"], t["label"].lower()))
     return themes
 
 
 def _scan_dir(
     themes_dir: Path,
     css_url_prefix: str,
+    source: str,
     themes: list[dict],
     seen: set[str],
     block: set[str] | None = None,
 ) -> None:
     """Append the themes found in *themes_dir* to *themes*, in place.
 
+    *source* is stamped on each entry (``"builtin"`` / ``"plugin"``).
     *seen* is shared across calls so an id discovered by an earlier call
     (a built-in) shadows a later one (a plugin). *block* is a set of ids
     this call must never emit regardless of *seen*.
@@ -117,6 +128,7 @@ def _scan_dir(
                 "order": _as_int(raw.get("order"), default=100),
                 "icon": str(raw.get("icon") or ""),
                 "css": f"{css_url_prefix}/{theme_id}/theme.css" if has_css else None,
+                "source": source,
             }
         )
 

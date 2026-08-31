@@ -7710,6 +7710,13 @@ stops a plugin claiming `dark`. `inject_theme_links` / `stamp_default_theme` /
 `theme_routes.init_routes` all take the 2nd dir through. New config key
 `dashboard.plugins_dir` (default `"plugins"`, CWD-relative like static_dir →
 `/opt/meshpoint/plugins/` on Pi). Plugin themes are git-TRACKED (starter set);
-no .gitignore change. Sort still `(order, label)` — the `order` NUMBERING SCHEME
-is a separate open problem (user renumbering by hand; light interleaves with
-plugin themes). 19 theme_registry tests green. Not Pi-verified yet.
+no .gitignore change. 20 theme_registry tests green. Not Pi-verified yet.
+
+**Theme source tier + optgroups (2026-08-31)**: each scanned theme now carries
+`source: "builtin" | "plugin"`; sort key is `(source_rank, order, label)` so
+built-ins ALWAYS sort ahead of plugin themes regardless of `order` — this kills
+the cross-set numbering-collision problem entirely (`order` only matters within
+a group now). `theme_editor.js` `_groupedOptions()` renders the default-theme
+and "Start from" `<select>`s with `<optgroup label="Built-in">` /
+`<optgroup label="Community">`. `theme_controller.js` unchanged (cycles the
+sorted id list; grouping falls out for free).

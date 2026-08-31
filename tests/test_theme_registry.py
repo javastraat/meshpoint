@@ -106,6 +106,14 @@ class TestPluginThemes(unittest.TestCase):
         self.assertEqual([t["id"] for t in entries], ["dark", "light", "nord"])
         self.assertEqual(by_id["nord"]["css"], "/plugins/themes/nord/theme.css")
         self.assertEqual(by_id["light"]["css"], "/themes/light/theme.css")
+        self.assertEqual(by_id["light"]["source"], "builtin")
+        self.assertEqual(by_id["nord"]["source"], "plugin")
+
+    def test_builtins_sort_before_plugins_regardless_of_order(self) -> None:
+        # A plugin theme with order 0 must still land after every built-in.
+        _write_theme(self.plugins, "greedy", {"label": "Greedy", "order": 0}, "html{--x:1}")
+        ids = [t["id"] for t in scan_themes(self.core, self.plugins)]
+        self.assertEqual(ids, ["dark", "light", "greedy"])
 
     def test_core_theme_wins_id_collision(self) -> None:
         _write_theme(self.plugins, "light", {"label": "Impostor", "order": 2}, "html{--y:2}")

@@ -190,12 +190,23 @@
                 const res = await fetch('/api/themes', { credentials: 'same-origin' });
                 const data = res.ok ? await res.json() : {};
                 this.themes = Array.isArray(data.themes) ? data.themes : [];
-                const opts = this.themes.map((t) => `<option value="${t.id}">${t.label || t.id}</option>`).join('');
+                const opts = this._groupedOptions();
                 if (this.defaultSel) { this.defaultSel.innerHTML = opts; this.defaultSel.value = data.default || 'dark'; }
                 if (this.baseSel) this.baseSel.innerHTML = opts;
             } catch (_e) {
                 this._set(this.status, 'error', 'Could not load the theme list.');
             }
+        }
+
+        // Built-in themes and plugin drop-ins in separate <optgroup>s so
+        // the picker shows the curated set first, then a labelled divider.
+        _groupedOptions() {
+            const opt = (t) => `<option value="${t.id}">${t.label || t.id}</option>`;
+            const group = (label, src) => {
+                const rows = this.themes.filter((t) => (t.source || 'builtin') === src);
+                return rows.length ? `<optgroup label="${label}">${rows.map(opt).join('')}</optgroup>` : '';
+            };
+            return group('Built-in', 'builtin') + group('Community', 'plugin');
         }
 
         _renderGroups() {
