@@ -107,7 +107,7 @@
     padding: 0.1rem 0.45rem;
     background: var(--overlay-weak);
     border: 1px solid var(--hairline);
-    border-bottom-color: rgba(0, 0, 0, 0.4);
+    border-bottom-color: var(--scrim);
     border-radius: 4px;
     font-family: var(--font-mono);
     font-size: 0.7rem;
