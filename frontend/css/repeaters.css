@@ -30,7 +30,7 @@
     border: 1px solid color-mix(in srgb, var(--border, #232a38) 84%, #2a3551 16%);
     border-radius: 12px;
     padding: 1.25rem;
-    box-shadow: 0 10px 24px rgba(3, 8, 20, 0.28);
+    box-shadow: 0 10px 24px var(--scrim);
 }
 
 .rp-card--sensors .rp-card__head {

@@ -293,7 +293,7 @@
     font-size: 12px;
     color: var(--term-text-faint);
     padding: 8px 14px 12px;
-    background: rgba(0, 0, 0, 0.2);
+    background: var(--sunken);
     border-top: 1px solid var(--term-border);
 }
 
@@ -331,7 +331,7 @@
     align-items: center;
     gap: 6px;
     padding: 8px 10px;
-    background: rgba(15, 17, 24, 0.96);
+    background: var(--bg-popover);
     backdrop-filter: blur(10px);
     border: 1px solid var(--term-border-strong);
     border-radius: 12px;
@@ -415,7 +415,7 @@
     right: 0;
     width: min(380px, 90vw);
     height: 100vh;
-    background: rgba(15, 18, 24, 0.96);
+    background: var(--bg-popover);
     backdrop-filter: blur(8px);
     border-left: 1px solid var(--term-border);
     box-shadow: -16px 0 36px rgba(0, 0, 0, 0.4);
@@ -589,12 +589,12 @@
 }
 
 .danger-modal--open .danger-modal__backdrop {
-    background: rgba(0, 0, 0, 0.55);
+    background: var(--scrim);
 }
 
 .danger-modal__sheet {
     position: relative;
-    background: #15181f;
+    background: var(--bg-inset);
     border: 1px solid rgba(247, 118, 142, 0.32);
     border-radius: 14px;
     padding: 24px;
@@ -625,7 +625,7 @@
 }
 
 .danger-modal__code {
-    background: #0c0f14;
+    background: var(--bg-inset);
     border: 1px solid var(--term-border);
     border-radius: 8px;
     padding: 10px 12px;

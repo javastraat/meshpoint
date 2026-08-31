@@ -33,7 +33,7 @@
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: rgba(243, 244, 246, 0.25);
+    background: var(--hairline);
     flex-shrink: 0;
 }
 
@@ -58,7 +58,7 @@
 
 .lsn-tabbar__btn {
     background: none;
-    border: 1px solid rgba(243, 244, 246, 0.15);
+    border: 1px solid var(--hairline);
     border-radius: 8px;
     color: var(--text-secondary);
     font-size: 13px;
@@ -98,7 +98,7 @@
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: rgba(243, 244, 246, 0.25);
+    background: var(--hairline);
     flex-shrink: 0;
 }
 
@@ -158,7 +158,7 @@
     width: 100%;
     height: 100%;
     min-height: 60vh;
-    background: #0a0e14;
+    background: var(--bg-inset);
 }
 
 .adsb-map .leaflet-tile-pane {
@@ -166,7 +166,7 @@
 }
 
 .adsb-map .leaflet-control-attribution {
-    background: rgba(7, 11, 20, 0.82) !important;
+    background: var(--bg-popover) !important;
     color: var(--text-muted) !important;
     font-size: 10px !important;
 }
@@ -211,7 +211,7 @@
     display: flex;
     gap: 10px;
     padding: 6px 0;
-    border-bottom: 1px solid rgba(243, 244, 246, 0.06);
+    border-bottom: 1px solid var(--hairline);
     align-items: baseline;
 }
 
@@ -260,12 +260,12 @@
     color: var(--text-muted);
     font-weight: 400;
     background: var(--bg-glass);
-    border-bottom: 1px solid rgba(243, 244, 246, 0.12);
+    border-bottom: 1px solid var(--hairline);
 }
 
 .adsb-table td {
     padding: 5px 10px 5px 0;
-    border-bottom: 1px solid rgba(243, 244, 246, 0.06);
+    border-bottom: 1px solid var(--hairline);
     color: var(--text-primary);
 }
 
@@ -1034,7 +1034,7 @@
 
 .dab-manual__select {
     background: var(--overlay-weak);
-    border: 1px solid rgba(243, 244, 246, 0.15);
+    border: 1px solid var(--hairline);
     border-radius: 6px;
     color: inherit;
     font: inherit;
@@ -1081,7 +1081,7 @@
     align-items: center;
     gap: 12px;
     padding: 8px 10px;
-    border: 1px solid rgba(243, 244, 246, 0.08);
+    border: 1px solid var(--hairline);
     border-radius: 6px;
 }
 
@@ -1137,7 +1137,7 @@
 
 .dabcfg-row {
     padding: 10px;
-    border: 1px solid rgba(243, 244, 246, 0.08);
+    border: 1px solid var(--hairline);
     border-radius: 6px;
     margin-bottom: 8px;
 }
@@ -1165,7 +1165,7 @@
 .dabcfg-row__input {
     width: 100%;
     background: var(--overlay-weak);
-    border: 1px solid rgba(243, 244, 246, 0.15);
+    border: 1px solid var(--hairline);
     border-radius: 4px;
     color: var(--text-primary);
     padding: 4px 8px;
@@ -1197,7 +1197,7 @@
 .dabcfg-row__stations {
     margin-top: 8px;
     padding-top: 8px;
-    border-top: 1px solid rgba(243, 244, 246, 0.06);
+    border-top: 1px solid var(--hairline);
     color: var(--text-muted);
     font-size: 12px;
     line-height: 1.5;
@@ -1215,7 +1215,7 @@
 .dabcfg-scan-advanced {
     margin-top: 14px;
     padding-top: 14px;
-    border-top: 1px solid rgba(243, 244, 246, 0.08);
+    border-top: 1px solid var(--hairline);
 }
 
 .dabcfg-scan-channels {
@@ -1231,7 +1231,7 @@
     gap: 4px;
     padding: 8px 10px;
     background: var(--overlay-weak);
-    border: 1px solid rgba(243, 244, 246, 0.06);
+    border: 1px solid var(--hairline);
     border-radius: 6px;
     min-width: 4.5em;
 }
@@ -1275,7 +1275,7 @@
 .dabcfg-scan-option__input {
     width: 6em;
     background: var(--overlay-weak);
-    border: 1px solid rgba(243, 244, 246, 0.15);
+    border: 1px solid var(--hairline);
     border-radius: 4px;
     color: var(--text-primary);
     padding: 4px 8px;

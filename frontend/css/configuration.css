@@ -356,7 +356,7 @@ select.cfg-field__input option:checked {
     bottom: 24px;
     left: 50%;
     transform: translateX(-50%) translateY(20px);
-    background: rgba(15, 18, 24, 0.96);
+    background: var(--bg-popover);
     color: var(--text-primary);
     padding: 12px 18px;
     border-radius: 10px;

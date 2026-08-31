@@ -53,7 +53,7 @@
     padding: 0.45rem 0.75rem;
     border-radius: var(--radius-sm);
     border: 1px solid rgba(245, 158, 11, 0.35);
-    background: rgba(15, 23, 42, 0.92);
+    background: var(--bg-popover);
     color: var(--accent-amber);
     font-family: var(--font-mono);
     font-size: 0.68rem;

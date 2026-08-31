@@ -640,7 +640,7 @@ select.update-field__input option:checked {
     margin-top: 14px;
     border: 1px solid var(--hairline);
     border-radius: 10px;
-    background: rgba(0, 0, 0, 0.35);
+    background: var(--scrim);
     overflow: hidden;
 }
 
@@ -735,7 +735,7 @@ select.update-field__input option:checked {
 .update-log__step details {
     border: 1px solid var(--hairline);
     border-radius: 8px;
-    background: rgba(0, 0, 0, 0.2);
+    background: var(--sunken);
 }
 
 .update-log__step[data-status="error"] details {
@@ -777,7 +777,7 @@ select.update-field__input option:checked {
 .update-log__stream {
     margin: 0;
     padding: 10px 14px;
-    background: rgba(0, 0, 0, 0.4);
+    background: var(--scrim);
     border-top: 1px solid var(--hairline);
     font-family: 'JetBrains Mono', monospace;
     font-size: 12px;
@@ -802,7 +802,7 @@ select.update-field__input option:checked {
     margin-top: 16px;
     padding: 18px 20px;
     border-radius: 12px;
-    background: rgba(13, 26, 43, 0.55);
+    background: var(--bg-inset);
     border: 1px solid rgba(0, 209, 255, 0.18);
     color: var(--text-primary);
     display: none;
@@ -880,7 +880,7 @@ select.update-field__input option:checked {
     position: fixed;
     inset: 0;
     z-index: 1000;
-    background: rgba(3, 8, 20, 0.6);
+    background: var(--bg-popover);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -888,14 +888,14 @@ select.update-field__input option:checked {
 }
 
 .rn-modal {
-    background: var(--surface-1, #12161f);
+    background: var(--surface-1, var(--bg-inset));
     border: 1px solid var(--border, #232a38);
     border-radius: 12px;
     width: min(760px, 100%);
     max-height: 84vh;
     display: flex;
     flex-direction: column;
-    box-shadow: 0 24px 60px rgba(3, 8, 20, 0.5);
+    box-shadow: 0 24px 60px var(--scrim);
 }
 
 .rn-modal__head {

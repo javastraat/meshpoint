@@ -15,7 +15,7 @@
 .keymap__backdrop {
     position: absolute;
     inset: 0;
-    background: rgba(7, 11, 20, 0.6);
+    background: var(--bg-popover);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
 }
@@ -25,7 +25,7 @@
     width: min(640px, 92vw);
     max-height: 80vh;
     overflow-y: auto;
-    background: linear-gradient(180deg, rgba(20, 28, 46, 0.95) 0%, rgba(13, 19, 32, 0.96) 100%);
+    background: var(--bg-popover);
     border-radius: var(--radius-md);
     border: 1px solid var(--hairline);
     box-shadow: 0 30px 60px rgba(0, 0, 0, 0.55);

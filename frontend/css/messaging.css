@@ -167,7 +167,7 @@
     display: inline-flex;
     margin: 12px 16px 8px;
     padding: 3px;
-    background: rgba(0, 0, 0, 0.3);
+    background: var(--scrim);
     border: 1px solid var(--msg-border);
     border-radius: 999px;
     gap: 2px;
@@ -807,7 +807,7 @@
 .msg-compose__input {
     flex: 1;
     padding: 10px 14px;
-    background: rgba(0, 0, 0, 0.3);
+    background: var(--scrim);
     border: 1px solid var(--msg-border);
     border-radius: 10px;
     color: var(--msg-text);
@@ -863,7 +863,7 @@
 .msg-modal-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.6);
+    background: var(--scrim);
     backdrop-filter: blur(4px);
     display: flex;
     align-items: center;
@@ -912,7 +912,7 @@
 .msg-modal__search {
     margin: 10px 14px;
     padding: 9px 12px;
-    background: rgba(0, 0, 0, 0.3);
+    background: var(--scrim);
     border: 1px solid var(--msg-border);
     border-radius: 8px;
     color: var(--msg-text);

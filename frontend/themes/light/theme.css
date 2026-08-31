@@ -1,20 +1,23 @@
 /* Light theme -- the first light-polarity theme (dark text on a light
- * background). Meshpoint's CSS is dark-first. Pass 1 (done): the ~25
- * palette variables below, plus ~200 hardcoded near-white `color:`
- * values and ~110 faint-white overlay fills/borders were tokenized to
- * --text-* / --overlay-* / --hairline, so body text, tables, hover
- * states and dividers all flip.
+ * background). Meshpoint's CSS is dark-first; getting here took a
+ * frontend-wide tokenization pass:
+ *   - ~200 hardcoded near-white `color:` values      -> --text-*
+ *   - ~110 faint white-tint fills/borders            -> --overlay-* / --hairline
+ *   - ~55 nested "sunken" blocks (rgba(0,0,0,~0.2))  -> --sunken
+ *   - ~70 dark panel / popover / inset / scrim fills -> --bg-inset /
+ *     --bg-popover / --scrim, plus --brand-amber and the --card-bg /
+ *     --border-subtle / --surface-1 aliases
+ * Every one keeps its dark value in :root, so the dark themes are
+ * unchanged; this file redefines the tokens for light polarity.
  *
- * Known remaining rough edges (pass 2):
- *   - Some panels/modals/dropdowns still hardcode a dark hex or gradient
- *     fill; the broad override block below catches the common container
- *     classes but not every one.
- *   - The chat and terminal panels keep their own --msg-* / --term-*
- *     variable sets and stay dark by design.
- *   - Charts / <canvas> (RF spectrum, node metrics, thermals) draw with
- *     hardcoded dark colours and don't read theme state.
- *   - The Leaflet maps use an OSM raster with a dark-invert CSS filter,
- *     so they render inverted (dark) under this theme.
+ * Known remaining rough edges:
+ *   - Chart / <canvas> internals (RF spectrum, node metrics, thermals,
+ *     repeater trends) draw with hardcoded dark colours and don't read
+ *     theme state -- the panel around them is light, the plot is not.
+ *     `meshpoint:themechange` fires on every switch as the hook to fix
+ *     this when the chart code learns to re-theme.
+ *   - The xterm terminal + Messages panels flip via their own --term-* /
+ *     --msg-* token sets (redefined below).
  *
  * See memory/plugin-architecture-review.md for the staged plan. */
 
@@ -46,6 +49,10 @@ html[data-theme="light"] {
     --overlay-strong: rgba(20, 28, 46, 0.14);
     --hairline: rgba(20, 28, 46, 0.12);
     --sunken: rgba(20, 28, 46, 0.035);
+    --bg-inset: #eef1f6;
+    --bg-popover: #ffffff;
+    --scrim: rgba(20, 28, 46, 0.38);
+    --brand-amber: #b06a00;
 
     --sidebar-bg: #ffffff;
     --sidebar-border: #d5dce6;

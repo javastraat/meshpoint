@@ -31,7 +31,7 @@
 
 .ch-table td {
     padding: 0.4rem 0.5rem;
-    border-bottom: 1px solid rgba(35, 48, 73, 0.5);
+    border-bottom: 1px solid var(--border);
     vertical-align: middle;
     overflow: hidden;
 }
@@ -126,6 +126,6 @@
 
 .ch-table__name-input:focus {
     border-color: var(--accent-cyan);
-    background: rgba(10, 14, 23, 0.6);
+    background: var(--bg-inset);
     box-shadow: var(--glow-cyan);
 }

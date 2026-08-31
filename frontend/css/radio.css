@@ -226,7 +226,7 @@
 /* Inputs and selects. */
 
 .r-input {
-    background: rgba(10, 14, 23, 0.7);
+    background: var(--bg-inset);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     color: var(--text-primary);
@@ -260,7 +260,7 @@
 }
 
 .r-select {
-    background: rgba(10, 14, 23, 0.7);
+    background: var(--bg-inset);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     color: var(--text-primary);
@@ -290,7 +290,7 @@
 .r-switch__track {
     position: absolute;
     inset: 0;
-    background: rgba(10, 14, 23, 0.8);
+    background: var(--bg-inset);
     border: 1px solid var(--border);
     border-radius: 999px;
     cursor: pointer;

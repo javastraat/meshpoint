@@ -178,7 +178,7 @@
 /* ---- Sections ---- */
 
 .nd-section {
-    border-bottom: 1px solid rgba(35, 48, 73, 0.4);
+    border-bottom: 1px solid var(--border);
 }
 
 .nd-section__header {
@@ -310,7 +310,7 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.3);
+    background: var(--scrim);
     z-index: 1999;
     opacity: 0;
     pointer-events: none;

@@ -7546,3 +7546,19 @@ scripted pass (scratchpad `tokenize_colors.py` + `tokenize_surfaces.py`):
 **Still v1 / not fully live-verified**: `--msg-*`/`--term-*` panel var sets,
 charts/`<canvas>`, and invert-filtered map tiles remain dark. Dashboard chrome +
 tables + Settings should now be readable in `light`.
+
+**Light theme -- full tokenization sweep (2026-08-31)**: after page-by-page fixes
+(topbar, reconnect pill, version stamp, Messages/Terminal --msg/--term sets, maps
+w/ invert-filter drop, adsb dark planes, Repeaters cards, config --sunken blocks),
+did the final sweep the user asked for ("all should be in the theme"): scripted
+mapping of ~70 remaining hardcoded dark surface/border literals across 22 CSS
+files to new tokens -- `--bg-inset` (recessed panels/readouts/code), `--bg-popover`
+(command palette, keymap overlay, menus, dropdowns), `--scrim` (modal backdrops),
+`--brand-amber` (was undefined -> was always #ffb84d), plus `--surface-1` alias.
+All defined in `:root` (dashboard.css) with their current dark values so dark
+themes are ~unchanged; `frontend/themes/light/theme.css` overrides them.
+Box-shadow lines that wrongly got a surface token were reverted to `--scrim`.
+scratchpad: `sweep.py`. Remaining known gap: Chart.js/`<canvas>` internals still
+draw dark (RF spectrum, node metrics, thermals, repeater trends) -- panel is
+light, plot isn't; `meshpoint:themechange` event is the hook to fix that later.
+Not yet fully live-verified; dark needs a spot-check.

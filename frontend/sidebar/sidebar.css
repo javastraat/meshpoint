@@ -711,7 +711,7 @@
     display: none;
     position: fixed;
     inset: 0;
-    background: rgba(2, 4, 8, 0.55);
+    background: var(--bg-popover);
     backdrop-filter: blur(2px);
     z-index: 90;
     opacity: 0;

@@ -60,7 +60,7 @@
 }
 
 .topo-map .leaflet-control-attribution {
-    background: rgba(7, 11, 20, 0.82) !important;
+    background: var(--bg-popover) !important;
     color: var(--text-muted) !important;
     font-size: 10px !important;
 }

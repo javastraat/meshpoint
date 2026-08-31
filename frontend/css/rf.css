@@ -51,7 +51,7 @@
 }
 
 .rf-card {
-    background: var(--bg-card, rgba(15, 23, 42, 0.65));
+    background: var(--bg-card, var(--bg-popover));
     border: 1px solid var(--border, rgba(51, 65, 85, 0.8));
     border-radius: var(--radius, 8px);
     padding: 1rem;
@@ -122,7 +122,7 @@
 .rf-badge--off {
     background: rgba(71, 85, 105, 0.25);
     color: var(--text-secondary);
-    border: 1px solid rgba(71, 85, 105, 0.5);
+    border: 1px solid var(--border);
 }
 
 .rf-sparkline-wrap {

@@ -35,7 +35,7 @@
     padding: 0.3rem 0.85rem;
     border-radius: var(--radius-sm);
     border: 1px solid transparent;
-    background: rgba(15, 22, 36, 0.4);
+    background: var(--bg-popover);
     opacity: 0;
     transform: translateX(-6px);
     animation: init-checklist-row-in 220ms var(--ease-out-expo) forwards;

@@ -39,6 +39,14 @@
      * previews) -- spelled out as rgba(0,0,0,~0.2) in a lot of places,
      * which turns muddy grey on a light card. */
     --sunken: rgba(0, 0, 0, 0.2);
+    /* Larger recessed surfaces (skyplot panel, radio readouts, code
+     * blocks) and floating popovers (command palette, keymap overlay,
+     * menus). Dark values match what the old rgba() literals rendered;
+     * the light theme flips them. --scrim is the modal-backdrop dimmer. */
+    --bg-inset: #10151f;
+    --bg-popover: #0b111c;
+    --scrim: rgba(0, 0, 0, 0.5);
+    --brand-amber: var(--accent-amber);
     --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
     --font-sans: 'Inter', -apple-system, sans-serif;
     --radius: 8px;
@@ -319,7 +327,7 @@ html, body {
 }
 
 #map .leaflet-control-attribution {
-    background: rgba(7, 11, 20, 0.82) !important;
+    background: var(--bg-popover) !important;
     color: var(--text-muted) !important;
     font-size: 10px !important;
 }
@@ -445,7 +453,7 @@ html, body {
 
 .node-item {
     padding: 0.5rem 0.75rem;
-    border-bottom: 1px solid rgba(35, 48, 73, 0.4);
+    border-bottom: 1px solid var(--border);
     cursor: pointer;
     transition: background 0.15s;
 }

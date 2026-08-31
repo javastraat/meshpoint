@@ -225,7 +225,7 @@
 .update-history__foot {
     margin: 10px 0 0;
     padding-top: 10px;
-    border-top: 1px solid rgba(35, 48, 73, 0.85);
+    border-top: 1px solid var(--border);
     font-size: 12px;
     line-height: 1.4;
     color: var(--text-secondary, #94a3b8);
