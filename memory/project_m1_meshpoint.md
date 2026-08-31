@@ -7659,3 +7659,28 @@ Repeaters, Messages, RTL-SDR (all sub-tabs), RF Environment, Hardware, Updates,
 GPS, all Config sub-pages, node drawer, Terminal, LoRaWAN, Topology (map+graph),
 Meshtastic/MeshCore/DAPNET/Pager. Auth/login pages are deliberately not
 theme-aware. TODO #1 (theme editor) and #3 (plugin Phase 0) remain.
+
+**Theme editor shipped — download-only (2026-08-31, TODO #1)**: new
+**Settings → Themes** sub-page (`#/settings/themes`). The default-theme picker
+(`<select data-default-theme>` → `PUT /api/config/dashboard/theme`) moved here
+out of Settings → System; `meshpoint_display_form.js` lost its `_themeSelect` /
+`_loadDefaultTheme` / `_saveDefaultTheme` (keeps units + msg-notification
+toggles). New builder card: `frontend/js/settings/theme_editor.js`
+(`window.ThemeEditor`) + `frontend/css/theme_editor.css`, booted by
+`_bootThemeEditor(router)` in app.js (onRouteChange enter/leave → `onActivated`
+/ `onLeft`). Route `settings/themes` added to `allowedRoutes`; guarded by the
+generic `startsWith('settings/')` → `settings` section (same as Updates/Auth).
+How it works: reads a base theme's token values by flipping `data-theme` on
+`<html>` and `getComputedStyle().getPropertyValue()` with a recursive `var()`
+resolver; ~30 tokens in 4 groups (Base 7, Accents 6, Sidebar 5, Surfaces 12 —
+alpha tokens get an opacity slider). Live preview = base theme stays via
+`data-theme`, only changed tokens pushed as inline custom props + `meshpoint:
+themechange`. Leaving the route clears the inline props. Download theme.css =
+every token whose value differs from the `dark`/`:root` baseline (self-contained
+regardless of base polarity), as `html[data-theme="<slug>"]{…}`; Download
+theme.json = `{id,label,order:100,icon:"palette"}`. `--msg-*`/`--term-*` and
+`--glow-*` deliberately excluded (UI note tells the user to hand-edit for a full
+light-polarity theme). node --check clean on all touched JS; 14 theme_registry
+tests green; changelog parses (31 sections). Not live-verified on the Pi.
+Server-side "save as new theme" still deferred. **Only TODO #3 (plugin Phase 0)
+remains.**

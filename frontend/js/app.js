@@ -50,7 +50,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             'configuration/meshcore', 'configuration/reticulum', 'configuration/serial',
             'configuration/pocsag-serial', 'configuration/firmware',
             'configuration/repeater-poll', 'configuration/metrics',
-            'settings/updates', 'settings/auth', 'settings/dangerous', 'settings/storage',
+            'settings/updates', 'settings/themes', 'settings/auth', 'settings/dangerous', 'settings/storage',
         ],
         guard: _buildRouteGuard(identity),
         onDenied: _toastAdminRequired,
@@ -146,6 +146,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     _bootAuthPanel(router);
     _bootTerminalPanel(router);
     _bootUpdatePanel(router);
+    _bootThemeEditor(router);
     _bootConfigurationPanel(router);
     _bootDangerousPanel(router);
     _bootLoRaWANPanel(router);
@@ -440,6 +441,20 @@ function _bootUpdatePanel(router) {
     router.onRouteChange((route) => {
         if (route !== 'settings/updates') return;
         controller.refresh();
+    });
+}
+
+function _bootThemeEditor(router) {
+    const root = document.getElementById('settings-themes-panel');
+    if (!root || !window.ThemeEditor) return;
+    const editor = new window.ThemeEditor(root);
+    editor.bind();
+    let wasActive = false;
+    router.onRouteChange((route) => {
+        const active = route === 'settings/themes';
+        if (active && !wasActive) editor.onActivated();
+        else if (!active && wasActive) editor.onLeft();
+        wasActive = active;
     });
 }
 
