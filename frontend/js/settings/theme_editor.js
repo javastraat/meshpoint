@@ -124,6 +124,7 @@
             this.status = el.querySelector('[data-te-status]');
             this.themes = [];
             this.base = 'dark';
+            this._nameAuto = true;   // track auto-vs-typed name
             this.values = {};      // working values, keyed by token
             this.baseValues = {};   // the chosen base theme's values
             this.darkValues = {};   // the :root baseline
@@ -132,6 +133,9 @@
 
         bind() {
             this.baseSel?.addEventListener('change', () => this._loadBase(this.baseSel.value));
+            this.nameInput?.addEventListener('input', () => {
+                this._nameAuto = !this.nameInput.value.trim();
+            });
             this.defaultSel?.addEventListener('change', () => this._saveDefault());
             this.el.querySelector('[data-te-reset]')?.addEventListener('click', () => this._loadBase(this.base));
             this.el.querySelector('[data-te-download]')?.addEventListener('click', () => this._download());
@@ -222,7 +226,7 @@
             this.values = { ...this.baseValues };
             this.groupsEl.querySelectorAll('.te-swatch').forEach((sw) => this._syncSwatch(sw, true));
             if (this.active) this._applyPreview();
-            if (!this.nameInput.value) this.nameInput.value = `${this.base}-custom`;
+            if (this._nameAuto) this.nameInput.value = `${this.base}-custom`;
         }
 
         _syncSwatch(sw, fromBase) {
