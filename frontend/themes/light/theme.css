@@ -134,6 +134,49 @@ html[data-theme="light"] .capcode-modal {
     border-color: var(--border) !important;
 }
 
+/* Maps: the dashboard / topology / ADS-B maps run plain OSM raster
+ * tiles under a CSS invert filter to fake a dark basemap. Drop the
+ * filter so the light theme gets the tiles' native light rendering. */
+html[data-theme="light"] #map .leaflet-tile-pane,
+html[data-theme="light"] .topo-map .leaflet-tile-pane,
+html[data-theme="light"] .adsb-map .leaflet-tile-pane {
+    filter: none;
+}
+
+html[data-theme="light"] .adsb-map {
+    background: var(--bg-secondary);
+}
+
+html[data-theme="light"] #map .leaflet-control-attribution,
+html[data-theme="light"] .adsb-map .leaflet-control-attribution {
+    background: rgba(255, 255, 255, 0.82) !important;
+}
+
+/* RTL-SDR "Listener" -- the Radio / DAB+ device panel and the analogue
+ * slide-rule dial are hardcoded near-black skeuomorphic bezels. Give
+ * them light equivalents and drop the neon bloom on the big readout. */
+html[data-theme="light"] .lsn-radio {
+    background:
+        radial-gradient(120% 80% at 50% -20%, rgba(14, 123, 160, 0.06), transparent 60%),
+        linear-gradient(180deg, #f4f6fa, #e9edf4);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.8),
+        inset 0 0 30px rgba(20, 28, 46, 0.05);
+}
+
+html[data-theme="light"] .lsn-ana__dial {
+    background:
+        radial-gradient(120% 140% at 50% -30%, rgba(178, 106, 6, 0.1), transparent 60%),
+        linear-gradient(180deg, #fbf4e8, #f1e8d6);
+    box-shadow: inset 0 0 18px rgba(20, 28, 46, 0.06);
+}
+
+html[data-theme="light"] .lsn-freq__num,
+html[data-theme="light"] .lsn-freq__unit,
+html[data-theme="light"] .lsn-station__text--big {
+    text-shadow: none;
+}
+
 /* Modal/drawer backdrops: the dark scrim is fine, just lighten it a bit. */
 html[data-theme="light"] .danger-modal__backdrop,
 html[data-theme="light"] .nd-backdrop,
