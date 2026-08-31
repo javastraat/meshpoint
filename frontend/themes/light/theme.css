@@ -22,7 +22,7 @@ html[data-theme="light"] {
     --bg-primary: #eceff4;
     --bg-secondary: #dfe4ec;
     --bg-card: #ffffff;
-    --bg-glass: rgba(255, 255, 255, 0.86);
+    --bg-glass: rgba(255, 255, 255, 0.94);
     --border: #c2ccda;
     --border-glow: rgba(14, 123, 160, 0.28);
     --text-primary: #172033;
