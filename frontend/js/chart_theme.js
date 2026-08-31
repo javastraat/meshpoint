@@ -35,19 +35,22 @@
         '#a879c9', '#5aa469', '#d98282', '#c9a13c',
     ];
 
-    // Semantic series -> palette token (theme-tracked). Anything not
-    // listed falls through to the categorical scale by index.
+    // Semantic series -> a distinct colour. Picked so the sets that
+    // actually co-occur on one chart never collide -- node-drawer /
+    // repeater trends show battery+voltage+temp+humidity+pressure+
+    // rssi(+chUtil+airUtil) all at once. Accent tokens track the theme;
+    // the rest are fixed hues legible on both polarities.
     const SEMANTIC = {
         battery: () => token('--accent-green', '#22c55e'),
-        voltage: () => CATEGORICAL[11],            // gold, not pure yellow
+        voltage: () => '#d4a017',                 // gold-yellow
         temp: () => token('--accent-amber', '#f97316'),
         temperature: () => token('--accent-amber', '#f97316'),
-        humidity: () => token('--accent-cyan', '#38bdf8'),
+        humidity: () => '#48b0cf',                // sky
         pressure: () => token('--accent-purple', '#c084fc'),
         rssi: () => token('--accent-cyan', '#06b6d4'),
-        snr: () => CATEGORICAL[2],
+        snr: () => '#5aa469',                     // moss green
         duty: () => token('--accent-cyan', '#06b6d4'),
-        chutil: () => token('--accent-purple', '#a855f7'),
+        chutil: () => '#c56ba6',                  // magenta
         airutil: () => token('--accent-blue', '#3b82f6'),
         // spectrum-card protocol markers -- kept distinct from the
         // median/peak data lines below so the legend never doubles up
