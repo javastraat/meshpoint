@@ -31,23 +31,33 @@
 
 .ch-table td {
     padding: 0.4rem 0.5rem;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--hairline);
     vertical-align: middle;
     overflow: hidden;
 }
 
+/* `display: flex` here turns the <td> into a flex container, which drops
+ * it out of the table's row layout -- the number top-aligns while its
+ * sibling cells stay centred, and the row's border-bottom is drawn at
+ * the short flex box instead of the full row height (staggered divider
+ * lines). Keep it a real table-cell; lay the number + reorder arrows
+ * out inline instead. */
 .ch-table__idx {
     color: var(--text-muted);
     font-family: var(--font-mono);
     font-size: 0.7rem;
-    display: flex;
-    align-items: center;
-    gap: 0.3rem;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+
+.ch-table__idx-num {
+    margin-right: 0.3rem;
 }
 
 .ch-table__reorder {
     display: inline-flex;
     flex-direction: column;
+    vertical-align: middle;
     gap: 1px;
 }
 
