@@ -7507,3 +7507,21 @@ charts/map to theme state). Added a `day` glyph to `app.js`'s theme-toggle icon
 map for `light`. Theme count in the picker is now 6 (dark, high-contrast,
 sunlight, amber-mono, green-crt, light). Changelog bullet updated. Still not
 live-verified on the Pi.
+
+**LIVE-VERIFIED 2026-08-31**: user screenshotted the real Pi dashboard in `dark`,
+`green-crt`, and `amber-mono` — all three render correctly end to end (topbar
+protocol chips, stat tiles, sidebar, node cards, packet table, noise-floor
+sparkline all pick up the palette; Leaflet map stays neutral, as designed). The
+drop-in theme system + server-side `<link>` injection confirmed working on the
+device. `light` not yet screenshotted — still expect the documented rough edges
+there.
+
+**Light theme topbar fix (2026-08-31)**: user live-tested `light` — topbar chips
+(hardcoded dark translucent fill + neon border glow in `frontend/topbar/topbar.css`)
+washed out on the light strip. Added a topbar override block to
+`frontend/themes/light/theme.css`: light strip gradient, solid-white chips with a
+real `#c2ccda` border, killed the chip brand/readout `text-shadow` glow, fixed the
+translucent-white divider bars. Covers `.topbar-meshtastic/.topbar-meshcore/
+.topbar-serial/.topbar-radio` (serial selector also covers the dapnet/pager/
+reticulum chips, which all carry `.topbar-serial`). Still v1 — Settings/Messaging/
+Terminal white-tint overlays and the charts/map remain the known unfixed edges.

@@ -65,3 +65,49 @@ html[data-theme="light"] .stat-card__value,
 html[data-theme="light"] .r-readout-grid dd {
     text-shadow: none;
 }
+
+/* Topbar: the strip and its protocol chips hardcode a dark translucent
+ * fill + neon border glows that wash out on a light bg. Give the strip
+ * a light surface and the chips a solid white card with a real border. */
+html[data-theme="light"] .topbar {
+    background: linear-gradient(180deg, #f3f5f9 0%, #e8ecf2 100%);
+    border-bottom-color: #c2ccda;
+}
+
+html[data-theme="light"] .topbar::after {
+    opacity: 0.2;
+}
+
+html[data-theme="light"] .topbar-meshtastic,
+html[data-theme="light"] .topbar-meshcore,
+html[data-theme="light"] .topbar-serial,
+html[data-theme="light"] .topbar-radio {
+    background: #ffffff;
+    border-color: #c2ccda;
+    box-shadow: 0 1px 2px rgba(23, 32, 51, 0.08);
+}
+
+html[data-theme="light"] .topbar-meshtastic:hover,
+html[data-theme="light"] .topbar-meshcore:hover,
+html[data-theme="light"] .topbar-serial:hover,
+html[data-theme="light"] .topbar-radio:hover {
+    border-color: #94a1b4;
+    box-shadow: 0 1px 4px rgba(23, 32, 51, 0.14);
+}
+
+/* Kill the neon text-shadow on chip brand labels + readouts. */
+html[data-theme="light"] .topbar [class$="__brand"],
+html[data-theme="light"] .topbar [class$="__freq"],
+html[data-theme="light"] .topbar [class$="__preset"],
+html[data-theme="light"] .topbar [class$="__call"],
+html[data-theme="light"] .topbar [class$="__channel"],
+html[data-theme="light"] .topbar [class$="__name"],
+html[data-theme="light"] .topbar [class$="__region"] {
+    text-shadow: none;
+}
+
+/* Chip divider bars are translucent-white -- invisible on white. */
+html[data-theme="light"] .topbar [class$="__brand"],
+html[data-theme="light"] .topbar [class$="__sep--bar"] {
+    border-color: #d5dce6;
+}
