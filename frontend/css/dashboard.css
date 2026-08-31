@@ -26,6 +26,15 @@
     --overlay-med: rgba(255, 255, 255, 0.07);
     --overlay-strong: rgba(255, 255, 255, 0.12);
     --hairline: rgba(255, 255, 255, 0.08);
+    /* Aliases: some stylesheets reference these names with a hardcoded
+     * dark fallback (the token was never actually defined, so the
+     * fallback always won and that surface stayed dark in every theme).
+     * Point them at the real palette so they flip with the theme. */
+    --card-bg: var(--bg-card);
+    --card-border: var(--border);
+    --border-subtle: var(--hairline);
+    --bg-card-hover: var(--overlay-weak);
+    --text: var(--text-primary);
     --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
     --font-sans: 'Inter', -apple-system, sans-serif;
     --radius: 8px;
