@@ -7760,3 +7760,18 @@ community), `_deleteTheme()`, `_confirm()` (lazy DangerousModal / window.confirm
 needed to see saved themes. **Pi-verified 2026-08-31: save, overwrite, and
 delete all working.** Themes track fully done — only plugin roadmap Phase 0
 (server.py registry refactor) remains.
+
+**Community theme pack + a11y theme (2026-08-31)**: added 9 drop-in themes to
+`plugins/themes/` — 8 popular dark palettes (dracula, catppuccin-mocha,
+rose-pine, everforest-dark, one-dark, kanagawa, github-dark, ayu-mirage) +
+`colorblind-safe` (six `--accent-*` from the Okabe & Ito Color Universal Design
+palette: sky-blue/bluish-green/blue/reddish-purple/orange/vermillion on a
+neutral #1a1a1a high-contrast base). Each is a ~24-token shallow dark-polarity
+override like nord/gruvbox, own CSS (palette hex only, not copied config),
+`author`/`homepage`/`description` credited. Also: user moved `solarized-dark`
+frontend/themes → plugins/themes (fork addition, not in the original), docs
+updated everywhere (README/CHANGELOG/CONFIGURATION/default.yaml). Picker now
+18 themes: 4 built-in (dark/light/high-contrast/sunlight) + 14 community.
+Accessibility Q&A recorded: `high-contrast` = low-vision pick, `colorblind-safe`
++ the fork-wide CB-safe chart palette cover colour-vision deficiency; a theme
+can't change text size (browser zoom for that).

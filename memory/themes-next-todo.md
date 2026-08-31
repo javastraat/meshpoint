@@ -1,12 +1,14 @@
 # Themes — follow-up TODO
 
-Backlog after the v0.8.1 themes + full frontend colour-tokenization push
-(drop-in `frontend/themes/<id>/`, `GET /api/themes`, `meshpoint:themechange`
-event, 6 shipped themes incl. the first light mode). See
-[plugin-architecture-review.md](plugin-architecture-review.md) — the themes
-work was "Spike 1" of that plan.
+Backlog after the v0.8.1 themes + full frontend colour-tokenization push. See
+[plugin-architecture-review.md](plugin-architecture-review.md) — the themes work
+was "Spike 1" of that plan.
 
-Ranked roughly by bang-for-buck. Not started unless noted.
+**Status (2026-08-31): everything below is done and Pi-verified except #3.**
+18 themes ship (4 built-in + 14 community incl. `colorblind-safe`); Settings →
+Themes has the live builder with Save-to-device + the Installed-themes manager.
+
+Original backlog table, ranked by bang-for-buck:
 
 | # | Item | What it is | Effort | Notes / why |
 |---|------|-----------|--------|-------------|
@@ -34,7 +36,8 @@ Ranked roughly by bang-for-buck. Not started unless noted.
   always precede plugin themes — `order` collisions across the two sets no
   longer matter. Settings → Themes selectors group them in `Built-in` /
   `Community` `<optgroup>`s. `dashboard.plugins_dir` key; `/plugins/themes`
-  mount. Shipped extras: nord, gruvbox-dark, amber-mono, green-crt.
+  mount. `order` is built-in-only now; plugin themes sort by normalised label.
+  `theme.json` gained optional `author`/`homepage`/`description`.
 
 Theme dir split + source tier Pi-verified working 2026-08-31.
 
@@ -53,7 +56,6 @@ Theme dir split + source tier Pi-verified working 2026-08-31.
 
 ## Open
 
-- **#3 plugin roadmap Phase 0** (unchanged — still last). The only item left.
-
-Steps 2–4 are ~2 days of easy wins that make light mode genuinely finished.
-#5 is the fun one. #6 is the deep architecture work.
+- **#3 plugin roadmap Phase 0** (unchanged — still last). The only item left on
+  the whole themes track. Deep backend context-switch; do it with undivided
+  focus, guarded by the 143-file test suite + `docs/plans/*-tests/`.
