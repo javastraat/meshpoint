@@ -49,12 +49,13 @@
         duty: () => token('--accent-cyan', '#06b6d4'),
         chutil: () => token('--accent-purple', '#a855f7'),
         airutil: () => token('--accent-blue', '#3b82f6'),
-        // protocol identity -- matches the topbar chips
-        meshtastic: () => token('--accent-cyan', '#06b6d4'),
-        meshcore: () => token('--accent-purple', '#a855f7'),
+        // spectrum-card protocol markers -- kept distinct from the
+        // median/peak data lines below so the legend never doubles up
+        meshtastic: () => token('--accent-green', '#10b981'),
+        meshcore: () => token('--accent-amber', '#f59e0b'),
         lorawan: () => token('--accent-blue', '#3b82f6'),
-        pager: () => token('--accent-amber', '#f59e0b'),
-        dapnet: () => token('--accent-amber', '#f59e0b'),
+        pager: () => token('--accent-red', '#ef4444'),
+        dapnet: () => token('--accent-red', '#ef4444'),
         median: () => token('--accent-cyan', '#06b6d4'),
         peak: () => token('--accent-purple', '#a855f7'),
     };
