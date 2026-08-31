@@ -1,6 +1,8 @@
 {
   "id": "green-crt",
   "label": "Green CRT",
-  "order": 6,
-  "icon": "terminal"
+  "icon": "terminal",
+  "author": "Meshpoint",
+  "homepage": "https://github.com/KMX415/meshpoint",
+  "description": "P1-phosphor green-on-black terminal look."
 }

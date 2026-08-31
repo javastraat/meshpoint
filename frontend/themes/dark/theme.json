@@ -2,5 +2,6 @@
   "id": "dark",
   "label": "Dark",
   "order": 0,
-  "icon": "moon"
+  "icon": "moon",
+  "description": "The default. Baseline palette everything renders against."
 }

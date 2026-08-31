@@ -974,6 +974,18 @@ Changes to `host`/`port`/`static_dir`/`plugins_dir` take effect on service resta
 
 **`plugins_dir`** — where drop-in themes are read from (`<plugins_dir>/themes/<id>/`, each a `theme.json` + `theme.css`). Resolved from the working directory like `static_dir` (so `/opt/meshpoint/plugins/` on the Pi). A built-in theme id always wins an id collision with a plugin theme, and a plugin folder can't claim `dark`. To add a theme, use the builder at **Settings → Themes** (start from an existing theme, tweak the palette, **Download theme.css** + **Download theme.json**) or hand-write the pair — drop it into a new `plugins/themes/<id>/` folder and restart; `GET /api/themes` picks it up.
 
+`theme.json` fields:
+
+| key | | |
+|---|---|---|
+| `id` | required | short slug; must match the folder name |
+| `label` | required | display name in the picker |
+| `icon` | optional | one of `moon` `sun` `day` `contrast` `monitor` `terminal` `palette` `circle` (defaults to a generic dot) |
+| `order` | built-ins only | integer curation sequence; **ignored for `plugins/themes/`** — those sort alphabetically by label in a separate "Community" group, always below the built-ins |
+| `author` | optional | credit shown in the theme builder |
+| `homepage` | optional | URL shown as a `↗` link next to the credit |
+| `description` | optional | one line shown under "Start from" in the builder |
+
 ### RF Environment tab
 
 Open **RF Environment** in the sidebar for a full-page noise-floor sparkline, calibration state, and the latest SX1302 spectral-scan histogram. Data comes from `GET /api/rf/status` (same sources as the sidebar telemetry rail).

@@ -115,6 +115,28 @@ class TestPluginThemes(unittest.TestCase):
         ids = [t["id"] for t in scan_themes(self.core, self.plugins)]
         self.assertEqual(ids, ["dark", "light", "greedy"])
 
+    def test_plugin_entries_have_no_order_and_sort_by_normalised_label(self) -> None:
+        _write_theme(self.plugins, "zulu", {"label": "Zulu"}, "html{--x:1}")
+        _write_theme(self.plugins, "sneaky", {"label": "  -alpha"}, "html{--x:1}")
+        _write_theme(self.plugins, "mid", {"label": "Mango"}, "html{--x:1}")
+        plugins = [t for t in scan_themes(self.core, self.plugins) if t["source"] == "plugin"]
+        self.assertEqual([t["id"] for t in plugins], ["sneaky", "mid", "zulu"])
+        self.assertNotIn("order", plugins[0])
+
+    def test_author_fields_carried_through(self) -> None:
+        _write_theme(
+            self.plugins, "nord",
+            {"label": "Nord", "author": "Arctic Ice Studio",
+             "homepage": "https://nordtheme.com", "description": "Bluish."},
+            "html{--x:1}",
+        )
+        nord = next(t for t in scan_themes(self.core, self.plugins) if t["id"] == "nord")
+        self.assertEqual(nord["author"], "Arctic Ice Studio")
+        self.assertEqual(nord["homepage"], "https://nordtheme.com")
+        self.assertEqual(nord["description"], "Bluish.")
+        light = next(t for t in scan_themes(self.core, self.plugins) if t["id"] == "light")
+        self.assertEqual(light["author"], "")
+
     def test_core_theme_wins_id_collision(self) -> None:
         _write_theme(self.plugins, "light", {"label": "Impostor", "order": 2}, "html{--y:2}")
         by_id = {t["id"]: t for t in scan_themes(self.core, self.plugins)}

@@ -43,13 +43,18 @@ def scan_themes(themes_dir: Path, plugin_themes_dir: Path | None = None) -> list
     Built-in themes come from *themes_dir* (``/themes/<id>/theme.css``);
     optional extra themes from *plugin_themes_dir*
     (``/plugins/themes/<id>/theme.css``). Each entry:
-    ``{"id", "label", "order", "icon", "css", "source"}`` where ``css`` is
-    the browser URL for a non-empty ``theme.css`` or ``None`` and
-    ``source`` is ``"builtin"`` or ``"plugin"``. Folders with a
-    missing/unparseable ``theme.json`` are skipped with a warning. A
-    built-in id wins an id collision with a plugin theme; a plugin folder
-    can't claim ``dark``. Sorted built-ins first (then by
-    ``(order, label)`` within each group).
+    ``{"id", "label", "icon", "css", "source", "author", "homepage",
+    "description"}`` -- ``css`` is the browser URL for a non-empty
+    ``theme.css`` or ``None``; ``source`` is ``"builtin"`` or
+    ``"plugin"``; ``author``/``homepage``/``description`` are ``""`` when
+    absent. Built-in entries also carry ``order`` (an integer curation
+    sequence); plugin entries do not -- they sort alphabetically.
+
+    Folders with a missing/unparseable ``theme.json`` are skipped with a
+    warning. A built-in id wins an id collision with a plugin theme; a
+    plugin folder can't claim ``dark``. Built-ins always sort first (by
+    ``order`` then label); plugin themes follow, sorted by a normalised
+    label so a leading ``-``/space can't game the order.
     """
     themes: list[dict] = []
     seen: set[str] = set()
@@ -67,15 +72,22 @@ def scan_themes(themes_dir: Path, plugin_themes_dir: Path | None = None) -> list
             {
                 "id": DEFAULT_THEME_ID, "label": "Dark", "order": 0,
                 "icon": "moon", "css": None, "source": "builtin",
+                "author": "", "homepage": "", "description": "",
             }
         )
 
-    # Built-ins always sort ahead of plugin themes, whatever their
-    # `order` -- so a drop-in can never jump the curated set in the
-    # picker. `order`/`label` only order within each group.
-    _rank = {"builtin": 0, "plugin": 1}
-    themes.sort(key=lambda t: (_rank[t["source"]], t["order"], t["label"].lower()))
+    themes.sort(key=_sort_key)
     return themes
+
+
+def _sort_key(theme: dict) -> tuple:
+    """Built-ins first (by ``order`` then label); plugins after, by a
+    normalised label (leading non-alphanumerics stripped) so a ``-`` or
+    space prefix can't float a drop-in to the top of its group."""
+    label_key = re.sub(r"^[^a-z0-9]+", "", theme["label"].strip().lower())
+    if theme["source"] == "builtin":
+        return (0, theme.get("order", 100), label_key)
+    return (1, 0, label_key)
 
 
 def _scan_dir(
@@ -121,16 +133,21 @@ def _scan_dir(
 
         has_css = _has_css_rules(entry / "theme.css")
 
-        themes.append(
-            {
-                "id": theme_id,
-                "label": str(raw.get("label") or theme_id.replace("-", " ").title()),
-                "order": _as_int(raw.get("order"), default=100),
-                "icon": str(raw.get("icon") or ""),
-                "css": f"{css_url_prefix}/{theme_id}/theme.css" if has_css else None,
-                "source": source,
-            }
-        )
+        entry_dict = {
+            "id": theme_id,
+            "label": str(raw.get("label") or theme_id.replace("-", " ").title()),
+            "icon": str(raw.get("icon") or ""),
+            "css": f"{css_url_prefix}/{theme_id}/theme.css" if has_css else None,
+            "source": source,
+            "author": str(raw.get("author") or ""),
+            "homepage": str(raw.get("homepage") or ""),
+            "description": str(raw.get("description") or ""),
+        }
+        # `order` is a built-in-only curation sequence; plugin themes sort
+        # alphabetically so contributors don't pick a meaningless number.
+        if source == "builtin":
+            entry_dict["order"] = _as_int(raw.get("order"), default=100)
+        themes.append(entry_dict)
 
 
 def theme_link_tags(themes: list[dict], token: str = BOOT_TOKEN) -> str:

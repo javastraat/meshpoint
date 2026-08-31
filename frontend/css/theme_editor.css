@@ -47,6 +47,26 @@
     margin-bottom: 1rem;
 }
 
+.theme-editor__controls-wide { grid-column: 1 / -1; }
+
+.cfg-field__label-opt {
+    font-weight: 400;
+    color: var(--text-muted);
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+.theme-editor__base-meta {
+    margin: -0.25rem 0 0.5rem;
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+}
+
+.theme-editor__base-meta a {
+    color: var(--accent-cyan);
+    text-decoration: none;
+}
+
 .theme-editor__groups {
     display: flex;
     flex-direction: column;

@@ -2,5 +2,8 @@
   "id": "solarized-dark",
   "label": "Solarized Dark",
   "order": 3,
-  "icon": "palette"
+  "icon": "palette",
+  "author": "Ethan Schoonover",
+  "homepage": "https://ethanschoonover.com/solarized/",
+  "description": "Precision colours for machines and people."
 }

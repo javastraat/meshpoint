@@ -1,6 +1,8 @@
 {
   "id": "amber-mono",
   "label": "Amber mono",
-  "order": 5,
-  "icon": "monitor"
+  "icon": "monitor",
+  "author": "Meshpoint",
+  "homepage": "https://github.com/KMX415/meshpoint",
+  "description": "Amber-phosphor terminal tint over the dark palette."
 }

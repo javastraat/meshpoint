@@ -1,6 +1,8 @@
 {
   "id": "nord",
   "label": "Nord",
-  "order": 9,
-  "icon": "palette"
+  "icon": "palette",
+  "author": "Arctic Ice Studio",
+  "homepage": "https://www.nordtheme.com/",
+  "description": "Arctic, north-bluish palette."
 }

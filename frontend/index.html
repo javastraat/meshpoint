@@ -865,7 +865,20 @@
                                 <span class="cfg-field__label">New theme name</span>
                                 <input class="cfg-field__input" type="text" maxlength="32" placeholder="my-theme" data-te-name>
                             </label>
+                            <label class="cfg-field">
+                                <span class="cfg-field__label">Author <span class="cfg-field__label-opt">(optional)</span></span>
+                                <input class="cfg-field__input" type="text" maxlength="80" placeholder="Your name" data-te-author>
+                            </label>
+                            <label class="cfg-field">
+                                <span class="cfg-field__label">Homepage <span class="cfg-field__label-opt">(optional)</span></span>
+                                <input class="cfg-field__input" type="url" maxlength="200" placeholder="https://…" data-te-homepage>
+                            </label>
+                            <label class="cfg-field theme-editor__controls-wide">
+                                <span class="cfg-field__label">Description <span class="cfg-field__label-opt">(optional)</span></span>
+                                <input class="cfg-field__input" type="text" maxlength="120" placeholder="One line about the palette" data-te-desc>
+                            </label>
                         </div>
+                        <p class="theme-editor__base-meta" data-te-base-meta hidden></p>
                         <div class="theme-editor__groups" data-te-groups></div>
                         <div class="theme-editor__advanced-note">
                             The Messages panel and Terminal keep their own colour sets (<code>--msg-*</code> / <code>--term-*</code>) — you can't preview them from here, so they aren't swatches. Where your <strong>Start from</strong> theme already overrides them (e.g. Light) the download carries those in; tick the box below to also get the rest as a commented-out scaffold to hand-tune.

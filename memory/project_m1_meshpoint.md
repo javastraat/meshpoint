@@ -7712,11 +7712,17 @@ stops a plugin claiming `dark`. `inject_theme_links` / `stamp_default_theme` /
 `/opt/meshpoint/plugins/` on Pi). Plugin themes are git-TRACKED (starter set);
 no .gitignore change. 20 theme_registry tests green. Not Pi-verified yet.
 
-**Theme source tier + optgroups (2026-08-31)**: each scanned theme now carries
-`source: "builtin" | "plugin"`; sort key is `(source_rank, order, label)` so
-built-ins ALWAYS sort ahead of plugin themes regardless of `order` — this kills
-the cross-set numbering-collision problem entirely (`order` only matters within
-a group now). `theme_editor.js` `_groupedOptions()` renders the default-theme
-and "Start from" `<select>`s with `<optgroup label="Built-in">` /
-`<optgroup label="Community">`. `theme_controller.js` unchanged (cycles the
-sorted id list; grouping falls out for free).
+**Theme source tier + optgroups + author fields (2026-08-31)**: each scanned
+theme carries `source: "builtin" | "plugin"`. `_sort_key()`: built-ins first by
+`(order, label)`, then plugins by a normalised label (leading non-alphanumerics
+stripped so `-Nord` / ` nord` can't float to the top of the Community group).
+**`order` is now built-in-only** — `_scan_dir` only adds the `order` key when
+`source == "builtin"`; the 4 bundled plugin `theme.json` files lost their
+`order`. `theme.json` also gained optional `author` / `homepage` /
+`description` (always present in the API entry, `""` when absent). Built-in
+manifests got `description`s; solarized-dark got Schoonover attribution.
+`theme_editor.js`: `_groupedOptions()` → `<optgroup Built-in/Community>` (now
+HTML-escaped); `_renderBaseMeta()` shows the base theme's description/author/↗
+under "Start from"; builder has Author/Homepage/Description inputs and
+`_themeJson()` emits them (and dropped `order`). `theme_controller.js`
+unchanged. 22 theme_registry tests.

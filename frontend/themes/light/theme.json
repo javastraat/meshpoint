@@ -2,5 +2,6 @@
   "id": "light",
   "label": "Light",
   "order": 5,
-  "icon": "day"
+  "icon": "day",
+  "description": "Light-polarity theme for daylight and projectors."
 }

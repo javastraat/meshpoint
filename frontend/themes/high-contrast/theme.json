@@ -2,5 +2,6 @@
   "id": "high-contrast",
   "label": "High contrast",
   "order": 1,
-  "icon": "contrast"
+  "icon": "contrast",
+  "description": "Maximum-contrast dark theme for low vision / bright rooms."
 }

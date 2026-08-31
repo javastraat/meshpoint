@@ -2,5 +2,6 @@
   "id": "sunlight",
   "label": "Sunlight",
   "order": 4,
-  "icon": "sun"
+  "icon": "sun",
+  "description": "High-brightness light theme tuned for direct sunlight."
 }
