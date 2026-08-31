@@ -1,0 +1,32 @@
+/* Nord -- https://www.nordtheme.com/
+ * Dark-polarity, so a shallow palette override over the baseline. */
+
+html[data-theme="nord"] {
+    --bg-primary: #2e3440;
+    --bg-secondary: #2b303b;
+    --bg-card: #3b4252;
+    --bg-glass: rgba(59, 66, 82, 0.72);
+    --border: #434c5e;
+    --border-glow: rgba(136, 192, 208, 0.28);
+    --text-primary: #eceff4;
+    --text-secondary: #d8dee9;
+    --text-muted: #7b88a1;
+    --accent-cyan: #88c0d0;
+    --accent-green: #a3be8c;
+    --accent-blue: #81a1c1;
+    --accent-purple: #b48ead;
+    --accent-amber: #ebcb8b;
+    --accent-red: #bf616a;
+    --glow-cyan: 0 0 8px rgba(136, 192, 208, 0.3);
+    --glow-green: 0 0 8px rgba(163, 190, 140, 0.3);
+    --bg-inset: #2b303b;
+    --bg-popover: #2e3440;
+
+    --sidebar-bg: #2e3440;
+    --sidebar-border: #3b4252;
+    --sidebar-item-hover: rgba(136, 192, 208, 0.1);
+    --sidebar-item-active-bg: rgba(163, 190, 140, 0.16);
+    --sidebar-accent: #88c0d0;
+    --sidebar-text: #eceff4;
+    --sidebar-text-muted: #7b88a1;
+}

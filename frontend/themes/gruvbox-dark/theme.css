@@ -1,0 +1,32 @@
+/* Gruvbox Dark -- https://github.com/morhetz/gruvbox
+ * Warm retro-groove palette. Dark-polarity override. */
+
+html[data-theme="gruvbox-dark"] {
+    --bg-primary: #1d2021;
+    --bg-secondary: #282828;
+    --bg-card: #32302f;
+    --bg-glass: rgba(40, 40, 40, 0.74);
+    --border: #504945;
+    --border-glow: rgba(142, 192, 124, 0.25);
+    --text-primary: #ebdbb2;
+    --text-secondary: #bdae93;
+    --text-muted: #928374;
+    --accent-cyan: #8ec07c;
+    --accent-green: #b8bb26;
+    --accent-blue: #83a598;
+    --accent-purple: #d3869b;
+    --accent-amber: #fabd2f;
+    --accent-red: #fb4934;
+    --glow-cyan: 0 0 8px rgba(142, 192, 124, 0.3);
+    --glow-green: 0 0 8px rgba(184, 187, 38, 0.3);
+    --bg-inset: #232323;
+    --bg-popover: #1d2021;
+
+    --sidebar-bg: #1d2021;
+    --sidebar-border: #3c3836;
+    --sidebar-item-hover: rgba(142, 192, 124, 0.1);
+    --sidebar-item-active-bg: rgba(184, 187, 38, 0.16);
+    --sidebar-accent: #8ec07c;
+    --sidebar-text: #ebdbb2;
+    --sidebar-text-muted: #928374;
+}

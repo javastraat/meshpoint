@@ -7602,3 +7602,10 @@ First color_accents.py run had a `color:` substring-match bug that also hit
 Post-pass audit: raw colour literals in component CSS 909 -> 280 (all
 accents/shadows/tints, intentionally theme-independent); NEUTRAL surface/text/
 border literals not tokenised = 0.
+
+**Community theme pack (2026-08-31)**: shipped 3 drop-in dark-polarity themes --
+`frontend/themes/nord/`, `solarized-dark/`, `gruvbox-dark/` (order 6/7/8, icon
+"palette"). Each = theme.json + a ~28-line theme.css overriding the core palette
+(bg/text/accent/border) + `--bg-inset`/`--bg-popover` + the `--sidebar-*` set +
+`--glow-cyan/green`. No code touched -- `scan_themes` picks them up, picker now
+lists 9. First item off `memory/themes-next-todo.md`. Not yet live-verified.

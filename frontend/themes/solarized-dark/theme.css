@@ -1,0 +1,32 @@
+/* Solarized Dark -- Ethan Schoonover's palette
+ * (https://ethanschoonover.com/solarized/). Dark-polarity override. */
+
+html[data-theme="solarized-dark"] {
+    --bg-primary: #002b36;
+    --bg-secondary: #01323d;
+    --bg-card: #073642;
+    --bg-glass: rgba(7, 54, 66, 0.74);
+    --border: #0e4553;
+    --border-glow: rgba(42, 161, 152, 0.28);
+    --text-primary: #93a1a1;
+    --text-secondary: #839496;
+    --text-muted: #5c7279;
+    --accent-cyan: #2aa198;
+    --accent-green: #859900;
+    --accent-blue: #268bd2;
+    --accent-purple: #6c71c4;
+    --accent-amber: #b58900;
+    --accent-red: #dc322f;
+    --glow-cyan: 0 0 8px rgba(42, 161, 152, 0.3);
+    --glow-green: 0 0 8px rgba(133, 153, 0, 0.3);
+    --bg-inset: #01323d;
+    --bg-popover: #002b36;
+
+    --sidebar-bg: #002b36;
+    --sidebar-border: #073642;
+    --sidebar-item-hover: rgba(42, 161, 152, 0.1);
+    --sidebar-item-active-bg: rgba(133, 153, 0, 0.16);
+    --sidebar-accent: #2aa198;
+    --sidebar-text: #93a1a1;
+    --sidebar-text-muted: #5c7279;
+}
