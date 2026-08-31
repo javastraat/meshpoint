@@ -138,6 +138,12 @@ class RadioThermalsCard {
             : tempText;
     }
 
+    _ink() {
+        return (window.ChartTheme && window.ChartTheme.ink()) || {
+            fg: '#94a3b8', faint: '#64748b', grid: 'rgba(51, 65, 85, 0.3)',
+        };
+    }
+
     _panelChart(canvas, data, color, opts) {
         return new Chart(canvas, {
             type: 'line',
@@ -185,21 +191,21 @@ class RadioThermalsCard {
                         ticks: {
                             display: !opts.hideXTicks,
                             maxTicksLimit: 6,
-                            color: '#64748b',
+                            color: this._ink().faint,
                             font: { size: 9 },
                             callback: (v) => this._formatAxisTime(v, opts.span),
                         },
-                        grid: { color: 'rgba(51, 65, 85, 0.25)' },
+                        grid: { color: this._ink().grid },
                     },
                     y: {
                         suggestedMin: opts.suggestedMin,
                         suggestedMax: opts.suggestedMax,
                         ticks: {
                             maxTicksLimit: 4,
-                            color: '#64748b',
+                            color: this._ink().faint,
                             font: { size: 9 },
                         },
-                        grid: { color: 'rgba(51, 65, 85, 0.25)' },
+                        grid: { color: this._ink().grid },
                     },
                 },
             },

@@ -703,7 +703,7 @@ class StatsTab {
                 legend: {
                     position: 'bottom',
                     labels: {
-                        color: '#94a3b8',
+                        color: this._ink().fg,
                         font: { size: 11 },
                         padding: 8,
                         usePointStyle: true,
@@ -732,10 +732,16 @@ class StatsTab {
             indexAxis: 'y',
             plugins: { legend: { display: false } },
             scales: {
-                x: { ticks: { color: '#64748b', precision: 0 }, grid: { color: 'rgba(30,41,59,0.5)' } },
-                y: { ticks: { color: '#94a3b8', font: { size: 11 } }, grid: { display: false } },
+                x: { ticks: { color: this._ink().faint, precision: 0 }, grid: { color: this._ink().grid } },
+                y: { ticks: { color: this._ink().fg, font: { size: 11 } }, grid: { display: false } },
             },
         });
+    }
+
+    _ink() {
+        return (window.ChartTheme && window.ChartTheme.ink()) || {
+            fg: '#94a3b8', faint: '#64748b', grid: 'rgba(30, 41, 59, 0.5)',
+        };
     }
 
     _renderChart(canvasId, type, data, extraOpts, centerLabel, extraPlugins) {
@@ -758,8 +764,8 @@ class StatsTab {
             responsive: true,
             maintainAspectRatio: false,
             scales: type === 'bar' && !(extraOpts && extraOpts.indexAxis) ? {
-                x: { ticks: { color: '#64748b', font: { size: 10 } }, grid: { color: 'rgba(30,41,59,0.5)' } },
-                y: { ticks: { color: '#64748b' }, grid: { color: 'rgba(30,41,59,0.5)' } },
+                x: { ticks: { color: this._ink().faint, font: { size: 10 } }, grid: { color: this._ink().grid } },
+                y: { ticks: { color: this._ink().faint }, grid: { color: this._ink().grid } },
             } : undefined,
         };
 

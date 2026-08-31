@@ -10,14 +10,12 @@
  * Every one keeps its dark value in :root, so the dark themes are
  * unchanged; this file redefines the tokens for light polarity.
  *
- * Known remaining rough edges:
- *   - Chart / <canvas> internals (RF spectrum, node metrics, thermals,
- *     repeater trends) draw with hardcoded dark colours and don't read
- *     theme state -- the panel around them is light, the plot is not.
- *     `meshpoint:themechange` fires on every switch as the hook to fix
- *     this when the chart code learns to re-theme.
- *   - The xterm terminal + Messages panels flip via their own --term-* /
- *     --msg-* token sets (redefined below).
+ * JS-rendered surfaces that can't read CSS vars re-theme via the
+ * `meshpoint:themechange` event: the xterm terminal (its own palette),
+ * and every chart (js/chart_theme.js pushes the palette into
+ * Chart.defaults + repaints; the manual spectrum/topology canvases
+ * redraw). The Messages panels flip via their own --msg-* token set,
+ * redefined below.
  *
  * See memory/plugin-architecture-review.md for the staged plan. */
 

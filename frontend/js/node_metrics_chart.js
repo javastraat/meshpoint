@@ -9,6 +9,13 @@ class NodeMetricsChart {
         this._timeSpanMs = 0;
     }
 
+
+    _ink() {
+        return (window.ChartTheme && window.ChartTheme.ink()) || {
+            fg: '#94a3b8', faint: '#64748b', grid: 'rgba(51, 65, 85, 0.3)',
+        };
+    }
+
     destroy() {
         if (this._chart) {
             this._chart.destroy();
@@ -53,7 +60,7 @@ class NodeMetricsChart {
                         labels: {
                             boxWidth: 10,
                             font: { size: 10 },
-                            color: '#94a3b8',
+                            color: this._ink().fg,
                             generateLabels: (chart) => {
                                 const defaults = Chart.defaults.plugins.legend.labels
                                     .generateLabels(chart);
@@ -62,7 +69,7 @@ class NodeMetricsChart {
                                     return {
                                         ...item,
                                         textDecoration: hidden ? 'line-through' : '',
-                                        fontColor: hidden ? '#475569' : '#94a3b8',
+                                        fontColor: hidden ? this._ink().faint : this._ink().fg,
                                     };
                                 });
                             },
@@ -104,11 +111,11 @@ class NodeMetricsChart {
                 max: bounds.max,
                 ticks: {
                     maxTicksLimit: 6,
-                    color: '#64748b',
+                    color: this._ink().faint,
                     font: { size: 9 },
                     callback: (v) => this._formatAxisTime(v),
                 },
-                grid: { color: 'rgba(51, 65, 85, 0.35)' },
+                grid: { color: this._ink().grid },
             },
             y: {
                 display: hasAxis('y'),
@@ -121,8 +128,8 @@ class NodeMetricsChart {
                     color: '#22c55e',
                     font: { size: 9 },
                 },
-                ticks: { color: '#64748b', font: { size: 9 } },
-                grid: { color: 'rgba(51, 65, 85, 0.25)' },
+                ticks: { color: this._ink().faint, font: { size: 9 } },
+                grid: { color: this._ink().grid },
             },
             y1: {
                 display: hasAxis('y1'),
@@ -135,7 +142,7 @@ class NodeMetricsChart {
                     color: '#eab308',
                     font: { size: 9 },
                 },
-                ticks: { color: '#64748b', font: { size: 9 } },
+                ticks: { color: this._ink().faint, font: { size: 9 } },
                 grid: { drawOnChartArea: false },
             },
             y2: {
@@ -149,7 +156,7 @@ class NodeMetricsChart {
                     color: '#06b6d4',
                     font: { size: 9 },
                 },
-                ticks: { color: '#64748b', font: { size: 9 } },
+                ticks: { color: this._ink().faint, font: { size: 9 } },
                 grid: { drawOnChartArea: false },
             },
             y3: {
@@ -161,7 +168,7 @@ class NodeMetricsChart {
                     color: '#f97316',
                     font: { size: 9 },
                 },
-                ticks: { color: '#64748b', font: { size: 9 } },
+                ticks: { color: this._ink().faint, font: { size: 9 } },
                 grid: { drawOnChartArea: false },
             },
             y4: {
@@ -173,7 +180,7 @@ class NodeMetricsChart {
                     color: '#c084fc',
                     font: { size: 9 },
                 },
-                ticks: { color: '#64748b', font: { size: 9 } },
+                ticks: { color: this._ink().faint, font: { size: 9 } },
                 grid: { drawOnChartArea: false },
             },
         };

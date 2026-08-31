@@ -7574,3 +7574,16 @@ line-based sweep couldn't reach -- .init-checklist vignette (color-mix on
 dropped their now-redundant entries from the light !important override block;
 defined --surface-1 / --radius-md aliases. All 6 modal/palette backdrops now
 use --scrim.
+
+**Light theme -- charts re-theme (2026-08-31)**: closed the last gap. New
+`frontend/js/chart_theme.js` (loaded right after chart.umd, before any chart
+file): `ChartTheme.ink()` reads `--text-secondary`/`--text-muted`/`--hairline`
+etc; `applyDefaults()` pushes them into `Chart.defaults` (color/borderColor/
+scale.grid/scale.ticks/legend/tooltip); on `meshpoint:themechange` it re-applies
++ walks every live `Chart.instances` overwriting ticks/grid/legend colour (axis
+*title* colours left alone -- they match a data series) and calls update('none').
+Per-chart hardcoded greys (`#94a3b8`/`#64748b`/grid rgba) in node_metrics_chart,
+radio_thermals_card, stats_tab replaced with `this._ink()` reads so first render
+is right too. Manual canvases: radio_spectrum_card + topology_tab now read tokens
+at draw and have a themechange->redraw listener. repeaters trends reuse
+NodeMetricsChart so covered. QR canvas is theme-neutral. Terminal already done.

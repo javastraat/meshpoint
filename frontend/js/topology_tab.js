@@ -146,6 +146,7 @@ class TopologyTab {
 
         this._bindPointer();
         window.addEventListener('resize', () => { if (this._visible) this._resize(); });
+        window.addEventListener('meshpoint:themechange', () => { if (this._visible) this._draw(); });
         this._applyMode();
     }
 

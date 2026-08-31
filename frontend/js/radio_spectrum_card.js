@@ -28,6 +28,7 @@ class RadioSpectrumCard {
         this._refreshTimer = null;
         this._emptyRetryTimer = null;
         this._redraw = () => this._draw();
+        window.addEventListener('meshpoint:themechange', this._redraw);
     }
 
     mount(rootEl) {
@@ -235,10 +236,11 @@ class RadioSpectrumCard {
         const y = (dbm) => pad.t + ((yMax - dbm) / (yMax - yMin)) * plotH;
         this._geom = { x, y, fMin, fMax, pad, plotW, plotH, cssH };
 
-        // grid + axes (recessive)
+        // grid + axes (recessive) -- theme-aware
+        const ink = (window.ChartTheme && window.ChartTheme.ink()) || {};
         ctx.font = '10px "JetBrains Mono", monospace';
-        ctx.fillStyle = 'rgba(148, 163, 184, 0.7)';
-        ctx.strokeStyle = 'rgba(148, 163, 184, 0.12)';
+        ctx.fillStyle = ink.faint || 'rgba(148, 163, 184, 0.7)';
+        ctx.strokeStyle = ink.grid || 'rgba(148, 163, 184, 0.12)';
         ctx.lineWidth = 1;
         for (let dbm = yMin; dbm <= yMax; dbm += 10) {
             ctx.beginPath();
