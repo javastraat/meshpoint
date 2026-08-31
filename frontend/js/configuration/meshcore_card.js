@@ -616,11 +616,13 @@ class MeshcoreConfigCard {
                             <td class="ch-table__idx">0</td>
                             <td>Public</td>
                             <td class="ch-table__psk-cell">
-                                <input class="ch-table__name-input" data-field="public_key_hex"
-                                       type="password" value="${publicKeyHex}"
-                                       placeholder="32-char hex default public key" />
-                                <button class="ch-table__reveal" type="button"
-                                        title="Show/hide key">&#128065;</button>
+                                <div class="ch-table__psk-inner">
+                                    <input class="ch-table__name-input" data-field="public_key_hex"
+                                           type="password" value="${publicKeyHex}"
+                                           placeholder="32-char hex default public key" />
+                                    <button class="ch-table__reveal" type="button"
+                                            title="Show/hide key">&#128065;</button>
+                                </div>
                             </td>
                             <td></td>
                         </tr>
@@ -674,11 +676,13 @@ class MeshcoreConfigCard {
                                value="${name}" placeholder="Channel name" />
                     </td>
                     <td class="ch-table__psk-cell">
-                        <input class="ch-table__name-input" data-field="key_hex"
-                               type="password" value="${keyHex}"
-                               placeholder="32-char hex (empty = hashtag)" />
-                        <button class="ch-table__reveal" type="button"
-                                title="Show/hide key">&#128065;</button>
+                        <div class="ch-table__psk-inner">
+                            <input class="ch-table__name-input" data-field="key_hex"
+                                   type="password" value="${keyHex}"
+                                   placeholder="32-char hex (empty = hashtag)" />
+                            <button class="ch-table__reveal" type="button"
+                                    title="Show/hide key">&#128065;</button>
+                        </div>
                     </td>
                     <td class="ch-table__admin-cell">
                         <input type="checkbox" data-field="admin_only" title="Hide from viewer role" ${isPrivate ? 'checked' : ''} />
