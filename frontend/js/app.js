@@ -242,7 +242,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 // Topbar theme toggle: cycles through the themes discovered from
 // /api/themes, with an icon + tooltip reflecting the current one.
 // Reuses window.themeController. Icons are keyed by the manifest's
-// `icon` keyword (moon / contrast / sun); an unknown keyword falls
+// `icon` keyword (see GLYPHS below: moon / contrast / sun / day /
+// monitor / terminal / palette / circle); an unknown keyword falls
 // back to the moon glyph, so a brand-new theme folder still gets a
 // usable button with no code change here.
 function _registerThemeToggle(topbar) {
@@ -262,6 +263,16 @@ function _registerThemeToggle(topbar) {
             + 'M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'),
         day: SVG('<circle cx="12" cy="12" r="5" fill="currentColor" stroke="none"/>'
             + '<path d="M12 1v3M12 20v3M1 12h3M20 12h3M4 4l2 2M18 18l2 2M4 20l2-2M18 6l2-2"/>'),
+        monitor: SVG('<rect x="2" y="3" width="20" height="14" rx="2"/>'
+            + '<path d="M8 21h8M12 17v4"/>'),
+        terminal: SVG('<rect x="2" y="3" width="20" height="18" rx="2"/>'
+            + '<path d="M6 8l3 3-3 3M12 14h6"/>'),
+        palette: SVG('<path d="M12 3a9 9 0 1 0 0 18c1 0 1.5-.7 1.5-1.5 0-.4-.2-.8-.4-1'
+            + '-.3-.3-.4-.6-.4-1 0-.8.7-1.5 1.5-1.5H16a5 5 0 0 0 5-5c0-4.4-4-8-9-8z"/>'
+            + '<circle cx="7.5" cy="10.5" r="1" fill="currentColor" stroke="none"/>'
+            + '<circle cx="12" cy="7.5" r="1" fill="currentColor" stroke="none"/>'
+            + '<circle cx="16.5" cy="10.5" r="1" fill="currentColor" stroke="none"/>'),
+        circle: SVG('<circle cx="12" cy="12" r="9"/>'),
     };
     const glyphFor = (themeId) => {
         const meta = tc.themes().find((t) => t.id === themeId);

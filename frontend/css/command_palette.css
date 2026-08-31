@@ -72,7 +72,7 @@
     overflow-y: auto;
     max-height: 48vh;
     scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+    scrollbar-color: var(--overlay-strong) transparent;
 }
 
 .cmd-palette__list li {
