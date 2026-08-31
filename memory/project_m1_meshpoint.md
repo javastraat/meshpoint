@@ -7726,3 +7726,9 @@ HTML-escaped); `_renderBaseMeta()` shows the base theme's description/author/↗
 under "Start from"; builder has Author/Homepage/Description inputs and
 `_themeJson()` emits them (and dropped `order`). `theme_controller.js`
 unchanged. 22 theme_registry tests.
+
+**Pi-verified working (2026-08-31)**: the whole themes track (Settings → Themes
+sub-page, download-only builder, `plugins/themes/` loading + `/plugins/themes`
+mount, source-tier optgroups, author fields) confirmed live on the device by the
+user. Themes track is done; only plugin roadmap Phase 0 (server.py registry
+refactor) remains.

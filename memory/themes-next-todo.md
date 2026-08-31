@@ -36,9 +36,11 @@ Ranked roughly by bang-for-buck. Not started unless noted.
   `Community` `<optgroup>`s. `dashboard.plugins_dir` key; `/plugins/themes`
   mount. Shipped extras: nord, gruvbox-dark, amber-mono, green-crt.
 
+All theme work Pi-verified working 2026-08-31.
+
 ## Open
 
-- **#3 plugin roadmap Phase 0** (unchanged — still last).
+- **#3 plugin roadmap Phase 0** (unchanged — still last). The only item left.
 
 Steps 2–4 are ~2 days of easy wins that make light mode genuinely finished.
 #5 is the fun one. #6 is the deep architecture work.
