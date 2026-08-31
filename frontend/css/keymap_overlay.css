@@ -15,7 +15,7 @@
 .keymap__backdrop {
     position: absolute;
     inset: 0;
-    background: var(--bg-popover);
+    background: var(--scrim);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
 }

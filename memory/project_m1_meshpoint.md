@@ -7562,3 +7562,15 @@ scratchpad: `sweep.py`. Remaining known gap: Chart.js/`<canvas>` internals still
 draw dark (RF spectrum, node metrics, thermals, repeater trends) -- panel is
 light, plot isn't; `meshpoint:themechange` event is the hook to fix that later.
 Not yet fully live-verified; dark needs a spot-check.
+
+**Light theme -- sweep follow-up (2026-08-31)**: user flagged the release-notes
+modal. The tokenization sweep had a bug: 3 dark-navy scrims (rgba(7,11,20,0.6)-ish
+on .cmd-palette__backdrop, .keymap__backdrop, .rn-modal-overlay) got mapped to
+opaque --bg-popover instead of --scrim -- a dark-theme regression too (opaque
+full-screen instead of a dim). Fixed to --scrim. Also: .nc-header
+--bg-popover->--bg-inset (too dark); tokenized the 3 multi-line dark gradients the
+line-based sweep couldn't reach -- .init-checklist vignette (color-mix on
+--bg-primary), .update-history and .rp-card (accent wash + var(--bg-card)), and
+dropped their now-redundant entries from the light !important override block;
+defined --surface-1 / --radius-md aliases. All 6 modal/palette backdrops now
+use --scrim.

@@ -20,8 +20,8 @@
     background:
         radial-gradient(
             ellipse at center,
-            rgba(15, 22, 36, 0.72) 0%,
-            rgba(15, 22, 36, 0.55) 60%,
+            color-mix(in srgb, var(--bg-primary) 72%, transparent) 0%,
+            color-mix(in srgb, var(--bg-primary) 55%, transparent) 60%,
             transparent 100%
         );
 }

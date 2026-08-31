@@ -880,7 +880,7 @@ select.update-field__input option:checked {
     position: fixed;
     inset: 0;
     z-index: 1000;
-    background: var(--bg-popover);
+    background: var(--scrim);
     display: flex;
     align-items: center;
     justify-content: center;

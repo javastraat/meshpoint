@@ -16,7 +16,7 @@
 .cmd-palette__backdrop {
     position: absolute;
     inset: 0;
-    background: var(--bg-popover);
+    background: var(--scrim);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
 }

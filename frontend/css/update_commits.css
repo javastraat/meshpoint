@@ -6,12 +6,8 @@
     border-radius: 12px;
     border: 1px solid var(--border, #233049);
     background:
-        linear-gradient(
-            165deg,
-            rgba(6, 182, 212, 0.07) 0%,
-            rgba(22, 32, 51, 0.55) 42%,
-            rgba(15, 23, 42, 0.4) 100%
-        );
+        linear-gradient(165deg, rgba(6, 182, 212, 0.07) 0%, transparent 55%),
+        var(--bg-card);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
     animation: updateHistoryReveal 420ms ease-out both;
 }

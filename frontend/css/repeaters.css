@@ -25,9 +25,9 @@
 
 .rp-card {
     background:
-        radial-gradient(140% 130% at 90% -18%, rgba(34, 197, 94, 0.1) 0%, rgba(34, 197, 94, 0) 45%),
-        linear-gradient(180deg, rgba(11, 17, 31, 0.96) 0%, rgba(10, 15, 28, 0.98) 100%);
-    border: 1px solid color-mix(in srgb, var(--border, #232a38) 84%, #2a3551 16%);
+        radial-gradient(140% 130% at 90% -18%, rgba(34, 197, 94, 0.1) 0%, transparent 45%),
+        var(--bg-card);
+    border: 1px solid var(--border);
     border-radius: 12px;
     padding: 1.25rem;
     box-shadow: 0 10px 24px var(--scrim);
