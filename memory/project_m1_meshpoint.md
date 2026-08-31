@@ -7490,3 +7490,20 @@ theme persisted). **Option B** (extract the dark palette into `themes/dark/theme
 **Next spike candidates:** Phase 0 route/service registry refactor of the ~2,100-line
 `src/api/server.py` `create_app`/`lifespan` (highest-leverage internal win), then
 Phase 2 decoder registry + opening the closed `Protocol` enum.
+
+### Spike 1 follow-up — theme pack (2026-08-31, same session)
+
+User liked `amber-mono`, asked for a green terminal theme and a light theme.
+Added `frontend/themes/green-crt/` (green-phosphor, dark-polarity, trivial
+variable override like amber-mono) and `frontend/themes/light/` (first
+light-polarity theme). `light` is explicitly a **v1**: the ~25 palette vars flip
+so the main chrome (bg/text/cards/sidebar) is right, but the ~140 hardcoded
+`rgba(255,255,255,0.0x)` faint-white overlays (Settings/Messaging/Listener/
+Terminal), the `--msg-*`/`--term-*` panel var sets, the hardcoded chart/canvas
+colours, and the invert-filtered OSM map tiles all still render dark. Full polish
+= the staged "Light theme" L-task already in this file's backlog (line ~2066:
+consolidate hardcoded colours into tokens first, then light override + wire
+charts/map to theme state). Added a `day` glyph to `app.js`'s theme-toggle icon
+map for `light`. Theme count in the picker is now 6 (dark, high-contrast,
+sunlight, amber-mono, green-crt, light). Changelog bullet updated. Still not
+live-verified on the Pi.

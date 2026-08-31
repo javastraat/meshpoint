@@ -286,9 +286,11 @@ permission disclosure UI. Consider subprocess isolation for untrusted sources.
 **Status: implemented 2026-08-31** (not yet live-verified on the Pi). See
 `memory/project_m1_meshpoint.md` → "Plugin architecture — Spike 1" for the full
 change list. New: `src/api/theme_registry.py`, `src/api/routes/theme_routes.py`,
-`frontend/themes/{dark,high-contrast,sunlight,amber-mono}/`,
+`frontend/themes/{dark,high-contrast,sunlight,amber-mono,green-crt,light}/`,
 `tests/test_theme_registry.py` (9 tests green). Deleted:
-`frontend/css/theme_high_contrast.css`.
+`frontend/css/theme_high_contrast.css`. `light` is a v1 (chrome flips, but
+hardcoded white overlays / chat+terminal panels / charts / map tiles stay dark —
+full polish is the staged light-theme task).
 
 The smallest end-to-end slice that proves "drop a folder ⇒ capability appears"
 without touching the pipeline, the `Protocol` enum, or the deployment model.

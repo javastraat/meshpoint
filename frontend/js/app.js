@@ -260,6 +260,8 @@ function _registerThemeToggle(topbar) {
         sun: SVG('<circle cx="12" cy="12" r="4"/>'
             + '<path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4'
             + 'M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'),
+        day: SVG('<circle cx="12" cy="12" r="5" fill="currentColor" stroke="none"/>'
+            + '<path d="M12 1v3M12 20v3M1 12h3M20 12h3M4 4l2 2M18 18l2 2M4 20l2-2M18 6l2-2"/>'),
     };
     const glyphFor = (themeId) => {
         const meta = tc.themes().find((t) => t.id === themeId);

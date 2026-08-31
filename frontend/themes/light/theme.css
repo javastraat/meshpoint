@@ -1,0 +1,67 @@
+/* Light theme -- the first light-polarity theme (dark text on a light
+ * background). Meshpoint's CSS is dark-first: most surfaces read the
+ * ~25 palette variables below and flip cleanly, but a light theme is
+ * not purely a variable swap. Known rough edges in this v1:
+ *
+ *   - ~140 hardcoded faint-white overlays (rgba(255,255,255,0.05)-ish,
+ *     mostly on Settings / Messaging / Listener / Terminal) go nearly
+ *     invisible on a light bg -- they need per-file black-tint equivalents.
+ *   - The chat and terminal panels keep their own --msg-* / --term-*
+ *     variable sets and stay dark.
+ *   - Charts / <canvas> (RF spectrum, node metrics, thermals) draw with
+ *     hardcoded dark colours and don't read theme state.
+ *   - The Leaflet maps use an OSM raster with a dark-invert CSS filter,
+ *     so they render inverted (dark) under this theme.
+ *
+ * Full polish is the staged "light theme" work in
+ * memory/plugin-architecture-review.md (consolidate hardcoded colours
+ * into tokens, then wire charts + map tiles to theme state). */
+
+html[data-theme="light"] {
+    --bg-primary: #eceff4;
+    --bg-secondary: #dfe4ec;
+    --bg-card: #ffffff;
+    --bg-glass: rgba(255, 255, 255, 0.82);
+    --border: #c2ccda;
+    --border-glow: rgba(14, 123, 160, 0.28);
+    --text-primary: #172033;
+    --text-secondary: #45536b;
+    --text-muted: #6a7789;
+    --accent-green: #0a9f6e;
+    --accent-cyan: #0e7ba0;
+    --accent-blue: #2563eb;
+    --accent-purple: #8b34e0;
+    --accent-amber: #b26a06;
+    --accent-red: #d33a2c;
+    --glow-cyan: 0 1px 3px rgba(23, 32, 51, 0.12);
+    --glow-green: 0 1px 3px rgba(23, 32, 51, 0.12);
+    --glow-amber: 0 1px 3px rgba(178, 106, 6, 0.18);
+    --glow-red: 0 1px 3px rgba(211, 58, 44, 0.18);
+
+    --sidebar-bg: #ffffff;
+    --sidebar-border: #d5dce6;
+    --sidebar-item-hover: rgba(14, 123, 160, 0.08);
+    --sidebar-item-active-bg: rgba(10, 159, 110, 0.12);
+    --sidebar-accent: #0a9f6e;
+    --sidebar-text: #172033;
+    --sidebar-text-muted: #6a7789;
+}
+
+/* Give cards/panels a real edge -- on a light bg the dark theme's
+ * glow-only separation disappears. Mirrors what the sunlight theme
+ * does for its own contrast pass. */
+html[data-theme="light"] .stat-card,
+html[data-theme="light"] .panel,
+html[data-theme="light"] .r-card,
+html[data-theme="light"] .since-line,
+html[data-theme="light"] .keymap__panel,
+html[data-theme="light"] .cmd-palette__panel {
+    border-color: #c2ccda !important;
+    box-shadow: 0 1px 3px rgba(23, 32, 51, 0.08) !important;
+}
+
+/* Neon value glows read as blur on white. */
+html[data-theme="light"] .stat-card__value,
+html[data-theme="light"] .r-readout-grid dd {
+    text-shadow: none;
+}

@@ -1,0 +1,35 @@
+/* Green CRT -- P1-phosphor green-on-black terminal look over the
+ * baseline dark palette. Same polarity as dark, so it's a shallow
+ * variable override. */
+
+html[data-theme="green-crt"] {
+    --text-primary: #4dff88;
+    --text-secondary: #2fbf63;
+    --text-muted: #1c8a43;
+    --accent-cyan: #33ff99;
+    --accent-green: #4dff88;
+    --accent-blue: #33ffcc;
+    --accent-purple: #7dffb0;
+    --accent-amber: #b6ff66;
+    --accent-red: #ff7a53;
+    --bg-primary: #030b07;
+    --bg-secondary: #08160f;
+    --bg-card: #0a1c12;
+    --bg-glass: rgba(10, 28, 18, 0.72);
+    --border: #143d28;
+    --border-glow: rgba(77, 255, 136, 0.22);
+    --glow-cyan: 0 0 8px rgba(77, 255, 136, 0.35);
+    --glow-green: 0 0 8px rgba(77, 255, 136, 0.4);
+    --sidebar-bg: #030b07;
+    --sidebar-border: #143d28;
+    --sidebar-item-hover: rgba(77, 255, 136, 0.1);
+    --sidebar-item-active-bg: rgba(77, 255, 136, 0.16);
+    --sidebar-accent: #4dff88;
+    --sidebar-text: #4dff88;
+    --sidebar-text-muted: #1c8a43;
+}
+
+html[data-theme="green-crt"] .stat-card__value,
+html[data-theme="green-crt"] .r-readout-grid dd {
+    text-shadow: 0 0 8px rgba(77, 255, 136, 0.45);
+}
