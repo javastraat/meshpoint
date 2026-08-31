@@ -12,8 +12,12 @@ class NodeMetricsChart {
 
     _ink() {
         return (window.ChartTheme && window.ChartTheme.ink()) || {
-            fg: '#94a3b8', faint: '#64748b', grid: 'rgba(51, 65, 85, 0.3)',
+            fg: '#94a3b8', faint: '#64748b', grid: 'rgba(51, 65, 85, 0.3)', text: '#e2e8f0', border: '#233049',
         };
+    }
+
+    _series(key) {
+        return (window.ChartTheme && window.ChartTheme.series(key)) || '#06b6d4';
     }
 
     destroy() {
@@ -125,7 +129,7 @@ class NodeMetricsChart {
                 title: {
                     display: hasAxis('y'),
                     text: '%',
-                    color: '#22c55e',
+                    color: this._series('battery'),
                     font: { size: 9 },
                 },
                 ticks: { color: this._ink().faint, font: { size: 9 } },
@@ -139,7 +143,7 @@ class NodeMetricsChart {
                 title: {
                     display: hasAxis('y1'),
                     text: 'V',
-                    color: '#eab308',
+                    color: this._series('voltage'),
                     font: { size: 9 },
                 },
                 ticks: { color: this._ink().faint, font: { size: 9 } },
@@ -153,7 +157,7 @@ class NodeMetricsChart {
                 title: {
                     display: hasAxis('y2'),
                     text: 'dBm',
-                    color: '#06b6d4',
+                    color: this._series('rssi'),
                     font: { size: 9 },
                 },
                 ticks: { color: this._ink().faint, font: { size: 9 } },
@@ -165,7 +169,7 @@ class NodeMetricsChart {
                 title: {
                     display: hasAxis('y3'),
                     text: '°C',
-                    color: '#f97316',
+                    color: this._series('temp'),
                     font: { size: 9 },
                 },
                 ticks: { color: this._ink().faint, font: { size: 9 } },
@@ -177,7 +181,7 @@ class NodeMetricsChart {
                 title: {
                     display: hasAxis('y4'),
                     text: 'hPa',
-                    color: '#c084fc',
+                    color: this._series('pressure'),
                     font: { size: 9 },
                 },
                 ticks: { color: this._ink().faint, font: { size: 9 } },
@@ -225,17 +229,17 @@ class NodeMetricsChart {
         const telem = this._downsampleSignal(history.telemetry || [], 800);
         const signal = this._downsampleSignal(history.signal || [], 350);
 
-        this._addSeries(out, 'Battery', '#22c55e', 'y', telem, (t) => {
+        this._addSeries(out, 'Battery', null, 'y', telem, (t) => {
             const v = t.battery_level;
             // 101 is Meshtastic's "externally powered, no battery"
             // sentinel, not a real reading -- exclude it from the chart
             // so a powered node doesn't draw a spike above the 100% axis.
             return v != null && v > 0 && v <= 100 ? v : null;
         }, false);
-        this._addSeries(out, 'Voltage', '#eab308', 'y1', telem, (t) => t.voltage, false);
-        this._addSeries(out, 'ChUtil', '#a855f7', 'y', telem, (t) => t.channel_utilization, false);
-        this._addSeries(out, 'AirUtil', '#3b82f6', 'y', telem, (t) => t.air_util_tx, false);
-        this._addSeries(out, 'Temp', '#f97316', 'y3', telem, (t) => {
+        this._addSeries(out, 'Voltage', null, 'y1', telem, (t) => t.voltage, false);
+        this._addSeries(out, 'ChUtil', null, 'y', telem, (t) => t.channel_utilization, false);
+        this._addSeries(out, 'AirUtil', null, 'y', telem, (t) => t.air_util_tx, false);
+        this._addSeries(out, 'Temp', null, 'y3', telem, (t) => {
             if (t.temperature == null) return null;
             const c = Number(t.temperature);
             if (Number.isNaN(c) || c === 0 || c < -60 || c > 85) return null;
@@ -243,13 +247,13 @@ class NodeMetricsChart {
         }, false);
         // Humidity shares the 0-100% left axis; Pressure gets its own hPa
         // axis. Both only appear when the node reports them (>= 2 points).
-        this._addSeries(out, 'Humidity', '#38bdf8', 'y', telem, (t) => t.humidity, false);
-        this._addSeries(out, 'Pressure', '#c084fc', 'y4', telem, (t) => {
+        this._addSeries(out, 'Humidity', null, 'y', telem, (t) => t.humidity, false);
+        this._addSeries(out, 'Pressure', null, 'y4', telem, (t) => {
             const p = t.barometric_pressure;
             return p != null && Number(p) > 0 ? Number(p) : null;
         }, false);
         // RSSI is dense: hidden by default; click legend to show.
-        this._addSeries(out, 'RSSI', '#06b6d4', 'y2', signal, (s) => s.rssi, true);
+        this._addSeries(out, 'RSSI', null, 'y2', signal, (s) => s.rssi, true);
 
         return out.filter((d) => d.data.length >= 2);
     }
@@ -267,7 +271,8 @@ class NodeMetricsChart {
         return out;
     }
 
-    _addSeries(list, label, color, yAxisID, rows, pick, hiddenDefault) {
+    _addSeries(list, label, _legacyColor, yAxisID, rows, pick, hiddenDefault) {
+        const color = this._series(label);
         const data = [];
         for (const row of rows) {
             const y = pick(row);
@@ -285,6 +290,8 @@ class NodeMetricsChart {
             hidden: hiddenDefault,
             borderColor: color,
             backgroundColor: color + (label === 'RSSI' ? '18' : '22'),
+            _meshSeries: label,
+            _meshFill: label === 'RSSI' ? '18' : '22',
             borderWidth: label === 'RSSI' ? 1 : 1.5,
             pointRadius: 0,
             pointHitRadius: 8,

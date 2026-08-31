@@ -14,8 +14,8 @@
  * for the duty half of this picture.
  */
 class RadioThermalsCard {
-    static TEMP_COLOR = '#f97316';   // matches "Temp" series in node drawer
-    static DUTY_COLOR = '#06b6d4';
+    // Series keys resolved through ChartTheme so they track the theme
+    // and stay in sync with the node-drawer chart.
     static MAX_DRAW_POINTS = 720;
 
     constructor(api) {
@@ -106,7 +106,7 @@ class RadioThermalsCard {
             this._panelChart(
                 this._root.querySelector('[data-th-temp]'),
                 rows.map((r) => ({ x: r.ts * 1000, y: r.temp_c })),
-                RadioThermalsCard.TEMP_COLOR,
+                'temp',
                 {
                     minX, maxX, span,
                     suggestedMin: 40, suggestedMax: 60,
@@ -119,7 +119,7 @@ class RadioThermalsCard {
             this._charts.push(this._panelChart(
                 this._root.querySelector('[data-th-duty]'),
                 rows.map((r) => ({ x: r.ts * 1000, y: r.duty * 100 })),
-                RadioThermalsCard.DUTY_COLOR,
+                'duty',
                 {
                     minX, maxX, span,
                     suggestedMin: 0, suggestedMax: 100,
@@ -140,11 +140,12 @@ class RadioThermalsCard {
 
     _ink() {
         return (window.ChartTheme && window.ChartTheme.ink()) || {
-            fg: '#94a3b8', faint: '#64748b', grid: 'rgba(51, 65, 85, 0.3)',
+            fg: '#94a3b8', faint: '#64748b', grid: 'rgba(51, 65, 85, 0.3)', text: '#e2e8f0', border: '#233049',
         };
     }
 
-    _panelChart(canvas, data, color, opts) {
+    _panelChart(canvas, data, seriesKey, opts) {
+        const color = (window.ChartTheme && window.ChartTheme.series(seriesKey)) || '#06b6d4';
         return new Chart(canvas, {
             type: 'line',
             data: {
@@ -152,6 +153,8 @@ class RadioThermalsCard {
                     data,
                     borderColor: color,
                     backgroundColor: color + '22',
+                    _meshSeries: seriesKey,
+                    _meshFill: '22',
                     borderWidth: 1.5,
                     pointRadius: 0,
                     pointHitRadius: 8,

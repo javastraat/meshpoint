@@ -10,14 +10,14 @@
  * box has no spectral-scan support (no SX1261 path).
  */
 class RadioSpectrumCard {
-    static MEDIAN_COLOR = '#06b6d4';
-    static PEAK_COLOR = '#a855f7';
-    static MARKER_COLORS = {
-        lorawan: '#3b82f6',
-        meshtastic: '#10b981',
-        meshcore: '#f59e0b',
-        pager: '#ef4444',
-    };
+    // Colours resolved live so they track the active theme -- median /
+    // peak / per-protocol channel markers, matching the topbar chips.
+    _color(key) {
+        return (window.ChartTheme && window.ChartTheme.series(key))
+            || { median: '#06b6d4', peak: '#a855f7', lorawan: '#3b82f6',
+                 meshtastic: '#10b981', meshcore: '#f59e0b', pager: '#ef4444' }[key]
+            || '#94a3b8';
+    }
 
     constructor(api) {
         this._api = api;
@@ -28,7 +28,8 @@ class RadioSpectrumCard {
         this._refreshTimer = null;
         this._emptyRetryTimer = null;
         this._redraw = () => this._draw();
-        window.addEventListener('meshpoint:themechange', this._redraw);
+        this._reskin = () => { if (this._root) this._renderLegend(); this._draw(); };
+        window.addEventListener('meshpoint:themechange', this._reskin);
     }
 
     mount(rootEl) {
@@ -84,12 +85,12 @@ class RadioSpectrumCard {
         if (!legend) return;
         const present = new Set(this._markers.map((m) => m.protocol));
         const entries = [
-            { label: 'Median', color: RadioSpectrumCard.MEDIAN_COLOR },
-            { label: 'Peak (p95)', color: RadioSpectrumCard.PEAK_COLOR },
-            { protocol: 'lorawan', label: 'LoRaWAN ch', color: RadioSpectrumCard.MARKER_COLORS.lorawan },
-            { protocol: 'meshtastic', label: 'Meshtastic', color: RadioSpectrumCard.MARKER_COLORS.meshtastic },
-            { protocol: 'meshcore', label: 'MeshCore', color: RadioSpectrumCard.MARKER_COLORS.meshcore },
-            { protocol: 'pager', label: 'Pager', color: RadioSpectrumCard.MARKER_COLORS.pager },
+            { label: 'Median', color: this._color('median') },
+            { label: 'Peak (p95)', color: this._color('peak') },
+            { protocol: 'lorawan', label: 'LoRaWAN ch', color: this._color('lorawan') },
+            { protocol: 'meshtastic', label: 'Meshtastic', color: this._color('meshtastic') },
+            { protocol: 'meshcore', label: 'MeshCore', color: this._color('meshcore') },
+            { protocol: 'pager', label: 'Pager', color: this._color('pager') },
         ];
         legend.innerHTML = entries
             .filter((e) => !e.protocol || present.has(e.protocol))
@@ -259,8 +260,7 @@ class RadioSpectrumCard {
         // channel markers under the data lines
         this._markers.forEach((m) => {
             if (m.mhz < fMin || m.mhz > fMax) return;
-            const color = RadioSpectrumCard.MARKER_COLORS[m.protocol]
-                || 'rgba(148,163,184,0.5)';
+            const color = this._color(m.protocol);
             ctx.strokeStyle = color;
             ctx.globalAlpha = 0.55;
             ctx.setLineDash([3, 4]);
@@ -276,7 +276,7 @@ class RadioSpectrumCard {
         });
 
         // p95 peak line (thin)
-        ctx.strokeStyle = RadioSpectrumCard.PEAK_COLOR;
+        ctx.strokeStyle = this._color('peak');
         ctx.lineWidth = 1;
         ctx.beginPath();
         points.forEach((p, i) => {
@@ -292,7 +292,7 @@ class RadioSpectrumCard {
             if (i === 0) ctx.moveTo(x(p.frequency_mhz), y(p.median_dbm));
             else ctx.lineTo(x(p.frequency_mhz), y(p.median_dbm));
         });
-        ctx.strokeStyle = RadioSpectrumCard.MEDIAN_COLOR;
+        ctx.strokeStyle = this._color('median');
         ctx.lineWidth = 2;
         ctx.stroke();
         ctx.lineTo(x(points[points.length - 1].frequency_mhz), pad.t + plotH);

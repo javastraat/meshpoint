@@ -7624,3 +7624,23 @@ UI: a "Default theme" `<select>` in the Settings→System display card
 (`meshpoint_display_form.js`, populated from /api/themes, PUT on change) --
 admin-only because viewers can't reach that panel. 14 theme tests green,
 ruff clean. Not live-verified.
+
+**LIVE-VERIFIED 2026-08-31 (server-side default theme)**: user set the default to
+`green-crt` in Settings→System, opened an incognito window (no localStorage), and
+the dashboard loaded straight into Green CRT with no flash. The `<html>`
+data-theme stamp + localStorage-override precedence both confirmed working on the
+Pi.
+
+**Chart categorical palette (2026-08-31, TODO #5)**: `chart_theme.js` gained
+`ChartTheme.series(key)` / `.categorical` / `.status(level)`. Semantic series
+(battery/voltage/temp/humidity/pressure/rssi/snr/duty/chutil/airutil + protocol
+identity meshtastic/meshcore/lorawan/pager) resolve to `--accent-*` tokens so
+they track the theme; everything else draws from a fixed 12-colour Tol/Okabe-Ito
+set legible on both polarities (no pure yellow/black). `repaintAll` now also
+re-resolves any dataset tagged `_meshSeries`/`_meshFill` on themechange.
+Converted: node_metrics_chart (axis titles + `_addSeries`), radio_thermals_card
+(TEMP/DUTY statics -> series keys), stats_tab (CHART_COLORS array + all
+donut/bar/quality colours -> chartColors/chartSeries/chartStatus, donut centre
+text -> `_ink().text`), rf_tab (histogram bars + grid), radio_spectrum_card
+(MEDIAN/PEAK/MARKER_COLORS statics -> live `_color()`, legend re-skins on
+themechange). node --check clean, theme tests green. Not live-verified.

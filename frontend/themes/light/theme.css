@@ -11,11 +11,11 @@
  * unchanged; this file redefines the tokens for light polarity.
  *
  * JS-rendered surfaces that can't read CSS vars re-theme via the
- * `meshpoint:themechange` event: the xterm terminal (its own palette),
- * and every chart (js/chart_theme.js pushes the palette into
- * Chart.defaults + repaints; the manual spectrum/topology canvases
- * redraw). The Messages panels flip via their own --msg-* token set,
- * redefined below.
+ * `meshpoint:themechange` event: the xterm terminal (its own palette);
+ * every chart (js/chart_theme.js -- chrome via Chart.defaults, data
+ * series via ChartTheme.series/categorical, semantic colours tracking
+ * --accent-*); the manual spectrum / topology canvases redraw. The
+ * Messages panels flip via their own --msg-* token set, redefined below.
  *
  * See memory/plugin-architecture-review.md for the staged plan. */
 

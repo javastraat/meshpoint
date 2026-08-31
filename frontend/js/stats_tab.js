@@ -13,11 +13,18 @@ const ROLE_NAMES = {
 // HW_NAMES now lives in meshtastic_hw_names.js (shared with node_drawer.js,
 // node_cards.js, and meshtastic_panel.js), loaded earlier in index.html.
 
-const CHART_COLORS = [
-    '#06b6d4', '#a855f7', '#f59e0b', '#3b82f6', '#10b981',
-    '#ef4444', '#ec4899', '#8b5cf6', '#14b8a6', '#f97316',
-    '#eab308', '#6366f1', '#84cc16', '#e11d48',
-];
+function chartColors() {
+    return (window.ChartTheme && window.ChartTheme.categorical) || [
+        '#4c8dd6', '#e08e2a', '#2fa88f', '#c56ba6', '#7d7fd0',
+        '#d1584f', '#93ab4b', '#48b0cf', '#a879c9', '#5aa469',
+    ];
+}
+function chartSeries(k) {
+    return (window.ChartTheme && window.ChartTheme.series(k)) || '#4c8dd6';
+}
+function chartStatus(l) {
+    return (window.ChartTheme && window.ChartTheme.status(l)) || '#22c55e';
+}
 
 class StatsTab {
     constructor(containerId) {
@@ -476,7 +483,7 @@ class StatsTab {
         const labels = Object.keys(protocols);
         const values = Object.values(protocols);
         const total = overrideTotal != null ? overrideTotal : values.reduce((a, b) => a + b, 0);
-        this._renderDoughnut('sc-protocol', labels, values, CHART_COLORS, total);
+        this._renderDoughnut('sc-protocol', labels, values, chartColors(), total);
     }
 
     _updateTypes(types) {
@@ -493,8 +500,8 @@ class StatsTab {
             labels: buckets,
             datasets: [{
                 data: counts,
-                backgroundColor: 'rgba(6, 182, 212, 0.6)',
-                borderColor: '#06b6d4',
+                backgroundColor: chartSeries('rssi') + '99',
+                borderColor: chartSeries('rssi'),
                 borderWidth: 1,
             }],
         }, { plugins: { legend: { display: false } } });
@@ -507,8 +514,8 @@ class StatsTab {
             labels: buckets,
             datasets: [{
                 data: counts,
-                backgroundColor: 'rgba(168, 85, 247, 0.6)',
-                borderColor: '#a855f7',
+                backgroundColor: chartSeries('snr') + '99',
+                borderColor: chartSeries('snr'),
                 borderWidth: 1,
             }],
         }, { plugins: { legend: { display: false } } });
@@ -519,12 +526,12 @@ class StatsTab {
         if (avgRssi == null) return;
         const quality = Math.max(0, Math.min(100, ((avgRssi + 130) / 90) * 100));
         const remaining = 100 - quality;
-        const color = quality >= 70 ? '#22c55e' : quality >= 40 ? '#f59e0b' : '#ef4444';
+        const color = chartStatus(quality);
         this._renderChart('sc-quality', 'doughnut', {
             labels: ['Signal', ''],
             datasets: [{
                 data: [quality, remaining],
-                backgroundColor: [color, 'rgba(30, 41, 59, 0.5)'],
+                backgroundColor: [color, this._ink().border],
                 borderWidth: 0,
             }],
         }, {
@@ -543,7 +550,7 @@ class StatsTab {
         this._renderDoughnut('sc-direct-relayed',
             ['Direct', 'Relayed'],
             [direct, relayed],
-            ['#06b6d4', '#a855f7'],
+            [chartColors()[0], chartColors()[3]],
             total > 0 ? total.toLocaleString() : '0',
         );
     }
@@ -555,7 +562,7 @@ class StatsTab {
         this._renderDoughnut('sc-active-nodes',
             [`${active} active`, `${inactive} inactive`],
             [active, inactive],
-            ['#22c55e', 'rgba(30, 41, 59, 0.5)'],
+            [chartStatus('ok'), this._ink().border],
             `${active} / ${total}`,
         );
     }
@@ -572,7 +579,7 @@ class StatsTab {
         const labels = entries.map(([k]) => ROLE_NAMES[k] || k);
         const values = entries.map(([, v]) => v);
         const total = values.reduce((a, b) => a + b, 0);
-        this._renderDoughnut('sc-roles', labels, values, CHART_COLORS, total);
+        this._renderDoughnut('sc-roles', labels, values, chartColors(), total);
         this._reconcileNetworkSection();
     }
 
@@ -588,7 +595,7 @@ class StatsTab {
         const labels = entries.map(([k]) => HW_NAMES[k] || k);
         const values = entries.map(([, v]) => v);
         const total = values.reduce((a, b) => a + b, 0);
-        this._renderDoughnut('sc-hw', labels, values, CHART_COLORS, total);
+        this._renderDoughnut('sc-hw', labels, values, chartColors(), total);
         this._reconcileNetworkSection();
     }
 
@@ -622,8 +629,8 @@ class StatsTab {
             labels,
             datasets: [{
                 data: counts,
-                backgroundColor: 'rgba(59, 130, 246, 0.6)',
-                borderColor: '#3b82f6',
+                backgroundColor: chartSeries('airutil') + '99',
+                borderColor: chartSeries('airutil'),
                 borderWidth: 1,
             }],
         }, { plugins: { legend: { display: false } } });
@@ -641,7 +648,7 @@ class StatsTab {
         this._renderDoughnut('sc-relay',
             ['Relayed', 'Rejected'],
             [relayed, rejected],
-            ['#22c55e', '#ef4444'],
+            [chartStatus('ok'), chartStatus('bad')],
         );
     }
 
@@ -650,7 +657,7 @@ class StatsTab {
         const labels = Object.keys(reasons);
         const values = Object.values(reasons);
         if (labels.length === 0) return;
-        this._renderHorizontalBar('sc-reject', labels, values, '#ef4444');
+        this._renderHorizontalBar('sc-reject', labels, values, chartStatus('bad'));
     }
 
     _renderDoughnut(canvasId, labels, values, colors, centerText) {
@@ -687,7 +694,7 @@ class StatsTab {
                 const cy = (chartArea.top + chartArea.bottom) / 2;
                 ctx.save();
                 ctx.font = 'bold 16px "JetBrains Mono", monospace';
-                ctx.fillStyle = '#f1f5f9';
+                ctx.fillStyle = this._ink().text;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillText(String(chart._meshCenterText), cx, cy);
@@ -719,7 +726,7 @@ class StatsTab {
     }
 
     _renderHorizontalBar(canvasId, labels, values, color) {
-        const barColor = color || '#06b6d4';
+        const barColor = color || chartSeries('rssi');
         this._renderChart(canvasId, 'bar', {
             labels,
             datasets: [{
@@ -740,7 +747,7 @@ class StatsTab {
 
     _ink() {
         return (window.ChartTheme && window.ChartTheme.ink()) || {
-            fg: '#94a3b8', faint: '#64748b', grid: 'rgba(30, 41, 59, 0.5)',
+            fg: '#94a3b8', faint: '#64748b', grid: 'rgba(30, 41, 59, 0.5)', text: '#e2e8f0', border: '#233049',
         };
     }
 
@@ -787,7 +794,7 @@ class StatsTab {
                     const cy = (chartArea.top + chartArea.bottom) / 2;
                     ctx.save();
                     ctx.font = 'bold 16px "JetBrains Mono", monospace';
-                    ctx.fillStyle = '#f1f5f9';
+                    ctx.fillStyle = this._ink().text;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.fillText(String(chart._meshCenterText), cx, cy);

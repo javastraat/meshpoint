@@ -391,6 +391,8 @@ class RfTab {
             const token = (name, fallback) => root.getPropertyValue(name).trim() || fallback;
             const textSecondary = token('--text-secondary', '#94a3b8');
             const textMuted = token('--text-muted', '#64748b');
+            const gridCol = (window.ChartTheme && window.ChartTheme.ink().grid) || token('--hairline', 'rgba(148, 163, 184, 0.18)');
+            const barCol = (window.ChartTheme && window.ChartTheme.series('rssi')) || token('--accent-cyan', '#06b6d4');
             this._histogramChart = new Chart(canvas, {
                 type: 'bar',
                 data: {
@@ -398,9 +400,11 @@ class RfTab {
                     datasets: [{
                         label: 'Samples',
                         data: counts,
-                        backgroundColor: 'rgba(6, 182, 212, 0.55)',
-                        borderColor: 'rgba(6, 182, 212, 0.9)',
+                        backgroundColor: barCol + '8c',
+                        borderColor: barCol,
                         borderWidth: 1,
+                        _meshSeries: 'rssi',
+                        _meshFill: '8c',
                     }],
                 },
                 options: {
@@ -419,12 +423,12 @@ class RfTab {
                         x: {
                             title: { display: true, text: 'RSSI level (dBm)', color: textMuted },
                             ticks: { color: textSecondary, maxTicksLimit: 12 },
-                            grid: { color: 'rgba(51, 65, 85, 0.35)' },
+                            grid: { color: gridCol },
                         },
                         y: {
                             title: { display: true, text: 'Sample count', color: textMuted },
                             ticks: { color: textSecondary },
-                            grid: { color: 'rgba(51, 65, 85, 0.35)' },
+                            grid: { color: gridCol },
                             beginAtZero: true,
                         },
                     },
