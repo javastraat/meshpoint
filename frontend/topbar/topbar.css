@@ -567,6 +567,56 @@
     box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.35);
 }
 
+/* Theme picker popover -- opened by holding the theme toggle button
+   (frontend/js/app.js _registerThemeToggle). position:fixed + JS-computed
+   coordinates so it's never clipped by a topbar/panel with its own
+   stacking or overflow. */
+.theme-menu {
+    position: fixed;
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 170px;
+    max-width: 240px;
+    padding: 6px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.theme-menu__item {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.4rem 0.55rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-secondary);
+    font: inherit;
+    font-size: 0.8rem;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+
+.theme-menu__item svg { flex: 0 0 auto; }
+.theme-menu__item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.theme-menu__item:hover,
+.theme-menu__item:focus-visible {
+    outline: none;
+    background: var(--overlay-weak);
+    color: var(--text-primary);
+}
+
+.theme-menu__item--active {
+    color: var(--accent-cyan);
+    border-color: var(--border);
+}
+
 /* --- Responsive -------------------------------------------------- */
 
 @media (max-width: 900px) and (min-width: 769px) {

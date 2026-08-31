@@ -284,24 +284,129 @@ function _registerThemeToggle(topbar) {
         return (meta && meta.label) || themeId;
     };
 
+    const LONG_PRESS_MS = 450;
+    let longPressFired = false;
+    let pressTimer = null;
+    let menuEl = null;
+
     const btn = topbar.registerAction({
         id: 'theme',
         label: 'Theme',
         icon: glyphFor(tc.current()),
-        onClick: () => update(tc.cycle()),
+        onClick: () => {
+            // A long-press already handled this interaction (opened the
+            // picker) -- the browser still fires a trailing click on
+            // release, which must not also cycle the theme.
+            if (longPressFired) { longPressFired = false; return; }
+            update(tc.cycle());
+        },
     });
 
     function update(theme) {
         if (!btn) return;
         btn.innerHTML = glyphFor(theme);
         const name = labelFor(theme);
-        btn.setAttribute('title', `Theme: ${name} · click to cycle`);
+        btn.setAttribute('title', `Theme: ${name} · click to cycle, hold to pick`);
         btn.setAttribute('aria-label', `Theme: ${name}`);
     }
     update(tc.current());
     // Manifest arrives async; refresh the icon/label once real metadata
     // is in (fallback list has no-op effect if the fetch failed).
     tc.ready.then(() => update(tc.current()));
+
+    if (!btn) return;
+
+    function closeMenu() {
+        if (!menuEl) return;
+        menuEl.remove();
+        menuEl = null;
+        document.removeEventListener('pointerdown', onOutsidePointer, true);
+        document.removeEventListener('keydown', onMenuKeydown, true);
+        window.removeEventListener('resize', closeMenu);
+        window.removeEventListener('scroll', closeMenu, true);
+    }
+
+    function onOutsidePointer(e) {
+        if (menuEl && !menuEl.contains(e.target) && e.target !== btn) closeMenu();
+    }
+
+    function onMenuKeydown(e) {
+        if (e.key === 'Escape') { closeMenu(); btn.focus(); }
+    }
+
+    function openMenu() {
+        if (menuEl) return;
+        const items = tc.themes();
+        if (!items.length) return;
+
+        menuEl = document.createElement('div');
+        menuEl.className = 'theme-menu';
+        menuEl.setAttribute('role', 'menu');
+        menuEl.setAttribute('aria-label', 'Pick a theme');
+
+        let activeItem = null;
+        items.forEach((meta) => {
+            const item = document.createElement('button');
+            item.type = 'button';
+            item.className = 'theme-menu__item';
+            item.setAttribute('role', 'menuitemradio');
+            const isActive = meta.id === tc.current();
+            item.setAttribute('aria-checked', String(isActive));
+            if (isActive) { item.classList.add('theme-menu__item--active'); activeItem = item; }
+            item.innerHTML = GLYPHS[meta.icon] || GLYPHS.moon;
+            const labelSpan = document.createElement('span');
+            labelSpan.textContent = meta.label;
+            item.appendChild(labelSpan);
+            item.addEventListener('click', () => {
+                update(tc.apply(meta.id));
+                closeMenu();
+                btn.focus();
+            });
+            menuEl.appendChild(item);
+        });
+
+        document.body.appendChild(menuEl);
+
+        // Anchor under the button, flipped above if it would overflow the
+        // viewport bottom, clamped so it never runs off the right edge.
+        const rect = btn.getBoundingClientRect();
+        const menuRect = menuEl.getBoundingClientRect();
+        let top = rect.bottom + 6;
+        if (top + menuRect.height > window.innerHeight) {
+            top = rect.top - menuRect.height - 6;
+        }
+        let left = rect.right - menuRect.width;
+        left = Math.max(6, Math.min(left, window.innerWidth - menuRect.width - 6));
+        menuEl.style.top = `${Math.max(6, top)}px`;
+        menuEl.style.left = `${left}px`;
+
+        document.addEventListener('pointerdown', onOutsidePointer, true);
+        document.addEventListener('keydown', onMenuKeydown, true);
+        window.addEventListener('resize', closeMenu);
+        window.addEventListener('scroll', closeMenu, true);
+        (activeItem || menuEl.firstElementChild)?.focus();
+    }
+
+    function cancelPress() {
+        if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+    }
+
+    btn.addEventListener('pointerdown', (e) => {
+        if (e.button != null && e.button !== 0) return;
+        longPressFired = false;
+        cancelPress();
+        pressTimer = setTimeout(() => {
+            pressTimer = null;
+            longPressFired = true;
+            openMenu();
+        }, LONG_PRESS_MS);
+    });
+    btn.addEventListener('pointerup', cancelPress);
+    btn.addEventListener('pointercancel', cancelPress);
+    btn.addEventListener('pointerleave', cancelPress);
+    // Long-press on touch would otherwise also raise the OS/browser
+    // context menu on top of ours.
+    btn.addEventListener('contextmenu', (e) => e.preventDefault());
 }
 
 function _bootDangerousPanel(router) {
