@@ -962,14 +962,17 @@ dashboard:
   host: "0.0.0.0"             # listen on all interfaces
   port: 8080
   static_dir: "frontend"
+  plugins_dir: "plugins"     # extra/community themes: <plugins_dir>/themes/<id>/
   theme: "dark"              # default theme for browsers that haven't picked one
 ```
 
 Access at `http://<pi-ip>:8080`. Bind to `127.0.0.1` to restrict to local access only.
 
-Changes to `host`/`port`/`static_dir` take effect on service restart. If the configured address can't be used (config typo, port already taken, privileged port), the server logs the problem and falls back to `0.0.0.0:8080` so the dashboard stays reachable.
+Changes to `host`/`port`/`static_dir`/`plugins_dir` take effect on service restart. If the configured address can't be used (config typo, port already taken, privileged port), the server logs the problem and falls back to `0.0.0.0:8080` so the dashboard stays reachable.
 
-**`theme`** — the default dashboard theme, one of the folder names under `frontend/themes/` (`dark`, `light`, `high-contrast`, `sunlight`, `amber-mono`, `green-crt`, `nord`, `solarized-dark`, `gruvbox-dark`, or your own). It's what a browser shows when nobody has picked a theme via the topbar toggle; a per-browser choice made there overrides it locally. Editable at **Settings → Themes → Default theme** (admin only) or with `PUT /api/config/dashboard/theme` — applies live, no restart. To add a theme, use the builder on that same page (start from an existing theme, tweak the palette, **Download theme.css** + **Download theme.json**) or hand-write a `theme.json` + `theme.css` — either way, drop the pair into a new `frontend/themes/<id>/` folder and restart; `GET /api/themes` picks it up.
+**`theme`** — the default dashboard theme, one of the installed theme ids. Built-ins ship in `frontend/themes/` (`dark`, `light`, `high-contrast`, `sunlight`, `solarized-dark`); the bundled extras in `plugins/themes/` are `amber-mono`, `green-crt`, `nord`, `gruvbox-dark`. It's what a browser shows when nobody has picked a theme via the topbar toggle; a per-browser choice made there overrides it locally. Editable at **Settings → Themes → Default theme** (admin only) or with `PUT /api/config/dashboard/theme` — applies live, no restart.
+
+**`plugins_dir`** — where drop-in themes are read from (`<plugins_dir>/themes/<id>/`, each a `theme.json` + `theme.css`). Resolved from the working directory like `static_dir` (so `/opt/meshpoint/plugins/` on the Pi). A built-in theme id always wins an id collision with a plugin theme, and a plugin folder can't claim `dark`. To add a theme, use the builder at **Settings → Themes** (start from an existing theme, tweak the palette, **Download theme.css** + **Download theme.json**) or hand-write the pair — drop it into a new `plugins/themes/<id>/` folder and restart; `GET /api/themes` picks it up.
 
 ### RF Environment tab
 

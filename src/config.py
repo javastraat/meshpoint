@@ -403,9 +403,12 @@ class DashboardConfig:
     host: str = "0.0.0.0"  # nosec B104 -- intentional for local device dashboard
     port: int = 8080
     static_dir: str = "frontend"
-    # Default dashboard theme id (folder name under frontend/themes/).
-    # Browsers that have never picked a theme use this; a per-browser
-    # choice made in the theme toggle overrides it locally.
+    # Extra/community drop-ins (currently: plugins/themes/<id>/). Resolved
+    # like static_dir, from the working dir (/opt/meshpoint on the Pi).
+    plugins_dir: str = "plugins"
+    # Default dashboard theme id (folder name under frontend/themes/ or
+    # plugins/themes/). Browsers that have never picked a theme use this;
+    # a per-browser choice made in the theme toggle overrides it locally.
     theme: str = "dark"
 
 

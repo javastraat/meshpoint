@@ -7697,3 +7697,19 @@ got `height:100%; overflow-y:auto` (was unscrollable — `.section` is a fixed
 `overflow:hidden` flex column). NOTE: `--term-*` CSS tokens are just the panel
 chrome; the xterm ANSI palette is separate, set in JS (`terminal_renderer.js`
 `_tokyoNightDay/_tokyoNightStorm`), not a CSS token and not in the builder.
+
+**Themes split into built-in + plugin dirs (2026-08-31)**: themes now load from
+TWO locations. `frontend/themes/` = built-ins (dark, light, high-contrast,
+sunlight, solarized-dark), served `/themes/<id>/theme.css` via the `/` mount.
+`plugins/themes/` = extra/community drop-ins (ships amber-mono, green-crt, nord,
+gruvbox-dark), served via a dedicated `/plugins/themes` StaticFiles mount
+registered before the `/` catch-all. First real `plugins/` dir. `scan_themes`
+gained an optional `plugin_themes_dir` 2nd arg; `_scan_dir` helper does one dir,
+`seen` set shared so a built-in id wins a collision, `block={DEFAULT_THEME_ID}`
+stops a plugin claiming `dark`. `inject_theme_links` / `stamp_default_theme` /
+`theme_routes.init_routes` all take the 2nd dir through. New config key
+`dashboard.plugins_dir` (default `"plugins"`, CWD-relative like static_dir →
+`/opt/meshpoint/plugins/` on Pi). Plugin themes are git-TRACKED (starter set);
+no .gitignore change. Sort still `(order, label)` — the `order` NUMBERING SCHEME
+is a separate open problem (user renumbering by hand; light interleaves with
+plugin themes). 19 theme_registry tests green. Not Pi-verified yet.

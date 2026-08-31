@@ -26,7 +26,21 @@ Ranked roughly by bang-for-buck. Not started unless noted.
 5. ~~#1 in-dashboard theme editor~~ — **done** (download-only; Settings → Themes)
 6. **#3 plugin roadmap Phase 0** — last; it's a context switch (deep backend), give it undivided focus
 
-Only #3 left.
+## Also done (2026-08-31)
+
+- **Theme dir split**: built-ins in `frontend/themes/`, extras/community in
+  `plugins/themes/` (first `plugins/` dir). `scan_themes` reads both;
+  `dashboard.plugins_dir` key; `/plugins/themes` mount. Shipped extras: nord,
+  gruvbox-dark, amber-mono, green-crt.
+
+## Open
+
+- **#3 plugin roadmap Phase 0** (unchanged — still last).
+- **Theme `order` numbering scheme.** With two dirs, a flat `order` still lets a
+  plugin theme interleave with built-ins (light currently at 5, tied with
+  amber-mono). Options discussed: a `tier` (core/community) in the sort key so
+  community `order` is advisory-only and can never jump the built-in block.
+  Deferred by the user — revisit.
 
 Steps 2–4 are ~2 days of easy wins that make light mode genuinely finished.
 #5 is the fun one. #6 is the deep architecture work.

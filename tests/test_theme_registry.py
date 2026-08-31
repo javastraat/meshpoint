@@ -87,6 +87,51 @@ class TestScanThemes(unittest.TestCase):
         self.assertEqual(entry["order"], 100)
 
 
+class TestPluginThemes(unittest.TestCase):
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        base = Path(self._tmp.name)
+        self.core = base / "frontend" / "themes"
+        self.plugins = base / "plugins" / "themes"
+        _write_theme(self.core, "dark", {"label": "Dark", "order": 0}, "/* baseline */")
+        _write_theme(self.core, "light", {"label": "Light", "order": 1}, "html{--x:1}")
+
+    def tearDown(self) -> None:
+        self._tmp.cleanup()
+
+    def test_merges_core_and_plugin_dirs(self) -> None:
+        _write_theme(self.plugins, "nord", {"label": "Nord", "order": 9}, "html{--x:1}")
+        entries = scan_themes(self.core, self.plugins)
+        by_id = {t["id"]: t for t in entries}
+        self.assertEqual([t["id"] for t in entries], ["dark", "light", "nord"])
+        self.assertEqual(by_id["nord"]["css"], "/plugins/themes/nord/theme.css")
+        self.assertEqual(by_id["light"]["css"], "/themes/light/theme.css")
+
+    def test_core_theme_wins_id_collision(self) -> None:
+        _write_theme(self.plugins, "light", {"label": "Impostor", "order": 2}, "html{--y:2}")
+        by_id = {t["id"]: t for t in scan_themes(self.core, self.plugins)}
+        self.assertEqual(by_id["light"]["label"], "Light")
+        self.assertEqual(by_id["light"]["css"], "/themes/light/theme.css")
+
+    def test_plugin_cannot_claim_dark(self) -> None:
+        _write_theme(self.plugins, "dark", {"label": "Fake dark", "order": 0}, "html{--z:3}")
+        by_id = {t["id"]: t for t in scan_themes(self.core, self.plugins)}
+        self.assertIsNone(by_id["dark"]["css"])
+        self.assertEqual(by_id["dark"]["label"], "Dark")
+
+    def test_no_plugin_dir_is_unchanged(self) -> None:
+        self.assertEqual(
+            [t["id"] for t in scan_themes(self.core)],
+            [t["id"] for t in scan_themes(self.core, self.plugins / "nope")],
+        )
+
+    def test_inject_emits_plugin_link(self) -> None:
+        _write_theme(self.plugins, "nord", {"label": "Nord", "order": 9}, "html{--x:1}")
+        html = "<html><head></head><body></body></html>"
+        out = inject_theme_links(html, self.core, self.plugins, token="abc")
+        self.assertIn('href="/plugins/themes/nord/theme.css?v=abc"', out)
+
+
 class TestThemeLinkInjection(unittest.TestCase):
     def setUp(self) -> None:
         self._tmp = tempfile.TemporaryDirectory()

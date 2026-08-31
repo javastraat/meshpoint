@@ -26,19 +26,25 @@ from src.config import AppConfig, save_section_to_yaml
 router = APIRouter(prefix="/api", tags=["themes"])
 
 _themes_dir: Path | None = None
+_plugin_themes_dir: Path | None = None
 _config: AppConfig | None = None
 
 
-def init_routes(themes_dir: Path, config: AppConfig | None = None) -> None:
-    global _themes_dir, _config
+def init_routes(
+    themes_dir: Path,
+    plugin_themes_dir: Path | None = None,
+    config: AppConfig | None = None,
+) -> None:
+    global _themes_dir, _plugin_themes_dir, _config
     _themes_dir = themes_dir
+    _plugin_themes_dir = plugin_themes_dir
     _config = config
 
 
 def _theme_ids() -> set[str]:
     if _themes_dir is None:
         return {DEFAULT_THEME_ID}
-    return {t["id"] for t in scan_themes(_themes_dir)}
+    return {t["id"] for t in scan_themes(_themes_dir, _plugin_themes_dir)}
 
 
 def _current_default() -> str:
@@ -50,7 +56,11 @@ def _current_default() -> str:
 
 @router.get("/themes")
 async def list_themes() -> dict:
-    themes = scan_themes(_themes_dir) if _themes_dir is not None else []
+    themes = (
+        scan_themes(_themes_dir, _plugin_themes_dir)
+        if _themes_dir is not None
+        else []
+    )
     return {"themes": themes, "default": _current_default()}
 
 

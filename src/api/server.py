@@ -187,7 +187,11 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
         config=config,
     )
     backup_routes.init_routes(config)
-    theme_routes.init_routes(Path(config.dashboard.static_dir) / "themes", config)
+    theme_routes.init_routes(
+        Path(config.dashboard.static_dir) / "themes",
+        Path(config.dashboard.plugins_dir) / "themes",
+        config,
+    )
     # Dangerous registry is wired in lifespan so clear-db / wipe-phantoms /
     # force-nodeinfo can close over the live pipeline objects.
 
@@ -581,6 +585,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
             await ws_manager.disconnect(websocket)
 
     static_dir = Path(config.dashboard.static_dir)
+    plugin_themes_dir = Path(config.dashboard.plugins_dir) / "themes"
 
     @app.get("/setup", include_in_schema=False)
     async def serve_setup_page():
@@ -607,11 +612,23 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
         # silently twice. no-cache keeps the HTML itself revalidated.
         html = (static_dir / "index.html").read_text(encoding="utf-8")
         themes_dir = static_dir / "themes"
-        html = inject_theme_links(html, themes_dir)
-        html = stamp_default_theme(html, config.dashboard.theme, themes_dir)
+        html = inject_theme_links(html, themes_dir, plugin_themes_dir)
+        html = stamp_default_theme(
+            html, config.dashboard.theme, themes_dir, plugin_themes_dir
+        )
         return HTMLResponse(
             bust_asset_urls(html),
             headers={"Cache-Control": "no-cache"},
+        )
+
+    # Community/extra theme CSS lives outside the static tree; give it a
+    # narrow mount (only theme.css files are web-facing, not all of
+    # plugins/). Must precede the "/" catch-all so it wins.
+    if plugin_themes_dir.is_dir():
+        app.mount(
+            "/plugins/themes",
+            StaticFiles(directory=str(plugin_themes_dir)),
+            name="plugin-themes",
         )
 
     if static_dir.exists():

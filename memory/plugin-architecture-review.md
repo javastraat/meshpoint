@@ -326,6 +326,14 @@ themes shipped fully out-of-tree; overkill for the first slice.
 surface, ~1–2 days, and it lands as a self-contained PR upstream can take on its
 own merits.
 
+**Landed (2026-08-31):** Spike 1 shipped, and then the theme dir was split into
+built-in (`frontend/themes/`) + **`plugins/themes/`** — the first concrete
+`plugins/` directory. `scan_themes(themes_dir, plugin_themes_dir=None)` scans
+both, built-in id wins collisions, plugin can't claim `dark`; plugin CSS gets a
+dedicated `/plugins/themes` static mount; `dashboard.plugins_dir` config key.
+This is the template for how later plugin surfaces (decoders, panels) get
+discovered — a `plugins/<kind>/<name>/` folder + a manifest, scanned at boot.
+
 **Next after it proves out:** Phase 0 route/service registry refactor of
 `src/api/server.py` (bigger, but the highest-leverage internal win), then Phase 2
 decoder registry + opening the `Protocol` enum.

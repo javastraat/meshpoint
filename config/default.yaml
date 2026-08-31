@@ -116,10 +116,12 @@ dashboard:                # web dashboard / API server
   host: "0.0.0.0"
   port: 8080
   static_dir: "frontend"
-  # Default dashboard theme (folder name under frontend/themes/): dark,
-  # light, high-contrast, sunlight, amber-mono, green-crt, nord,
-  # solarized-dark, gruvbox-dark. A per-browser choice in the theme
-  # toggle overrides this locally. Editable from Settings -> System.
+  # Extra/community themes drop-in dir. themes live in <plugins_dir>/themes/<id>/.
+  plugins_dir: "plugins"
+  # Default dashboard theme. Built-ins (frontend/themes/): dark, light,
+  # high-contrast, sunlight, solarized-dark. Bundled extras (plugins/themes/):
+  # amber-mono, green-crt, nord, gruvbox-dark. A per-browser choice in the
+  # theme toggle overrides this locally. Editable from Settings -> Themes.
   theme: "dark"
 
 metrics:                  # Prometheus-compatible /metrics scrape endpoint
