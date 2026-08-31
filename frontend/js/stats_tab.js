@@ -694,7 +694,7 @@ class StatsTab {
                 const cy = (chartArea.top + chartArea.bottom) / 2;
                 ctx.save();
                 ctx.font = 'bold 16px "JetBrains Mono", monospace';
-                ctx.fillStyle = this._ink().text;
+                ctx.fillStyle = (window.ChartTheme && window.ChartTheme.ink().text) || "#e2e8f0";
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillText(String(chart._meshCenterText), cx, cy);
@@ -794,7 +794,7 @@ class StatsTab {
                     const cy = (chartArea.top + chartArea.bottom) / 2;
                     ctx.save();
                     ctx.font = 'bold 16px "JetBrains Mono", monospace';
-                    ctx.fillStyle = this._ink().text;
+                    ctx.fillStyle = (window.ChartTheme && window.ChartTheme.ink().text) || "#e2e8f0";
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.fillText(String(chart._meshCenterText), cx, cy);
