@@ -962,11 +962,14 @@ dashboard:
   host: "0.0.0.0"             # listen on all interfaces
   port: 8080
   static_dir: "frontend"
+  theme: "dark"              # default theme for browsers that haven't picked one
 ```
 
 Access at `http://<pi-ip>:8080`. Bind to `127.0.0.1` to restrict to local access only.
 
-Changes take effect on service restart. If the configured address can't be used (config typo, port already taken, privileged port), the server logs the problem and falls back to `0.0.0.0:8080` so the dashboard stays reachable.
+Changes to `host`/`port`/`static_dir` take effect on service restart. If the configured address can't be used (config typo, port already taken, privileged port), the server logs the problem and falls back to `0.0.0.0:8080` so the dashboard stays reachable.
+
+**`theme`** — the default dashboard theme, one of the folder names under `frontend/themes/` (`dark`, `light`, `high-contrast`, `sunlight`, `amber-mono`, `green-crt`, `nord`, `solarized-dark`, `gruvbox-dark`, or your own). It's what a browser shows when nobody has picked a theme via the topbar toggle; a per-browser choice made there overrides it locally. Editable at **Settings → System → Default theme** (admin only) or with `PUT /api/config/dashboard/theme` — applies live, no restart. To add a theme, drop a `theme.json` + `theme.css` into a new `frontend/themes/<id>/` folder; `GET /api/themes` picks it up on the next load.
 
 ### RF Environment tab
 

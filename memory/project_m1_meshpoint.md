@@ -7609,3 +7609,18 @@ border literals not tokenised = 0.
 (bg/text/accent/border) + `--bg-inset`/`--bg-popover` + the `--sidebar-*` set +
 `--glow-cyan/green`. No code touched -- `scan_themes` picks them up, picker now
 lists 9. First item off `memory/themes-next-todo.md`. Not yet live-verified.
+
+**Server-side default theme (2026-08-31, TODO #4)**: `DashboardConfig.theme`
+(default "dark") in local.yaml. `GET /api/themes` now returns
+`default: config.dashboard.theme` (validated against the scan). New
+`PUT /api/config/dashboard/theme` -- `require_admin` + audit
+(`config.dashboard_theme`), validates the id, `save_section_to_yaml` +
+in-memory update (live, no restart). `serve_dashboard_root` calls new
+`theme_registry.stamp_default_theme()` -> adds `data-theme="<id>"` to `<html>`
+(no-op for dark / unknown / already-stamped) so the default paints flash-free.
+`theme_controller.js` refactored: precedence localStorage choice -> server
+default -> dark; `_setAttr()` (no persist) vs `apply()` (persist + event).
+UI: a "Default theme" `<select>` in the Settings→System display card
+(`meshpoint_display_form.js`, populated from /api/themes, PUT on change) --
+admin-only because viewers can't reach that panel. 14 theme tests green,
+ruff clean. Not live-verified.

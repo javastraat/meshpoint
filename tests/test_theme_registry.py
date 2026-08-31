@@ -16,6 +16,7 @@ from pathlib import Path
 from src.api.theme_registry import (
     inject_theme_links,
     scan_themes,
+    stamp_default_theme,
     theme_link_tags,
 )
 
@@ -111,6 +112,35 @@ class TestThemeLinkInjection(unittest.TestCase):
     def test_inject_is_noop_without_head(self) -> None:
         html = "<div>fragment</div>"
         self.assertEqual(inject_theme_links(html, self.root), html)
+
+
+class TestStampDefaultTheme(unittest.TestCase):
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        _write_theme(self.root, "nord", {"label": "Nord", "order": 6}, "html{--x:1}")
+
+    def tearDown(self) -> None:
+        self._tmp.cleanup()
+
+    _HTML = '<!doctype html>\n<html lang="en">\n<head></head>'
+
+    def test_stamps_known_non_dark_theme(self) -> None:
+        out = stamp_default_theme(self._HTML, "nord", self.root)
+        self.assertIn('<html data-theme="nord" lang="en">', out)
+
+    def test_noop_for_dark(self) -> None:
+        self.assertEqual(stamp_default_theme(self._HTML, "dark", self.root), self._HTML)
+
+    def test_noop_for_unknown_theme(self) -> None:
+        self.assertEqual(stamp_default_theme(self._HTML, "bogus", self.root), self._HTML)
+
+    def test_noop_when_already_stamped(self) -> None:
+        html = '<html data-theme="light" lang="en">'
+        self.assertEqual(stamp_default_theme(html, "nord", self.root), html)
+
+    def test_noop_for_empty(self) -> None:
+        self.assertEqual(stamp_default_theme(self._HTML, "", self.root), self._HTML)
 
 
 if __name__ == "__main__":  # pragma: no cover

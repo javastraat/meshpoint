@@ -116,6 +116,11 @@ dashboard:                # web dashboard / API server
   host: "0.0.0.0"
   port: 8080
   static_dir: "frontend"
+  # Default dashboard theme (folder name under frontend/themes/): dark,
+  # light, high-contrast, sunlight, amber-mono, green-crt, nord,
+  # solarized-dark, gruvbox-dark. A per-browser choice in the theme
+  # toggle overrides this locally. Editable from Settings -> System.
+  theme: "dark"
 
 metrics:                  # Prometheus-compatible /metrics scrape endpoint
   enabled: false

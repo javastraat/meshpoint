@@ -106,6 +106,23 @@ def inject_theme_links(html: str, themes_dir: Path, token: str = BOOT_TOKEN) -> 
     return html.replace("</head>", tags + "</head>", 1)
 
 
+_HTML_TAG_RE = re.compile(r"<html\b(?![^>]*\bdata-theme=)", re.IGNORECASE)
+
+
+def stamp_default_theme(html: str, theme_id: str, themes_dir: Path) -> str:
+    """Stamp ``data-theme`` on the ``<html>`` tag so the server default
+    paints on first load with no flash. No-op for ``dark`` (the bare
+    ``:root`` baseline) or an unknown id. A per-browser choice in
+    localStorage still overrides this once ``theme_controller.js`` runs.
+    """
+    theme_id = (theme_id or "").strip()
+    if not theme_id or theme_id == DEFAULT_THEME_ID:
+        return html
+    if theme_id not in {t["id"] for t in scan_themes(themes_dir)}:
+        return html
+    return _HTML_TAG_RE.sub(f'<html data-theme="{theme_id}"', html, count=1)
+
+
 _CSS_COMMENT_RE = re.compile(r"/\*.*?\*/", re.DOTALL)
 
 

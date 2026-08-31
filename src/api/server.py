@@ -14,7 +14,7 @@ from src.analytics.signal_analyzer import SignalAnalyzer
 from src.analytics.traffic_monitor import TrafficMonitor
 from src.api.audit import AuditLogWriter
 from src.api.html_assets import bust_asset_urls
-from src.api.theme_registry import inject_theme_links
+from src.api.theme_registry import inject_theme_links, stamp_default_theme
 from src.api.audit import dependencies as audit_deps
 from src.api.auth import dependencies as auth_deps
 from src.api.auth.auth_bootstrap import AuthSubsystem, build_auth_subsystem
@@ -187,7 +187,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
         config=config,
     )
     backup_routes.init_routes(config)
-    theme_routes.init_routes(Path(config.dashboard.static_dir) / "themes")
+    theme_routes.init_routes(Path(config.dashboard.static_dir) / "themes", config)
     # Dangerous registry is wired in lifespan so clear-db / wipe-phantoms /
     # force-nodeinfo can close over the live pipeline objects.
 
@@ -606,7 +606,9 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
         # caches -- stale SPA JS against fresh HTML broke features
         # silently twice. no-cache keeps the HTML itself revalidated.
         html = (static_dir / "index.html").read_text(encoding="utf-8")
-        html = inject_theme_links(html, static_dir / "themes")
+        themes_dir = static_dir / "themes"
+        html = inject_theme_links(html, themes_dir)
+        html = stamp_default_theme(html, config.dashboard.theme, themes_dir)
         return HTMLResponse(
             bust_asset_urls(html),
             headers={"Cache-Control": "no-cache"},
