@@ -47,6 +47,8 @@
     --bg-popover: #0b111c;
     --scrim: rgba(0, 0, 0, 0.5);
     --brand-amber: var(--accent-amber);
+    --surface-1: var(--bg-card);
+    --radius-md: var(--radius);
     --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
     --font-sans: 'Inter', -apple-system, sans-serif;
     --radius: 8px;

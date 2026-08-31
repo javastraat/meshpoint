@@ -603,7 +603,7 @@ select.update-field__input option:checked {
     height: 10px;
     border-radius: 50%;
     flex-shrink: 0;
-    background: rgba(255, 255, 255, 0.18);
+    background: var(--overlay-strong);
 }
 
 .update-progress__step[data-status="pending"] .update-progress__step-icon {
