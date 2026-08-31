@@ -66,7 +66,7 @@ class TerminalRenderer {
             macOptionIsMeta: true,
             allowProposedApi: true,
             convertEol: false,
-            theme: this._tokyoNightStorm(),
+            theme: this._palette(),
         });
 
         this._loadAddons();
@@ -231,6 +231,49 @@ class TerminalRenderer {
     _toggleSearch() {
         this.onSearchToggle();
         return false;
+    }
+
+    /** Dark or light xterm palette, matching the active dashboard theme. */
+    _palette() {
+        return document.documentElement.getAttribute('data-theme') === 'light'
+            ? this._tokyoNightDay()
+            : this._tokyoNightStorm();
+    }
+
+    /** Re-apply the palette after a live theme switch (no reconnect needed). */
+    refreshTheme() {
+        if (this.term) this.term.options.theme = this._palette();
+    }
+
+    /**
+     * Light-theme ANSI palette -- dark ink on white, primaries darkened
+     * enough to stay legible (pure yellow/cyan vanish on white).
+     */
+    _tokyoNightDay() {
+        return {
+            background: '#ffffff',
+            foreground: '#172033',
+            cursor: '#b06a00',
+            cursorAccent: '#ffffff',
+            selectionBackground: 'rgba(176, 106, 0, 0.22)',
+            selectionForeground: '#172033',
+            black:         '#0f1320',
+            red:           '#c0392b',
+            green:         '#2f7d32',
+            yellow:        '#a6791f',
+            blue:          '#2f5fd0',
+            magenta:       '#8b34a8',
+            cyan:          '#0e7a90',
+            white:         '#5a6473',
+            brightBlack:   '#8a93a6',
+            brightRed:     '#d64541',
+            brightGreen:   '#3f9142',
+            brightYellow:  '#b8860b',
+            brightBlue:    '#3b6fe0',
+            brightMagenta: '#a248c0',
+            brightCyan:    '#1592ab',
+            brightWhite:   '#1a2233',
+        };
     }
 
     /**

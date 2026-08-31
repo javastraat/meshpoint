@@ -46,6 +46,9 @@ class ThemeController {
         document.documentElement.setAttribute('data-theme', next);
         this._current = next;
         try { localStorage.setItem(this._key, next); } catch (_e) {}
+        // Let JS-rendered surfaces that can't read CSS vars (xterm, canvas
+        // charts) re-theme themselves without a reload.
+        try { window.dispatchEvent(new CustomEvent('meshpoint:themechange', { detail: next })); } catch (_e) {}
         return next;
     }
 

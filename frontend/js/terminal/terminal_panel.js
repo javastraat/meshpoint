@@ -47,6 +47,7 @@ class TerminalPanelController {
         this.disconnectBtn?.addEventListener('click', () => this.disconnect());
         this.clearBtn?.addEventListener('click', () => this.renderer?.clear());
         this.searchBtn?.addEventListener('click', () => this._toggleSearch());
+        window.addEventListener('meshpoint:themechange', () => this.renderer?.refreshTheme());
         this.copyBtn?.addEventListener('click', () => this._copySelection());
         this._wireClientCallbacks();
         document.addEventListener(
