@@ -278,3 +278,36 @@ permission disclosure UI. Consider subprocess isolation for untrusted sources.
   so "just install it" breaks anyway; (4) a single-device deployment needs
   disable-able modules, not an ecosystem — and feature flags already half-deliver
   that.
+
+---
+
+## Getting started — Spike 1: pluggable themes directory
+
+The smallest end-to-end slice that proves "drop a folder ⇒ capability appears"
+without touching the pipeline, the `Protocol` enum, or the deployment model.
+This is Phase 1; it also establishes the manifest-scan pattern that Phase 3
+reuses for sidebar entries and frontend bundles.
+
+| # | Task | File(s) | Notes |
+|---|------|---------|-------|
+| 1 | Create `frontend/themes/` with two example theme folders, each `theme.json` (`{id,label,order}`) + `theme.css` | `frontend/themes/sunlight/`, `frontend/themes/high-contrast/` | Move the existing `[data-theme="sunlight"]` / `[data-theme="high-contrast"]` blocks out of `frontend/css/theme_high_contrast.css` verbatim — no visual change |
+| 2 | Add `GET /api/themes` that scans `frontend/themes/*/theme.json` and returns the list | new `src/api/routes/theme_routes.py` (~30 lines), register in `src/api/server.py` | Unauthenticated is fine (same exposure as static CSS); sort by `order` then `label`; skip malformed JSON |
+| 3 | Serve `frontend/themes/` as static files | `src/api/server.py` static mount | So each `theme.css` is reachable |
+| 4 | `theme_controller.js`: fetch `/api/themes` on init, build `valid`/`order` from the response instead of the hardcoded arrays; keep `dark` as the built-in baseline | `frontend/js/theme_controller.js` | Fall back to `['dark']` if the fetch fails |
+| 5 | Inject `<link rel="stylesheet">` per discovered theme at runtime | `frontend/js/theme_controller.js` (or the `serve_dashboard_root` HTML rewrite) | Drop the per-theme `<link>` lines from `frontend/index.html` |
+| 6 | Point the theme picker at the dynamic list | wherever the cycle/picker lives (`frontend/js/command_palette.js` / keymap overlay) | Cycle through discovered ids, not a literal array |
+| 7 | pytest: temp dir with 2 fake `theme.json`, assert `/api/themes` returns them sorted and ignores malformed JSON | `tests/test_theme_routes.py` | Runs on the Mac, no hardware/venv deps |
+| 8 | Add a third theme folder as the "does it actually work" demo | `frontend/themes/amber-mono/` | Acceptance test: add folder, restart, theme shows in picker — zero core edits |
+| 9 | Changelog bullet under the current version section (`docs/CHANGELOG.md`); verify it parses with `ChangelogParser.parse_file` | `docs/CHANGELOG.md` | Per repo convention |
+
+**Definition of done:** adding `frontend/themes/<x>/{theme.json,theme.css}` and
+restarting makes `<x>` appear in the picker with no change to any `.js` / `.py`
+file.
+
+**Why this slice first:** no `apt` / `pip` deps, no out-of-tree code, no security
+surface, ~1–2 days, and it lands as a self-contained PR upstream can take on its
+own merits.
+
+**Next after it proves out:** Phase 0 route/service registry refactor of
+`src/api/server.py` (bigger, but the highest-leverage internal win), then Phase 2
+decoder registry + opening the `Protocol` enum.
