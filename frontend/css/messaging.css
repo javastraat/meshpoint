@@ -70,7 +70,7 @@
     border-right: 1px solid var(--msg-border);
     display: flex;
     flex-direction: column;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, transparent 100%), var(--msg-bg);
+    background: linear-gradient(180deg, var(--overlay-weak) 0%, transparent 100%), var(--msg-bg);
 }
 
 .msg-sidebar__header {
@@ -440,7 +440,7 @@
     gap: 12px;
     padding: 14px 18px;
     border-bottom: 1px solid var(--msg-border);
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, transparent 100%), var(--msg-bg-strip);
+    background: linear-gradient(180deg, var(--overlay-weak) 0%, transparent 100%), var(--msg-bg-strip);
     transition: border-color 200ms ease, background 200ms ease;
 }
 
