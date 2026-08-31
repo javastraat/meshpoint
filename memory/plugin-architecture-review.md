@@ -290,14 +290,14 @@ reuses for sidebar entries and frontend bundles.
 
 | # | Task | File(s) | Notes |
 |---|------|---------|-------|
-| 1 | Create `frontend/themes/` with two example theme folders, each `theme.json` (`{id,label,order}`) + `theme.css` | `frontend/themes/sunlight/`, `frontend/themes/high-contrast/` | Move the existing `[data-theme="sunlight"]` / `[data-theme="high-contrast"]` blocks out of `frontend/css/theme_high_contrast.css` verbatim — no visual change |
+| 1 | Create `frontend/themes/` with two theme folders, each `theme.json` (`{id,label,order,icon}`) + `theme.css` | `frontend/themes/sunlight/`, `frontend/themes/high-contrast/` | Move the `[data-theme="sunlight"]` / `[data-theme="high-contrast"]` blocks out of `frontend/css/theme_high_contrast.css` verbatim — no visual change. `dark` stays the built-in baseline (bare `:root` in `dashboard.css`, no folder). Leave the `@media (prefers-contrast: more)` auto-bump in a base CSS file. |
 | 2 | Add `GET /api/themes` that scans `frontend/themes/*/theme.json` and returns the list | new `src/api/routes/theme_routes.py` (~30 lines), register in `src/api/server.py` | Unauthenticated is fine (same exposure as static CSS); sort by `order` then `label`; skip malformed JSON |
 | 3 | Serve `frontend/themes/` as static files | `src/api/server.py` static mount | So each `theme.css` is reachable |
 | 4 | `theme_controller.js`: fetch `/api/themes` on init, build `valid`/`order` from the response instead of the hardcoded arrays; keep `dark` as the built-in baseline | `frontend/js/theme_controller.js` | Fall back to `['dark']` if the fetch fails |
 | 5 | Inject `<link rel="stylesheet">` per discovered theme at runtime | `frontend/js/theme_controller.js` (or the `serve_dashboard_root` HTML rewrite) | Drop the per-theme `<link>` lines from `frontend/index.html` |
-| 6 | Point the theme picker at the dynamic list | wherever the cycle/picker lives (`frontend/js/command_palette.js` / keymap overlay) | Cycle through discovered ids, not a literal array |
+| 6 | Point the theme picker at the dynamic list | `frontend/js/app.js` — `_registerThemeToggle` (~L244, the `ICONS`/`LABELS` maps) and the `theme:cycle` command-palette entry (~L791) | Drive icon/label/order from the manifest; fallback icon for unrecognized ids; cycle the discovered id list, not the literal `['dark','high-contrast','sunlight']` array |
 | 7 | pytest: temp dir with 2 fake `theme.json`, assert `/api/themes` returns them sorted and ignores malformed JSON | `tests/test_theme_routes.py` | Runs on the Mac, no hardware/venv deps |
-| 8 | Add a third theme folder as the "does it actually work" demo | `frontend/themes/amber-mono/` | Acceptance test: add folder, restart, theme shows in picker — zero core edits |
+| 8 | Add a new theme folder as the "does it actually work" demo (→ 4 selectable themes) | `frontend/themes/amber-mono/` | Acceptance test: add folder, restart, theme shows in picker — zero `.js` / `.py` edits |
 | 9 | Changelog bullet under the current version section (`docs/CHANGELOG.md`); verify it parses with `ChangelogParser.parse_file` | `docs/CHANGELOG.md` | Per repo convention |
 
 **Definition of done:** adding `frontend/themes/<x>/{theme.json,theme.css}` and
