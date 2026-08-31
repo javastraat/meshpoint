@@ -217,6 +217,30 @@ html[data-theme="light"] .lsn-station__text--big {
     text-shadow: none;
 }
 
+/* Selected skin toggle / active preset / preset tab -- a lit bright-cyan
+ * fill reads muddy on white. Lighten to a tint + accent text/border. */
+html[data-theme="light"] .lsn-skins button.active {
+    background: rgba(14, 123, 160, 0.14);
+    color: var(--accent-cyan);
+}
+
+html[data-theme="light"] .lsn-presets button.lsn-preset--active,
+html[data-theme="light"] .lsn-preset-tab.active {
+    background: rgba(14, 123, 160, 0.1);
+    border-color: var(--accent-cyan);
+    color: var(--accent-cyan);
+    box-shadow: none;
+}
+
+html[data-theme="light"] .lsn-presets button.lsn-preset--active .lsn-preset-row__freq {
+    color: var(--text-secondary);
+}
+
+html[data-theme="light"] .lsn-presets button.lsn-preset--active .lsn-fav,
+html[data-theme="light"] .lsn-presets button.lsn-preset--active .lsn-fav.on {
+    color: var(--accent-amber);
+}
+
 /* Modal/drawer backdrops: the dark scrim is fine, just lighten it a bit. */
 html[data-theme="light"] .danger-modal__backdrop,
 html[data-theme="light"] .nd-backdrop,
