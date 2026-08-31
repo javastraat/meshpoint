@@ -103,12 +103,39 @@ html[data-theme="light"] .cmd-palette__panel {
     box-shadow: 0 1px 3px rgba(23, 32, 51, 0.08) !important;
 }
 
-/* The relay / system dashboard cards carry a faint accent-tint
- * gradient -- imperceptible on dark, a visible green/blue wash on
- * white. Flatten them so the whole top row is uniform. */
+/* Faint accent-tint gradients baked into card backgrounds -- a
+ * near-invisible touch on dark, a visible green/blue/cyan wash on
+ * white. Flatten to the plain card surface so rows of cards read as
+ * uniform. */
 html[data-theme="light"] .stat-card--relay,
-html[data-theme="light"] .stat-card--system {
+html[data-theme="light"] .stat-card--system,
+html[data-theme="light"] .rp-card,
+html[data-theme="light"] .update-history {
     background: var(--bg-card);
+}
+
+/* Same, for the cyan glow behind the NodeInfo-broadcast countdown
+ * (an inner block, so drop it to transparent rather than a surface). */
+html[data-theme="light"] .r-countdown {
+    background: transparent;
+}
+
+/* Sent chat bubbles hardcode a bright #ffb84d amber gradient -- right
+ * on dark, loud on white. Calmer amber + softer shadow for light. */
+html[data-theme="light"] .msg-bubble--sent {
+    background: linear-gradient(135deg, #e0921f 0%, #d0821a 100%);
+    box-shadow: 0 4px 12px -8px rgba(176, 106, 0, 0.4);
+}
+
+/* Drop the baked-in amber wash on the chat pane and the halo behind
+ * the empty-state icon -- flat surfaces on light. */
+html[data-theme="light"] .msg-chat {
+    background: var(--msg-bg);
+}
+
+html[data-theme="light"] .msg-chat__placeholder-icon {
+    background: var(--overlay-weak);
+    box-shadow: none;
 }
 
 /* Neon value glows read as blur on white. */
