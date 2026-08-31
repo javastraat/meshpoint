@@ -1,7 +1,7 @@
 {
   "id": "sunlight",
   "label": "Sunlight",
-  "order": 4,
+  "order": 3,
   "icon": "sun",
   "description": "High-brightness light theme tuned for direct sunlight."
 }
