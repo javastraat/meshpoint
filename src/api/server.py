@@ -14,6 +14,7 @@ from src.analytics.signal_analyzer import SignalAnalyzer
 from src.analytics.traffic_monitor import TrafficMonitor
 from src.api.audit import AuditLogWriter
 from src.api.html_assets import bust_asset_urls
+from src.api.theme_registry import inject_theme_links
 from src.api.audit import dependencies as audit_deps
 from src.api.auth import dependencies as auth_deps
 from src.api.auth.auth_bootstrap import AuthSubsystem, build_auth_subsystem
@@ -84,6 +85,7 @@ from src.api.routes import (
     metrics_routes,
     rf_routes,
     stats_routes,
+    theme_routes,
     system_config_routes,
     system_metrics,
     terminal_routes,
@@ -185,6 +187,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
         config=config,
     )
     backup_routes.init_routes(config)
+    theme_routes.init_routes(Path(config.dashboard.static_dir) / "themes")
     # Dangerous registry is wired in lifespan so clear-db / wipe-phantoms /
     # force-nodeinfo can close over the live pipeline objects.
 
@@ -544,6 +547,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     app.include_router(meshcore_firmware_routes.router, dependencies=protected)
     app.include_router(config_routes.router, dependencies=protected)
     app.include_router(stats_routes.router)
+    app.include_router(theme_routes.router)
     app.include_router(lorawan_routes.router, dependencies=protected)
     app.include_router(lorawan_config_routes.router, dependencies=protected)
     app.include_router(dapnet_routes.router, dependencies=protected)
@@ -602,6 +606,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
         # caches -- stale SPA JS against fresh HTML broke features
         # silently twice. no-cache keeps the HTML itself revalidated.
         html = (static_dir / "index.html").read_text(encoding="utf-8")
+        html = inject_theme_links(html, static_dir / "themes")
         return HTMLResponse(
             bust_asset_urls(html),
             headers={"Cache-Control": "no-cache"},

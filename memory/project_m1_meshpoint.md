@@ -7434,3 +7434,59 @@ The actual bandplan is negotiated entirely by the **network server** (LNS), not 
 **Could the HAL itself be patched?** Technically yes — `loragw_sx1302.c` is real open C source compiled for the Pi, not a sealed vendor blob; the `DCFREE_ENC` write could in principle be changed to bypass whitening both ways, and CRC is already software-toggleable (`no_crc` param already exists in `send_fsk_packet()`). POCSAG's own 576-bit alternating preamble happens to match the generic alternating-bit convention most chips' hardware preamble generators already produce, so that piece may be less of an obstacle than it first looks. But real costs make this a from-scratch project, not a tweak: (1) `loragw_sx1302.c` is shared by every LoRa/Meshtastic/LoRaWAN channel on the concentrator, not isolated to ch9 — a register-level mistake risks the whole capture pipeline; (2) the SX1302 only exists on the deployed Pi, so every iteration means rebuild+reflash+test live on real hardware, no Mac-side compile-check the way Arduino sketches get; (3) even with whitening bypassed, a real POCSAG batch/BCH encoder-decoder would still need to be built in Python from scratch (though `pocsag_companion868.ino`'s own decode logic is a usable reference) and fed through `lgw_send()`'s single-framed-packet model, working around its lack of a native continuous-stream concept.
 
 **Status**: pure investigation, nothing attempted or planned. Answer for the record: no, not today; theoretically patchable but a substantial, genuinely risky undertaking (shared HAL file, Pi-only testing, still needs a from-scratch POCSAG software layer on top) — worth remembering as "answered and understood, not worth pursuing casually" rather than re-investigating from scratch if it comes up again.
+
+## Plugin architecture — Spike 1: pluggable themes directory (2026-08-31, DONE, not yet live-verified)
+
+Context: user asked whether Meshpoint should move to a plugin-first architecture
+(`rtl-sdr` plugin, `themes` plugin, `lorawan` decoder plugin, etc.). Full review
+written to `memory/plugin-architecture-review.md` — verdict **"do it partially":
+internal registry refactors + a themes directory yes; out-of-tree sandboxed
+plugin marketplace no (fork/one-PR-at-a-time workflow, no real in-process
+isolation, apt-dependency plugins break "just install it")**. Spike 1 is the
+themes directory — the smallest "drop a folder ⇒ capability appears" slice.
+
+**What shipped:**
+- `src/api/theme_registry.py` (FastAPI-free, unit-tests on the Mac) — `scan_themes(themes_dir)`
+  reads `frontend/themes/<id>/theme.json` (`{id,label,order,icon}`) + optional
+  `theme.css`, returns sorted `[{id,label,order,icon,css}]`. `css` is `None` for a
+  comment-only file (CSS comments stripped before the emptiness check), so
+  `dark`'s placeholder gets no `<link>`. `dark` baseline is always in the list
+  even with no folder. Also `theme_link_tags()` / `inject_theme_links(html, dir)`.
+- `src/api/routes/theme_routes.py` — `GET /api/themes` → `{themes:[...], default:"dark"}`,
+  unauthenticated (no device data; the `.css` files are already public via the
+  static mount). `init_routes(themes_dir)` in `create_app`, `include_router` added.
+- `src/api/server.py` — `serve_dashboard_root` now runs `inject_theme_links()` on
+  the HTML before `bust_asset_urls()`, so every enabled theme's CSS is in `<head>`
+  at first paint (no flash for a persisted non-dark theme). `bust_asset_urls`
+  regex doesn't re-bust the injected tags (they already carry `?v=`).
+- `frontend/themes/{dark,high-contrast,sunlight,amber-mono}/` — the 3 existing
+  themes moved out of `frontend/css/theme_high_contrast.css` **verbatim**;
+  `amber-mono` is a demo proving the pattern. `dark/theme.css` is a comment only
+  (palette stays on `:root` in `dashboard.css`).
+- `frontend/css/theme_high_contrast.css` **deleted** (`git rm`); its `<link>`
+  removed from `index.html`; its `@media (prefers-contrast: more)` block moved
+  into `dashboard.css` right after `:root`.
+- `frontend/js/theme_controller.js` — fetches `/api/themes` in the constructor
+  (`this.ready` promise), builds `valid`/`cycle` order + `themes()` metadata from
+  it; falls back to the hardcoded 3 if the fetch fails; drops a persisted theme
+  whose folder vanished back to `dark`.
+- `frontend/js/app.js` — `_registerThemeToggle` now keys its 3 SVG glyphs by the
+  manifest `icon` keyword (`moon`/`contrast`/`sun`, fallback `moon`) and refreshes
+  once `tc.ready` resolves; command-palette label de-hardcoded to "Cycle theme".
+- `tests/test_theme_registry.py` — 9 tests, all green via
+  `python3 -m unittest tests.test_theme_registry` (no fastapi/pytest on the Mac).
+- Changelog bullet under `### v0.8.1` (parser: 31 sections OK, `0.8.1` present).
+  README "UI / UX" theme-toggle bullet updated. No new config keys → CONFIGURATION.md
+  untouched.
+
+**DoD met:** adding `frontend/themes/<x>/{theme.json,theme.css}` + restart makes
+`<x>` appear in the picker with zero `.js`/`.py` edits.
+
+**Not yet done:** live verification on the Pi (load dashboard, cycle through 4
+themes, confirm `amber-mono` renders, confirm no FOUC on reload with a non-dark
+theme persisted). **Option B** (extract the dark palette into `themes/dark/theme.css`
++ server-side `<head>` CSS inlining) deferred — see the review doc.
+
+**Next spike candidates:** Phase 0 route/service registry refactor of the ~2,100-line
+`src/api/server.py` `create_app`/`lifespan` (highest-leverage internal win), then
+Phase 2 decoder registry + opening the closed `Protocol` enum.

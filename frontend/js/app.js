@@ -239,8 +239,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
-// Topbar theme toggle: cycles dark -> high-contrast -> sunlight, with an
-// icon + tooltip that reflect the current theme. Reuses window.themeController.
+// Topbar theme toggle: cycles through the themes discovered from
+// /api/themes, with an icon + tooltip reflecting the current one.
+// Reuses window.themeController. Icons are keyed by the manifest's
+// `icon` keyword (moon / contrast / sun); an unknown keyword falls
+// back to the moon glyph, so a brand-new theme folder still gets a
+// usable button with no code change here.
 function _registerThemeToggle(topbar) {
     const tc = window.themeController;
     if (!tc || typeof topbar.registerAction !== 'function') return;
@@ -249,31 +253,41 @@ function _registerThemeToggle(topbar) {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
              stroke-linecap="round" stroke-linejoin="round" width="16" height="16"
              aria-hidden="true" ${extra}>${inner}</svg>`;
-    const ICONS = {
-        'dark': SVG('<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>'),
-        'high-contrast': SVG('<circle cx="12" cy="12" r="9"/>'
+    const GLYPHS = {
+        moon: SVG('<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>'),
+        contrast: SVG('<circle cx="12" cy="12" r="9"/>'
             + '<path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" stroke="none"/>'),
-        'sunlight': SVG('<circle cx="12" cy="12" r="4"/>'
+        sun: SVG('<circle cx="12" cy="12" r="4"/>'
             + '<path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4'
             + 'M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'),
     };
-    const LABELS = { 'dark': 'Dark', 'high-contrast': 'High contrast', 'sunlight': 'Sunlight' };
+    const glyphFor = (themeId) => {
+        const meta = tc.themes().find((t) => t.id === themeId);
+        return GLYPHS[meta && meta.icon] || GLYPHS.moon;
+    };
+    const labelFor = (themeId) => {
+        const meta = tc.themes().find((t) => t.id === themeId);
+        return (meta && meta.label) || themeId;
+    };
 
     const btn = topbar.registerAction({
         id: 'theme',
         label: 'Theme',
-        icon: ICONS[tc.current()] || ICONS.dark,
+        icon: glyphFor(tc.current()),
         onClick: () => update(tc.cycle()),
     });
 
     function update(theme) {
         if (!btn) return;
-        btn.innerHTML = ICONS[theme] || ICONS.dark;
-        const name = LABELS[theme] || theme;
+        btn.innerHTML = glyphFor(theme);
+        const name = labelFor(theme);
         btn.setAttribute('title', `Theme: ${name} · click to cycle`);
         btn.setAttribute('aria-label', `Theme: ${name}`);
     }
     update(tc.current());
+    // Manifest arrives async; refresh the icon/label once real metadata
+    // is in (fallback list has no-op effect if the fetch failed).
+    tc.ready.then(() => update(tc.current()));
 }
 
 function _bootDangerousPanel(router) {
@@ -789,7 +803,7 @@ function _bootCommandPaletteAndKeymap(router) {
 
     palette.register({
         id: 'theme:cycle',
-        label: 'Cycle theme (dark / high-contrast / sunlight)',
+        label: 'Cycle theme',
         group: 'View',
         icon: '◐',
         run: () => {

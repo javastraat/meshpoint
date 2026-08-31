@@ -1,0 +1,117 @@
+"""Tests for the theme folder scanner (Spike 1 of the plugin work).
+
+FastAPI-free by design -- exercises src/api/theme_registry.py directly,
+the same way test_html_assets-style logic runs on the Mac without a
+venv. The route in src/api/routes/theme_routes.py is a thin wrapper
+over ``scan_themes`` and is covered by that.
+"""
+
+from __future__ import annotations
+
+import json
+import tempfile
+import unittest
+from pathlib import Path
+
+from src.api.theme_registry import (
+    inject_theme_links,
+    scan_themes,
+    theme_link_tags,
+)
+
+
+def _write_theme(root: Path, name: str, manifest, css: str | None = None) -> None:
+    folder = root / name
+    folder.mkdir(parents=True)
+    if manifest is not None:
+        (folder / "theme.json").write_text(
+            manifest if isinstance(manifest, str) else json.dumps(manifest),
+            encoding="utf-8",
+        )
+    if css is not None:
+        (folder / "theme.css").write_text(css, encoding="utf-8")
+
+
+class TestScanThemes(unittest.TestCase):
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+
+    def tearDown(self) -> None:
+        self._tmp.cleanup()
+
+    def test_returns_dark_baseline_when_dir_missing(self) -> None:
+        themes = scan_themes(self.root / "nope")
+        self.assertEqual([t["id"] for t in themes], ["dark"])
+        self.assertIsNone(themes[0]["css"])
+
+    def test_sorted_by_order_then_label(self) -> None:
+        _write_theme(self.root, "sunlight", {"label": "Sunlight", "order": 2}, "html{--x:1}")
+        _write_theme(self.root, "high-contrast", {"label": "High contrast", "order": 1}, "html{--x:1}")
+        _write_theme(self.root, "dark", {"label": "Dark", "order": 0}, "/* baseline */")
+        _write_theme(self.root, "amber-mono", {"label": "Amber mono", "order": 3}, "html{--x:1}")
+
+        self.assertEqual(
+            [t["id"] for t in scan_themes(self.root)],
+            ["dark", "high-contrast", "sunlight", "amber-mono"],
+        )
+
+    def test_comment_only_css_counts_as_no_css(self) -> None:
+        _write_theme(self.root, "dark", {"label": "Dark", "order": 0},
+                     "/* palette lives in dashboard.css */\n")
+        _write_theme(self.root, "sunlight", {"label": "Sunlight", "order": 2},
+                     "html[data-theme=sunlight]{--bg:#000}")
+
+        by_id = {t["id"]: t for t in scan_themes(self.root)}
+        self.assertIsNone(by_id["dark"]["css"])
+        self.assertEqual(by_id["sunlight"]["css"], "/themes/sunlight/theme.css")
+
+    def test_skips_malformed_and_non_object_manifests(self) -> None:
+        _write_theme(self.root, "broken", "{not json", "html{--x:1}")
+        _write_theme(self.root, "listy", "[1, 2, 3]", "html{--x:1}")
+        _write_theme(self.root, "nomanifest", None, "html{--x:1}")
+        _write_theme(self.root, "sunlight", {"label": "Sunlight", "order": 2}, "html{--x:1}")
+
+        ids = [t["id"] for t in scan_themes(self.root)]
+        self.assertEqual(sorted(ids), ["dark", "sunlight"])
+
+    def test_id_defaults_to_folder_name_and_label_is_titlecased(self) -> None:
+        _write_theme(self.root, "amber-mono", {"order": 3}, "html{--x:1}")
+        entry = next(t for t in scan_themes(self.root) if t["id"] == "amber-mono")
+        self.assertEqual(entry["label"], "Amber Mono")
+
+    def test_bad_order_falls_back_without_crashing(self) -> None:
+        _write_theme(self.root, "weird", {"label": "Weird", "order": "soon"}, "html{--x:1}")
+        entry = next(t for t in scan_themes(self.root) if t["id"] == "weird")
+        self.assertEqual(entry["order"], 100)
+
+
+class TestThemeLinkInjection(unittest.TestCase):
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        _write_theme(self.root, "dark", {"label": "Dark", "order": 0}, "/* baseline */")
+        _write_theme(self.root, "sunlight", {"label": "Sunlight", "order": 2},
+                     "html[data-theme=sunlight]{--bg:#000}")
+
+    def tearDown(self) -> None:
+        self._tmp.cleanup()
+
+    def test_link_tags_only_for_themes_with_css(self) -> None:
+        tags = theme_link_tags(scan_themes(self.root), token="abc")
+        self.assertIn('href="/themes/sunlight/theme.css?v=abc"', tags)
+        self.assertNotIn("/themes/dark/", tags)
+
+    def test_inject_places_tags_before_head_close(self) -> None:
+        html = "<html><head><title>x</title></head><body></body></html>"
+        out = inject_theme_links(html, self.root, token="abc")
+        self.assertIn('theme.css?v=abc"></head>', out)
+        self.assertEqual(out.count("</head>"), 1)
+
+    def test_inject_is_noop_without_head(self) -> None:
+        html = "<div>fragment</div>"
+        self.assertEqual(inject_theme_links(html, self.root), html)
+
+
+if __name__ == "__main__":  # pragma: no cover
+    unittest.main()

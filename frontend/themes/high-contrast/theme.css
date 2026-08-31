@@ -1,0 +1,38 @@
+/* High-contrast theme.
+ *
+ * Overrides the small set of CSS variables that the rest of the
+ * stylesheets read for colour decisions. Anything that hardcodes RGB
+ * values stays put -- this theme is about lifting contrast for
+ * dim/cluttered viewing, not about replacing the palette wholesale. */
+
+html[data-theme="high-contrast"] {
+    --text-primary: #ffffff;
+    --text-secondary: #e6f1ff;
+    --text-muted: #c0d0e8;
+    --accent-cyan: #5feaff;
+    --accent-amber: #ffc857;
+    --accent-green: #5dffc1;
+    --accent-red: #ff7a7a;
+    --bg-primary: #04060c;
+    --bg-secondary: #0b1424;
+    --sidebar-bg: #050912;
+    --sidebar-border: rgba(255, 255, 255, 0.16);
+    --sidebar-item-hover: rgba(95, 234, 255, 0.12);
+    --sidebar-text: #ffffff;
+    --sidebar-text-muted: #c0d0e8;
+}
+
+html[data-theme="high-contrast"] .stat-card,
+html[data-theme="high-contrast"] .panel,
+html[data-theme="high-contrast"] .r-card {
+    border-color: rgba(255, 255, 255, 0.16) !important;
+    box-shadow:
+        0 0 0 1px rgba(95, 234, 255, 0.08),
+        0 4px 14px rgba(0, 0, 0, 0.7) !important;
+}
+
+html[data-theme="high-contrast"] .since-line,
+html[data-theme="high-contrast"] .keymap__panel,
+html[data-theme="high-contrast"] .cmd-palette__panel {
+    border-color: rgba(95, 234, 255, 0.45) !important;
+}

@@ -24,6 +24,16 @@
     --radius-sm: 4px;
 }
 
+/* Honor a system high-contrast preference automatically when the user
+ * hasn't explicitly picked a theme. (Explicit themes live in
+ * frontend/themes/<id>/theme.css and are injected server-side.) */
+@media (prefers-contrast: more) {
+    html:not([data-theme]) {
+        --text-primary: #ffffff;
+        --text-secondary: #e6f1ff;
+    }
+}
+
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 html, body {

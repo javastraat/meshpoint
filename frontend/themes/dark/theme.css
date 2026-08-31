@@ -1,0 +1,6 @@
+/* Dark is the baseline theme. Its palette is defined on bare :root in
+ * frontend/css/dashboard.css (a synchronously-loaded stylesheet, so it
+ * never flashes). This file exists only so `dark` is a uniform registry
+ * entry alongside the other theme folders -- it intentionally ships no
+ * rules. To pull the baseline palette in here, see "Option B" in
+ * memory/plugin-architecture-review.md. */

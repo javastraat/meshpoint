@@ -1,0 +1,24 @@
+/* Amber mono -- demo theme proving "drop a folder -> theme appears".
+ * An amber-phosphor-terminal tint over the baseline dark palette. */
+
+html[data-theme="amber-mono"] {
+    --text-primary: #ffcf7a;
+    --text-secondary: #d9a35e;
+    --text-muted: #9a7038;
+    --accent-cyan: #ffb347;
+    --accent-green: #ffcf7a;
+    --accent-amber: #ffb347;
+    --accent-red: #ff8c69;
+    --bg-primary: #0c0a06;
+    --bg-secondary: #16110a;
+    --sidebar-bg: #0c0a06;
+    --sidebar-border: rgba(255, 179, 71, 0.22);
+    --sidebar-item-hover: rgba(255, 179, 71, 0.14);
+    --sidebar-text: #ffcf7a;
+    --sidebar-text-muted: #9a7038;
+}
+
+html[data-theme="amber-mono"] .stat-card__value,
+html[data-theme="amber-mono"] .r-readout-grid dd {
+    text-shadow: 0 0 8px rgba(255, 179, 71, 0.4);
+}
