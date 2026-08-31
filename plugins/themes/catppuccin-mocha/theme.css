@@ -1,0 +1,32 @@
+/* Catppuccin Mocha -- https://catppuccin.com/ (MIT palette, own CSS).
+ * Dark-polarity shallow override over the baseline. */
+
+html[data-theme="catppuccin-mocha"] {
+    --bg-primary: #1e1e2e;
+    --bg-secondary: #181825;
+    --bg-card: #313244;
+    --bg-glass: rgba(30, 30, 46, 0.74);
+    --border: #45475a;
+    --border-glow: rgba(203, 166, 247, 0.28);
+    --text-primary: #cdd6f4;
+    --text-secondary: #bac2de;
+    --text-muted: #a6adc8;
+    --accent-cyan: #94e2d5;
+    --accent-green: #a6e3a1;
+    --accent-blue: #89b4fa;
+    --accent-purple: #cba6f7;
+    --accent-amber: #f9e2af;
+    --accent-red: #f38ba8;
+    --glow-cyan: 0 0 8px rgba(148, 226, 213, 0.3);
+    --glow-green: 0 0 8px rgba(166, 227, 161, 0.3);
+    --bg-inset: #181825;
+    --bg-popover: #11111b;
+
+    --sidebar-bg: #181825;
+    --sidebar-border: #313244;
+    --sidebar-item-hover: rgba(203, 166, 247, 0.1);
+    --sidebar-item-active-bg: rgba(166, 227, 161, 0.16);
+    --sidebar-accent: #cba6f7;
+    --sidebar-text: #cdd6f4;
+    --sidebar-text-muted: #a6adc8;
+}

@@ -1,0 +1,32 @@
+/* Kanagawa -- https://github.com/rebelot/kanagawa.nvim (MIT palette, own CSS).
+ * Dark-polarity shallow override over the baseline. */
+
+html[data-theme="kanagawa"] {
+    --bg-primary: #1f1f28;
+    --bg-secondary: #181820;
+    --bg-card: #2a2a37;
+    --bg-glass: rgba(31, 31, 40, 0.76);
+    --border: #363646;
+    --border-glow: rgba(126, 156, 216, 0.26);
+    --text-primary: #dcd7ba;
+    --text-secondary: #c8c093;
+    --text-muted: #727169;
+    --accent-cyan: #7fb4ca;
+    --accent-green: #98bb6c;
+    --accent-blue: #7e9cd8;
+    --accent-purple: #957fb8;
+    --accent-amber: #e6c384;
+    --accent-red: #e46876;
+    --glow-cyan: 0 0 8px rgba(127, 180, 202, 0.3);
+    --glow-green: 0 0 8px rgba(152, 187, 108, 0.3);
+    --bg-inset: #181820;
+    --bg-popover: #16161d;
+
+    --sidebar-bg: #16161d;
+    --sidebar-border: #2a2a37;
+    --sidebar-item-hover: rgba(126, 156, 216, 0.1);
+    --sidebar-item-active-bg: rgba(152, 187, 108, 0.16);
+    --sidebar-accent: #7e9cd8;
+    --sidebar-text: #dcd7ba;
+    --sidebar-text-muted: #727169;
+}

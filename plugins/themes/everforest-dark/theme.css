@@ -1,0 +1,32 @@
+/* Everforest Dark -- https://github.com/sainnhe/everforest (MIT palette, own CSS).
+ * Dark-polarity shallow override over the baseline. */
+
+html[data-theme="everforest-dark"] {
+    --bg-primary: #2d353b;
+    --bg-secondary: #272e33;
+    --bg-card: #343f44;
+    --bg-glass: rgba(45, 53, 59, 0.76);
+    --border: #475258;
+    --border-glow: rgba(167, 192, 128, 0.26);
+    --text-primary: #d3c6aa;
+    --text-secondary: #9da9a0;
+    --text-muted: #7a8478;
+    --accent-cyan: #83c092;
+    --accent-green: #a7c080;
+    --accent-blue: #7fbbb3;
+    --accent-purple: #d699b6;
+    --accent-amber: #dbbc7f;
+    --accent-red: #e67e80;
+    --glow-cyan: 0 0 8px rgba(131, 192, 146, 0.3);
+    --glow-green: 0 0 8px rgba(167, 192, 128, 0.3);
+    --bg-inset: #272e33;
+    --bg-popover: #2d353b;
+
+    --sidebar-bg: #272e33;
+    --sidebar-border: #343f44;
+    --sidebar-item-hover: rgba(167, 192, 128, 0.1);
+    --sidebar-item-active-bg: rgba(131, 192, 146, 0.16);
+    --sidebar-accent: #a7c080;
+    --sidebar-text: #d3c6aa;
+    --sidebar-text-muted: #859289;
+}

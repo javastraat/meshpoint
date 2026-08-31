@@ -1,0 +1,32 @@
+/* Rose Pine -- https://rosepinetheme.com/ (MIT palette, own CSS).
+ * Dark-polarity shallow override over the baseline. */
+
+html[data-theme="rose-pine"] {
+    --bg-primary: #191724;
+    --bg-secondary: #1f1d2e;
+    --bg-card: #26233a;
+    --bg-glass: rgba(25, 23, 36, 0.76);
+    --border: #403d52;
+    --border-glow: rgba(196, 167, 231, 0.26);
+    --text-primary: #e0def4;
+    --text-secondary: #908caa;
+    --text-muted: #6e6a86;
+    --accent-cyan: #9ccfd8;
+    --accent-green: #5dc2a3;
+    --accent-blue: #31748f;
+    --accent-purple: #c4a7e7;
+    --accent-amber: #f6c177;
+    --accent-red: #eb6f92;
+    --glow-cyan: 0 0 8px rgba(156, 207, 216, 0.3);
+    --glow-green: 0 0 8px rgba(93, 194, 163, 0.3);
+    --bg-inset: #1f1d2e;
+    --bg-popover: #191724;
+
+    --sidebar-bg: #191724;
+    --sidebar-border: #26233a;
+    --sidebar-item-hover: rgba(196, 167, 231, 0.1);
+    --sidebar-item-active-bg: rgba(156, 207, 216, 0.16);
+    --sidebar-accent: #c4a7e7;
+    --sidebar-text: #e0def4;
+    --sidebar-text-muted: #908caa;
+}

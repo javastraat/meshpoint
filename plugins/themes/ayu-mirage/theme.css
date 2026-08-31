@@ -1,0 +1,32 @@
+/* Ayu Mirage -- https://github.com/ayu-theme/ayu-colors (MIT palette, own CSS).
+ * Dark-polarity shallow override over the baseline. */
+
+html[data-theme="ayu-mirage"] {
+    --bg-primary: #1f2430;
+    --bg-secondary: #191e2a;
+    --bg-card: #232834;
+    --bg-glass: rgba(31, 36, 48, 0.76);
+    --border: #333a47;
+    --border-glow: rgba(115, 208, 255, 0.26);
+    --text-primary: #cccac2;
+    --text-secondary: #b8b5a9;
+    --text-muted: #707a8c;
+    --accent-cyan: #5ccfe6;
+    --accent-green: #87d96c;
+    --accent-blue: #73d0ff;
+    --accent-purple: #dfbfff;
+    --accent-amber: #ffd173;
+    --accent-red: #ff6666;
+    --glow-cyan: 0 0 8px rgba(92, 207, 230, 0.3);
+    --glow-green: 0 0 8px rgba(135, 217, 108, 0.3);
+    --bg-inset: #191e2a;
+    --bg-popover: #1c212b;
+
+    --sidebar-bg: #191e2a;
+    --sidebar-border: #232834;
+    --sidebar-item-hover: rgba(115, 208, 255, 0.1);
+    --sidebar-item-active-bg: rgba(135, 217, 108, 0.16);
+    --sidebar-accent: #73d0ff;
+    --sidebar-text: #cccac2;
+    --sidebar-text-muted: #707a8c;
+}

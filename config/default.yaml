@@ -119,9 +119,12 @@ dashboard:                # web dashboard / API server
   # Extra/community themes drop-in dir. themes live in <plugins_dir>/themes/<id>/.
   plugins_dir: "plugins"
   # Default dashboard theme. Built-ins (frontend/themes/): dark, light,
-  # high-contrast, sunlight, solarized-dark. Bundled extras (plugins/themes/):
-  # amber-mono, green-crt, nord, gruvbox-dark. A per-browser choice in the
-  # theme toggle overrides this locally. Editable from Settings -> Themes.
+  # high-contrast, sunlight. Bundled extras (plugins/themes/): solarized-dark,
+  # nord, gruvbox-dark, amber-mono, green-crt, dracula, catppuccin-mocha,
+  # rose-pine, everforest-dark, one-dark, kanagawa, github-dark, ayu-mirage,
+  # colorblind-safe.
+  # A per-browser choice in the theme toggle overrides this locally.
+  # Editable from Settings -> Themes.
   theme: "dark"
 
 metrics:                  # Prometheus-compatible /metrics scrape endpoint

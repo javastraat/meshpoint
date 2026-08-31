@@ -38,11 +38,18 @@ Ranked roughly by bang-for-buck. Not started unless noted.
 
 Theme dir split + source tier Pi-verified working 2026-08-31.
 
-- **Builder "Save to device" + "Installed themes" manager** (2026-08-31): `POST
-  /api/themes` writes `plugins/themes/<id>/` (admin+audit, no restart), `DELETE
-  /api/themes/{id}` removes community themes. `src/api/theme_store.py` +
-  `tests/test_theme_store.py`. Guards: slug regex, 64KiB, `@import` ban,
-  built-in ids protected. Not yet Pi-verified.
+- **Builder "Save to device" + "Installed themes" manager** (2026-08-31,
+  Pi-verified: save / overwrite / delete all working): `POST /api/themes` writes
+  `plugins/themes/<id>/` (admin+audit, no restart), `DELETE /api/themes/{id}`
+  removes community themes. `src/api/theme_store.py` + `tests/test_theme_store.py`.
+  Guards: slug regex, 64KiB, `@import` ban, built-in ids protected.
+
+- **Community theme pack + a11y theme** (2026-08-31): 8 more dark palettes in
+  `plugins/themes/` (dracula, catppuccin-mocha, rose-pine, everforest-dark,
+  one-dark, kanagawa, github-dark, ayu-mirage) + `colorblind-safe` (Okabe-Ito
+  accents, neutral high-contrast base). Own CSS, palette values only, credited.
+  18 themes total. `high-contrast` stays the low-vision pick; charts already
+  CB-safe fork-wide.
 
 ## Open
 

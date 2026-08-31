@@ -1,0 +1,32 @@
+/* Dracula -- https://draculatheme.com/ (palette values only, own CSS).
+ * Dark-polarity shallow override over the baseline. */
+
+html[data-theme="dracula"] {
+    --bg-primary: #282a36;
+    --bg-secondary: #21222c;
+    --bg-card: #343746;
+    --bg-glass: rgba(40, 42, 54, 0.74);
+    --border: #44475a;
+    --border-glow: rgba(189, 147, 249, 0.28);
+    --text-primary: #f8f8f2;
+    --text-secondary: #c9c9dd;
+    --text-muted: #6272a4;
+    --accent-cyan: #8be9fd;
+    --accent-green: #50fa7b;
+    --accent-blue: #62d6e8;
+    --accent-purple: #bd93f9;
+    --accent-amber: #ffb86c;
+    --accent-red: #ff5555;
+    --glow-cyan: 0 0 8px rgba(139, 233, 253, 0.3);
+    --glow-green: 0 0 8px rgba(80, 250, 123, 0.3);
+    --bg-inset: #21222c;
+    --bg-popover: #282a36;
+
+    --sidebar-bg: #282a36;
+    --sidebar-border: #343746;
+    --sidebar-item-hover: rgba(189, 147, 249, 0.12);
+    --sidebar-item-active-bg: rgba(189, 147, 249, 0.18);
+    --sidebar-accent: #bd93f9;
+    --sidebar-text: #f8f8f2;
+    --sidebar-text-muted: #6272a4;
+}

@@ -1,0 +1,8 @@
+{
+  "id": "colorblind-safe",
+  "label": "Colour-blind safe",
+  "icon": "circle",
+  "author": "Okabe & Ito",
+  "homepage": "https://jfly.uni-koeln.de/color/",
+  "description": "Okabe-Ito accent palette — accents stay distinct for deuteranopia, protanopia and tritanopia."
+}

@@ -1,0 +1,32 @@
+/* One Dark -- Atom (https://github.com/atom/atom) (MIT palette, own CSS).
+ * Dark-polarity shallow override over the baseline. */
+
+html[data-theme="one-dark"] {
+    --bg-primary: #282c34;
+    --bg-secondary: #21252b;
+    --bg-card: #2f343f;
+    --bg-glass: rgba(40, 44, 52, 0.74);
+    --border: #3e4451;
+    --border-glow: rgba(97, 175, 239, 0.26);
+    --text-primary: #abb2bf;
+    --text-secondary: #9aa2b1;
+    --text-muted: #5c6370;
+    --accent-cyan: #56b6c2;
+    --accent-green: #98c379;
+    --accent-blue: #61afef;
+    --accent-purple: #c678dd;
+    --accent-amber: #e5c07b;
+    --accent-red: #e06c75;
+    --glow-cyan: 0 0 8px rgba(86, 182, 194, 0.3);
+    --glow-green: 0 0 8px rgba(152, 195, 121, 0.3);
+    --bg-inset: #21252b;
+    --bg-popover: #21252b;
+
+    --sidebar-bg: #21252b;
+    --sidebar-border: #2f343f;
+    --sidebar-item-hover: rgba(97, 175, 239, 0.1);
+    --sidebar-item-active-bg: rgba(152, 195, 121, 0.16);
+    --sidebar-accent: #61afef;
+    --sidebar-text: #abb2bf;
+    --sidebar-text-muted: #5c6370;
+}

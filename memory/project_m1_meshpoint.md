@@ -7700,9 +7700,11 @@ chrome; the xterm ANSI palette is separate, set in JS (`terminal_renderer.js`
 
 **Themes split into built-in + plugin dirs (2026-08-31)**: themes now load from
 TWO locations. `frontend/themes/` = built-ins (dark, light, high-contrast,
-sunlight, solarized-dark), served `/themes/<id>/theme.css` via the `/` mount.
-`plugins/themes/` = extra/community drop-ins (ships amber-mono, green-crt, nord,
-gruvbox-dark), served via a dedicated `/plugins/themes` StaticFiles mount
+sunlight — the ones from the original fork + our light theme), served
+`/themes/<id>/theme.css` via the `/` mount. `plugins/themes/` = extra/community
+drop-ins (ships solarized-dark, nord, gruvbox-dark, amber-mono, green-crt — all
+fork additions; user moved solarized-dark here since it wasn't in the original),
+served via a dedicated `/plugins/themes` StaticFiles mount
 registered before the `/` catch-all. First real `plugins/` dir. `scan_themes`
 gained an optional `plugin_themes_dir` 2nd arg; `_scan_dir` helper does one dir,
 `seen` set shared so a built-in id wins a collision, `block={DEFAULT_THEME_ID}`
@@ -7755,4 +7757,6 @@ save on a fresh install is served without restart. Frontend `theme_editor.js`:
 community), `_deleteTheme()`, `_confirm()` (lazy DangerousModal / window.confirm),
 `_esc()` promoted. `_themeJson()` already drops `order`. 35 theme tests
 (test_theme_store.py new, 20 store + 15 registry... actually 20+22). No restart
-needed to see saved themes. Not Pi-verified.
+needed to see saved themes. **Pi-verified 2026-08-31: save, overwrite, and
+delete all working.** Themes track fully done — only plugin roadmap Phase 0
+(server.py registry refactor) remains.

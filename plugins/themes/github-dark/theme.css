@@ -1,0 +1,32 @@
+/* GitHub Dark -- Primer (https://primer.style/) (MIT palette, own CSS).
+ * Dark-polarity shallow override over the baseline. */
+
+html[data-theme="github-dark"] {
+    --bg-primary: #0d1117;
+    --bg-secondary: #161b22;
+    --bg-card: #161b22;
+    --bg-glass: rgba(13, 17, 23, 0.78);
+    --border: #30363d;
+    --border-glow: rgba(47, 129, 247, 0.28);
+    --text-primary: #e6edf3;
+    --text-secondary: #7d8590;
+    --text-muted: #6e7681;
+    --accent-cyan: #39c5cf;
+    --accent-green: #3fb950;
+    --accent-blue: #2f81f7;
+    --accent-purple: #a371f7;
+    --accent-amber: #d29922;
+    --accent-red: #f85149;
+    --glow-cyan: 0 0 8px rgba(57, 197, 207, 0.3);
+    --glow-green: 0 0 8px rgba(63, 185, 80, 0.3);
+    --bg-inset: #010409;
+    --bg-popover: #161b22;
+
+    --sidebar-bg: #010409;
+    --sidebar-border: #21262d;
+    --sidebar-item-hover: rgba(47, 129, 247, 0.1);
+    --sidebar-item-active-bg: rgba(63, 185, 80, 0.16);
+    --sidebar-accent: #2f81f7;
+    --sidebar-text: #e6edf3;
+    --sidebar-text-muted: #7d8590;
+}
