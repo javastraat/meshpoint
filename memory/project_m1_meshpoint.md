@@ -7644,3 +7644,18 @@ donut/bar/quality colours -> chartColors/chartSeries/chartStatus, donut centre
 text -> `_ink().text`), rf_tab (histogram bars + grid), radio_spectrum_card
 (MEDIAN/PEAK/MARKER_COLORS statics -> live `_color()`, legend re-skins on
 themechange). node --check clean, theme tests green. Not live-verified.
+
+**Light theme polish pass complete (2026-08-31, TODO #6)**: walked every page in
+`light` with the user. Fixes made: flattened accent-washed card backgrounds
+(`.stat-card--relay/--system`, `.rp-card`, `.update-history`, `.r-countdown`,
+`.msg-chat`, `.msg-chat__placeholder-icon`); calmer sent-chat-bubble amber;
+lightened the RTL-SDR selected skin/preset buttons to a tint (match the tab bar);
+distinct chart series colours so co-shown series (voltage/temp/humidity/rssi) no
+longer collide (also fixed a pre-existing chutil/pressure clash); stripped the
+last dead colour fallback (`var(--sidebar-bg, #0f1624)`). Only non-colour
+`var(--x, fb)` remaining is the RDS marquee `--scroll-dur`/`--scroll-dist` (set
+inline by JS, correct). Every page confirmed by screenshot: Dashboard, Stats,
+Repeaters, Messages, RTL-SDR (all sub-tabs), RF Environment, Hardware, Updates,
+GPS, all Config sub-pages, node drawer, Terminal, LoRaWAN, Topology (map+graph),
+Meshtastic/MeshCore/DAPNET/Pager. Auth/login pages are deliberately not
+theme-aware. TODO #1 (theme editor) and #3 (plugin Phase 0) remain.

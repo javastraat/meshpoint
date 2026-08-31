@@ -200,7 +200,7 @@
     height: 14px;
     border-radius: 50%;
     background: var(--text-muted);
-    border: 2px solid var(--sidebar-bg, #0f1624);
+    border: 2px solid var(--sidebar-bg);
     z-index: 3;
     transition: background var(--motion-fast) var(--ease-out-expo),
                 box-shadow var(--motion-fast) var(--ease-out-expo);
