@@ -11,7 +11,7 @@
     padding: 0.18rem 0.55rem;
     border-radius: 999px;
     background: rgba(15, 22, 36, 0.6);
-    border: 1px solid rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--hairline);
     backdrop-filter: blur(6px);
     -webkit-backdrop-filter: blur(6px);
     font-family: var(--font-mono);

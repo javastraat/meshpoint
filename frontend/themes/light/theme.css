@@ -1,27 +1,28 @@
 /* Light theme -- the first light-polarity theme (dark text on a light
- * background). Meshpoint's CSS is dark-first: most surfaces read the
- * ~25 palette variables below and flip cleanly, but a light theme is
- * not purely a variable swap. Known rough edges in this v1:
+ * background). Meshpoint's CSS is dark-first. Pass 1 (done): the ~25
+ * palette variables below, plus ~200 hardcoded near-white `color:`
+ * values and ~110 faint-white overlay fills/borders were tokenized to
+ * --text-* / --overlay-* / --hairline, so body text, tables, hover
+ * states and dividers all flip.
  *
- *   - ~140 hardcoded faint-white overlays (rgba(255,255,255,0.05)-ish,
- *     mostly on Settings / Messaging / Listener / Terminal) go nearly
- *     invisible on a light bg -- they need per-file black-tint equivalents.
+ * Known remaining rough edges (pass 2):
+ *   - Some panels/modals/dropdowns still hardcode a dark hex or gradient
+ *     fill; the broad override block below catches the common container
+ *     classes but not every one.
  *   - The chat and terminal panels keep their own --msg-* / --term-*
- *     variable sets and stay dark.
+ *     variable sets and stay dark by design.
  *   - Charts / <canvas> (RF spectrum, node metrics, thermals) draw with
  *     hardcoded dark colours and don't read theme state.
  *   - The Leaflet maps use an OSM raster with a dark-invert CSS filter,
  *     so they render inverted (dark) under this theme.
  *
- * Full polish is the staged "light theme" work in
- * memory/plugin-architecture-review.md (consolidate hardcoded colours
- * into tokens, then wire charts + map tiles to theme state). */
+ * See memory/plugin-architecture-review.md for the staged plan. */
 
 html[data-theme="light"] {
     --bg-primary: #eceff4;
     --bg-secondary: #dfe4ec;
     --bg-card: #ffffff;
-    --bg-glass: rgba(255, 255, 255, 0.82);
+    --bg-glass: rgba(255, 255, 255, 0.86);
     --border: #c2ccda;
     --border-glow: rgba(14, 123, 160, 0.28);
     --text-primary: #172033;
@@ -38,6 +39,13 @@ html[data-theme="light"] {
     --glow-amber: 0 1px 3px rgba(178, 106, 6, 0.18);
     --glow-red: 0 1px 3px rgba(211, 58, 44, 0.18);
 
+    /* Overlay tint tokens flip white -> near-black so hover fills and
+     * hairline dividers stay visible. */
+    --overlay-weak: rgba(20, 28, 46, 0.045);
+    --overlay-med: rgba(20, 28, 46, 0.08);
+    --overlay-strong: rgba(20, 28, 46, 0.14);
+    --hairline: rgba(20, 28, 46, 0.12);
+
     --sidebar-bg: #ffffff;
     --sidebar-border: #d5dce6;
     --sidebar-item-hover: rgba(14, 123, 160, 0.08);
@@ -48,8 +56,7 @@ html[data-theme="light"] {
 }
 
 /* Give cards/panels a real edge -- on a light bg the dark theme's
- * glow-only separation disappears. Mirrors what the sunlight theme
- * does for its own contrast pass. */
+ * glow-only separation disappears. */
 html[data-theme="light"] .stat-card,
 html[data-theme="light"] .panel,
 html[data-theme="light"] .r-card,
@@ -62,13 +69,50 @@ html[data-theme="light"] .cmd-palette__panel {
 
 /* Neon value glows read as blur on white. */
 html[data-theme="light"] .stat-card__value,
-html[data-theme="light"] .r-readout-grid dd {
+html[data-theme="light"] .r-readout-grid dd,
+html[data-theme="light"] [class$="__value"] {
     text-shadow: none;
 }
 
+/* Container families that still hardcode a dark hex / gradient fill.
+ * Force them onto the card surface so their (already tokenized) text
+ * is legible. Broad on purpose -- a flat light card beats an
+ * unreadable dark one; pass 2 can restore per-component nuance. */
+html[data-theme="light"] .cfg-card,
+html[data-theme="light"] .cfg-empty,
+html[data-theme="light"] .dangerous-card,
+html[data-theme="light"] .dangerous-panel,
+html[data-theme="light"] .backup-restore-card,
+html[data-theme="light"] .auth-card,
+html[data-theme="light"] .auth-panel,
+html[data-theme="light"] .forbidden-card,
+html[data-theme="light"] .update-history,
+html[data-theme="light"] .update-card,
+html[data-theme="light"] .release-notes,
+html[data-theme="light"] .danger-modal__sheet,
+html[data-theme="light"] .packet-modal,
+html[data-theme="light"] .pkt-modal,
+html[data-theme="light"] .node-drawer,
+html[data-theme="light"] .nd-drawer,
+html[data-theme="light"] .lsn-panel,
+html[data-theme="light"] .lw-panel,
+html[data-theme="light"] .adsb-table-wrap,
+html[data-theme="light"] .ch-table,
+html[data-theme="light"] .neighbours-modal,
+html[data-theme="light"] .capcode-modal {
+    background: var(--bg-card) !important;
+    border-color: var(--border) !important;
+}
+
+/* Modal/drawer backdrops: the dark scrim is fine, just lighten it a bit. */
+html[data-theme="light"] .danger-modal__backdrop,
+html[data-theme="light"] .nd-backdrop,
+html[data-theme="light"] [class$="__backdrop"] {
+    background: rgba(20, 28, 46, 0.35) !important;
+}
+
 /* Topbar: the strip and its protocol chips hardcode a dark translucent
- * fill + neon border glows that wash out on a light bg. Give the strip
- * a light surface and the chips a solid white card with a real border. */
+ * fill + neon border glows that wash out on a light bg. */
 html[data-theme="light"] .topbar {
     background: linear-gradient(180deg, #f3f5f9 0%, #e8ecf2 100%);
     border-bottom-color: #c2ccda;

@@ -555,7 +555,7 @@
 
 .topbar-action:hover {
     border-color: var(--border);
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--overlay-weak);
     color: var(--accent-cyan);
 }
 

@@ -27,7 +27,7 @@
     overflow-y: auto;
     background: linear-gradient(180deg, rgba(20, 28, 46, 0.95) 0%, rgba(13, 19, 32, 0.96) 100%);
     border-radius: var(--radius-md);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--hairline);
     box-shadow: 0 30px 60px rgba(0, 0, 0, 0.55);
     padding: 1.1rem 1.3rem 1.4rem;
     animation: keymap-pop 180ms var(--ease-out-expo);
@@ -42,7 +42,7 @@
     display: flex;
     justify-content: space-between;
     align-items: baseline;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    border-bottom: 1px solid var(--hairline);
     padding-bottom: 0.6rem;
     margin-bottom: 0.8rem;
 }
@@ -84,7 +84,7 @@
     grid-template-columns: 1fr auto;
     gap: 1rem;
     padding: 0.35rem 0;
-    border-bottom: 1px dashed rgba(255, 255, 255, 0.04);
+    border-bottom: 1px dashed var(--hairline);
     align-items: center;
 }
 
@@ -105,8 +105,8 @@
     justify-content: center;
     min-width: 22px;
     padding: 0.1rem 0.45rem;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--overlay-weak);
+    border: 1px solid var(--hairline);
     border-bottom-color: rgba(0, 0, 0, 0.4);
     border-radius: 4px;
     font-family: var(--font-mono);

@@ -12,7 +12,7 @@
     --auth-accent: var(--brand-amber, #ffb84d);
     --auth-danger: #ff6b6b;
     --auth-success: #44d39a;
-    color: #f3f4f6;
+    color: var(--text-primary);
     padding: 24px clamp(16px, 3vw, 32px);
     overflow-y: auto;
     height: 100%;
@@ -32,7 +32,7 @@
 
 .auth-panel__subtitle {
     margin: 0;
-    color: rgba(243, 244, 246, 0.65);
+    color: var(--text-secondary);
     font-size: 14px;
 }
 
@@ -71,7 +71,7 @@
 
 .auth-card__hint {
     margin: 0;
-    color: rgba(243, 244, 246, 0.62);
+    color: var(--text-secondary);
     font-size: 13px;
     line-height: 1.5;
 }
@@ -105,7 +105,7 @@
     font-size: 12px;
     text-transform: uppercase;
     letter-spacing: 0.6px;
-    color: rgba(243, 244, 246, 0.6);
+    color: var(--text-secondary);
     font-weight: 500;
 }
 
@@ -113,7 +113,7 @@
     background: var(--auth-input-bg);
     border: 1px solid var(--auth-input-border);
     border-radius: 8px;
-    color: #f3f4f6;
+    color: var(--text-primary);
     padding: 10px 12px;
     font-size: 14px;
     font-family: inherit;
@@ -123,7 +123,7 @@
 .auth-field__input:focus {
     outline: none;
     border-color: var(--auth-accent);
-    background: rgba(255, 255, 255, 0.07);
+    background: var(--overlay-med);
 }
 
 .auth-button {
@@ -156,12 +156,12 @@
 
 .auth-button--ghost {
     background: transparent;
-    color: rgba(243, 244, 246, 0.85);
+    color: var(--text-primary);
     border: 1px solid var(--auth-card-border);
 }
 
 .auth-button--ghost:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--overlay-weak);
 }
 
 .auth-button--danger {
@@ -183,7 +183,7 @@
 .auth-strength span {
     height: 4px;
     border-radius: 2px;
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--overlay-med);
     transition: background 200ms ease;
 }
 
@@ -202,7 +202,7 @@
 
 .auth-status[data-kind="error"] { color: var(--auth-danger); }
 .auth-status[data-kind="success"] { color: var(--auth-success); }
-.auth-status[data-kind="pending"] { color: rgba(243, 244, 246, 0.7); }
+.auth-status[data-kind="pending"] { color: var(--text-secondary); }
 
 .auth-pill {
     display: inline-flex;
@@ -230,9 +230,9 @@
 
 .auth-preset {
     appearance: none;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    background: rgba(255, 255, 255, 0.04);
-    color: rgba(243, 244, 246, 0.8);
+    border: 1px solid var(--hairline);
+    background: var(--overlay-weak);
+    color: var(--text-primary);
     border-radius: 999px;
     padding: 6px 14px;
     font-size: 12px;
@@ -264,7 +264,7 @@
 .auth-readout {
     font-family: 'JetBrains Mono', Menlo, Consolas, monospace;
     font-size: 13px;
-    color: rgba(243, 244, 246, 0.85);
+    color: var(--text-primary);
     background: rgba(255, 184, 77, 0.06);
     border: 1px solid rgba(255, 184, 77, 0.18);
     border-radius: 8px;
@@ -273,8 +273,8 @@
 }
 
 .auth-pill[data-state="disabled"] {
-    background: rgba(255, 255, 255, 0.06);
-    color: rgba(243, 244, 246, 0.5);
+    background: var(--overlay-med);
+    color: var(--text-muted);
 }
 
 @keyframes authPanelFadeIn {
@@ -290,7 +290,7 @@
 /* ---------- Updates panel ---------- */
 
 .update-panel {
-    color: #f3f4f6;
+    color: var(--text-primary);
     color-scheme: dark;
     padding: 24px clamp(16px, 3vw, 32px);
     overflow-y: auto;
@@ -312,13 +312,13 @@
 
 .update-panel__subtitle {
     margin: 0;
-    color: rgba(243, 244, 246, 0.65);
+    color: var(--text-secondary);
     font-size: 14px;
 }
 
 .update-card {
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: var(--overlay-weak);
+    border: 1px solid var(--hairline);
     border-radius: 14px;
     padding: 20px;
     display: flex;
@@ -336,7 +336,7 @@
 
 .update-card__description {
     margin: 0;
-    color: rgba(243, 244, 246, 0.7);
+    color: var(--text-secondary);
     font-size: 13px;
 }
 
@@ -349,13 +349,13 @@
 }
 
 .update-card__description[data-tier="custom"] {
-    color: #ff6b6b;
+    color: var(--accent-red);
 }
 
 .update-sync-status {
     margin: 0;
     font-size: 13px;
-    color: rgba(243, 244, 246, 0.75);
+    color: var(--text-secondary);
     line-height: 1.45;
 }
 
@@ -368,13 +368,13 @@
 }
 
 .update-sync-status[data-kind="error"] {
-    color: #ff6b6b;
+    color: var(--accent-red);
 }
 
 .update-rollback-hint {
     margin: 8px 0 0;
     font-size: 12px;
-    color: rgba(243, 244, 246, 0.55);
+    color: var(--text-muted);
     line-height: 1.4;
 }
 
@@ -394,15 +394,15 @@
     font-size: 12px;
     text-transform: uppercase;
     letter-spacing: 0.6px;
-    color: rgba(243, 244, 246, 0.6);
+    color: var(--text-secondary);
     font-weight: 500;
 }
 
 .update-field__input {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--overlay-weak);
+    border: 1px solid var(--hairline);
     border-radius: 8px;
-    color: #f3f4f6;
+    color: var(--text-primary);
     padding: 10px 12px;
     font-size: 14px;
     font-family: inherit;
@@ -428,8 +428,8 @@ select.update-field__input option:checked {
     display: flex;
     flex-direction: column;
     gap: 4px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: var(--overlay-weak);
+    border: 1px solid var(--hairline);
     border-radius: 8px;
     padding: 10px 12px;
 }
@@ -437,7 +437,7 @@ select.update-field__input option:checked {
 .update-version__label {
     font-size: 11px;
     text-transform: uppercase;
-    color: rgba(243, 244, 246, 0.5);
+    color: var(--text-muted);
     letter-spacing: 0.6px;
 }
 
@@ -450,7 +450,7 @@ select.update-field__input option:checked {
 .update-version__branch {
     font-family: 'JetBrains Mono', Menlo, monospace;
     font-size: 11px;
-    color: rgba(243, 244, 246, 0.55);
+    color: var(--text-muted);
     min-height: 1.2em;
     text-decoration: none;
 }
@@ -460,7 +460,7 @@ select.update-field__input option:checked {
 }
 
 .update-version__branch[href]:hover {
-    color: rgba(243, 244, 246, 0.85);
+    color: var(--text-primary);
     text-decoration: underline;
 }
 
@@ -472,7 +472,7 @@ select.update-field__input option:checked {
 
 .update-status[data-kind="error"] { color: #ff6b6b; }
 .update-status[data-kind="success"] { color: #44d39a; }
-.update-status[data-kind="pending"] { color: rgba(243, 244, 246, 0.7); }
+.update-status[data-kind="pending"] { color: var(--text-secondary); }
 
 .update-progress[hidden] {
     display: none !important;
@@ -511,13 +511,13 @@ select.update-field__input option:checked {
     margin: 0;
     font-size: 16px;
     font-weight: 600;
-    color: rgba(243, 244, 246, 0.95);
+    color: var(--text-primary);
 }
 
 .update-progress__branch {
     margin: 6px 0 0;
     font-size: 13px;
-    color: rgba(243, 244, 246, 0.65);
+    color: var(--text-secondary);
 }
 
 .update-progress__branch code {
@@ -528,7 +528,7 @@ select.update-field__input option:checked {
 .update-progress__meter {
     height: 4px;
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--overlay-med);
     overflow: hidden;
     margin-bottom: 10px;
 }
@@ -563,14 +563,14 @@ select.update-field__input option:checked {
     margin: 0 0 6px;
     font-family: 'JetBrains Mono', monospace;
     font-size: 12px;
-    color: rgba(243, 244, 246, 0.7);
+    color: var(--text-secondary);
 }
 
 .update-progress__hint {
     margin: 0 0 14px;
     font-size: 13px;
     line-height: 1.45;
-    color: rgba(243, 244, 246, 0.62);
+    color: var(--text-secondary);
 }
 
 .update-progress__steps {
@@ -587,15 +587,15 @@ select.update-field__input option:checked {
     align-items: center;
     gap: 10px;
     font-size: 13px;
-    color: rgba(243, 244, 246, 0.45);
+    color: var(--text-muted);
 }
 
 .update-progress__step[data-status="ok"] {
-    color: rgba(243, 244, 246, 0.9);
+    color: var(--text-primary);
 }
 
 .update-progress__step[data-status="error"] {
-    color: #ff8a8a;
+    color: var(--accent-red);
 }
 
 .update-progress__step-icon {
@@ -607,11 +607,11 @@ select.update-field__input option:checked {
 }
 
 .update-progress__step[data-status="pending"] .update-progress__step-icon {
-    background: rgba(255, 255, 255, 0.12);
+    background: var(--overlay-strong);
 }
 
 .update-progress__step[data-status="active"] {
-    color: rgba(243, 244, 246, 0.95);
+    color: var(--text-primary);
 }
 
 .update-progress__step[data-status="active"] .update-progress__step-icon {
@@ -638,7 +638,7 @@ select.update-field__input option:checked {
 
 .update-progress__terminal {
     margin-top: 14px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--hairline);
     border-radius: 10px;
     background: rgba(0, 0, 0, 0.35);
     overflow: hidden;
@@ -650,8 +650,8 @@ select.update-field__input option:checked {
     font-size: 11px;
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: rgba(243, 244, 246, 0.55);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--hairline);
     font-family: 'JetBrains Mono', monospace;
 }
 
@@ -663,14 +663,14 @@ select.update-field__input option:checked {
     font-family: 'JetBrains Mono', monospace;
     font-size: 11px;
     line-height: 1.45;
-    color: rgba(243, 244, 246, 0.82);
+    color: var(--text-primary);
     white-space: pre-wrap;
     word-break: break-word;
 }
 
 .update-log {
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: var(--overlay-weak);
+    border: 1px solid var(--hairline);
     border-radius: 14px;
     padding: 16px 20px;
     display: flex;
@@ -688,13 +688,13 @@ select.update-field__input option:checked {
     flex-wrap: wrap;
     gap: 12px;
     padding-bottom: 10px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    border-bottom: 1px solid var(--hairline);
 }
 
 .update-log__summary p {
     margin: 0;
     flex: 1;
-    color: rgba(243, 244, 246, 0.85);
+    color: var(--text-primary);
     font-size: 14px;
 }
 
@@ -709,18 +709,18 @@ select.update-field__input option:checked {
 
 .update-log__summary[data-status="success"] .update-log__status {
     background: rgba(68, 211, 154, 0.16);
-    color: #44d39a;
+    color: var(--accent-green);
 }
 
 .update-log__summary[data-status="error"] .update-log__status {
     background: rgba(255, 107, 107, 0.16);
-    color: #ff6b6b;
+    color: var(--accent-red);
 }
 
 .update-log__sha {
     font-family: 'JetBrains Mono', monospace;
     font-size: 12px;
-    color: rgba(243, 244, 246, 0.55);
+    color: var(--text-muted);
 }
 
 .update-log__steps {
@@ -733,7 +733,7 @@ select.update-field__input option:checked {
 }
 
 .update-log__step details {
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--hairline);
     border-radius: 8px;
     background: rgba(0, 0, 0, 0.2);
 }
@@ -761,7 +761,7 @@ select.update-field__input option:checked {
 .update-log__step-cmd {
     flex: 1;
     font-size: 12px;
-    color: rgba(243, 244, 246, 0.6);
+    color: var(--text-secondary);
     font-family: 'JetBrains Mono', monospace;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -770,7 +770,7 @@ select.update-field__input option:checked {
 
 .update-log__step-rc {
     font-size: 11px;
-    color: rgba(243, 244, 246, 0.5);
+    color: var(--text-muted);
     font-family: monospace;
 }
 
@@ -778,10 +778,10 @@ select.update-field__input option:checked {
     margin: 0;
     padding: 10px 14px;
     background: rgba(0, 0, 0, 0.4);
-    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    border-top: 1px solid var(--hairline);
     font-family: 'JetBrains Mono', monospace;
     font-size: 12px;
-    color: rgba(243, 244, 246, 0.85);
+    color: var(--text-primary);
     white-space: pre-wrap;
     word-break: break-word;
     max-height: 220px;
@@ -789,7 +789,7 @@ select.update-field__input option:checked {
 }
 
 .update-log__stream--err {
-    color: #ffb1b1;
+    color: var(--accent-red);
 }
 
 @media (max-width: 720px) {
@@ -804,7 +804,7 @@ select.update-field__input option:checked {
     border-radius: 12px;
     background: rgba(13, 26, 43, 0.55);
     border: 1px solid rgba(0, 209, 255, 0.18);
-    color: rgba(243, 244, 246, 0.92);
+    color: var(--text-primary);
     display: none;
 }
 
@@ -833,21 +833,21 @@ select.update-field__input option:checked {
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    color: rgba(0, 209, 255, 0.85);
+    color: var(--accent-cyan);
     font-weight: 600;
 }
 
 .update-release-notes__title {
     margin: 0;
     font-size: 14px;
-    color: #f3f4f6;
+    color: var(--text-primary);
     font-weight: 600;
 }
 
 .update-release-notes__date {
     margin: 0;
     font-size: 12px;
-    color: rgba(243, 244, 246, 0.55);
+    color: var(--text-muted);
 }
 
 .update-release-notes__list {
@@ -937,7 +937,7 @@ select.update-field__input option:checked {
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    color: rgba(0, 209, 255, 0.85);
+    color: var(--accent-cyan);
     font-weight: 600;
     border-bottom: 1px solid rgba(0, 209, 255, 0.18);
     padding-bottom: 3px;
@@ -956,7 +956,7 @@ select.update-field__input option:checked {
     position: relative;
     font-size: 13px;
     line-height: 1.45;
-    color: rgba(243, 244, 246, 0.88);
+    color: var(--text-primary);
 }
 
 .update-release-notes__bullet::before {
@@ -964,13 +964,13 @@ select.update-field__input option:checked {
     position: absolute;
     left: 2px;
     top: 0;
-    color: rgba(0, 209, 255, 0.6);
+    color: var(--accent-cyan);
     font-weight: 700;
     line-height: 1.45;
 }
 
 .update-release-notes__bullet-headline {
-    color: #f3f4f6;
+    color: var(--text-primary);
     font-weight: 600;
 }
 
@@ -978,7 +978,7 @@ select.update-field__input option:checked {
     display: block;
     font-size: 12px;
     line-height: 1.4;
-    color: rgba(243, 244, 246, 0.62);
+    color: var(--text-secondary);
     max-width: 52rem;
 }
 
@@ -986,11 +986,11 @@ select.update-field__input option:checked {
 .update-release-notes__error {
     margin: 0;
     font-size: 13px;
-    color: rgba(243, 244, 246, 0.6);
+    color: var(--text-secondary);
 }
 
 .update-release-notes[data-state="error"] .update-release-notes__error {
-    color: #ff6b6b;
+    color: var(--accent-red);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1001,7 +1001,7 @@ select.update-field__input option:checked {
 /* ---------- Settings > Meshpoint (service actions) ---------- */
 
 .dangerous-panel {
-    color: #f3f4f6;
+    color: var(--text-primary);
     padding: 24px clamp(16px, 3vw, 32px);
     height: 100%;
     overflow-y: auto;
@@ -1015,7 +1015,7 @@ select.update-field__input option:checked {
 .dangerous-panel__head--secondary {
     margin-top: 28px;
     padding-top: 20px;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    border-top: 1px solid var(--hairline);
 }
 
 .meshpoint-display-card {
@@ -1040,7 +1040,7 @@ select.update-field__input option:checked {
 
 .backup-card__summary {
     margin: 0 0 12px;
-    color: rgba(243, 244, 246, 0.72);
+    color: var(--text-secondary);
     font-size: 13px;
     line-height: 1.5;
 }
@@ -1053,17 +1053,17 @@ select.update-field__input option:checked {
     margin: 0 0 4px;
     font-size: 22px;
     font-weight: 600;
-    color: #f3f4f6;
+    color: var(--text-primary);
 }
 
 .dangerous-panel__head--secondary .dangerous-panel__title {
     font-size: 18px;
-    color: #ff8a8a;
+    color: var(--accent-red);
 }
 
 .dangerous-panel__subtitle {
     margin: 0;
-    color: rgba(243, 244, 246, 0.65);
+    color: var(--text-secondary);
     font-size: 14px;
 }
 
@@ -1110,14 +1110,14 @@ select.update-field__input option:checked {
     padding: 3px 8px;
     border-radius: 999px;
     background: rgba(255, 107, 107, 0.16);
-    color: #ff6b6b;
+    color: var(--accent-red);
     font-weight: 600;
 }
 
 .dangerous-card__description {
     margin: 0;
     font-size: 13px;
-    color: rgba(243, 244, 246, 0.65);
+    color: var(--text-secondary);
     line-height: 1.5;
 }
 
@@ -1135,7 +1135,7 @@ select.update-field__input option:checked {
 
 .dangerous-card__result[data-kind="success"] { color: #44d39a; }
 .dangerous-card__result[data-kind="error"] { color: #ff6b6b; }
-.dangerous-card__result[data-kind="pending"] { color: rgba(243, 244, 246, 0.6); }
+.dangerous-card__result[data-kind="pending"] { color: var(--text-secondary); }
 
 .dangerous-panel__status {
     margin: 0 0 12px;

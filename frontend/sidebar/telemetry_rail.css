@@ -60,8 +60,8 @@
     gap: 0.25rem;
     padding: 0.45rem 0.55rem 0.4rem;
     border-radius: var(--radius-sm);
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px solid rgba(255, 255, 255, 0.04);
+    background: var(--overlay-weak);
+    border: 1px solid var(--hairline);
 }
 
 .telemetry-rail__noise-head {
@@ -202,7 +202,7 @@
 .telemetry-rail__player-btn:hover,
 .telemetry-rail__player-btn:focus-visible {
     color: var(--sidebar-text);
-    background: rgba(255, 255, 255, 0.06);
+    background: var(--overlay-med);
     outline: none;
 }
 
@@ -228,8 +228,8 @@
     width: 100%;
     padding: 0.42rem 0.55rem;
     border-radius: var(--radius-sm);
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--hairline);
+    background: var(--overlay-weak);
     color: var(--sidebar-text-muted);
     text-decoration: none;
     font-family: var(--font-mono);
@@ -243,7 +243,7 @@
 
 .telemetry-rail__rf-link:hover,
 .telemetry-rail__rf-link:focus-visible {
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--overlay-weak);
     border-color: rgba(0, 229, 255, 0.22);
     color: var(--sidebar-text);
     outline: none;

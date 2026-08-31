@@ -236,7 +236,7 @@
     font-size: 0.6rem;
     font-family: var(--font-mono);
     border-radius: 3px;
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--overlay-weak);
     color: var(--text-secondary);
     white-space: nowrap;
 }
@@ -253,22 +253,22 @@
 }
 
 .nc-chip--excellent {
-    color: #00e676;
+    color: var(--accent-green);
     background: rgba(0, 230, 118, 0.1);
 }
 
 .nc-chip--good {
-    color: #4ecdc4;
+    color: var(--accent-green);
     background: rgba(78, 205, 196, 0.1);
 }
 
 .nc-chip--fair {
-    color: #ffd54f;
+    color: var(--accent-amber);
     background: rgba(255, 213, 79, 0.1);
 }
 
 .nc-chip--poor {
-    color: #ff5252;
+    color: var(--accent-red);
     background: rgba(255, 82, 82, 0.1);
 }
 
@@ -279,7 +279,7 @@
 
 .nc-chip--meta {
     color: var(--text-muted);
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--overlay-weak);
     font-size: 0.55rem;
 }
 
@@ -309,7 +309,7 @@
     display: inline-block;
     width: 2.5px;
     border-radius: 1px;
-    background: rgba(255, 255, 255, 0.12);
+    background: var(--overlay-strong);
 }
 
 .nc-bar--h1 { height: 4px; }

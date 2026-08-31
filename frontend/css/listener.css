@@ -26,7 +26,7 @@
     font-size: 12px;
     font-weight: 400;
     text-transform: none;
-    color: rgba(243, 244, 246, 0.6);
+    color: var(--text-secondary);
 }
 
 .lsn-status__dot {
@@ -60,20 +60,20 @@
     background: none;
     border: 1px solid rgba(243, 244, 246, 0.15);
     border-radius: 8px;
-    color: rgba(243, 244, 246, 0.6);
+    color: var(--text-secondary);
     font-size: 13px;
     padding: 6px 14px;
     cursor: pointer;
 }
 
 .lsn-tabbar__btn:hover {
-    color: #f3f4f6;
+    color: var(--text-primary);
 }
 
 .lsn-tabbar__btn--active {
     background: rgba(52, 211, 153, 0.12);
     border-color: rgba(52, 211, 153, 0.4);
-    color: #34d399;
+    color: var(--accent-green);
 }
 
 /* ── P2000 / Pagers message log ───────────────────────── */
@@ -91,7 +91,7 @@
     align-items: center;
     gap: 8px;
     font-size: 13px;
-    color: rgba(243, 244, 246, 0.6);
+    color: var(--text-secondary);
 }
 
 .pager-status__dot {
@@ -124,7 +124,7 @@
     align-items: center;
     gap: 6px;
     font-size: 13px;
-    color: rgba(243, 244, 246, 0.6);
+    color: var(--text-secondary);
     cursor: pointer;
     margin-right: 4px;
 }
@@ -138,7 +138,7 @@
     align-items: center;
     gap: 6px;
     font-size: 13px;
-    color: rgba(243, 244, 246, 0.6);
+    color: var(--text-secondary);
     cursor: pointer;
     margin-right: 4px;
 }
@@ -190,7 +190,7 @@
 }
 
 .pager-count {
-    color: rgba(243, 244, 246, 0.5);
+    color: var(--text-muted);
     font-weight: 400;
     font-size: 12px;
 }
@@ -203,7 +203,7 @@
 }
 
 .pager-log__empty {
-    color: rgba(243, 244, 246, 0.4);
+    color: var(--text-muted);
     padding: 12px 0;
 }
 
@@ -216,26 +216,26 @@
 }
 
 .pager-row__time {
-    color: rgba(243, 244, 246, 0.4);
+    color: var(--text-muted);
     flex-shrink: 0;
     width: 5.5em;
     white-space: nowrap;
 }
 
 .pager-row__proto {
-    color: #34d399;
+    color: var(--accent-green);
     flex-shrink: 0;
     width: 9em;
 }
 
 .pager-row__capcode {
-    color: rgba(243, 244, 246, 0.5);
+    color: var(--text-muted);
     flex-shrink: 0;
     width: 5.5em;
 }
 
 .pager-row__msg {
-    color: #f3f4f6;
+    color: var(--text-primary);
     word-break: break-word;
 }
 
@@ -257,7 +257,7 @@
     top: 0;
     text-align: left;
     padding: 6px 10px 6px 0;
-    color: rgba(243, 244, 246, 0.5);
+    color: var(--text-muted);
     font-weight: 400;
     background: var(--bg-glass);
     border-bottom: 1px solid rgba(243, 244, 246, 0.12);
@@ -266,15 +266,15 @@
 .adsb-table td {
     padding: 5px 10px 5px 0;
     border-bottom: 1px solid rgba(243, 244, 246, 0.06);
-    color: #f3f4f6;
+    color: var(--text-primary);
 }
 
 .adsb-table__hex {
-    color: #34d399;
+    color: var(--accent-green);
 }
 
 .adsb-table__empty td {
-    color: rgba(243, 244, 246, 0.4);
+    color: var(--text-muted);
     padding: 12px 0;
     border-bottom: none;
 }
@@ -319,13 +319,13 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.6px;
-    color: rgba(243, 244, 246, 0.4);
+    color: var(--text-muted);
 }
 
 .lsn-field input,
 .lsn-field select {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: var(--overlay-weak);
+    border: 1px solid var(--hairline);
     border-radius: 6px;
     color: inherit;
     font: inherit;
@@ -364,7 +364,7 @@
 }
 
 .lsn-field--level label span {
-    color: rgba(243, 244, 246, 0.75);
+    color: var(--text-secondary);
     font-variant-numeric: tabular-nums;
 }
 
@@ -379,7 +379,7 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.6px;
-    color: rgba(56, 189, 248, 0.8);
+    color: var(--accent-cyan);
     margin-bottom: 8px;
 }
 
@@ -396,10 +396,10 @@
     align-items: center;
     gap: 12px;
     width: 100%;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: var(--overlay-weak);
+    border: 1px solid var(--hairline);
     border-radius: 6px;
-    color: rgba(243, 244, 246, 0.75);
+    color: var(--text-secondary);
     font-size: 13px;
     text-align: left;
     padding: 8px 10px;
@@ -415,7 +415,7 @@
 }
 
 .lsn-preset-row__freq {
-    color: rgba(243, 244, 246, 0.45);
+    color: var(--text-muted);
     font-size: 12px;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
@@ -474,7 +474,7 @@
     font-size: 10px;
     font-weight: 700;
     letter-spacing: 0.8px;
-    color: rgba(243, 244, 246, 0.3);
+    color: var(--text-muted);
     transition: color 0.2s ease;
     cursor: help;
 }
@@ -485,7 +485,7 @@
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.14);
+    background: var(--overlay-strong);
     transition: background 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -527,7 +527,7 @@
     margin-top: -4px;
     font-size: 15px;
     font-weight: 600;
-    color: rgba(95, 234, 255, 0.8);
+    color: var(--accent-cyan);
     letter-spacing: 0.4px;
     min-height: 20px;
     max-width: 720px;
@@ -554,7 +554,7 @@
 .lsn-tag--rds { background: var(--accent-green, #00e5a0); }
 .lsn-tag--pty {
     background: transparent;
-    color: rgba(93, 255, 193, 0.85);
+    color: var(--accent-green);
     border: 1px solid rgba(0, 229, 160, 0.5);
     letter-spacing: 0.5px;
 }
@@ -613,7 +613,7 @@
     font-size: 14px;
     font-weight: 600;
     letter-spacing: 2px;
-    color: rgba(95, 234, 255, 0.55);
+    color: var(--accent-cyan);
 }
 
 /* DAB+'s VFD readout is now-playing-first: the big slot shows the
@@ -647,7 +647,7 @@
     font-size: 10px;
     font-weight: 700;
     letter-spacing: 0.8px;
-    color: rgba(243, 244, 246, 0.35);
+    color: var(--text-muted);
 }
 
 .lsn-vu__bar {
@@ -660,7 +660,7 @@
 .lsn-vu__seg {
     flex: 1;
     border-radius: 2px;
-    background: rgba(255, 255, 255, 0.06);
+    background: var(--overlay-med);
     transition: background 0.12s linear, box-shadow 0.12s linear;
 }
 
@@ -684,7 +684,7 @@
 .lsn-hint {
     margin-top: 10px;
     font-size: 11px;
-    color: rgba(243, 244, 246, 0.35);
+    color: var(--text-muted);
 }
 
 /* ── Skin toggle + display wrapper ─────────────────────── */
@@ -705,7 +705,7 @@
 .lsn-skins button {
     background: transparent;
     border: none;
-    color: rgba(243, 244, 246, 0.55);
+    color: var(--text-muted);
     font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.5px;
@@ -714,7 +714,7 @@
     transition: background 0.15s, color 0.15s;
 }
 
-.lsn-skins button:hover { color: rgba(243, 244, 246, 0.85); }
+.lsn-skins button:hover { color: var(--text-primary); }
 .lsn-skins button.active {
     background: var(--accent-cyan, #06b6d4);
     color: #04121a;
@@ -779,7 +779,7 @@
     transform: translateX(-50%);
     font-family: var(--font-mono, monospace);
     font-size: 10px;
-    color: rgba(255, 214, 150, 0.65);
+    color: var(--accent-amber);
 }
 
 .lsn-ana__needle {
@@ -826,7 +826,7 @@
     font-size: 13px;
     font-style: normal;
     letter-spacing: 2px;
-    color: rgba(245, 158, 11, 0.5);
+    color: var(--accent-amber);
 }
 
 .lsn-ana__row {
@@ -880,7 +880,7 @@
     font-size: 9px;
     font-weight: 700;
     letter-spacing: 1px;
-    color: rgba(243, 244, 246, 0.4);
+    color: var(--text-muted);
 }
 
 /* Dial glass sheen — a subtle diagonal reflection for that tuner look. */
@@ -923,8 +923,8 @@
 .lsn-preset-search {
     width: 100%;
     max-width: 320px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: var(--overlay-weak);
+    border: 1px solid var(--hairline);
     border-radius: 6px;
     color: inherit;
     font: inherit;
@@ -945,10 +945,10 @@
 .lsn-preset-tabs.dimmed .lsn-preset-tab { opacity: 0.4; }
 
 .lsn-preset-tab {
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: var(--overlay-weak);
+    border: 1px solid var(--hairline);
     border-radius: 8px;
-    color: rgba(243, 244, 246, 0.6);
+    color: var(--text-secondary);
     font-size: 12px;
     font-weight: 600;
     padding: 5px 12px;
@@ -956,7 +956,7 @@
     transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 .lsn-preset-tab:hover {
-    color: rgba(243, 244, 246, 0.9);
+    color: var(--text-primary);
     border-color: rgba(56, 189, 248, 0.4);
 }
 .lsn-preset-tab.active {
@@ -966,7 +966,7 @@
 }
 
 .lsn-preset-empty {
-    color: rgba(243, 244, 246, 0.4);
+    color: var(--text-muted);
     font-size: 13px;
     padding: 8px 0;
 }
@@ -976,7 +976,7 @@
 .lsn-fav {
     display: inline-block;
     margin-right: 5px;
-    color: rgba(243, 244, 246, 0.35);
+    color: var(--text-muted);
     cursor: pointer;
 }
 .lsn-fav:hover { color: var(--accent-amber, #f59e0b); }
@@ -1033,7 +1033,7 @@
 }
 
 .dab-manual__select {
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--overlay-weak);
     border: 1px solid rgba(243, 244, 246, 0.15);
     border-radius: 6px;
     color: inherit;
@@ -1060,7 +1060,7 @@
 }
 
 .dab-scan-note {
-    color: rgba(243, 244, 246, 0.45);
+    color: var(--text-muted);
     font-size: 12px;
 }
 
@@ -1071,7 +1071,7 @@
 }
 
 .dab-chanhint {
-    color: rgba(243, 244, 246, 0.45);
+    color: var(--text-muted);
     font-size: 12px;
     padding: 8px 0 0;
 }
@@ -1112,25 +1112,25 @@
 }
 
 .dabcfg-hint {
-    color: rgba(243, 244, 246, 0.5);
+    color: var(--text-muted);
     font-size: 12.5px;
     margin-bottom: 14px;
     line-height: 1.5;
 }
 
 .dabcfg-hint code {
-    background: rgba(255, 255, 255, 0.06);
+    background: var(--overlay-med);
     padding: 1px 5px;
     border-radius: 4px;
 }
 
 .dabcfg-empty {
-    color: rgba(243, 244, 246, 0.45);
+    color: var(--text-muted);
     padding: 12px 0;
 }
 
 .dabcfg-meta {
-    color: rgba(243, 244, 246, 0.4);
+    color: var(--text-muted);
     font-size: 12px;
     margin-bottom: 10px;
 }
@@ -1151,7 +1151,7 @@
 
 .dabcfg-row__chan {
     font-family: var(--font-mono, monospace);
-    color: #34d399;
+    color: var(--accent-green);
     flex-shrink: 0;
     width: 3em;
 }
@@ -1164,16 +1164,16 @@
 
 .dabcfg-row__input {
     width: 100%;
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--overlay-weak);
     border: 1px solid rgba(243, 244, 246, 0.15);
     border-radius: 4px;
-    color: #f3f4f6;
+    color: var(--text-primary);
     padding: 4px 8px;
     font-size: 13px;
 }
 
 .dabcfg-row__badge {
-    color: rgba(243, 244, 246, 0.4);
+    color: var(--text-muted);
     font-size: 10px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -1183,7 +1183,7 @@
 }
 
 .dabcfg-row__meta {
-    color: rgba(243, 244, 246, 0.4);
+    color: var(--text-muted);
     font-size: 11.5px;
     flex-shrink: 0;
 }
@@ -1198,7 +1198,7 @@
     margin-top: 8px;
     padding-top: 8px;
     border-top: 1px solid rgba(243, 244, 246, 0.06);
-    color: rgba(243, 244, 246, 0.5);
+    color: var(--text-muted);
     font-size: 12px;
     line-height: 1.5;
 }
@@ -1230,7 +1230,7 @@
     flex-direction: column;
     gap: 4px;
     padding: 8px 10px;
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--overlay-weak);
     border: 1px solid rgba(243, 244, 246, 0.06);
     border-radius: 6px;
     min-width: 4.5em;
@@ -1238,7 +1238,7 @@
 
 .dabcfg-scan-band__label {
     font-family: var(--font-mono, monospace);
-    color: rgba(243, 244, 246, 0.4);
+    color: var(--text-muted);
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -1251,7 +1251,7 @@
     gap: 6px;
     font-family: var(--font-mono, monospace);
     font-size: 12.5px;
-    color: rgba(243, 244, 246, 0.75);
+    color: var(--text-secondary);
     cursor: pointer;
     user-select: none;
 }
@@ -1269,15 +1269,15 @@
     flex-direction: column;
     gap: 4px;
     font-size: 12px;
-    color: rgba(243, 244, 246, 0.6);
+    color: var(--text-secondary);
 }
 
 .dabcfg-scan-option__input {
     width: 6em;
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--overlay-weak);
     border: 1px solid rgba(243, 244, 246, 0.15);
     border-radius: 4px;
-    color: #f3f4f6;
+    color: var(--text-primary);
     padding: 4px 8px;
     font-size: 13px;
 }
@@ -1297,13 +1297,13 @@
     padding: 10px 12px;
     max-height: 260px;
     overflow: auto;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: var(--overlay-weak);
+    border: 1px solid var(--hairline);
     border-radius: 10px;
     font-family: 'JetBrains Mono', monospace;
     font-size: 11px;
     line-height: 1.45;
-    color: rgba(243, 244, 246, 0.82);
+    color: var(--text-primary);
     white-space: pre-wrap;
     word-break: break-word;
 }

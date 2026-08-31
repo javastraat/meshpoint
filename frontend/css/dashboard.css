@@ -18,6 +18,14 @@
     --glow-green: 0 0 8px rgba(0, 229, 160, 0.4);
     --glow-amber: 0 0 8px rgba(245, 158, 11, 0.4);
     --glow-red: 0 0 8px rgba(239, 68, 68, 0.4);
+    /* Faint tint overlays (hover fills, hairline dividers). Defined here
+     * as the white-on-dark values every stylesheet has always used; the
+     * light theme (frontend/themes/light/) redefines them as black tints
+     * so those surfaces stay visible when the polarity flips. */
+    --overlay-weak: rgba(255, 255, 255, 0.04);
+    --overlay-med: rgba(255, 255, 255, 0.07);
+    --overlay-strong: rgba(255, 255, 255, 0.12);
+    --hairline: rgba(255, 255, 255, 0.08);
     --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
     --font-sans: 'Inter', -apple-system, sans-serif;
     --radius: 8px;
@@ -544,12 +552,12 @@ html, body {
 }
 
 .td-node-short {
-    color: #64748b;
+    color: var(--text-muted);
     font-size: 0.82em;
 }
 
 .td-bcast {
-    color: #475569;
+    color: var(--text-muted);
 }
 
 .packet-details-cell {

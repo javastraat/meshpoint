@@ -55,7 +55,7 @@
 .cmd-palette__input {
     background: transparent;
     border: none;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    border-bottom: 1px solid var(--hairline);
     padding: 0.55rem 0.95rem 0.85rem;
     color: var(--text-primary);
     font-size: 1.05rem;

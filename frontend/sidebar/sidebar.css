@@ -515,7 +515,7 @@
     align-items: center;
     gap: 4px;
     background: rgba(52, 211, 153, 0.15);
-    color: #34d399;
+    color: var(--accent-green);
 }
 
 .sidebar__badge--live::before {

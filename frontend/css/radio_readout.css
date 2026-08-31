@@ -57,7 +57,7 @@
     justify-content: space-between;
     gap: 0.75rem;
     padding: 0.5rem 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    border-bottom: 1px solid var(--hairline);
     min-height: 32px;
 }
 
@@ -187,7 +187,7 @@
 
 .ch-table--readout tbody td {
     padding: 0.55rem 0.55rem;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    border-bottom: 1px solid var(--hairline);
     color: var(--text-primary);
     font-family: var(--font-mono);
 }
@@ -267,7 +267,7 @@
 
 .ch-table__pill--off {
     color: var(--text-muted);
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--overlay-weak);
 }
 
 @media (max-width: 720px) {

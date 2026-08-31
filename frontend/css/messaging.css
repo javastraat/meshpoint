@@ -111,7 +111,7 @@
 .msg-icon-btn {
     appearance: none;
     border: 1px solid var(--msg-border);
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--overlay-weak);
     color: var(--msg-text-dim);
     width: 30px;
     height: 30px;
@@ -140,7 +140,7 @@
 .msg-pill-btn {
     appearance: none;
     border: 1px solid var(--msg-border);
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--overlay-weak);
     color: var(--msg-text);
     border-radius: 999px;
     padding: 6px 12px;
@@ -211,7 +211,7 @@
 
 .msg-sidebar__list::-webkit-scrollbar { width: 8px; }
 .msg-sidebar__list::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--overlay-med);
     border-radius: 999px;
 }
 
@@ -228,7 +228,7 @@
 }
 
 .msg-convo:hover {
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--overlay-weak);
     border-color: var(--msg-border);
 }
 
@@ -265,7 +265,7 @@
 .msg-convo__icon--bcast { background: var(--msg-accent); }
 
 .msg-convo__icon--channel {
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--overlay-weak);
     border: 1.5px solid var(--msg-border-strong);
     color: var(--msg-text-dim);
     font-size: 16px;
@@ -545,7 +545,7 @@
 
 .msg-chat__messages::-webkit-scrollbar { width: 8px; }
 .msg-chat__messages::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--overlay-med);
     border-radius: 999px;
 }
 
@@ -649,7 +649,7 @@
 }
 
 .msg-chat__placeholder-tag--all {
-    background: rgba(255, 255, 255, 0.12);
+    background: var(--overlay-strong);
     color: var(--msg-text-dim);
     border: 1px solid var(--msg-border);
 }
@@ -680,7 +680,7 @@
 
 .msg-bubble--received {
     align-self: flex-start;
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--overlay-weak);
     color: var(--msg-text);
     border: 1px solid var(--msg-border);
     border-bottom-left-radius: 4px;
@@ -755,7 +755,7 @@
     display: inline-block;
     width: 3px;
     border-radius: 1px;
-    background: rgba(255, 255, 255, 0.12);
+    background: var(--overlay-strong);
     transition: background 0.2s;
 }
 

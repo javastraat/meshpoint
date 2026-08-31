@@ -7525,3 +7525,24 @@ translucent-white divider bars. Covers `.topbar-meshtastic/.topbar-meshcore/
 .topbar-serial/.topbar-radio` (serial selector also covers the dapnet/pager/
 reticulum chips, which all carry `.topbar-serial`). Still v1 — Settings/Messaging/
 Terminal white-tint overlays and the charts/map remain the known unfixed edges.
+
+**Light theme colour tokenization pass (2026-08-31)**: user live-tested `light`
+and hit white-on-white text everywhere (Updates page, Meshtastic/MeshCore packet
++ contacts tables, etc). Root cause = the earlier "L-task" finding: ~25 CSS files
+hardcode a near-white foreground convention (`#f3f4f6` / `rgba(243,244,246,α)`)
+and faint `rgba(255,255,255,0.0x)` overlays instead of reading tokens. Did a
+scripted pass (scratchpad `tokenize_colors.py` + `tokenize_surfaces.py`):
+- ~200 hardcoded `color:` values → `var(--text-primary/secondary/muted)` by alpha
+  band, accent hexes → `var(--accent-*)`. Scoped to the `color` property only.
+- ~110 `background: rgba(255,255,255,0.0x)` + `border: rgba(255,255,255,0.0x)` →
+  new `--overlay-weak/med/strong` + `--hairline` tokens.
+- New tokens added to `:root` in `dashboard.css` with the *current dark values*
+  so dark themes are ~unchanged (tiny sub-2% alpha drift on ~20 hairline borders,
+  deemed acceptable). `light/theme.css` redefines the overlay tokens as
+  near-black tints + a broad `background: var(--bg-card) !important` override for
+  the container classes that still hardcode a dark hex/gradient fill (cfg-card,
+  dangerous-*, auth-*, update-history, *-modal, *-drawer, ch-table, lsn/lw-panel…).
+24 files changed. Braces balanced, theme tests green, changelog parses (31).
+**Still v1 / not fully live-verified**: `--msg-*`/`--term-*` panel var sets,
+charts/`<canvas>`, and invert-filtered map tiles remain dark. Dashboard chrome +
+tables + Settings should now be readable in `light`.

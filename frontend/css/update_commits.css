@@ -111,7 +111,7 @@
 
 .update-history__row--seen:hover {
     opacity: 1;
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--overlay-weak);
 }
 
 .update-history__rail {
