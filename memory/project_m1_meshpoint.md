@@ -7684,3 +7684,16 @@ light-polarity theme). node --check clean on all touched JS; 14 theme_registry
 tests green; changelog parses (31 sections). Not live-verified on the Pi.
 Server-side "save as new theme" still deferred. **Only TODO #3 (plugin Phase 0)
 remains.**
+
+**Theme editor download refinements (2026-08-31)**: downloaded `theme.css` now
+also carries the 25 `--msg-*` / `--term-*` chrome tokens (13+12) that the base
+theme overrides (so a Light-based download is complete). Checkbox
+`[data-te-carry-ref]` ("Include Messages / Terminal tokens for reference",
+default off) additionally emits the ones matching the dark baseline as
+commented-out lines — a scaffold for building a custom *dark* variant without
+downloading a second theme for the names. "New theme name" auto-tracks
+`<base>-custom` until the user types their own (`_nameAuto` flag). `.theme-editor`
+got `height:100%; overflow-y:auto` (was unscrollable — `.section` is a fixed
+`overflow:hidden` flex column). NOTE: `--term-*` CSS tokens are just the panel
+chrome; the xterm ANSI palette is separate, set in JS (`terminal_renderer.js`
+`_tokyoNightDay/_tokyoNightStorm`), not a CSS token and not in the builder.
