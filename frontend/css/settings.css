@@ -802,7 +802,7 @@ select.update-field__input option:checked {
     margin-top: 16px;
     padding: 18px 20px;
     border-radius: 12px;
-    background: var(--bg-inset);
+    background: var(--bg-card);
     border: 1px solid rgba(0, 209, 255, 0.18);
     color: var(--text-primary);
     display: none;

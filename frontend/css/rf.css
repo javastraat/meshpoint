@@ -114,13 +114,13 @@
 }
 
 .rf-badge--calibrating {
-    background: rgba(100, 116, 139, 0.2);
+    background: var(--overlay-med);
     color: var(--text-secondary);
-    border: 1px solid rgba(100, 116, 139, 0.4);
+    border: 1px solid var(--border);
 }
 
 .rf-badge--off {
-    background: rgba(71, 85, 105, 0.25);
+    background: var(--overlay-med);
     color: var(--text-secondary);
     border: 1px solid var(--border);
 }

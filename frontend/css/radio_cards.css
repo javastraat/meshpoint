@@ -80,7 +80,7 @@
 
 .duty-gauge__svg { width: 100%; height: 100%; display: block; }
 
-.duty-gauge__arc-bg { stroke: rgba(35, 48, 73, 0.85); }
+.duty-gauge__arc-bg { stroke: var(--border); }
 
 .duty-gauge__arc-fill {
     stroke: var(--accent-cyan);

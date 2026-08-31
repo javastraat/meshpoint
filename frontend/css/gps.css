@@ -69,7 +69,7 @@
 }
 
 .gps-skyplot__cardinals text {
-    fill: rgba(243, 244, 246, 0.55);
+    fill: var(--text-secondary);
     font-family: 'JetBrains Mono', monospace;
     font-size: 6px;
     font-weight: 600;
@@ -101,22 +101,22 @@
 
 .gps-skyplot__sat--used .gps-skyplot__sat-shape {
     fill: var(--accent-cyan, #22d3ee);
-    stroke: rgba(255, 255, 255, 0.6);
+    stroke: var(--text-secondary);
     filter: drop-shadow(0 0 1.5px rgba(34, 211, 238, 0.7));
 }
 
 .gps-skyplot__sat--visible .gps-skyplot__sat-shape {
     fill: var(--accent-amber, #f59e0b);
-    stroke: rgba(255, 255, 255, 0.4);
+    stroke: var(--text-muted);
 }
 
 .gps-skyplot__sat--weak .gps-skyplot__sat-shape {
-    fill: rgba(243, 244, 246, 0.25);
-    stroke: rgba(243, 244, 246, 0.35);
+    fill: var(--text-muted);
+    stroke: var(--hairline);
 }
 
 .gps-skyplot__sat-label {
-    fill: rgba(243, 244, 246, 0.6);
+    fill: var(--text-secondary);
     font-family: 'JetBrains Mono', monospace;
     font-size: 3px;
     pointer-events: none;

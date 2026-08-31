@@ -81,7 +81,7 @@
 }
 
 .mqtt-runtime--disabled {
-    background: rgba(100, 116, 139, 0.08);
+    background: var(--overlay-weak);
 }
 
 .mqtt-runtime__label {

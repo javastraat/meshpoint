@@ -166,4 +166,4 @@
     .topo-legend__stats { margin-left: 0; width: 100%; }
 }
 
-.topo-dot--context { background: #6b7687; opacity: 0.6; }
+.topo-dot--context { background: var(--text-muted); opacity: 0.6; }

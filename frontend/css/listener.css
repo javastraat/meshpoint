@@ -445,7 +445,7 @@
     /* Inset "device panel" bezel with a subtle top-lit gradient. */
     background:
         radial-gradient(120% 80% at 50% -20%, rgba(6, 182, 212, 0.08), transparent 60%),
-        linear-gradient(180deg, #0d1626, #0a1120);
+        var(--bg-inset);
     border: 1px solid var(--border, #233049);
     border-radius: 12px;
     box-shadow:
@@ -669,8 +669,8 @@
 .lsn-vu__seg.on[data-zone="r"] { background: var(--accent-red, #ef4444); box-shadow: 0 0 6px rgba(239, 68, 68, 0.6); }
 
 .lsn-vu__seg.peak {
-    background: rgba(243, 244, 246, 0.85);
-    box-shadow: 0 0 6px rgba(255, 255, 255, 0.6);
+    background: var(--text-secondary);
+    box-shadow: 0 0 6px var(--text-muted);
 }
 
 /* ── Audio ───────────────────────────────────────────── */
@@ -756,7 +756,7 @@
     border: 1px solid rgba(245, 158, 11, 0.25);
     background:
         radial-gradient(120% 140% at 50% -30%, rgba(245, 158, 11, 0.12), transparent 60%),
-        linear-gradient(180deg, #14100a, #0c0a06);
+        var(--bg-inset);
     box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.5);
     overflow: hidden;
 }
@@ -867,7 +867,7 @@
 .lsn-ana__vutick { stroke: rgba(255, 214, 150, 0.4); stroke-width: 1; }
 .lsn-ana__vuhub { fill: rgba(255, 214, 150, 0.85); }
 .lsn-ana__vuneedle {
-    stroke: #fff;
+    stroke: var(--text-primary);
     stroke-width: 2;
     stroke-linecap: round;
     filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.8));
