@@ -177,6 +177,16 @@ html[data-theme="light"] .lsn-station__text--big {
     text-shadow: none;
 }
 
+/* Repeaters -- the health / sensors / history / trends cards hardcode a
+ * near-opaque dark gradient, so their (tokenized) text lands dark-on-dark. */
+html[data-theme="light"] .rp-card {
+    background:
+        radial-gradient(140% 130% at 90% -18%, rgba(10, 159, 110, 0.08) 0%, transparent 45%),
+        var(--bg-card);
+    border-color: var(--border);
+    box-shadow: 0 1px 3px rgba(20, 28, 46, 0.08);
+}
+
 /* Modal/drawer backdrops: the dark scrim is fine, just lighten it a bit. */
 html[data-theme="light"] .danger-modal__backdrop,
 html[data-theme="light"] .nd-backdrop,
