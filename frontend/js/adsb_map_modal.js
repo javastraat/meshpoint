@@ -211,7 +211,14 @@ class AdsbMapModal {
         if (squawk === '7600') return '#60a5fa'; // radio failure
         if (squawk === '7700') return '#fbbf24'; // general emergency
         if (stale) return 'rgba(139, 154, 171, 0.6)';
-        return '#22d3ee'; // accent-cyan -- normal aircraft
+        // Normal aircraft: cyan reads well on the dark basemap; on the
+        // light theme's light OSM tiles a near-black silhouette is far
+        // more legible (emergency-squawk colours stay as-is).
+        return this._lightTheme() ? '#1a2233' : '#22d3ee';
+    }
+
+    _lightTheme() {
+        return document.documentElement.getAttribute('data-theme') === 'light';
     }
 
     _icon(a, color) {
