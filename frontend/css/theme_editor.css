@@ -163,6 +163,67 @@
 
 .theme-editor__refopt input { accent-color: var(--accent-cyan); }
 
+/* Installed-themes table */
+.te-installed {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+}
+
+.te-installed th {
+    text-align: left;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    padding: 0 0.75rem 0.4rem 0;
+}
+
+.te-installed td {
+    padding: 0.55rem 0.75rem 0.55rem 0;
+    border-top: 1px solid var(--hairline);
+    vertical-align: top;
+    color: var(--text-primary);
+}
+
+.te-installed__id {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+
+.te-installed__meta {
+    color: var(--text-secondary);
+    max-width: 22rem;
+}
+
+.te-installed__act { text-align: right; white-space: nowrap; }
+
+.te-installed__badge {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: 600;
+    border: 1px solid var(--hairline);
+}
+
+.te-installed__badge--builtin { color: var(--text-secondary); background: var(--overlay-weak); }
+.te-installed__badge--plugin { color: var(--accent-cyan); background: var(--overlay-weak); border-color: var(--accent-cyan); }
+
+.te-installed__del {
+    background: none;
+    border: 1px solid var(--accent-red);
+    color: var(--accent-red);
+    border-radius: 6px;
+    padding: 2px 10px;
+    font-size: 0.75rem;
+    cursor: pointer;
+}
+
+.te-installed__del:hover { background: var(--accent-red); color: var(--bg-primary); }
+
 @media (max-width: 640px) {
     .theme-editor { padding: 1rem; }
     .te-swatches { grid-template-columns: 1fr; }

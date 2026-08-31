@@ -36,7 +36,13 @@ Ranked roughly by bang-for-buck. Not started unless noted.
   `Community` `<optgroup>`s. `dashboard.plugins_dir` key; `/plugins/themes`
   mount. Shipped extras: nord, gruvbox-dark, amber-mono, green-crt.
 
-All theme work Pi-verified working 2026-08-31.
+Theme dir split + source tier Pi-verified working 2026-08-31.
+
+- **Builder "Save to device" + "Installed themes" manager** (2026-08-31): `POST
+  /api/themes` writes `plugins/themes/<id>/` (admin+audit, no restart), `DELETE
+  /api/themes/{id}` removes community themes. `src/api/theme_store.py` +
+  `tests/test_theme_store.py`. Guards: slug regex, 64KiB, `@import` ban,
+  built-in ids protected. Not yet Pi-verified.
 
 ## Open
 

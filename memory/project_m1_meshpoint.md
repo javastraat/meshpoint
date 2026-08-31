@@ -7732,3 +7732,27 @@ sub-page, download-only builder, `plugins/themes/` loading + `/plugins/themes`
 mount, source-tier optgroups, author fields) confirmed live on the device by the
 user. Themes track is done; only plugin roadmap Phase 0 (server.py registry
 refactor) remains.
+
+**Theme builder: save-to-device + Installed-themes manager (2026-08-31)**: new
+`src/api/theme_store.py` (FastAPI-free): `save_theme(plugin_dir, spec,
+builtin_ids)` + `delete_theme(...)`, `ThemeSaveError(code)` where code →
+HTTP status (`slug`/`label`/`import`→400, `reserved`→409, `toobig`→413,
+`perm`→403). `SLUG_RE = ^[a-z0-9][a-z0-9-]{1,38}$` (no dot/slash), 64KiB CSS
+cap, `@import` rejected (remote import = visitor IP leak), icon whitelisted to
+the 8 GLYPHS keywords, non-http homepage dropped, label/desc truncated.
+`delete_theme` refuses built-in ids + asserts `target.resolve().parent ==
+plugin_dir.resolve()`. Routes in `theme_routes.py`: `POST /api/themes` +
+`DELETE /api/themes/{id}` (require_admin + audit `theme.save`/`theme.delete`),
+`_builtin_ids()` = `scan_themes(_themes_dir)` only. DELETE also resets
+`dashboard.theme`→dark if it pointed at the deleted theme. NOTE: neither
+endpoint can ever touch `frontend/themes/` — `delete_theme` only gets
+`_plugin_themes_dir`; a community `dark`/built-in-id can't be created (save
+rejects) and if hand-dropped is invisible (scan `block`/`seen`) and DELETE
+rejects it. `server.py` now `mkdir`s `plugins/themes/` before the mount so a
+save on a fresh install is served without restart. Frontend `theme_editor.js`:
+`_saveToDevice()` (confirm-overwrite if id is an existing plugin theme),
+`_renderInstalled()` table (all themes, Built-in/Community badge, Delete on
+community), `_deleteTheme()`, `_confirm()` (lazy DangerousModal / window.confirm),
+`_esc()` promoted. `_themeJson()` already drops `order`. 35 theme tests
+(test_theme_store.py new, 20 store + 15 registry... actually 20+22). No restart
+needed to see saved themes. Not Pi-verified.

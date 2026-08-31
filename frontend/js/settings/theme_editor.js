@@ -141,6 +141,8 @@
             this.groupsEl = el.querySelector('[data-te-groups]');
             this.carryRef = el.querySelector('[data-te-carry-ref]');
             this.status = el.querySelector('[data-te-status]');
+            this.installedEl = el.querySelector('[data-te-installed]');
+            this._modal = null;
             this.themes = [];
             this.base = 'dark';
             this._nameAuto = true;   // track auto-vs-typed name
@@ -157,8 +159,27 @@
             });
             this.defaultSel?.addEventListener('change', () => this._saveDefault());
             this.el.querySelector('[data-te-reset]')?.addEventListener('click', () => this._loadBase(this.base));
+            this.el.querySelector('[data-te-save]')?.addEventListener('click', () => this._saveToDevice());
             this.el.querySelector('[data-te-download]')?.addEventListener('click', () => this._download());
             this.el.querySelector('[data-te-download-json]')?.addEventListener('click', () => this._downloadJson());
+            this.installedEl?.addEventListener('click', (e) => {
+                const btn = e.target.closest('[data-te-del]');
+                if (btn) this._deleteTheme(btn.dataset.teDel);
+            });
+        }
+
+        _esc(s) {
+            return String(s == null ? '' : s).replace(/[&<>"]/g, (c) => (
+                { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]
+            ));
+        }
+
+        async _confirm(message) {
+            if (window.DangerousModal) {
+                this._modal = this._modal || new window.DangerousModal();
+                return this._modal.confirm({ label: 'Delete theme?', command: 'Delete', description: message });
+            }
+            return window.confirm(message);
         }
 
         async onActivated() {
@@ -173,6 +194,7 @@
             }
             this.active = true;
             this._applyPreview();
+            this._renderInstalled();
         }
 
         onLeft() {
@@ -205,9 +227,7 @@
         // Built-in themes and plugin drop-ins in separate <optgroup>s so
         // the picker shows the curated set first, then a labelled divider.
         _groupedOptions() {
-            const esc = (s) => String(s).replace(/[&<>"]/g, (c) => (
-                { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]
-            ));
+            const esc = (s) => this._esc(s);
             const opt = (t) => `<option value="${esc(t.id)}">${esc(t.label || t.id)}</option>`;
             const group = (label, src) => {
                 const rows = this.themes.filter((t) => (t.source || 'builtin') === src);
@@ -364,7 +384,7 @@
             const tokenCount = (css.match(/^\s+--/gm) || []).length;
             if (!tokenCount) { this._set(this.status, 'error', 'Nothing to save — the palette still matches the dark baseline.'); return; }
             this._save('theme.css', css, 'text/css');
-            this._set(this.status, 'success', `Saved theme.css (${tokenCount} tokens). Put it in frontend/themes/${this._slug()}/ with theme.json, then restart.`);
+            this._set(this.status, 'success', `Saved theme.css (${tokenCount} tokens). Put it in plugins/themes/${this._slug()}/ with theme.json, then restart.`);
         }
 
         _downloadJson() {
@@ -399,6 +419,92 @@
                 this._set(this.defaultStatus, 'success', 'Saved. New sessions default to this theme.');
             } catch (_e) {
                 this._set(this.defaultStatus, 'error', 'Could not reach the server.');
+            }
+        }
+
+        async _saveToDevice() {
+            const css = this._themeCss();
+            const tokenCount = (css.match(/^\s+--/gm) || []).length;
+            if (!tokenCount) {
+                this._set(this.status, 'error', 'Nothing to save — the palette still matches the dark baseline.');
+                return;
+            }
+            const id = this._slug();
+            const clash = this.themes.find((t) => t.id === id && t.source === 'plugin');
+            if (clash && !(await this._confirm(`A theme called "${id}" already exists in plugins/themes/. Overwrite it?`))) {
+                return;
+            }
+
+            this._set(this.status, 'pending', 'Saving…');
+            try {
+                const res = await fetch('/api/themes', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        id,
+                        label: this._label(),
+                        icon: 'palette',
+                        author: (this.authorInput?.value || '').trim(),
+                        homepage: (this.homepageInput?.value || '').trim(),
+                        description: (this.descInput?.value || '').trim(),
+                        css,
+                    }),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    this._set(this.status, 'error', data.detail || `Could not save (${res.status}).`);
+                    return;
+                }
+                this._set(this.status, 'success',
+                    `${data.overwritten ? 'Updated' : 'Saved'} plugins/themes/${id}/. Reload the dashboard to use it.`);
+                await this._fetchThemes();
+                this._renderInstalled();
+            } catch (_e) {
+                this._set(this.status, 'error', 'Could not reach the server.');
+            }
+        }
+
+        _renderInstalled() {
+            const el = this.installedEl;
+            if (!el) return;
+            if (!this.themes.length) { el.innerHTML = '<p class="cfg-card__hint">No themes found.</p>'; return; }
+            const row = (t) => {
+                const src = (t.source || 'builtin') === 'plugin';
+                const meta = [t.author, t.description].filter(Boolean).map((s) => this._esc(s)).join(' — ');
+                return `<tr>
+                    <td>${this._esc(t.label || t.id)}<br><code class="te-installed__id">${this._esc(t.id)}</code></td>
+                    <td><span class="te-installed__badge te-installed__badge--${src ? 'plugin' : 'builtin'}">${src ? 'Community' : 'Built-in'}</span></td>
+                    <td class="te-installed__meta">${meta}</td>
+                    <td class="te-installed__act">${src ? `<button type="button" class="te-installed__del" data-te-del="${this._esc(t.id)}">Delete</button>` : ''}</td>
+                </tr>`;
+            };
+            el.innerHTML = `<table class="te-installed">
+                <thead><tr><th>Theme</th><th>Source</th><th>By</th><th></th></tr></thead>
+                <tbody>${this.themes.map(row).join('')}</tbody>
+            </table>`;
+        }
+
+        async _deleteTheme(id) {
+            if (!id) return;
+            if (!(await this._confirm(`Delete the "${id}" theme from plugins/themes/? This removes the folder on the device.`))) return;
+            this._set(this.status, 'pending', `Deleting ${id}…`);
+            try {
+                const res = await fetch(`/api/themes/${encodeURIComponent(id)}`, {
+                    method: 'DELETE',
+                    credentials: 'same-origin',
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    this._set(this.status, 'error', data.detail || `Could not delete (${res.status}).`);
+                    return;
+                }
+                this._set(this.status, 'success', `Deleted ${id}.`);
+                await this._fetchThemes();
+                this._renderInstalled();
+                if (this.base === id) this._loadBase(this.defaultSel?.value || 'dark');
+            } catch (_e) {
+                this._set(this.status, 'error', 'Could not reach the server.');
             }
         }
 

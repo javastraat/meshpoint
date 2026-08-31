@@ -886,10 +886,18 @@
                         </div>
                         <div class="cfg-card__actions">
                             <button class="terminal-button" type="button" data-te-reset>Reset changes</button>
-                            <button class="terminal-button terminal-button--primary" type="button" data-te-download>Download theme.css</button>
+                            <button class="terminal-button terminal-button--primary" type="button" data-te-save>Save to device</button>
+                            <button class="terminal-button" type="button" data-te-download>Download theme.css</button>
                             <button class="terminal-button" type="button" data-te-download-json>Download theme.json</button>
                         </div>
+                        <p class="auth-card__hint">Save writes it to <code>plugins/themes/</code> on the device (admin, logged). Reload the dashboard to see it in the picker. Download is for sharing or a pull request.</p>
                         <p class="auth-status" data-te-status aria-live="polite"></p>
+                    </article>
+
+                    <article class="auth-card">
+                        <h3 class="auth-card__title">Installed themes</h3>
+                        <p class="auth-card__hint">Everything the picker knows about. Community themes (from <code>plugins/themes/</code>) can be removed here; built-ins can't.</p>
+                        <div data-te-installed></div>
                     </article>
                 </div>
             </section>

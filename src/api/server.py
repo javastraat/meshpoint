@@ -623,7 +623,13 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
 
     # Community/extra theme CSS lives outside the static tree; give it a
     # narrow mount (only theme.css files are web-facing, not all of
-    # plugins/). Must precede the "/" catch-all so it wins.
+    # plugins/). Must precede the "/" catch-all so it wins. Ensure the
+    # dir exists so a theme saved via POST /api/themes on a fresh install
+    # (empty plugins/) is served without a restart.
+    try:
+        plugin_themes_dir.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        pass
     if plugin_themes_dir.is_dir():
         app.mount(
             "/plugins/themes",
