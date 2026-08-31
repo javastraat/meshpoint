@@ -103,6 +103,14 @@ html[data-theme="light"] .cmd-palette__panel {
     box-shadow: 0 1px 3px rgba(23, 32, 51, 0.08) !important;
 }
 
+/* The relay / system dashboard cards carry a faint accent-tint
+ * gradient -- imperceptible on dark, a visible green/blue wash on
+ * white. Flatten them so the whole top row is uniform. */
+html[data-theme="light"] .stat-card--relay,
+html[data-theme="light"] .stat-card--system {
+    background: var(--bg-card);
+}
+
 /* Neon value glows read as blur on white. */
 html[data-theme="light"] .stat-card__value,
 html[data-theme="light"] .r-readout-grid dd,
