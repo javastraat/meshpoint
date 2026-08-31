@@ -206,7 +206,7 @@
     overflow-y: auto;
     padding: 4px 6px 12px;
     scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+    scrollbar-color: var(--msg-border-strong) transparent;
 }
 
 .msg-sidebar__list::-webkit-scrollbar { width: 8px; }
@@ -540,7 +540,7 @@
     flex-direction: column;
     gap: 6px;
     scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+    scrollbar-color: var(--msg-border-strong) transparent;
 }
 
 .msg-chat__messages::-webkit-scrollbar { width: 8px; }
@@ -940,7 +940,7 @@
     transition: background 120ms ease;
 }
 
-.msg-contact:hover { background: rgba(255, 255, 255, 0.04); }
+.msg-contact:hover { background: var(--msg-bg-deep); }
 
 .msg-contact__name {
     font-size: 13px;

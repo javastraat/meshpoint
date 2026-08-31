@@ -53,6 +53,36 @@ html[data-theme="light"] {
     --sidebar-accent: #0a9f6e;
     --sidebar-text: #172033;
     --sidebar-text-muted: #6a7789;
+
+    /* Messages + Terminal ship their own local token sets (defined on
+     * bare :root in messaging.css / terminal.css). Redefine them here
+     * so those two screens flip too. */
+    --msg-bg: #ffffff;
+    --msg-bg-deep: #eef1f6;
+    --msg-bg-strip: #f5f7fb;
+    --msg-border: rgba(20, 28, 46, 0.1);
+    --msg-border-strong: rgba(20, 28, 46, 0.16);
+    --msg-accent: #b06a00;
+    --msg-accent-soft: rgba(176, 106, 0, 0.14);
+    --msg-text: #172033;
+    --msg-text-dim: rgba(23, 32, 51, 0.62);
+    --msg-text-faint: rgba(23, 32, 51, 0.42);
+    --msg-mt: #3557c4;
+    --msg-mc: #3f7f1c;
+    --msg-danger: #d33a2c;
+
+    --term-bg: #ffffff;
+    --term-bg-deep: #eef1f6;
+    --term-bg-strip: #f5f7fb;
+    --term-border: rgba(20, 28, 46, 0.1);
+    --term-border-strong: rgba(20, 28, 46, 0.16);
+    --term-accent: #b06a00;
+    --term-accent-soft: rgba(176, 106, 0, 0.14);
+    --term-danger: #d33a2c;
+    --term-success: #3f7f1c;
+    --term-text: #172033;
+    --term-text-dim: rgba(23, 32, 51, 0.6);
+    --term-text-faint: rgba(23, 32, 51, 0.4);
 }
 
 /* Give cards/panels a real edge -- on a light bg the dark theme's
