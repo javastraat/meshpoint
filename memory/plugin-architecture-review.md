@@ -290,19 +290,28 @@ reuses for sidebar entries and frontend bundles.
 
 | # | Task | File(s) | Notes |
 |---|------|---------|-------|
-| 1 | Create `frontend/themes/` with two theme folders, each `theme.json` (`{id,label,order,icon}`) + `theme.css` | `frontend/themes/sunlight/`, `frontend/themes/high-contrast/` | Move the `[data-theme="sunlight"]` / `[data-theme="high-contrast"]` blocks out of `frontend/css/theme_high_contrast.css` verbatim — no visual change. `dark` stays the built-in baseline (bare `:root` in `dashboard.css`, no folder). Leave the `@media (prefers-contrast: more)` auto-bump in a base CSS file. |
+| 1 | Create `frontend/themes/` with three theme folders, each `theme.json` (`{id,label,order,icon}`) + `theme.css` | `frontend/themes/dark/`, `frontend/themes/sunlight/`, `frontend/themes/high-contrast/` | Move the `[data-theme="sunlight"]` / `[data-theme="high-contrast"]` blocks out of `frontend/css/theme_high_contrast.css` verbatim — no visual change. **`dark` gets a folder as a registry entry only** (Option A): its `theme.css` is empty / `/* baseline palette lives in dashboard.css */`, so the picker lists it uniformly with no special-case `'dark'` string. The actual dark palette stays on bare `:root` in `dashboard.css` — a synchronously-loaded stylesheet — because it's the baseline everything renders against and the inline early-set `<script>` in `index.html` (~L1022–1049) exists precisely to avoid a flash. Leave the `@media (prefers-contrast: more)` auto-bump in a base CSS file. |
 | 2 | Add `GET /api/themes` that scans `frontend/themes/*/theme.json` and returns the list | new `src/api/routes/theme_routes.py` (~30 lines), register in `src/api/server.py` | Unauthenticated is fine (same exposure as static CSS); sort by `order` then `label`; skip malformed JSON |
 | 3 | Serve `frontend/themes/` as static files | `src/api/server.py` static mount | So each `theme.css` is reachable |
-| 4 | `theme_controller.js`: fetch `/api/themes` on init, build `valid`/`order` from the response instead of the hardcoded arrays; keep `dark` as the built-in baseline | `frontend/js/theme_controller.js` | Fall back to `['dark']` if the fetch fails |
-| 5 | Inject `<link rel="stylesheet">` per discovered theme at runtime | `frontend/js/theme_controller.js` (or the `serve_dashboard_root` HTML rewrite) | Drop the per-theme `<link>` lines from `frontend/index.html` |
+| 4 | `theme_controller.js`: fetch `/api/themes` on init, build `valid`/`order` from the response instead of the hardcoded arrays | `frontend/js/theme_controller.js` | Fall back to `['dark']` if the fetch fails; `dark` remains the default selection when nothing is persisted |
+| 5 | Inject `<link rel="stylesheet">` per discovered theme at runtime (skip empty `theme.css` like `dark`'s) | `frontend/js/theme_controller.js` (or the `serve_dashboard_root` HTML rewrite) | Drop the per-theme `<link>` lines from `frontend/index.html` |
 | 6 | Point the theme picker at the dynamic list | `frontend/js/app.js` — `_registerThemeToggle` (~L244, the `ICONS`/`LABELS` maps) and the `theme:cycle` command-palette entry (~L791) | Drive icon/label/order from the manifest; fallback icon for unrecognized ids; cycle the discovered id list, not the literal `['dark','high-contrast','sunlight']` array |
-| 7 | pytest: temp dir with 2 fake `theme.json`, assert `/api/themes` returns them sorted and ignores malformed JSON | `tests/test_theme_routes.py` | Runs on the Mac, no hardware/venv deps |
+| 7 | pytest: temp dir with 3 fake `theme.json`, assert `/api/themes` returns them sorted and ignores malformed JSON | `tests/test_theme_routes.py` | Runs on the Mac, no hardware/venv deps |
 | 8 | Add a new theme folder as the "does it actually work" demo (→ 4 selectable themes) | `frontend/themes/amber-mono/` | Acceptance test: add folder, restart, theme shows in picker — zero `.js` / `.py` edits |
 | 9 | Changelog bullet under the current version section (`docs/CHANGELOG.md`); verify it parses with `ChangelogParser.parse_file` | `docs/CHANGELOG.md` | Per repo convention |
 
 **Definition of done:** adding `frontend/themes/<x>/{theme.json,theme.css}` and
 restarting makes `<x>` appear in the picker with no change to any `.js` / `.py`
 file.
+
+**Option B (follow-up, not Spike 1) — make `dark` a *real* theme file too.**
+Extract the baseline palette out of `dashboard.css` into
+`frontend/themes/dark/theme.css` (`:root, [data-theme="dark"] { … }`) so every
+theme is genuinely a folder and `dashboard.css` carries no palette. Requires the
+server to **inline the active base theme's CSS into `<head>`** via the existing
+`serve_dashboard_root` HTML rewrite — otherwise a `<link>`-injected baseline
+flashes unstyled on every page load. Worth doing once the plugin model needs
+themes shipped fully out-of-tree; overkill for the first slice.
 
 **Why this slice first:** no `apt` / `pip` deps, no out-of-tree code, no security
 surface, ~1–2 days, and it lands as a self-contained PR upstream can take on its
