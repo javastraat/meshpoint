@@ -1,6 +1,6 @@
 {
   "id": "light",
   "label": "Light",
-  "order": 5,
+  "order": 1,
   "icon": "day"
 }
