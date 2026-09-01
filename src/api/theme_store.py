@@ -8,7 +8,10 @@ pattern as ``src/api/theme_registry.py``; the route handlers in
 :class:`ThemeSaveError` codes onto HTTP status.
 
 Only ``plugins/themes/`` is ever touched -- built-in themes live in
-``frontend/themes/`` and their ids are refused here.
+``frontend/themes/`` and their ids are refused here. A plugin theme can
+also carry ``"locked": true`` in its ``theme.json`` (the community pack
+and the repo's own example themes ship this way); locked folders can't
+be overwritten or deleted through this module, only edited on disk.
 """
 
 from __future__ import annotations
@@ -40,6 +43,15 @@ class ThemeSaveError(Exception):
         super().__init__(message)
         self.code = code
         self.message = message
+
+
+def _is_locked(folder: Path) -> bool:
+    """True when ``folder/theme.json`` sets ``"locked": true``."""
+    try:
+        raw = json.loads((folder / "theme.json").read_text(encoding="utf-8"))
+    except (ValueError, OSError):
+        return False
+    return bool(isinstance(raw, dict) and raw.get("locked"))
 
 
 def _chown_hint(path: Path) -> str:
@@ -101,6 +113,8 @@ def save_theme(plugin_dir: Path, spec: dict, builtin_ids: set[str]) -> dict:
 
     folder = plugin_dir / theme_id
     overwritten = folder.is_dir()
+    if overwritten and _is_locked(folder):
+        raise ThemeSaveError("reserved", f"{theme_id!r} is a locked theme and can't be overwritten.")
     try:
         folder.mkdir(parents=True, exist_ok=True)
         (folder / "theme.json").write_text(
@@ -127,6 +141,8 @@ def delete_theme(plugin_dir: Path, theme_id: str, builtin_ids: set[str]) -> None
         raise ThemeSaveError("slug", "Bad theme id.")
     if not target.is_dir():
         raise FileNotFoundError(theme_id)
+    if _is_locked(target):
+        raise ThemeSaveError("reserved", f"{theme_id!r} is a locked theme and can't be deleted.")
 
     try:
         shutil.rmtree(target)

@@ -211,6 +211,7 @@
 
 .te-installed__badge--builtin { color: var(--text-secondary); background: var(--overlay-weak); }
 .te-installed__badge--plugin { color: var(--accent-cyan); background: var(--overlay-weak); border-color: var(--accent-cyan); }
+.te-installed__badge--custom { color: var(--accent-green); background: var(--overlay-weak); border-color: var(--accent-green); }
 
 .te-installed__del {
     background: none;

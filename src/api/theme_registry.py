@@ -48,7 +48,11 @@ def scan_themes(themes_dir: Path, plugin_themes_dir: Path | None = None) -> list
     ``theme.css`` or ``None``; ``source`` is ``"builtin"`` or
     ``"plugin"``; ``author``/``homepage``/``description`` are ``""`` when
     absent. Built-in entries also carry ``order`` (an integer curation
-    sequence); plugin entries do not -- they sort alphabetically.
+    sequence); plugin entries do not -- they sort alphabetically. Plugin
+    entries instead carry ``locked`` (bool, from the manifest's
+    ``"locked"`` field) -- ``theme_store.py`` refuses to overwrite or
+    delete a locked folder, so the UI can hide the delete affordance for
+    themes that shipped with the app rather than ones a user saved.
 
     Folders with a missing/unparseable ``theme.json`` are skipped with a
     warning. A built-in id wins an id collision with a plugin theme; a
@@ -147,6 +151,8 @@ def _scan_dir(
         # alphabetically so contributors don't pick a meaningless number.
         if source == "builtin":
             entry_dict["order"] = _as_int(raw.get("order"), default=100)
+        else:
+            entry_dict["locked"] = bool(raw.get("locked"))
         themes.append(entry_dict)
 
 

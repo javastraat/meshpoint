@@ -123,6 +123,14 @@ class TestPluginThemes(unittest.TestCase):
         self.assertEqual([t["id"] for t in plugins], ["sneaky", "mid", "zulu"])
         self.assertNotIn("order", plugins[0])
 
+    def test_plugin_locked_field_defaults_false_and_is_carried_through(self) -> None:
+        _write_theme(self.plugins, "nord", {"label": "Nord", "locked": True}, "html{--x:1}")
+        _write_theme(self.plugins, "custom", {"label": "Custom"}, "html{--x:1}")
+        by_id = {t["id"]: t for t in scan_themes(self.core, self.plugins)}
+        self.assertTrue(by_id["nord"]["locked"])
+        self.assertFalse(by_id["custom"]["locked"])
+        self.assertNotIn("locked", by_id["light"])  # builtins don't carry it
+
     def test_author_fields_carried_through(self) -> None:
         _write_theme(
             self.plugins, "nord",

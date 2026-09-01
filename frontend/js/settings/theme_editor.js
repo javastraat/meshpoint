@@ -431,6 +431,10 @@
             }
             const id = this._slug();
             const clash = this.themes.find((t) => t.id === id && t.source === 'plugin');
+            if (clash?.locked) {
+                this._set(this.status, 'error', `"${id}" is a built-in community theme and can't be overwritten. Pick a different name.`);
+                return;
+            }
             if (clash && !(await this._confirm(`A theme called "${id}" already exists in plugins/themes/. Overwrite it?`))) {
                 return;
             }
@@ -470,13 +474,16 @@
             if (!el) return;
             if (!this.themes.length) { el.innerHTML = '<p class="cfg-card__hint">No themes found.</p>'; return; }
             const row = (t) => {
-                const src = (t.source || 'builtin') === 'plugin';
+                const isPlugin = (t.source || 'builtin') === 'plugin';
+                const locked = isPlugin && !!t.locked;
+                const badgeMod = isPlugin ? (locked ? 'plugin' : 'custom') : 'builtin';
+                const badgeLabel = isPlugin ? (locked ? 'Community' : 'Custom') : 'Built-in';
                 const meta = [t.author, t.description].filter(Boolean).map((s) => this._esc(s)).join(' — ');
                 return `<tr>
                     <td>${this._esc(t.label || t.id)}<br><code class="te-installed__id">${this._esc(t.id)}</code></td>
-                    <td><span class="te-installed__badge te-installed__badge--${src ? 'plugin' : 'builtin'}">${src ? 'Community' : 'Built-in'}</span></td>
+                    <td><span class="te-installed__badge te-installed__badge--${badgeMod}">${badgeLabel}</span></td>
                     <td class="te-installed__meta">${meta}</td>
-                    <td class="te-installed__act">${src ? `<button type="button" class="te-installed__del" data-te-del="${this._esc(t.id)}">Delete</button>` : ''}</td>
+                    <td class="te-installed__act">${isPlugin && !locked ? `<button type="button" class="te-installed__del" data-te-del="${this._esc(t.id)}">Delete</button>` : ''}</td>
                 </tr>`;
             };
             el.innerHTML = `<table class="te-installed">

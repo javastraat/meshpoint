@@ -2,6 +2,7 @@
   "id": "nord",
   "label": "Nord",
   "icon": "palette",
+  "locked": true,
   "author": "Arctic Ice Studio",
   "homepage": "https://www.nordtheme.com/",
   "description": "Arctic, north-bluish palette."

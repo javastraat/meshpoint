@@ -99,6 +99,18 @@ class TestSaveTheme(unittest.TestCase):
         self.assertEqual(manifest["icon"], "terminal")
         self.assertEqual(manifest["homepage"], "https://ok.example")
 
+    def test_refuses_to_overwrite_locked_theme(self) -> None:
+        save_theme(self.dir, self._spec(), _BUILTINS)
+        manifest_path = self.dir / "my-theme" / "theme.json"
+        manifest = json.loads(manifest_path.read_text())
+        manifest["locked"] = True
+        manifest_path.write_text(json.dumps(manifest))
+
+        with self.assertRaises(ThemeSaveError) as cm:
+            save_theme(self.dir, self._spec(label="Hijacked"), _BUILTINS)
+        self.assertEqual(cm.exception.code, "reserved")
+        self.assertEqual(json.loads(manifest_path.read_text())["label"], "My Theme")
+
 
 class TestDeleteTheme(unittest.TestCase):
     def setUp(self) -> None:
@@ -125,6 +137,17 @@ class TestDeleteTheme(unittest.TestCase):
     def test_refuses_traversal(self) -> None:
         with self.assertRaises(ThemeSaveError):
             delete_theme(self.dir, "../../etc", _BUILTINS)
+
+    def test_refuses_locked_theme(self) -> None:
+        manifest_path = self.dir / "doomed" / "theme.json"
+        manifest = json.loads(manifest_path.read_text())
+        manifest["locked"] = True
+        manifest_path.write_text(json.dumps(manifest))
+
+        with self.assertRaises(ThemeSaveError) as cm:
+            delete_theme(self.dir, "doomed", _BUILTINS)
+        self.assertEqual(cm.exception.code, "reserved")
+        self.assertTrue((self.dir / "doomed").is_dir())
 
 
 if __name__ == "__main__":  # pragma: no cover

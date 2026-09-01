@@ -2,6 +2,7 @@
   "id": "ayu-mirage",
   "label": "Ayu Mirage",
   "icon": "palette",
+  "locked": true,
   "author": "ayu-theme",
   "homepage": "https://github.com/ayu-theme/ayu-colors",
   "description": "Muted mid-dark theme with warm accents."

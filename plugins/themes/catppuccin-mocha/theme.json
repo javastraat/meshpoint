@@ -2,6 +2,7 @@
   "id": "catppuccin-mocha",
   "label": "Catppuccin Mocha",
   "icon": "palette",
+  "locked": true,
   "author": "Catppuccin",
   "homepage": "https://catppuccin.com/",
   "description": "Soothing pastel dark theme."

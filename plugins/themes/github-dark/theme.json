@@ -2,6 +2,7 @@
   "id": "github-dark",
   "label": "GitHub Dark",
   "icon": "palette",
+  "locked": true,
   "author": "GitHub Primer",
   "homepage": "https://primer.style/",
   "description": "GitHub's dark default, calm and neutral."

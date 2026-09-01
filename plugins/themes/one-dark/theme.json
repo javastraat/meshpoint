@@ -2,6 +2,7 @@
   "id": "one-dark",
   "label": "One Dark",
   "icon": "palette",
+  "locked": true,
   "author": "Atom",
   "homepage": "https://github.com/atom/atom",
   "description": "Atom's iconic dark syntax theme."
