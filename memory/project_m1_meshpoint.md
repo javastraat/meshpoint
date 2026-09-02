@@ -7891,7 +7891,9 @@ public-count snapshot=12, known auth-levels for a few named routers, no
 duplicate method+path, mini-app wiring + `/api/nodes` 401 + plugin-router
 mount check). ast/ruff clean, ChangelogParser parses (31 sections).
 
-**B2 — listener registry (2026-09-02, deploy pending)**: scoped to the 8
+**B2 — listener registry (2026-09-02, deployed + Pi-verified: FM radio, DAB+,
+ADS-B, P2000, Pagers, RTL433 all start and show data through the registry;
+the pager trio — the one tuple spec — confirmed)**: scoped to the 8
 RTL-SDR subprocess listeners. `src/api/listener_registry.py` (new, FastAPI-free):
 `register_listener(ListenerSpec(name, build, wire))`, `start_all(builtins)`,
 `stop_all()`, `plugin_specs()`, `live()`, `reset()`. `build` returns a listener
