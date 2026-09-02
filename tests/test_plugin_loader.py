@@ -182,6 +182,19 @@ class TestLoadPlugins(unittest.TestCase):
     def test_missing_apps_dir_returns_empty(self) -> None:
         self.assertEqual(load_plugins(self.builtin / "nope", None, {}), [])
 
+    def test_logs_a_summary_line_when_nothing_found(self) -> None:
+        with self.assertLogs("src.plugins.loader", level=logging.INFO) as logs:
+            self._load({})
+        self.assertTrue(any("no app plugins found" in m for m in logs.output))
+
+    def test_logs_a_summary_line_with_counts(self) -> None:
+        _make_plugin(self.apps, "acars", "def register(reg): reg.add_router(object())",
+                     provides='["routes"]')
+        _make_plugin(self.apps, "off", "def register(reg): pass", provides='["routes"]')
+        with self.assertLogs("src.plugins.loader", level=logging.INFO) as logs:
+            self._load({"acars": {"enabled": True}})
+        self.assertTrue(any("1 of 2 loaded" in m for m in logs.output))
+
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()

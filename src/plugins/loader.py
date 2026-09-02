@@ -82,7 +82,8 @@ def load_plugins(
     ``plugins.<id>.enabled`` is truthy. *plugins_config* is ``config.plugins``.
     """
     loaded: list[LoadedPlugin] = []
-    for manifest in discover_plugins(builtin_dir, community_dir):
+    manifests = discover_plugins(builtin_dir, community_dir)
+    for manifest in manifests:
         conf = plugins_config.get(manifest.name)
         conf = conf if isinstance(conf, dict) else {}
         if not _is_enabled(manifest, conf):
@@ -104,5 +105,14 @@ def load_plugins(
         loaded.append(LoadedPlugin(manifest, module))
         logger.info(
             "loaded %s plugin %s v%s", manifest.source, manifest.name, manifest.version,
+        )
+
+    if not manifests:
+        logger.info("plugins: no app plugins found")
+    else:
+        logger.info(
+            "plugins: %d of %d loaded (%s)",
+            len(loaded), len(manifests),
+            ", ".join(m.name for m in manifests),
         )
     return loaded

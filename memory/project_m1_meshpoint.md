@@ -7957,5 +7957,10 @@ load_plugins(...)` before the router loop (resets clear only plugin regs).
 `test_plugin_loader.py` (8), `test_plugin_registry_facade.py` (6),
 `test_config_loader.py` PluginsNamespaceTest (3) — all pure-Python, pass on Mac.
 `docs/CONFIGURATION.md` `## Plugins`. Default off (in-process = service privs).
+Deployed 2026-09-02, Pi boot clean. `load_plugins` now always logs a summary
+INFO line ("plugins: no app plugins found" / "plugins: N of M loaded (...)")
+so the subsystem is visibly alive even with zero plugins (user asked). The
+create_app `route_registry.reset()`/`listener_registry.reset()` did not disturb
+the 60 built-in routers / 6 built-in listeners.
 Next: B4c (mount `plugins/apps/<id>/frontend/` + inject `<script>`/`<link>`),
 B4d (`meshpoint plugin setup <id>` consent CLI), B5 (extract ACARS).
