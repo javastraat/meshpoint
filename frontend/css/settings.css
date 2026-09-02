@@ -1181,102 +1181,96 @@ select.update-field__input option:checked {
 
 .plugins-panel__status[data-kind="error"] { color: var(--accent-red); }
 
-.plugins-panel__list {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-    gap: 16px;
+/* Same table language as Settings > Themes' "Installed themes" list
+   (.te-installed in theme_editor.css) -- kept as its own class rather than
+   a shared one so the two features don't couple, but the rules mirror it
+   rule-for-rule for visual parity. */
+.plugins-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
 }
 
-.plugin-card {
-    background: var(--auth-card-bg);
-    border: 1px solid var(--auth-card-border);
-    border-radius: var(--auth-card-radius);
-    padding: 18px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    animation: authPanelFadeIn 360ms ease-out both;
-    transition: border-color 200ms ease, transform 200ms ease;
-}
-
-.plugin-card:hover {
-    border-color: var(--accent-cyan);
-    transform: translateY(-1px);
-}
-
-.plugin-card__head {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-}
-
-.plugin-card__title {
-    margin: 0;
-    font-size: 15px;
-    font-weight: 600;
-    font-family: var(--font-mono);
-}
-
-.plugin-card__pill {
-    font-size: 10px;
+.plugins-table th {
+    text-align: left;
+    font-size: 0.65rem;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.7px;
-    padding: 3px 8px;
-    border-radius: 999px;
-    background: var(--bg-inset);
-    color: var(--text-secondary);
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    padding: 0 0.75rem 0.4rem 0;
+}
+
+.plugins-table td {
+    padding: 0.6rem 0.75rem 0.6rem 0;
+    border-top: 1px solid var(--hairline);
+    vertical-align: top;
+    color: var(--text-primary);
+}
+
+.plugin-row__name {
     font-weight: 600;
 }
 
-.plugin-card__pill[data-pill="builtin"] {
-    background: rgba(6, 182, 212, 0.16);
-    color: var(--accent-cyan);
-}
-
-.plugin-card__version {
-    font-size: 11px;
+.plugin-row__version {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    font-weight: 400;
     color: var(--text-muted);
+    margin-top: 2px;
 }
 
-.plugin-card__switch {
-    margin-left: auto;
+.plugin-row__badge {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: 600;
+    border: 1px solid var(--hairline);
 }
 
-.plugin-card__description {
-    margin: 0;
-    font-size: 13px;
+.plugin-row__badge--builtin { color: var(--text-secondary); background: var(--overlay-weak); }
+.plugin-row__badge--community { color: var(--accent-cyan); background: var(--overlay-weak); border-color: var(--accent-cyan); }
+
+.plugin-row__meta {
     color: var(--text-secondary);
-    line-height: 1.5;
+    max-width: 26rem;
 }
 
-.plugin-card__meta {
-    margin: 0;
-    font-size: 12px;
+.plugin-row__provides {
     color: var(--text-muted);
+    font-size: 0.75rem;
+    margin-top: 3px;
 }
 
-.plugin-card__deps {
-    margin: 0;
-    font-size: 12px;
+.plugin-row__deps {
     color: var(--accent-amber);
-    line-height: 1.5;
+    font-size: 0.75rem;
+    margin-top: 3px;
 }
 
-.plugin-card__restart {
-    margin: 0;
-    font-size: 12px;
+.plugin-row__act {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.plugin-row__restart {
+    display: block;
+    font-size: 0.7rem;
     color: var(--accent-amber);
+    margin-top: 6px;
 }
 
-.plugin-card__result {
-    margin: 0;
-    font-size: 12px;
-    min-height: 1.2em;
+.plugin-row__result {
+    display: block;
+    font-size: 0.7rem;
+    min-height: 1.1em;
+    margin-top: 4px;
 }
 
-.plugin-card__result[data-kind="success"] { color: var(--accent-green); }
-.plugin-card__result[data-kind="error"] { color: var(--accent-red); }
-.plugin-card__result[data-kind="pending"] { color: var(--text-secondary); }
+.plugin-row__result[data-kind="success"] { color: var(--accent-green); }
+.plugin-row__result[data-kind="error"] { color: var(--accent-red); }
+.plugin-row__result[data-kind="pending"] { color: var(--text-secondary); }
 
 /* Commit timeline chrome lives in update_commits.css */

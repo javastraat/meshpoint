@@ -3,8 +3,9 @@
  *
  * Loads the discovered app-plugin catalog from ``GET /api/plugins`` (built-in
  * + community, each with its configured `enabled` state and whether it's
- * actually `loaded` in the running process), renders one card per plugin
- * with a toggle switch, and persists flips through ``PUT /api/plugins/{id}``.
+ * actually `loaded` in the running process), renders one row per plugin in a
+ * table (same shape as Settings > Themes' "Installed themes" list) with a
+ * toggle switch, and persists flips through ``PUT /api/plugins/{id}``.
  * Enabling/disabling only takes effect on the next restart -- the panel says
  * so inline rather than pretending the change is live.
  */
@@ -37,43 +38,52 @@ class PluginsPanelController {
 
     _render() {
         if (!this.listEl) return;
-        this.listEl.innerHTML = '';
+        if (!this._plugins.length) {
+            this.listEl.innerHTML = '';
+            return;
+        }
+        this.listEl.innerHTML = `<table class="plugins-table">
+            <thead><tr><th>Plugin</th><th>Source</th><th>Provides</th><th></th></tr></thead>
+            <tbody></tbody>
+        </table>`;
+        const tbody = this.listEl.querySelector('tbody');
         this._plugins.forEach((plugin) => {
-            this.listEl.appendChild(this._renderCard(plugin));
+            tbody.appendChild(this._renderRow(plugin));
         });
     }
 
-    _renderCard(plugin) {
-        const card = document.createElement('article');
-        card.className = 'plugin-card';
-        const sourceLabel = plugin.source === 'builtin' ? 'built-in' : 'community';
-        const provides = (plugin.provides || []).join(', ');
-        const restartNote = plugin.restart_required
-            ? `<p class="plugin-card__restart" data-restart>Restart required to ${plugin.enabled ? 'load' : 'unload'} this plugin.</p>`
-            : '';
+    _renderRow(plugin) {
+        const row = document.createElement('tr');
+        const badgeMod = plugin.source === 'builtin' ? 'builtin' : 'community';
+        const badgeLabel = plugin.source === 'builtin' ? 'Built-in' : 'Community';
+        const provides = (plugin.provides || []).join(', ') || '-';
         const depsNote = (plugin.apt_deps || []).length
-            ? `<p class="plugin-card__deps">Requires: <code>${this._escape(plugin.apt_deps.join(', '))}</code>${plugin.setup_script ? ` -- run <code>sudo bash plugins/apps/${this._escape(plugin.id)}/${this._escape(plugin.setup_script)}</code> on the device` : ''}</p>`
+            ? `<p class="plugin-row__deps">Requires: <code>${this._escape(plugin.apt_deps.join(', '))}</code>${plugin.setup_script ? ` — run <code>sudo bash plugins/apps/${this._escape(plugin.id)}/${this._escape(plugin.setup_script)}</code> on the device` : ''}</p>`
             : '';
-        card.innerHTML = `
-            <header class="plugin-card__head">
-                <h3 class="plugin-card__title">${this._escape(plugin.id)}</h3>
-                <span class="plugin-card__pill" data-pill="${plugin.source}">${sourceLabel}</span>
-                <span class="plugin-card__version">v${this._escape(plugin.version)}</span>
-                <label class="r-switch plugin-card__switch">
+        row.innerHTML = `
+            <td>
+                <span class="plugin-row__name">${this._escape(plugin.id)}</span>
+                <span class="plugin-row__version">v${this._escape(plugin.version)}${plugin.author ? ` &middot; ${this._escape(plugin.author)}` : ''}</span>
+            </td>
+            <td><span class="plugin-row__badge plugin-row__badge--${badgeMod}">${badgeLabel}</span></td>
+            <td class="plugin-row__meta">
+                ${this._escape(plugin.description) || 'No description provided.'}
+                <p class="plugin-row__provides">${this._escape(provides)}</p>
+                ${depsNote}
+            </td>
+            <td class="plugin-row__act">
+                <label class="r-switch">
                     <input type="checkbox" data-toggle ${plugin.enabled ? 'checked' : ''}>
                     <span class="r-switch__track"></span>
                 </label>
-            </header>
-            <p class="plugin-card__description">${this._escape(plugin.description) || 'No description provided.'}</p>
-            <p class="plugin-card__meta">Provides: ${this._escape(provides) || '-'}${plugin.author ? ` &middot; by ${this._escape(plugin.author)}` : ''}</p>
-            ${depsNote}
-            ${restartNote}
-            <p class="plugin-card__result" data-result aria-live="polite"></p>
+                ${plugin.restart_required ? `<span class="plugin-row__restart" data-restart>Restart to ${plugin.enabled ? 'load' : 'unload'}</span>` : ''}
+                <span class="plugin-row__result" data-result aria-live="polite"></span>
+            </td>
         `;
-        const toggle = card.querySelector('[data-toggle]');
-        const resultEl = card.querySelector('[data-result]');
+        const toggle = row.querySelector('[data-toggle]');
+        const resultEl = row.querySelector('[data-result]');
         toggle.addEventListener('change', () => this._setEnabled(plugin, toggle, resultEl));
-        return card;
+        return row;
     }
 
     async _setEnabled(plugin, toggle, resultEl) {
@@ -100,7 +110,7 @@ class PluginsPanelController {
             plugin.enabled = body.plugin.enabled;
             plugin.restart_required = body.plugin.restart_required;
             resultEl.dataset.kind = 'success';
-            resultEl.textContent = 'Saved. Restart the service to apply.';
+            resultEl.textContent = 'Saved. Restart to apply.';
         } catch (_e) {
             toggle.checked = !enabled;
             resultEl.dataset.kind = 'error';
