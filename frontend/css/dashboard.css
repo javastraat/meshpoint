@@ -298,6 +298,7 @@ html, body {
     transition: color 0.15s, background 0.15s;
 }
 .map-expand-btn:hover { color: var(--text); background: rgba(255,255,255,0.06); }
+.map-expand-btn.is-active { color: var(--accent-cyan); background: var(--overlay-med); }
 
 /* ---- Expanded map mode ---- */
 .dashboard--map-expanded .dashboard__stats { display: none; }
@@ -349,6 +350,31 @@ html, body {
     border-radius: var(--radius) !important;
     color: var(--text-secondary) !important;
     font-size: 0.75rem !important;
+}
+
+.leaflet-control-layers-expanded {
+    padding: 0.5rem 0.65rem !important;
+}
+
+.leaflet-control-layers-list label {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin: 0.15rem 0;
+    color: var(--text-primary);
+    cursor: pointer;
+}
+
+.leaflet-control-layers-list label span { flex: 1; }
+
+.leaflet-control-layers-selector {
+    accent-color: var(--accent-cyan);
+    margin: 0 !important;
+}
+
+.leaflet-control-layers-separator {
+    border-top: 1px solid var(--hairline) !important;
+    margin: 0.4rem 0 !important;
 }
 
 /* ---- Cluster overrides ---- */

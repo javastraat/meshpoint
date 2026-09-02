@@ -4,8 +4,18 @@
  */
 
 const MAP_VIEW_STORAGE_KEY = 'meshpoint.nodeMap.view';
+const MAP_PROTO_STORAGE_KEY = 'meshpoint.nodeMap.protocols';
+const MAP_CLUSTER_STORAGE_KEY = 'meshpoint.nodeMap.clustered';
 const MAP_DEFAULT_CENTER = [39.8, -98.5];
 const MAP_DEFAULT_ZOOM = 4;
+
+const PROTO_LABELS = {
+    meshtastic: 'Meshtastic',
+    meshcore: 'MeshCore',
+    reticulum: 'Reticulum',
+    lorawan: 'LoRaWAN',
+    dapnet: 'DAPNET',
+};
 
 class NodeMap {
     constructor(containerId) {
@@ -14,6 +24,11 @@ class NodeMap {
         this._markerGroup = null;
         this._deviceMarker = null;
         this._markers = {};
+        this._markerProto = {};       // node_id -> protocol
+        this._seenProtocols = new Set();
+        this._protoDummies = {};      // protocol -> dummy layer used as a control toggle
+        this._enabledProtocols = this._loadEnabledProtocols();  // Set, or null = all
+        this._clustered = this._loadClusterPref();
         this._initialized = false;
         this._hasFitBounds = false;
         this._init();
@@ -48,7 +63,7 @@ class NodeMap {
         this._topologyVisible = false;
         this._focusLine = null;
 
-        this._markerGroup = L.markerClusterGroup({
+        this._clusterOpts = {
             maxClusterRadius: 50,
             disableClusteringAtZoom: 13,
             spiderfyOnMaxZoom: true,
@@ -64,23 +79,16 @@ class NodeMap {
                     iconSize: L.point(40, 40),
                 });
             },
-        });
-        this._map.addLayer(this._markerGroup);
+        };
+        this._buildMarkerGroup();
 
-        const overlays = { 'Topology Links': this._topologyLayer };
-        L.control.layers(null, overlays, { position: 'topright', collapsed: true }).addTo(this._map);
+        this._layersControl = L.control.layers(
+            null, { 'Topology Links': this._topologyLayer },
+            { position: 'topright', collapsed: true },
+        ).addTo(this._map);
 
-        this._map.on('overlayadd', (e) => {
-            if (e.layer === this._topologyLayer) {
-                this._topologyVisible = true;
-                this._loadTopology();
-            }
-        });
-        this._map.on('overlayremove', (e) => {
-            if (e.layer === this._topologyLayer) {
-                this._topologyVisible = false;
-            }
-        });
+        this._map.on('overlayadd', (e) => this._onOverlayToggle(e.layer, true));
+        this._map.on('overlayremove', (e) => this._onOverlayToggle(e.layer, false));
 
         this._initialized = true;
 
@@ -145,6 +153,119 @@ class NodeMap {
         }
     }
 
+    // ---- marker group: cluster <-> flat -------------------------------
+
+    _buildMarkerGroup() {
+        if (this._markerGroup) {
+            this._markerGroup.clearLayers();   // detach markers so they can be re-added
+            this._map.removeLayer(this._markerGroup);
+        }
+        this._markerGroup = this._clustered
+            ? L.markerClusterGroup(this._clusterOpts)
+            : L.layerGroup();
+        this._map.addLayer(this._markerGroup);
+    }
+
+    _groupAdd(markers) {
+        if (!markers.length) return;
+        if (this._markerGroup.addLayers) this._markerGroup.addLayers(markers);
+        else markers.forEach((m) => this._markerGroup.addLayer(m));
+    }
+
+    _groupRemove(markers) {
+        if (!markers.length) return;
+        if (this._markerGroup.removeLayers) this._markerGroup.removeLayers(markers);
+        else markers.forEach((m) => this._markerGroup.removeLayer(m));
+    }
+
+    /** Toggle clustering. Returns the new state. */
+    toggleClustered() {
+        this._clustered = !this._clustered;
+        try { localStorage.setItem(MAP_CLUSTER_STORAGE_KEY, this._clustered ? 'on' : 'off'); } catch (_e) {}
+        const visible = Object.keys(this._markers)
+            .filter((id) => this._isProtocolEnabled(this._markerProto[id]))
+            .map((id) => this._markers[id]);
+        this._buildMarkerGroup();
+        this._groupAdd(visible);
+        return this._clustered;
+    }
+
+    isClustered() { return this._clustered; }
+
+    _loadClusterPref() {
+        try { return localStorage.getItem(MAP_CLUSTER_STORAGE_KEY) !== 'off'; }
+        catch (_e) { return true; }
+    }
+
+    // ---- per-protocol layer filter -----------------------------------
+
+    _loadEnabledProtocols() {
+        try {
+            const raw = localStorage.getItem(MAP_PROTO_STORAGE_KEY);
+            if (!raw || raw === 'all') return null;
+            const arr = JSON.parse(raw);
+            return Array.isArray(arr) ? new Set(arr) : null;
+        } catch (_e) {
+            return null;
+        }
+    }
+
+    _saveEnabledProtocols() {
+        try {
+            localStorage.setItem(
+                MAP_PROTO_STORAGE_KEY,
+                this._enabledProtocols ? JSON.stringify([...this._enabledProtocols]) : 'all',
+            );
+        } catch (_e) { /* best-effort */ }
+    }
+
+    _isProtocolEnabled(proto) {
+        return !this._enabledProtocols || this._enabledProtocols.has(proto);
+    }
+
+    _protoLabel(proto) {
+        return PROTO_LABELS[proto] || (proto.charAt(0).toUpperCase() + proto.slice(1));
+    }
+
+    /** Add a checkbox to the layers control the first time a protocol appears. */
+    _ensureProtocolOverlay(proto) {
+        if (this._protoDummies[proto]) return;
+        const dummy = L.layerGroup();
+        this._protoDummies[proto] = dummy;
+        // Adding to the map before addOverlay makes the checkbox render ticked.
+        if (this._isProtocolEnabled(proto)) this._map.addLayer(dummy);
+        this._layersControl.addOverlay(dummy, this._protoLabel(proto));
+    }
+
+    _onOverlayToggle(layer, on) {
+        if (layer === this._topologyLayer) {
+            this._topologyVisible = on;
+            if (on) this._loadTopology();
+            return;
+        }
+        const proto = Object.keys(this._protoDummies).find((p) => this._protoDummies[p] === layer);
+        if (!proto) return;
+        if (!this._enabledProtocols) this._enabledProtocols = new Set(this._seenProtocols);
+        if (on) this._enabledProtocols.add(proto);
+        else this._enabledProtocols.delete(proto);
+        this._saveEnabledProtocols();
+        this._applyProtocolFilter();
+    }
+
+    _applyProtocolFilter() {
+        const toAdd = [];
+        const toRemove = [];
+        for (const id of Object.keys(this._markers)) {
+            const marker = this._markers[id];
+            const on = this._isProtocolEnabled(this._markerProto[id]);
+            const inGroup = this._markerGroup.hasLayer(marker);
+            if (on && !inGroup) toAdd.push(marker);
+            else if (!on && inGroup) toRemove.push(marker);
+        }
+        this._groupRemove(toRemove);
+        this._groupAdd(toAdd);
+    }
+
     loadNodes(nodes, device) {
         if (!this._initialized) return;
 
@@ -153,6 +274,7 @@ class NodeMap {
 
         this._markerGroup.clearLayers();
         this._markers = {};
+        this._markerProto = {};
 
         const bounds = [];
 
@@ -219,7 +341,8 @@ class NodeMap {
     }
 
     _addNodeMarker(n) {
-        const isMeshtastic = (n.protocol || 'meshtastic') === 'meshtastic';
+        const proto = n.protocol || 'meshtastic';
+        const isMeshtastic = proto === 'meshtastic';
         const protoColor = isMeshtastic ? '#06b6d4' : '#a855f7';
 
         const heard = n.last_heard || n.last_seen;
@@ -267,8 +390,11 @@ class NodeMap {
             `Last heard: ${lastHeard}`
         );
 
-        this._markerGroup.addLayer(marker);
         this._markers[n.node_id] = marker;
+        this._markerProto[n.node_id] = proto;
+        this._seenProtocols.add(proto);
+        this._ensureProtocolOverlay(proto);
+        if (this._isProtocolEnabled(proto)) this._markerGroup.addLayer(marker);
     }
 
     _formatRelativeTime(timestamp) {

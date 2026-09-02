@@ -7811,3 +7811,21 @@ badge = source. Loaded via `<script>` before theme_controller.js in index.html.
 active theme elsewhere and came back. Now: first load bases on `_enteredTheme`
 (the on-screen theme, not the server default); re-entry re-bases on
 `_enteredTheme` too, guarded by `_hasEdits()` so unsaved swatch work isn't wiped.
+
+**Dashboard node map: protocol layer filter + uncluster toggle (2026-09-01)**:
+`frontend/js/components/node_map.js`. (1) The Leaflet layers control (stack icon)
+now grows a checkbox per protocol as nodes for it appear — `_ensureProtocolOverlay`
+adds a dummy `L.layerGroup` via `control.addOverlay()` (added to map first so it
+renders ticked), `_onOverlayToggle` maps the dummy back to its protocol. Enabled
+set (`_enabledProtocols`, null = all) persisted to `localStorage`
+`meshpoint.nodeMap.protocols`. `_applyProtocolFilter()` adds/removes markers from
+the SINGLE cluster group via `addLayers`/`removeLayers` (no rebuild). Markers
+tracked in `_markerProto` (node_id→protocol); `_addNodeMarker` only adds to the
+group if enabled. `PROTO_LABELS` map for nice names. (2) `toggleClustered()` /
+`isClustered()` swap `_markerGroup` between `L.markerClusterGroup` and plain
+`L.layerGroup` (`_buildMarkerGroup` clears old first), re-adding visible markers;
+persisted to `meshpoint.nodeMap.clustered`. New `#map-cluster-btn` in the panel
+header (between home + expand), `.map-expand-btn.is-active` when flat, wired in
+app.js. CSS: `.leaflet-control-layers-*` themed with tokens in dashboard.css.
+Device marker unaffected (always on map, never clustered/filtered). Not
+Pi-verified.

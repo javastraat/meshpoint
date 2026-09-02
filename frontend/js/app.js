@@ -204,6 +204,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         mapHomeBtn.addEventListener('click', () => nodeMap.centerOnHome());
     }
 
+    const mapClusterBtn = document.getElementById('map-cluster-btn');
+    if (mapClusterBtn) {
+        const syncClusterBtn = (clustered) => {
+            mapClusterBtn.classList.toggle('is-active', !clustered);
+            mapClusterBtn.title = clustered
+                ? 'Show every marker (no grouping)'
+                : 'Group nearby markers';
+        };
+        syncClusterBtn(nodeMap.isClustered());
+        mapClusterBtn.addEventListener('click', () => syncClusterBtn(nodeMap.toggleClustered()));
+    }
+
     const mapExpandBtn = document.getElementById('map-expand-btn');
     const dashboard = document.querySelector('.dashboard');
     if (mapExpandBtn && dashboard) {
