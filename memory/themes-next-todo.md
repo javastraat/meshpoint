@@ -67,6 +67,16 @@ Theme dir split + source tier Pi-verified working 2026-08-31.
 
 ## Open
 
-- **#3 plugin roadmap Phase 0** (unchanged — still last). The only item left on
-  the whole themes track. Deep backend context-switch; do it with undivided
-  focus, guarded by the 143-file test suite + `docs/plans/*-tests/`.
+- **#3 plugin roadmap Phase 0** — still the big backend item. Now has a concrete
+  driver: **ACARS** (see [plugin-architecture-review.md](plugin-architecture-review.md)).
+  Agreed plan 2026-09-02:
+  1. **Track A** — embed ACARS as listener #6 now (~3-4 d): `src/audio/acars_listener.py`
+     (copy adsb_listener), `src/api/routes/acars_routes.py`, "Datalink" dashboard
+     tab, `acars:` config section, `scripts/install.sh` opt-in section (build
+     `f00b4r0/acarsdec` + `szpajder/libacars`).
+  2. **B1-B4** — Phase 0 (server.py route/service registry) -> Phase 2
+     (capture-source registry + lifecycle, open `Protocol` enum) -> Phase 3
+     (frontend panel registry) -> plugin manifest + `setup.sh`/deps mechanism.
+     ~3 wk. Guarded by the 143-file suite + `docs/plans/*-tests/`.
+  3. **B5** — extract Track A's ACARS code into `plugins/apps/acars/` as the
+     reference plugin. `plugins/<kind>/<name>/` scheme (themes already do this).

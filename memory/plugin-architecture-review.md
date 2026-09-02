@@ -360,15 +360,25 @@ What an ACARS plugin must provide / what the runtime must accept:
   manifest run once with explicit consent, like `scripts/install.sh`'s opt-in
   arduino-cli / platformio / rnsd sections
 
-Layout: `plugins/acars/{plugin.toml, backend/__init__.py (register()),
-backend/listener.py, backend/routes.py, frontend/acars_panel.{js,css}, setup.sh}`.
+**Path decided (2026-09-02):** `plugins/<kind>/<name>/` scheme — `plugins/themes/`
+already works this way (`scan_themes`); "app" plugins go under **`plugins/apps/`**.
+
+```
+plugins/apps/acars/
+  plugin.toml            # name, meshpoint_api, provides=[capture_source,routes,panel], apt=[...], setup="setup.sh"
+  backend/__init__.py    # def register(reg): reg.add_capture_source(...); reg.add_router(...); reg.add_config(...)
+  backend/listener.py    # ~ copy of adsb_listener.py
+  backend/routes.py
+  frontend/acars_panel.{js,css}
+  setup.sh
+```
 
 ACARS needs essentially the whole roadmap (Phase 0 + 2 + 3 + a deps mechanism) —
 themes was cheap because a theme is pure CSS with no code/lifecycle/deps; ACARS is
 the opposite end (trusted in-process code + subprocess + system packages + panel).
 
-**Recommended path:** embed ACARS now (~1-2d, copy `adsb_listener.py` +
-`adsb_routes.py` + an ADS-B-style tab), ship the feature, THEN make ACARS the
-first thing extracted into the plugin format once Phase 0-3 land — proves the
-extraction round-trips with real code. Alternative: do Phase 0 first, build ACARS
-as plugin #1.
+**Agreed sequencing:** Track A (embed ACARS as listener #6 now, ~3-4 d total:
+`acars_listener.py` + `acars_routes.py` + Datalink tab + `acars:` config +
+`install.sh` opt-in section) -> then Phase 0 / 2 / 3 + deps mechanism (B1-B4,
+~3 wk) -> then **B5: extract Track A's code into `plugins/apps/acars/`** as the
+reference plugin. Nothing from Track A is wasted; B5 is move + adapt.
