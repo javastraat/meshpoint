@@ -377,8 +377,15 @@ ACARS needs essentially the whole roadmap (Phase 0 + 2 + 3 + a deps mechanism) â
 themes was cheap because a theme is pure CSS with no code/lifecycle/deps; ACARS is
 the opposite end (trusted in-process code + subprocess + system packages + panel).
 
-**Agreed sequencing:** Track A (embed ACARS as listener #6 now, ~3-4 d total:
-`acars_listener.py` + `acars_routes.py` + Datalink tab + `acars:` config +
-`install.sh` opt-in section) -> then Phase 0 / 2 / 3 + deps mechanism (B1-B4,
-~3 wk) -> then **B5: extract Track A's code into `plugins/apps/acars/`** as the
-reference plugin. Nothing from Track A is wasted; B5 is move + adapt.
+**Agreed sequencing:** Track A (embed ACARS as listener #6) -> Phase 0 / 2 / 3 +
+deps mechanism (B1-B4, ~3 wk) -> **B5: extract Track A's code into
+`plugins/apps/acars/`** as the reference plugin. Nothing from Track A is wasted;
+B5 is move + adapt.
+
+**Track A DONE 2026-09-02:** `src/audio/acars_listener.py` (copy of
+rtl433_listener), `src/api/routes/acars_routes.py`, RTL-SDR â†’ ACARS sub-tab
+(reuses `PagerPanel` + `_acarsRowHtml`), `scripts/install.sh` section 12,
+`tests/test_acars_listener.py`. No config section. The 6 hand-wired `server.py`
+spots this touches (import x2, global, lifespan start/stop, include_router) are
+exactly what B1 (Phase 0 registry) removes -- B5 will delete them and register
+via the plugin's `register()` instead.

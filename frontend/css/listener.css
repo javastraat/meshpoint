@@ -239,6 +239,30 @@
     word-break: break-word;
 }
 
+/* ACARS rows: wider callsign/tail column, dim message label, and an
+   indented pretty-print block for libacars-decoded standard messages. */
+.pager-row--acars .pager-row__proto {
+    width: 12em;
+    color: var(--accent-cyan);
+}
+
+.pager-row--acars .acars-label {
+    color: var(--text-muted);
+    font-size: 0.85em;
+}
+
+.pager-row__decoded {
+    margin: 0.35rem 0 0;
+    padding: 0.4rem 0.6rem;
+    background: var(--overlay-weak);
+    border-left: 2px solid var(--accent-cyan);
+    border-radius: 4px;
+    font-size: 0.8em;
+    color: var(--text-secondary);
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
 .adsb-table-wrap {
     max-height: 60vh;
     overflow: auto;

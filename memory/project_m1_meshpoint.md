@@ -7850,3 +7850,22 @@ unset = seed from `data-theme === 'light'`. app.js swaps the button glyph
 sun<->moon via `window.themeGlyph`. Scoped to `#map` only — topology/adsb maps
 still follow the theme. Sunlight theme deliberately left as-is (still gets the
 inverted map unless the user flips this button).
+
+**ACARS listener — Track A landed (2026-09-02)**: aircraft VHF datalink decoding
+in the dashboard, RTL-SDR → ACARS sub-tab. `src/audio/acars_listener.py`
+(near-copy of `rtl433_listener.py`: single subprocess, JSON lines from stdout,
+`deque(maxlen=200)`, `sdr_registry` owner `"acars"`, retry loop, idle watchdog).
+Command: `acarsdec --output json:file:path=- -g 34 -e --rtlsdr 0 131.525 131.725
+131.800 131.825` (EU freqs + gain hardcoded like rtl433's 433.92 — no config
+section, matching rtl433/adsb). `src/api/routes/acars_routes.py` = copy of
+rtl433_routes (start/stop/status/clear, require_admin, 503). Wired into
+`server.py` at the 6 usual spots. Frontend: reuses `PagerPanel`
+(`new PagerPanel('acars','/api/acars','ACARS',_acarsRowHtml)`) — `_acarsRowHtml`
+in `listener_panel.js` next to `_rtl433RowHtml`, shows flight/tail + label +
+text, expands `m.acars.libacars` when present. `.pager-row--acars` /
+`.pager-row__decoded` CSS in `listener.css`. `scripts/install.sh` new section 12
+(inside the RTL-SDR opt-in block) builds `f00b4r0/acarsdec` + `szpajder/libacars`
+from source; sections 12-28 renumbered to 13-29. `tests/test_acars_listener.py`
+(6 tests, FastAPI-free, fakes the subprocess with asyncio.StreamReader).
+Track A of the plugin plan — next: B1-B4 (registries) then B5 extract to
+`plugins/apps/acars/`. Not Pi-verified.

@@ -38,6 +38,33 @@ function _rtl433RowHtml(m, esc) {
     `;
 }
 
+// acarsdec --output json: one object per decoded ACARS message. Fixed
+// envelope fields (timestamp/tail/flight/label/text); when acarsdec was
+// built with libacars and the message is a recognised standard type, an
+// expanded `acars`/`libacars` sub-object carries the decoded fields --
+// pretty-printed underneath the raw text.
+function _acarsRowHtml(m, esc) {
+    const ts = m.timestamp || m.received_at;
+    const time = ts
+        ? new Date(ts * 1000).toLocaleTimeString([], {
+            hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+        })
+        : '';
+    const who = [m.flight, m.tail].filter(Boolean).join('  ');
+    const label = m.label ? `[${m.label}]` : '';
+    const decoded = (m.acars && m.acars.libacars) || m.libacars;
+    const extra = decoded
+        ? `<pre class="pager-row__decoded">${esc(JSON.stringify(decoded, null, 1))}</pre>`
+        : '';
+    return `
+        <div class="pager-row pager-row--acars">
+            <span class="pager-row__time">${esc(time)}</span>
+            <span class="pager-row__proto">${esc(who || '--')} <span class="acars-label">${esc(label)}</span></span>
+            <span class="pager-row__msg">${esc((m.text || '').trim() || '(no text)')}${extra}</span>
+        </div>
+    `;
+}
+
 /* ───────────────────────── Digital skin ───────────────────────── */
 
 class DigitalSkin {
@@ -413,6 +440,9 @@ class ListenerPanel {
         this._rtl433Panel = window.PagerPanel
             ? new window.PagerPanel('rtl433', '/api/rtl433', 'RTL433', _rtl433RowHtml)
             : null;
+        this._acarsPanel = window.PagerPanel
+            ? new window.PagerPanel('acars', '/api/acars', 'ACARS', _acarsRowHtml)
+            : null;
         this._adsbPanel = window.AdsbPanel ? new window.AdsbPanel() : null;
         this._dabPanel = window.DabPanel ? new window.DabPanel() : null;
         // Exposed so SidebarTelemetryRail's mini-player can show/control
@@ -474,6 +504,7 @@ class ListenerPanel {
         if (this._pagersPanel) this._pagersPanel.hide();
         if (this._pocsagPanel) this._pocsagPanel.hide();
         if (this._rtl433Panel) this._rtl433Panel.hide();
+        if (this._acarsPanel) this._acarsPanel.hide();
         if (this._adsbPanel) this._adsbPanel.hide();
         if (this._dabPanel) this._dabPanel.hide();
         if (this._dabConfigPanel) this._dabConfigPanel.hide();
@@ -488,6 +519,8 @@ class ListenerPanel {
             this._pocsagPanel.show();
         } else if (this._activeTab === 'rtl433' && this._rtl433Panel) {
             this._rtl433Panel.show();
+        } else if (this._activeTab === 'acars' && this._acarsPanel) {
+            this._acarsPanel.show();
         } else if (this._activeTab === 'adsb' && this._adsbPanel) {
             this._adsbPanel.show();
         } else if (this._activeTab === 'dab' && this._dabPanel) {
@@ -508,6 +541,7 @@ class ListenerPanel {
         if (this._activeTab === 'pagers' && this._pagersPanel) this._pagersPanel.hide();
         if (this._activeTab === 'pocsag' && this._pocsagPanel) this._pocsagPanel.hide();
         if (this._activeTab === 'rtl433' && this._rtl433Panel) this._rtl433Panel.hide();
+        if (this._activeTab === 'acars' && this._acarsPanel) this._acarsPanel.hide();
         if (this._activeTab === 'adsb' && this._adsbPanel) this._adsbPanel.hide();
         if (this._activeTab === 'dab' && this._dabPanel) this._dabPanel.hide();
         if (this._activeTab === 'dabconfig' && this._dabConfigPanel) this._dabConfigPanel.hide();
@@ -540,6 +574,7 @@ class ListenerPanel {
                 <button type="button" class="lsn-tabbar__btn" data-tab="pagers">Pagers</button>
                 <button type="button" class="lsn-tabbar__btn" data-tab="pocsag">POCSAG</button>
                 <button type="button" class="lsn-tabbar__btn" data-tab="rtl433">RTL433</button>
+                <button type="button" class="lsn-tabbar__btn" data-tab="acars">ACARS</button>
                 <button type="button" class="lsn-tabbar__btn" data-tab="adsb">ADS-B</button>
                 <button type="button" class="lsn-tabbar__btn" data-tab="dabconfig">DAB+ Config</button>
             </div>
@@ -633,6 +668,7 @@ class ListenerPanel {
             <div class="lsn-tab-content" data-tab="pagers" style="display:none" id="lsn-tab-pagers"></div>
             <div class="lsn-tab-content" data-tab="pocsag" style="display:none" id="lsn-tab-pocsag"></div>
             <div class="lsn-tab-content" data-tab="rtl433" style="display:none" id="lsn-tab-rtl433"></div>
+            <div class="lsn-tab-content" data-tab="acars" style="display:none" id="lsn-tab-acars"></div>
             <div class="lsn-tab-content" data-tab="adsb" style="display:none" id="lsn-tab-adsb"></div>
             <div class="lsn-tab-content" data-tab="dabconfig" style="display:none" id="lsn-tab-dabconfig"></div>
         `;
@@ -642,6 +678,7 @@ class ListenerPanel {
         if (this._pagersPanel) this._pagersPanel.mount(root.querySelector('#lsn-tab-pagers'));
         if (this._pocsagPanel) this._pocsagPanel.mount(root.querySelector('#lsn-tab-pocsag'));
         if (this._rtl433Panel) this._rtl433Panel.mount(root.querySelector('#lsn-tab-rtl433'));
+        if (this._acarsPanel) this._acarsPanel.mount(root.querySelector('#lsn-tab-acars'));
         if (this._adsbPanel) this._adsbPanel.mount(root.querySelector('#lsn-tab-adsb'));
         if (this._dabConfigPanel) this._dabConfigPanel.mount(root.querySelector('#lsn-tab-dabconfig'));
 

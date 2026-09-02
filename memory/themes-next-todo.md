@@ -70,10 +70,11 @@ Theme dir split + source tier Pi-verified working 2026-08-31.
 - **#3 plugin roadmap Phase 0** — still the big backend item. Now has a concrete
   driver: **ACARS** (see [plugin-architecture-review.md](plugin-architecture-review.md)).
   Agreed plan 2026-09-02:
-  1. **Track A** — embed ACARS as listener #6 now (~3-4 d): `src/audio/acars_listener.py`
-     (copy adsb_listener), `src/api/routes/acars_routes.py`, "Datalink" dashboard
-     tab, `acars:` config section, `scripts/install.sh` opt-in section (build
-     `f00b4r0/acarsdec` + `szpajder/libacars`).
+  1. ~~**Track A** — embed ACARS as listener #6~~ **DONE 2026-09-02**:
+     `src/audio/acars_listener.py` (copy of rtl433_listener), `acars_routes.py`,
+     RTL-SDR → ACARS sub-tab (reuses `PagerPanel`), `install.sh` section 12
+     (builds `f00b4r0/acarsdec` + `szpajder/libacars`), `tests/test_acars_listener.py`.
+     No config section (matches rtl433/adsb). Not Pi-verified yet.
   2. **B1-B4** — Phase 0 (server.py route/service registry) -> Phase 2
      (capture-source registry + lifecycle, open `Protocol` enum) -> Phase 3
      (frontend panel registry) -> plugin manifest + `setup.sh`/deps mechanism.
