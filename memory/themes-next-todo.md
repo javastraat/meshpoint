@@ -95,7 +95,8 @@ Theme dir split + source tier Pi-verified working 2026-08-31.
      - ~~**B3** — frontend panel registry~~ **DONE 2026-09-02**:
        `frontend/js/listener_panel_registry.js` (`window.registerListenerPanel`)
        + `listener_panel.js` collapsed to one `_subPanels` list. No JS tests in
-       repo -> `node --check` + manual Pi verification. Deploy pending.
+       repo -> `node --check` + manual Pi verification. Deployed + Pi-verified
+       2026-09-02 (P2000, DAB+, RTL433, ADS-B tabs — all 3 panel classes).
      - **B4** — `plugin.toml` manifest + deps mechanism (`setup.sh`).
   3. **B5** — extract Track A's ACARS code into `plugins/apps/acars/` as the
      reference plugin. `plugins/<kind>/<name>/` scheme (themes already do this).

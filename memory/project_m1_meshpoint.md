@@ -7911,7 +7911,9 @@ tx/broadcaster/fan/led/button graph deliberately untouched. Tests:
 `tests/test_create_app_listeners.py` (CI/Pi only). ast/ruff clean, ChangelogParser
 31 sections.
 
-**B3 — frontend panel registry (2026-09-02, deploy pending)**:
+**B3 — frontend panel registry (2026-09-02, deployed + Pi-verified: P2000,
+DAB+, RTL433, ADS-B tabs all switch and show live data — covers all three
+panel classes PagerPanel/DabPanel/AdsbPanel)**:
 `frontend/js/listener_panel_registry.js` (new — `window.LISTENER_PANELS` +
 `window.registerListenerPanel({tab, label, make})`, loaded in index.html right
 before `listener_panel.js`). `listener_panel.js`: the 8 hand-wired non-radio
