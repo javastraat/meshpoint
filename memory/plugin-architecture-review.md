@@ -420,6 +420,22 @@ fan/led/button graph in `lifespan` stays hand-wired (it's a real dependency
 chain, not repetitive). The `Protocol` enum opening is folded into B5 — ACARS
 is a standalone subprocess feed like rtl433 and doesn't tag the pipeline.
 
+**B3 DONE 2026-09-02 (frontend panel registry):**
+`frontend/js/listener_panel_registry.js` (new — `window.LISTENER_PANELS` array
++ `window.registerListenerPanel({tab, label, make})`; loaded in index.html just
+before `listener_panel.js`). `listener_panel.js`: the 8 hand-wired non-radio
+sub-panels (constructor `new`s, `hide()`, `_showActiveTab` if-chain,
+`_switchTab` hides, `_mount` tabbar buttons + content divs + mount calls) are
+now one `this._subPanels` list `[{tab, label, panel}]` — built from a greppable
+`builtins` literal (pager helper for the 5 PagerPanel tabs; dab/adsb/dabconfig
+gated on their own class) then `window.LISTENER_PANELS` mapped via `make()` and
+appended. New `_subPanel(tab)` finder. `_mount` generates the non-radio tabbar
+buttons + `#lsn-tab-<tab>` divs with `.map()`; radio tab stays a bespoke inline
+literal + the default branch. `window.dabPanel` still set (found by tab==='dab')
+for the sidebar mini-player. No visible change. No JS test framework in the repo
+-> `node --check` + manual Pi tab-click verification. Built-ins-first ordering
+like B1/B2.
+
 **Track A DONE 2026-09-02:** `src/audio/acars_listener.py` (copy of
 rtl433_listener), `src/api/routes/acars_routes.py`, RTL-SDR → ACARS sub-tab
 (reuses `PagerPanel` + `_acarsRowHtml`), `scripts/install.sh` section 12,

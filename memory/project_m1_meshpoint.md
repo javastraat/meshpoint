@@ -7909,5 +7909,19 @@ Listeners still built idle; `/start` route starts them. `lifespan`'s pipeline/
 tx/broadcaster/fan/led/button graph deliberately untouched. Tests:
 `tests/test_listener_registry.py` (7, pure Python, pass on Mac),
 `tests/test_create_app_listeners.py` (CI/Pi only). ast/ruff clean, ChangelogParser
-31 sections. Next: B3 (frontend panel registry), B4 (`plugin.toml`+deps), B5
-(extract ACARS to `plugins/apps/acars/`).
+31 sections.
+
+**B3 — frontend panel registry (2026-09-02, deploy pending)**:
+`frontend/js/listener_panel_registry.js` (new — `window.LISTENER_PANELS` +
+`window.registerListenerPanel({tab, label, make})`, loaded in index.html right
+before `listener_panel.js`). `listener_panel.js`: the 8 hand-wired non-radio
+sub-tabs (DAB+, P2000, Pagers, POCSAG, RTL433, ACARS, ADS-B, DAB+ Config),
+previously repeated across the constructor + `hide()` + `_showActiveTab()` +
+`_switchTab()` + `_mount()`, are now one `this._subPanels` `[{tab,label,panel}]`
+list built from a greppable `builtins` literal then `window.LISTENER_PANELS`
+(`.make()` factories) appended. `_mount()` generates the non-radio tabbar
+buttons + content divs with `.map()`; the radio tab stays bespoke/default.
+`window.dabPanel` still exported for the sidebar mini-player. No visible change.
+No JS test framework in repo -> `node --check` passes; Pi verification =
+click every tab. Next: B4 (`plugin.toml` + deps), B5 (extract ACARS to
+`plugins/apps/acars/`).

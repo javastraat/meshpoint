@@ -92,6 +92,10 @@ Theme dir split + source tier Pi-verified working 2026-08-31.
        `test_listener_registry.py` (Mac), `test_create_app_listeners.py` (CI/Pi).
        Deployed + Pi-verified 2026-09-02 — FM radio, DAB+, ADS-B, P2000,
        Pagers, RTL433 all start with live data (pager trio = tuple spec, OK).
-     - **B3** — frontend panel registry. **B4** — `plugin.toml` manifest + deps.
+     - ~~**B3** — frontend panel registry~~ **DONE 2026-09-02**:
+       `frontend/js/listener_panel_registry.js` (`window.registerListenerPanel`)
+       + `listener_panel.js` collapsed to one `_subPanels` list. No JS tests in
+       repo -> `node --check` + manual Pi verification. Deploy pending.
+     - **B4** — `plugin.toml` manifest + deps mechanism (`setup.sh`).
   3. **B5** — extract Track A's ACARS code into `plugins/apps/acars/` as the
      reference plugin. `plugins/<kind>/<name>/` scheme (themes already do this).

@@ -484,24 +484,43 @@ class ListenerPanel {
         // Kept as sibling panels rather than folded into this
         // already-large file.
         this._activeTab = 'radio';
-        this._p2000Panel = window.PagerPanel ? new window.PagerPanel('p2000', '/api/p2000', 'P2000') : null;
-        this._pagersPanel = window.PagerPanel ? new window.PagerPanel('pagers', '/api/pagers', 'Pagers') : null;
-        this._pocsagPanel = window.PagerPanel ? new window.PagerPanel('pocsag', '/api/pocsag', 'POCSAG') : null;
-        this._rtl433Panel = window.PagerPanel
-            ? new window.PagerPanel('rtl433', '/api/rtl433', 'RTL433', _rtl433RowHtml)
-            : null;
-        this._acarsPanel = window.PagerPanel
-            ? new window.PagerPanel('acars', '/api/acars', 'ACARS', _acarsRowHtml)
-            : null;
-        this._adsbPanel = window.AdsbPanel ? new window.AdsbPanel() : null;
-        this._dabPanel = window.DabPanel ? new window.DabPanel() : null;
+
+        // Every non-radio Listener sub-tab, in tabbar order. Each entry is
+        // {tab, label, panel} where panel has mount(el)/show()/hide(). The
+        // `radio` tab is bespoke (audio element + skins) and handled as the
+        // default branch, not from here. Plugins append their own entries via
+        // window.registerListenerPanel (see listener_panel_registry.js) and
+        // render after these built-ins.
+        // 'pocsag' etc. share the one RTL-SDR dongle (src/audio/sdr_registry.py)
+        // so only one of Radio/P2000/Pagers/POCSAG/RTL433/DAB+/ADS-B/ACARS runs
+        // at a time; 'dabconfig' is a read-only view over the channel-scan JSON
+        // and sits out that exclusivity dance.
+        const P = window.PagerPanel;
+        const pager = (tab, label, prefix, title, rowFn) =>
+            (P ? { tab, label, panel: new P(tab, prefix, title, rowFn) } : null);
+        const builtins = [
+            { tab: 'dab', label: 'DAB+', panel: window.DabPanel ? new window.DabPanel() : null },
+            pager('p2000', 'P2000', '/api/p2000', 'P2000'),
+            pager('pagers', 'Pagers', '/api/pagers', 'Pagers'),
+            pager('pocsag', 'POCSAG', '/api/pocsag', 'POCSAG'),
+            pager('rtl433', 'RTL433', '/api/rtl433', 'RTL433', _rtl433RowHtml),
+            pager('acars', 'ACARS', '/api/acars', 'ACARS', _acarsRowHtml),
+            { tab: 'adsb', label: 'ADS-B', panel: window.AdsbPanel ? new window.AdsbPanel() : null },
+            { tab: 'dabconfig', label: 'DAB+ Config', panel: window.DabConfigPanel ? new window.DabConfigPanel() : null },
+        ];
+        const plugins = (window.LISTENER_PANELS || []).map((d) => ({
+            tab: d.tab, label: d.label, panel: d.make ? d.make() : d.panel,
+        }));
+        this._subPanels = [...builtins, ...plugins].filter((d) => d && d.panel);
+
         // Exposed so SidebarTelemetryRail's mini-player can show/control
         // DAB+ playback too -- mirrors window.listenerPanel below.
-        if (this._dabPanel) window.dabPanel = this._dabPanel;
-        // Read-only tab over scripts/dab_channel_scan.py's JSON output --
-        // doesn't touch the dongle, so it isn't part of the exclusivity
-        // dance the other five tabs do.
-        this._dabConfigPanel = window.DabConfigPanel ? new window.DabConfigPanel() : null;
+        const dab = this._subPanels.find((d) => d.tab === 'dab');
+        if (dab) window.dabPanel = dab.panel;
+    }
+
+    _subPanel(tab) {
+        return this._subPanels.find((d) => d.tab === tab) || null;
     }
 
     _loadFavs() {
@@ -550,51 +569,26 @@ class ListenerPanel {
     hide() {
         clearInterval(this._statusTimer);
         this._statusTimer = null;
-        if (this._p2000Panel) this._p2000Panel.hide();
-        if (this._pagersPanel) this._pagersPanel.hide();
-        if (this._pocsagPanel) this._pocsagPanel.hide();
-        if (this._rtl433Panel) this._rtl433Panel.hide();
-        if (this._acarsPanel) this._acarsPanel.hide();
-        if (this._adsbPanel) this._adsbPanel.hide();
-        if (this._dabPanel) this._dabPanel.hide();
-        if (this._dabConfigPanel) this._dabConfigPanel.hide();
+        this._subPanels.forEach((d) => d.panel.hide());
     }
 
     _showActiveTab() {
-        if (this._activeTab === 'p2000' && this._p2000Panel) {
-            this._p2000Panel.show();
-        } else if (this._activeTab === 'pagers' && this._pagersPanel) {
-            this._pagersPanel.show();
-        } else if (this._activeTab === 'pocsag' && this._pocsagPanel) {
-            this._pocsagPanel.show();
-        } else if (this._activeTab === 'rtl433' && this._rtl433Panel) {
-            this._rtl433Panel.show();
-        } else if (this._activeTab === 'acars' && this._acarsPanel) {
-            this._acarsPanel.show();
-        } else if (this._activeTab === 'adsb' && this._adsbPanel) {
-            this._adsbPanel.show();
-        } else if (this._activeTab === 'dab' && this._dabPanel) {
-            this._dabPanel.show();
-        } else if (this._activeTab === 'dabconfig' && this._dabConfigPanel) {
-            this._dabConfigPanel.show();
-        } else {
-            this._refreshStatus();
-            this._statusTimer = setInterval(() => this._refreshStatus(), 500);
+        const d = this._subPanel(this._activeTab);
+        if (d) {
+            d.panel.show();
+            return;
         }
+        // radio tab (the default) -- no sibling panel, poll our own status
+        this._refreshStatus();
+        this._statusTimer = setInterval(() => this._refreshStatus(), 500);
     }
 
     _switchTab(tab) {
         if (tab === this._activeTab) return;
         clearInterval(this._statusTimer);
         this._statusTimer = null;
-        if (this._activeTab === 'p2000' && this._p2000Panel) this._p2000Panel.hide();
-        if (this._activeTab === 'pagers' && this._pagersPanel) this._pagersPanel.hide();
-        if (this._activeTab === 'pocsag' && this._pocsagPanel) this._pocsagPanel.hide();
-        if (this._activeTab === 'rtl433' && this._rtl433Panel) this._rtl433Panel.hide();
-        if (this._activeTab === 'acars' && this._acarsPanel) this._acarsPanel.hide();
-        if (this._activeTab === 'adsb' && this._adsbPanel) this._adsbPanel.hide();
-        if (this._activeTab === 'dab' && this._dabPanel) this._dabPanel.hide();
-        if (this._activeTab === 'dabconfig' && this._dabConfigPanel) this._dabConfigPanel.hide();
+        const prev = this._subPanel(this._activeTab);
+        if (prev) prev.panel.hide();
 
         this._activeTab = tab;
         const root = document.getElementById('listener-panel');
@@ -612,6 +606,15 @@ class ListenerPanel {
     _mount() {
         const root = document.getElementById('listener-panel');
         if (!root) return;
+        const esc = (s) => String(s).replace(/[&<>"]/g, (c) => (
+            { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]
+        ));
+        const tabBtns = this._subPanels.map((d) => (
+            `<button type="button" class="lsn-tabbar__btn" data-tab="${esc(d.tab)}">${esc(d.label)}</button>`
+        )).join('\n                ');
+        const tabDivs = this._subPanels.map((d) => (
+            `<div class="lsn-tab-content" data-tab="${esc(d.tab)}" style="display:none" id="lsn-tab-${esc(d.tab)}"></div>`
+        )).join('\n            ');
         root.innerHTML = `
             <header class="lsn-panel__head">
                 <h2 class="lsn-panel__title">Listener</h2>
@@ -619,14 +622,7 @@ class ListenerPanel {
 
             <div class="lsn-tabbar" id="lsn-tabbar">
                 <button type="button" class="lsn-tabbar__btn lsn-tabbar__btn--active" data-tab="radio">Radio</button>
-                <button type="button" class="lsn-tabbar__btn" data-tab="dab">DAB+</button>
-                <button type="button" class="lsn-tabbar__btn" data-tab="p2000">P2000</button>
-                <button type="button" class="lsn-tabbar__btn" data-tab="pagers">Pagers</button>
-                <button type="button" class="lsn-tabbar__btn" data-tab="pocsag">POCSAG</button>
-                <button type="button" class="lsn-tabbar__btn" data-tab="rtl433">RTL433</button>
-                <button type="button" class="lsn-tabbar__btn" data-tab="acars">ACARS</button>
-                <button type="button" class="lsn-tabbar__btn" data-tab="adsb">ADS-B</button>
-                <button type="button" class="lsn-tabbar__btn" data-tab="dabconfig">DAB+ Config</button>
+                ${tabBtns}
             </div>
 
             <div class="lsn-tab-content" data-tab="radio">
@@ -713,24 +709,12 @@ class ListenerPanel {
             </section>
             </div>
 
-            <div class="lsn-tab-content" data-tab="dab" style="display:none" id="lsn-tab-dab"></div>
-            <div class="lsn-tab-content" data-tab="p2000" style="display:none" id="lsn-tab-p2000"></div>
-            <div class="lsn-tab-content" data-tab="pagers" style="display:none" id="lsn-tab-pagers"></div>
-            <div class="lsn-tab-content" data-tab="pocsag" style="display:none" id="lsn-tab-pocsag"></div>
-            <div class="lsn-tab-content" data-tab="rtl433" style="display:none" id="lsn-tab-rtl433"></div>
-            <div class="lsn-tab-content" data-tab="acars" style="display:none" id="lsn-tab-acars"></div>
-            <div class="lsn-tab-content" data-tab="adsb" style="display:none" id="lsn-tab-adsb"></div>
-            <div class="lsn-tab-content" data-tab="dabconfig" style="display:none" id="lsn-tab-dabconfig"></div>
+            ${tabDivs}
         `;
 
-        if (this._dabPanel) this._dabPanel.mount(root.querySelector('#lsn-tab-dab'));
-        if (this._p2000Panel) this._p2000Panel.mount(root.querySelector('#lsn-tab-p2000'));
-        if (this._pagersPanel) this._pagersPanel.mount(root.querySelector('#lsn-tab-pagers'));
-        if (this._pocsagPanel) this._pocsagPanel.mount(root.querySelector('#lsn-tab-pocsag'));
-        if (this._rtl433Panel) this._rtl433Panel.mount(root.querySelector('#lsn-tab-rtl433'));
-        if (this._acarsPanel) this._acarsPanel.mount(root.querySelector('#lsn-tab-acars'));
-        if (this._adsbPanel) this._adsbPanel.mount(root.querySelector('#lsn-tab-adsb'));
-        if (this._dabConfigPanel) this._dabConfigPanel.mount(root.querySelector('#lsn-tab-dabconfig'));
+        this._subPanels.forEach((d) => {
+            d.panel.mount(root.querySelector('#lsn-tab-' + d.tab));
+        });
 
         root.querySelector('#lsn-tabbar').addEventListener('click', (ev) => {
             const btn = ev.target.closest('[data-tab]');
