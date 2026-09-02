@@ -37,8 +37,14 @@ def plugin_asset_tags(manifests: list[PluginManifest]) -> str:
                 f'<link rel="stylesheet" href="{plugin_asset_url(m.name, css)}">'
             )
         for js in m.frontend_scripts:
+            # Plain <script>, matching every other dashboard script: runs in
+            # document order at the marker -- after listener_panel_registry.js
+            # (defines registerListenerPanel), before app.js. Guarantees the
+            # plugin is registered before any app code runs, without depending
+            # on app.js constructing panels lazily (a deferred script runs
+            # after app.js, so it would only work while that stays true).
             tags.append(
-                f'<script src="{plugin_asset_url(m.name, js)}" defer></script>'
+                f'<script src="{plugin_asset_url(m.name, js)}"></script>'
             )
     return "".join(tags)
 
@@ -62,9 +68,9 @@ def resolve_plugin_asset(
 
 
 def inject_plugin_assets(html: str, manifests: list[PluginManifest]) -> str:
-    """Insert `<link>`/`<script defer>` tags for every loaded panel plugin at
-    the ``<!-- meshpoint:plugin-panels -->`` marker (or, failing that, just
-    before ``</body>``)."""
+    """Insert `<link>`/`<script>` tags for every loaded panel plugin at the
+    ``<!-- meshpoint:plugin-panels -->`` marker (or, failing that, just before
+    ``</body>``)."""
     tags = plugin_asset_tags(manifests)
     if not tags:
         return html

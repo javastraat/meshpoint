@@ -36,7 +36,7 @@ class TestInjectPluginAssets(unittest.TestCase):
             '<link rel="stylesheet" href="/plugins/apps/acars/frontend/a.css">', out,
         )
         self.assertIn(
-            '<script src="/plugins/apps/acars/frontend/a.js" defer></script>', out,
+            '<script src="/plugins/apps/acars/frontend/a.js"></script>', out,
         )
         # injected before the marker, i.e. before app.js has already run? no --
         # after the app.js line but style before script

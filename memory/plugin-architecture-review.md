@@ -500,7 +500,10 @@ deps, TBD in B5).
 validates existence + no `..` escape; `"panel"` in provides with no scripts ->
 `PluginManifestError("frontend")`). `PluginManifest.frontend_scripts` /
 `frontend_styles`. `src/plugins/assets.py` (new, FastAPI-free):
-`inject_plugin_assets(html, manifests)` inserts `<link>` + `<script defer>` for
+`inject_plugin_assets(html, manifests)` inserts `<link>` + plain `<script>`
+(matching every other dashboard script; runs in order at the marker, before
+app.js -- not `defer`, which would run after app.js and only work while panels
+are built lazily) for
 each loaded `panel` plugin at the `<!-- meshpoint:plugin-panels -->` marker
 (added to index.html just before `app.js`; falls back to before `</body>`);
 `plugin_asset_url`/`plugin_asset_tags`; `resolve_plugin_asset(manifests,

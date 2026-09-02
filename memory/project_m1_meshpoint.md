@@ -7967,7 +7967,9 @@ Full form once plugins exist: "plugins: N of M loaded (...)".
 existence + no `..`; a `panel` plugin must declare ≥1 script).
 `PluginManifest.frontend_scripts`/`frontend_styles`. `src/plugins/assets.py`
 (FastAPI-free): `inject_plugin_assets(html, manifests)` adds `<link>` +
-`<script defer>` per loaded `panel` plugin at the new
+plain `<script>` (matches every other dashboard script — runs in order at the
+marker, before `app.js`; not `defer`, which runs after app.js and would only
+work while panels are constructed lazily) per loaded `panel` plugin at the
 `<!-- meshpoint:plugin-panels -->` marker in `frontend/index.html` (right
 before `app.js`); `resolve_plugin_asset(manifests, id, path)` — the security
 core. `server.py`: `serve_dashboard_root` injects after `stamp_default_theme` /
