@@ -6,6 +6,7 @@
 const MAP_VIEW_STORAGE_KEY = 'meshpoint.nodeMap.view';
 const MAP_PROTO_STORAGE_KEY = 'meshpoint.nodeMap.protocols';
 const MAP_CLUSTER_STORAGE_KEY = 'meshpoint.nodeMap.clustered';
+const MAP_BASEMAP_STORAGE_KEY = 'meshpoint.nodeMap.basemap';
 const MAP_DEFAULT_CENTER = [39.8, -98.5];
 const MAP_DEFAULT_ZOOM = 4;
 
@@ -29,6 +30,7 @@ class NodeMap {
         this._protoDummies = {};      // protocol -> dummy layer used as a control toggle
         this._enabledProtocols = this._loadEnabledProtocols();  // Set, or null = all
         this._clustered = this._loadClusterPref();
+        this._basemapLight = this._loadBasemapPref();
         this._initialized = false;
         this._hasFitBounds = false;
         this._init();
@@ -57,6 +59,7 @@ class NodeMap {
             maxZoom: 19,
         }).addTo(this._map);
 
+        this._applyBasemap();
         this._wireResizeRecalc();
 
         this._topologyLayer = L.layerGroup();
@@ -196,6 +199,38 @@ class NodeMap {
         try { return localStorage.getItem(MAP_CLUSTER_STORAGE_KEY) !== 'off'; }
         catch (_e) { return true; }
     }
+
+    // ---- basemap: dark-inverted <-> native OSM colours ---------------
+
+    _loadBasemapPref() {
+        try {
+            const v = localStorage.getItem(MAP_BASEMAP_STORAGE_KEY);
+            if (v === 'light') return true;
+            if (v === 'dark') return false;
+        } catch (_e) { /* fall through */ }
+        // No explicit choice yet: match what the theme would do today
+        // (only the `light` theme ships a native basemap).
+        return document.documentElement.getAttribute('data-theme') === 'light';
+    }
+
+    _applyBasemap() {
+        const el = document.getElementById(this._containerId);
+        if (!el) return;
+        el.classList.toggle('map--basemap-light', this._basemapLight);
+        el.classList.toggle('map--basemap-dark', !this._basemapLight);
+    }
+
+    /** Toggle the basemap between dark-inverted and native. Returns the new state (true = light). */
+    toggleBasemap() {
+        this._basemapLight = !this._basemapLight;
+        try {
+            localStorage.setItem(MAP_BASEMAP_STORAGE_KEY, this._basemapLight ? 'light' : 'dark');
+        } catch (_e) { /* best-effort */ }
+        this._applyBasemap();
+        return this._basemapLight;
+    }
+
+    basemapIsLight() { return this._basemapLight; }
 
     // ---- per-protocol layer filter -----------------------------------
 

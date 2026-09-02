@@ -7840,3 +7840,13 @@ case-insensitive marker lookup and colours lines by kind (route=cyan/
 direct=green/neighbour=amber, reads --accent-* at draw time). Old
 `/api/analytics/topology` server route left in place (documented "legacy" in
 docs/API-ENDPOINTS.md), just no longer called by the frontend.
+
+**Dashboard map basemap toggle (2026-09-01)**: `#map-basemap-btn` in the map
+panel header (after home). `NodeMap.toggleBasemap()`/`basemapIsLight()` add
+`.map--basemap-light` / `.map--basemap-dark` to `#map`; CSS in dashboard.css
+`!important`-overrides the theme's tile filter (dark = the invert(1) filter,
+light = filter:none). Persisted `meshpoint.nodeMap.basemap` (light|dark);
+unset = seed from `data-theme === 'light'`. app.js swaps the button glyph
+sun<->moon via `window.themeGlyph`. Scoped to `#map` only — topology/adsb maps
+still follow the theme. Sunlight theme deliberately left as-is (still gets the
+inverted map unless the user flips this button).

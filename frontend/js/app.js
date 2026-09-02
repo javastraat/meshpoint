@@ -204,6 +204,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         mapHomeBtn.addEventListener('click', () => nodeMap.centerOnHome());
     }
 
+    const mapBasemapBtn = document.getElementById('map-basemap-btn');
+    if (mapBasemapBtn) {
+        const syncBasemapBtn = (light) => {
+            mapBasemapBtn.innerHTML = window.themeGlyph
+                ? window.themeGlyph(light ? 'moon' : 'sun', 14)
+                : '';
+            mapBasemapBtn.title = light ? 'Darken the map' : 'Lighten the map';
+        };
+        syncBasemapBtn(nodeMap.basemapIsLight());
+        mapBasemapBtn.addEventListener('click', () => syncBasemapBtn(nodeMap.toggleBasemap()));
+    }
+
     const mapClusterBtn = document.getElementById('map-cluster-btn');
     if (mapClusterBtn) {
         const syncClusterBtn = (clustered) => {

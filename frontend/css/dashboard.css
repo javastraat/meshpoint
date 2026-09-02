@@ -329,6 +329,14 @@ html, body {
     filter: invert(1) hue-rotate(180deg) saturate(0.22) brightness(0.72) contrast(1.22);
 }
 
+/* Manual basemap toggle (map header button) -- wins over the theme rule. */
+#map.map--basemap-dark .leaflet-tile-pane {
+    filter: invert(1) hue-rotate(180deg) saturate(0.22) brightness(0.72) contrast(1.22) !important;
+}
+#map.map--basemap-light .leaflet-tile-pane {
+    filter: none !important;
+}
+
 #map .leaflet-control-attribution {
     background: var(--bg-popover) !important;
     color: var(--text-muted) !important;
