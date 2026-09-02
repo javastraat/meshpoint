@@ -306,18 +306,22 @@
     top: 2px;
     background: var(--text-muted);
     border-radius: 50%;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);
     transition: transform 0.2s, background 0.2s, box-shadow 0.2s;
 }
 
 .r-switch input:checked + .r-switch__track {
-    background: rgba(6, 182, 212, 0.18);
+    /* Solid fill, not a translucent tint -- a low-alpha blend over the
+       track reads fine on the original dark theme but washes out on light
+       and disappears on high-contrast's near-black surfaces. */
+    background: var(--accent-cyan);
     border-color: var(--accent-cyan);
 }
 
 .r-switch input:checked + .r-switch__track::before {
     transform: translateX(18px);
-    background: var(--accent-cyan);
-    box-shadow: var(--glow-cyan);
+    background: #ffffff;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25), var(--glow-cyan);
 }
 
 /* Buttons. */
