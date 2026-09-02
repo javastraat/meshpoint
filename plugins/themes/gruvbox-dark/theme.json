@@ -1,7 +1,7 @@
 {
   "id": "gruvbox-dark",
   "label": "Gruvbox Dark",
-  "icon": "palette",
+  "icon": "leaf",
   "locked": true,
   "author": "Pavel Pertsev",
   "homepage": "https://github.com/morhetz/gruvbox",

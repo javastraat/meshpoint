@@ -27,10 +27,12 @@ SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]{1,38}$")
 
 MAX_CSS_BYTES = 64 * 1024
 
-# Matches the keyword set the dashboard's theme toggle knows (GLYPHS in
-# frontend/js/app.js); anything else falls back to "palette".
+# Keep in sync with THEME_GLYPH_KEYS in frontend/js/theme_glyphs.js;
+# anything else falls back to "palette".
 _KNOWN_ICONS = {
     "moon", "contrast", "sun", "day", "monitor", "terminal", "palette", "circle",
+    "snowflake", "leaf", "flower", "wave", "droplet", "sparkles", "atom",
+    "mountain", "eye",
 }
 
 _IMPORT_RE = re.compile(r"@import\b", re.IGNORECASE)

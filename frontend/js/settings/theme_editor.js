@@ -473,6 +473,7 @@
             const el = this.installedEl;
             if (!el) return;
             if (!this.themes.length) { el.innerHTML = '<p class="cfg-card__hint">No themes found.</p>'; return; }
+            const glyph = (key) => (window.themeGlyph ? window.themeGlyph(key, 18) : '');
             const row = (t) => {
                 const isPlugin = (t.source || 'builtin') === 'plugin';
                 const locked = isPlugin && !!t.locked;
@@ -480,7 +481,10 @@
                 const badgeLabel = isPlugin ? (locked ? 'Community' : 'Custom') : 'Built-in';
                 const meta = [t.author, t.description].filter(Boolean).map((s) => this._esc(s)).join(' — ');
                 return `<tr>
-                    <td>${this._esc(t.label || t.id)}<br><code class="te-installed__id">${this._esc(t.id)}</code></td>
+                    <td class="te-installed__name">
+                        <span class="te-installed__icon">${glyph(t.icon)}</span>
+                        <span>${this._esc(t.label || t.id)}<br><code class="te-installed__id">${this._esc(t.id)}</code></span>
+                    </td>
                     <td><span class="te-installed__badge te-installed__badge--${badgeMod}">${badgeLabel}</span></td>
                     <td class="te-installed__meta">${meta}</td>
                     <td class="te-installed__act">${isPlugin && !locked ? `<button type="button" class="te-installed__del" data-te-del="${this._esc(t.id)}">Delete</button>` : ''}</td>

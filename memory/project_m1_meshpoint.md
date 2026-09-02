@@ -7775,3 +7775,33 @@ updated everywhere (README/CHANGELOG/CONFIGURATION/default.yaml). Picker now
 Accessibility Q&A recorded: `high-contrast` = low-vision pick, `colorblind-safe`
 + the fork-wide CB-safe chart palette cover colour-vision deficiency; a theme
 can't change text size (browser zoom for that).
+
+**Topbar theme button: hold for a picker (2026-09-01, commit 363c57d)**: quick
+click still cycles; a ~450ms press-and-hold (mouse or touch) opens a popover
+listing every discovered theme with the current one highlighted — pick one to
+jump straight to it (no more 16 clicks to reach theme 17 of 18). Closes on
+select / outside-click / Escape. `frontend/js/app.js` (~109 lines added to
+`_registerThemeToggle`) + `frontend/topbar/topbar.css`.
+
+**Locked theme pack (2026-09-01, commit d3eff3e)**: shipped/example themes in
+`plugins/themes/` now carry `"locked": true` in their `theme.json`. `scan_themes`
+adds `locked: bool` to every plugin entry (`_scan_dir`, non-builtin branch).
+`theme_store.py` `save_theme`/`delete_theme` refuse a folder whose existing
+manifest is locked (`_is_locked()` → `ThemeSaveError("reserved", ...)`). The
+Installed-themes manager now shows THREE badges: **Built-in** (frontend/themes),
+**Community** (locked plugin = shipped, no Delete button), **Custom** (unlocked
+plugin = you saved it, deletable). So users can only remove their own themes,
+not the bundled pack. All 14 bundled plugin manifests got `"locked": true`.
+tests: +8 registry, +23 store.
+
+**Theme icon glyph set (2026-09-01)**: extracted the topbar theme button's inline
+SVG icons into `frontend/js/theme_glyphs.js` — `window.themeGlyph(key, size=16)`
++ `window.THEME_GLYPH_KEYS`. Used by `app.js` `_registerThemeToggle` (button +
+hold-picker) AND `theme_editor.js` `_renderInstalled()` (new icon column in the
+Installed-themes table). Added 9 glyphs: snowflake/leaf/flower/wave/droplet/
+sparkles/atom/mountain/eye. Community pack icons reassigned off the generic
+`palette`: nord=snowflake, everforest/gruvbox=leaf, rose-pine=flower,
+kanagawa=wave, catppuccin=droplet, dracula=sparkles, one-dark=atom,
+ayu-mirage=mountain, colorblind-safe=eye. `_KNOWN_ICONS` in `theme_store.py`
+kept in sync (comment cross-references both files). Icon = theme identity;
+badge = source. Loaded via `<script>` before theme_controller.js in index.html.

@@ -99,6 +99,13 @@ class TestSaveTheme(unittest.TestCase):
         self.assertEqual(manifest["icon"], "terminal")
         self.assertEqual(manifest["homepage"], "https://ok.example")
 
+    def test_keeps_pack_icons(self) -> None:
+        # icons introduced with the community pack (theme_glyphs.js)
+        for icon in ("snowflake", "leaf", "wave", "droplet", "atom", "eye"):
+            save_theme(self.dir, self._spec(id=f"t-{icon}", icon=icon), _BUILTINS)
+            manifest = json.loads((self.dir / f"t-{icon}" / "theme.json").read_text())
+            self.assertEqual(manifest["icon"], icon)
+
     def test_refuses_to_overwrite_locked_theme(self) -> None:
         save_theme(self.dir, self._spec(), _BUILTINS)
         manifest_path = self.dir / "my-theme" / "theme.json"

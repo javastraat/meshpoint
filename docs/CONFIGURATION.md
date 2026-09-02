@@ -980,7 +980,7 @@ Changes to `host`/`port`/`static_dir`/`plugins_dir` take effect on service resta
 |---|---|---|
 | `id` | required | short slug; must match the folder name |
 | `label` | required | display name in the picker |
-| `icon` | optional | one of `moon` `sun` `day` `contrast` `monitor` `terminal` `palette` `circle` (defaults to a generic dot) |
+| `icon` | optional | a keyword from `frontend/js/theme_glyphs.js` — `moon` `sun` `day` `contrast` `monitor` `terminal` `palette` `circle` `snowflake` `leaf` `flower` `wave` `droplet` `sparkles` `atom` `mountain` `eye` (unknown → `moon`) |
 | `order` | built-ins only | integer curation sequence; **ignored for `plugins/themes/`** — those sort alphabetically by label in a separate "Community" group, always below the built-ins |
 | `author` | optional | credit shown in the theme builder |
 | `homepage` | optional | URL shown as a `↗` link next to the credit |

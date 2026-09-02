@@ -4,9 +4,12 @@ Backlog after the v0.8.1 themes + full frontend colour-tokenization push. See
 [plugin-architecture-review.md](plugin-architecture-review.md) — the themes work
 was "Spike 1" of that plan.
 
-**Status (2026-08-31): everything below is done and Pi-verified except #3.**
-18 themes ship (4 built-in + 14 community incl. `colorblind-safe`); Settings →
-Themes has the live builder with Save-to-device + the Installed-themes manager.
+**Status (2026-09-01): everything below is done and Pi-verified except #3.**
+18 themes ship (4 built-in + 14 bundled community incl. `colorblind-safe`).
+Settings → Themes has the live builder with Save-to-device + the Installed-themes
+manager (badges: Built-in / Community = locked/shipped / Custom = your saves,
+only Custom is deletable). Topbar theme button: quick-click cycles, press-and-hold
+opens a full picker popover.
 
 Original backlog table, ranked by bang-for-buck:
 
@@ -53,6 +56,14 @@ Theme dir split + source tier Pi-verified working 2026-08-31.
   accents, neutral high-contrast base). Own CSS, palette values only, credited.
   18 themes total. `high-contrast` stays the low-vision pick; charts already
   CB-safe fork-wide.
+
+- **Hold-for-picker on the topbar theme button** (2026-09-01): ~450ms hold →
+  popover listing all themes; quick click still cycles. `app.js` + `topbar.css`.
+
+- **Locked theme pack** (2026-09-01): bundled `plugins/themes/` manifests carry
+  `"locked": true`; `theme_store` won't overwrite/delete a locked folder;
+  Installed-themes manager splits Community (locked, no delete) vs Custom (your
+  saves, deletable). `scan_themes` adds `locked: bool` to plugin entries.
 
 ## Open
 

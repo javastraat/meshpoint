@@ -1,7 +1,7 @@
 {
   "id": "kanagawa",
   "label": "Kanagawa",
-  "icon": "palette",
+  "icon": "wave",
   "locked": true,
   "author": "rebelot",
   "homepage": "https://github.com/rebelot/kanagawa.nvim",
