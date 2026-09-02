@@ -79,13 +79,17 @@ Theme dir split + source tier Pi-verified working 2026-08-31.
      (capture-source registry + lifecycle, open `Protocol` enum) -> Phase 3
      (frontend panel registry) -> plugin manifest + `setup.sh`/deps mechanism.
      ~3 wk. Guarded by the 143-file suite + `docs/plans/*-tests/`.
-     - ~~**B1** — router registry~~ **DONE 2026-09-02**, scoped to routers only:
-       `src/api/route_registry.py` + `_BUILTIN_ROUTERS` data list + loop in
-       `create_app`. `lifespan` left alone (that's B2). Tests:
+     - ~~**B1** — router registry~~ **DONE + Pi-verified 2026-09-02**, scoped to
+       routers only: `src/api/route_registry.py` + `_BUILTIN_ROUTERS` data list
+       + loop in `create_app`. `lifespan` left alone (that's B2). Tests:
        `test_route_registry.py` (Mac), `test_create_app_routers.py` (CI/Pi).
-     - **B2** — capture-source / service registry with a uniform start/stop/
-       status lifecycle; open the `Protocol` enum. This is where the ~280-line
-       `lifespan` graph gets a seam.
+       Deployed — no 404 on any sidebar page.
+     - ~~**B2** — listener registry~~ **DONE 2026-09-02**, scoped to the 8
+       RTL-SDR listeners only: `src/api/listener_registry.py` + `_BUILTIN_LISTENERS`
+       list in server.py, `start_all()`/`stop_all()` in lifespan. The
+       pipeline/tx/broadcaster/fan/led/button graph stays hand-wired (not
+       repetitive). `Protocol` enum opening folded into B5. Tests:
+       `test_listener_registry.py` (Mac), `test_create_app_listeners.py` (CI/Pi).
      - **B3** — frontend panel registry. **B4** — `plugin.toml` manifest + deps.
   3. **B5** — extract Track A's ACARS code into `plugins/apps/acars/` as the
      reference plugin. `plugins/<kind>/<name>/` scheme (themes already do this).

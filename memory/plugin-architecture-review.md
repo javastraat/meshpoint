@@ -397,6 +397,29 @@ route + mini-app wiring/plugin-mount check).
 **NOT done in B1 (deferred):** the ~280-line `lifespan` dependency graph is
 untouched — the listener/service lifecycle seam is B2's job.
 
+**B2 DONE 2026-09-02 (scoped to the listener lifecycle only):**
+`src/api/listener_registry.py` (new, FastAPI-free — `register_listener(spec)`,
+`plugin_specs()`, `start_all(builtins)`, `stop_all()`, `live()`, `reset()`;
+`ListenerSpec(name, build, wire)` where `build` returns a listener or a tuple
+and `wire` gets that result). `src/api/server.py`: the 8 hand-constructed
+listeners + their 8 `if x is not None: await x.stop()` shutdown blocks are now
+a module-level `_BUILTIN_LISTENERS` list (6 specs — pagers is one spec that
+builds the 3-tuple) passed to `listener_registry.start_all(_BUILTIN_LISTENERS)`
+at lifespan startup and `await listener_registry.stop_all()` at shutdown.
+`stop_all` catches per-listener stop errors so one bad stop doesn't abort
+shutdown. Built-ins stay a greppable list in server.py — they do NOT call
+`register_listener` (same split as `_BUILTIN_ROUTERS` vs `route_registry`).
+Listeners are still built idle — their `/start` route starts them on demand.
+Nothing outside server.py referenced the old `_rtl_listener …` globals; they're
+gone. Tests: `tests/test_listener_registry.py` (7, pure Python, Mac),
+`tests/test_create_app_listeners.py` (CI/Pi — needs fastapi: names/shape,
+start_all wires all 6 route modules, `/status` routes answer `running:false`,
+plugin spec builds after built-ins, listener↔router prefix alignment).
+**NOT done in B2 (deferred):** the pipeline → tx_service → broadcaster →
+fan/led/button graph in `lifespan` stays hand-wired (it's a real dependency
+chain, not repetitive). The `Protocol` enum opening is folded into B5 — ACARS
+is a standalone subprocess feed like rtl433 and doesn't tag the pipeline.
+
 **Track A DONE 2026-09-02:** `src/audio/acars_listener.py` (copy of
 rtl433_listener), `src/api/routes/acars_routes.py`, RTL-SDR → ACARS sub-tab
 (reuses `PagerPanel` + `_acarsRowHtml`), `scripts/install.sh` section 12,

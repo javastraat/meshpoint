@@ -7874,7 +7874,8 @@ Track A of the plugin plan — next: B1-B4 (registries) then B5 extract to
 `plugins/apps/acars/`. Track A is deployed and Pi-verified working (decoded
 KLM 787s live; libacars ADS-C decode confirmed).
 
-**B1 — router registry (2026-09-02, deployed pending)**: scoped to routers
+**B1 — router registry (2026-09-02, deployed + Pi-verified: no 404 on any
+sidebar page)**: scoped to routers
 only. `src/api/route_registry.py` (new, FastAPI-free): `register_router(router,
 *, public=False)`, `registered()`, `reset()`, `RouterSpec` dataclass — the
 plugin seam for out-of-core routers under `plugins/apps/<name>/`. `server.py`:
@@ -7889,3 +7890,22 @@ Tests: `tests/test_route_registry.py` (5, pure Python, pass on Mac),
 public-count snapshot=12, known auth-levels for a few named routers, no
 duplicate method+path, mini-app wiring + `/api/nodes` 401 + plugin-router
 mount check). ast/ruff clean, ChangelogParser parses (31 sections).
+
+**B2 — listener registry (2026-09-02, deploy pending)**: scoped to the 8
+RTL-SDR subprocess listeners. `src/api/listener_registry.py` (new, FastAPI-free):
+`register_listener(ListenerSpec(name, build, wire))`, `start_all(builtins)`,
+`stop_all()`, `plugin_specs()`, `live()`, `reset()`. `build` returns a listener
+or a tuple; `wire` gets that result (pagers = one spec building the p2000/
+pagers/pocsag trio, wired via `pager_routes.init_routes(*trio)`). `server.py`:
+the 8 hand-constructed listeners in `lifespan` + their 8 `if x is not None:
+await x.stop()` shutdown blocks collapsed to a module-level `_BUILTIN_LISTENERS`
+list (6 specs) → `listener_registry.start_all(_BUILTIN_LISTENERS)` at startup,
+`await listener_registry.stop_all()` at shutdown. `stop_all` logs+swallows a
+per-listener stop error so one bad stop can't abort shutdown. Old `_rtl_listener
+… _acars_listener` module globals removed (nothing outside server.py used them).
+Listeners still built idle; `/start` route starts them. `lifespan`'s pipeline/
+tx/broadcaster/fan/led/button graph deliberately untouched. Tests:
+`tests/test_listener_registry.py` (7, pure Python, pass on Mac),
+`tests/test_create_app_listeners.py` (CI/Pi only). ast/ruff clean, ChangelogParser
+31 sections. Next: B3 (frontend panel registry), B4 (`plugin.toml`+deps), B5
+(extract ACARS to `plugins/apps/acars/`).

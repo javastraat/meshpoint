@@ -14,7 +14,7 @@ from src.analytics.signal_analyzer import SignalAnalyzer
 from src.analytics.traffic_monitor import TrafficMonitor
 from src.api.audit import AuditLogWriter
 from src.api.html_assets import bust_asset_urls
-from src.api import route_registry
+from src.api import listener_registry, route_registry
 from src.api.theme_registry import inject_theme_links, stamp_default_theme
 from src.api.audit import dependencies as audit_deps
 from src.api.auth import dependencies as auth_deps
@@ -141,14 +141,6 @@ _noise_floor_emitter_task = None
 _spectral_scan_service: SpectralScanService | None = None
 _rfenv_companion_service: RfEnvCompanionScanService | None = None
 _reticulum_service: LxmfService | None = None
-_rtl_listener: RtlListener | None = None
-_p2000_listener: PagerListener | None = None
-_pagers_listener: PagerListener | None = None
-_pocsag_listener: PagerListener | None = None
-_rtl433_listener: Rtl433Listener | None = None
-_dab_listener: DabListener | None = None
-_adsb_listener: AdsbListener | None = None
-_acars_listener: AcarsListener | None = None
 _fan_controller_task = None
 _fan_controller = None
 _temp_sampler_task = None
@@ -225,6 +217,36 @@ _BUILTIN_ROUTERS: list[tuple] = [
     (meshcore_routes.router, False),
     (rf_routes.router, False),
     (topology_routes.router, False),
+]
+
+
+# Every built-in RTL-SDR subprocess listener, in startup order. `True`-less:
+# `build` runs at lifespan startup; the listener is NOT .start()ed (its /start
+# route does that on demand). Plugins never appear here -- they append via
+# src.api.listener_registry, built right after this list. See that module.
+_BUILTIN_LISTENERS: list[listener_registry.ListenerSpec] = [
+    listener_registry.ListenerSpec(
+        "radio", RtlListener, listener_routes.init_routes,
+    ),
+    listener_registry.ListenerSpec(
+        "pagers",
+        lambda: (
+            PagerListener("p2000"),
+            PagerListener("pagers"),
+            PagerListener("pocsag"),
+        ),
+        lambda trio: pager_routes.init_routes(*trio),
+    ),
+    listener_registry.ListenerSpec(
+        "rtl433", Rtl433Listener, rtl433_routes.init_routes,
+    ),
+    listener_registry.ListenerSpec("dab", DabListener, dab_routes.init_routes),
+    listener_registry.ListenerSpec(
+        "adsb", AdsbListener, adsb_routes.init_routes,
+    ),
+    listener_registry.ListenerSpec(
+        "acars", AcarsListener, acars_routes.init_routes,
+    ),
 ]
 
 
@@ -490,40 +512,11 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
             reticulum_service=_reticulum_service,
         )
         _init_dangerous_registry(pipeline)
-        global _rtl_listener, _p2000_listener, _pagers_listener, _pocsag_listener, _rtl433_listener, _dab_listener, _adsb_listener, _acars_listener
-        _rtl_listener = RtlListener()
-        listener_routes.init_routes(_rtl_listener)
-        _p2000_listener = PagerListener("p2000")
-        _pagers_listener = PagerListener("pagers")
-        _pocsag_listener = PagerListener("pocsag")
-        pager_routes.init_routes(_p2000_listener, _pagers_listener, _pocsag_listener)
-        _rtl433_listener = Rtl433Listener()
-        rtl433_routes.init_routes(_rtl433_listener)
-        _dab_listener = DabListener()
-        dab_routes.init_routes(_dab_listener)
-        _adsb_listener = AdsbListener()
-        adsb_routes.init_routes(_adsb_listener)
-        _acars_listener = AcarsListener()
-        acars_routes.init_routes(_acars_listener)
+        listener_registry.start_all(_BUILTIN_LISTENERS)
         print_banner(config, sources=pipeline.capture_coordinator.sources)
         logger.info("Meshpoint started -- listening for packets")
         yield
-        if _rtl_listener is not None:
-            await _rtl_listener.stop()
-        if _p2000_listener is not None:
-            await _p2000_listener.stop()
-        if _pagers_listener is not None:
-            await _pagers_listener.stop()
-        if _pocsag_listener is not None:
-            await _pocsag_listener.stop()
-        if _rtl433_listener is not None:
-            await _rtl433_listener.stop()
-        if _dab_listener is not None:
-            await _dab_listener.stop()
-        if _adsb_listener is not None:
-            await _adsb_listener.stop()
-        if _acars_listener is not None:
-            await _acars_listener.stop()
+        await listener_registry.stop_all()
         if _spectral_scan_service is not None:
             await _spectral_scan_service.stop()
         if _rfenv_companion_service is not None:
