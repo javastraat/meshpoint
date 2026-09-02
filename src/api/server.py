@@ -14,6 +14,7 @@ from src.analytics.signal_analyzer import SignalAnalyzer
 from src.analytics.traffic_monitor import TrafficMonitor
 from src.api.audit import AuditLogWriter
 from src.api.html_assets import bust_asset_urls
+from src.api import route_registry
 from src.api.theme_registry import inject_theme_links, stamp_default_theme
 from src.api.audit import dependencies as audit_deps
 from src.api.auth import dependencies as auth_deps
@@ -157,6 +158,74 @@ _led_controller = None
 _button_controller_task = None
 _repeater_poller = None
 _update_check_task = None
+
+
+# Every built-in API router, in mount order. `True` = public (no auth
+# gate); `False` = behind Depends(require_auth) like every /api/* route.
+# Plugins never appear here -- they append via src.api.route_registry,
+# merged after this list in create_app.
+_BUILTIN_ROUTERS: list[tuple] = [
+    (auth_routes.router, True),
+    (metrics_routes.router, True),
+    (identity_routes.router, True),
+    (auth_config_routes.router, True),
+    (public_radar_routes.router, True),
+    (terminal_routes.router, True),
+    (update_routes.router, True),
+    (backup_routes.router, True),
+    (dangerous_routes.router, True),
+    (nodes.router, False),
+    (packets.router, False),
+    (analytics.router, False),
+    (device.router, False),
+    (system_metrics.router, True),
+    (update_check.router, False),
+    (messages.router, False),
+    (nodeinfo_routes.router, False),
+    (position_broadcast_routes.router, False),
+    (telemetry_broadcast_routes.router, False),
+    (mqtt_config_routes.router, False),
+    (upstream_config_routes.router, False),
+    (device_config_routes.router, False),
+    (gps_status.router, False),
+    (system_config_routes.router, False),
+    (hardware_config_routes.router, False),
+    (repeater_config_routes.router, False),
+    (metrics_config_routes.router, False),
+    (meshcore_config_routes.router, False),
+    (serial_config_routes.router, False),
+    (dapnet_config_routes.router, False),
+    (rfenv_companion_config_routes.router, False),
+    (pocsag_firmware_routes.router, False),
+    (pager_firmware_routes.router, False),
+    (rfenv_companion_firmware_routes.router, False),
+    (reticulum_companion_firmware_routes.router, False),
+    (rnode_firmware_routes.router, False),
+    (meshtastic_firmware_routes.router, False),
+    (meshcore_firmware_routes.router, False),
+    (config_routes.router, False),
+    (stats_routes.router, True),
+    (theme_routes.router, True),
+    (lorawan_routes.router, False),
+    (lorawan_config_routes.router, False),
+    (dapnet_routes.router, False),
+    (reticulum_routes.router, False),
+    (reticulum_config_routes.router, False),
+    (emergency_pager_routes.router, False),
+    (listener_routes.router, False),
+    (pager_routes.p2000_router, False),
+    (pager_routes.pagers_router, False),
+    (pager_routes.pocsag_router, False),
+    (rtl433_routes.router, False),
+    (dab_routes.router, False),
+    (adsb_routes.router, False),
+    (acars_routes.router, False),
+    (spectrum_routes.router, False),
+    (meshtastic_routes.router, False),
+    (meshcore_routes.router, False),
+    (rf_routes.router, False),
+    (topology_routes.router, False),
+]
 
 
 def create_app(config: AppConfig | None = None) -> FastAPI:
@@ -516,68 +585,13 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
         lifespan=lifespan,
     )
 
-    app.include_router(auth_routes.router)
-    app.include_router(metrics_routes.router)
-    app.include_router(identity_routes.router)
-    app.include_router(auth_config_routes.router)
-    app.include_router(public_radar_routes.router)
-    app.include_router(terminal_routes.router)
-    app.include_router(update_routes.router)
-    app.include_router(backup_routes.router)
-    app.include_router(dangerous_routes.router)
-
     protected = [Depends(require_auth)]
-    app.include_router(nodes.router, dependencies=protected)
-    app.include_router(packets.router, dependencies=protected)
-    app.include_router(analytics.router, dependencies=protected)
-    app.include_router(device.router, dependencies=protected)
-    app.include_router(system_metrics.router)
-    app.include_router(update_check.router, dependencies=protected)
-    app.include_router(messages.router, dependencies=protected)
-    app.include_router(nodeinfo_routes.router, dependencies=protected)
-    app.include_router(position_broadcast_routes.router, dependencies=protected)
-    app.include_router(telemetry_broadcast_routes.router, dependencies=protected)
-    app.include_router(mqtt_config_routes.router, dependencies=protected)
-    app.include_router(upstream_config_routes.router, dependencies=protected)
-    app.include_router(device_config_routes.router, dependencies=protected)
-    app.include_router(gps_status.router, dependencies=protected)
-    app.include_router(system_config_routes.router, dependencies=protected)
-    app.include_router(hardware_config_routes.router, dependencies=protected)
-    app.include_router(repeater_config_routes.router, dependencies=protected)
-    app.include_router(metrics_config_routes.router, dependencies=protected)
-    app.include_router(meshcore_config_routes.router, dependencies=protected)
-    app.include_router(serial_config_routes.router, dependencies=protected)
-    app.include_router(dapnet_config_routes.router, dependencies=protected)
-    app.include_router(rfenv_companion_config_routes.router, dependencies=protected)
-    app.include_router(pocsag_firmware_routes.router, dependencies=protected)
-    app.include_router(pager_firmware_routes.router, dependencies=protected)
-    app.include_router(rfenv_companion_firmware_routes.router, dependencies=protected)
-    app.include_router(reticulum_companion_firmware_routes.router, dependencies=protected)
-    app.include_router(rnode_firmware_routes.router, dependencies=protected)
-    app.include_router(meshtastic_firmware_routes.router, dependencies=protected)
-    app.include_router(meshcore_firmware_routes.router, dependencies=protected)
-    app.include_router(config_routes.router, dependencies=protected)
-    app.include_router(stats_routes.router)
-    app.include_router(theme_routes.router)
-    app.include_router(lorawan_routes.router, dependencies=protected)
-    app.include_router(lorawan_config_routes.router, dependencies=protected)
-    app.include_router(dapnet_routes.router, dependencies=protected)
-    app.include_router(reticulum_routes.router, dependencies=protected)
-    app.include_router(reticulum_config_routes.router, dependencies=protected)
-    app.include_router(emergency_pager_routes.router, dependencies=protected)
-    app.include_router(listener_routes.router, dependencies=protected)
-    app.include_router(pager_routes.p2000_router, dependencies=protected)
-    app.include_router(pager_routes.pagers_router, dependencies=protected)
-    app.include_router(pager_routes.pocsag_router, dependencies=protected)
-    app.include_router(rtl433_routes.router, dependencies=protected)
-    app.include_router(dab_routes.router, dependencies=protected)
-    app.include_router(adsb_routes.router, dependencies=protected)
-    app.include_router(acars_routes.router, dependencies=protected)
-    app.include_router(spectrum_routes.router, dependencies=protected)
-    app.include_router(meshtastic_routes.router, dependencies=protected)
-    app.include_router(meshcore_routes.router, dependencies=protected)
-    app.include_router(rf_routes.router, dependencies=protected)
-    app.include_router(topology_routes.router, dependencies=protected)
+    for router, public in _BUILTIN_ROUTERS:
+        app.include_router(router, dependencies=None if public else protected)
+    for spec in route_registry.registered():
+        app.include_router(
+            spec.router, dependencies=None if spec.public else protected,
+        )
 
     @app.websocket("/ws")
     async def websocket_endpoint(websocket: WebSocket):

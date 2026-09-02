@@ -382,6 +382,21 @@ deps mechanism (B1-B4, ~3 wk) -> **B5: extract Track A's code into
 `plugins/apps/acars/`** as the reference plugin. Nothing from Track A is wasted;
 B5 is move + adapt.
 
+**B1 DONE 2026-09-02 (scoped to the router registry only):**
+`src/api/route_registry.py` (new, FastAPI-free — `register_router(router, *,
+public=False)`, `registered()`, `reset()`, `RouterSpec` dataclass).
+`src/api/server.py`: the 60 hand-wired `app.include_router(...)` calls are now
+a module-level `_BUILTIN_ROUTERS: list[tuple]` (each `(router, public_bool)`,
+12 public / 48 gated) driven by one loop in `create_app`, followed by a loop
+over `route_registry.registered()`. Built-ins deliberately stay a greppable
+list in server.py — they do NOT call `register_router`; the registry is purely
+the plugin seam. No behaviour change. Tests: `tests/test_route_registry.py`
+(5, pure Python, runs on Mac), `tests/test_create_app_routers.py` (CI/Pi only —
+needs fastapi; shape + public-count snapshot + known auth-levels + no dup
+route + mini-app wiring/plugin-mount check).
+**NOT done in B1 (deferred):** the ~280-line `lifespan` dependency graph is
+untouched — the listener/service lifecycle seam is B2's job.
+
 **Track A DONE 2026-09-02:** `src/audio/acars_listener.py` (copy of
 rtl433_listener), `src/api/routes/acars_routes.py`, RTL-SDR → ACARS sub-tab
 (reuses `PagerPanel` + `_acarsRowHtml`), `scripts/install.sh` section 12,

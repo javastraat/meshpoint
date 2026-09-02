@@ -7871,4 +7871,21 @@ decode behind a `<details>`. H1 airline telemetry stays raw (carrier-proprietary
 from source; sections 12-28 renumbered to 13-29. `tests/test_acars_listener.py`
 (6 tests, FastAPI-free, fakes the subprocess with asyncio.StreamReader).
 Track A of the plugin plan — next: B1-B4 (registries) then B5 extract to
-`plugins/apps/acars/`. Not Pi-verified.
+`plugins/apps/acars/`. Track A is deployed and Pi-verified working (decoded
+KLM 787s live; libacars ADS-C decode confirmed).
+
+**B1 — router registry (2026-09-02, deployed pending)**: scoped to routers
+only. `src/api/route_registry.py` (new, FastAPI-free): `register_router(router,
+*, public=False)`, `registered()`, `reset()`, `RouterSpec` dataclass — the
+plugin seam for out-of-core routers under `plugins/apps/<name>/`. `server.py`:
+the 60 `app.include_router(...)` calls are now a module-level
+`_BUILTIN_ROUTERS: list[tuple]` (60 `(router, public_bool)` entries, 12 public /
+48 behind `Depends(require_auth)`) driven by one loop in `create_app`, then a
+second loop over `route_registry.registered()`. Built-ins stay a greppable list
+in server.py and do NOT call `register_router`. No behaviour change. The
+~280-line `lifespan` graph is deliberately untouched — that seam is B2.
+Tests: `tests/test_route_registry.py` (5, pure Python, pass on Mac),
+`tests/test_create_app_routers.py` (CI/Pi only — needs fastapi: list shape,
+public-count snapshot=12, known auth-levels for a few named routers, no
+duplicate method+path, mini-app wiring + `/api/nodes` 401 + plugin-router
+mount check). ast/ruff clean, ChangelogParser parses (31 sections).
