@@ -7976,9 +7976,29 @@ route (before the `/` catch-all) — **scoped route not a StaticFiles mount**,
 serves only manifest-declared files from either tier, no traversal, never
 exposes `plugin.toml`/`backend/`/`setup.sh`. Tests: `test_plugin_assets.py`
 (11), `test_plugin_manifest.py` +6 — pure-Python, Mac. `docs/CONFIGURATION.md`
-full manifest example. Next: B4d (`meshpoint plugin setup <id>` deps consent
-CLI), B5 (extract ACARS to a plugin). The
-create_app `route_registry.reset()`/`listener_registry.reset()` did not disturb
-the 60 built-in routers / 6 built-in listeners.
-Next: B4c (mount `plugins/apps/<id>/frontend/` + inject `<script>`/`<link>`),
-B4d (`meshpoint plugin setup <id>` consent CLI), B5 (extract ACARS).
+full manifest example. Deployed + Pi-verified 2026-09-02 (no-op: boot clean,
+HTML unchanged). The create_app
+`route_registry.reset()`/`listener_registry.reset()` did not disturb the
+built-in routers / listeners.
+
+**B5 — ACARS extracted to a plugin (2026-09-02, ⚠️ behaviour change)**:
+`plugins/apps/acars/` (community tier, opt-in `plugins.acars.enabled: true`).
+Layout: `plugin.toml`, `setup.sh` (acarsdec+libacars, was install.sh §12),
+`backend/{__init__.py (register, DEFERRED imports so listener tests need no
+fastapi), listener.py, routes.py, tests/test_listener.py}`,
+`frontend/acars_panel.{js,css}`, `README.md`. `plugins/` is now a package
+(5 `__init__.py`). REMOVED from core: `src/audio/acars_listener.py`,
+`src/api/routes/acars_routes.py`, `tests/test_acars_listener.py`; server.py
+acars imports + `_BUILTIN_ROUTERS` (60->59) + `_BUILTIN_LISTENERS` (6->5);
+`listener_panel.js` `_acars*` fns + `pager('acars',...)`; `listener.css` acars
+rules; `install.sh` §12 (sections renumbered 13-28->12-27, "6-12"->"6-11").
+`PluginRegistry.add_listener(name,build,wire=None)`. `PLUGIN_API_VERSION 1`
+documented to include fastapi.APIRouter + src.api.auth.dependencies +
+src.audio.sdr_registry. CI now `ruff check src/ tests/ plugins/` +
+`pytest tests/ plugins/`. `config/default.yaml` gained a commented `plugins:`
+block. Tests: 98 Mac pass (2 fastapi-skipped);
+`test_plugin_loader.py::TestShippedAcarsPlugin` (CI-gated). **Plugin roadmap
+B1-B5 COMPLETE.** Pi deploy: (1) deploy -> ACARS tab gone; (2)
+`sudo bash plugins/apps/acars/setup.sh` (no-op, already built); (3) add
+`plugins.acars.enabled: true` to local.yaml + restart -> tab back.
+Remaining: B4d (deps-consent CLI, optional/low-priority).

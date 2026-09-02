@@ -1,7 +1,7 @@
 """ACARS (aircraft VHF datalink) endpoints: start / stop / status / clear.
 
-See src/audio/acars_listener.py for the listener class, and
-src/audio/sdr_registry.py for why starting this can fail with a 503
+See ``listener.py`` for the listener class, and
+``src/audio/sdr_registry.py`` for why starting this can fail with a 503
 while the FM listener, a pager kind, RTL433, DAB+ or ADS-B is active
 (only one process can hold the RTL-SDR dongle at a time; manual stop
 required by design).
@@ -15,7 +15,8 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from src.api.auth.dependencies import require_admin
 from src.api.auth.jwt_session import SessionClaims
-from src.audio.acars_listener import AcarsListener
+
+from .listener import AcarsListener
 
 router = APIRouter(prefix="/api/acars", tags=["acars"])
 

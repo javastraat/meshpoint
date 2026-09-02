@@ -51,8 +51,14 @@ class PluginRegistry:
         self._require("routes", "add_router()")
         route_registry.register_router(router, public=public)
 
-    def add_listener(self, spec: Any) -> None:
-        """Register a ``listener_registry.ListenerSpec`` -- built idle at app
-        startup, started on demand by its own ``/start`` route."""
+    def add_listener(
+        self, name: str, build: Any, wire: Any = None,
+    ) -> None:
+        """Register an RTL-SDR listener. *build* is a zero-arg callable
+        returning the listener (or a tuple of them); *wire* is an optional
+        callback handed that result to inject it into its router. Built idle
+        at app startup, started on demand by the listener's ``/start`` route."""
         self._require("listener", "add_listener()")
-        listener_registry.register_listener(spec)
+        listener_registry.register_listener(
+            listener_registry.ListenerSpec(name, build, wire),
+        )

@@ -516,6 +516,34 @@ pure-Python, pass on Mac (78 in the plugin suites total). `docs/CONFIGURATION.md
 Plugins section has the full manifest example now. Deploy still a no-op.
 NOT in B4c: B4d (`setup.sh`/apt consent CLI), B5 (extract ACARS).
 
+**B5 DONE 2026-09-02 (ACARS extracted to a community plugin):**
+`plugins/apps/acars/` -- `plugin.toml` (provides listener/routes/panel, [deps]
+apt+setup.sh, [frontend] scripts/styles), `backend/__init__.py` (`register(reg)`
+with DEFERRED imports so `backend.listener` tests without fastapi),
+`backend/listener.py` (= old `src/audio/acars_listener.py` verbatim),
+`backend/routes.py` (= old `acars_routes.py`, `from .listener import`),
+`backend/tests/test_listener.py` (the moved 6 tests, `from plugins.apps.acars...`),
+`frontend/acars_panel.{js,css}` (the 3 `_acars*` fns + `registerListenerPanel`;
+CSS = the `.acars-*`/`.pager-row--acars`/`.pager-row__decoded` rules from
+listener.css), `setup.sh` (acarsdec+libacars build, was install.sh §12),
+`README.md`. `plugins/` + `plugins/apps/` + the plugin subdirs got `__init__.py`
+(importable for tests). **Community tier** -> opt-in `plugins.acars.enabled: true`.
+REMOVED from core: `src/audio/acars_listener.py`, `src/api/routes/acars_routes.py`,
+`tests/test_acars_listener.py`; server.py `acars_routes`/`AcarsListener` imports +
+`_BUILTIN_ROUTERS` entry (60->59) + `_BUILTIN_LISTENERS` entry (6->5);
+`listener_panel.js` the `_acars*` fns + `pager('acars',...)` line; `listener.css`
+the acars rules; `install.sh` §12 (renumbered 13-28 -> 12-27, "sections 6-12" ->
+"6-11", 5 sub-tools not 6). `frontend/sidebar/listener_badge.js` keeps its
+1-line `acars: 'ACARS'` owner label (module-local const, not patchable; harmless
+-- `sdr_registry` still lists `acars` as a valid owner). `PluginRegistry.add_listener`
+signature -> `add_listener(name, build, wire=None)` (builds the ListenerSpec
+internally so plugins don't import `listener_registry`). `PLUGIN_API_VERSION 1`
+now documented to include: `fastapi.APIRouter`, `src.api.auth.dependencies`
+(`require_admin`/`SessionClaims`), `src.audio.sdr_registry`. CI: `ruff check` +
+`pytest` now include `plugins/`. `tests/test_plugin_loader.py` +
+`TestShippedAcarsPlugin` (fastapi-gated). Tests 98 pass on Mac (2 skipped).
+Plugin roadmap B1-B5 COMPLETE. Remaining: B4d (deps-consent CLI, optional).
+
 **Track A DONE 2026-09-02:** `src/audio/acars_listener.py` (copy of
 rtl433_listener), `src/api/routes/acars_routes.py`, RTL-SDR → ACARS sub-tab
 (reuses `PagerPanel` + `_acarsRowHtml`), `scripts/install.sh` section 12,

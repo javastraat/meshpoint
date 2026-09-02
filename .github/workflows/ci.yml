@@ -29,7 +29,7 @@ jobs:
         run: pip install -r requirements.txt "ruff==0.15.1" pytest pytest-asyncio httpx
 
       - name: Lint
-        run: ruff check src/ tests/
+        run: ruff check src/ tests/ plugins/
 
       - name: Run tests
-        run: python -m pytest tests/ -v --ignore=tests/test_crypto_service.py --ignore=tests/test_meshtastic_decoder.py --ignore=tests/test_meshcore_decoder.py
+        run: python -m pytest tests/ plugins/ -v --ignore=tests/test_crypto_service.py --ignore=tests/test_meshtastic_decoder.py --ignore=tests/test_meshcore_decoder.py

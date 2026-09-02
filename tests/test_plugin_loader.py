@@ -148,7 +148,7 @@ class TestLoadPlugins(unittest.TestCase):
     def test_provides_mismatch_skips_plugin(self) -> None:
         _make_plugin(self.apps, "acars", """
             def register(reg):
-                reg.add_listener(object())
+                reg.add_listener("x", lambda: None)
         """, provides='["routes"]')
 
         with self.assertLogs("src.plugins.loader", level=logging.ERROR):
@@ -194,6 +194,48 @@ class TestLoadPlugins(unittest.TestCase):
         with self.assertLogs("src.plugins.loader", level=logging.INFO) as logs:
             self._load({"acars": {"enabled": True}})
         self.assertTrue(any("1 of 2 loaded" in m for m in logs.output))
+
+
+try:
+    import fastapi  # noqa: F401
+    _HAS_FASTAPI = True
+except ImportError:
+    _HAS_FASTAPI = False
+
+
+@unittest.skipUnless(_HAS_FASTAPI, "acars backend imports fastapi (CI / Pi only)")
+class TestShippedAcarsPlugin(unittest.TestCase):
+    """The real plugins/apps/acars/ folder loads and registers its pieces."""
+
+    def setUp(self) -> None:
+        route_registry.reset()
+        listener_registry.reset()
+        self._community = Path(__file__).resolve().parents[1] / "plugins" / "apps"
+
+    def tearDown(self) -> None:
+        for name in [m for m in list(sys.modules) if m.startswith("meshpoint_plugin_")]:
+            del sys.modules[name]
+        route_registry.reset()
+        listener_registry.reset()
+
+    def test_acars_loads_when_enabled(self) -> None:
+        loaded = load_plugins(
+            self._community / "nonexistent-builtin",
+            self._community,
+            {"acars": {"enabled": True}},
+        )
+        self.assertIn("acars", [p.manifest.name for p in loaded])
+        self.assertTrue(
+            any(getattr(s.router, "prefix", "") == "/api/acars"
+                for s in route_registry.registered())
+        )
+        self.assertIn("acars", [s.name for s in listener_registry.plugin_specs()])
+
+    def test_acars_skipped_when_not_enabled(self) -> None:
+        loaded = load_plugins(
+            self._community / "nonexistent-builtin", self._community, {},
+        )
+        self.assertNotIn("acars", [p.manifest.name for p in loaded])
 
 
 if __name__ == "__main__":  # pragma: no cover

@@ -61,7 +61,6 @@ from src.api.routes import (
     pager_routes,
     emergency_pager_routes,
     rtl433_routes,
-    acars_routes,
     lorawan_routes,
     lorawan_config_routes,
     dapnet_routes,
@@ -108,7 +107,6 @@ from src.api.terminal import CommandCatalog, SessionManager
 from src.api.update import ReleaseChannelRegistry, UpdateApplier
 from src.api.update.rollback_state import resolve_rollback_state_path
 from src.api.upstream_client import UpstreamClient
-from src.audio.acars_listener import AcarsListener
 from src.audio.adsb_listener import AdsbListener
 from src.audio.dab_listener import DabListener
 from src.audio.pager_listener import PagerListener
@@ -221,7 +219,6 @@ _BUILTIN_ROUTERS: list[tuple] = [
     (rtl433_routes.router, False),
     (dab_routes.router, False),
     (adsb_routes.router, False),
-    (acars_routes.router, False),
     (spectrum_routes.router, False),
     (meshtastic_routes.router, False),
     (meshcore_routes.router, False),
@@ -253,9 +250,6 @@ _BUILTIN_LISTENERS: list[listener_registry.ListenerSpec] = [
     listener_registry.ListenerSpec("dab", DabListener, dab_routes.init_routes),
     listener_registry.ListenerSpec(
         "adsb", AdsbListener, adsb_routes.init_routes,
-    ),
-    listener_registry.ListenerSpec(
-        "acars", AcarsListener, acars_routes.init_routes,
     ),
 ]
 

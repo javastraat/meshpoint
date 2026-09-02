@@ -22,7 +22,6 @@ from fastapi.testclient import TestClient
 from src.api import listener_registry
 from src.api.listener_registry import ListenerSpec
 from src.api.routes import (
-    acars_routes,
     adsb_routes,
     dab_routes,
     listener_routes,
@@ -31,7 +30,7 @@ from src.api.routes import (
 )
 from src.api.server import _BUILTIN_LISTENERS
 
-_EXPECTED_NAMES = ["radio", "pagers", "rtl433", "dab", "adsb", "acars"]
+_EXPECTED_NAMES = ["radio", "pagers", "rtl433", "dab", "adsb"]
 
 
 class TestBuiltinListenerList(unittest.TestCase):
@@ -47,7 +46,7 @@ class TestBuiltinListenerList(unittest.TestCase):
 
     def test_start_all_wires_every_route_module(self) -> None:
         for mod in (listener_routes, pager_routes, rtl433_routes, dab_routes,
-                    adsb_routes, acars_routes):
+                    adsb_routes):
             getattr(mod, "reset_routes", lambda: None)()
 
         listener_registry.start_all(_BUILTIN_LISTENERS)
@@ -62,7 +61,6 @@ class TestBuiltinListenerList(unittest.TestCase):
             self.assertIsNotNone(rtl433_routes._listener)
             self.assertIsNotNone(dab_routes._listener)
             self.assertIsNotNone(adsb_routes._listener)
-            self.assertIsNotNone(acars_routes._listener)
             self.assertIsNotNone(pager_routes._p2000)
             self.assertIsNotNone(pager_routes._pagers)
             self.assertIsNotNone(pager_routes._pocsag)
@@ -74,10 +72,10 @@ class TestBuiltinListenerList(unittest.TestCase):
         try:
             app = FastAPI()
             for r in (rtl433_routes.router, dab_routes.router,
-                      adsb_routes.router, acars_routes.router):
+                      adsb_routes.router):
                 app.include_router(r)
             client = TestClient(app)
-            for prefix in ("/api/rtl433", "/api/dab", "/api/adsb", "/api/acars"):
+            for prefix in ("/api/rtl433", "/api/dab", "/api/adsb"):
                 resp = client.get(f"{prefix}/status")
                 self.assertEqual(resp.status_code, 200, prefix)
                 self.assertFalse(resp.json().get("running"), prefix)
@@ -114,7 +112,7 @@ class TestBuiltinListenerRouterAlignment(unittest.TestCase):
         from src.api.server import _BUILTIN_ROUTERS
 
         prefixes = {getattr(r, "prefix", "") for r, _ in _BUILTIN_ROUTERS}
-        for p in ("/api/rtl433", "/api/dab", "/api/adsb", "/api/acars"):
+        for p in ("/api/rtl433", "/api/dab", "/api/adsb"):
             self.assertIn(p, prefixes)
 
 

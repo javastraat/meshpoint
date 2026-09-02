@@ -332,3 +332,13 @@ lorawan:
         - name: temperature_c
           type: int16_be
           scale: 0.01
+
+# App plugins (plugins/apps/<id>/). Everything under plugins.<id> is that
+# plugin's own config; only `enabled` is read by the loader. Built-in
+# plugins (src/plugins/apps/) load unless enabled: false; community
+# drop-ins (plugins/apps/) load only with enabled: true -- an in-process
+# plugin runs with the service's privileges, so it's opt-in. See
+# docs/CONFIGURATION.md (Plugins).
+plugins: {}
+  # acars:                 # bundled ACARS decoder (plugins/apps/acars/)
+  #   enabled: false       # true to load; first run plugins/apps/acars/setup.sh

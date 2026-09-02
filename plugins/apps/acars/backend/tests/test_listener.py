@@ -13,8 +13,9 @@ import json
 import unittest
 from unittest import mock
 
-from src.audio import acars_listener, sdr_registry
-from src.audio.acars_listener import AcarsListener
+from plugins.apps.acars.backend import listener as acars_listener
+from plugins.apps.acars.backend.listener import AcarsListener
+from src.audio import sdr_registry
 
 
 def _reader(*lines: bytes, eof: bool = True) -> asyncio.StreamReader:

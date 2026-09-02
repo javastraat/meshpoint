@@ -58,9 +58,12 @@ class TestPluginRegistry(unittest.TestCase):
 
     def test_add_listener_delegates_when_declared(self) -> None:
         reg = PluginRegistry(_manifest("listener"), {})
-        spec = listener_registry.ListenerSpec("x", lambda: None)
-        reg.add_listener(spec)
-        self.assertEqual(listener_registry.plugin_specs(), [spec])
+        build = lambda: None  # noqa: E731
+        reg.add_listener("x", build, None)
+        specs = listener_registry.plugin_specs()
+        self.assertEqual(len(specs), 1)
+        self.assertEqual(specs[0].name, "x")
+        self.assertIs(specs[0].build, build)
 
     def test_add_router_rejected_when_not_in_provides(self) -> None:
         reg = PluginRegistry(_manifest("listener"), {})
@@ -71,7 +74,7 @@ class TestPluginRegistry(unittest.TestCase):
     def test_add_listener_rejected_when_not_in_provides(self) -> None:
         reg = PluginRegistry(_manifest("routes"), {})
         with self.assertRaises(PluginRegistryError):
-            reg.add_listener(object())
+            reg.add_listener("x", lambda: None)
         self.assertEqual(listener_registry.plugin_specs(), [])
 
 

@@ -117,7 +117,15 @@ Theme dir split + source tier Pi-verified working 2026-08-31.
          `GET /plugins/apps/{id}/{path}` route in server.py (declared files
          only, both tiers, no traversal). 17 new pure-Python tests. Deploy
          no-op until a plugin exists.
-       - **B4d** — `setup.sh` / apt consent mechanism (CLI: `meshpoint plugin
-         setup <name>`), never auto-run.
-  3. **B5** — extract Track A's ACARS code into `plugins/apps/acars/` as the
-     reference plugin. `plugins/<kind>/<name>/` scheme (themes already do this).
+       - **B4d** (optional, not started) — `setup.sh` / apt consent CLI
+         (`meshpoint plugin setup <name>`), never auto-run. Lower priority now
+         that B5 shipped `plugins/apps/acars/setup.sh` as a plain `sudo bash`
+         script.
+  3. ~~**B5** — extract ACARS into `plugins/apps/acars/`~~ **DONE 2026-09-02**.
+     Community tier, opt-in `plugins.acars.enabled: true` + `setup.sh`. Removed
+     from core: acars_listener.py, acars_routes.py, test_acars_listener.py,
+     server.py wiring (routers 60->59, listeners 6->5), listener_panel.js
+     `_acars*` + tab entry, listener.css acars rules, install.sh §12. CI runs
+     `plugins/` now. `PluginRegistry.add_listener(name,build,wire)`.
+     **Plugin roadmap B1-B5 complete.** ⚠️ deploy = behaviour change for ACARS
+     users (must enable + run setup.sh).
