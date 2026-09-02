@@ -8022,13 +8022,73 @@ hard browser refresh):**
 There is NO `meshpoint plugin` CLI yet -- that's B4d (not built). Nothing CLI
 to test for B5.
 
+**B6 — Plugins management page (2026-09-02, DONE, not yet live-verified)**:
+Settings → Plugins sub-page. Backend: `src/api/routes/plugin_routes.py`
+(new) — `GET /api/plugins` (any session) calls `discover_plugins(builtin_dir,
+community_dir)` fresh every request (not the startup-time `_loaded_plugins`
+list alone, so a disabled or not-yet-restarted plugin still shows up) and
+returns each manifest's `id/version/source/provides/description/author/
+apt_deps/setup_script` plus computed `enabled` (via a newly-exported
+`src.plugins.loader.is_plugin_enabled`, renamed from the loader's private
+`_is_enabled` so both call sites share one truth), `loaded` (is this plugin
+id in the startup-time `_loaded_plugins` list — i.e. actually active in the
+running process), and `restart_required` (`enabled != loaded`). `PUT
+/api/plugins/{id}` (`require_admin`, audited as `config.plugin_update`) reads
+the plugin's *existing* `config.plugins[id]` dict, merges in the new
+`enabled` bool (preserving any other keys a plugin already stores there —
+e.g. ACARS's `freqs`/`gain` — since `save_section_to_yaml("plugins", {id:
+merged})` replaces the whole `plugins.<id>` sub-dict, not just `enabled`),
+writes it, 404s on an unknown id, 403s on `PermissionError` (same
+try/except-around-save pattern as every other config route). Wired into
+`server.py`: `plugin_routes.router` added to `_BUILTIN_ROUTERS` (protected,
+alongside the other config routers) and `plugin_routes.init_routes(config,
+builtin_dir, community_dir, loaded_plugins=_loaded_plugins)` called from
+`_init_routes`. `tests/test_create_app_routers.py` router-count snapshot
+bumped 59→60. New `tests/test_plugin_routes.py` (FastAPI `TestClient`,
+mirrors `test_mqtt_config_routes.py`'s pattern — admin-override fixture,
+`patch(...save_section_to_yaml)`) — list shows builtin+community with correct
+enabled/loaded/restart_required, community defaults to disabled, empty-list
+case, PUT preserves sibling config keys, unknown id 404s, PermissionError
+403s. **Can't run on Mac (no fastapi venv, per this file's own rule) — only
+`py_compile`d; CI is the first real run.** Pure-Python
+`tests/test_plugin_loader.py` (38 tests, all pass on Mac) still green after
+the `is_plugin_enabled` rename.
+
+Frontend: `frontend/js/settings/plugins_panel_controller.js` (new) —
+`PluginsPanelController`, same shape as `DangerousPanelController` (fetch on
+first visit to the route, render one card per plugin, in-place PUT on
+toggle). Each card shows a `.r-switch` toggle (existing CSS component,
+defined in `radio.css` but previously unused anywhere in the app — this is
+its first real usage), source pill (builtin/community), version, provides
+list, an amber "requires: `<apt deps>` — run `sudo bash
+plugins/apps/<id>/setup.sh`" hint when the manifest lists apt deps, and an
+amber "restart required" line when `enabled != loaded`. Toggle failure
+(403/network) reverts the checkbox and shows the reason inline; success shows
+"Saved. Restart the service to apply." New `.plugins-panel`/`.plugin-card`
+rules in `settings.css` (parallel to `.dangerous-panel`/`.dangerous-card` but
+neutral/cyan instead of red, since disabling a plugin isn't a destructive
+action). `index.html`: new `data-section="settings/plugins"` section +
+sidebar sublist item (after Storage, before System) + script tag. `app.js`:
+route added to `allowedRoutes` (falls under the existing generic
+`settings/*` → `settings` guard section, same as Auth/Updates — no new
+`available_sections` key needed, unlike Dangerous/Storage which have their
+own), `_bootPluginsPanel(router)` wired in next to `_bootDangerousPanel`, a
+command-palette entry added. `node --check`ed both JS files; CSS brace count
+balanced (212/212).
+
+**Not yet live-verified** — needs a Pi reload to confirm: the page lists
+ACARS (currently deployed) with correct enabled/loaded state, the toggle
+actually flips `plugins.acars.enabled` in `local.yaml` and survives a
+restart, a 403 surfaces correctly for a non-admin session (viewer role can't
+reach Settings at all per the existing route guard, so this may only be
+testable by temporarily demoting the admin session), and the `.r-switch`
+CSS renders correctly across at least the dark theme (never previously
+exercised in a real layout).
+
 **Remaining plugin work** (full write-up: "Plugin system — remaining work" in
 `memory/plugin-architecture-review.md`; sketches in `memory/themes-next-todo.md`):
-- **B6** — Plugins management page (Settings sub-page; `GET /api/plugins` +
-  `PUT /api/plugins/{id}` writing `plugins.<id>.enabled` to local.yaml;
-  restart-to-apply). **User asked 2026-09-02. Next up.**
 - **B7** — plugin config schema (stop ACARS hardcoding freqs/gain; wire or drop
-  `provides=["config"]`). After B6.
+  `provides=["config"]`). Next up.
 - **B4d** — `meshpoint plugin setup <id>` deps-consent CLI + `plugins list`.
   Optional/low priority (setup.sh already works as `sudo bash`).
 - **B8** — community plugin uninstall button (delete `plugins/apps/<id>/`).

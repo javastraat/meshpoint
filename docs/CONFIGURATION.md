@@ -1218,6 +1218,13 @@ build supports, or is otherwise invalid, is logged and skipped. System
 dependencies (`[deps]`) are **not** installed automatically — run the plugin's
 setup step yourself first.
 
+**Settings → Plugins** in the dashboard (admin-only) lists every discovered
+plugin and lets you flip `plugins.<id>.enabled` without editing `local.yaml`
+by hand — `GET /api/plugins` / `PUT /api/plugins/{id}`. Since plugins load
+once at startup, the toggle only changes what a restart will load; the page
+shows both the saved setting and whether the plugin is actually loaded right
+now, and flags "restart required" when they disagree.
+
 ## Device Identity
 
 ```yaml

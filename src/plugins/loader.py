@@ -62,9 +62,13 @@ def _import_backend(manifest: PluginManifest) -> ModuleType:
     return module
 
 
-def _is_enabled(manifest: PluginManifest, conf: dict) -> bool:
+def is_plugin_enabled(manifest: PluginManifest, conf: dict) -> bool:
     """Built-ins (``src/plugins/apps/``) load unless explicitly disabled --
-    they're core-authored. Community drop-ins are opt-in."""
+    they're core-authored. Community drop-ins are opt-in.
+
+    Shared with ``src.api.routes.plugin_routes`` so the management page's
+    "enabled" flag matches exactly what a restart would actually load.
+    """
     enabled = conf.get("enabled")
     if manifest.source == SOURCE_BUILTIN:
         return enabled is not False
@@ -86,7 +90,7 @@ def load_plugins(
     for manifest in manifests:
         conf = plugins_config.get(manifest.name)
         conf = conf if isinstance(conf, dict) else {}
-        if not _is_enabled(manifest, conf):
+        if not is_plugin_enabled(manifest, conf):
             logger.info(
                 "%s plugin %s v%s present but not enabled "
                 "(set plugins.%s.enabled: true)",

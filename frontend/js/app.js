@@ -50,7 +50,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             'configuration/meshcore', 'configuration/reticulum', 'configuration/serial',
             'configuration/pocsag-serial', 'configuration/firmware',
             'configuration/repeater-poll', 'configuration/metrics',
-            'settings/updates', 'settings/themes', 'settings/auth', 'settings/dangerous', 'settings/storage',
+            'settings/updates', 'settings/themes', 'settings/auth', 'settings/dangerous', 'settings/storage', 'settings/plugins',
         ],
         guard: _buildRouteGuard(identity),
         onDenied: _toastAdminRequired,
@@ -149,6 +149,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     _bootThemeEditor(router);
     _bootConfigurationPanel(router);
     _bootDangerousPanel(router);
+    _bootPluginsPanel(router);
     _bootLoRaWANPanel(router);
     _bootDapnetPanel(router, identity);
     _bootPagerPanel(router, identity);
@@ -430,6 +431,20 @@ function _bootDangerousPanel(router) {
         primed = true;
         controller.refresh();
         backupCard?.refresh();
+    });
+}
+
+function _bootPluginsPanel(router) {
+    const root = document.getElementById('settings-plugins-panel');
+    if (!root || !window.PluginsPanelController) return;
+    const controller = new PluginsPanelController(root);
+    controller.bind();
+    let primed = false;
+    router.onRouteChange((route) => {
+        if (route !== 'settings/plugins') return;
+        if (primed) return;
+        primed = true;
+        controller.refresh();
     });
 }
 
@@ -921,6 +936,7 @@ function _bootCommandPaletteAndKeymap(router) {
         ['configuration/metrics', 'Go to Configuration · Metrics', 'Configuration'],
         ['settings/auth', 'Go to Settings · Auth', 'Settings'],
         ['settings/updates', 'Go to Settings · Updates', 'Settings'],
+        ['settings/plugins', 'Go to Settings · Plugins', 'Settings'],
         ['settings/dangerous', 'Go to Settings · System', 'Settings'],
     ];
     routeCommands.forEach(([routeId, label, group]) => {

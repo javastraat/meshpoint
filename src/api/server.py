@@ -74,6 +74,7 @@ from src.api.routes import (
     telemetry_broadcast_routes,
     nodes,
     packets,
+    plugin_routes,
     public_radar_routes,
     metrics_config_routes,
     repeater_config_routes,
@@ -196,6 +197,7 @@ _BUILTIN_ROUTERS: list[tuple] = [
     (serial_config_routes.router, False),
     (dapnet_config_routes.router, False),
     (rfenv_companion_config_routes.router, False),
+    (plugin_routes.router, False),
     (pocsag_firmware_routes.router, False),
     (pager_firmware_routes.router, False),
     (rfenv_companion_firmware_routes.router, False),
@@ -1985,6 +1987,12 @@ def _init_routes(
     serial_config_routes.init_routes(config=config, serial_sources=_find_serial_sources(coord))
     dapnet_config_routes.init_routes(dapnet_sources=_find_dapnet_sources(coord))
     rfenv_companion_config_routes.init_routes(config=config, service=_rfenv_companion_service)
+    plugin_routes.init_routes(
+        config=config,
+        builtin_dir=Path(__file__).resolve().parents[1] / "plugins" / "apps",
+        community_dir=Path(config.dashboard.plugins_dir) / "apps",
+        loaded_plugins=_loaded_plugins,
+    )
     pocsag_firmware_routes.init_routes(config=config, dapnet_sources=_find_dapnet_sources(coord))
     meshtastic_firmware_routes.init_routes(config=config, serial_sources=_find_serial_sources(coord))
     meshcore_firmware_routes.init_routes(config=config, meshcore_sources=_find_meshcore_sources(coord))

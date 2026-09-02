@@ -122,6 +122,7 @@ This is a customized fork of upstream [KMX415/meshpoint](https://github.com/KMX4
 <a id="plugins"></a>
 **Plugins**
 - **App plugins** — optional features (an RTL-SDR listener + its API routes + a dashboard tab) that live in `plugins/apps/<id>/` instead of core, wired through a `register(reg)` entry point against a small facade over Meshpoint's route and listener registries. They load from `src/plugins/apps/` (bundled) or `plugins/apps/` (drop-in); a `plugin.toml` manifest declares the API version, capabilities, apt/`setup.sh` dependencies, and frontend files. Loading is opt-in per plugin (`plugins.<id>.enabled` in `local.yaml`) because an in-process plugin runs with the service's privileges. The **ACARS** decoder is the reference plugin (`plugins/apps/acars/`). See [Configuration → Plugins](docs/CONFIGURATION.md#plugins).
+- **Settings → Plugins** — every discovered plugin (built-in or community) in one page, with a toggle for its `enabled` flag (admin-only, saved to `local.yaml`). Since plugins load once at startup, each card also shows whether it's currently loaded and flags when a restart is needed to apply a change.
 
 > Because this is a fork, a dashboard **Update** (which runs `git reset --hard origin/main`) will overwrite these changes unless your `origin` remote points at this fork rather than upstream.
 

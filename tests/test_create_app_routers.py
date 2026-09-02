@@ -53,7 +53,7 @@ class TestBuiltinRouterList(unittest.TestCase):
         self.by_id = {id(r): pub for r, pub in _BUILTIN_ROUTERS}
 
     def test_shape(self) -> None:
-        self.assertEqual(len(_BUILTIN_ROUTERS), 59)
+        self.assertEqual(len(_BUILTIN_ROUTERS), 60)
         for entry in _BUILTIN_ROUTERS:
             self.assertIsInstance(entry, tuple)
             router, public = entry

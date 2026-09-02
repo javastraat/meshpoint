@@ -375,6 +375,7 @@
                             <li class="sidebar__subitem"><a href="#/settings/themes" class="sidebar__link" data-route="settings/themes"><span class="sidebar__label">Themes</span></a></li>
                             <li class="sidebar__subitem"><a href="#/settings/auth" class="sidebar__link" data-route="settings/auth"><span class="sidebar__label">Auth</span></a></li>
                             <li class="sidebar__subitem"><a href="#/settings/storage" class="sidebar__link" data-route="settings/storage"><span class="sidebar__label">Storage</span></a></li>
+                            <li class="sidebar__subitem"><a href="#/settings/plugins" class="sidebar__link" data-route="settings/plugins"><span class="sidebar__label">Plugins</span></a></li>
                             <li class="sidebar__subitem" data-requires-section="settings.dangerous"><a href="#/settings/dangerous" class="sidebar__link" data-route="settings/dangerous"><span class="sidebar__label">System</span></a></li>
                         </ul>
                     </li>
@@ -1092,6 +1093,17 @@
                     <div class="dangerous-panel__list" data-dangerous-list></div>
                 </div>
             </section>
+
+            <section class="section" data-section="settings/plugins" style="display:none">
+                <div id="settings-plugins-panel" class="plugins-panel">
+                    <header class="plugins-panel__head">
+                        <h2 class="plugins-panel__title">Plugins</h2>
+                        <p class="plugins-panel__subtitle">Built-in and community app plugins discovered under <code>plugins/apps/</code>. Enabling or disabling one only takes effect after restarting the service.</p>
+                    </header>
+                    <p class="plugins-panel__status" data-plugins-status aria-live="polite"></p>
+                    <div class="plugins-panel__list" data-plugins-list></div>
+                </div>
+            </section>
         </main>
 
         <div id="node-backdrop" class="nd-backdrop"></div>
@@ -1177,6 +1189,7 @@
     <script src="js/settings/theme_editor.js"></script>
     <script src="js/settings/backup_restore_card.js"></script>
     <script src="js/settings/dangerous_panel_controller.js"></script>
+    <script src="js/settings/plugins_panel_controller.js"></script>
     <script src="js/configuration/identity_card.js"></script>
     <script src="js/configuration/radio_card.js"></script>
     <script src="js/configuration/radio_advanced_card.js"></script>
