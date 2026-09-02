@@ -7925,5 +7925,16 @@ list built from a greppable `builtins` literal then `window.LISTENER_PANELS`
 buttons + content divs with `.map()`; the radio tab stays bespoke/default.
 `window.dabPanel` still exported for the sidebar mini-player. No visible change.
 No JS test framework in repo -> `node --check` passes; Pi verification =
-click every tab. Next: B4 (`plugin.toml` + deps), B5 (extract ACARS to
-`plugins/apps/acars/`).
+click every tab.
+
+**B4a — plugin manifest parser (2026-09-02, no runtime change)**:
+`src/plugins/manifest.py` (new, FastAPI-free, stdlib `tomllib`) +
+`src/plugins/__init__.py`. `PLUGIN_API_VERSION = 1`. `parse_manifest(dir)` and
+`discover_plugins(apps_dir)` for `plugins/apps/<name>/plugin.toml`; frozen
+`PluginManifest` dataclass; `PluginManifestError(code, msg)`. Validates name
+(== folder, `^[a-z0-9][a-z0-9-]{1,38}$`), version, `meshpoint_api` (refused if
+> PLUGIN_API_VERSION), `provides` ⊆ {listener,routes,panel,config}, optional
+`[deps]` (apt list + setup file that must exist), `[meta]` strings.
+`tests/test_plugin_manifest.py` (17, pass on Mac). NOT wired into create_app —
+that's B4b. Next: B4b (loader + PluginRegistry facade + config.plugins.<id>),
+B4c (frontend asset mount), B4d (setup.sh consent CLI), B5 (extract ACARS).

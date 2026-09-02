@@ -97,6 +97,17 @@ Theme dir split + source tier Pi-verified working 2026-08-31.
        + `listener_panel.js` collapsed to one `_subPanels` list. No JS tests in
        repo -> `node --check` + manual Pi verification. Deployed + Pi-verified
        2026-09-02 (P2000, DAB+, RTL433, ADS-B tabs — all 3 panel classes).
-     - **B4** — `plugin.toml` manifest + deps mechanism (`setup.sh`).
+     - **B4** — `plugin.toml` manifest + loader + deps mechanism. Split:
+       - ~~**B4a** — manifest schema + `src/plugins/manifest.py` parser +
+         `discover_plugins()`~~ **DONE 2026-09-02**, pure Python, 17 tests,
+         not wired in yet (no runtime change).
+       - **B4b** — the loader: import `plugins/apps/<name>/backend/__init__.py`,
+         call `register(reg)` where `reg` is a `PluginRegistry` facade over
+         route_registry + listener_registry; `config.plugins.<id>.enabled` gate;
+         wire into `create_app`.
+       - **B4c** — mount `plugins/apps/<name>/frontend/` + inject its
+         `<script>`/`<link>` into index.html.
+       - **B4d** — `setup.sh` / apt consent mechanism (CLI: `meshpoint plugin
+         setup <name>`), never auto-run.
   3. **B5** — extract Track A's ACARS code into `plugins/apps/acars/` as the
      reference plugin. `plugins/<kind>/<name>/` scheme (themes already do this).

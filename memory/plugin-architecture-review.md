@@ -436,6 +436,23 @@ for the sidebar mini-player. No visible change. No JS test framework in the repo
 -> `node --check` + manual Pi tab-click verification. Built-ins-first ordering
 like B1/B2.
 
+**B4a DONE 2026-09-02 (plugin manifest schema + parser/discovery, not wired):**
+`src/plugins/manifest.py` (new, FastAPI-free, stdlib `tomllib`):
+`PLUGIN_API_VERSION = 1` (the contract number B1-B3's seams collectively define
+-- bump when a seam's observable contract changes), `PluginManifest` frozen
+dataclass, `parse_manifest(plugin_dir)`, `discover_plugins(apps_dir)`,
+`PluginManifestError(code, message)` with codes
+missing/toml/name/version/api/provides/deps/meta. `plugin.toml` schema:
+`name` (== folder name, SLUG_RE), `version`, `meshpoint_api` (int >= 1, refused
+if > PLUGIN_API_VERSION), `provides` (non-empty subset of
+{listener,routes,panel,config}), optional `[deps]` (`apt` = list of pkg names,
+`setup` = relative path that must exist), optional `[meta]`
+(description/homepage/author strings). `discover_plugins` scans
+`plugins/apps/*/plugin.toml`, skips+warns bad ones, returns sorted by name.
+Tests: `tests/test_plugin_manifest.py` (17, pure Python, Mac). NOT wired into
+`create_app` -- that's B4b (loader + `PluginRegistry` facade + `config.plugins.<id>`
+gate). No runtime change, nothing to deploy.
+
 **Track A DONE 2026-09-02:** `src/audio/acars_listener.py` (copy of
 rtl433_listener), `src/api/routes/acars_routes.py`, RTL-SDR → ACARS sub-tab
 (reuses `PagerPanel` + `_acarsRowHtml`), `scripts/install.sh` section 12,
