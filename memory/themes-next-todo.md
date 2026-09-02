@@ -101,10 +101,12 @@ Theme dir split + source tier Pi-verified working 2026-08-31.
        - ~~**B4a** — manifest schema + `src/plugins/manifest.py` parser +
          `discover_plugins()`~~ **DONE 2026-09-02**, pure Python, 17 tests,
          not wired in yet (no runtime change).
-       - **B4b** — the loader: import `plugins/apps/<name>/backend/__init__.py`,
-         call `register(reg)` where `reg` is a `PluginRegistry` facade over
-         route_registry + listener_registry; `config.plugins.<id>.enabled` gate;
-         wire into `create_app`.
+       - ~~**B4b** — loader + `PluginRegistry` facade + `config.plugins.<id>`
+         gate~~ **DONE 2026-09-02**: `src/plugins/loader.py` + `registry.py`,
+         `AppConfig.plugins: dict`, wired into `create_app` (with
+         route_registry/listener_registry `.reset()` first). 17 new pure-Python
+         tests. `docs/CONFIGURATION.md` `## Plugins`. Default off. No plugin
+         ships yet -> deploy is a no-op.
        - **B4c** — mount `plugins/apps/<name>/frontend/` + inject its
          `<script>`/`<link>` into index.html.
        - **B4d** — `setup.sh` / apt consent mechanism (CLI: `meshpoint plugin

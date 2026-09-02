@@ -7935,6 +7935,23 @@ click every tab.
 (== folder, `^[a-z0-9][a-z0-9-]{1,38}$`), version, `meshpoint_api` (refused if
 > PLUGIN_API_VERSION), `provides` ⊆ {listener,routes,panel,config}, optional
 `[deps]` (apt list + setup file that must exist), `[meta]` strings.
-`tests/test_plugin_manifest.py` (17, pass on Mac). NOT wired into create_app —
-that's B4b. Next: B4b (loader + PluginRegistry facade + config.plugins.<id>),
-B4c (frontend asset mount), B4d (setup.sh consent CLI), B5 (extract ACARS).
+`tests/test_plugin_manifest.py` (17, pass on Mac).
+
+**B4b — plugin loader + facade + config gate (2026-09-02, deploy = no-op)**:
+`src/plugins/registry.py` — `PluginRegistry` facade (`add_router`/`add_listener`
+-> the B1/B2 registries, checked vs `manifest.provides`; `.config` = copy of
+`config.plugins.<id>`). `src/plugins/loader.py` — `load_plugins(apps_dir,
+plugins_config)`: discover -> skip unless `plugins.<id>.enabled` -> import
+`backend/__init__.py` via `spec_from_file_location(submodule_search_locations=…)`
+(relative imports work, no `__init__.py` boilerplate) -> `module.register(reg)`;
+failures logged+skipped, never abort boot. `src/config.py` — `AppConfig.plugins:
+dict` (opaque, default `{}`), `_apply_yaml` pops+merges `plugins` before the
+section loop (no false "unknown key" on `plugins.<id>.*`). `server.py` —
+`create_app` runs `route_registry.reset(); listener_registry.reset();
+load_plugins(...)` before the router loop (resets clear only plugin regs).
+`_loaded_plugins` module global for a future `/api/plugins`. Tests: 
+`test_plugin_loader.py` (8), `test_plugin_registry_facade.py` (6),
+`test_config_loader.py` PluginsNamespaceTest (3) — all pure-Python, pass on Mac.
+`docs/CONFIGURATION.md` `## Plugins`. Default off (in-process = service privs).
+Next: B4c (mount `plugins/apps/<id>/frontend/` + inject `<script>`/`<link>`),
+B4d (`meshpoint plugin setup <id>` consent CLI), B5 (extract ACARS).

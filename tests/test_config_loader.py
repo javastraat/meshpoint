@@ -124,6 +124,47 @@ class ApplyYamlUnknownKeyTest(unittest.TestCase):
         self.assertEqual(cfg.transmit.nodeinfo.interval_minutes, 60)
 
 
+class PluginsNamespaceTest(unittest.TestCase):
+    """plugins.<id> is an opaque per-plugin mapping -- popped before the
+    section loop, never scanned for 'unknown' keys."""
+
+    def _write(self, text: str) -> Path:
+        tmp = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", delete=False, encoding="utf-8"
+        )
+        tmp.write(text)
+        tmp.close()
+        path = Path(tmp.name)
+        self.addCleanup(lambda: path.unlink(missing_ok=True))
+        return path
+
+    def test_default_is_empty_dict(self):
+        self.assertEqual(AppConfig().plugins, {})
+
+    def test_plugins_land_verbatim_without_unknown_key_warning(self):
+        cfg = AppConfig()
+        path = self._write(
+            "plugins:\n"
+            "  acars:\n"
+            "    enabled: true\n"
+            "    freqs: [131.525, 131.725]\n"
+            "    gain: 34\n"
+        )
+        with self.assertNoLogs("src.config", level="WARNING"):
+            _apply_yaml(cfg, path)
+
+        self.assertEqual(
+            cfg.plugins,
+            {"acars": {"enabled": True, "freqs": [131.525, 131.725], "gain": 34}},
+        )
+
+    def test_second_file_merges_into_existing_plugin(self):
+        cfg = AppConfig()
+        _apply_yaml(cfg, self._write("plugins:\n  acars:\n    enabled: true\n    gain: 34\n"))
+        _apply_yaml(cfg, self._write("plugins:\n  acars:\n    gain: 40\n"))
+        self.assertEqual(cfg.plugins["acars"], {"enabled": True, "gain": 40})
+
+
 class SerialDeviceConfigTest(unittest.TestCase):
     """Multi-stick Meshtastic USB capture (T5): opt-in capture.serial list."""
 

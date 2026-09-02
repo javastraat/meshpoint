@@ -453,6 +453,33 @@ Tests: `tests/test_plugin_manifest.py` (17, pure Python, Mac). NOT wired into
 `create_app` -- that's B4b (loader + `PluginRegistry` facade + `config.plugins.<id>`
 gate). No runtime change, nothing to deploy.
 
+**B4b DONE 2026-09-02 (plugin loader + PluginRegistry facade + config gate):**
+`src/plugins/registry.py` (`PluginRegistry` — `.manifest`, `.name`, `.config`
+[copy of `config.plugins.<id>`], `add_router(router, public=False)` ->
+route_registry, `add_listener(spec)` -> listener_registry; each checked against
+`manifest.provides` -> `PluginRegistryError`). `src/plugins/loader.py`
+(`load_plugins(apps_dir, plugins_config) -> list[LoadedPlugin]`: discover ->
+skip unless `plugins.<id>.enabled` truthy -> `_import_backend` via
+`importlib.util.spec_from_file_location(..., submodule_search_locations=[backend/])`
+so relative imports work and no `__init__.py` boilerplate needed under
+`plugins/apps/` -> call `module.register(reg)`; any failure logged+skipped, one
+bad plugin never stops boot). `src/config.py`: `AppConfig.plugins: dict`
+(opaque, default `{}`); `_apply_yaml` pops `plugins` before the section loop and
+merges per-id so a 2nd YAML adds rather than replaces, and
+`_collect_unknown_keys` never sees `plugins.<id>.*`. `src/api/server.py`:
+`create_app` does `route_registry.reset(); listener_registry.reset();
+_loaded_plugins = load_plugins(Path(plugins_dir)/"apps", config.plugins)` before
+the router loop — the resets clear ONLY plugin registrations (built-ins are the
+`_BUILTIN_*` literals), so repeat `create_app()` is clean (refines B1's
+no-reset note now that plugins register at create_app time, not import time).
+`_loaded_plugins` module global kept for a future `/api/plugins` endpoint.
+Tests (all pure-Python, pass on Mac): `tests/test_plugin_loader.py` (8),
+`tests/test_plugin_registry_facade.py` (6), `tests/test_config_loader.py`
++PluginsNamespaceTest (3). `docs/CONFIGURATION.md` has a `## Plugins` section.
+**NOT in B4b:** frontend asset mount/injection (B4c), `setup.sh`/apt consent
+CLI (B4d). No plugin ships yet -> deploy is a no-op (loader returns [] with no
+`plugins/apps/` dir).
+
 **Track A DONE 2026-09-02:** `src/audio/acars_listener.py` (copy of
 rtl433_listener), `src/api/routes/acars_routes.py`, RTL-SDR → ACARS sub-tab
 (reuses `PagerPanel` + `_acarsRowHtml`), `scripts/install.sh` section 12,

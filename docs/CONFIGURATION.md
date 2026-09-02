@@ -1162,6 +1162,35 @@ If you leave `require_auth: true`, Prometheus needs to authenticate on every scr
 
 ---
 
+## Plugins
+
+App plugins are out-of-core features (an extra listener + its API routes + a
+dashboard tab) that live in `plugins/apps/<id>/` and are loaded at startup — but
+**only if you explicitly enable them**. An in-process plugin runs with the same
+privileges as the Meshpoint service, so installing one is equivalent to running
+its code on your device; loading is opt-in, never automatic.
+
+```yaml
+plugins:
+  acars:                 # <id> = the plugin's folder name under plugins/apps/
+    enabled: true        # default false — the loader skips a plugin that isn't
+                         # enabled here (it's still listed in the logs as
+                         # "found but not enabled")
+    # everything else under plugins.<id> is the plugin's own config —
+    # frequencies, gain, RTL device, etc. Meshpoint stores it verbatim and
+    # hands it to the plugin; it is never checked against the core schema, so
+    # a typo here won't show up in the "unknown config key" warning.
+    freqs: [131.525, 131.725, 131.800, 131.825]
+    gain: 34
+```
+
+A plugin folder holds a `plugin.toml` manifest (`name`, `version`,
+`meshpoint_api`, `provides`, optional `[deps]` for apt packages / a `setup.sh`
+build script, optional `[meta]`). A manifest that targets a newer `meshpoint_api`
+than this build supports, or is otherwise invalid, is logged and skipped rather
+than loaded. Any system dependencies a plugin needs (`[deps]`) are **not**
+installed automatically — run the plugin's setup step yourself first.
+
 ## Device Identity
 
 ```yaml

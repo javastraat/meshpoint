@@ -109,6 +109,7 @@ from src.audio.rtl433_listener import Rtl433Listener
 from src.audio.rtl_listener import RtlListener
 from src.api.websocket_manager import WebSocketManager
 from src.config import AppConfig, SerialDeviceConfig, load_config, validate_activation
+from src.plugins.loader import load_plugins
 from src.coordinator import PipelineCoordinator
 from src.log_format import print_banner, print_packet, setup_logging
 from src.models.device_identity import DeviceIdentity, _stable_device_id
@@ -150,6 +151,7 @@ _led_controller = None
 _button_controller_task = None
 _repeater_poller = None
 _update_check_task = None
+_loaded_plugins = []  # list[src.plugins.loader.LoadedPlugin], set by create_app
 
 
 # Every built-in API router, in mount order. `True` = public (no auth
@@ -253,6 +255,17 @@ _BUILTIN_LISTENERS: list[listener_registry.ListenerSpec] = [
 def create_app(config: AppConfig | None = None) -> FastAPI:
     if config is None:
         config = load_config()
+
+    # Discover + register enabled app plugins before the router / listener
+    # lists below are consumed. reset() clears only plugin registrations --
+    # built-ins live in the _BUILTIN_* literals, never in the registries --
+    # so a second create_app() (tests) starts clean.
+    route_registry.reset()
+    listener_registry.reset()
+    global _loaded_plugins
+    _loaded_plugins = load_plugins(
+        Path(config.dashboard.plugins_dir) / "apps", config.plugins,
+    )
 
     auth_subsystem = build_auth_subsystem(config)
     auth_routes.init_routes(auth_subsystem.service)

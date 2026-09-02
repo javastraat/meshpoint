@@ -821,6 +821,12 @@ class AppConfig:
     update_check: UpdateCheckConfig = field(default_factory=UpdateCheckConfig)
     dapnet: DapnetConfig = field(default_factory=DapnetConfig)
     reticulum: ReticulumConfig = field(default_factory=ReticulumConfig)
+    # Per-plugin config, keyed by plugin id (folder name under
+    # plugins/apps/). Opaque: each plugin owns its own sub-schema. The
+    # loader only reads plugins.<id>.enabled (default false -- an
+    # in-process plugin runs with the service user's rights, so loading
+    # is opt-in). See src/plugins/loader.py.
+    plugins: dict = field(default_factory=dict)
 
 
 def _resolve_radio_frequency(radio: "RadioConfig") -> None:
@@ -888,6 +894,20 @@ def _apply_yaml(cfg: AppConfig, path: Path) -> None:
     if not isinstance(raw, dict):
         logger.warning("Ignoring %s: top-level YAML is not a mapping.", path)
         return
+
+    # plugins.<id> is an opaque per-plugin mapping (the plugin owns its
+    # sub-schema). Pop it before the section loop so _collect_unknown_keys
+    # doesn't flag plugins.<id>.* as typos, and merge onto any existing
+    # value so a second YAML file adds plugins rather than replacing them.
+    plugins_raw = raw.pop("plugins", None)
+    if isinstance(plugins_raw, dict):
+        for plugin_id, plugin_conf in plugins_raw.items():
+            if isinstance(plugin_conf, dict) and isinstance(
+                cfg.plugins.get(plugin_id), dict
+            ):
+                cfg.plugins[plugin_id].update(plugin_conf)
+            else:
+                cfg.plugins[plugin_id] = plugin_conf
 
     # meshcore_usb supports both a legacy single-dict and a new list-of-dicts.
     # Pop it before the generic merge so _merge_dataclass doesn't store raw dicts.
