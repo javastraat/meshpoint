@@ -166,7 +166,14 @@ class PagerPanel {
         }
         if (text) {
             if (status.running) {
-                text.textContent = `listening on ${Number(status.frequency_mhz).toFixed(4)} MHz`;
+                const f = status.frequencies;
+                if (Array.isArray(f) && f.length > 1) {
+                    text.textContent = `listening on ${f.length} channels (${f[0]}–${f[f.length - 1]} MHz)`;
+                } else if (Array.isArray(f) && f.length === 1) {
+                    text.textContent = `listening on ${f[0]} MHz`;
+                } else {
+                    text.textContent = `listening on ${Number(status.frequency_mhz).toFixed(4)} MHz`;
+                }
             } else if (busyOwner) {
                 text.textContent = `busy -- in use by ${_DONGLE_OWNER_LABELS[busyOwner] || busyOwner}`;
             } else if (status.last_error) {
