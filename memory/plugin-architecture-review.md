@@ -337,3 +337,38 @@ discovered — a `plugins/<kind>/<name>/` folder + a manifest, scanned at boot.
 **Next after it proves out:** Phase 0 route/service registry refactor of
 `src/api/server.py` (bigger, but the highest-leverage internal win), then Phase 2
 decoder registry + opening the `Protocol` enum.
+
+---
+
+## Reference plugin candidate: ACARS (2026-09-02)
+
+The user wants ACARS decoding (aircraft VHF datalink, 131.525/131.725/131.800/
+131.825 MHz) and explicitly does NOT want it embedded in core — wants it as a
+plugin another operator can install. It's the ideal forcing function: same shape
+as 5 existing listeners (`src/audio/{adsb,rtl433,pager,dab,rtl}_listener.py` —
+spawn external decoder, parse output, feed pipeline), so the "add a 6th" pain is
+concrete. Working standalone today: built `f00b4r0/acarsdec` (NOT the archived
+`TLeconte/acarsdec`) + `szpajder/libacars` from source on the Pi, `acarsdec
+--output monitor:file -g 34 --rtlsdr 0 <freqs>`.
+
+What an ACARS plugin must provide / what the runtime must accept:
+- capture-source class (start/stop/status)      -> Phase 0 service registry
+- `/api/acars/*` routes                         -> Phase 0 router registry
+- dashboard panel + sidebar + `#/acars` route   -> Phase 3 frontend panel registry
+- config schema (freqs/gain/rtl device) + RTL claim via existing `sdr_registry`
+- **system deps** (build acarsdec+libacars, apt pkgs) -> NEW: `setup.sh` +
+  manifest run once with explicit consent, like `scripts/install.sh`'s opt-in
+  arduino-cli / platformio / rnsd sections
+
+Layout: `plugins/acars/{plugin.toml, backend/__init__.py (register()),
+backend/listener.py, backend/routes.py, frontend/acars_panel.{js,css}, setup.sh}`.
+
+ACARS needs essentially the whole roadmap (Phase 0 + 2 + 3 + a deps mechanism) —
+themes was cheap because a theme is pure CSS with no code/lifecycle/deps; ACARS is
+the opposite end (trusted in-process code + subprocess + system packages + panel).
+
+**Recommended path:** embed ACARS now (~1-2d, copy `adsb_listener.py` +
+`adsb_routes.py` + an ADS-B-style tab), ship the feature, THEN make ACARS the
+first thing extracted into the plugin format once Phase 0-3 land — proves the
+extraction round-trips with real code. Alternative: do Phase 0 first, build ACARS
+as plugin #1.
