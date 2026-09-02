@@ -564,40 +564,58 @@ class NodeMap {
 
     async _loadTopology() {
         try {
-            const res = await fetch('/api/analytics/topology?hours=24');
+            // Same graph the Topology tab uses (traceroute chains + direct
+            // hears + MeshCore neighbour rows). The old /api/analytics/topology
+            // was NEIGHBORINFO-only, which modern firmware doesn't broadcast.
+            const res = await fetch('/api/topology/graph', { credentials: 'same-origin' });
+            if (!res.ok) throw new Error(`topology ${res.status}`);
             const data = await res.json();
-            const links = Array.isArray(data) ? data : (data.edges || []);
+            const edges = Array.isArray(data.edges) ? data.edges : [];
             this._topologyLayer.clearLayers();
 
+            // The graph lowercases node ids; markers are keyed by the nodes
+            // API's casing. Match case-insensitively.
+            const byLcId = {};
+            for (const id of Object.keys(this._markers)) {
+                byLcId[id.toLowerCase()] = this._markers[id];
+            }
+
+            const css = (name, fb) => {
+                try {
+                    const v = getComputedStyle(document.documentElement)
+                        .getPropertyValue(name).trim();
+                    return v || fb;
+                } catch (_e) { return fb; }
+            };
+            const kindColor = {
+                route: css('--accent-cyan', '#22d3ee'),
+                direct: css('--accent-green', '#34d399'),
+                neighbour: css('--accent-amber', '#fbbf24'),
+            };
+            const dimColor = css('--text-secondary', '#8b98a9');
+
             let drawn = 0;
-            for (const link of links) {
-                const srcMarker = this._markers[link.source];
-                const tgtMarker = this._markers[link.target];
-                if (!srcMarker || !tgtMarker) continue;
+            for (const e of edges) {
+                const a = byLcId[String(e.a || '').toLowerCase()];
+                const b = byLcId[String(e.b || '').toLowerCase()];
+                if (!a || !b) continue;
 
-                const line = L.polyline(
-                    [srcMarker.getLatLng(), tgtMarker.getLatLng()],
-                    {
-                        color: '#f59e0b',
-                        weight: 1.5,
-                        opacity: 0.6,
-                        dashArray: '4, 4',
-                    },
-                );
-
-                const rssiLabel = link.rssi != null ? `RSSI: ${link.rssi} dBm` : '';
-                const snrLabel = link.snr != null ? `SNR: ${link.snr} dB` : '';
-                const tooltip = [
-                    `${link.source} ↔ ${link.target}`,
-                    rssiLabel, snrLabel,
-                ].filter(Boolean).join('<br>');
-                line.bindTooltip(tooltip);
+                const line = L.polyline([a.getLatLng(), b.getLatLng()], {
+                    color: kindColor[e.kind] || dimColor,
+                    weight: 1.5,
+                    opacity: 0.65,
+                    dashArray: '4, 4',
+                });
+                const bits = [`${e.a} ↔ ${e.b}`, e.kind];
+                if (e.rssi != null) bits.push(`RSSI: ${e.rssi} dBm`);
+                if (e.snr != null) bits.push(`SNR: ${e.snr} dB`);
+                line.bindTooltip(bits.filter(Boolean).join('<br>'));
 
                 this._topologyLayer.addLayer(line);
                 drawn += 1;
             }
             this._showTopologyMapHint(
-                this._topologyVisible && links.length > 0 && drawn === 0,
+                this._topologyVisible && edges.length > 0 && drawn === 0,
             );
         } catch (e) {
             console.error('Topology load failed:', e);

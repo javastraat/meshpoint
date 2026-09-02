@@ -7829,3 +7829,14 @@ header (between home + expand), `.map-expand-btn.is-active` when flat, wired in
 app.js. CSS: `.leaflet-control-layers-*` themed with tokens in dashboard.css.
 Device marker unaffected (always on map, never clustered/filtered). Not
 Pi-verified.
+
+**Dashboard map "Topology Links" fix (2026-09-01)**: `_loadTopology` was calling
+`/api/analytics/topology` (analytics.py, NEIGHBORINFO-only — modern Meshtastic
+doesn't broadcast it, mesh has zero; user got a 404). Repointed at
+`/api/topology/graph` (topology_routes.py — the graph the Topology tab uses:
+traceroute chains + direct hears + MeshCore neighbour rows). Edge shape is
+`{a,b,kind,rssi,snr,last_seen}` with lowercased ids → node_map now builds a
+case-insensitive marker lookup and colours lines by kind (route=cyan/
+direct=green/neighbour=amber, reads --accent-* at draw time). Old
+`/api/analytics/topology` server route left in place (documented "legacy" in
+docs/API-ENDPOINTS.md), just no longer called by the frontend.
