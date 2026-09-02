@@ -49,6 +49,13 @@ _SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]{1,38}$")
 
 KNOWN_PROVIDES = frozenset({"listener", "routes", "panel", "config"})
 
+# Where a plugin folder was found. Built-ins ship in the repo under
+# src/plugins/apps/ and load unless explicitly disabled; community drop-ins
+# live in <plugins_dir>/apps/ and are opt-in. Mirrors themes' builtin/plugin
+# split (see src/api/theme_registry.py).
+SOURCE_BUILTIN = "builtin"
+SOURCE_COMMUNITY = "community"
+
 
 class PluginManifestError(Exception):
     """A ``plugin.toml`` that can't be trusted. ``code`` is a short slug
@@ -72,10 +79,15 @@ class PluginManifest:
     homepage: str
     author: str
     path: Path
+    source: str = SOURCE_COMMUNITY  # SOURCE_BUILTIN or SOURCE_COMMUNITY
 
     @property
     def setup_path(self) -> Path | None:
         return self.path / self.setup if self.setup else None
+
+    @property
+    def is_builtin(self) -> bool:
+        return self.source == SOURCE_BUILTIN
 
 
 def _str_field(table: dict, key: str, code: str) -> str:
@@ -85,10 +97,14 @@ def _str_field(table: dict, key: str, code: str) -> str:
     return value
 
 
-def parse_manifest(plugin_dir: Path) -> PluginManifest:
+def parse_manifest(
+    plugin_dir: Path, source: str = SOURCE_COMMUNITY,
+) -> PluginManifest:
     """Read and validate ``<plugin_dir>/plugin.toml``.
 
-    Raises :class:`PluginManifestError` on anything wrong.
+    *source* records where the folder was found (:data:`SOURCE_BUILTIN` for
+    ``src/plugins/apps/``, :data:`SOURCE_COMMUNITY` for a drop-in). Raises
+    :class:`PluginManifestError` on anything wrong.
     """
     manifest_file = plugin_dir / MANIFEST_NAME
     if not manifest_file.is_file():
@@ -168,15 +184,11 @@ def parse_manifest(plugin_dir: Path) -> PluginManifest:
         homepage=_str_field(meta, "homepage", "meta"),
         author=_str_field(meta, "author", "meta"),
         path=plugin_dir,
+        source=source,
     )
 
 
-def discover_plugins(apps_dir: Path) -> list[PluginManifest]:
-    """Every valid plugin under *apps_dir* (``plugins/apps/``), sorted by name.
-
-    A folder with a missing/invalid ``plugin.toml`` is logged and skipped, so
-    one bad plugin can't stop the rest from loading.
-    """
+def _scan_dir(apps_dir: Path, source: str, seen: set[str]) -> list[PluginManifest]:
     if not apps_dir.is_dir():
         return []
     found: list[PluginManifest] = []
@@ -184,7 +196,34 @@ def discover_plugins(apps_dir: Path) -> list[PluginManifest]:
         if not child.is_dir() or not (child / MANIFEST_NAME).is_file():
             continue
         try:
-            found.append(parse_manifest(child))
+            manifest = parse_manifest(child, source)
         except PluginManifestError as exc:
             logger.warning("skipping plugin %s: %s", child.name, exc)
+            continue
+        if manifest.name in seen:
+            logger.warning(
+                "skipping %s plugin %s: a built-in plugin already owns that id",
+                source, manifest.name,
+            )
+            continue
+        seen.add(manifest.name)
+        found.append(manifest)
     return found
+
+
+def discover_plugins(
+    builtin_dir: Path, community_dir: Path | None = None,
+) -> list[PluginManifest]:
+    """Every valid plugin, built-ins first then community, sorted by name
+    within each tier.
+
+    *builtin_dir* is ``src/plugins/apps/`` (ships in the repo); *community_dir*
+    is ``<plugins_dir>/apps/`` (drop-ins). A folder with a missing/invalid
+    ``plugin.toml`` is logged and skipped. A built-in id wins an id collision --
+    the community folder of the same name is skipped.
+    """
+    seen: set[str] = set()
+    result = _scan_dir(builtin_dir, SOURCE_BUILTIN, seen)
+    if community_dir is not None:
+        result.extend(_scan_dir(community_dir, SOURCE_COMMUNITY, seen))
+    return result

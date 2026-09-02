@@ -1165,17 +1165,23 @@ If you leave `require_auth: true`, Prometheus needs to authenticate on every scr
 ## Plugins
 
 App plugins are out-of-core features (an extra listener + its API routes + a
-dashboard tab) that live in `plugins/apps/<id>/` and are loaded at startup — but
-**only if you explicitly enable them**. An in-process plugin runs with the same
-privileges as the Meshpoint service, so installing one is equivalent to running
-its code on your device; loading is opt-in, never automatic.
+dashboard tab). They load from two places:
+
+* **Built-in** — `src/plugins/apps/<id>/`, ships in the repo. Loads
+  automatically **unless** you set `plugins.<id>.enabled: false`.
+* **Community** — `plugins/apps/<id>/`, a folder you drop in yourself. Loads
+  **only** when you set `plugins.<id>.enabled: true`. An in-process plugin runs
+  with the same privileges as the Meshpoint service, so enabling a third-party
+  one is equivalent to running its code on your device.
+
+A built-in id wins if a community folder of the same name exists.
 
 ```yaml
 plugins:
-  acars:                 # <id> = the plugin's folder name under plugins/apps/
-    enabled: true        # default false — the loader skips a plugin that isn't
-                         # enabled here (it's still listed in the logs as
-                         # "found but not enabled")
+  acars:                 # <id> = the plugin's folder name
+    enabled: true        # community: required to load. built-in: only needed
+                         # to turn one OFF (enabled: false). A skipped plugin is
+                         # logged as "present but not enabled".
     # everything else under plugins.<id> is the plugin's own config —
     # frequencies, gain, RTL device, etc. Meshpoint stores it verbatim and
     # hands it to the plugin; it is never checked against the core schema, so

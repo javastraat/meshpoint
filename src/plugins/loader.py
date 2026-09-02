@@ -21,7 +21,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
 
-from src.plugins.manifest import PluginManifest, discover_plugins
+from src.plugins.manifest import (
+    SOURCE_BUILTIN,
+    PluginManifest,
+    discover_plugins,
+)
 from src.plugins.registry import PluginRegistry
 
 logger = logging.getLogger(__name__)
@@ -58,19 +62,34 @@ def _import_backend(manifest: PluginManifest) -> ModuleType:
     return module
 
 
-def load_plugins(apps_dir: Path, plugins_config: dict) -> list[LoadedPlugin]:
-    """Load every enabled plugin under *apps_dir* (``plugins/apps/``).
+def _is_enabled(manifest: PluginManifest, conf: dict) -> bool:
+    """Built-ins (``src/plugins/apps/``) load unless explicitly disabled --
+    they're core-authored. Community drop-ins are opt-in."""
+    enabled = conf.get("enabled")
+    if manifest.source == SOURCE_BUILTIN:
+        return enabled is not False
+    return bool(enabled)
 
-    *plugins_config* is ``config.plugins`` -- ``{"<id>": {"enabled": bool, ...}}``.
+
+def load_plugins(
+    builtin_dir: Path, community_dir: Path | None, plugins_config: dict,
+) -> list[LoadedPlugin]:
+    """Load every enabled plugin.
+
+    Built-ins come from *builtin_dir* (``src/plugins/apps/``) and load unless
+    ``plugins.<id>.enabled`` is explicitly ``false``. Community plugins come
+    from *community_dir* (``<plugins_dir>/apps/``) and load only when
+    ``plugins.<id>.enabled`` is truthy. *plugins_config* is ``config.plugins``.
     """
     loaded: list[LoadedPlugin] = []
-    for manifest in discover_plugins(apps_dir):
-        conf = plugins_config.get(manifest.name) or {}
-        if not (isinstance(conf, dict) and conf.get("enabled")):
+    for manifest in discover_plugins(builtin_dir, community_dir):
+        conf = plugins_config.get(manifest.name)
+        conf = conf if isinstance(conf, dict) else {}
+        if not _is_enabled(manifest, conf):
             logger.info(
-                "plugin %s v%s found but not enabled "
+                "%s plugin %s v%s present but not enabled "
                 "(set plugins.%s.enabled: true)",
-                manifest.name, manifest.version, manifest.name,
+                manifest.source, manifest.name, manifest.version, manifest.name,
             )
             continue
         try:
@@ -83,5 +102,7 @@ def load_plugins(apps_dir: Path, plugins_config: dict) -> list[LoadedPlugin]:
             logger.exception("plugin %s failed to load -- skipping", manifest.name)
             continue
         loaded.append(LoadedPlugin(manifest, module))
-        logger.info("loaded plugin %s v%s", manifest.name, manifest.version)
+        logger.info(
+            "loaded %s plugin %s v%s", manifest.source, manifest.name, manifest.version,
+        )
     return loaded

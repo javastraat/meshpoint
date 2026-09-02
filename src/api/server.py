@@ -264,7 +264,9 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     listener_registry.reset()
     global _loaded_plugins
     _loaded_plugins = load_plugins(
-        Path(config.dashboard.plugins_dir) / "apps", config.plugins,
+        Path(__file__).resolve().parents[1] / "plugins" / "apps",
+        Path(config.dashboard.plugins_dir) / "apps",
+        config.plugins,
     )
 
     auth_subsystem = build_auth_subsystem(config)

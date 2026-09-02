@@ -458,8 +458,9 @@ gate). No runtime change, nothing to deploy.
 [copy of `config.plugins.<id>`], `add_router(router, public=False)` ->
 route_registry, `add_listener(spec)` -> listener_registry; each checked against
 `manifest.provides` -> `PluginRegistryError`). `src/plugins/loader.py`
-(`load_plugins(apps_dir, plugins_config) -> list[LoadedPlugin]`: discover ->
-skip unless `plugins.<id>.enabled` truthy -> `_import_backend` via
+(`load_plugins(builtin_dir, community_dir, plugins_config) -> list[LoadedPlugin]`:
+discover (2 tiers) -> `_is_enabled` (built-in unless `enabled is False`;
+community only if truthy) -> `_import_backend` via
 `importlib.util.spec_from_file_location(..., submodule_search_locations=[backend/])`
 so relative imports work and no `__init__.py` boilerplate needed under
 `plugins/apps/` -> call `module.register(reg)`; any failure logged+skipped, one
@@ -479,6 +480,28 @@ Tests (all pure-Python, pass on Mac): `tests/test_plugin_loader.py` (8),
 **NOT in B4b:** frontend asset mount/injection (B4c), `setup.sh`/apt consent
 CLI (B4d). No plugin ships yet -> deploy is a no-op (loader returns [] with no
 `plugins/apps/` dir).
+
+**Two-tier plugin sources (user, 2026-09-02):** app plugins load from BOTH
+`src/plugins/apps/<id>/` (built-in, ships in repo) and `<plugins_dir>/apps/<id>/`
+(community drop-in) -- exact mirror of themes' `frontend/themes` vs
+`plugins/themes`. `discover_plugins(builtin_dir, community_dir=None)` scans
+built-ins first; a built-in id wins an id collision (community dupe skipped +
+warned). `PluginManifest.source` = `"builtin"`/`"community"` (+ `.is_builtin`).
+Enable gate differs by tier: **built-ins load unless
+`plugins.<id>.enabled is False`; community load only if `enabled` truthy**
+(`loader._is_enabled`). server.py passes
+`Path(__file__).resolve().parents[1]/"plugins"/"apps"` (== `src/plugins/apps`)
++ `Path(config.dashboard.plugins_dir)/"apps"`. `src/plugins/apps/` doesn't
+exist yet -- B5 creates it (ACARS may land there as a built-in given its heavy
+deps, TBD in B5).
+
+**B4c decided (user, 2026-09-02):** do it the SAME way as `plugins/themes/` --
+`app.mount("/plugins/apps", StaticFiles(...))` before the `/` catch-all (mirror
+of the `/plugins/themes` mount), plus an `inject_plugin_assets()` helper beside
+`inject_theme_links` that adds each enabled panel-plugin's `<script>`/`<link>`
+(declared in `plugin.toml`, e.g. `[frontend] scripts=[...] styles=[...]`) to the
+served index.html. `plugins/apps/acars/frontend/acars_panel.js` ->
+`/plugins/apps/acars/frontend/acars_panel.js` -> `window.registerListenerPanel`.
 
 **Track A DONE 2026-09-02:** `src/audio/acars_listener.py` (copy of
 rtl433_listener), `src/api/routes/acars_routes.py`, RTL-SDR → ACARS sub-tab

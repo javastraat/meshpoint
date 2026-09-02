@@ -43,11 +43,17 @@ def _make_plugin(apps: Path, name: str, backend_init: str, *,
 class TestLoadPlugins(unittest.TestCase):
     def setUp(self) -> None:
         self._tmp = tempfile.TemporaryDirectory()
-        self.apps = Path(self._tmp.name) / "apps"
+        root = Path(self._tmp.name)
+        self.builtin = root / "builtin"
+        self.apps = root / "apps"  # community drop-ins
+        self.builtin.mkdir()
         self.apps.mkdir()
         route_registry.reset()
         listener_registry.reset()
         self._mods_before = set(sys.modules)
+
+    def _load(self, config: dict):
+        return load_plugins(self.builtin, self.apps, config)
 
     def tearDown(self) -> None:
         for name in set(sys.modules) - self._mods_before:
@@ -65,7 +71,7 @@ class TestLoadPlugins(unittest.TestCase):
                 reg.add_router(SENTINEL_ROUTER, public=True)
         """, provides='["routes"]')
 
-        loaded = load_plugins(self.apps, {"acars": {"enabled": True}})
+        loaded = self._load({"acars": {"enabled": True}})
 
         self.assertEqual([p.manifest.name for p in loaded], ["acars"])
         specs = route_registry.registered()
@@ -77,7 +83,7 @@ class TestLoadPlugins(unittest.TestCase):
         _make_plugin(self.apps, "unset", "def register(reg): raise AssertionError")
 
         with self.assertLogs("src.plugins.loader", level=logging.INFO):
-            loaded = load_plugins(self.apps, {"off": {"enabled": False}})
+            loaded = self._load({"off": {"enabled": False}})
 
         self.assertEqual(loaded, [])
         self.assertEqual(route_registry.registered(), [])
@@ -93,13 +99,51 @@ class TestLoadPlugins(unittest.TestCase):
         """, provides='["routes"]')
 
         with self.assertLogs("src.plugins.loader", level=logging.ERROR):
-            loaded = load_plugins(
-                self.apps,
+            loaded = self._load(
                 {"aaa-bad": {"enabled": True}, "zzz-good": {"enabled": True}},
             )
 
         self.assertEqual([p.manifest.name for p in loaded], ["zzz-good"])
         self.assertEqual(len(route_registry.registered()), 1)
+
+    def test_builtin_plugin_loads_without_config(self) -> None:
+        _make_plugin(self.builtin, "acars", """
+            def register(reg):
+                reg.add_router(object())
+        """, provides='["routes"]')
+
+        loaded = self._load({})  # no plugins.acars entry at all
+
+        self.assertEqual([(p.manifest.name, p.manifest.source) for p in loaded],
+                         [("acars", "builtin")])
+        self.assertEqual(len(route_registry.registered()), 1)
+
+    def test_builtin_plugin_can_be_explicitly_disabled(self) -> None:
+        _make_plugin(self.builtin, "acars", """
+            def register(reg):
+                raise AssertionError("should not run")
+        """, provides='["routes"]')
+
+        with self.assertLogs("src.plugins.loader", level=logging.INFO):
+            loaded = self._load({"acars": {"enabled": False}})
+
+        self.assertEqual(loaded, [])
+
+    def test_builtin_wins_id_collision_with_community(self) -> None:
+        _make_plugin(self.builtin, "acars", """
+            def register(reg):
+                reg.add_router("builtin-router")
+        """, provides='["routes"]')
+        _make_plugin(self.apps, "acars", """
+            def register(reg):
+                raise AssertionError("community dupe should be skipped")
+        """, provides='["routes"]')
+
+        with self.assertLogs(level=logging.WARNING):
+            loaded = self._load({"acars": {"enabled": True}})
+
+        self.assertEqual([p.manifest.source for p in loaded], ["builtin"])
+        self.assertEqual(route_registry.registered()[0].router, "builtin-router")
 
     def test_provides_mismatch_skips_plugin(self) -> None:
         _make_plugin(self.apps, "acars", """
@@ -108,7 +152,7 @@ class TestLoadPlugins(unittest.TestCase):
         """, provides='["routes"]')
 
         with self.assertLogs("src.plugins.loader", level=logging.ERROR):
-            loaded = load_plugins(self.apps, {"acars": {"enabled": True}})
+            loaded = self._load({"acars": {"enabled": True}})
 
         self.assertEqual(loaded, [])
         self.assertEqual(listener_registry.plugin_specs(), [])
@@ -121,7 +165,7 @@ class TestLoadPlugins(unittest.TestCase):
                 reg.add_router(ROUTER)
         """, provides='["routes"]', extra={"helper.py": "ROUTER = object()"})
 
-        loaded = load_plugins(self.apps, {"acars": {"enabled": True}})
+        loaded = self._load({"acars": {"enabled": True}})
 
         self.assertEqual(len(loaded), 1)
         self.assertEqual(len(route_registry.registered()), 1)
@@ -131,12 +175,12 @@ class TestLoadPlugins(unittest.TestCase):
                      provides='["routes"]')
 
         with self.assertLogs("src.plugins.loader", level=logging.ERROR):
-            loaded = load_plugins(self.apps, {"acars": {"enabled": True}})
+            loaded = self._load({"acars": {"enabled": True}})
 
         self.assertEqual(loaded, [])
 
     def test_missing_apps_dir_returns_empty(self) -> None:
-        self.assertEqual(load_plugins(self.apps / "nope", {}), [])
+        self.assertEqual(load_plugins(self.builtin / "nope", None, {}), [])
 
 
 if __name__ == "__main__":  # pragma: no cover

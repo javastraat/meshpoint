@@ -7940,8 +7940,12 @@ click every tab.
 **B4b — plugin loader + facade + config gate (2026-09-02, deploy = no-op)**:
 `src/plugins/registry.py` — `PluginRegistry` facade (`add_router`/`add_listener`
 -> the B1/B2 registries, checked vs `manifest.provides`; `.config` = copy of
-`config.plugins.<id>`). `src/plugins/loader.py` — `load_plugins(apps_dir,
-plugins_config)`: discover -> skip unless `plugins.<id>.enabled` -> import
+`config.plugins.<id>`). `src/plugins/loader.py` — `load_plugins(builtin_dir,
+community_dir, plugins_config)`: discover from BOTH `src/plugins/apps/<id>/`
+(built-in, ships in repo) and `<plugins_dir>/apps/<id>/` (community drop-in) —
+mirror of themes' two-dir scan; built-ins first, built-in wins id collision;
+`manifest.source` ∈ {builtin, community}. Enable gate: **built-in loads unless
+`plugins.<id>.enabled is False`; community only if truthy**. Import
 `backend/__init__.py` via `spec_from_file_location(submodule_search_locations=…)`
 (relative imports work, no `__init__.py` boilerplate) -> `module.register(reg)`;
 failures logged+skipped, never abort boot. `src/config.py` — `AppConfig.plugins:

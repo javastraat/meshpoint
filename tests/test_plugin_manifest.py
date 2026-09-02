@@ -63,6 +63,16 @@ class TestParseManifest(unittest.TestCase):
         self.assertEqual(m.author, "")
         self.assertEqual(m.path, d)
         self.assertIsNone(m.setup_path)
+        self.assertEqual(m.source, "community")
+        self.assertFalse(m.is_builtin)
+
+    def test_source_builtin(self) -> None:
+        from src.plugins.manifest import SOURCE_BUILTIN
+
+        d = _write_plugin(self.root, "acars", _VALID)
+        m = parse_manifest(d, SOURCE_BUILTIN)
+        self.assertEqual(m.source, "builtin")
+        self.assertTrue(m.is_builtin)
 
     def test_valid_full(self) -> None:
         toml = _VALID + """
@@ -149,27 +159,45 @@ author = "Einstein"
 class TestDiscoverPlugins(unittest.TestCase):
     def setUp(self) -> None:
         self._tmp = tempfile.TemporaryDirectory()
-        self.apps = Path(self._tmp.name) / "apps"
-        self.apps.mkdir()
+        root = Path(self._tmp.name)
+        self.builtin = root / "builtin"
+        self.community = root / "community"
+        self.builtin.mkdir()
+        self.community.mkdir()
 
     def tearDown(self) -> None:
         self._tmp.cleanup()
 
-    def test_missing_dir_returns_empty(self) -> None:
-        self.assertEqual(discover_plugins(self.apps / "nope"), [])
+    def test_missing_dirs_return_empty(self) -> None:
+        self.assertEqual(discover_plugins(self.builtin / "nope"), [])
+        self.assertEqual(
+            discover_plugins(self.builtin / "nope", self.community / "nope"), [],
+        )
 
     def test_returns_valid_sorted_skips_bad(self) -> None:
-        _write_plugin(self.apps, "zulu", _VALID.replace('"acars"', '"zulu"'))
-        _write_plugin(self.apps, "acars", _VALID)
-        _write_plugin(self.apps, "broken", 'name = "broken"\nmeshpoint_api = 99\n')
-        (self.apps / "not-a-plugin").mkdir()  # no plugin.toml
-        (self.apps / "loose.txt").write_text("x", encoding="utf-8")
+        _write_plugin(self.community, "zulu", _VALID.replace('"acars"', '"zulu"'))
+        _write_plugin(self.community, "acars", _VALID)
+        _write_plugin(self.community, "broken", 'name = "broken"\nmeshpoint_api = 99\n')
+        (self.community / "not-a-plugin").mkdir()  # no plugin.toml
+        (self.community / "loose.txt").write_text("x", encoding="utf-8")
 
         with self.assertLogs("src.plugins.manifest", level=logging.WARNING) as logs:
-            found = discover_plugins(self.apps)
+            found = discover_plugins(self.builtin, self.community)
 
         self.assertEqual([m.name for m in found], ["acars", "zulu"])
+        self.assertTrue(all(m.source == "community" for m in found))
         self.assertTrue(any("broken" in line for line in logs.output))
+
+    def test_builtins_come_first_and_win_id_collisions(self) -> None:
+        _write_plugin(self.builtin, "acars", _VALID)
+        _write_plugin(self.community, "acars", _VALID)  # same id -> skipped
+        _write_plugin(self.community, "extra", _VALID.replace('"acars"', '"extra"'))
+
+        with self.assertLogs("src.plugins.manifest", level=logging.WARNING):
+            found = discover_plugins(self.builtin, self.community)
+
+        self.assertEqual([(m.name, m.source) for m in found],
+                         [("acars", "builtin"), ("extra", "community")])
 
 
 if __name__ == "__main__":  # pragma: no cover
