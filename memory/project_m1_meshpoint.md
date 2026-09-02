@@ -7861,8 +7861,11 @@ section, matching rtl433/adsb). `src/api/routes/acars_routes.py` = copy of
 rtl433_routes (start/stop/status/clear, require_admin, 503). Wired into
 `server.py` at the 6 usual spots. Frontend: reuses `PagerPanel`
 (`new PagerPanel('acars','/api/acars','ACARS',_acarsRowHtml)`) — `_acarsRowHtml`
-in `listener_panel.js` next to `_rtl433RowHtml`, shows flight/tail + label +
-text, expands `m.acars.libacars` when present. `.pager-row--acars` /
+in `listener_panel.js` next to `_rtl433RowHtml`: flight/tail + label + text;
+**ADS-C** (`arinc622.adsc.tags[].basic_report`, label B6) and plain-text **POS**
+reports (label H1) collapse to a one-line summary with the lat/lon parsed
+(`_acarsLatLon` for `N52233E004447` compact strings) and linked to OSM, full
+decode behind a `<details>`. H1 airline telemetry stays raw (carrier-proprietary). `.pager-row--acars` /
 `.pager-row__decoded` CSS in `listener.css`. `scripts/install.sh` new section 12
 (inside the RTL-SDR opt-in block) builds `f00b4r0/acarsdec` + `szpajder/libacars`
 from source; sections 12-28 renumbered to 13-29. `tests/test_acars_listener.py`
