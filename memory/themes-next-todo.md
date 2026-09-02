@@ -129,3 +129,51 @@ Theme dir split + source tier Pi-verified working 2026-08-31.
      `plugins/` now. `PluginRegistry.add_listener(name,build,wire)`.
      **Plugin roadmap B1-B5 complete.** ⚠️ deploy = behaviour change for ACARS
      users (must enable + run setup.sh).
+  4. **B6 — Plugins management page (user asked 2026-09-02, NOT started).**
+     A Settings sub-page (sibling of Settings -> Themes) that lists every
+     discovered plugin (built-in + community) and toggles each on/off.
+     Sketch / open questions:
+     - `GET /api/plugins` (new route module) -> per plugin:
+       `{id, version, source, provides, description, homepage, enabled,
+       loaded, apt, setup, deps_ok}`. `loaded` = in `server._loaded_plugins`
+       this run; `deps_ok` = best-effort (e.g. `shutil.which` for a known
+       binary?) or just surface `apt`/`setup` so the user knows to run it.
+     - `PUT /api/plugins/{id}` `{enabled: bool}` (admin + audited) -> writes
+       `plugins.<id>.enabled` into `local.yaml`. Needs the yaml-patch helper
+       (`src/config.py save_section_to_yaml`, as `theme_routes` uses for
+       `dashboard.theme`) -- but `plugins` is an opaque dict, not a dataclass
+       section, so check `save_section_to_yaml` handles a plain-dict section
+       or add a small `save_plugin_enabled(id, bool)`.
+     - **Restart required**: plugins load once in `create_app`, so a toggle
+       can't take effect live (unlike theme default). Page must show a
+       "restart to apply" banner; maybe reuse the Settings -> Updates restart
+       affordance, or just tell the user.
+     - Frontend: `frontend/js/settings/plugins.js` + a nav entry; card per
+       plugin (name, source badge builtin/community, version, provides chips,
+       description, enable toggle, "needs setup.sh" hint when apt/setup set
+       and not loaded despite enabled).
+     - `_loaded_plugins` is already kept as a module global in server.py for
+       exactly this.
+  5. **B4d — deps-consent CLI (`meshpoint plugin setup <id>`).** NOT started,
+     optional/low-priority. Reads a plugin's `[deps]`, prints the apt packages
+     + `setup.sh` it would run, asks Y/n, then runs it (`sudo` needed for the
+     apt/`make install`). Pairs with `meshpoint plugins list` (reuse B6's
+     `GET /api/plugins` logic, or a shared `discover_plugins` call). Lower
+     priority because B5 shipped `plugins/apps/acars/setup.sh` as a plain
+     `sudo bash plugins/apps/acars/setup.sh` — the CLI is just nicer UX + a
+     confirmation gate, not required.
+  6. **B7 — plugin config schema.** `plugins.<id>` is opaque today; ACARS
+     hardcodes `_FREQUENCIES`/`_GAIN` in `backend/listener.py`. Let a plugin
+     declare a config schema (in `plugin.toml` or `register`) so B6's page can
+     render a settings form and `config.plugins.<id>` gets defaulted/validated.
+     Also: wire up `provides = ["config"]` (declared in `KNOWN_PROVIDES`, no
+     `PluginRegistry.add_config` yet) or drop it. Do after B6.
+  7. **B8 — community plugin uninstall.** "Remove" button on B6's page for
+     community plugins → delete `plugins/apps/<id>/`, mirroring
+     `theme_store.delete_theme`; built-ins locked like the locked theme pack.
+
+  **Full remaining-work list + unfinished capability surface + docs debt:**
+  see the "Plugin system — remaining work" section in
+  [plugin-architecture-review.md](plugin-architecture-review.md).
+  Not planned unless real external demand: out-of-tree `plugin add <url>`,
+  pip deps, subprocess isolation, public SemVer contract (Phase 4 in that doc).

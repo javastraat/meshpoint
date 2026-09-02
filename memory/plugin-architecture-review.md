@@ -545,7 +545,71 @@ now documented to include: `fastapi.APIRouter`, `src.api.auth.dependencies`
 (`require_admin`/`SessionClaims`), `src.audio.sdr_registry`. CI: `ruff check` +
 `pytest` now include `plugins/`. `tests/test_plugin_loader.py` +
 `TestShippedAcarsPlugin` (fastapi-gated). Tests 98 pass on Mac (2 skipped).
-Plugin roadmap B1-B5 COMPLETE. Remaining: B4d (deps-consent CLI, optional).
+Plugin roadmap B1-B5 COMPLETE.
+
+---
+
+## Plugin system — remaining work (as of 2026-09-02)
+
+The core seams (routers, RTL-SDR listeners, panel tabs, manifest, loader,
+two-tier discovery, asset serving) all exist and ACARS proves them end to end.
+What's left, roughly by priority:
+
+**B6 — Plugins management page (user asked 2026-09-02).** Settings sub-page
+(sibling of Settings -> Themes). Full sketch in
+`memory/themes-next-todo.md`. Summary:
+- `GET /api/plugins` (new route module) -> per plugin `{id, version, source,
+  provides, description, homepage, enabled, loaded, apt, setup}`. `loaded` from
+  `server._loaded_plugins` (already a module global). Public or admin -- TBD.
+- `PUT /api/plugins/{id}` `{enabled}` (admin + audited) -> write
+  `plugins.<id>.enabled` into `local.yaml`. `plugins` is an opaque dict, not a
+  dataclass section -- check whether `src/config.py save_section_to_yaml`
+  handles that or add `save_plugin_enabled(id, bool)`.
+- **Restart required** to apply (plugins load once in `create_app`) -> the page
+  needs a "restart to apply" banner. No live enable/disable.
+- Frontend: `frontend/js/settings/plugins.js` + nav entry; card per plugin
+  (source badge builtin/community, version, provides chips, description, toggle,
+  a "run setup.sh" hint when `apt`/`setup` set and not `loaded` despite
+  `enabled`).
+
+**B7 — plugin config schema.** Today `plugins.<id>` is opaque and a plugin
+(ACARS) hardcodes its settings (`_FREQUENCIES`/`_GAIN` in `listener.py`). A
+plugin should be able to declare a config schema (in `plugin.toml` or a
+`config_schema()` in `register`) so B6's page can render a form and
+`config.plugins.<id>` gets defaulted/validated. Blocked-ish on B6.
+
+**B4d — deps-consent CLI (`meshpoint plugin setup <id>`).** Optional/low
+priority now that `plugins/apps/acars/setup.sh` is a plain `sudo bash` script.
+Would read `[deps]`, show the apt list + script, confirm, run it. Pairs with a
+`meshpoint plugins list` (reuses `GET /api/plugins` logic).
+
+**B8 — community plugin uninstall.** A "Remove" button on B6's page for
+community plugins (delete `plugins/apps/<id>/`), mirroring theme delete
+(`theme_store.delete_theme`). Built-ins locked, like the locked theme pack.
+
+**Unfinished capability surface:**
+- `provides = ["config"]` is in `KNOWN_PROVIDES` but `PluginRegistry` has no
+  `add_config` -- either implement (B7) or drop it from the set.
+- Plugins can only add an RTL-SDR *listener* + routes + a *Listener sub-tab*.
+  No seam yet for: a pipeline *decoder* (LoRaWAN-style), a *capture source*, a
+  top-level *sidebar page* (B3's panel registry is Listener-tab-specific), a
+  *config settings sub-page*. Add these only when a real plugin needs them.
+- Sidebar listener badge label: `_LISTENER_OWNER_LABELS` in
+  `frontend/sidebar/listener_badge.js` is a module-local const, so a plugin's
+  dongle owner shows lowercase (`acars` not `ACARS`). Kept the core line for
+  ACARS; a general fix = expose the map on `window`.
+
+**Docs debt:** no "writing a plugin" guide. `plugins/apps/acars/README.md` +
+`docs/CONFIGURATION.md#plugins` are the only references. A `docs/PLUGINS.md`
+(manifest schema, `register(reg)` API, `PLUGIN_API_VERSION` contract + what
+imports are allowed, test layout, `__init__.py` requirement for pytest
+collection) would help before any third party writes one.
+
+**Explicitly NOT planned** (Phase 4 in this doc): out-of-tree install
+(`meshpoint plugin add <url>`), pip-dep resolution, subprocess isolation,
+a public SemVer contract with deprecation policy. Only if real external demand.
+
+---
 
 **Track A DONE 2026-09-02:** `src/audio/acars_listener.py` (copy of
 rtl433_listener), `src/api/routes/acars_routes.py`, RTL-SDR → ACARS sub-tab

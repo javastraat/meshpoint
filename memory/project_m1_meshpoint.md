@@ -8000,7 +8000,39 @@ src.audio.sdr_registry. CI now `ruff check src/ tests/ plugins/` +
 `pytest tests/ plugins/`. `config/default.yaml` gained a commented `plugins:`
 block. Tests: 98 Mac pass (2 fastapi-skipped);
 `test_plugin_loader.py::TestShippedAcarsPlugin` (CI-gated). **Plugin roadmap
-B1-B5 COMPLETE.** Pi deploy: (1) deploy -> ACARS tab gone; (2)
-`sudo bash plugins/apps/acars/setup.sh` (no-op, already built); (3) add
-`plugins.acars.enabled: true` to local.yaml + restart -> tab back.
-Remaining: B4d (deps-consent CLI, optional/low-priority).
+B1-B5 COMPLETE.**
+
+Deploy fix 2026-09-02: plugin `<script>` was injected with `defer` -> ran
+AFTER `app.js`'s `new ListenerPanel()`, so the tab never registered. Now
+plain `<script>` (matches every other dashboard script, runs at the marker
+before app.js). Backend loaded fine throughout (`plugins: 1 of 1 loaded (acars)`).
+
+**B5 Pi verification checklist (as of 2026-09-02 — deployed, backend confirmed
+`loaded community plugin acars v1.0.0`; tab/decode still to confirm after a
+hard browser refresh):**
+| Check | How | Expect |
+|---|---|---|
+| Tab appears | hard-refresh dashboard (Ctrl-Shift-R) -> Listener | ACARS tab next to ADS-B |
+| Assets load | DevTools Network, filter `acars` | `acars_panel.js` + `.css` both 200, not 404 |
+| Decoding | ACARS tab -> Start listening | messages arrive; ADS-C/POS rows render (coord link + details toggle) |
+| setup.sh idempotent | `sudo bash plugins/apps/acars/setup.sh` | "acarsdec already installed ... nothing to do", exit 0 |
+| setup.sh build path (optional) | `sudo rm -rf /opt/acarsdec /opt/libacars /usr/local/bin/acarsdec /usr/local/lib/libacars*; sudo ldconfig; sudo bash plugins/apps/acars/setup.sh` | clone+cmake+make ~2-3min, then `acarsdec --version` works |
+| Disable path | `plugins.acars.enabled: false`, restart | log: `acars ... present but not enabled`; tab gone; boot clean |
+
+There is NO `meshpoint plugin` CLI yet -- that's B4d (not built). Nothing CLI
+to test for B5.
+
+**Remaining plugin work** (full write-up: "Plugin system — remaining work" in
+`memory/plugin-architecture-review.md`; sketches in `memory/themes-next-todo.md`):
+- **B6** — Plugins management page (Settings sub-page; `GET /api/plugins` +
+  `PUT /api/plugins/{id}` writing `plugins.<id>.enabled` to local.yaml;
+  restart-to-apply). **User asked 2026-09-02. Next up.**
+- **B7** — plugin config schema (stop ACARS hardcoding freqs/gain; wire or drop
+  `provides=["config"]`). After B6.
+- **B4d** — `meshpoint plugin setup <id>` deps-consent CLI + `plugins list`.
+  Optional/low priority (setup.sh already works as `sudo bash`).
+- **B8** — community plugin uninstall button (delete `plugins/apps/<id>/`).
+- Unfinished capability surface (decoder/capture-source/sidebar-page seams,
+  sidebar badge label) + docs debt (`docs/PLUGINS.md`) — see the review doc.
+- NOT planned unless external demand: out-of-tree install, pip deps, subprocess
+  isolation, SemVer contract.
