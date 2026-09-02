@@ -189,12 +189,21 @@
                 await this._fetchThemes();
                 this.darkValues = readTheme('dark', ALL_TOKENS.concat(CARRIED_TOKENS));
                 this._renderGroups();
-                this._loadBase(this.defaultSel?.value || this._enteredTheme || 'dark');
                 this._loaded = true;
+                this._loadBase(this._enteredTheme || 'dark');
+            } else if (this.base !== this._enteredTheme && !this._hasEdits()) {
+                // Re-entering after the active theme changed elsewhere (topbar
+                // toggle): start from what's on screen now. Keep in-progress
+                // swatch edits though — don't wipe unsaved work.
+                this._loadBase(this._enteredTheme);
             }
             this.active = true;
             this._applyPreview();
             this._renderInstalled();
+        }
+
+        _hasEdits() {
+            return ALL_TOKENS.some((t) => (this.values[t] || '') !== (this.baseValues[t] || ''));
         }
 
         onLeft() {

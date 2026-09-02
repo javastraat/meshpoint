@@ -7805,3 +7805,9 @@ kanagawa=wave, catppuccin=droplet, dracula=sparkles, one-dark=atom,
 ayu-mirage=mountain, colorblind-safe=eye. `_KNOWN_ICONS` in `theme_store.py`
 kept in sync (comment cross-references both files). Icon = theme identity;
 badge = source. Loaded via `<script>` before theme_controller.js in index.html.
+
+**Theme builder re-base fix (2026-09-01)**: `onActivated()` only called
+`_loadBase()` on first load, so "Start from" stayed stale if you changed the
+active theme elsewhere and came back. Now: first load bases on `_enteredTheme`
+(the on-screen theme, not the server default); re-entry re-bases on
+`_enteredTheme` too, guarded by `_hasEdits()` so unsaved swatch work isn't wiped.
