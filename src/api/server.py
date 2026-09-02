@@ -4,7 +4,14 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi import (
+    Depends,
+    FastAPI,
+    HTTPException,
+    Request,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -109,6 +116,7 @@ from src.audio.rtl433_listener import Rtl433Listener
 from src.audio.rtl_listener import RtlListener
 from src.api.websocket_manager import WebSocketManager
 from src.config import AppConfig, SerialDeviceConfig, load_config, validate_activation
+from src.plugins.assets import inject_plugin_assets, resolve_plugin_asset
 from src.plugins.loader import load_plugins
 from src.coordinator import PipelineCoordinator
 from src.log_format import print_banner, print_packet, setup_logging
@@ -646,10 +654,25 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
         html = stamp_default_theme(
             html, config.dashboard.theme, themes_dir, plugin_themes_dir
         )
+        html = inject_plugin_assets(html, [p.manifest for p in _loaded_plugins])
         return HTMLResponse(
             bust_asset_urls(html),
             headers={"Cache-Control": "no-cache"},
         )
+
+    @app.get(
+        "/plugins/apps/{plugin_id}/{asset_path:path}", include_in_schema=False,
+    )
+    async def serve_plugin_asset(plugin_id: str, asset_path: str):
+        # Serve ONLY the frontend files a loaded plugin's manifest declared
+        # (either tier). Not a StaticFiles mount -- that would also expose
+        # plugin.toml / backend/ / setup.sh and reach only the community dir.
+        full = resolve_plugin_asset(
+            [p.manifest for p in _loaded_plugins], plugin_id, asset_path,
+        )
+        if full is None:
+            raise HTTPException(status_code=404)
+        return FileResponse(full)
 
     # Community/extra theme CSS lives outside the static tree; give it a
     # narrow mount (only theme.css files are web-facing, not all of

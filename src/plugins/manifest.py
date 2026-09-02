@@ -24,6 +24,10 @@ Manifest shape::
     apt = ["cmake", "pkg-config"]
     setup = "setup.sh"             # relative to the plugin dir, must exist
 
+    [frontend]                     # required when "panel" in provides
+    scripts = ["frontend/acars_panel.js"]   # rel paths, must exist
+    styles  = ["frontend/acars_panel.css"]  # optional
+
     [meta]                         # optional, all strings
     description = "..."
     homepage = "..."
@@ -78,6 +82,8 @@ class PluginManifest:
     description: str
     homepage: str
     author: str
+    frontend_scripts: tuple[str, ...]  # relative paths, verified to exist
+    frontend_styles: tuple[str, ...]
     path: Path
     source: str = SOURCE_COMMUNITY  # SOURCE_BUILTIN or SOURCE_COMMUNITY
 
@@ -95,6 +101,29 @@ def _str_field(table: dict, key: str, code: str) -> str:
     if not isinstance(value, str):
         raise PluginManifestError(code, f"{key!r} must be a string.")
     return value
+
+
+def _rel_paths(value, plugin_dir: Path, key: str) -> tuple[str, ...]:
+    """Validate a ``[frontend]`` list: relative-path strings, inside the
+    plugin dir, that exist."""
+    if not isinstance(value, list) or any(not isinstance(p, str) for p in value):
+        raise PluginManifestError(
+            "frontend", f"'frontend.{key}' must be a list of path strings.",
+        )
+    out: list[str] = []
+    for rel in value:
+        rel = rel.strip().lstrip("/")
+        target = (plugin_dir / rel).resolve()
+        if plugin_dir.resolve() not in target.parents:
+            raise PluginManifestError(
+                "frontend", f"'frontend.{key}' entry {rel!r} escapes the plugin dir.",
+            )
+        if not target.is_file():
+            raise PluginManifestError(
+                "frontend", f"'frontend.{key}' file {rel!r} does not exist.",
+            )
+        out.append(rel)
+    return tuple(out)
 
 
 def parse_manifest(
@@ -173,6 +202,17 @@ def parse_manifest(
     if not isinstance(meta, dict):
         raise PluginManifestError("meta", "'[meta]' must be a table.")
 
+    frontend = data.get("frontend", {})
+    if not isinstance(frontend, dict):
+        raise PluginManifestError("frontend", "'[frontend]' must be a table.")
+    scripts = _rel_paths(frontend.get("scripts", []), plugin_dir, "scripts")
+    styles = _rel_paths(frontend.get("styles", []), plugin_dir, "styles")
+    if "panel" in provides and not scripts:
+        raise PluginManifestError(
+            "frontend",
+            "a 'panel' plugin must list at least one 'frontend.scripts' file.",
+        )
+
     return PluginManifest(
         name=name,
         version=version,
@@ -183,6 +223,8 @@ def parse_manifest(
         description=_str_field(meta, "description", "meta"),
         homepage=_str_field(meta, "homepage", "meta"),
         author=_str_field(meta, "author", "meta"),
+        frontend_scripts=scripts,
+        frontend_styles=styles,
         path=plugin_dir,
         source=source,
     )

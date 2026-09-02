@@ -110,16 +110,13 @@ Theme dir split + source tier Pi-verified working 2026-08-31.
          `enabled: true`); built-in wins id collisions; `manifest.source`.
          ~24 pure-Python tests. `docs/CONFIGURATION.md` `## Plugins`. No plugin
          ships yet -> deploy is a no-op.
-       - **B4c** — serve plugin frontends the SAME way as `plugins/themes/`
-         (user, 2026-09-02): `app.mount("/plugins/apps", StaticFiles(...))`
-         registered before the `/` catch-all (mirrors the `/plugins/themes`
-         mount at server.py ~662), + an `inject_plugin_assets()` helper next to
-         `inject_theme_links` that rewrites the served index.html to add each
-         enabled panel-plugin's `<script>`/`<link>` from files its `plugin.toml`
-         declares (`[frontend] scripts=[...] styles=[...]`). So
-         `plugins/apps/acars/frontend/acars_panel.js` loads from
-         `/plugins/apps/acars/frontend/acars_panel.js` and calls
-         `window.registerListenerPanel(...)`.
+       - ~~**B4c** — serve + inject panel-plugin frontends~~ **DONE 2026-09-02**:
+         `plugin.toml` `[frontend]` table, `src/plugins/assets.py`
+         (`inject_plugin_assets` at the `<!-- meshpoint:plugin-panels -->`
+         marker in index.html + `resolve_plugin_asset`), scoped
+         `GET /plugins/apps/{id}/{path}` route in server.py (declared files
+         only, both tiers, no traversal). 17 new pure-Python tests. Deploy
+         no-op until a plugin exists.
        - **B4d** — `setup.sh` / apt consent mechanism (CLI: `meshpoint plugin
          setup <name>`), never auto-run.
   3. **B5** — extract Track A's ACARS code into `plugins/apps/acars/` as the

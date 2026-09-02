@@ -7957,9 +7957,27 @@ load_plugins(...)` before the router loop (resets clear only plugin regs).
 `test_plugin_loader.py` (8), `test_plugin_registry_facade.py` (6),
 `test_config_loader.py` PluginsNamespaceTest (3) — all pure-Python, pass on Mac.
 `docs/CONFIGURATION.md` `## Plugins`. Default off (in-process = service privs).
-Deployed 2026-09-02, Pi boot clean. `load_plugins` now always logs a summary
-INFO line ("plugins: no app plugins found" / "plugins: N of M loaded (...)")
-so the subsystem is visibly alive even with zero plugins (user asked). The
+Deployed + Pi-verified 2026-09-02. Boot log shows
+`INFO loader: plugins: no app plugins found` (the summary line — always logged
+so the subsystem is visibly alive even with zero plugins; user asked).
+Full form once plugins exist: "plugins: N of M loaded (...)".
+
+**B4c — serve + inject panel-plugin frontends (2026-09-02, deploy no-op)**:
+`plugin.toml` `[frontend]` table (`scripts`/`styles`, rel paths validated for
+existence + no `..`; a `panel` plugin must declare ≥1 script).
+`PluginManifest.frontend_scripts`/`frontend_styles`. `src/plugins/assets.py`
+(FastAPI-free): `inject_plugin_assets(html, manifests)` adds `<link>` +
+`<script defer>` per loaded `panel` plugin at the new
+`<!-- meshpoint:plugin-panels -->` marker in `frontend/index.html` (right
+before `app.js`); `resolve_plugin_asset(manifests, id, path)` — the security
+core. `server.py`: `serve_dashboard_root` injects after `stamp_default_theme` /
+before `bust_asset_urls`; new `GET /plugins/apps/{plugin_id}/{asset_path:path}`
+route (before the `/` catch-all) — **scoped route not a StaticFiles mount**,
+serves only manifest-declared files from either tier, no traversal, never
+exposes `plugin.toml`/`backend/`/`setup.sh`. Tests: `test_plugin_assets.py`
+(11), `test_plugin_manifest.py` +6 — pure-Python, Mac. `docs/CONFIGURATION.md`
+full manifest example. Next: B4d (`meshpoint plugin setup <id>` deps consent
+CLI), B5 (extract ACARS to a plugin). The
 create_app `route_registry.reset()`/`listener_registry.reset()` did not disturb
 the 60 built-in routers / 6 built-in listeners.
 Next: B4c (mount `plugins/apps/<id>/frontend/` + inject `<script>`/`<link>`),

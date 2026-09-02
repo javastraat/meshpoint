@@ -22,7 +22,7 @@ _VALID = """\
 name = "acars"
 version = "0.1.0"
 meshpoint_api = 1
-provides = ["listener", "routes", "panel"]
+provides = ["listener", "routes"]
 """
 
 
@@ -31,7 +31,9 @@ def _write_plugin(root: Path, name: str, toml: str, *, extra_files=()) -> Path:
     d.mkdir(parents=True)
     (d / "plugin.toml").write_text(toml, encoding="utf-8")
     for fname in extra_files:
-        (d / fname).write_text("#!/bin/sh\n", encoding="utf-8")
+        f = d / fname
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_text("#!/bin/sh\n", encoding="utf-8")
     return d
 
 
@@ -55,7 +57,7 @@ class TestParseManifest(unittest.TestCase):
         self.assertEqual(m.name, "acars")
         self.assertEqual(m.version, "0.1.0")
         self.assertEqual(m.api_version, 1)
-        self.assertEqual(m.provides, ("listener", "routes", "panel"))
+        self.assertEqual(m.provides, ("listener", "routes"))
         self.assertEqual(m.apt, ())
         self.assertIsNone(m.setup)
         self.assertEqual(m.description, "")
@@ -65,6 +67,8 @@ class TestParseManifest(unittest.TestCase):
         self.assertIsNone(m.setup_path)
         self.assertEqual(m.source, "community")
         self.assertFalse(m.is_builtin)
+        self.assertEqual(m.frontend_scripts, ())
+        self.assertEqual(m.frontend_styles, ())
 
     def test_source_builtin(self) -> None:
         from src.plugins.manifest import SOURCE_BUILTIN
@@ -133,15 +137,58 @@ author = "Einstein"
 
     def test_provides_empty(self) -> None:
         self.assertEqual(
-            self._code("acars", _VALID.replace('["listener", "routes", "panel"]', "[]")),
+            self._code("acars", _VALID.replace('["listener", "routes"]', "[]")),
             "provides",
         )
 
     def test_provides_unknown(self) -> None:
         self.assertEqual(
-            self._code("acars", _VALID.replace('"panel"', '"telepathy"')),
+            self._code("acars", _VALID.replace('"routes"', '"telepathy"')),
             "provides",
         )
+
+    def test_frontend_table_parsed(self) -> None:
+        toml = _VALID.replace(
+            'provides = ["listener", "routes"]',
+            'provides = ["routes", "panel"]',
+        ) + """
+[frontend]
+scripts = ["frontend/panel.js", "/frontend/extra.js"]
+styles = ["frontend/panel.css"]
+"""
+        d = _write_plugin(self.root, "acars", toml, extra_files=(
+            "frontend/panel.js", "frontend/extra.js", "frontend/panel.css",
+        ))
+        m = parse_manifest(d)
+        self.assertEqual(
+            m.frontend_scripts, ("frontend/panel.js", "frontend/extra.js"),
+        )
+        self.assertEqual(m.frontend_styles, ("frontend/panel.css",))
+
+    def test_panel_without_scripts_is_rejected(self) -> None:
+        toml = _VALID.replace(
+            'provides = ["listener", "routes"]', 'provides = ["panel"]',
+        )
+        self.assertEqual(self._code("acars", toml), "frontend")
+
+    def test_frontend_script_must_exist(self) -> None:
+        toml = _VALID.replace(
+            'provides = ["listener", "routes"]', 'provides = ["panel"]',
+        ) + '\n[frontend]\nscripts = ["frontend/missing.js"]\n'
+        self.assertEqual(self._code("acars", toml), "frontend")
+
+    def test_frontend_path_cannot_escape(self) -> None:
+        toml = _VALID.replace(
+            'provides = ["listener", "routes"]', 'provides = ["panel"]',
+        ) + '\n[frontend]\nscripts = ["../evil.js"]\n'
+        self.assertEqual(self._code("acars", toml), "frontend")
+
+    def test_non_panel_plugin_ignores_frontend(self) -> None:
+        toml = _VALID + '\n[frontend]\nscripts = ["frontend/x.js"]\n'
+        d = _write_plugin(self.root, "acars", toml,
+                          extra_files=("frontend/x.js",))
+        m = parse_manifest(d)
+        self.assertEqual(m.frontend_scripts, ("frontend/x.js",))
 
     def test_apt_not_strings(self) -> None:
         toml = _VALID + '\n[deps]\napt = ["cmake", 3]\n'

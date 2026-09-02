@@ -1190,12 +1190,33 @@ plugins:
     gain: 34
 ```
 
-A plugin folder holds a `plugin.toml` manifest (`name`, `version`,
-`meshpoint_api`, `provides`, optional `[deps]` for apt packages / a `setup.sh`
-build script, optional `[meta]`). A manifest that targets a newer `meshpoint_api`
-than this build supports, or is otherwise invalid, is logged and skipped rather
-than loaded. Any system dependencies a plugin needs (`[deps]`) are **not**
-installed automatically — run the plugin's setup step yourself first.
+A plugin folder holds a `plugin.toml` manifest:
+
+```toml
+name = "acars"
+version = "0.1.0"
+meshpoint_api = 1
+provides = ["listener", "routes", "panel"]
+
+[deps]                                    # optional
+apt = ["cmake", "libcjson-dev"]
+setup = "setup.sh"
+
+[frontend]                                # required when "panel" in provides
+scripts = ["frontend/acars_panel.js"]     # served from /plugins/apps/acars/...
+styles  = ["frontend/acars_panel.css"]    # optional
+
+[meta]                                     # optional
+description = "Aircraft VHF datalink (ACARS)"
+```
+
+A plugin with `panel` in `provides` must list at least one `[frontend].scripts`
+file; those `.js`/`.css` files (and only those) are served under
+`/plugins/apps/<id>/` and injected into the dashboard so the plugin's tab
+registers itself. A manifest that targets a newer `meshpoint_api` than this
+build supports, or is otherwise invalid, is logged and skipped. System
+dependencies (`[deps]`) are **not** installed automatically — run the plugin's
+setup step yourself first.
 
 ## Device Identity
 

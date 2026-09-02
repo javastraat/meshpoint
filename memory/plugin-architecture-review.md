@@ -495,13 +495,26 @@ Enable gate differs by tier: **built-ins load unless
 exist yet -- B5 creates it (ACARS may land there as a built-in given its heavy
 deps, TBD in B5).
 
-**B4c decided (user, 2026-09-02):** do it the SAME way as `plugins/themes/` --
-`app.mount("/plugins/apps", StaticFiles(...))` before the `/` catch-all (mirror
-of the `/plugins/themes` mount), plus an `inject_plugin_assets()` helper beside
-`inject_theme_links` that adds each enabled panel-plugin's `<script>`/`<link>`
-(declared in `plugin.toml`, e.g. `[frontend] scripts=[...] styles=[...]`) to the
-served index.html. `plugins/apps/acars/frontend/acars_panel.js` ->
-`/plugins/apps/acars/frontend/acars_panel.js` -> `window.registerListenerPanel`.
+**B4c DONE 2026-09-02 (serve + inject panel-plugin frontends):**
+`plugin.toml` gains `[frontend]` (`scripts`/`styles` = rel paths, `_rel_paths()`
+validates existence + no `..` escape; `"panel"` in provides with no scripts ->
+`PluginManifestError("frontend")`). `PluginManifest.frontend_scripts` /
+`frontend_styles`. `src/plugins/assets.py` (new, FastAPI-free):
+`inject_plugin_assets(html, manifests)` inserts `<link>` + `<script defer>` for
+each loaded `panel` plugin at the `<!-- meshpoint:plugin-panels -->` marker
+(added to index.html just before `app.js`; falls back to before `</body>`);
+`plugin_asset_url`/`plugin_asset_tags`; `resolve_plugin_asset(manifests,
+plugin_id, asset_path) -> Path | None` (the security core, Mac-testable).
+`server.py`: `serve_dashboard_root` calls `inject_plugin_assets(...)` after
+`stamp_default_theme`, before `bust_asset_urls` (so bust adds `?v=`); new route
+`GET /plugins/apps/{plugin_id}/{asset_path:path}` (before the `/` catch-all) =
+3 lines around `resolve_plugin_asset` + `FileResponse`. **Scoped route, NOT a
+StaticFiles mount** -- serves only declared files, either tier, no traversal,
+`plugin.toml`/`backend/`/`setup.sh` never exposed. Tests: `test_plugin_assets.py`
+(11 -- inject + resolve), `test_plugin_manifest.py` +6 (`[frontend]`). All
+pure-Python, pass on Mac (78 in the plugin suites total). `docs/CONFIGURATION.md`
+Plugins section has the full manifest example now. Deploy still a no-op.
+NOT in B4c: B4d (`setup.sh`/apt consent CLI), B5 (extract ACARS).
 
 **Track A DONE 2026-09-02:** `src/audio/acars_listener.py` (copy of
 rtl433_listener), `src/api/routes/acars_routes.py`, RTL-SDR → ACARS sub-tab

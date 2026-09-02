@@ -25,6 +25,8 @@ def _manifest(*provides: str) -> PluginManifest:
         description="",
         homepage="",
         author="",
+        frontend_scripts=(),
+        frontend_styles=(),
         path=Path("/tmp/acars"),
     )
 
