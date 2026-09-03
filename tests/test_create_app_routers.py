@@ -115,15 +115,28 @@ class TestBuiltinRouterWiring(unittest.TestCase):
         self.assertEqual(self.client.get("/api/nodes").status_code, 401)
 
     def test_core_page_prefixes_are_all_mounted(self) -> None:
-        mounted = {
-            getattr(rt, "path", "") for rt in self.client.app.routes
-        }
-        for prefix in ("/api/nodes", "/api/messages", "/api/config",
-                       "/api/themes", "/api/topology", "/api/rf"):
-            self.assertTrue(
-                any(p.startswith(prefix) for p in mounted),
-                f"no route under {prefix}",
-            )
+        """Live requests, not static ``app.routes`` introspection -- FastAPI
+        has changed how an included router's routes show up on ``app.routes``
+        before (e.g. 0.141's ``_IncludedRouter`` wrapper no longer flattens
+        them into plain ``APIRoute`` objects with a ``.path``), which broke
+        this check without anything actually being unmounted. An HTTP
+        request is stable across that: a matched protected route 401s (no
+        session) rather than 404s, and a matched public route doesn't 404
+        either -- both prove the router is really mounted regardless of how
+        the framework represents it internally."""
+        checks = (
+            ("/api/nodes", False),
+            ("/api/messages/status", False),
+            ("/api/config", False),
+            ("/api/themes", True),
+            ("/api/topology/graph", False),
+            ("/api/rf/status", False),
+        )
+        for path, public in checks:
+            resp = self.client.get(path)
+            self.assertNotEqual(resp.status_code, 404, f"no route under {path}")
+            if not public:
+                self.assertEqual(resp.status_code, 401, f"{path} should require auth")
 
     def test_registered_plugin_router_is_mounted_and_public(self) -> None:
         r = self.client.get("/api/plugintest/ping")
