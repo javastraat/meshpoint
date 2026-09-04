@@ -1264,6 +1264,22 @@ select.update-field__input option:checked {
     white-space: nowrap;
 }
 
+.plugin-row__del {
+    display: inline-block;
+    margin-left: 8px;
+    background: none;
+    border: 1px solid var(--accent-red);
+    color: var(--accent-red);
+    border-radius: 6px;
+    padding: 2px 10px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    vertical-align: middle;
+}
+
+.plugin-row__del:hover { background: var(--accent-red); color: var(--bg-primary); }
+.plugin-row__del:disabled { opacity: 0.5; cursor: default; }
+
 .plugin-row__restart {
     display: block;
     font-size: 0.7rem;

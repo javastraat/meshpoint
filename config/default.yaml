@@ -345,3 +345,4 @@ plugins: {}
   #   freqs: [131.525, 131.725, 131.800, 131.825]  # optional, default: EU channels above
   #   gain: 34             # optional, default: 34 (not AGC -- overloads on strong ground stations)
   #   device: 0            # optional, default: 0 (RTL-SDR device index)
+  

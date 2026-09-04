@@ -8096,7 +8096,7 @@ light/high-contrast theme rendering after the final CSS fixes (only dark
 was re-screenshotted after the switch-color + card-wrapper fixes landed).
 
 **B7 — ACARS freqs/gain/device are now real config, "config" provides
-dropped (2026-09-04, DONE, not yet live-verified)**: `plugins/apps/acars/
+dropped (2026-09-04, DONE, LIVE-VERIFIED)**: `plugins/apps/acars/
 backend/listener.py` — `AcarsListener.__init__` now takes `frequencies`/
 `gain`/`device` (all optional), replacing the module constants `_FREQUENCIES`/
 `_GAIN`/`_DEVICE` with `_DEFAULT_FREQUENCIES`/`_DEFAULT_GAIN`/
@@ -8128,10 +8128,68 @@ rename. All 51 plugin-related tests (`test_plugin_loader.py` +
 FastAPI-gated `TestShippedAcarsPlugin` which exercises the real
 `register(reg)` closure end-to-end) pass in a throwaway venv matching CI's
 FastAPI 0.141/Starlette 1.6. `ruff check` clean on all changed files.
-**Not yet live-verified** — needs a Pi restart + a check that `local.yaml`
-overrides (e.g. a non-default `gain`) actually show up in the `acarsdec`
-startup log line the user already knows to look for
-(`ACARS listener starting: acarsdec ...`).
+**LIVE-VERIFIED 2026-09-04** — both the default path (unchanged `local.yaml`,
+log line identical to pre-B7) and the override path: user set
+`plugins.acars.gain: 35` and edited one frequency (`131.825` -> `131.826`) in
+`local.yaml`, restarted, and the log line showed `-g 35 ... 131.826` exactly
+as expected, `device` left commented out and correctly defaulted to `0`.
+(Noted for the user: `131.800` logged as `131.8` -- YAML parses an unquoted
+`131.800` as the float `131.8`, trailing zero not preserved; same tuned
+frequency either way, not a bug.) B7 fully done, nothing outstanding.
+
+**Plugins page: author + homepage link (2026-09-04, DONE, not yet
+live-verified)** — small fix, not a lettered milestone. `plugin_routes.py`'s
+`_describe()` already returned `author`/`homepage` (parsed from
+`plugin.toml`'s `[meta]` since B4a) but `plugins_panel_controller.js` never
+rendered `homepage` at all, and ACARS's own manifest had no `author` set, so
+the field silently showed nothing. Added `author = "Einstein PD2EMC"` to
+`plugins/apps/acars/plugin.toml` (same convention as
+`plugins/themes/*/theme.json`) and a `byLine` in the row template combining
+author + a `target="_blank" rel="noopener noreferrer"` homepage link, styled
+via new `.plugin-row__version a` rules in `settings.css`.
+
+**B8 — community plugin uninstall (2026-09-04, DONE, not yet
+live-verified)**: User flagged the exact same bundled-vs-user-dropped-in
+problem the theme pack already solved with `theme.json`'s `"locked": true`
+-- ACARS lives in `plugins/apps/` (community tier by directory, same as
+`plugins/themes/`) despite being git-tracked and shipped with the fork, so a
+naive "community = deletable" rule would let someone delete it, and a future
+`Update` (`git reset --hard origin/main`) would silently bring it back.
+Decided (with the user, before writing code) to mirror the theme solution
+exactly rather than reclassify ACARS as built-in (would undercut its purpose
+as *the reference community plugin*). `src/plugins/manifest.py`:
+`PluginManifest.locked: bool = False`, parsed from a new **top-level**
+`locked` key in `plugin.toml` (validated bool) -- module docstring's example
+updated. **`plugins/apps/acars/plugin.toml` gained `locked = true`.**
+`src/config.py`: new `remove_subsection_key(section, key)` (mirrors
+`save_section_to_yaml`'s read/modify/write shape but for deletion) so a
+deleted plugin's `plugins.<id>` local.yaml entry doesn't linger as orphaned
+config. `plugin_routes.py`: `_describe()` gained `"locked"` and
+`"deletable"` (`source == community and not locked`) fields; new `DELETE
+/api/plugins/{id}` (admin, audited `config.plugin_delete`) -- 403 on a
+built-in or locked plugin, 404 unknown id, `shutil.rmtree(manifest.path)`
+then pops `_config.plugins[id]` + calls `remove_subsection_key`, 403 on a
+`PermissionError` from either. Frontend: `plugins_panel_controller.js` adds
+a `.plugin-row__del` Delete button when `plugin.deletable`, gated behind the
+same `DangerousModal` confirm-to-delete dialog Themes' "Installed themes"
+list already uses (`window.DangerousModal`, already loaded globally). New
+CSS mirrors `.te-installed__del` (red outline, fills red on hover).
+**Caught during testing**: the FIRST version of the new `locked`-aware test
+helper in `test_plugin_routes.py` appended `locked = true` *after* the
+`[meta]` table in the generated TOML, which silently nests it under
+`data["meta"]["locked"]` instead of the top-level key `parse_manifest` reads
+-- both new tests (`test_locked_community_plugin_is_not_deletable`,
+`test_locked_community_plugin_cannot_be_deleted`) failed with "locked" false
+when it should've been true, catching it immediately; fixed by moving the
+conditional `locked = true` line before `[meta]` in the template. The real
+`plugins/apps/acars/plugin.toml` was written correctly from the start (key
+placed before `[deps]`) -- confirmed by `parse_manifest()` directly against
+the real file. Tests: `test_plugin_manifest.py` +2 (`test_locked_true`,
+`test_locked_not_bool`), `test_plugin_routes.py` +6 (list shows
+locked/deletable correctly; delete succeeds + cleans up config; built-in
+403; locked 403; unknown 404; rmtree PermissionError 403) -- 72
+plugin-related tests total, all pass in the throwaway venv (FastAPI
+0.141/Starlette 1.6). `ruff check` clean; `node --check` clean.
 
 **Remaining plugin work** (full write-up: "Plugin system — remaining work" in
 `memory/plugin-architecture-review.md`; sketches in `memory/themes-next-todo.md`):
@@ -8142,9 +8200,14 @@ startup log line the user already knows to look for
   session), and re-screenshotting light/high-contrast theme rendering after
   the two post-launch CSS fixes (`.r-switch` solid fill, `.auth-card`
   wrapper) — only dark was re-confirmed after those landed.
+- **B8 not yet live-verified** — needs a Pi restart + a real delete: drop a
+  throwaway test folder under `plugins/apps/`, confirm it shows a Delete
+  button and ACARS doesn't, delete it via the UI, confirm the folder and its
+  `plugins.<id>` entry (if any) are actually gone, and confirm the
+  confirm-to-delete modal renders correctly (first real use of
+  `DangerousModal` from this page).
 - **B4d** — `meshpoint plugin setup <id>` deps-consent CLI + `plugins list`.
   Optional/low priority (setup.sh already works as `sudo bash`).
-- **B8** — community plugin uninstall button (delete `plugins/apps/<id>/`).
 - Unfinished capability surface (decoder/capture-source/sidebar-page seams,
   sidebar badge label) + docs debt (`docs/PLUGINS.md`) — see the review doc.
 - NOT planned unless external demand: out-of-tree install, pip deps, subprocess

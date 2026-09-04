@@ -2,6 +2,7 @@ name = "acars"
 version = "1.0.0"
 meshpoint_api = 1
 provides = ["listener", "routes", "panel"]
+locked = true  # shipped with this fork -- not user-installed, can't be deleted
 
 [deps]
 apt = ["cmake", "pkg-config", "libcjson-dev", "zlib1g-dev", "libxml2-dev", "libsndfile1-dev"]

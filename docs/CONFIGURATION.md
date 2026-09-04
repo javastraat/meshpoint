@@ -1201,6 +1201,10 @@ name = "acars"
 version = "0.1.0"
 meshpoint_api = 1
 provides = ["listener", "routes", "panel"]
+locked = true                             # optional, default false. Community-tier
+                                           # only -- refuses the Plugins page's Delete
+                                           # button. For a shipped/bundled plugin like
+                                           # this one, not a user drop-in.
 
 [deps]                                    # optional
 apt = ["cmake", "libcjson-dev"]
@@ -1228,6 +1232,13 @@ by hand — `GET /api/plugins` / `PUT /api/plugins/{id}`. Since plugins load
 once at startup, the toggle only changes what a restart will load; the page
 shows both the saved setting and whether the plugin is actually loaded right
 now, and flags "restart required" when they disagree.
+
+A community plugin you dropped in yourself also gets a **Delete** button —
+`DELETE /api/plugins/{id}` removes its folder under `plugins/apps/<id>/` and
+its `plugins.<id>` config entry. Built-in plugins and a `locked = true`
+community plugin (a shipped/bundled one, like ACARS — see below) can't be
+deleted this way; `git` tracks their files, so removing them wouldn't stick
+past the next `Update` anyway.
 
 ## Device Identity
 

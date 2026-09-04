@@ -22,7 +22,7 @@ name = "{name}"
 version = "{version}"
 meshpoint_api = 1
 provides = ["routes"]
-
+{locked_line}
 [meta]
 description = "{description}"
 """
@@ -41,13 +41,15 @@ def _build_app() -> FastAPI:
 
 def _make_plugin_dir(
     apps: Path, name: str, *, version: str = "1.0.0", description: str = "",
+    locked: bool = False,
 ) -> Path:
     d = apps / name
     d.mkdir(parents=True)
-    (d / "plugin.toml").write_text(
-        textwrap.dedent(_MANIFEST.format(name=name, version=version, description=description)),
-        encoding="utf-8",
-    )
+    toml = textwrap.dedent(_MANIFEST.format(
+        name=name, version=version, description=description,
+        locked_line="locked = true" if locked else "",
+    ))
+    (d / "plugin.toml").write_text(toml, encoding="utf-8")
     (d / "backend").mkdir()
     (d / "backend" / "__init__.py").write_text(
         "def register(reg): pass\n", encoding="utf-8",
@@ -100,6 +102,7 @@ class TestListPlugins(_PluginRoutesTestBase):
         self.assertTrue(core["enabled"])  # builtins default enabled
         self.assertFalse(core["loaded"])  # not in the loaded_plugins list
         self.assertTrue(core["restart_required"])
+        self.assertFalse(core["deletable"])  # built-ins are never deletable
 
         acars = by_id["acars"]
         self.assertEqual(acars["source"], "community")
@@ -107,6 +110,19 @@ class TestListPlugins(_PluginRoutesTestBase):
         self.assertTrue(acars["loaded"])
         self.assertFalse(acars["restart_required"])
         self.assertEqual(acars["description"], "community decoder")
+        self.assertFalse(acars["locked"])
+        self.assertTrue(acars["deletable"])
+
+    def test_locked_community_plugin_is_not_deletable(self) -> None:
+        _make_plugin_dir(self.community, "acars", locked=True)
+        config = MagicMock()
+        config.plugins = {}
+        self._init(config)
+
+        client = TestClient(_build_app())
+        body = client.get("/api/plugins").json()
+        self.assertTrue(body["plugins"][0]["locked"])
+        self.assertFalse(body["plugins"][0]["deletable"])
 
     def test_community_plugin_defaults_to_disabled(self) -> None:
         _make_plugin_dir(self.community, "off-by-default")
@@ -167,6 +183,63 @@ class TestUpdatePlugin(_PluginRoutesTestBase):
             side_effect=PermissionError("cannot write to local.yaml"),
         ):
             resp = self.client.put("/api/plugins/acars", json={"enabled": True})
+        self.assertEqual(resp.status_code, 403)
+
+
+class TestDeletePlugin(_PluginRoutesTestBase):
+    def setUp(self) -> None:
+        super().setUp()
+        self.config = MagicMock()
+        self.config.plugins = {"acars": {"enabled": True, "squelch": -20}}
+        self.client = None  # built per-test after _init, since plugins vary
+
+    def _client(self) -> TestClient:
+        return TestClient(_build_app())
+
+    def test_deletes_community_plugin_folder_and_config(self) -> None:
+        d = _make_plugin_dir(self.community, "acars")
+        self._init(self.config)
+        client = self._client()
+
+        with patch("src.api.routes.plugin_routes.remove_subsection_key") as mock_remove:
+            resp = client.delete("/api/plugins/acars")
+
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+        self.assertTrue(body["deleted"])
+        self.assertEqual(body["id"], "acars")
+        self.assertTrue(body["restart_required"])
+        self.assertFalse(d.exists())
+        self.assertNotIn("acars", self.config.plugins)
+        mock_remove.assert_called_once_with("plugins", "acars")
+
+    def test_builtin_plugin_cannot_be_deleted(self) -> None:
+        d = _make_plugin_dir(self.builtin, "core-thing")
+        self._init(self.config)
+        resp = self._client().delete("/api/plugins/core-thing")
+        self.assertEqual(resp.status_code, 403)
+        self.assertTrue(d.exists())  # never touched
+
+    def test_locked_community_plugin_cannot_be_deleted(self) -> None:
+        d = _make_plugin_dir(self.community, "acars", locked=True)
+        self._init(self.config)
+        resp = self._client().delete("/api/plugins/acars")
+        self.assertEqual(resp.status_code, 403)
+        self.assertTrue(d.exists())
+
+    def test_unknown_plugin_returns_404(self) -> None:
+        self._init(self.config)
+        resp = self._client().delete("/api/plugins/nope")
+        self.assertEqual(resp.status_code, 404)
+
+    def test_permission_error_on_rmtree_returns_403(self) -> None:
+        _make_plugin_dir(self.community, "acars")
+        self._init(self.config)
+        with patch(
+            "src.api.routes.plugin_routes.shutil.rmtree",
+            side_effect=PermissionError("nope"),
+        ):
+            resp = self._client().delete("/api/plugins/acars")
         self.assertEqual(resp.status_code, 403)
 
 

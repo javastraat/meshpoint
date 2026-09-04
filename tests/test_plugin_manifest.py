@@ -69,6 +69,7 @@ class TestParseManifest(unittest.TestCase):
         self.assertFalse(m.is_builtin)
         self.assertEqual(m.frontend_scripts, ())
         self.assertEqual(m.frontend_styles, ())
+        self.assertFalse(m.locked)
 
     def test_source_builtin(self) -> None:
         from src.plugins.manifest import SOURCE_BUILTIN
@@ -201,6 +202,16 @@ styles = ["frontend/panel.css"]
     def test_meta_not_string(self) -> None:
         toml = _VALID + "\n[meta]\nauthor = 42\n"
         self.assertEqual(self._code("acars", toml), "meta")
+
+    def test_locked_true(self) -> None:
+        toml = _VALID + "\nlocked = true\n"
+        d = _write_plugin(self.root, "acars", toml)
+        m = parse_manifest(d)
+        self.assertTrue(m.locked)
+
+    def test_locked_not_bool(self) -> None:
+        toml = _VALID + '\nlocked = "yes"\n'
+        self.assertEqual(self._code("acars", toml), "locked")
 
 
 class TestDiscoverPlugins(unittest.TestCase):

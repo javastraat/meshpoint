@@ -1050,6 +1050,34 @@ def save_section_to_yaml(section: str, values: dict) -> None:
         )
 
 
+def remove_subsection_key(section: str, key: str) -> None:
+    """Drop one key from a nested section of local.yaml (e.g. plugins.<id>
+    after deleting that plugin's folder). No-op if the file, section, or key
+    doesn't exist -- deleting something already absent isn't an error here.
+    """
+    path = _get_local_yaml_path()
+    if not path.exists():
+        return
+    with open(path, "r") as fh:
+        existing = yaml.safe_load(fh) or {}
+
+    sub = existing.get(section)
+    if not isinstance(sub, dict) or key not in sub:
+        return
+    del sub[key]
+
+    try:
+        with open(path, "w") as fh:
+            yaml.dump(existing, fh, default_flow_style=False, sort_keys=False)
+    except PermissionError:
+        import getpass
+        hint_user = getpass.getuser() or "meshpoint"
+        raise PermissionError(
+            f"Cannot write to {path}. "
+            f"Fix with: sudo chown {hint_user}:{hint_user} {path}"
+        )
+
+
 def validate_activation(config: AppConfig) -> None:
     """Require a valid signed API key only when upstream (Meshradar) is enabled."""
     if not config.upstream.enabled:

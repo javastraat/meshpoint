@@ -19,6 +19,8 @@ Manifest shape::
     version = "0.1.0"
     meshpoint_api = 1
     provides = ["listener", "routes", "panel"]
+    locked = false                 # optional, default false. true = shipped/bundled
+                                    # community plugin; refuses an "uninstall" delete.
 
     [deps]                         # optional
     apt = ["cmake", "pkg-config"]
@@ -86,6 +88,11 @@ class PluginManifest:
     frontend_styles: tuple[str, ...]
     path: Path
     source: str = SOURCE_COMMUNITY  # SOURCE_BUILTIN or SOURCE_COMMUNITY
+    # Mirrors theme.json's "locked": true (src/api/theme_store.py) -- marks a
+    # shipped/bundled community plugin (e.g. ACARS) so an "uninstall" button
+    # can refuse to delete it. Meaningless for built-ins, which are never
+    # offered a delete button regardless of this flag.
+    locked: bool = False
 
     @property
     def setup_path(self) -> Path | None:
@@ -159,6 +166,10 @@ def parse_manifest(
     if not isinstance(version, str) or not version.strip():
         raise PluginManifestError("version", "'version' must be a non-empty string.")
 
+    locked = data.get("locked", False)
+    if not isinstance(locked, bool):
+        raise PluginManifestError("locked", "'locked' must be a boolean.")
+
     api_version = data.get("meshpoint_api")
     if not isinstance(api_version, int) or isinstance(api_version, bool):
         raise PluginManifestError("api", "'meshpoint_api' must be an integer.")
@@ -227,6 +238,7 @@ def parse_manifest(
         frontend_styles=styles,
         path=plugin_dir,
         source=source,
+        locked=locked,
     )
 
 

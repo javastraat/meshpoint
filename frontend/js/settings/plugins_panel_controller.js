@@ -7,7 +7,10 @@
  * table (same shape as Settings > Themes' "Installed themes" list) with a
  * toggle switch, and persists flips through ``PUT /api/plugins/{id}``.
  * Enabling/disabling only takes effect on the next restart -- the panel says
- * so inline rather than pretending the change is live.
+ * so inline rather than pretending the change is live. A `deletable` plugin
+ * (community tier, not `locked`) also gets a Delete button that removes its
+ * folder via ``DELETE /api/plugins/{id}`` -- same confirm-to-delete modal as
+ * Settings > Themes' "Installed themes" list.
  */
 
 class PluginsPanelController {
@@ -16,6 +19,7 @@ class PluginsPanelController {
         this.listEl = rootEl.querySelector('[data-plugins-list]');
         this.statusEl = rootEl.querySelector('[data-plugins-status]');
         this._plugins = [];
+        this._modal = null;
     }
 
     bind() {}
@@ -80,6 +84,7 @@ class PluginsPanelController {
                     <input type="checkbox" data-toggle ${plugin.enabled ? 'checked' : ''}>
                     <span class="r-switch__track"></span>
                 </label>
+                ${plugin.deletable ? `<button type="button" class="plugin-row__del" data-delete>Delete</button>` : ''}
                 ${plugin.restart_required ? `<span class="plugin-row__restart" data-restart>Restart to ${plugin.enabled ? 'load' : 'unload'}</span>` : ''}
                 <span class="plugin-row__result" data-result aria-live="polite"></span>
             </td>
@@ -87,6 +92,10 @@ class PluginsPanelController {
         const toggle = row.querySelector('[data-toggle]');
         const resultEl = row.querySelector('[data-result]');
         toggle.addEventListener('change', () => this._setEnabled(plugin, toggle, resultEl));
+        const delBtn = row.querySelector('[data-delete]');
+        if (delBtn) {
+            delBtn.addEventListener('click', () => this._deletePlugin(plugin, delBtn, resultEl));
+        }
         return row;
     }
 
@@ -122,6 +131,48 @@ class PluginsPanelController {
         } finally {
             toggle.disabled = false;
         }
+    }
+
+    async _deletePlugin(plugin, button, resultEl) {
+        const ok = await this._confirm(
+            `Delete the "${plugin.id}" plugin from plugins/apps/? This removes ` +
+            `the folder on the device and its plugins.${plugin.id} config. Takes ` +
+            `effect on the next restart.`,
+        );
+        if (!ok) return;
+        button.disabled = true;
+        resultEl.dataset.kind = 'pending';
+        resultEl.textContent = 'Deleting…';
+        try {
+            const response = await fetch(`/api/plugins/${encodeURIComponent(plugin.id)}`, {
+                method: 'DELETE',
+                credentials: 'same-origin',
+            });
+            if (!response.ok) {
+                const body = await response.json().catch(() => ({}));
+                resultEl.dataset.kind = 'error';
+                resultEl.textContent = body.detail || (response.status === 403
+                    ? 'Admin role required.'
+                    : `Failed (HTTP ${response.status}).`);
+                button.disabled = false;
+                return;
+            }
+            this._plugins = this._plugins.filter((p) => p.id !== plugin.id);
+            this._render();
+            this._setStatus('', this._plugins.length ? '' : 'No plugins found under plugins/apps/.');
+        } catch (_e) {
+            resultEl.dataset.kind = 'error';
+            resultEl.textContent = 'Network error.';
+            button.disabled = false;
+        }
+    }
+
+    async _confirm(message) {
+        if (window.DangerousModal) {
+            this._modal = this._modal || new window.DangerousModal();
+            return this._modal.confirm({ label: 'Delete plugin?', command: 'Delete', description: message });
+        }
+        return window.confirm(message);
     }
 
     _setStatus(kind, message) {

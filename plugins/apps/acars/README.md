@@ -9,7 +9,10 @@ telemetry (label H1) stays raw — it's carrier-proprietary.
 
 This is Meshpoint's reference **community plugin**: a listener, its `/api/acars`
 routes and its dashboard tab, all under `plugins/apps/acars/`, wired through
-`register(reg)` — nothing in core.
+`register(reg)` — nothing in core. It ships `locked = true` in its
+`plugin.toml`, so unlike a plugin you drop in yourself it won't offer a
+Delete button on Settings → Plugins (it's git-tracked, so deleting it
+wouldn't stick past the next `Update` anyway).
 
 ## Install
 
