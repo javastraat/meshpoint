@@ -93,6 +93,7 @@ styles  = ["frontend/acars_panel.css"]    # optional
 route = "hello-world"                     # url route id, bare slug [a-z0-9-]
 label = "Hello World"                     # sidebar link text
 category = "networks"                     # networks | radio | ops | configuration | settings
+icon = "plug"                             # optional, default "plug" -- see KNOWN_SIDEBAR_ICONS
 
 [meta]                                    # optional, all strings
 description = "Aircraft VHF datalink (ACARS) decoding via acarsdec + libacars"
@@ -110,6 +111,7 @@ author = "Your Name"
 | `[deps].apt` / `.setup` | no | System packages + a build script. **Never installed automatically** — the operator runs it themselves (`sudo bash plugins/apps/<id>/setup.sh` or `sudo meshpoint plugin setup <id>`, which just wraps the same script after showing what it does). |
 | `[frontend].scripts` / `.styles` | scripts required iff `panel` or `sidebar` in `provides` | Served at `/plugins/apps/<id>/<path>` — **only** the exact files listed here, from either tier, nothing else in the folder is reachable (`src/plugins/assets.py:resolve_plugin_asset`). |
 | `[sidebar].route` / `.label` / `.category` | required iff `sidebar` in `provides` | See [Adding a top-level sidebar page](#adding-a-top-level-sidebar-page-sidebar) below. `category` must be one of `KNOWN_SIDEBAR_CATEGORIES` in `src/plugins/manifest.py`. |
+| `[sidebar].icon` | no, default `"plug"` | One of `KNOWN_SIDEBAR_ICONS` (`src/plugins/manifest.py`) — a curated key, not raw SVG. See [Adding a top-level sidebar page](#adding-a-top-level-sidebar-page-sidebar). |
 | `[meta].*` | no | Shown on Settings → Plugins: description, a clickable homepage link, author. |
 
 ## The `register(reg)` entry point
@@ -217,6 +219,7 @@ script:
    route = "hello-world"     # -> #/hello-world
    label = "Hello World"     # sidebar link text
    category = "networks"     # networks | radio | ops | configuration | settings
+   icon = "plug"             # optional, default "plug" -- see below
    ```
 
    `category` must be an *existing* sidebar section — you're placing your
@@ -226,6 +229,15 @@ script:
    your route gets nested as `<category>/<route>` the same way the built-in
    subitems are (e.g. `settings/plugins`) — so `category = "settings"` with
    `route = "hello-world"` ends up at `#/settings/hello-world`.
+
+   `icon` picks from a small curated set in `frontend/sidebar/
+   sidebar_plugin_registry.js`'s `_ICON_PATHS` (kept in sync with
+   `KNOWN_SIDEBAR_ICONS` in `src/plugins/manifest.py`) — currently `plug`
+   (default), `antenna`, `chart`, `message`, `terminal`, `map`, `list`,
+   `grid`. Deliberately a name, not raw SVG from the manifest — that would
+   let a plugin's `plugin.toml` inject arbitrary markup into every viewer's
+   sidebar. An unrecognized key falls back to `plug` rather than breaking
+   the page.
 
 2. Your frontend script supplies the page content — same
    `mount(rootEl)`/`show()`/`hide()` shape `"panel"` uses:
@@ -249,19 +261,14 @@ script:
    rather.
 
 3. That's it — no manual route registration. `src/plugins/assets.py`'s
-   `sidebar_descriptor_tags()` pushes your `{route, label, category}` onto
-   `window.MESHPOINT_SIDEBAR_PLUGINS` at serve time; `frontend/sidebar/
+   `sidebar_descriptor_tags()` pushes your `{route, label, category, icon}`
+   onto `window.MESHPOINT_SIDEBAR_PLUGINS` at serve time; `frontend/sidebar/
    sidebar_plugin_registry.js`'s `mountPluginSidebarPages()` (called from
    `app.js`, *before* the Router/sidebar are built) reads that plus your
    `registerSidebarPage()` call and builds the actual `<li>` + `<section>`.
    A page declared in `plugin.toml` whose script never calls
    `registerSidebarPage()` logs a console warning and is silently skipped
    (never blocks the rest of the app).
-
-   All sidebar-page plugins currently share one generic icon — there's no
-   per-plugin icon field yet (would mean either trusting arbitrary SVG from
-   a manifest, or a curated icon-name enum; not worth the complexity for
-   the first plugin using this seam).
 
 ## Your plugin's own config
 

@@ -197,9 +197,11 @@ class TestLoadPlugins(unittest.TestCase):
 
 
 class TestShippedHelloWorldPlugin(unittest.TestCase):
-    """The real plugins/apps/hello-world/ folder loads cleanly. FastAPI-free
-    (its register() has nothing to do), so this runs on the Mac too --
-    unlike TestShippedAcarsPlugin below."""
+    """The real plugins/apps/hello-world/ folder loads cleanly (community
+    tier -- kept there rather than moved to built-in, so it stays easy for
+    a user to actually find and copy as a template). FastAPI-free (its
+    register() has nothing to do), so this runs on the Mac too -- unlike
+    TestShippedAcarsPlugin below."""
 
     def setUp(self) -> None:
         route_registry.reset()
@@ -220,6 +222,7 @@ class TestShippedHelloWorldPlugin(unittest.TestCase):
         )
         self.assertIn("hello-world", [p.manifest.name for p in loaded])
         manifest = next(p.manifest for p in loaded if p.manifest.name == "hello-world")
+        self.assertEqual(manifest.source, "community")
         self.assertEqual(manifest.provides, ("sidebar",))
         self.assertEqual(manifest.sidebar.route, "hello-world")
         self.assertEqual(manifest.sidebar.category, "networks")

@@ -232,6 +232,25 @@ styles = ["frontend/panel.css"]
         self.assertEqual(m.sidebar.route, "hello-world")
         self.assertEqual(m.sidebar.label, "Hello World")
         self.assertEqual(m.sidebar.category, "networks")
+        self.assertEqual(m.sidebar.icon, "plug")  # default when omitted
+
+    def test_sidebar_icon_explicit(self) -> None:
+        toml = self._sidebar_toml(
+            '\n[sidebar]\nroute = "x"\nlabel = "X"\ncategory = "networks"\n'
+            'icon = "antenna"\n',
+        )
+        d = _write_plugin(self.root, "acars", toml, extra_files=("frontend/x.js",))
+        m = parse_manifest(d)
+        self.assertEqual(m.sidebar.icon, "antenna")
+
+    def test_sidebar_icon_unknown_is_rejected(self) -> None:
+        toml = self._sidebar_toml(
+            '\n[sidebar]\nroute = "x"\nlabel = "X"\ncategory = "networks"\n'
+            'icon = "unicorn"\n',
+        )
+        self.assertEqual(
+            self._code("acars", toml, extra_files=("frontend/x.js",)), "sidebar",
+        )
 
     def test_sidebar_provides_without_table_is_rejected(self) -> None:
         toml = (

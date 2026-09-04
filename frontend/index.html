@@ -1097,8 +1097,12 @@
             <section class="section" data-section="settings/plugins" style="display:none">
                 <div id="settings-plugins-panel" class="plugins-panel">
                     <header class="plugins-panel__head">
-                        <h2 class="plugins-panel__title">Plugins</h2>
+                        <div class="plugins-panel__head-row">
+                            <h2 class="plugins-panel__title">Plugins</h2>
+                            <button class="terminal-button" type="button" data-restart-service>Restart service</button>
+                        </div>
                         <p class="plugins-panel__subtitle">Built-in and community app plugins discovered under <code>plugins/apps/</code>. Enabling or disabling one only takes effect after restarting the service.</p>
+                        <p class="plugins-panel__restart-status" data-restart-status aria-live="polite"></p>
                     </header>
                     <article class="auth-card">
                         <p class="plugins-panel__status" data-plugins-status aria-live="polite"></p>

@@ -10,7 +10,11 @@
  * so inline rather than pretending the change is live. A `deletable` plugin
  * (community tier, not `locked`) also gets a Delete button that removes its
  * folder via ``DELETE /api/plugins/{id}`` -- same confirm-to-delete modal as
- * Settings > Themes' "Installed themes" list.
+ * Settings > Themes' "Installed themes" list. A page-level "Restart service"
+ * button reuses the existing `restart_service` dangerous action
+ * (``POST /api/dangerous/invoke``, same one Settings > System's "Restart
+ * service" card triggers) so a pending enable/disable/delete change can be
+ * applied without leaving this page.
  */
 
 class PluginsPanelController {
@@ -18,11 +22,60 @@ class PluginsPanelController {
         this.root = rootEl;
         this.listEl = rootEl.querySelector('[data-plugins-list]');
         this.statusEl = rootEl.querySelector('[data-plugins-status]');
+        this.restartBtn = rootEl.querySelector('[data-restart-service]');
+        this.restartStatusEl = rootEl.querySelector('[data-restart-status]');
         this._plugins = [];
         this._modal = null;
     }
 
-    bind() {}
+    bind() {
+        if (this.restartBtn) {
+            this.restartBtn.addEventListener('click', () => this._restartService());
+        }
+    }
+
+    async _restartService() {
+        const ok = await this._confirm(
+            'Restart the Meshpoint service now? This applies any pending plugin ' +
+            'enable/disable changes above. The dashboard will briefly disconnect ' +
+            'and reload while it comes back up.',
+            { label: 'Restart service?', command: 'Restart service' },
+        );
+        if (!ok) return;
+        this.restartBtn.disabled = true;
+        this._setRestartStatus('pending', 'Restarting…');
+        try {
+            const response = await fetch('/api/dangerous/invoke', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action_id: 'restart_service' }),
+            });
+            if (!response.ok) {
+                this._setRestartStatus('error', response.status === 403
+                    ? 'Admin role required.'
+                    : `Failed (HTTP ${response.status}).`);
+                this.restartBtn.disabled = false;
+                return;
+            }
+            const body = await response.json();
+            this._setRestartStatus(
+                body.success ? 'success' : 'error',
+                body.success
+                    ? 'Restarting… the dashboard will reconnect in a few seconds.'
+                    : (body.message || 'Restart failed.'),
+            );
+        } catch (_e) {
+            this._setRestartStatus('error', 'Network error.');
+            this.restartBtn.disabled = false;
+        }
+    }
+
+    _setRestartStatus(kind, message) {
+        if (!this.restartStatusEl) return;
+        this.restartStatusEl.dataset.kind = kind;
+        this.restartStatusEl.textContent = message;
+    }
 
     async refresh() {
         try {
@@ -167,10 +220,10 @@ class PluginsPanelController {
         }
     }
 
-    async _confirm(message) {
+    async _confirm(message, { label = 'Delete plugin?', command = 'Delete' } = {}) {
         if (window.DangerousModal) {
             this._modal = this._modal || new window.DangerousModal();
-            return this._modal.confirm({ label: 'Delete plugin?', command: 'Delete', description: message });
+            return this._modal.confirm({ label, command, description: message });
         }
         return window.confirm(message);
     }

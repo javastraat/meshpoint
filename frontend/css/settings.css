@@ -1159,8 +1159,16 @@ select.update-field__input option:checked {
     animation: authPanelFadeIn 320ms ease-out both;
 }
 
+.plugins-panel__head-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 4px;
+}
+
 .plugins-panel__title {
-    margin: 0 0 4px;
+    margin: 0;
     font-size: 22px;
     font-weight: 600;
     color: var(--text-primary);
@@ -1171,6 +1179,16 @@ select.update-field__input option:checked {
     color: var(--text-secondary);
     font-size: 14px;
 }
+
+.plugins-panel__restart-status {
+    margin: 6px 0 0;
+    font-size: 13px;
+    min-height: 1.2em;
+}
+
+.plugins-panel__restart-status[data-kind="pending"] { color: var(--text-secondary); }
+.plugins-panel__restart-status[data-kind="success"] { color: var(--accent-green); }
+.plugins-panel__restart-status[data-kind="error"] { color: var(--accent-red); }
 
 .plugins-panel__status {
     margin: 0 0 12px;

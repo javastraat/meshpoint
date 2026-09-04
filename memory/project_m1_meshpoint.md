@@ -8423,11 +8423,97 @@ via a file-changed system note, not asked for; re-verified `parse_manifest`
 + the loader test still pass with it in place (they do; `locked` is
 orthogonal to `sidebar`/`provides`).
 
-**Not yet live-verified** -- needs a Pi restart with `plugins.hello-world.
-enabled: true`: does "Hello World" actually render under Networks in a
-real browser, in the correct DOM position, with the shared plug icon
-looking reasonable, and does clicking it show/hide correctly via the real
-Router (not just the jsdom simulation above)?
+**LIVE-VERIFIED 2026-09-04**: user enabled it and restarted; screenshot
+shows "Hello World" exactly where the jsdom simulation predicted -- right
+after Topology, right before the "Radio" section header, inside Networks
+-- with the shared plug icon rendering correctly, the item highlighted as
+the active route, and the mounted page content ("Hello, World." + the
+description paragraph) matching the plugin's own markup exactly. Whole
+`"sidebar"` seam confirmed working end to end in a real browser, not just
+simulated.
+
+**Tier back-and-forth, same day**: after live-verifying, user moved
+`hello-world` from `plugins/apps/` (community) to `src/plugins/apps/`
+(built-in) on disk directly (no discussion first) to see what that felt
+like, asked mid-move why `manifest.py` needed touching at all for "one
+plugin" (answered: one-time framework plumbing so *any* future plugin's
+`[sidebar]` table means something, same category as `[frontend]`/`locked`
+already there -- a plugin author never edits that file, only writes TOML),
+confirmed `plugins/apps/` was the right instinct, then moved it back to
+community with the reasoning **"i was thinking to move it internal but
+then users cant find it"** -- i.e. deliberately keeping it discoverable as
+a copy-paste template outweighs the convenience of built-in default-on.
+Final state: **`plugins/apps/hello-world/` (community), matching the
+original build and the live-verification above** -- the built-in detour
+left no trace once reverted. Caught + fixed the fallout from chasing the
+move reactively: `tests/test_plugin_loader.py::TestShippedHelloWorldPlugin`
+had been rewritten mid-flight for the (now reverted) built-in path and
+started failing the moment the folder moved back -- reverted the test to
+its original community-tier form (`enabled: true` required, source
+`"community"`). Also reverted matching path references in
+`docs/PLUGINS.md`/`docs/CHANGELOG.md`/the plugin's own `README.md` that
+had been updated for the built-in detour. Full suite re-confirmed green
+(1531) after settling. Lesson for next time: when a file move happens
+mid-session, wait for an explicit "this is final" rather than immediately
+chasing each intermediate state through docs/tests -- got one round of
+wasted edits out of reacting to the first move before the second one
+landed.
+
+**Sidebar icon field (2026-09-04, DONE, not yet live-verified)**: User
+asked for it directly ("can we also set the icon... in the toml"),
+revisiting the earlier "current limitations" note that had explicitly
+deferred a per-plugin icon as not worth the complexity for a single
+plugin -- now that there's real demand, built the safe version that note
+already anticipated: a **curated icon-key enum, not raw SVG from
+`plugin.toml`** (arbitrary SVG from a manifest would be a real injection
+surface). `src/plugins/manifest.py`: new `KNOWN_SIDEBAR_ICONS` frozenset
+(`plug` default, `antenna`, `chart`, `message`, `terminal`, `map`, `list`,
+`grid`), `SidebarSpec.icon: str = "plug"`, `_parse_sidebar` validates
+membership. `src/plugins/assets.py`: `icon` added to the pushed descriptor
+JSON. `frontend/sidebar/sidebar_plugin_registry.js`: replaced the single
+hardcoded icon constant with an `_ICON_PATHS` map + `_iconSvg(name)`
+(unknown/missing key falls back to `plug` rather than rendering broken).
+Icon provenance, to stay low-risk without inventing unverified path data:
+`chart`/`message`/`terminal`/`grid` are byte-identical paths copy-pasted
+from the real Stats/Messages/Terminal/Dashboard sidebar icons already
+proven working in this app; `antenna`/`map`/`list` are well-known
+ubiquitous icon shapes (wifi symbol / map-pin / list-with-dots), not
+hand-invented bezier curves I couldn't visually verify. Verified with
+jsdom again (same technique as the original seam): a `chart`-tagged
+descriptor renders `<line>` elements and no `<polyline>` (confirms it's
+not accidentally reusing the terminal path), and an unrecognized icon key
+renders markup byte-identical to the `plug` fallback rather than an empty
+icon. Tests: `test_plugin_manifest.py` +3 (default `plug` when omitted,
+explicit valid icon, unknown icon rejected with code `sidebar`),
+`test_plugin_assets.py` +2 (icon in descriptor JSON, explicit non-default
+icon). 1534 tests total, `ruff check` clean. `docs/PLUGINS.md` updated
+(icon field in the reference table + the "Adding a top-level sidebar page"
+walkthrough); the earlier "no per-plugin icon" caveat removed since it's
+no longer true. **Not yet live-verified** -- the shipped `hello-world`
+still uses the default `plug` icon (already confirmed working live), so
+this only needs a Pi check if/when a *different* icon key is actually
+used by some plugin.
+
+**Settings → Plugins: "Restart service" button (2026-09-04, DONE, not yet
+live-verified)**: User asked for a one-click way to apply a pending
+enable/disable/delete without leaving the page. Deliberately **reused the
+existing `restart_service` dangerous action** (`src/api/dangerous/
+handlers.py::build_restart_service_action`, already registered
+unconditionally in `server.py`, same one Settings → System's own restart
+card already triggers) rather than building new backend plumbing --
+confirmed its exact request/response shape (`POST /api/dangerous/invoke`
+`{action_id}` -> `{success, message, details}`) directly from
+`dangerous_routes.py` before wiring the frontend, so nothing was guessed.
+`index.html`: button added to the Plugins page header row; new
+`.plugins-panel__head-row`/`.plugins-panel__restart-status` CSS.
+`plugins_panel_controller.js`: `_confirm()` generalized to accept an
+optional `{label, command}` override (previously hardcoded to the Delete
+dialog's wording) so the same `DangerousModal` instance serves both the
+restart confirm and the existing delete confirm; `_restartService()` mirrors
+`_deletePlugin()`'s pending/success/error status pattern. No backend code
+touched at all -- pure reuse. **Not yet live-verified** -- needs a real
+click-through on the Pi to confirm the confirm-modal wording reads well and
+the dashboard actually reconnects cleanly after the detached restart.
 
 - NOT planned unless external demand: out-of-tree install, pip deps, subprocess
   isolation, SemVer contract.

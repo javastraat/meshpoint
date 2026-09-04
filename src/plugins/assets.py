@@ -33,11 +33,14 @@ def plugin_asset_url(plugin_id: str, rel_path: str) -> str:
 
 def sidebar_descriptor_tags(manifests: list[PluginManifest]) -> str:
     """One ``<script>`` pushing every sidebar-page plugin's
-    ``{id, route, label, category}`` onto ``window.MESHPOINT_SIDEBAR_PLUGINS``
-    -- read by ``frontend/sidebar/sidebar_plugin_registry.js``'s
-    ``mountPluginSidebarPages()``, which builds the actual nav `<li>` +
-    content `<section>` before the plugin's own script (also injected here,
-    via :func:`plugin_asset_tags`) calls ``window.registerSidebarPage(...)``.
+    ``{id, route, label, category, icon}`` onto
+    ``window.MESHPOINT_SIDEBAR_PLUGINS`` -- read by ``frontend/sidebar/
+    sidebar_plugin_registry.js``'s ``mountPluginSidebarPages()``, which
+    builds the actual nav `<li>` + content `<section>` before the plugin's
+    own script (also injected here, via :func:`plugin_asset_tags`) calls
+    ``window.registerSidebarPage(...)``. ``icon`` is a key into that
+    script's own curated glyph set (:data:`~src.plugins.manifest.
+    KNOWN_SIDEBAR_ICONS`), never raw markup.
     """
     descriptors = [
         {
@@ -45,6 +48,7 @@ def sidebar_descriptor_tags(manifests: list[PluginManifest]) -> str:
             "route": m.sidebar.route,
             "label": m.sidebar.label,
             "category": m.sidebar.category,
+            "icon": m.sidebar.icon,
         }
         for m in manifests
         if "sidebar" in m.provides and m.sidebar is not None

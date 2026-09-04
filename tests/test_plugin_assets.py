@@ -77,6 +77,7 @@ class TestSidebarDescriptorTags(unittest.TestCase):
             route=kw.pop("route", "hello-world"),
             label=kw.pop("label", "Hello World"),
             category=kw.pop("category", "networks"),
+            icon=kw.pop("icon", "plug"),
         )
         return _m("hello-world", provides=("sidebar",), sidebar=spec, **kw)
 
@@ -87,6 +88,11 @@ class TestSidebarDescriptorTags(unittest.TestCase):
         self.assertIn('"route":"hello-world"', out)
         self.assertIn('"label":"Hello World"', out)
         self.assertIn('"category":"networks"', out)
+        self.assertIn('"icon":"plug"', out)
+
+    def test_descriptor_includes_explicit_icon(self) -> None:
+        out = sidebar_descriptor_tags([self._sidebar_plugin(icon="antenna")])
+        self.assertIn('"icon":"antenna"', out)
 
     def test_no_sidebar_plugins_returns_empty(self) -> None:
         self.assertEqual(sidebar_descriptor_tags([_m("acars")]), "")

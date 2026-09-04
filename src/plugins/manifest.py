@@ -34,6 +34,7 @@ Manifest shape::
     route = "hello-world"          # url route id (bare slug, [a-z0-9-])
     label = "Hello World"          # sidebar link text
     category = "networks"          # one of: networks, radio, ops, configuration, settings
+    icon = "plug"                  # optional, default "plug" -- one of KNOWN_SIDEBAR_ICONS
 
     [meta]                         # optional, all strings
     description = "..."
@@ -70,6 +71,16 @@ KNOWN_SIDEBAR_CATEGORIES = frozenset({
     "networks", "radio", "ops", "configuration", "settings",
 })
 
+# A curated icon set for a sidebar page, keyed by name -- not arbitrary SVG
+# from a manifest (that's a real injection surface for a file some other
+# person authored). frontend/sidebar/sidebar_plugin_registry.js owns the
+# actual glyphs; this is just the set of valid keys. "plug" (the original,
+# only, generic icon) stays the default.
+KNOWN_SIDEBAR_ICONS = frozenset({
+    "plug", "antenna", "chart", "message", "terminal", "map", "list", "grid",
+})
+_DEFAULT_SIDEBAR_ICON = "plug"
+
 # Where a plugin folder was found. Built-ins ship in the repo under
 # src/plugins/apps/ and load unless explicitly disabled; community drop-ins
 # live in <plugins_dir>/apps/ and are opt-in. Mirrors themes' builtin/plugin
@@ -96,6 +107,7 @@ class SidebarSpec:
     route: str
     label: str
     category: str
+    icon: str = _DEFAULT_SIDEBAR_ICON
 
 
 @dataclass(frozen=True)
@@ -307,7 +319,14 @@ def _parse_sidebar(value, provides: list) -> SidebarSpec | None:
             f"'sidebar.category' must be one of {sorted(KNOWN_SIDEBAR_CATEGORIES)}.",
         )
 
-    return SidebarSpec(route=route, label=label.strip(), category=category)
+    icon = value.get("icon", _DEFAULT_SIDEBAR_ICON)
+    if icon not in KNOWN_SIDEBAR_ICONS:
+        raise PluginManifestError(
+            "sidebar",
+            f"'sidebar.icon' must be one of {sorted(KNOWN_SIDEBAR_ICONS)}.",
+        )
+
+    return SidebarSpec(route=route, label=label.strip(), category=category, icon=icon)
 
 
 def _scan_dir(apps_dir: Path, source: str, seen: set[str]) -> list[PluginManifest]:

@@ -6,7 +6,7 @@
  *
  *   1. A <script> per sidebar-capable plugin, generated from its
  *      plugin.toml [sidebar] table, pushing a descriptor onto
- *      window.MESHPOINT_SIDEBAR_PLUGINS -- {id, route, label, category}.
+ *      window.MESHPOINT_SIDEBAR_PLUGINS -- {id, route, label, category, icon}.
  *   2. The plugin's own frontend script, calling:
  *
  *        window.registerSidebarPage({
@@ -42,14 +42,38 @@ window.MESHPOINT_SIDEBAR_PLUGINS = window.MESHPOINT_SIDEBAR_PLUGINS || [];
         factories[route] = make;
     };
 
-    // Generic "plugin page" glyph -- shared by every plugin sidebar item in
-    // this first cut rather than a per-plugin icon (which would mean either
-    // trusting arbitrary SVG from a manifest, or a curated icon-name enum;
-    // not worth the complexity for a first plugin using this seam).
-    const _ICON_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
-        'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-        '<path d="M9 2v4M15 2v4M7 8h10l-1 6a4 4 0 0 1-4 4h0a4 4 0 0 1-4-4z"/>' +
-        '<path d="M12 18v4"/></svg>';
+    // Curated icon set for a plugin's sidebar item -- keyed by name, not
+    // arbitrary SVG from plugin.toml (that would let a manifest inject
+    // whatever markup it wants). Matches src/plugins/manifest.py's
+    // KNOWN_SIDEBAR_ICONS exactly; add a key in both places together.
+    // "chart"/"message"/"terminal"/"grid" reuse the exact paths the
+    // built-in Stats/Messages/Terminal/Dashboard sidebar icons already use,
+    // for visual consistency; "antenna"/"map"/"list" are well-known
+    // standard icon shapes (wifi/map-pin/list); "plug" is the original
+    // default, kept for anything not fitting the others.
+    const _ICON_PATHS = {
+        plug: '<path d="M9 2v4M15 2v4M7 8h10l-1 6a4 4 0 0 1-4 4h0a4 4 0 0 1-4-4z"/>'
+            + '<path d="M12 18v4"/>',
+        antenna: '<path d="M12 20h.01"/><path d="M2 8.82a15 15 0 0 1 20 0"/>'
+            + '<path d="M5 12.859a10 10 0 0 1 14 0"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/>',
+        chart: '<line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/>'
+            + '<line x1="6" y1="20" x2="6" y2="16"/>',
+        message: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+        terminal: '<polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>',
+        map: '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
+        list: '<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/>'
+            + '<line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/>'
+            + '<line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>',
+        grid: '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>'
+            + '<rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>',
+    };
+
+    function _iconSvg(name) {
+        const inner = _ICON_PATHS[name] || _ICON_PATHS.plug;
+        return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+            + 'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+            + inner + '</svg>';
+    }
 
     function _escape(value) {
         return String(value || '').replace(/[&<>"']/g, (c) => (
@@ -90,10 +114,10 @@ window.MESHPOINT_SIDEBAR_PLUGINS = window.MESHPOINT_SIDEBAR_PLUGINS || [];
         return { parent: list, before: node };
     }
 
-    function _buildLink(routeId, label, nested) {
+    function _buildLink(routeId, label, nested, icon) {
         const li = document.createElement('li');
         li.className = nested ? 'sidebar__subitem' : 'sidebar__item';
-        const iconHtml = nested ? '' : `<span class="sidebar__icon">${_ICON_SVG}</span>`;
+        const iconHtml = nested ? '' : `<span class="sidebar__icon">${_iconSvg(icon)}</span>`;
         li.innerHTML = `<a href="#/${routeId}" class="sidebar__link" data-route="${routeId}">` +
             `${iconHtml}<span class="sidebar__label">${_escape(label)}</span></a>`;
         return li;
@@ -125,7 +149,7 @@ window.MESHPOINT_SIDEBAR_PLUGINS = window.MESHPOINT_SIDEBAR_PLUGINS || [];
             const nested = _isNested(desc.category);
             const routeId = nested ? `${desc.category}/${desc.route}` : desc.route;
 
-            const li = _buildLink(routeId, desc.label, nested);
+            const li = _buildLink(routeId, desc.label, nested, desc.icon);
             if (target.before) target.parent.insertBefore(li, target.before);
             else target.parent.appendChild(li);
 
