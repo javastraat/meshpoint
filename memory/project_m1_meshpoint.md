@@ -9164,5 +9164,70 @@ is the last remaining piece** -- extracting it would let
 (nothing left in `_KINDS`), unlike P2000/POCSAG which left the shared
 files alive and trimmed. DAB+ is still the other original candidate
 (Config sub-tab, more work); plain-FM Radio still explicitly out of
-scope. Also still open: the grey-overlay-after-restart bug noted above,
-unrelated to any of this plugin work.
+scope.
+
+**POCSAG later LIVE-VERIFIED clean on the Pi, same day**: fresh restart
+log showed `loaded community plugin pocsag v1.0.0`, `plugins: 1 of 6
+loaded`, `commits_behind=0`, zero errors anywhere in startup, and (from
+an earlier check the same session) the listener starts with the exact
+expected `rtl_fm -d 0 -f 439987500 -M fm -s 22050 -l 250 | multimon-ng -a
+POCSAG512 -a POCSAG1200 -a POCSAG2400 -t raw /dev/stdin` command, no
+errors. Plugin loading + listener startup both confirmed working
+end-to-end. User then tested reception and got "No messages yet" despite
+real DAPNET traffic showing in the log at the same time -- worked through
+with the user that DAPNET (a separate USB-serial companion device with
+its own dedicated SX1276/SX1262 radio, capture source literally named
+`dapnet_433`) is completely unrelated to the RTL-SDR `pocsag` plugin,
+despite DAPNET pages physically being POCSAG-modulated RF on the same
+439.9875 MHz band -- confirmed the RTL-SDR pipeline itself is byte-for-
+byte unchanged from what worked pre-extraction (per the v6 worklist's own
+"POCSAG LIVE-VERIFIED via screenshot... 3 real POCSAG1200 messages" note),
+so the "No messages yet" is a real-world RF reception question (gain/
+antenna/actual on-air traffic), not a regression from this extraction.
+Not chased further -- correctly out of scope for the plugin-split work.
+
+**Real bug found and fixed the same session, unrelated to the pager-
+plugin extractions**: user reported (with a screenshot) that clicking
+Settings -> Plugins' "Restart service" button left the WHOLE page looking
+stuck under a grey overlay showing "Restarting... the dashboard will
+reconnect in a few seconds." forever, even though the service had
+genuinely already come back (`Uptime 0m`, a live session, fresh device
+data all visibly loaded in the same screenshot). Root-caused by reading
+`plugins_panel_controller.js` directly rather than guessing at a CSS
+overlay bug: `_restartService()` set `restartBtn.disabled = true` before
+invoking the restart, but only ever reset it to `false` on the two
+*failure* branches (HTTP error, network error) -- there was no `finally`,
+so the success path (the only one that matters, since a successful
+restart kills and replaces the whole process) left the button disabled
+forever. Worse, nothing anywhere re-fetched the plugin list afterward, so
+every row that had a pending enable/disable kept showing its stale dim
+"Saved. Restart to apply." result text (styled in the muted
+`--text-secondary` grey) indefinitely. Together -- one permanently
+disabled button plus several rows frozen in dim "pending" styling -- that
+*reads* as a stuck full-page grey overlay even though there never was one
+(ruled out `DangerousModal`'s own backdrop CSS explicitly by reading it --
+its `_resolve()` always calls `_hide()` regardless of confirm/cancel, and
+the closed-state CSS is genuinely `pointer-events:none; background:
+transparent`, so it isn't the culprit). Compared against `_setEnabled()`
+right above it in the same file, which already correctly resets
+`toggle.disabled = false` in a `finally` -- confirms this was a one-off
+inconsistency, not a systemic pattern in this file.
+
+Fixed: button re-enable moved into a `finally` (matches `_setEnabled`'s
+existing pattern); added `_reconnectAfterRestart()` which polls
+`GET /api/plugins` every 3s (up to 6 attempts / ~18s, generous for a
+concentrator reinit) until the restarted service answers, then calls the
+controller's own `refresh()` so `enabled`/`loaded`/`restart_required`
+reflect the new process instead of the frozen pre-restart snapshot.
+**Verified the actual control flow, not just read the diff**: wrote a
+throwaway Node harness (`global.window = {}`, `eval()`'d the real source
+file, shimmed `fetch`/`setTimeout`) simulating a restart where
+`/api/plugins` fails twice then succeeds -- confirmed `btn.disabled` is
+`false` immediately after `_restartService()` resolves (not stuck), and
+that the background poll correctly retries through the failures and ends
+with status text "Reconnected -- plugin list refreshed." `node --check`
+clean. New CHANGELOG bullet under v0.8.1, right after the earlier
+"Requires:" hint fix (44 bullets total now, parser re-verified).
+**Not yet live-verified on the Pi** -- next session should confirm a real
+restart-via-Plugins-page now clears itself within ~20s without a manual
+page reload.

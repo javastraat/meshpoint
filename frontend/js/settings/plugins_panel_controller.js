@@ -55,20 +55,47 @@ class PluginsPanelController {
                 this._setRestartStatus('error', response.status === 403
                     ? 'Admin role required.'
                     : `Failed (HTTP ${response.status}).`);
-                this.restartBtn.disabled = false;
                 return;
             }
             const body = await response.json();
-            this._setRestartStatus(
-                body.success ? 'success' : 'error',
-                body.success
-                    ? 'Restarting… the dashboard will reconnect in a few seconds.'
-                    : (body.message || 'Restart failed.'),
-            );
+            if (!body.success) {
+                this._setRestartStatus('error', body.message || 'Restart failed.');
+                return;
+            }
+            this._setRestartStatus('success', 'Restarting… the dashboard will reconnect in a few seconds.');
+            // Fire-and-forget: the service process fully exits and restarts
+            // (systemd), so this page's own plugin list -- and every row's
+            // "Saved. Restart to apply." pending state -- otherwise stays
+            // frozen forever with no code anywhere re-fetching it, which
+            // reads as a stuck/greyed-out page even once the service is
+            // long back up and everything else (WS, uptime, sessions) has
+            // already reconnected on its own.
+            this._reconnectAfterRestart();
         } catch (_e) {
             this._setRestartStatus('error', 'Network error.');
+        } finally {
             this.restartBtn.disabled = false;
         }
+    }
+
+    /** Polls until the restarted service answers again, then refreshes the
+     * plugin list so enabled/loaded/restart_required reflect the new
+     * process instead of the stale pre-restart snapshot. */
+    async _reconnectAfterRestart() {
+        const RETRY_DELAY_MS = 3000;
+        const MAX_ATTEMPTS = 6; // ~18s -- generous for a concentrator reinit
+        for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+            try {
+                const response = await fetch('/api/plugins', { credentials: 'same-origin' });
+                if (response.ok) {
+                    await this.refresh();
+                    this._setRestartStatus('success', 'Reconnected — plugin list refreshed.');
+                    return;
+                }
+            } catch (_e) { /* still restarting -- keep retrying */ }
+        }
+        this._setRestartStatus('error', 'Still unreachable after the restart — reload the page to check.');
     }
 
     _setRestartStatus(kind, message) {
