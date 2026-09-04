@@ -1260,6 +1260,36 @@ select.update-field__input option:checked {
 }
 .plugin-row--host td { border-top-color: var(--border); }
 
+/* Clicking a host row's name (or its chevron) folds/unfolds its group --
+   scoped to just the name+chevron wrapper, not the whole row or cell, so
+   the homepage link in the version line right below stays independently
+   clickable instead of also toggling the fold. */
+.plugin-row__namewrap--foldable {
+    cursor: pointer;
+    user-select: none;
+}
+.plugin-row__namewrap--foldable:hover .plugin-row__name { color: var(--accent-cyan); }
+
+.plugin-row__toggle {
+    appearance: none;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    width: 1rem;
+    display: inline-block;
+    text-align: center;
+    cursor: pointer;
+    padding: 0;
+}
+
+.plugin-row__count {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: 400;
+    margin-left: 2px;
+}
+
 .plugin-row__version {
     display: block;
     font-family: var(--font-mono);

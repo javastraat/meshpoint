@@ -27,6 +27,22 @@ class PluginsPanelController {
         this.searchEl = rootEl.querySelector('[data-plugins-search]');
         this._plugins = [];
         this._filterText = '';
+        // Which group-root ids are folded shut -- persists across
+        // _render() calls (a toggle/delete/search re-renders the whole
+        // table) since it's UI-only state, not re-derived from the API.
+        // Ignored entirely while a filter is active (see _render()) so
+        // typing a search term can never hide a real match behind a
+        // collapsed group.
+        this._collapsedGroups = new Set();
+        // A group starts collapsed the first time we ever see it (e.g.
+        // "rtlsdr" alone accounts for 8 of 11 plugins today -- showing
+        // all of them by default defeats the point of grouping), then
+        // respects whatever the admin does with it after that for the
+        // rest of this page session. Tracked separately from
+        // _collapsedGroups so a later refresh() (every toggle/delete
+        // re-fetches and re-renders) doesn't stomp back over a group the
+        // admin just expanded a moment ago.
+        this._seenGroupRoots = new Set();
         this._modal = null;
     }
 
@@ -151,7 +167,8 @@ class PluginsPanelController {
      * group. Group order itself is stable -- whichever group's first
      * member appears first in the API's own (alphabetical) order -- so
      * the overall page doesn't reshuffle unpredictably as plugins are
-     * added.
+     * added. Returns [{root, members}], not a flat list -- _render()
+     * decides what to actually show based on fold/filter state.
      */
     _groupedPlugins() {
         const byId = new Map(this._plugins.map((p) => [p.id, p]));
@@ -178,13 +195,7 @@ class PluginsPanelController {
             if (plugin.id !== root) groups.get(root).members.push(plugin);
         });
 
-        const ordered = [];
-        groupOrder.forEach((root) => {
-            const group = groups.get(root);
-            ordered.push({ plugin: group.root, grouped: group.members.length > 0 });
-            group.members.forEach((m) => ordered.push({ plugin: m, grouped: true }));
-        });
-        return ordered;
+        return groupOrder.map((root) => groups.get(root));
     }
 
     _render() {
@@ -193,7 +204,36 @@ class PluginsPanelController {
             this.listEl.innerHTML = '';
             return;
         }
-        const rows = this._groupedPlugins().filter(({ plugin }) => this._matchesFilter(plugin));
+
+        // While actively searching, fold state is ignored entirely (a
+        // collapsed group must never hide a real match) and a host whose
+        // OWN text doesn't match is still shown as context above any of
+        // its members that do -- a bare "p2000" row floating with no
+        // visible host reads as confusing as the un-grouped list this
+        // whole feature replaced.
+        const searching = !!this._filterText;
+        const rows = []; // {plugin, grouped, hostMeta}
+        this._groupedPlugins().forEach(({ root, members }) => {
+            const hasMembers = members.length > 0;
+            if (searching) {
+                const matchingMembers = members.filter((m) => this._matchesFilter(m));
+                if (!this._matchesFilter(root) && !matchingMembers.length) return;
+                rows.push({ plugin: root, grouped: hasMembers, hostMeta: null });
+                matchingMembers.forEach((m) => rows.push({ plugin: m, grouped: true, hostMeta: null }));
+                return;
+            }
+            if (hasMembers && !this._seenGroupRoots.has(root.id)) {
+                this._seenGroupRoots.add(root.id);
+                this._collapsedGroups.add(root.id); // collapsed by default on first sight
+            }
+            const collapsed = hasMembers && this._collapsedGroups.has(root.id);
+            rows.push({
+                plugin: root, grouped: hasMembers,
+                hostMeta: hasMembers ? { collapsed, memberCount: members.length } : null,
+            });
+            if (!collapsed) members.forEach((m) => rows.push({ plugin: m, grouped: true, hostMeta: null }));
+        });
+
         if (!rows.length) {
             this.listEl.innerHTML = '';
             this._setStatus('', `No plugins match "${this.searchEl ? this.searchEl.value.trim() : ''}".`);
@@ -205,8 +245,8 @@ class PluginsPanelController {
             <tbody></tbody>
         </table>`;
         const tbody = this.listEl.querySelector('tbody');
-        rows.forEach(({ plugin, grouped }) => {
-            tbody.appendChild(this._renderRow(plugin, grouped));
+        rows.forEach(({ plugin, grouped, hostMeta }) => {
+            tbody.appendChild(this._renderRow(plugin, grouped, hostMeta));
         });
         // A message queued by _setEnabled() just before its own
         // refresh()-triggered re-render -- applied once here, then
@@ -225,7 +265,7 @@ class PluginsPanelController {
         }
     }
 
-    _renderRow(plugin, grouped = false) {
+    _renderRow(plugin, grouped = false, hostMeta = null) {
         const row = document.createElement('tr');
         // Visual cue for _groupedPlugins()'s reordering: a hook plugin
         // (has its own dependency) sits indented under its host; the host
@@ -235,6 +275,15 @@ class PluginsPanelController {
         // some other row order.
         if (plugin.dependency) row.classList.add('plugin-row--dependent');
         else if (grouped) row.classList.add('plugin-row--host');
+        // hostMeta is only set (by _render(), never while a search filter
+        // is active) on a group-root row that actually has members --
+        // a clickable chevron toggles its group folded/open, remembered
+        // in this._collapsedGroups across re-renders.
+        const toggleHtml = hostMeta
+            ? `<button type="button" class="plugin-row__toggle" data-group-toggle ` +
+              `aria-expanded="${!hostMeta.collapsed}" title="${hostMeta.collapsed ? 'Show' : 'Hide'} ${hostMeta.memberCount} dependent plugin${hostMeta.memberCount === 1 ? '' : 's'}">` +
+              `${hostMeta.collapsed ? '▸' : '▾'}</button>`
+            : '';
         const badgeMod = plugin.source === 'builtin' ? 'builtin' : 'community';
         const badgeLabel = plugin.source === 'builtin' ? 'Built-in' : 'Community';
         const provides = (plugin.provides || []).join(', ') || '-';
@@ -263,7 +312,10 @@ class PluginsPanelController {
         ].filter(Boolean).join(' &middot; ');
         row.innerHTML = `
             <td>
-                <span class="plugin-row__name">${this._escape(plugin.id)}</span>
+                <span${hostMeta ? ' class="plugin-row__namewrap--foldable" data-group-toggle-cell' : ''}>
+                    ${toggleHtml}<span class="plugin-row__name">${this._escape(plugin.id)}</span>
+                    ${hostMeta && hostMeta.collapsed ? `<span class="plugin-row__count">(${hostMeta.memberCount})</span>` : ''}
+                </span>
                 <span class="plugin-row__version">v${this._escape(plugin.version)}${byLine ? ` &middot; ${byLine}` : ''}</span>
             </td>
             <td><span class="plugin-row__badge plugin-row__badge--${badgeMod}">${badgeLabel}</span></td>
@@ -289,6 +341,18 @@ class PluginsPanelController {
         const delBtn = row.querySelector('[data-delete]');
         if (delBtn) {
             delBtn.addEventListener('click', () => this._deletePlugin(plugin, delBtn, resultEl));
+        }
+        // Wired on the name+chevron wrapper, not the whole row or the
+        // whole first cell -- the version/byline span right below it
+        // holds the homepage link, which must stay independently
+        // clickable (navigate) instead of also toggling the fold.
+        const groupToggleArea = row.querySelector('[data-group-toggle-cell]');
+        if (groupToggleArea) {
+            groupToggleArea.addEventListener('click', () => {
+                if (this._collapsedGroups.has(plugin.id)) this._collapsedGroups.delete(plugin.id);
+                else this._collapsedGroups.add(plugin.id);
+                this._render();
+            });
         }
         return row;
     }

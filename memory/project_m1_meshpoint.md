@@ -11063,3 +11063,67 @@ at the time each router was actually removed, not a new user-facing
 change itself.
 
 **NOT yet done**: CI hasn't been re-run to confirm green after this fix.
+
+## Plugins page fold/unfold, same session
+
+User, after live-confirming grouping worked: "can you make it to fold and
+unfold so when clicking on rtl sdr row it wil unfold the options under
+it ? is that an idea ? what do you think ?" then, when I initially
+defaulted new groups to OPEN (click-to-collapse): "maybe a sort of auto
+group auto sort ?" -- re-reading the original ask more carefully after
+that, "clicking... will unfold" clearly implies the default state is
+FOLDED, not open, so flipped the default before shipping rather than
+after a second round of feedback.
+
+**Default-collapsed, but only on first sight, not every render**: naive
+"always start collapsed" would re-collapse a group the admin just opened
+the moment ANYTHING else on the page changes `_render()` (any toggle,
+delete, or the cascade-triggered `refresh()` from the dependency-enforcement
+work all rebuild the whole table). Solved with two separate sets:
+`_seenGroupRoots` (has this root ever been rendered before, in this page
+session) and `_collapsedGroups` (the actual current fold state) -- a root
+gets added to both, defaulting to collapsed, only the FIRST time
+`_render()` ever encounters it; every render after that only reads
+`_collapsedGroups`, so a later refresh respects whatever the admin already
+did with it.
+
+**Click target scoping, got wrong on the first pass and caught before
+shipping**: initially wired the click listener on the WHOLE first `<td>`
+(name + version + byline), which would have also fired when clicking the
+homepage link inside `byLine` -- clicking "homepage" would open the link
+in a new tab AND silently fold the group in the current one, since click
+bubbles past the anchor to the td. Fixed by wrapping just the chevron +
+name (+ collapsed member count) in their own `<span data-group-toggle-cell>`
+and wiring the listener there instead -- the version/byline line sits
+outside that wrapper, in the same `<td>`, untouched.
+
+**Search interaction, extended slightly beyond the original ask while
+already touching this code**: fold state is ignored entirely whenever
+`this._filterText` is non-empty (a collapsed group must never hide a
+match), and -- new, not asked for but a natural consequence of properly
+handling this -- a host whose own text doesn't match the search is still
+shown as context above any of its members that DO match, rather than a
+bare unindented dependent row floating with nothing above it. Small
+addition since `_render()`'s search branch already computes
+`matchingMembers` anyway.
+
+**`_groupedPlugins()` reshaped**: now returns `[{root, members}]` (a real
+group structure) instead of the flat pre-ordered list from the previous
+grouping-only pass, since `_render()` needs the member LIST (not just a
+flattened order) to decide fold/unfold and to compute the "(N)" collapsed
+count -- the flat-list shape from last time couldn't express that.
+
+**Verified**: `node --check` only -- no JS unit-test framework exists
+anywhere in this repo (confirmed by searching for `*.test.js`/`jest.config`/
+`package.json`, none found), matching how every other frontend-only change
+this whole multi-session effort has been verified. Backend
+`tests/test_plugin_routes.py` (20/20) re-run anyway even though this pass
+touched no Python, since `_groupedPlugins()` reads the same `dependency`
+shape those tests exercise server-side -- confirmed unaffected. New
+CHANGELOG bullet under `### v0.8.1` (62 bullets now, up from 61).
+
+**NOT yet done**: not live-verified on the Pi yet -- next session should
+confirm every group (rtlsdr's 8, hello-world's 1) starts folded showing
+"▸ id (N)", clicking unfolds/re-folds correctly, and that folding one
+group while a search is active is impossible (chevron shouldn't even
+render during search, per this pass's design).
