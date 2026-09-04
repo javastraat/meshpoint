@@ -2,15 +2,20 @@
 
 Live DAB/DAB+ digital radio off the shared RTL-SDR dongle via
 [`welle-cli`](https://github.com/AlbrechtL/welle.io) (the headless webserver
-mode of the welle.io project), and adds two tabs to the Listener page:
+mode of the welle.io project). Unlike every other RTL-SDR plugin, its UI
+doesn't live on the built-in Listener page — it renders on the
+[RTL-SDR Plugins](../rtlsdr/) page instead, via the `"hook"` seam
+(`plugin.toml`'s `[hook] host = "rtlsdr"`), first to move off ahead of
+Radio itself (see [`plugins/apps/rtlsdr/README.md`](../rtlsdr/README.md)
+for why). Two pieces, stacked on that page:
 
-- **DAB+** — pick a channel (Favorites, a scanned-channel tab, or Manual),
-  tune it, and welle-cli progressively decodes the ensemble's station list
-  as it locks. Styled like the Radio tab's Digital skin (LEDs, VFD-style
-  readout, VU meter, native `<audio>` controls) so it reads as the same
-  instrument family, with a station list below since DAB+ carries several
-  stations per channel rather than one per frequency.
-- **DAB+ Config** — shows what `dab_channel_scan.py` found on this antenna
+- **The player** — pick a channel (Favorites, a scanned-channel tab, or
+  Manual), tune it, and welle-cli progressively decodes the ensemble's
+  station list as it locks. Styled like the Radio tab's Digital skin (LEDs,
+  VFD-style readout, VU meter, native `<audio>` controls) so it reads as
+  the same instrument family, with a station list below since DAB+ carries
+  several stations per channel rather than one per frequency.
+- **Config** — shows what `dab_channel_scan.py` found on this antenna
   (read from its JSON output), lets an admin set a friendlier per-channel
   display name, and runs the scan itself with live streamed output instead
   of CLI-only over SSH.
@@ -42,17 +47,20 @@ like every other plugin.
    GUI dependencies. Idempotent — skips the apt install if `welle-cli` is
    already on `PATH`.
 
-2. Enable it in `local.yaml` and restart Meshpoint:
+2. Enable it (and [`rtlsdr`](../rtlsdr/), its host page) in `local.yaml`
+   and restart Meshpoint:
 
    ```yaml
    plugins:
+     rtlsdr:
+       enabled: true
      dab:
        enabled: true
    ```
 
-3. Open the dashboard → Listener → **DAB+ Config** and run a scan (or
-   **DAB+** → pick a channel from Favorites/Manual) to find stations at
-   this antenna.
+3. Open the dashboard → Radio → **RTL-SDR Plugins** and run a scan (Config,
+   below the player) or pick a channel from Favorites/Manual in the player
+   itself to find stations at this antenna.
 
 Shares the one RTL-SDR dongle with the FM / Pager / RTL433 / ACARS / ADS-B
 listeners (only one active at a time; stop the other one first) — both
@@ -62,14 +70,14 @@ owner names, so a busy message can say which DAB+ activity is holding it.
 ## Layout
 
 ```
-plugin.toml                    manifest (name, deps, [frontend], meta)
+plugin.toml                    manifest (name, deps, [frontend], [hook], meta)
 setup.sh                       welle.io apt install
 dab_channel_scan.py            standalone Band III channel scanner (also runnable
                                 directly over SSH, see its own docstring)
 backend/listener.py            welle-cli subprocess + /mux.json poll + MP3 stream proxy (DabListener)
 backend/routes.py              /api/dab  status / tune / stop / stream / scan-results / scan
 backend/__init__.py            register(reg)
-frontend/dab_panel.js          the DAB+ Listener tab (channel picker, station list, playback)
-frontend/dab_config_panel.js   the DAB+ Config tab (scan results, renaming, run-scan panel)
-frontend/dab_panel.css         styling for both tabs
+frontend/dab_panel.js          the player (channel picker, station list, playback) -- hooks into rtlsdr
+frontend/dab_config_panel.js   Config (scan results, renaming, run-scan panel) -- hooks into rtlsdr
+frontend/dab_panel.css         styling for both
 ```

@@ -10044,3 +10044,131 @@ item isn't validated anywhere and only surfaces visually.
 yet (only Mac-side discovery re-check so far) -- next session should pull,
 restart, confirm the sidebar now shows "RTL-SDR" (built-in) and "RTL-SDR
 Plugins" (this plugin) as clearly distinct entries.
+
+**User confirmed "RTL-SDR Plugins" is intentionally a temporary label**:
+once the full item-1 shell split actually happens (built-in Listener page
+gone, this plugin becomes the real host), rename it back to the cleaner
+plain "RTL-SDR" then -- no collision left to avoid at that point. Not
+urgent, just don't be surprised by a future rename request; it's already
+the plan.
+
+**LIVE-VERIFIED on the Pi, label fix confirmed correct**: two screenshots --
+sidebar now shows "RTL-SDR" and "RTL-SDR Plugins" as clearly distinct
+entries, no more collision. Built-in Listener page's DAB+ tab shown fully
+intact (Favorites list with real stations -- SLAM!/Sky Radio/Radio 10/
+Qmusic/BNR Nieuwsradio -- tune controls, VU meter, audio player, all
+untouched by this work). New "RTL-SDR Plugins" page shows the DAB+ hook
+card reading "Idle", correctly matching the real Listener page's own
+"idle" status shown right above it in the other screenshot -- confirms the
+hook is pulling real live state via `GET /api/dab/status`, not static
+placeholder text. This closes out item 1's scoped-down first step
+end-to-end (mechanism + real-plugin test + label fix), all confirmed both
+in Mac-side tests and live on hardware.
+
+---
+
+## DAB+ actually moves off the Listener page -- the test became the real thing
+
+User's very next message after seeing the status-card screenshot: "where
+is my dab+ player in rtl-sdr plugin" -- expected the REAL interactive
+player, not a status blurb. Follow-up clarified the real intent: "we need
+it all in the rtlsdr plugin since the listener will be removed once the
+fm radio is also a plugin" -- i.e. this was never meant to stay a small
+side-by-side test forever; DAB+ should fully relocate, since the built-in
+Listener page is going away eventually regardless (once Radio also
+migrates). Then: "so move dabpanel to the rtlsdr plugin i guess something
+like that orso?" and "maybe dont show it in listener anymore" -- confirmed
+explicitly: MOVE, don't duplicate, and remove DAB+ from the Listener
+page's tabbar entirely.
+
+**Checked for a real correctness reason to move rather than duplicate,
+before touching anything** (not just for tidiness): grepped `dab_panel.js`
+for `getElementById` vs `this._root.querySelector` usage. Every other
+element lookup in the file is properly scoped to `this._root` (its own
+mounted subtree) -- confirmed safe to mount anywhere. But the `<audio
+id="dab-audio">` element (playback source, volume, play/pause) is looked
+up via a bare `document.getElementById('dab-audio')` in three places, NOT
+scoped. Two live `DabPanel` instances mounted simultaneously (old Listener
+tab + new rtlsdr hook) would have had two `<audio id="dab-audio">`
+elements in the DOM at once, and `getElementById` always returns the
+FIRST match -- so audio controls on the second-mounted instance would
+have silently operated on the FIRST instance's audio element. This
+confirmed "move, don't duplicate" wasn't just following instructions, it
+was actually necessary to avoid a real bug. `_statusTimer` polling, by
+contrast, IS properly gated by show()/hide() already (only the visible
+instance would ever poll) -- not a concern either way, but checked.
+
+**Changes**:
+- Deleted `plugins/apps/dab/frontend/dab_rtlsdr_hook.js` (the small
+  status-card test file from the previous entry) -- fully superseded.
+- `dab_panel.js` and `dab_config_panel.js`'s bottom registration blocks
+  changed from `window.registerListenerPanel({tab, label, make})` to
+  `window.registerPageHook({host: 'rtlsdr', make})`. `dab_panel.js`'s
+  `make()` also does `window.dabPanel = panel;` before returning it --
+  replaces the Listener page shell's old job of exposing that global for
+  `SidebarTelemetryRail`'s mini-player (`getNowPlaying()`/
+  `stopFromSidebar()`); `dab_config_panel.js` needs no equivalent (never
+  had a sidebar-mini-player role).
+- `plugins/apps/dab/plugin.toml`: `provides` drops `"panel"` (now
+  `["listener", "routes", "hook"]`), `[frontend].scripts` drops the
+  deleted file, `[hook]` comment rewritten from "test case" framing to
+  the real migration.
+- `frontend/js/listener_panel.js`: removed the now-dead `const dab =
+  this._subPanels.find((d) => d.tab === 'dab'); if (dab) window.dabPanel
+  = dab.panel;` block (DAB+ will never appear in `_subPanels` again since
+  it doesn't call `registerListenerPanel` anymore) -- and its own
+  constructor comment block, which still listed DAB+ among the plugins
+  using `registerListenerPanel`.
+- `frontend/js/listener_panel_registry.js`'s doc comment updated the same
+  way -- DAB+ named specifically as the one that USED to use this seam
+  and now uses the different hook seam instead, so a future reader
+  doesn't go looking for it here.
+- `plugins/apps/rtlsdr/frontend/rtlsdr_panel.js`'s own placeholder text
+  no longer claims DAB+ still runs on the Listener page.
+
+**Docs**: `plugins/apps/dab/README.md` rewritten -- "adds two tabs to the
+Listener page" -> points at the RTL-SDR Plugins page instead, install
+steps now enable `rtlsdr` alongside `dab`. `plugins/apps/rtlsdr/README.md`
+rewritten from "staging ground, not a real feature yet" to "the future
+RTL-SDR host page, under construction" with DAB+ documented as the first
+real (not toy) migration, including the audio-id correctness reason for
+why it moved wholesale. `docs/PLUGINS.md`'s hook-seam worked-example
+paragraph updated the same way. `README.md`: the DAB+ "What's Different"
+bullet reworded (no longer "adds a Listener tab"), and the big RTL-SDR
+paragraph split -- DAB+'s description moved OUT of the Listener-page
+paragraph into a new short "RTL-SDR Plugins page" paragraph right after
+it, matching the real page structure now.
+
+**CHANGELOG**: per this session's established convention (point-in-time
+record, never retroactively edited), the PREVIOUS bullet describing the
+small status-card test was left exactly as originally written -- true at
+the time. A NEW bullet added describing the real migration, explaining
+the audio-id reason for moving rather than duplicating, and the ⚠️
+behaviour change (must also enable `rtlsdr` now for DAB+ to show up
+anywhere). `ChangelogParser.parse_file` re-parse: v0.8.1 now has 51
+bullets (was 50) -- checked for the italic-in-headline gotcha again before
+writing, none used this time either.
+
+**Verified on the Mac**: `node --check` clean on every touched JS file.
+`discover_plugins()` re-confirms `dab`'s `provides` is now `('listener',
+'routes', 'hook')` with no `sidebar`/`panel`, `frontend_scripts` down to
+just the two real files. `load_plugins()` (via the fastapi-capable
+interpreter behind the `pytest` shebang) loads both `dab`/`rtlsdr`
+cleanly end to end. A Node harness (`eval()`'d the real
+`page_hook_registry.js`, stubbed `DabPanel`/`DabConfigPanel` classes)
+confirmed: both hooks register for host `'rtlsdr'`, `mountPageHooks`
+mounts BOTH in registration order (stacked, matching the `.rtlsdr-hooks`
+flex-column CSS already written for exactly this), and `window.dabPanel`
+gets set by the `make()` callback as designed.
+
+**NOT yet done / next steps**: **not live-verified on the Pi yet** --
+next session should pull, restart, confirm the Listener page's tabbar now
+shows ONLY "Radio" (DAB+/DAB+ Config gone), and Radio -> RTL-SDR Plugins
+shows the real interactive DAB+ player stacked above the Config panel,
+both fully functional (tune a channel, confirm playback, confirm the
+sidebar mini-player still shows DAB+ now-playing/stop). This is real
+progress toward the full item-1 shell split, not just a mechanism test
+anymore -- next candidates to migrate the same way, whenever picked up:
+any of Pagers/POCSAG/P2000/RTL433/ADS-B/ACARS, then eventually Radio
+itself (the biggest one, and the one that finally lets the built-in
+Listener page + its shell get deleted entirely).

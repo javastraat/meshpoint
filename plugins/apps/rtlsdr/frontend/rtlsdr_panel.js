@@ -1,20 +1,15 @@
 /**
- * RTL-SDR -- staging ground for the eventual RTL-SDR host page.
+ * RTL-SDR Plugins -- the future RTL-SDR host page, under construction.
  *
- * Today the built-in Listener page (Radio + every RTL-SDR plugin's tab via
- * window.registerListenerPanel) is still the real thing. This page exists
- * to prove out a DIFFERENT seam -- a plugin injecting content into another
- * plugin's page via window.registerPageHook() (see
- * frontend/sidebar/page_hook_registry.js and docs/PLUGINS.md) -- against a
- * real, non-trivial plugin (DAB+, see plugins/apps/dab/frontend/
- * dab_rtlsdr_hook.js) rather than just the hello-world-hook toy example.
- *
- * If this pans out, the plan is to eventually move the Listener page's
- * shell (tabbar, #listener-panel ownership, window.LISTENER_PANELS
- * consumption) out of core into this plugin, with Radio itself becoming
- * an ordinary plugin registering into it like every other RTL-SDR tab.
- * Not done yet -- this page is deliberately just a placeholder + a hook
- * mount point until that's decided.
+ * The built-in Listener page (Radio + every RTL-SDR plugin's tab via
+ * window.registerListenerPanel) is still core, but RTL-SDR plugins are
+ * migrating off it onto THIS page instead, one at a time, via a DIFFERENT
+ * seam -- a plugin injecting content into another plugin's page via
+ * window.registerPageHook() (see frontend/sidebar/page_hook_registry.js
+ * and docs/PLUGINS.md). DAB+ (plugins/apps/dab/) was the first to move --
+ * see its own README for why. The plan is for every other RTL-SDR plugin,
+ * and eventually Radio itself, to follow, at which point the built-in
+ * Listener page goes away entirely.
  */
 window.registerSidebarPage({
     route: 'rtlsdr',
@@ -26,10 +21,10 @@ window.registerSidebarPage({
                 <div class="plugin-page">
                     <h2>RTL-SDR Plugins</h2>
                     <p>Enable RTL-SDR plugins to see their content here.
-                    This page is a staging ground for the real RTL-SDR host
-                    page -- for now, the Listener page (in the sidebar,
-                    under this same section) is still where Radio/DAB+/
-                    P2000/Pagers/POCSAG/RTL433/ADS-B/ACARS actually run.</p>
+                    Plugins are migrating onto this page one at a time --
+                    anything not listed here yet still runs on the
+                    Listener page (in the sidebar, under this same
+                    section) instead.</p>
                     ${hasHooks ? '<div class="rtlsdr-hooks" data-rtlsdr-hooks></div>' : ''}
                 </div>
             `;

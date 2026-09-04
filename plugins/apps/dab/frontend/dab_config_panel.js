@@ -377,12 +377,14 @@ class DabConfigPanel {
 
 window.DabConfigPanel = DabConfigPanel;
 
-if (typeof window.registerListenerPanel === 'function') {
-    window.registerListenerPanel({
-        tab: 'dabconfig',
-        label: 'DAB+ Config',
+// Lives on the RTL-SDR Plugins page (plugins/apps/rtlsdr/) via the "hook"
+// seam, not the built-in Listener page's tabbar -- see dab_panel.js's own
+// note for why this moved wholesale instead of being duplicated.
+if (typeof window.registerPageHook === 'function') {
+    window.registerPageHook({
+        host: 'rtlsdr',
         make: () => new DabConfigPanel(),
     });
 } else {
-    console.warn('DAB+ plugin: listener panel registry missing');
+    console.warn('DAB+ plugin: page hook registry missing');
 }

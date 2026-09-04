@@ -302,12 +302,16 @@ World Hook** (the hook —
 With both enabled, opening the Hello World page shows its usual content
 plus a second box below it, rendered by the hook plugin.
 
-A second, less toy example: **RTL-SDR** (`plugins/apps/rtlsdr/`) is a bare
-host page, and the shipped **DAB+** plugin hooks a small read-only status
-card into it (`plugins/apps/dab/frontend/dab_rtlsdr_hook.js`) *in addition
-to* its own existing Listener-page tab, unchanged — proof that a real,
-already-shipped plugin can hook into a second page without disturbing
-anything about its first one.
+A second, less toy example: **RTL-SDR** (`plugins/apps/rtlsdr/`) is meant
+to eventually replace the built-in Listener page entirely, one plugin at a
+time. The shipped **DAB+** plugin is the first to move — it dropped
+`"panel"` from `provides` and no longer appears on the Listener page at
+all; both its player and its Config panel now hook into the RTL-SDR page
+instead (`plugins/apps/dab/frontend/dab_panel.js` /
+`dab_config_panel.js`). Moving wholesale rather than duplicating mattered
+here for a concrete reason, not just tidiness: DAB+'s player looks up its
+`<audio>` element by a hardcoded id, not scoped to its own mounted root,
+so two live instances at once would have fought over it.
 
 1. List `"hook"` in `provides` and fill in `[hook]` with the target host's
    id — another plugin's `[sidebar].route`:

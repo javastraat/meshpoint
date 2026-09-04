@@ -972,12 +972,23 @@ class DabPanel {
 
 window.DabPanel = DabPanel;
 
-if (typeof window.registerListenerPanel === 'function') {
-    window.registerListenerPanel({
-        tab: 'dab',
-        label: 'DAB+',
-        make: () => new DabPanel(),
+// Lives on the RTL-SDR Plugins page (plugins/apps/rtlsdr/) via the "hook"
+// seam, not the built-in Listener page's tabbar -- moved wholesale rather
+// than duplicated, since dab-audio (the <audio> element id below) is
+// looked up via a global document.getElementById, not scoped to this
+// panel's own root; two live instances at once would fight over it.
+if (typeof window.registerPageHook === 'function') {
+    window.registerPageHook({
+        host: 'rtlsdr',
+        make: () => {
+            const panel = new DabPanel();
+            // Exposed for SidebarTelemetryRail's mini-player
+            // (getNowPlaying()/stopFromSidebar()) -- previously set by the
+            // Listener page's own shell when DAB+ was one of its tabs.
+            window.dabPanel = panel;
+            return panel;
+        },
     });
 } else {
-    console.warn('DAB+ plugin: listener panel registry missing');
+    console.warn('DAB+ plugin: page hook registry missing');
 }

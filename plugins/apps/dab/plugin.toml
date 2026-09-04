@@ -1,7 +1,7 @@
 name = "dab"
 version = "1.0.0"
 meshpoint_api = 1
-provides = ["listener", "routes", "panel", "hook"]
+provides = ["listener", "routes", "hook"]
 locked = true  # shipped with this fork -- not user-installed, can't be deleted
 
 [deps]
@@ -9,14 +9,18 @@ apt = ["welle.io"]
 setup = "setup.sh"
 
 [frontend]
-scripts = ["frontend/dab_panel.js", "frontend/dab_config_panel.js", "frontend/dab_rtlsdr_hook.js"]
+scripts = ["frontend/dab_panel.js", "frontend/dab_config_panel.js"]
 styles = ["frontend/dab_panel.css"]
 
 [hook]
-host = "rtlsdr"    # a small status card on the rtlsdr plugin's page --
-                    # see frontend/dab_rtlsdr_hook.js. Test case for the
-                    # "hook" seam against a real, non-trivial plugin
-                    # (plugins/apps/rtlsdr/README.md has the full context).
+host = "rtlsdr"    # both the DAB+ player (dab_panel.js) and DAB+ Config
+                    # (dab_config_panel.js) render on the rtlsdr plugin's
+                    # page -- NOT the built-in Listener page's tabbar
+                    # (no "panel" in provides above). First real use of the
+                    # "hook" seam, not just a test: DAB+ moved off the
+                    # Listener page entirely, since it'll be removed once
+                    # Radio also becomes a plugin (see
+                    # plugins/apps/rtlsdr/README.md).
 
 [meta]
 description = "DAB/DAB+ digital radio via welle-cli -- channel scan, live tuning/playback, and per-channel display names"

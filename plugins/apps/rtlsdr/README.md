@@ -1,31 +1,37 @@
 # RTL-SDR plugin
 
-A staging ground, not a real feature yet. Adds an **RTL-SDR Plugins** page
-under the sidebar's Radio section (next to the built-in Listener page,
-labeled just "RTL-SDR" — deliberately a different label, since the two
-looked confusingly identical in the sidebar when this first shipped; the
-Listener page is still where Radio/DAB+/P2000/Pagers/POCSAG/RTL433/ADS-B/
-ACARS actually run) with placeholder text plus a mount point other plugins
-can inject content into via the `"hook"` seam.
+The future RTL-SDR host page, under construction. Adds an **RTL-SDR
+Plugins** page under the sidebar's Radio section (next to the built-in
+Listener page, labeled just "RTL-SDR" — deliberately a different label,
+since the two looked confusingly identical in the sidebar when this first
+shipped) with placeholder text plus a mount point other plugins inject
+content into via the `"hook"` seam.
 
 ## Why this exists
 
 The built-in Listener page (`frontend/js/listener_panel.js`) is currently
-*both* Radio's own implementation *and* the tabbar host every RTL-SDR
-plugin already attaches to via `window.registerListenerPanel`. Splitting
-those apart — a neutral host page plus Radio becoming an ordinary plugin
-like every other RTL-SDR tab — is a real, fairly large piece of work.
-Before committing to it, this plugin proves out a *different*, already-built
-seam (`"hook"` — see [Hello World Hook](../hello-world-hook/), the original
-reference) against a real, non-trivial plugin instead of a toy example:
-[DAB+](../dab/) hooks a small status card into this page
-(`plugins/apps/dab/frontend/dab_rtlsdr_hook.js`).
+*both* Radio's own implementation *and* the tabbar host every other
+RTL-SDR plugin attaches to via `window.registerListenerPanel`. The plan is
+for RTL-SDR plugins to migrate off it one at a time, onto this page instead
+(via `"hook"`, not `"panel"` — see [Hello World Hook](../hello-world-hook/)
+for the seam's own minimal reference), ending with Radio itself becoming
+an ordinary plugin here too and the built-in Listener page going away
+entirely.
 
-If that works out, the plan is for this page to eventually become the real
-RTL-SDR host — Radio's own listener/routes/panel moving out of core into
-`plugins/apps/radio/`, and `scripts/install.sh`'s RTL-SDR section (librtlsdr
-build, kernel DVB blacklist) moving into this plugin's `setup.sh` (currently
-a no-op placeholder). Not done yet — deliberately scoped small first.
+**[DAB+](../dab/) is the first to move** — not a toy test, a real
+migration: it dropped `"panel"` from its `provides` and no longer appears
+on the Listener page's tabbar at all. Both its player
+(`plugins/apps/dab/frontend/dab_panel.js`) and its Config panel
+(`dab_config_panel.js`) hook into this page instead, stacked one below the
+other. Moved wholesale rather than duplicated deliberately — DAB+'s player
+looks up its `<audio>` element by a hardcoded id (`document.
+getElementById('dab-audio')`, not scoped to its own mounted root), so two
+live instances at once (old tab + new hook) would have fought over it.
+
+Once every RTL-SDR plugin (and Radio) has migrated, `scripts/install.sh`'s
+RTL-SDR section (librtlsdr build, kernel DVB blacklist) moves into this
+plugin's `setup.sh` (currently a no-op placeholder), and the built-in
+Listener page is deleted.
 
 ## Enable it
 
@@ -37,7 +43,8 @@ plugins:
 
 Restart, then Radio → RTL-SDR Plugins in the sidebar (not "RTL-SDR" —
 that's the built-in Listener page). Also enable `dab` (see
-[`plugins/apps/dab/`](../dab/)) to see its hook render on this page.
+[`plugins/apps/dab/`](../dab/)) to get the DAB+ player and Config panel on
+this page — without it enabled, the page is just the placeholder text.
 
 ## Layout
 
