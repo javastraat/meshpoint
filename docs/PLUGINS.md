@@ -233,8 +233,11 @@ script:
    `icon` picks from a small curated set in `frontend/sidebar/
    sidebar_plugin_registry.js`'s `_ICON_PATHS` (kept in sync with
    `KNOWN_SIDEBAR_ICONS` in `src/plugins/manifest.py`) — currently `plug`
-   (default), `antenna`, `chart`, `message`, `terminal`, `map`, `list`,
-   `grid`. Deliberately a name, not raw SVG from the manifest — that would
+   (default), `antenna`, `map`, `list` (generic), plus `chart`, `message`,
+   `terminal`, `grid`, `topology`, `rf`, `pager`, `dapnet`, `reticulum`,
+   `lorawan`, `gear` (exact copies of Meshpoint's own existing sidebar
+   icons for those pages — reuse one that already fits your plugin's
+   domain). Deliberately a name, not raw SVG from the manifest — that would
    let a plugin's `plugin.toml` inject arbitrary markup into every viewer's
    sidebar. An unrecognized key falls back to `plug` rather than breaking
    the page.

@@ -75,9 +75,12 @@ KNOWN_SIDEBAR_CATEGORIES = frozenset({
 # from a manifest (that's a real injection surface for a file some other
 # person authored). frontend/sidebar/sidebar_plugin_registry.js owns the
 # actual glyphs; this is just the set of valid keys. "plug" (the original,
-# only, generic icon) stays the default.
+# only, generic icon) stays the default. topology/rf/pager/dapnet/
+# reticulum/lorawan/gear are exact copies of Meshpoint's own existing
+# sidebar icons for those pages -- reuse, not new geometry.
 KNOWN_SIDEBAR_ICONS = frozenset({
     "plug", "antenna", "chart", "message", "terminal", "map", "list", "grid",
+    "topology", "rf", "pager", "dapnet", "reticulum", "lorawan", "gear",
 })
 _DEFAULT_SIDEBAR_ICON = "plug"
 

@@ -46,11 +46,13 @@ window.MESHPOINT_SIDEBAR_PLUGINS = window.MESHPOINT_SIDEBAR_PLUGINS || [];
     // arbitrary SVG from plugin.toml (that would let a manifest inject
     // whatever markup it wants). Matches src/plugins/manifest.py's
     // KNOWN_SIDEBAR_ICONS exactly; add a key in both places together.
-    // "chart"/"message"/"terminal"/"grid" reuse the exact paths the
-    // built-in Stats/Messages/Terminal/Dashboard sidebar icons already use,
-    // for visual consistency; "antenna"/"map"/"list" are well-known
-    // standard icon shapes (wifi/map-pin/list); "plug" is the original
-    // default, kept for anything not fitting the others.
+    // "chart"/"message"/"terminal"/"grid"/"topology"/"rf"/"pager"/"dapnet"/
+    // "reticulum"/"lorawan"/"gear" are exact copies of this same file's own
+    // Stats/Messages/Terminal/Dashboard/Topology/RF Environment/Pager/
+    // DAPNET/Reticulum/LoRaWAN/Settings sidebar icons -- reuse, not new
+    // geometry. "antenna"/"map"/"list" are well-known standard icon shapes
+    // (wifi/map-pin/list) not sourced from elsewhere in this app. "plug" is
+    // the original default, kept for anything not fitting the others.
     const _ICON_PATHS = {
         plug: '<path d="M9 2v4M15 2v4M7 8h10l-1 6a4 4 0 0 1-4 4h0a4 4 0 0 1-4-4z"/>'
             + '<path d="M12 18v4"/>',
@@ -66,6 +68,22 @@ window.MESHPOINT_SIDEBAR_PLUGINS = window.MESHPOINT_SIDEBAR_PLUGINS || [];
             + '<line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>',
         grid: '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>'
             + '<rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>',
+        topology: '<circle cx="12" cy="5" r="2"/><circle cx="5" cy="19" r="2"/>'
+            + '<circle cx="19" cy="19" r="2"/><line x1="12" y1="7" x2="5" y2="17"/>'
+            + '<line x1="12" y1="7" x2="19" y2="17"/><line x1="5" y1="19" x2="19" y2="19"/>',
+        rf: '<path d="M4 18v-4"/><path d="M8 18V8"/><path d="M12 18v-6"/>'
+            + '<path d="M16 18V4"/><path d="M20 18v-9"/>',
+        pager: '<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>'
+            + '<polyline points="22,6 12,13 2,6"/>',
+        dapnet: '<path d="M17 7l2-3"/><rect x="5" y="7" width="14" height="13" rx="2"/>'
+            + '<rect x="8" y="10" width="8" height="4" rx="0.5"/>'
+            + '<circle cx="8" cy="17" r="0.6" fill="currentColor" stroke="none"/>'
+            + '<circle cx="12" cy="17" r="0.6" fill="currentColor" stroke="none"/>'
+            + '<circle cx="16" cy="17" r="0.6" fill="currentColor" stroke="none"/>',
+        reticulum: '<circle cx="5" cy="6" r="2"/><circle cx="19" cy="6" r="2"/>'
+            + '<circle cx="12" cy="18" r="2"/><path d="M6.7 7.3 10.3 16.3M17.3 7.3 13.7 16.3M7 6h10"/>',
+        lorawan: '<path d="M2 12C2 12 5 5 12 5s10 7 10 7-3 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="2"/>',
+        gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06,.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82,.33l-.06,.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06,.06a1.65 1.65 0 0 0 1.82,.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.01a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06,.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
     };
 
     function _iconSvg(name) {

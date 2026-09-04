@@ -8489,10 +8489,40 @@ explicit valid icon, unknown icon rejected with code `sidebar`),
 icon). 1534 tests total, `ruff check` clean. `docs/PLUGINS.md` updated
 (icon field in the reference table + the "Adding a top-level sidebar page"
 walkthrough); the earlier "no per-plugin icon" caveat removed since it's
-no longer true. **Not yet live-verified** -- the shipped `hello-world`
-still uses the default `plug` icon (already confirmed working live), so
-this only needs a Pi check if/when a *different* icon key is actually
-used by some plugin.
+no longer true.
+
+**Same-session follow-on**: user asked directly whether a plugin could
+reuse icons "already in meshpoint" rather than just the original 8 generic
+ones -- expanded `KNOWN_SIDEBAR_ICONS`/`_ICON_PATHS` with 7 more, this time
+**exact copies of Meshpoint's own real sidebar icons** for LoRaWAN
+(`lorawan`), Topology (`topology`), RF Environment (`rf`), Pager (`pager`),
+DAPNET (`dapnet`), Reticulum (`reticulum`), and the actual Settings gear
+(`gear`) -- 15 total now. Caught a real transcription bug before it shipped:
+manually chunking the long Settings-gear SVG path across multiple joined JS
+string literals silently corrupted two adjacent numbers at a bad break
+point (`...1.51` + `1.65...` concatenated into `1.511.65`, an invalid path
+number) -- would have rendered a broken/malformed icon with no error
+anywhere. Caught it by *not trusting the manual transcription*: wrote a
+Python script that re-extracted the exact original `<path d="...">` string
+straight from `index.html` via regex and regenerated that one JS entry
+programmatically instead of by hand. Then went further and verified **all
+six** new reused icons the same way -- a script that pulls each icon's
+original SVG inner-markup from `index.html` by `data-route`, evals the
+corresponding JS string literal out of `sidebar_plugin_registry.js`, and
+diffs the two after whitespace normalization; all matched byte-for-byte.
+Re-ran the jsdom mount check across all 15 icon keys (each produces a
+non-empty `<svg>`). Full suite re-confirmed green (1534) and `ruff` clean
+after the expansion. **Lesson**: hand-splitting a long SVG path across
+concatenated string literals is exactly the kind of edit that looks fine
+on review but is silently wrong at a boundary -- for icon/path reuse work
+specifically, always regenerate programmatically from the source of truth
+(or diff against it after) rather than trusting a manual transcription,
+even a careful one.
+
+**Not yet live-verified** (both the icon field and its expanded set) --
+the shipped `hello-world` still uses the default `plug` icon (already
+confirmed working live), so this only needs a Pi check if/when a
+*different* icon key is actually used by some plugin.
 
 **Settings → Plugins: "Restart service" button (2026-09-04, DONE, not yet
 live-verified)**: User asked for a one-click way to apply a pending
