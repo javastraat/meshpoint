@@ -83,6 +83,7 @@ from src.api.routes import (
     reticulum_config_routes,
     reticulum_routes,
     rnode_firmware_routes,
+    sdr_status_routes,
     meshtastic_firmware_routes,
     meshcore_firmware_routes,
     spectrum_routes,
@@ -209,6 +210,7 @@ _BUILTIN_ROUTERS: list[tuple] = [
     (meshcore_routes.router, False),
     (rf_routes.router, False),
     (topology_routes.router, False),
+    (sdr_status_routes.router, False),
 ]
 
 

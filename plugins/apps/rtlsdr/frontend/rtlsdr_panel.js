@@ -24,15 +24,16 @@ window.registerSidebarPage({
             mount(rootEl) {
                 const hasHooks = (window.MESHPOINT_PAGE_HOOKS || [])
                     .some((h) => h.host === 'rtlsdr');
+                const emptyState = `
+                    <p>No RTL-SDR plugins enabled yet. Enable one --
+                    Radio, DAB+, P2000, Pagers, POCSAG, RTL433, ACARS, or
+                    ADS-B -- in Settings &rarr; Plugins to see its tab
+                    here.</p>
+                `;
                 rootEl.innerHTML = `
                     <div class="plugin-page">
-                        <h2>RTL-SDR Plugins</h2>
-                        <p>Enable RTL-SDR plugins to see their content here.
-                        Plugins are migrating onto this page one at a time --
-                        anything not listed here yet still runs on the
-                        Listener page (in the sidebar, under this same
-                        section) instead.</p>
-                        ${hasHooks ? '<div class="rtlsdr-hooks" data-rtlsdr-hooks></div>' : ''}
+                        <h2>RTL-SDR</h2>
+                        ${hasHooks ? '<div class="rtlsdr-hooks" data-rtlsdr-hooks></div>' : emptyState}
                     </div>
                 `;
                 if (hasHooks && typeof window.mountPageHooks === 'function') {

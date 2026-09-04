@@ -153,8 +153,15 @@ window.MESHPOINT_SIDEBAR_PLUGINS = window.MESHPOINT_SIDEBAR_PLUGINS || [];
         const li = document.createElement('li');
         li.className = nested ? 'sidebar__subitem' : 'sidebar__item';
         const iconHtml = nested ? '' : `<span class="sidebar__icon">${_iconSvg(icon)}</span>`;
+        // Same data-badge-for convention as the built-in sidebar items
+        // (messages/radio/settings-updates in index.html) -- gives every
+        // plugin sidebar page a status-badge slot via
+        // SidebarController.setStatusBadge(routeId, ...), even though
+        // only the rtlsdr plugin actually populates one today (see
+        // sdr_status_badge.js). Hidden until a badge script sets it.
         li.innerHTML = `<a href="#/${routeId}" class="sidebar__link" data-route="${routeId}">` +
-            `${iconHtml}<span class="sidebar__label">${_escape(label)}</span></a>`;
+            `${iconHtml}<span class="sidebar__label">${_escape(label)}</span>` +
+            `<span class="sidebar__badge" data-badge-for="${routeId}" style="display:none"></span></a>`;
         return li;
     }
 

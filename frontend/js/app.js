@@ -74,6 +74,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         window.radioTxBadge = radioTxBadge;
     }
 
+    if (window.SdrStatusBadge) {
+        const sdrStatusBadge = new SdrStatusBadge(sidebar);
+        sdrStatusBadge.init();
+        window.sdrStatusBadge = sdrStatusBadge;
+    }
+
     if (window.UpdateCheckBadge) {
         const updateCheckBadge = new UpdateCheckBadge(sidebar);
         updateCheckBadge.init();
