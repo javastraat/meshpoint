@@ -1,4 +1,4 @@
-"""RTL-SDR Pagers decoder: rtl_fm -> multimon-ng -> decoded message log.
+"""RTL-SDR POCSAG decoder: rtl_fm -> multimon-ng -> decoded message log.
 
 Unlike the FM listener (src/audio/rtl_listener.py), there's nothing here
 meant to be listened to -- multimon-ng's own stdout IS the decoded
@@ -10,19 +10,16 @@ Pipeline:  rtl_fm (demod to s16le PCM) | multimon-ng (decode to text)
 No ffmpeg stage -- nothing here produces audio.
 
 Fixed frequency/decoders, not user-tunable (unlike the FM listener's
-frequency picker): the "pagers" kind covers the POCSAG512/1200/2400
-variants on 172.45 MHz. (P2000/FLEX and POCSAG -- the same decoders on
-439.9875 MHz -- have both split out into their own plugins --
-plugins/apps/p2000/backend/listener.py and
-plugins/apps/pocsag/backend/listener.py -- leaving just this one kind
-here. Still parameterized by `kind` for now rather than collapsed to a
-single hardcoded class, since "pagers" itself may be the next one
-extracted the same way.)
+frequency picker): POCSAG512/1200/2400 on 439.9875 MHz. Same shape as
+src/audio/pager_listener.py's PagerListener (which still covers the
+"pagers" kind -- same POCSAG-family decoders, just on 172.45 MHz instead
+-- still core) -- POCSAG was split out as the second of the three former
+pager kinds to become its own plugin (after P2000/FLEX).
 
-Only one of RtlListener/PagerListener("pagers") may hold the RTL-SDR
-dongle at a time -- see src/audio/sdr_registry.py. Manual-stop-required:
-starting one while another is active raises RuntimeError rather than
-silently stopping the other.
+Only one of RtlListener/PagerListener("pagers")/PocsagListener may hold
+the RTL-SDR dongle at a time -- see src/audio/sdr_registry.py.
+Manual-stop-required: starting one while another is active raises
+RuntimeError rather than silently stopping the other.
 """
 
 from __future__ import annotations
@@ -47,6 +44,10 @@ _IDLE_STOP_SECS = 600  # mirrors rtl_listener.py's convention
 _DEVICE_SETTLE_SECS = 0.4
 _START_CHECK_SECS = 0.4
 _START_RETRIES = 3
+_OWNER = "pocsag"
+
+_FREQUENCY_HZ = 439_987_500
+_MULTIMON_ARGS = ["-a", "POCSAG512", "-a", "POCSAG1200", "-a", "POCSAG2400"]
 
 _ERROR_RE = re.compile(
     r"failed|error|cannot|could not|invalid|no supported|usb_",
@@ -66,13 +67,6 @@ _POCSAG_RE = re.compile(
 # (confirmed on real captured output, 2026-07-12) -- strip trailing ones
 # for a clean display; they carry no message content.
 _TRAILING_NUL_RE = re.compile(r"(?:<NUL>)+\s*$")
-
-_KINDS = {
-    "pagers": {
-        "frequency_hz": 172_450_000,
-        "multimon_args": ["-a", "POCSAG512", "-a", "POCSAG1200", "-a", "POCSAG2400"],
-    },
-}
 
 
 def _parse_line(text: str) -> Optional[dict]:
@@ -101,14 +95,10 @@ def _parse_line(text: str) -> Optional[dict]:
     return None  # startup banner, blank lines, etc -- not a decoded page
 
 
-class PagerListener:
-    """Owns one rtl_fm|multimon-ng pipeline for a fixed pager protocol set."""
+class PocsagListener:
+    """Owns one rtl_fm|multimon-ng pipeline decoding POCSAG pages."""
 
-    def __init__(self, kind: str) -> None:
-        if kind not in _KINDS:
-            raise ValueError(f"unknown pager kind {kind!r}; one of {sorted(_KINDS)}")
-        self.kind = kind
-        self._spec = _KINDS[kind]
+    def __init__(self) -> None:
         self._proc: Optional[asyncio.subprocess.Process] = None
         self._reader_task: Optional[asyncio.Task] = None
         self._stderr_task: Optional[asyncio.Task] = None
@@ -133,11 +123,11 @@ class PagerListener:
         async with self._lock:
             if self.running:
                 return  # already running, idempotent
-            sdr_registry.claim(self.kind)
+            sdr_registry.claim(_OWNER)
             try:
                 await self._start_locked_retrying()
             except Exception:
-                sdr_registry.release(self.kind)
+                sdr_registry.release(_OWNER)
                 raise
 
     async def stop(self) -> None:
@@ -156,16 +146,15 @@ class PagerListener:
 
     def status(self) -> dict:
         return {
-            "kind": self.kind,
+            "kind": _OWNER,
             "running": self.running,
-            "frequency_hz": self._spec["frequency_hz"],
-            "frequency_mhz": round(self._spec["frequency_hz"] / 1e6, 6),
+            "frequency_hz": _FREQUENCY_HZ,
+            "frequency_mhz": round(_FREQUENCY_HZ / 1e6, 6),
             "message_count": len(self.messages),
             "messages": list(self.messages),
             "last_error": self._last_error,
             # Who currently holds the shared RTL-SDR dongle (None = free,
-            # this kind, or the other listener) -- lets the frontend show
-            # "busy" instead of a bare "idle" when someone else has it.
+            # "pocsag", or one of the other listeners' owner names).
             "dongle_owner": sdr_registry.current_owner(),
         }
 
@@ -173,17 +162,15 @@ class PagerListener:
 
     async def _start_locked(self) -> None:
         rtl_cmd = [
-            "rtl_fm", "-d", "0", "-f", str(self._spec["frequency_hz"]),
+            "rtl_fm", "-d", "0", "-f", str(_FREQUENCY_HZ),
             "-M", "fm", "-s", "22050", "-l", "250",
         ]
-        multimon_cmd = [
-            "multimon-ng", *self._spec["multimon_args"], "-t", "raw", "/dev/stdin",
-        ]
+        multimon_cmd = ["multimon-ng", *_MULTIMON_ARGS, "-t", "raw", "/dev/stdin"]
         rtl_str = " ".join(shlex.quote(x) for x in rtl_cmd)
         mm_str = " ".join(shlex.quote(x) for x in multimon_cmd)
         cmd = f"{rtl_str} | {mm_str}"
 
-        logger.info("Pager listener (%s) starting: %s", self.kind, cmd)
+        logger.info("POCSAG listener starting: %s", cmd)
         self._last_error = ""
         self._proc = await asyncio.create_subprocess_exec(
             "/bin/bash", "-c", cmd,
@@ -200,8 +187,9 @@ class PagerListener:
     async def _start_locked_retrying(self) -> None:
         """Start the pipeline, retrying if rtl_fm can't open the dongle yet.
 
-        Mirrors RtlListener's retry loop: on a fast start-right-after-stop
-        the previous rtl_fm may still hold the USB device.
+        Mirrors RtlListener/PagerListener's retry loop: on a fast
+        start-right-after-stop the previous rtl_fm may still hold the USB
+        device.
         """
         for attempt in range(1, _START_RETRIES + 1):
             await self._start_locked()
@@ -209,9 +197,8 @@ class PagerListener:
             if self._proc is not None and self._proc.returncode is None:
                 return  # still alive -> device opened
             logger.warning(
-                "Pager listener (%s) start attempt %d/%d failed (%s); retrying",
-                self.kind, attempt, _START_RETRIES,
-                self._last_error or "process exited",
+                "POCSAG listener start attempt %d/%d failed (%s); retrying",
+                attempt, _START_RETRIES, self._last_error or "process exited",
             )
             await self._stop_locked_no_release()
             if attempt < _START_RETRIES:
@@ -221,7 +208,7 @@ class PagerListener:
 
     async def _stop_locked(self) -> None:
         await self._stop_locked_no_release()
-        sdr_registry.release(self.kind)
+        sdr_registry.release(_OWNER)
 
     async def _stop_locked_no_release(self) -> None:
         """Tear down the process without releasing the registry claim --
@@ -246,7 +233,7 @@ class PagerListener:
                 except (ProcessLookupError, PermissionError):
                     pass
                 await proc.wait()
-            logger.info("Pager listener (%s) stopped", self.kind)
+            logger.info("POCSAG listener stopped")
 
     # ── background tasks ──────────────────────────────────────────
 
@@ -269,11 +256,9 @@ class PagerListener:
         if self._proc is proc:
             rc = proc.returncode
             self._last_error = self._last_error or f"pipeline exited (code {rc})"
-            logger.warning(
-                "Pager listener (%s) pipeline ended: %s", self.kind, self._last_error,
-            )
+            logger.warning("POCSAG listener pipeline ended: %s", self._last_error)
             self._proc = None
-            sdr_registry.release(self.kind)
+            sdr_registry.release(_OWNER)
 
     async def _stderr_loop(self, proc: asyncio.subprocess.Process) -> None:
         try:
@@ -284,7 +269,7 @@ class PagerListener:
                 text = line.decode(errors="replace").rstrip()
                 if not text:
                     continue
-                logger.debug("pager pipeline (%s): %s", self.kind, text)
+                logger.debug("POCSAG pipeline: %s", text)
                 if _ERROR_RE.search(text):
                     self._last_error = text
         except asyncio.CancelledError:
@@ -298,8 +283,7 @@ class PagerListener:
                 idle = time.monotonic() - self._last_poll_at
                 if idle >= _IDLE_STOP_SECS:
                     logger.info(
-                        "Pager listener (%s) idle for %.0f s -- stopping",
-                        self.kind, idle,
+                        "POCSAG listener idle for %.0f s -- stopping", idle,
                     )
                     async with self._lock:
                         await self._stop_locked()

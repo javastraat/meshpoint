@@ -212,7 +212,6 @@ _BUILTIN_ROUTERS: list[tuple] = [
     (emergency_pager_routes.router, False),
     (listener_routes.router, False),
     (pager_routes.pagers_router, False),
-    (pager_routes.pocsag_router, False),
     (dab_routes.router, False),
     (spectrum_routes.router, False),
     (meshtastic_routes.router, False),
@@ -232,11 +231,8 @@ _BUILTIN_LISTENERS: list[listener_registry.ListenerSpec] = [
     ),
     listener_registry.ListenerSpec(
         "pagers",
-        lambda: (
-            PagerListener("pagers"),
-            PagerListener("pocsag"),
-        ),
-        lambda duo: pager_routes.init_routes(*duo),
+        lambda: PagerListener("pagers"),
+        pager_routes.init_routes,
     ),
     listener_registry.ListenerSpec("dab", DabListener, dab_routes.init_routes),
 ]

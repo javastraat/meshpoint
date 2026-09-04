@@ -27,6 +27,7 @@ from src.api.routes import (
     pager_routes,
 )
 from src.api.server import _BUILTIN_LISTENERS
+from src.audio.pager_listener import PagerListener
 
 _EXPECTED_NAMES = ["radio", "pagers", "dab"]
 
@@ -48,16 +49,18 @@ class TestBuiltinListenerList(unittest.TestCase):
 
         listener_registry.start_all(_BUILTIN_LISTENERS)
         try:
-            # one entry per init_routes call, pagers builds a 2-tuple
+            # one entry per init_routes call; pagers builds a single
+            # listener now (P2000 and POCSAG both split into their own
+            # plugins, leaving just this one kind here).
             names = [n for n, _ in listener_registry.live()]
             self.assertEqual(names, _EXPECTED_NAMES)
             pagers_obj = next(o for n, o in listener_registry.live() if n == "pagers")
-            self.assertEqual(len(pagers_obj), 2)
+            self.assertIsInstance(pagers_obj, PagerListener)
+            self.assertEqual(pagers_obj.kind, "pagers")
 
             self.assertIsNotNone(listener_routes._listener)
             self.assertIsNotNone(dab_routes._listener)
             self.assertIsNotNone(pager_routes._pagers)
-            self.assertIsNotNone(pager_routes._pocsag)
         finally:
             asyncio.run(listener_registry.stop_all())
 

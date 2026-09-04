@@ -9060,16 +9060,109 @@ clean on `listener_panel.js` and the new `p2000_panel.js`.
 `ChangelogParser.parse_file` re-parse: 42 sections, new P2000 bullet
 present under the real v0.8.1 section.
 
+**LIVE-VERIFIED on the Pi, 2026-09-04**: user pulled, restarted, and
+confirmed "p2000 works" -- FLEX decode + the plugin split of shared
+`pager_listener.py`/`pager_routes.py` code both hold up on real hardware,
+Pagers unaffected. First confirmation that the split-not-move extraction
+shape (as opposed to ACARS/RTL433/ADS-B's clean lift-and-shift) is sound
+in practice, not just in tests.
+
+**Unrelated bug noticed by the user during this same live check, flagged
+but explicitly not urgent ("i know its something different just noticed
+it")**: after clicking Settings -> Plugins' "Restart service" button, the
+service restarts fine (screenshot showed `Uptime 0m`, a live session, and
+fresh device-status data all loading correctly) but the whole page stays
+stuck under a greyed-out/dimmed overlay showing "Restarting... the
+dashboard will reconnect in a few seconds." forever, even though the
+dashboard clearly DID reconnect. Traced as far as: neither
+`plugins_panel_controller.js`'s `_restartService()` nor
+`dangerous_panel_controller.js`'s generic `_invoke()` do a page reload or
+any reconnect-wait logic at all -- both just POST `/api/dangerous/invoke`
+and print a status string, so neither one owns the grey dimming or its
+removal. The overlay must be coming from somewhere else entirely (a
+global WS-disconnected dimming class on `<body>` that isn't being cleared
+on reconnect, most likely) -- **not yet located, not yet fixed**. Next
+session should grep for whatever applies the dimming (a class toggled by
+`websocket_client.js`'s disconnect/reconnect handlers is the prime
+suspect) and confirm it's actually being removed on the reconnect event
+that clearly did fire (fresh data loaded). Low priority per the user's
+own framing, but worth fixing since it makes a successful restart look
+like a hang.
+
+**POCSAG extracted to a plugin (2026-09-04, ⚠️ behaviour change, DONE, not
+yet live-verified)**: Fifth tab-by-tab extraction, second "split" (after
+P2000) rather than a lift-and-shift -- same shared-file surgery pattern,
+now against the smaller two-kind `pager_listener.py`/`pager_routes.py`
+P2000 left behind. Straightforward mechanically since the P2000 split
+already established the exact recipe: new `plugins/apps/pocsag/` with
+`PocsagListener` (frequency/multimon_args hardcoded to 439.9875 MHz /
+POCSAG512-2400, `_parse_line` keeping only the POCSAG branch -- there was
+no FLEX-equivalent dead code to strip this time since Pagers still uses
+identical POCSAG parsing), single-router `routes.py`, 7 new tests (real
+`<NUL>`-padded alpha + numeric captured-format lines as fixtures, mirrors
+the POCSAG parsing tests that never existed standalone before), tiny
+`frontend/pocsag_panel.js` reusing core `PagerPanel`, `setup.sh` (same
+"usually a no-op" shape as P2000's, `multimon-ng` already built by
+`scripts/install.sh` for Pagers regardless).
+
+Bigger structural change than the P2000 split: with POCSAG gone, only
+`"pagers"` remains in `_KINDS`, so `server.py`'s `"pagers"` `ListenerSpec`
+collapsed from a tuple-returning lambda down to a bare
+`lambda: PagerListener("pagers")` + `pager_routes.init_routes` directly
+(no more lambda unpacking a tuple) -- now the same shape as `DabListener`'s
+spec. `pager_routes.py`'s `init_routes()` takes one listener instead of
+two. Deliberately did NOT collapse `PagerListener` itself to drop the
+`kind` parameter (still validates against a now-single-entry `_KINDS`
+dict) -- reasoned this class is likely to be deleted entirely soon if
+Pagers is the next thing extracted (very plausible given the user's
+one-by-one pace), so simplifying it now would be throwaway work; left an
+explicit comment in the docstring explaining why the seemingly-redundant
+parameterization was kept. `tests/test_create_app_listeners.py`'s
+`pagers_obj` assertion changed from a tuple-length check to
+`assertIsInstance(pagers_obj, PagerListener)` + `.kind == "pagers"`,
+matching the new bare-object shape.
+
+Docs: `docs/API-ENDPOINTS.md`'s Pagers/POCSAG combined rows split back to
+Pagers-only (matching the file's pipe-separated-path convention, same
+care taken as the P2000 pass). `README.md`: new POCSAG plugin bullet
+next to P2000's, the P2000 bullet's own wording fixed (it said "Pagers/
+POCSAG (still core)" -- no longer true, now just "Pagers"), the big
+RTL-SDR paragraph updated again (down to "One more tab" for Pagers alone,
+POCSAG's own sentence added), the manual-install section gained a POCSAG
+plugin-pointer bullet, the App-plugins example list extended, and --
+**caught a leftover the P2000 pass had missed** -- the API-endpoints
+summary table near the bottom of the file still had the old combined
+`{pagers,pocsag}` rows never updated during the P2000 or ADS-B passes;
+fixed now, folded POCSAG into the existing `{rtl433,acars,adsb,p2000,...}`
+plugin-shape row instead. `docs/CONFIGURATION.md` had nothing POCSAG-
+specific to touch (confirmed by grep -- all real "POCSAG" hits there are
+about the unrelated DAPNET `pocsag_companion` TX system, not this RX
+listener, same distinction already documented in
+`emergency_pager_routes.py`'s own "not to be confused with" comment).
+
+CHANGELOG: new `v0.8.1` bullet right after P2000's, explicitly framed as
+"the second of the three former pager kinds," noting the `init_routes()`
+shape change and that Pagers itself is unaffected.
+
+**Verified on the Mac**: `py_compile` clean on every touched/new Python
+file; grepped for stale `PagerListener("pocsag")`/`pager_routes._pocsag`/
+`pocsag_router` references -- zero hits. `pytest plugins/` -- 39/39 pass
+(all five plugins + hello-world together). `node --check` clean on
+`listener_panel.js` and the new `pocsag_panel.js`. `ChangelogParser.
+parse_file` re-parse: 43 bullets in v0.8.1, new POCSAG bullet present.
+
 **NOT yet done / next steps**: **not live-verified on the Pi** -- next
-session should pull, restart, confirm P2000 is gone from the Listener
-page until enabled (while Pagers/POCSAG keep working exactly as before,
-important to confirm since this was a split of shared code, not an
-isolated move), then run `sudo meshpoint plugin setup p2000` +
-`plugins.p2000.enabled: true` + restart, and confirm the P2000 tab comes
-back working (FLEX decode, same shared-dongle busy behaviour). **Pagers
-and POCSAG remain the next two extraction candidates** if the user wants
-to keep going down this same "three separate plugins" path -- each would
-need the same kind of split-not-move treatment done here, now against an
-even smaller shared `pager_listener.py`/`pager_routes.py` (already down
-to just those two kinds). DAB+ is still the other original candidate
-(Config sub-tab, more work); plain-FM Radio still explicitly out of scope.
+session should pull, restart, confirm POCSAG is gone from the Listener
+page until enabled (Pagers keeps working exactly as before -- especially
+worth double-checking this time, since `pager_listener.py`'s `_KINDS`
+dict and `server.py`'s listener spec both changed shape, not just lost an
+entry), then `sudo meshpoint plugin setup pocsag` + `plugins.pocsag.
+enabled: true` + restart, confirm the POCSAG tab decodes again. **If the
+user wants to finish the "three separate plugins" pattern, Pagers itself
+is the last remaining piece** -- extracting it would let
+`pager_listener.py`/`pager_routes.py` be deleted from core entirely
+(nothing left in `_KINDS`), unlike P2000/POCSAG which left the shared
+files alive and trimmed. DAB+ is still the other original candidate
+(Config sub-tab, more work); plain-FM Radio still explicitly out of
+scope. Also still open: the grey-overlay-after-restart bug noted above,
+unrelated to any of this plugin work.
