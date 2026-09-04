@@ -1,10 +1,12 @@
 # RTL-SDR plugin
 
-A staging ground, not a real feature yet. Adds an **RTL-SDR** page under the
-sidebar's Radio section (next to the built-in Listener page, which is still
-where Radio/DAB+/P2000/Pagers/POCSAG/RTL433/ADS-B/ACARS actually run) with
-placeholder text plus a mount point other plugins can inject content into
-via the `"hook"` seam.
+A staging ground, not a real feature yet. Adds an **RTL-SDR Plugins** page
+under the sidebar's Radio section (next to the built-in Listener page,
+labeled just "RTL-SDR" — deliberately a different label, since the two
+looked confusingly identical in the sidebar when this first shipped; the
+Listener page is still where Radio/DAB+/P2000/Pagers/POCSAG/RTL433/ADS-B/
+ACARS actually run) with placeholder text plus a mount point other plugins
+can inject content into via the `"hook"` seam.
 
 ## Why this exists
 
@@ -33,7 +35,8 @@ plugins:
     enabled: true
 ```
 
-Restart, then Radio → RTL-SDR in the sidebar. Also enable `dab` (see
+Restart, then Radio → RTL-SDR Plugins in the sidebar (not "RTL-SDR" —
+that's the built-in Listener page). Also enable `dab` (see
 [`plugins/apps/dab/`](../dab/)) to see its hook render on this page.
 
 ## Layout

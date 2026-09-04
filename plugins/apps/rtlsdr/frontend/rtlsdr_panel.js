@@ -24,7 +24,7 @@ window.registerSidebarPage({
                 .some((h) => h.host === 'rtlsdr');
             rootEl.innerHTML = `
                 <div class="plugin-page">
-                    <h2>RTL-SDR</h2>
+                    <h2>RTL-SDR Plugins</h2>
                     <p>Enable RTL-SDR plugins to see their content here.
                     This page is a staging ground for the real RTL-SDR host
                     page -- for now, the Listener page (in the sidebar,

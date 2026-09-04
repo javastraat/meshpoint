@@ -10018,3 +10018,29 @@ placeholder text, shown unconditionally, not conditionally like the
 eventual real shell's "activate a plugin" message would be -- these are
 two different pieces of copy for two different pages, don't conflate
 them).
+
+**Live-verified on the Pi same day -- and a real naming bug caught in the
+process**: screenshot showed both plugins working exactly as designed
+(placeholder text + DAB+'s "Idle" status card rendering correctly), but
+also showed something I missed: the built-in Listener page's sidebar link
+has ALWAYS been labeled "RTL-SDR" (`frontend/index.html`'s hardcoded
+`<li data-route="listener">`, `<span class="sidebar__label">RTL-SDR</span>`
+-- its actual route/id is "listener", but its on-screen label already was
+"RTL-SDR" before this session ever touched it). I'd given the new plugin
+`label = "RTL-SDR"` too, without checking -- two sidebar entries with the
+literal same text, confirmed genuinely confusing live (user: "i dont see
+it fully yet, i think we miss alot from the listener from the main code"
+-- had landed on the new placeholder page, not the real one, because
+nothing distinguished them by label). **Fixed**: renamed to `"RTL-SDR
+Plugins"` in `plugin.toml`, the page's own `<h2>` heading, and every
+README mention -- re-verified `discover_plugins()` picks up the new label.
+**Lesson: when adding a new sidebar entry, grep the existing sidebar
+labels in `index.html` first**, not just the plugin ids/routes -- a route
+collision is caught by the manifest parser (`KNOWN_SIDEBAR_CATEGORIES`/
+slug validation), but a LABEL collision against a hardcoded core sidebar
+item isn't validated anywhere and only surfaces visually.
+
+**NOT yet done**: the renamed label hasn't been re-confirmed on the Pi
+yet (only Mac-side discovery re-check so far) -- next session should pull,
+restart, confirm the sidebar now shows "RTL-SDR" (built-in) and "RTL-SDR
+Plugins" (this plugin) as clearly distinct entries.

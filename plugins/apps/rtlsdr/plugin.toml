@@ -34,7 +34,11 @@ styles = ["frontend/rtlsdr_panel.css"]
 
 [sidebar]
 route = "rtlsdr"          # -> #/rtlsdr
-label = "RTL-SDR"         # sidebar link text
+label = "RTL-SDR Plugins" # sidebar link text -- NOT "RTL-SDR": the built-in
+                           # Listener page (route "listener") already uses
+                           # that exact label, and the two showing up as
+                           # identical-looking sidebar entries was genuinely
+                           # confusing in practice (caught live on the Pi).
 category = "radio"        # same section the built-in Listener page sits in
 icon = "antenna"          # generic wifi/signal glyph
 
