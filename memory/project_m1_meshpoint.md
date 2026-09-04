@@ -11122,8 +11122,57 @@ touched no Python, since `_groupedPlugins()` reads the same `dependency`
 shape those tests exercise server-side -- confirmed unaffected. New
 CHANGELOG bullet under `### v0.8.1` (62 bullets now, up from 61).
 
-**NOT yet done**: not live-verified on the Pi yet -- next session should
-confirm every group (rtlsdr's 8, hello-world's 1) starts folded showing
-"▸ id (N)", clicking unfolds/re-folds correctly, and that folding one
-group while a search is active is impossible (chevron shouldn't even
-render during search, per this pass's design).
+**LIVE-VERIFIED on the Pi, same session**: both groups confirmed starting
+folded ("▸ rtlsdr (8)", "▸ hello-world (1)") on a fresh page load, and
+unfolding correctly on click -- screenshot of `hello-world` expanded shows
+`hello-world-hook` indented underneath with its "↳" marker and the red
+"Depends on: hello-world (not enabled)" note, chevron flipped to "▾",
+`rtlsdr`'s group independently still folded. Fold/unfold, the dependency
+enforcement UI, and the grouping all confirmed working together on real
+data, closing out this whole plugin-management-UI polish thread for the
+night.
+
+## TODO (2026-09-05, user explicitly asked to queue this before signing off, not build yet): expand the curated plugin sidebar icon set beyond today's 16
+
+User, wrapping up for the night: "maybe add that we need all icons
+avalibe for plugins :)" -- flagging that `KNOWN_SIDEBAR_ICONS`
+(`src/plugins/manifest.py`) only offers 16 choices today (`plug`,
+`antenna`, `chart`, `message`, `terminal`, `map`, `list`, `grid`,
+`topology`, `rf`, `pager`, `dapnet`, `reticulum`, `lorawan`, `gear`,
+`usb` -- the last two added this session, `gear`+`usb`), each a hand-drawn
+SVG path baked into `frontend/sidebar/sidebar_plugin_registry.js`'s
+`_ICON_PATHS`. A community plugin author whose domain doesn't match any
+of these 16 is stuck with the generic `plug` default -- fine for the
+plugins built so far (all of which found a reasonably fitting icon), but
+a real limitation as more community plugins show up.
+
+**Not investigated yet, just scoped from memory of the existing
+mechanism**: the curated-key design (`icon = "usb"` in `plugin.toml`,
+never raw SVG) is deliberate and should stay -- letting a manifest inject
+arbitrary SVG markup into every viewer's sidebar would be a real XSS-ish
+surface, same reasoning already documented in this file for why plugin
+themes can't `@import` and why plugin sidebar pages go through
+`registerSidebarPage()` rather than raw HTML injection. So "all icons
+available" has to mean "a much bigger curated set," not "let plugins
+supply their own SVG."
+
+**Two directions worth weighing next session** (not decided, needs an
+actual AskUserQuestion or at least a proposal before building): (1) hand-add
+many more curated paths the same way `usb` was added this session (one at
+a time, whenever a real plugin needs one) -- zero new infrastructure, but
+slow and only ever covers what's been asked for; (2) bundle a whole
+existing open-source icon set (Lucide/Feather/Tabler are the usual
+suspects, all MIT-licensed, all already stroke-based `0 0 24 24` matching
+this app's existing convention) as a big static `_ICON_PATHS` table
+generated once from that library's SVGs, giving plugin authors dozens-to-hundreds
+of choices immediately -- more upfront work (need to actually pull the
+license-compatible SVG source and generate the lookup table, plus keep
+`KNOWN_SIDEBAR_ICONS` and the JS map in sync, same dual-source-of-truth
+gotcha `usb` already required updating in two places for) but solves the
+problem once instead of icon-by-icon. `usb`'s own `_ICON_VIEWBOX` override
+mechanism (added this session for its non-standard coordinate space)
+would need to generalize cleanly if a bulk-imported set doesn't uniformly
+share the `0 0 24 24` viewBox either.
+
+Not started. Pick this up when the user asks for it specifically --
+explicitly deferred tonight in favor of just writing it down.
