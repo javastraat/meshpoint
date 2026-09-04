@@ -9231,3 +9231,93 @@ clean. New CHANGELOG bullet under v0.8.1, right after the earlier
 **Not yet live-verified on the Pi** -- next session should confirm a real
 restart-via-Plugins-page now clears itself within ~20s without a manual
 page reload.
+
+**The grey screen turned out to be a real, separate CSS bug -- light
+theme only -- found through a live debugging session with the user,
+2026-09-04.** The disabled-button fix above genuinely helped (confirmed
+working: "Reconnected -- plugin list refreshed." showing correctly) but
+the user reported "still weird" with a follow-up screenshot showing the
+page still visually washed out. Investigation process worth remembering:
+1. Ruled out `plugins_panel_controller.js`/`dangerous_panel_controller.js`
+   doing any page reload or reconnect-wait logic themselves (neither
+   does -- confirmed by reading both fully).
+2. Ruled out `reconnect_storyboard.js`'s WS-disconnect pill (a small
+   top-right pill, its CSS confirmed `position:fixed` but tiny, no
+   full-viewport backdrop).
+3. Ruled out the release-notes `.rn-modal-overlay` (conditionally
+   rendered, unrelated feature).
+4. **Key moment**: user confirmed via `meshpoint plugin list`-style
+   evidence it happens from BOTH Settings -> Plugins' restart button AND
+   Settings -> Dangerous' generic restart card -- ruling out anything
+   specific to `plugins_panel_controller.js` and pointing at something
+   shared (both funnel through the same `DangerousModal`).
+5. Had the user run a live console snippet on the actual device listing
+   every visible `position:fixed` element's computed background --
+   nothing suspicious in the first pass, because `.danger-modal__backdrop`
+   is `position:absolute` relative to its `position:fixed` parent
+   `.danger-modal`, so the snippet's `position === 'fixed'` filter never
+   caught it. Real lesson: a `position:fixed` scan alone isn't enough
+   for a backdrop pattern where the fixed element is a near-invisible
+   wrapper and an absolutely-positioned child does the actual painting.
+6. Re-read `dangerous_modal.js` + `terminal.css`'s `.danger-modal__backdrop`
+   rule directly: hides via `background: transparent` by default, only
+   `var(--scrim)` when `.danger-modal--open` is present on the ancestor
+   -- a DIFFERENT hide mechanism from every other backdrop in the app
+   (`.nd-backdrop`/`.cmd-palette__backdrop`/`.keymap__backdrop` all hide
+   via `opacity`/mount-unmount instead).
+7. Grepped `--scrim` usage across `frontend/themes/*/theme.css` on a hunch
+   ("only in light theme" was the user's own clarifying comment) and found
+   `frontend/themes/light/theme.css`'s own backdrop-lightening rule:
+   `html[data-theme="light"] .danger-modal__backdrop, .nd-backdrop,
+   [class$="__backdrop"] { background: ... !important; }` -- unconditional,
+   `!important`, applied directly to `.danger-modal__backdrop` (twice
+   over, once by name and again via the generic catch-all).
+
+**Root cause**: that light-theme override permanently pins
+`.danger-modal__backdrop` to a 35%-opacity dark tint (`rgba(20,28,46,0.35)`)
+the instant `DangerousModal._ensureMounted()` first appends it to
+`document.body` (i.e. the first time ANY confirm dialog is used, e.g.
+clicking "Restart service") -- since `!important` beats the base rule's
+`background: transparent` default regardless of whether `.danger-modal--open`
+is present. The backdrop is `position:fixed; inset:0; z-index:80`, so
+from that point on the ENTIRE viewport sits under a permanent dark tint,
+surviving navigation and WS reconnects (nothing about it is
+state-dependent), matching every symptom the user reported: light-theme
+only, triggered by either restart button, doesn't clear on its own, whole
+page not just the Plugins page.
+
+**Fixed**: scoped the light-theme override to
+`html[data-theme="light"] .danger-modal--open .danger-modal__backdrop`
+(matching the base rule's own conditional) and excluded
+`.danger-modal__backdrop` from the generic `[class$="__backdrop"]`
+catch-all via `:not()` so it can't be re-caught unconditionally through
+that second path. Every other backdrop matched by that generic selector
+is unaffected (they hide via opacity/mounting, not background-toggling,
+so an unconditional background override never broke them). **Also fixed
+in passing, found via the same console-warning evidence**
+(`Ancestor with aria-hidden: <div class="danger-modal" aria-hidden="true">`
+in the DevTools console, right there in one of the user's screenshots):
+`DangerousModal._hide()` never blurred the focused Confirm/Cancel button
+before marking the modal `aria-hidden="true"`, trapping focus inside a
+hidden subtree -- now blurs `document.activeElement` first if it's inside
+`this._root`.
+
+New CHANGELOG bullet under v0.8.1 (45 bullets total, parser re-verified),
+framed honestly as "the disabled-button fix was real but was a red
+herring for this specific report -- here's the actual cause." `node
+--check` clean on both edited JS/reasoning files. **Not yet live-verified
+on the Pi** -- next session should have the user switch to light theme,
+trigger a restart via either Plugins or Dangerous, and confirm the page
+stays fully normal-looking (no tint) throughout and after.
+
+**Process note worth remembering for next time**: this took ~6 rounds of
+back-and-forth with the user (screenshots, a view-source paste that
+wasn't useful, then finally a live console snippet) before landing on the
+actual cause. The single highest-leverage moment was asking the user
+"does this only happen in one theme?" -- as soon as they said "light
+theme only," that reframed the whole search from "which JS state is
+stuck" to "which theme override is wrong," and the `--scrim` grep found
+it in under a minute. **For a UI bug that looks like a stuck overlay:
+ask about theme/browser/reproducibility scope EARLY**, not after
+exhausting the obvious JS suspects -- it narrows the search space far
+faster than reading more source top-to-bottom.

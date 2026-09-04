@@ -82,6 +82,14 @@ class DangerousModal {
     }
 
     _hide() {
+        // Blur before marking aria-hidden -- confirm()'s own setTimeout
+        // focuses _confirmBtn on open, and leaving that focus in place
+        // traps it inside a now aria-hidden subtree (Chrome warns:
+        // "Ancestor with aria-hidden"), which assistive tech can't
+        // recover from until something else steals focus.
+        if (this._root.contains(document.activeElement)) {
+            document.activeElement.blur();
+        }
         this._root.setAttribute('aria-hidden', 'true');
         this._root.classList.remove('danger-modal--open');
     }

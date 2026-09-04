@@ -241,10 +241,26 @@ html[data-theme="light"] .lsn-presets button.lsn-preset--active .lsn-fav.on {
     color: var(--accent-amber);
 }
 
-/* Modal/drawer backdrops: the dark scrim is fine, just lighten it a bit. */
-html[data-theme="light"] .danger-modal__backdrop,
+/* Modal/drawer backdrops: the dark scrim is fine, just lighten it a bit.
+ * .danger-modal__backdrop is the odd one out: it toggles its OWN
+ * background (transparent <-> scrim, via the .danger-modal--open parent
+ * class -- see terminal.css) as its hide/show mechanism, unlike every
+ * other backdrop here which hides via opacity/mounting instead. An
+ * unconditional !important override here -- as this rule used to be --
+ * broke that toggle: the backdrop is mounted once (DangerousModal keeps
+ * its DOM node forever, never unmounts) and would sit permanently tinted
+ * at 35% opacity over the full viewport (position:fixed, inset:0,
+ * z-index 80) the moment ANY dangerous-action confirm (e.g. Settings ->
+ * Plugins' or Settings -> Dangerous' "Restart service") was used even
+ * once, light theme only, with no way to clear it short of a hard
+ * refresh. Scoped to the --open state so it matches the base rule's own
+ * conditional and only tints while a confirm dialog is actually showing. */
+html[data-theme="light"] .danger-modal--open .danger-modal__backdrop {
+    background: rgba(20, 28, 46, 0.35) !important;
+}
+
 html[data-theme="light"] .nd-backdrop,
-html[data-theme="light"] [class$="__backdrop"] {
+html[data-theme="light"] [class$="__backdrop"]:not(.danger-modal__backdrop) {
     background: rgba(20, 28, 46, 0.35) !important;
 }
 
