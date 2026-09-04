@@ -1,9 +1,9 @@
 """ADS-B (air traffic, dump1090) endpoints: start / stop / status.
 
-See src/audio/adsb_listener.py for the listener class, and
-src/audio/sdr_registry.py for why starting this can fail with a 503
-while another RTL-SDR listener is active (only one process can hold the
-dongle at a time; manual stop required by design).
+See ``listener.py`` for the listener class, and ``src/audio/sdr_registry.py``
+for why starting this can fail with a 503 while another RTL-SDR listener is
+active (only one process can hold the dongle at a time; manual stop
+required by design).
 """
 
 from __future__ import annotations
@@ -15,7 +15,8 @@ from pydantic import BaseModel, Field
 
 from src.api.auth.dependencies import require_admin
 from src.api.auth.jwt_session import SessionClaims
-from src.audio.adsb_listener import AdsbListener
+
+from .listener import AdsbListener
 
 router = APIRouter(prefix="/api/adsb", tags=["adsb"])
 

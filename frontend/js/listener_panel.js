@@ -389,8 +389,8 @@ class ListenerPanel {
         // window.registerListenerPanel (see listener_panel_registry.js) and
         // render after these built-ins.
         // 'pocsag' etc. share the one RTL-SDR dongle (src/audio/sdr_registry.py)
-        // so only one of Radio/P2000/Pagers/POCSAG/DAB+/ADS-B runs at a time
-        // (the RTL433/ACARS plugins join that set when installed); 'dabconfig'
+        // so only one of Radio/P2000/Pagers/POCSAG/DAB+ runs at a time (the
+        // RTL433/ACARS/ADS-B plugins join that set when installed); 'dabconfig'
         // is a read-only view over the channel-scan JSON and sits out that dance.
         const P = window.PagerPanel;
         const pager = (tab, label, prefix, title, rowFn) =>
@@ -400,7 +400,6 @@ class ListenerPanel {
             pager('p2000', 'P2000', '/api/p2000', 'P2000'),
             pager('pagers', 'Pagers', '/api/pagers', 'Pagers'),
             pager('pocsag', 'POCSAG', '/api/pocsag', 'POCSAG'),
-            { tab: 'adsb', label: 'ADS-B', panel: window.AdsbPanel ? new window.AdsbPanel() : null },
             { tab: 'dabconfig', label: 'DAB+ Config', panel: window.DabConfigPanel ? new window.DabConfigPanel() : null },
         ];
         const plugins = (window.LISTENER_PANELS || []).map((d) => ({

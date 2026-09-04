@@ -22,14 +22,13 @@ from fastapi.testclient import TestClient
 from src.api import listener_registry
 from src.api.listener_registry import ListenerSpec
 from src.api.routes import (
-    adsb_routes,
     dab_routes,
     listener_routes,
     pager_routes,
 )
 from src.api.server import _BUILTIN_LISTENERS
 
-_EXPECTED_NAMES = ["radio", "pagers", "dab", "adsb"]
+_EXPECTED_NAMES = ["radio", "pagers", "dab"]
 
 
 class TestBuiltinListenerList(unittest.TestCase):
@@ -44,8 +43,7 @@ class TestBuiltinListenerList(unittest.TestCase):
             self.assertTrue(callable(s.wire))
 
     def test_start_all_wires_every_route_module(self) -> None:
-        for mod in (listener_routes, pager_routes, dab_routes,
-                    adsb_routes):
+        for mod in (listener_routes, pager_routes, dab_routes):
             getattr(mod, "reset_routes", lambda: None)()
 
         listener_registry.start_all(_BUILTIN_LISTENERS)
@@ -58,7 +56,6 @@ class TestBuiltinListenerList(unittest.TestCase):
 
             self.assertIsNotNone(listener_routes._listener)
             self.assertIsNotNone(dab_routes._listener)
-            self.assertIsNotNone(adsb_routes._listener)
             self.assertIsNotNone(pager_routes._p2000)
             self.assertIsNotNone(pager_routes._pagers)
             self.assertIsNotNone(pager_routes._pocsag)
@@ -69,13 +66,11 @@ class TestBuiltinListenerList(unittest.TestCase):
         listener_registry.start_all(_BUILTIN_LISTENERS)
         try:
             app = FastAPI()
-            for r in (dab_routes.router, adsb_routes.router):
-                app.include_router(r)
+            app.include_router(dab_routes.router)
             client = TestClient(app)
-            for prefix in ("/api/dab", "/api/adsb"):
-                resp = client.get(f"{prefix}/status")
-                self.assertEqual(resp.status_code, 200, prefix)
-                self.assertFalse(resp.json().get("running"), prefix)
+            resp = client.get("/api/dab/status")
+            self.assertEqual(resp.status_code, 200)
+            self.assertFalse(resp.json().get("running"))
         finally:
             asyncio.run(listener_registry.stop_all())
 
@@ -109,8 +104,7 @@ class TestBuiltinListenerRouterAlignment(unittest.TestCase):
         from src.api.server import _BUILTIN_ROUTERS
 
         prefixes = {getattr(r, "prefix", "") for r, _ in _BUILTIN_ROUTERS}
-        for p in ("/api/dab", "/api/adsb"):
-            self.assertIn(p, prefixes)
+        self.assertIn("/api/dab", prefixes)
 
 
 if __name__ == "__main__":  # pragma: no cover

@@ -1,15 +1,14 @@
 """ADS-B (air traffic) listener: manages a dump1090 subprocess and polls its
 built-in webserver for the current aircraft table.
 
-Like DabListener (src/audio/dab_listener.py) and unlike RtlListener/
-PagerListener/Rtl433Listener -- which each parse a stream of demodulated
-audio or discrete decoded events -- dump1090 is a complete, self-contained
-1090ES receiver with its own embedded HTTP server: `dump1090 --net
---net-http-port <port>`. We spawn it once, then poll its own `/data.json`
-every 2s for the full list of currently-tracked aircraft (a live snapshot,
-not an append-only event log -- ADS-B naturally models as "which aircraft
-are visible right now", the same way every other ADS-B web UI, including
-dump1090's own bundled gmap.html, presents it).
+Unlike RtlListener/PagerListener/Rtl433Listener -- which each parse a stream
+of demodulated audio or discrete decoded events -- dump1090 is a complete,
+self-contained 1090ES receiver with its own embedded HTTP server: `dump1090
+--net --net-http-port <port>`. We spawn it once, then poll its own
+`/data.json` every 2s for the full list of currently-tracked aircraft (a
+live snapshot, not an append-only event log -- ADS-B naturally models as
+"which aircraft are visible right now", the same way every other ADS-B web
+UI, including dump1090's own bundled gmap.html, presents it).
 
 Only one of RtlListener/PagerListener(*)/Rtl433Listener/DabListener/
 AdsbListener may hold the RTL-SDR dongle at a time -- see

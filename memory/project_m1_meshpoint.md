@@ -8753,13 +8753,156 @@ an environment limitation and not a regression from this change.
 under the real `v0.8.1` section (not "Unreleased" -- matches this file's own
 `src/version.py`-driven convention).
 
+**LIVE-VERIFIED on the Pi, 2026-09-04** (a same-day mixup first: the user
+initially checked a different node with no RTL-SDR attached and saw nothing,
+then found the real cause -- the sensecap M1's own service was still 2
+commits behind, `commits_behind=2` visible in its own periodic-update-check
+log line, so the RTL433 plugin folder genuinely wasn't on disk yet; `git
+pull` + restart fixed that independent of any code issue). After pulling and
+restarting on the actual M1: **Settings → Plugins** screenshot shows all
+three plugins now -- `acars` (enabled/loaded), `hello-world` (disabled),
+`rtl433` (v1.0.0, Community, enabled/loaded, correct "Requires: rtl-433 --
+run sudo meshpoint plugin setup rtl433" hint). **Listener → RTL433**
+screenshot shows the tab live: "listening on 433.9200 MHz", Start/Stop/Clear
+controls present and correctly stateful (Start greyed out while already
+running). Both bugs' worth of doubt (missing plugin, broken listener) fully
+resolved -- extraction genuinely works end to end on real hardware, not just
+Mac-side checks.
+
+**Next steps**: per the user's "tab by tab" plan, **ADS-B, Pagers, and DAB+
+are the next extraction candidates** (DAB+ is more work, its Config sub-tab
+needs a second panel); plain-FM **Radio is explicitly not next** -- different
+shape entirely (needs the sidebar seam + streamed audio, not the panel seam).
+
+**ADS-B extracted to a plugin (2026-09-04, ⚠️ behaviour change, DONE, not yet
+live-verified)**: Same day, third tab-by-tab extraction after ACARS and
+RTL433 -- user picked ADS-B next (of the two remaining "proven ACARS shape"
+candidates, ADS-B and Pagers; DAB+ still deliberately last, its Config
+sub-tab is more work). This one was the first genuinely multi-file
+frontend: unlike ACARS/RTL433 (one JS file reusing core `PagerPanel`),
+ADS-B has its own bespoke `AdsbPanel` class plus two modals
+(`AdsbMapModal` -- a live Leaflet map with per-aircraft trails and
+squawk-based coloring, `AdsbFlightModal` -- hexdb.io/planespotters.net
+enrichment lookups) that were separate `<script>` tags hardcoded into
+`index.html`, not going through the plugin asset injector at all before
+this. Also the first with CSS actually mixed into core `listener.css`
+(interleaved between shared `.pager-*` rules, not cleanly separable by
+eye -- had to read the file with line numbers and cut exact `.adsb-*`
+blocks) rather than living in a dedicated file already.
+
+Mechanical shape mirrors RTL433/ACARS: `src/audio/adsb_listener.py` ->
+`plugins/apps/adsb/backend/listener.py`, `src/api/routes/adsb_routes.py`
+-> `backend/routes.py` (owner string `"adsb"` unchanged); new
+`backend/__init__.py` (`register(reg)`, no config needed --
+`AdsbListener` takes no constructor args, `metric` is a per-request
+StartRequest field, not plugin config); new `plugin.toml` (`locked =
+true`, no `apt` list -- `dump1090` is a from-source build like acarsdec,
+not a plain apt package like rtl_433, so `[deps]` only has `setup =
+"setup.sh"`); new `setup.sh` mirrors `scripts/install.sh`'s old dump1090
+section exactly (git clone + `make EXTRACFLAGS=-fcommon` + manual
+`install` since upstream's Makefile has no install target); new
+`README.md`.
+
+Frontend, the actually-new-shape part: `frontend/js/adsb_panel.js`
+(wrapped in an IIFE this time, unlike the original which was a bare
+top-level class -- calls `window.registerListenerPanel({tab: 'adsb',
+label: 'ADS-B', make: () => new AdsbPanel()})` instead of the old
+`window.AdsbPanel = AdsbPanel` + a hardcoded `listener_panel.js` builtin
+entry), `adsb_map_modal.js`, `adsb_flight_modal.js` all moved to
+`plugins/apps/adsb/frontend/` unchanged otherwise (both modals already
+self-registered as `window.AdsbMapModal`/`window.AdsbFlightModal`
+singletons, no registry needed for those two). Confirmed via grep that
+nothing outside `adsb_panel.js` itself referenced `window.AdsbPanel`, so
+dropping that global on the rewrite was safe. Confirmed Leaflet
+(`unpkg.com/leaflet@1.9.4`) loads as a core dashboard dependency well
+before the plugin-panels injection marker, so the plugin needed no
+Leaflet packaging of its own. The three `<script src="js/adsb_*.js">`
+lines removed from `index.html`; the `adsb` entry removed from
+`listener_panel.js`'s builtin `_subPanels` list.
+
+CSS: extracted exactly the `.adsb-*` rule blocks (metric toggle, map
+modal + Leaflet overrides, marker, table, photo -- confirmed exact line
+ranges by reading `listener.css` with line numbers first) out of core
+`listener.css` into a new `plugins/apps/adsb/frontend/adsb_panel.css`,
+leaving the interleaved shared `.pager-*`/`.lsn-*` rules in core
+untouched. Wired via `plugin.toml`'s `[frontend].styles`.
+
+`src/api/server.py`: removed `adsb_routes`/`AdsbListener` imports and
+their `_BUILTIN_ROUTERS`/`_BUILTIN_LISTENERS` entries. `tests/
+test_create_app_listeners.py` updated (`_EXPECTED_NAMES` drops `"adsb"`,
+simplified the now-single-element `for prefix in (...)` loops in the
+router/status tests into direct assertions rather than leaving
+one-item-loop noise behind) -- no dedicated core-level ADS-B listener
+test existed before either. New `plugins/apps/adsb/backend/tests/
+test_listener.py` (6 tests) -- genuinely new coverage this time (the
+poll-loop snapshot/sort/failed-poll-keeps-previous-snapshot logic had
+never been unit tested at all, builtin or otherwise). **Hit and fixed a
+real test-writing bug while building this**: two new tests initially
+asserted on `lis.aircraft` *after* calling `await lis.stop()`, which
+deliberately clears `self.aircraft` by design -- both failed with
+"0 != 2" until the assertions were moved before the `stop()` call;
+confirmed the underlying listener code was correct all along by
+reproducing the poll loop standalone (outside the test harness, on both
+python3.14 and the pytest-venv's python3.11) before concluding the bug
+was in the test, not the code.
+
+`scripts/install.sh`: removed the old section 9 (dump1090 clone+build),
+renumbered welle.io 10->9. **Also fixed a pre-existing off-by-one gap
+from the RTL433 session**: that earlier renumbering (10->9, 11->10) had
+correctly shifted the RTL-SDR sub-block but never cascaded into section
+12 ("Install Meshtastic and MeshCore CLI tools") onward, leaving a
+silent gap (section 11 didn't exist, jumping straight 10->12) -- caught
+this while renumbering for ADS-B and fixed the whole tail (12->10 through
+28->26) via a small Python script matching exact `# ── N. ` headings,
+plus the two "section 13" cross-references (arduino-cli, now section
+11). Re-ran `grep -n "section [0-9]"` after to confirm every remaining
+cross-reference still points at the right section. Also caught and fixed
+two more pre-existing stale-wording spots while touching this same area:
+the `--skip-rtlsdr` usage-header comment and its interactive echo prompt
+both still listed "ADS-B" and "generic 433/868 sensors" (RTL433) as if
+still built by this script, even though RTL433 was already a plugin from
+the prior session -- both rewritten to say what's actually still
+installed here (P2000/Pagers/POCSAG/DAB+) and point at
+`plugins/apps/*/setup.sh` for the rest. `bash -n` clean.
+
+Docs: `docs/API-ENDPOINTS.md`'s "Only one of Radio/P2000/.../DAB+" line
+gained ADS-B to its plugin list (its `/api/adsb/*` routes were never
+documented there even when built-in, same as ACARS before it -- nothing
+to remove from the table itself). `README.md`: new ADS-B plugin bullet
+next to ACARS/RTL433's, the big RTL-SDR paragraph rewritten again (ADS-B
+moved out of the "built-in" description into the "ACARS, RTL433 and
+ADS-B are all bundled plugins" sentence), the old detailed from-source
+"ADS-B (optional)" manual-install bullet replaced with a short
+plugin-pointer bullet (matching RTL433's shape) placed right after
+RTL433's, the API-endpoints summary table's two dedicated `/api/adsb/*`
+rows deleted and folded into the existing `{rtl433,acars}` plugin-shape
+row (now `{rtl433,acars,adsb}`), and the "App plugins" bullet's example
+list extended. `docs/CONFIGURATION.md` had nothing ADS-B-specific to
+update (confirmed by grep -- same as RTL433, it was always-on with no
+config keys).
+
+CHANGELOG: new `v0.8.1` bullet right after RTL433's, same "⚠️ Behaviour
+change" framing (ADS-B was always-on with no config gate before; now off
+by default, needs `plugins.adsb.enabled: true` + `setup.sh`).
+
+**Verified on the Mac**: `py_compile` clean on every touched/new Python
+file; grepped the whole tree for stale `adsb_listener`/`adsb_routes`
+path references and `window.AdsbPanel` after the move -- zero hits.
+`pytest plugins/apps/adsb/backend/tests/test_listener.py` -- 6/6 pass.
+`pytest plugins/` -- 25/25 pass (ACARS + RTL433 + hello-world + ADS-B
+together). `node --check` clean on all three moved JS files plus the
+edited `listener_panel.js`. `ChangelogParser.parse_file` re-parse: 31
+sections, v0.8.1 now 40 bullets, new ADS-B bullet present under the real
+version section.
+
 **NOT yet done / next steps**: **not live-verified on the Pi** -- next
-session should pull, restart, confirm RTL433 is gone from the Listener page
-until enabled, then run `sudo meshpoint plugin setup rtl433` (or `setup.sh`
-directly) + `plugins.rtl433.enabled: true` + restart, and confirm the tab
-comes back working exactly as before (start/stop/clear, live decoded-message
-log, shared-dongle busy behaviour against Radio/Pagers/ACARS/DAB+/ADS-B).
-Per the user's "tab by tab" plan, **ADS-B, Pagers, and DAB+ are the next
-extraction candidates** (DAB+ is more work, its Config sub-tab needs a second
-panel); plain-FM **Radio is explicitly not next** -- different shape
-entirely (needs the sidebar seam + streamed audio, not the panel seam).
+session should pull, restart, confirm ADS-B is gone from the Listener
+page until enabled, then run `sudo meshpoint plugin setup adsb` (builds
+dump1090 from source, will take longer than RTL433's plain apt install)
++ `plugins.adsb.enabled: true` + restart, and confirm the tab, the Map
+modal (Leaflet, live aircraft markers/trails), and the flight-detail
+modal (hexdb.io/planespotters.net lookups) all still work exactly as
+before. Per the user's plan, **Pagers and DAB+ are the remaining
+extraction candidates** (DAB+ still the most work, Config sub-tab);
+plain-FM **Radio still explicitly not planned** -- different seam
+entirely.

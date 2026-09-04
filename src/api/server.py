@@ -45,7 +45,6 @@ from src.api.meshcore_contacts import (
     sync_meshcore_contacts_to_nodes,
 )
 from src.api.routes import (
-    adsb_routes,
     analytics,
     auth_config_routes,
     auth_routes,
@@ -107,7 +106,6 @@ from src.api.terminal import CommandCatalog, SessionManager
 from src.api.update import ReleaseChannelRegistry, UpdateApplier
 from src.api.update.rollback_state import resolve_rollback_state_path
 from src.api.upstream_client import UpstreamClient
-from src.audio.adsb_listener import AdsbListener
 from src.audio.dab_listener import DabListener
 from src.audio.pager_listener import PagerListener
 from src.audio.rtl_listener import RtlListener
@@ -217,7 +215,6 @@ _BUILTIN_ROUTERS: list[tuple] = [
     (pager_routes.pagers_router, False),
     (pager_routes.pocsag_router, False),
     (dab_routes.router, False),
-    (adsb_routes.router, False),
     (spectrum_routes.router, False),
     (meshtastic_routes.router, False),
     (meshcore_routes.router, False),
@@ -244,9 +241,6 @@ _BUILTIN_LISTENERS: list[listener_registry.ListenerSpec] = [
         lambda trio: pager_routes.init_routes(*trio),
     ),
     listener_registry.ListenerSpec("dab", DabListener, dab_routes.init_routes),
-    listener_registry.ListenerSpec(
-        "adsb", AdsbListener, adsb_routes.init_routes,
-    ),
 ]
 
 
