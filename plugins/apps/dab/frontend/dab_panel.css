@@ -294,3 +294,25 @@
     white-space: pre-wrap;
     word-break: break-word;
 }
+
+/* ── RTL-SDR page hook (dab_rtlsdr_hook.js) -- a small status card, not a
+   full tab, so its own tiny block rather than reusing the .dab-* rules
+   above (those are all sized/shaped for the Listener page's tabbed layout). */
+.dab-rtlsdr-hook {
+    padding: 12px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--hairline);
+    background: var(--overlay-weak);
+}
+
+.dab-rtlsdr-hook h3 {
+    margin: 0 0 6px;
+    font-size: 14px;
+    color: var(--accent-green);
+}
+
+.dab-rtlsdr-hook p {
+    margin: 0;
+    font-size: 13px;
+    color: var(--text-secondary);
+}

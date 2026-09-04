@@ -9895,16 +9895,126 @@ file. `node --check` clean on `page_hook_registry.js`, updated
 re-parse: v0.8.1 now has 49 bullets (was 48), new hook-capability bullet
 present and correctly parsed after the italic-in-headline fix.
 
-**NOT yet done / next steps**: **not live-verified on the Pi** -- next
-session should pull, restart, enable `hello-world` + `hello-world-hook`
-both, confirm Networks -> Hello World shows the usual content plus the
-injected box below it; then disable just `hello-world-hook` and confirm
-Hello World's page renders exactly as before (no stray empty container).
-After that: **item 1** from the design note above (the neutral "rtlsdr"
-host shell + Radio becoming a plugin like every other RTL-SDR tab) is the
-next real target for this direction, now that the underlying "plugin
-attaches into another plugin's page" mechanism is proven on a trivial
-example -- remember the "activate a plugin" placeholder idea for the bare
-host page when that work starts. **Item 2** (formal host-presence/
-dependency checking for a hook plugin) stays explicitly deferred until
-there's a second real use case beyond hello-world-hook to design it against.
+**LIVE-VERIFIED on the Pi, same day**: screenshot confirms Networks -> Hello
+World renders exactly as designed -- the page's own "Hello, World." content
+and badge unchanged, then a dashed-border box below it (the hook content,
+correctly separated by the `.hello-world-hooks` divider) reading "This box
+was not drawn by the Hello World page itself -- it was injected by a second,
+independent plugin (`plugins/apps/hello-world-hook/`) via
+`window.registerPageHook()`...". Mechanism confirmed working end-to-end on
+real hardware, not just Mac-side unit/harness tests. (The other half of the
+live check -- disabling just `hello-world-hook` and confirming the page
+renders with zero stray container -- wasn't shown in the screenshot, but is
+already covered by the `hasHooks` guard verified via the Node harness, so
+not a blocker.)
+
+**NOT yet done / next steps**: **item 1** from the design note above (the
+neutral "rtlsdr" host shell + Radio becoming a plugin like every other
+RTL-SDR tab) is the next real target for this direction, now that the
+underlying "plugin attaches into another plugin's page" mechanism is proven
+both in tests and live on hardware -- remember the "activate a plugin"
+placeholder idea for the bare host page when that work starts. **Item 2**
+(formal host-presence/dependency checking for a hook plugin) stays
+explicitly deferred until there's a second real use case beyond
+hello-world-hook to design it against.
+
+---
+
+## Item 1, scoped down: `plugins/apps/rtlsdr/` staging plugin + DAB+ as its first real hook
+
+I laid out the FULL item-1 plan when asked (split `ListenerPanel` into a
+neutral shell + Radio-as-a-plugin, move `install.sh`'s RTL-SDR section into
+the shell's `setup.sh`, redsea into Radio's own `setup.sh`, decide on
+Radio's plugin id / whether `/api/listener` renames, etc. -- a genuinely
+big, multi-phase piece of work). **User deliberately scoped it down
+instead**: don't touch the built-in Listener page or Radio at all yet --
+build the "rtlsdr" plugin as a bare placeholder page (like Hello World),
+and hook a REAL already-shipped plugin (DAB+, not another toy) into it, to
+de-risk the mechanism against real plugin code before committing to the
+big shell-split refactor. Good call -- much smaller blast radius, and
+exercises the exact same `"hook"` seam hello-world-hook just proved, just
+against a plugin with actual backend state (a running/idle listener,
+`/api/dab/status`) instead of static text.
+
+**`plugins/apps/rtlsdr/`** (new, `provides = ["sidebar"]`, `locked = true`,
+sidebar `route = "rtlsdr"` / `category = "radio"` -- same section the
+built-in Listener page sits in, so it shows up right next to it, exactly
+matching "next to the built-in listener" from the user's own framing):
+- `setup.sh` is a genuine no-op (just echoes an enable-it hint) --
+  deliberately NOT wired to install anything yet. Its own comment explains
+  it's reserved for the eventual librtlsdr-build-and-blacklist step from
+  the full item-1 plan, and that every existing RTL-SDR plugin still
+  depends on `scripts/install.sh`'s own RTL-SDR section for that, not on
+  this plugin.
+- `frontend/rtlsdr_panel.js` renders static "Enable RTL-SDR plugins..."
+  placeholder text (always shown) plus a hook-mount container that only
+  gets added to the DOM when `window.MESHPOINT_PAGE_HOOKS` actually has an
+  entry for `host: 'rtlsdr'` -- same `hasHooks`-gated pattern hello-world's
+  own `mount()` already established, reused verbatim rather than
+  reinvented.
+- Its own README is explicit that this is NOT a real feature yet -- "a
+  staging ground, not a real feature yet" -- so a future session (or the
+  user re-reading this) doesn't mistake it for finished work.
+
+**DAB+ gains `"hook"`** (now `provides = ["listener", "routes", "panel",
+"hook"]`) with `[hook] host = "rtlsdr"`. New
+`plugins/apps/dab/frontend/dab_rtlsdr_hook.js` -- deliberately a SEPARATE
+file from `dab_panel.js`/`dab_config_panel.js` (not folded into either), so
+this experimental bit stays clearly isolated from DAB+'s real, working,
+already-live-verified Listener-page tab, which is completely untouched.
+Renders a small read-only status card: one-shot `GET /api/dab/status` on
+mount (no polling -- this is a proof of mechanism, not a live dashboard;
+the real DAB+ tab already covers that), shows "Tuned to <channel> --
+<ensemble> (SNR ... dB)" when running, "Idle -- RTL-SDR dongle busy
+with <owner>" when another listener holds the dongle, or plain "Idle"
+otherwise, with graceful "Status unavailable" on fetch failure (verified
+this path itself via a Node harness with a rejecting fake `fetch`). New
+`.dab-rtlsdr-hook` CSS block appended to `dab_panel.css` (small
+card, deliberately its own class rather than reusing the `.dab-*`/
+`.dabcfg-*` Listener-tab rules, which are all sized/shaped for that
+different, tabbed layout).
+
+**Verified on the Mac**: `node --check` clean on both new JS files.
+`py_compile` clean on `rtlsdr`'s `backend/__init__.py`. `bash -n` clean on
+its `setup.sh`. `discover_plugins()` finds both with the right
+`hook`/`sidebar`/`frontend_scripts` fields populated (confirmed
+`dab_rtlsdr_hook.js` landed in `dab`'s `frontend_scripts` tuple correctly).
+`plugin_asset_tags()`/`resolve_plugin_asset()` confirmed serving the new
+hook file. **`load_plugins()` end-to-end needed the fastapi-capable
+interpreter** (bare `python3` on PATH lacks fastapi, same standing Mac
+limitation noted since the DAB+ pass) -- found by running it against the
+wrong interpreter first and seeing `dab` fail to import with
+`ModuleNotFoundError: No module named 'fastapi'` (expected, not a real
+bug); re-ran via the interpreter behind the `pytest` shebang
+(`/opt/homebrew/opt/python@3.11/bin/python3.11`) and both `dab`/`rtlsdr`
+loaded cleanly. A second Node harness (`eval()`'d the real
+`page_hook_registry.js` + `dab_rtlsdr_hook.js` together, faked `fetch` to
+reject, faked a minimal DOM element class) confirmed the hook actually
+registers for host `'rtlsdr'`, mounts real markup containing "DAB+" and
+the status placeholder, when driven through `mountPageHooks('rtlsdr',
+...)` the same way `rtlsdr_panel.js` would call it. `pytest
+tests/test_plugin_manifest.py tests/test_plugin_loader.py
+tests/test_plugin_assets.py plugins/` -- 134/134 pass, `pytest plugins/`
+alone still 61/61 unchanged (neither new file added a backend test of its
+own -- both are pure frontend-injection additions). `ChangelogParser.
+parse_file` re-parse: v0.8.1 now has 50 bullets (was 49) -- this time
+checked for the italic-in-headline gotcha from the hello-world-hook pass
+BEFORE writing the bullet, not after, and got it right the first time.
+
+**NOT yet done / next steps**: **not live-verified on the Pi yet** -- next
+session should pull, restart, enable `rtlsdr` + `dab` both, confirm Radio
+-> RTL-SDR in the sidebar shows the placeholder text plus DAB+'s status
+card (tune DAB+ from its real Listener-page tab first, then check the
+rtlsdr page's card reflects "Tuned to ..." -- the one-shot-fetch-on-mount
+design means it needs a fresh page load/re-mount to pick up a status
+change, not live updates, which is fine for what this is testing). Once
+that's confirmed: **decide whether to proceed with the full item-1 shell
+split** (see the design note earlier in this file) now that the hook
+mechanism is proven against a second, real plugin -- or keep finding
+smaller ways to de-risk it further first. The "activate a plugin"
+placeholder idea is still parked for whenever the real shell gets built,
+NOT for this `rtlsdr` staging page (which already has its own permanent
+placeholder text, shown unconditionally, not conditionally like the
+eventual real shell's "activate a plugin" message would be -- these are
+two different pieces of copy for two different pages, don't conflate
+them).

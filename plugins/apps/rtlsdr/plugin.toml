@@ -1,0 +1,44 @@
+name = "rtlsdr"
+version = "0.1.0"
+meshpoint_api = 1
+provides = ["sidebar"]    # capabilities this plugin uses -- non-empty subset of:
+                           #   listener  register an RTL-SDR subprocess listener
+                           #             (shares the one physical dongle with
+                           #             every other listener) -- reg.add_listener()
+                           #   routes    mount a FastAPI router under /api/<...>
+                           #             -- reg.add_router()
+                           #   panel     add a sub-tab to the Listener page
+                           #             (window.registerListenerPanel)
+                           #   sidebar   add a whole top-level sidebar page of
+                           #             your own (this plugin) -- see [sidebar]
+                           #             below and window.registerSidebarPage()
+                           #   hook      inject content into ANOTHER plugin's
+                           #             page -- see the DAB+ plugin, which
+                           #             hooks a small status card into THIS
+                           #             page's [hook] mount point
+                           # Using a capability not listed here raises at
+                           # register-time (PluginRegistry._require). See
+                           # docs/PLUGINS.md and the ACARS plugin for a
+                           # listener + routes + panel worked example.
+locked = true  # shipped with this fork -- not user-installed, can't be deleted
+
+[deps]
+setup = "setup.sh"    # currently a no-op placeholder -- reserved for the
+                       # eventual librtlsdr build + kernel DVB blacklist step
+                       # once this becomes the real RTL-SDR host page (see
+                       # its own comment for the full plan)
+
+[frontend]
+scripts = ["frontend/rtlsdr_panel.js"]
+styles = ["frontend/rtlsdr_panel.css"]
+
+[sidebar]
+route = "rtlsdr"          # -> #/rtlsdr
+label = "RTL-SDR"         # sidebar link text
+category = "radio"        # same section the built-in Listener page sits in
+icon = "antenna"          # generic wifi/signal glyph
+
+[meta]
+description = "Staging ground for the eventual RTL-SDR host page -- other plugins hook their own content into it via the 'hook' seam (see the DAB+ plugin for a worked example) instead of the built-in Listener page's tabbar seam."
+homepage = "https://github.com/KMX415/meshpoint"
+author = "Einstein PD2EMC"
