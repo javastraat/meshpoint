@@ -8929,3 +8929,21 @@ hello-world, apt-without-setup as a theoretical edge case) -- each
 renders correctly, including hello-world still showing nothing.
 `node --check` clean. New CHANGELOG bullet under v0.8.1, right after the
 ADS-B extraction bullet (41 bullets total now, parser re-verified).
+
+**Same bug, second occurrence, caught by the user's own live `meshpoint
+plugin list` terminal output right after the web fix landed**: the CLI
+(`src/cli/plugin_command.py::_print_plugin_row`) has its own independent
+copy of this exact "deps:" hint, also keyed on `apt_deps` truthiness --
+missed when fixing the web version since they're two separate
+implementations reading the same `GET /api/plugins` JSON, not a shared
+component. Applied the identical fix (show whenever `apt_deps` or
+`setup_script` is present, "a build step" fallback label). Verified
+directly (not just read) by calling `_print_plugin_row()` standalone
+against all 4 dependency shapes (apt+setup / no-apt+setup / neither /
+apt-without-setup) -- output matches the web fix's rendering exactly.
+CHANGELOG bullet updated in place to cover both fixes together (still
+41 bullets, one bullet's text expanded rather than a new one added).
+**Lesson for next time a manifest-derived UI hint needs fixing: check
+both `plugins_panel_controller.js` (web) and `plugin_command.py` (CLI)
+together** -- they render the same plugin metadata independently and
+have already drifted once.

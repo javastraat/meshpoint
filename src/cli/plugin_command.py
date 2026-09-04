@@ -79,9 +79,17 @@ def _print_plugin_row(p: dict) -> None:
     else:
         state = f"{_DIM}disabled{_RESET}"
     print(f"  {name:<28} {source:<10} {state}")
-    if p.get("apt_deps"):
+    # A plugin can need setup.sh with no apt packages at all (e.g. a
+    # from-source build like ADS-B's dump1090 -- its build tools are
+    # already covered by scripts/install.sh's base system packages), so
+    # this must show whenever EITHER is present, not just apt_deps being
+    # non-empty -- same bug/fix as plugins_panel_controller.js's web
+    # equivalent of this row.
+    apt_deps = p.get("apt_deps") or []
+    if apt_deps or p.get("setup_script"):
+        deps_label = ', '.join(apt_deps) if apt_deps else "a build step"
         print(
-            f"      {_DIM}deps: {', '.join(p['apt_deps'])} "
+            f"      {_DIM}deps: {deps_label} "
             f"-- run: meshpoint plugin setup {p['id']}{_RESET}"
         )
 
