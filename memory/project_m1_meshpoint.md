@@ -10958,8 +10958,108 @@ explaining the enforcement in plain terms. New CHANGELOG bullet under
 `### v0.8.1` (60 bullets now, up from 59 -- verified via
 `ChangelogParser.parse_file()`).
 
-**NOT yet done**: not live-verified on the Pi -- next session should
-confirm a hook's toggle actually shows greyed-out + tooltipped in the
-real Settings → Plugins page when its host is off, and that turning a
-host off for real cascades and shows the "Also disabled: ..." message
-inline.
+**LIVE-VERIFIED on the Pi, same session**: screenshot confirms greyed-out
++ tooltipped toggles work exactly as designed -- `hello-world-hook` shows
+"Depends on: hello-world (not enabled)" in red with its toggle disabled
+(Hello World itself is off), while every RTL-SDR hook correctly shows
+"Depends on: rtlsdr (enabled)" now that `rtlsdr` is on, ADS-B's toggle
+live and green. Dependency resolution and the greyed-toggle UX both
+confirmed working on real data, not just the synthetic test fixtures.
+
+## Plugins page polish: host-first grouping + a filter box (2026-09-05, same session)
+
+User, looking at the same live screenshot: "sort them by hook and maybe
+the hook host always first ?" then, after confirming the approach ("maybe
+a sort of auto group auto sort ?"), immediately followed with "also maybe
+add a search on the top right of the plugin page ? a filter ? if we have
+more it will be hard to find plugins :) is that an idea ?" -- two small,
+clearly-scoped UX asks, both accepted and built without needing an
+AskUserQuestion round (unlike the dependency-enforcement design choice
+earlier this session, these had only one reasonable shape each).
+
+**Grouping (`plugins_panel_controller.js`'s new `_groupedPlugins()`)**:
+walks each plugin's `dependency` chain (added by the enforcement work
+just above) via a `rootId()` helper -- follows `dependency.host_id`
+through `byId` lookups until hitting a plugin with no dependency (a true
+host or standalone plugin), with a `seen` set guarding against a cycle.
+Groups every plugin under its resolved root, root always first within
+its own group. Group-to-group order is deliberately NOT re-sorted
+further -- it's "whichever group's first member appears first in the
+API's own alphabetical order," so `rtlsdr`'s group (whose first
+alphabetical member is `acars`) lands before `hello-world`'s group
+(first member `hello-world` itself) without needing an arbitrary
+secondary sort key, and the page won't reshuffle unpredictably as more
+plugins are added later. Visual reinforcement, not just reordering: a
+dependent row gets a small "↳" prefix + indent (new `.plugin-row--dependent`
+in `settings.css`), the host row starting a group gets a slightly
+stronger top rule (`.plugin-row--host`) -- confirmed necessary, not just
+decoration: pure reordering without SOME visual cue reads as "some other
+arbitrary order," not obviously "grouped."
+
+**Filter box**: new `<input type="search" data-plugins-search>` in
+`index.html`'s plugins-panel header row (`margin-right: auto` on the
+title pushes search + Restart service to the right, matching "top right
+of the page" literally). `_matchesFilter()` does a plain case-insensitive
+substring match against `id` + `description` + `provides.join(' ')` --
+deliberately simple (no fuzzy matching, no per-field weighting) since a
+dozen-ish plugins doesn't need more, and typing a seam name like "hook"
+usefully surfaces every hook plugin at once as a side effect of matching
+`provides`. Filtering runs on top of the grouped/ordered list from
+`_groupedPlugins()` (not before it), so a match still renders in its
+correct grouped position rather than falling back to flat order.
+
+**One design choice made without asking, flagged here rather than in the
+CHANGELOG's own more clinical tone**: filtering can silently drop a hook's
+host out of view if only the hook itself matches the search text (e.g.
+searching "radio" happens to also match `rtlsdr`'s own description today,
+which mentions "Radio" by name, but that's coincidental, not guaranteed
+for an arbitrary future plugin/search). Decided this was fine for a
+find-a-plugin-by-name box -- preserving group context under an active
+filter would need real work (always including a matched hook's host even
+when the host itself doesn't match) for a benefit that's mostly cosmetic;
+not built, revisit only if it turns out to actually confuse someone in
+practice.
+
+**Verified**: `node --check` clean; re-ran the full `tests/test_plugin_routes.py`
+suite (20/20, this was frontend-only work so nothing there could have
+regressed, but confirmed anyway since `_groupedPlugins()` reads the same
+`dependency` shape those tests exercise on the backend side). New
+CHANGELOG bullet under `### v0.8.1` (61 bullets now, up from 60).
+
+**NOT yet done**: not live-verified on the Pi yet -- next session should
+confirm the grouping renders in the expected host-first order against
+the real 11-plugin catalog (predicted: `rtlsdr` then its 8 dependents,
+then `hello-world` then `hello-world-hook`) and that the filter box
+actually narrows the list live while typing.
+
+## CI fix: stale hardcoded `_BUILTIN_ROUTERS` count (2026-09-05, same session)
+
+User pasted a GitHub Actions CI failure: `tests/test_create_app_routers.py::
+TestBuiltinRouterList::test_shape` -- `AssertionError: 54 != 60`. This test
+(`tests/`, needs real fastapi/aiosqlite, so it only ever runs on CI/the Pi,
+never on this Mac -- exactly the class of test this file's own CLAUDE.md
+convention flags as "test logic with stubs... provide snippets the user
+runs on the Pi") hardcodes the exact length of `src.api.server`'s
+`_BUILTIN_ROUTERS` list as a deliberate "force a conscious edit" regression
+guard. It was never updated across this entire session's whole
+DAB+/P2000/Pagers/POCSAG/RTL433/ACARS/ADS-B/Radio router-extraction
+sequence (each removed one built-in router), nor when this session's own
+new `sdr_status_routes` was added (+1) -- 60 became stale a while ago and
+this is apparently the first CI run since.
+
+Confirmed via direct grep count against the real `_BUILTIN_ROUTERS` list
+literal in `server.py` (54 entries, matching the CI failure's actual value
+exactly) rather than guessing -- also checked `test_public_count_snapshot`'s
+separate hardcoded `12` (public routers): unaffected, none of the removed
+routers or the new `sdr_status_routes` (registered `False`/protected)
+were public, so only `test_shape`'s `60` needed changing, to `54`.
+Couldn't execute the fix locally to confirm green (same pre-existing
+Homebrew-fastapi-version 204-route collection error as everything else
+importing `src.api.server` on this Mac) -- verified by direct count +
+`py_compile` instead, same pattern already established earlier this
+session for `tests/test_create_app_listeners.py`. No CHANGELOG bullet --
+pure test-suite maintenance catching up to behavior already changelogged
+at the time each router was actually removed, not a new user-facing
+change itself.
+
+**NOT yet done**: CI hasn't been re-run to confirm green after this fix.

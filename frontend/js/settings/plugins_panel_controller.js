@@ -24,13 +24,21 @@ class PluginsPanelController {
         this.statusEl = rootEl.querySelector('[data-plugins-status]');
         this.restartBtn = rootEl.querySelector('[data-restart-service]');
         this.restartStatusEl = rootEl.querySelector('[data-restart-status]');
+        this.searchEl = rootEl.querySelector('[data-plugins-search]');
         this._plugins = [];
+        this._filterText = '';
         this._modal = null;
     }
 
     bind() {
         if (this.restartBtn) {
             this.restartBtn.addEventListener('click', () => this._restartService());
+        }
+        if (this.searchEl) {
+            this.searchEl.addEventListener('input', () => {
+                this._filterText = this.searchEl.value.trim().toLowerCase();
+                this._render();
+            });
         }
     }
 
@@ -120,19 +128,85 @@ class PluginsPanelController {
         }
     }
 
+    /** Case-insensitive substring match against id/description/provides --
+     * enough to find a plugin by name, what it does, or which seam it uses
+     * (e.g. typing "hook" surfaces every hook plugin at once). */
+    _matchesFilter(plugin) {
+        if (!this._filterText) return true;
+        const haystack = [
+            plugin.id, plugin.description, (plugin.provides || []).join(' '),
+        ].join(' ').toLowerCase();
+        return haystack.includes(this._filterText);
+    }
+
+    /**
+     * Groups every plugin under the host it (transitively) hooks into,
+     * host first within its own group -- a "hook" plugin listed right
+     * after (and visually under) the page it actually depends on reads
+     * far more clearly than the plain alphabetical order the API returns,
+     * which scatters a host and its hooks wherever their names happen to
+     * fall (e.g. "rtlsdr" sorts dead last, after all 8 plugins that hook
+     * into it). Standalone plugins (no [hook], or a [hook] whose host
+     * route resolves to nothing installed) are their own one-plugin
+     * group. Group order itself is stable -- whichever group's first
+     * member appears first in the API's own (alphabetical) order -- so
+     * the overall page doesn't reshuffle unpredictably as plugins are
+     * added.
+     */
+    _groupedPlugins() {
+        const byId = new Map(this._plugins.map((p) => [p.id, p]));
+        const rootId = (plugin) => {
+            const seen = new Set();
+            let current = plugin;
+            while (current.dependency && current.dependency.host_id && !seen.has(current.id)) {
+                seen.add(current.id);
+                const host = byId.get(current.dependency.host_id);
+                if (!host) break;
+                current = host;
+            }
+            return current.id;
+        };
+
+        const groups = new Map(); // rootId -> { root, members: [] }
+        const groupOrder = [];
+        this._plugins.forEach((plugin) => {
+            const root = rootId(plugin);
+            if (!groups.has(root)) {
+                groups.set(root, { root: byId.get(root) || plugin, members: [] });
+                groupOrder.push(root);
+            }
+            if (plugin.id !== root) groups.get(root).members.push(plugin);
+        });
+
+        const ordered = [];
+        groupOrder.forEach((root) => {
+            const group = groups.get(root);
+            ordered.push({ plugin: group.root, grouped: group.members.length > 0 });
+            group.members.forEach((m) => ordered.push({ plugin: m, grouped: true }));
+        });
+        return ordered;
+    }
+
     _render() {
         if (!this.listEl) return;
         if (!this._plugins.length) {
             this.listEl.innerHTML = '';
             return;
         }
+        const rows = this._groupedPlugins().filter(({ plugin }) => this._matchesFilter(plugin));
+        if (!rows.length) {
+            this.listEl.innerHTML = '';
+            this._setStatus('', `No plugins match "${this.searchEl ? this.searchEl.value.trim() : ''}".`);
+            return;
+        }
+        this._setStatus('', '');
         this.listEl.innerHTML = `<table class="plugins-table">
             <thead><tr><th>Plugin</th><th>Source</th><th>Provides</th><th></th></tr></thead>
             <tbody></tbody>
         </table>`;
         const tbody = this.listEl.querySelector('tbody');
-        this._plugins.forEach((plugin) => {
-            tbody.appendChild(this._renderRow(plugin));
+        rows.forEach(({ plugin, grouped }) => {
+            tbody.appendChild(this._renderRow(plugin, grouped));
         });
         // A message queued by _setEnabled() just before its own
         // refresh()-triggered re-render -- applied once here, then
@@ -151,8 +225,16 @@ class PluginsPanelController {
         }
     }
 
-    _renderRow(plugin) {
+    _renderRow(plugin, grouped = false) {
         const row = document.createElement('tr');
+        // Visual cue for _groupedPlugins()'s reordering: a hook plugin
+        // (has its own dependency) sits indented under its host; the host
+        // row itself (grouped=true but no dependency of its own) gets a
+        // subtle top rule marking where a new group starts, so a run of
+        // hooks reads as "belonging to" the host above rather than just
+        // some other row order.
+        if (plugin.dependency) row.classList.add('plugin-row--dependent');
+        else if (grouped) row.classList.add('plugin-row--host');
         const badgeMod = plugin.source === 'builtin' ? 'builtin' : 'community';
         const badgeLabel = plugin.source === 'builtin' ? 'Built-in' : 'Community';
         const provides = (plugin.provides || []).join(', ') || '-';

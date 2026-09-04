@@ -1172,7 +1172,24 @@ select.update-field__input option:checked {
     font-size: 22px;
     font-weight: 600;
     color: var(--text-primary);
+    margin-right: auto; /* pushes the search box + restart button to the right */
 }
+
+.plugins-panel__search {
+    appearance: none;
+    width: 220px;
+    max-width: 40vw;
+    border: 1px solid var(--border);
+    background: var(--bg-inset);
+    color: var(--text-primary);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 13px;
+    font-family: inherit;
+}
+
+.plugins-panel__search::placeholder { color: var(--text-muted); }
+.plugins-panel__search:focus { outline: none; border-color: var(--accent-cyan); }
 
 .plugins-panel__subtitle {
     margin: 0;
@@ -1229,6 +1246,19 @@ select.update-field__input option:checked {
 .plugin-row__name {
     font-weight: 600;
 }
+
+/* _groupedPlugins()'s host-first reordering: a hook's row is indented
+   under the host it depends on, and the host row that starts a group
+   gets a slightly stronger top rule -- together they read as one
+   cluster instead of just some other row order. */
+.plugin-row--dependent td:first-child { padding-left: 1.25rem; }
+.plugin-row--dependent .plugin-row__name::before {
+    content: "\21B3"; /* ↳ */
+    color: var(--text-muted);
+    margin-right: 4px;
+    font-weight: 400;
+}
+.plugin-row--host td { border-top-color: var(--border); }
 
 .plugin-row__version {
     display: block;
