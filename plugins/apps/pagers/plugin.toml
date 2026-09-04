@@ -1,0 +1,16 @@
+name = "pagers"
+version = "1.0.0"
+meshpoint_api = 1
+provides = ["listener", "routes", "panel"]
+locked = true  # shipped with this fork -- not user-installed, can't be deleted
+
+[deps]
+setup = "setup.sh"
+
+[frontend]
+scripts = ["frontend/pagers_panel.js"]
+
+[meta]
+description = "POCSAG512/1200/2400 pager decoding on 172.45 MHz via rtl_fm + multimon-ng"
+homepage = "https://github.com/EliasOenal/multimon-ng"
+author = "Einstein PD2EMC"

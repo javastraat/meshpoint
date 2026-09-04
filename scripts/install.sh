@@ -16,8 +16,8 @@
 #                                               # Environment Compile+Flash);
 #                                               # otherwise prompted [y/N]
 #   sudo ./scripts/install.sh --skip-rtlsdr    # skip RTL-SDR support (FM/RDS,
-#                                               # P2000/Pagers/POCSAG, DAB+;
-#                                               # RTL433/ADS-B/ACARS are
+#                                               # DAB+; Pagers/POCSAG/P2000/
+#                                               # RTL433/ADS-B/ACARS are all
 #                                               # separate plugins, see
 #                                               # plugins/apps/*/setup.sh);
 #                                               # otherwise prompted [y/N]
@@ -107,7 +107,7 @@ else
     warn "Could not determine free disk space (df failed) -- proceeding anyway."
 fi
 
-# The arduino-cli/ESP32 toolchain (section 11 below) is only needed for
+# The arduino-cli/ESP32 toolchain (section 10 below) is only needed for
 # the Configuration -> Firmware page's POCSAG/Pager/RF Environment
 # Compile+Flash cards -- MeshCore/Meshtastic flashing uses prebuilt
 # releases + esptool instead and is unaffected either way. It's a
@@ -121,7 +121,7 @@ fi
 # Already-installed check comes first, ahead of even showing the
 # explanation: on a box that already has it (e.g. a repeat/upgrade run),
 # asking again every time is just noise -- silently default to "yes"
-# instead (section 11's own per-step idempotency then does the real work
+# instead (section 10's own per-step idempotency then does the real work
 # of confirming/filling in anything actually missing, and announces that
 # itself when it gets there -- no need to say it twice, here too). An
 # explicit --skip-arduino still wins over that, in case someone wants a
@@ -222,19 +222,17 @@ if [ "$INSTALL_RNSD" = "1" ] && ! systemctl is-enabled rnsd &>/dev/null && [ -t 
     esac
 fi
 
-# Sections 6-9 below are all downstream of one physical USB RTL-SDR
+# Sections 6-8 below are all downstream of one physical USB RTL-SDR
 # dongle: the rtl-sdr userspace library + kernel DVB blacklist, then
-# three decoders built/installed on top of it -- redsea (RDS), multimon-ng
-# (POCSAG/P2000/pager digital modes), and welle.io (DAB+). Every one of
-# them is dead weight without a dongle plugged in, and several are
-# from-source builds, so ask once for all of them rather than separate
-# prompts -- they're only ever used together on the RTL-SDR tab anyway.
-# (The RTL433, ADS-B and ACARS decoders are plugins:
-# plugins/apps/rtl433/setup.sh, plugins/apps/adsb/setup.sh and
-# plugins/apps/acars/setup.sh.)
-# `rtl_sdr` (the first of the three) stands in for "already set up" here,
+# two decoders built/installed on top of it -- redsea (RDS) and welle.io
+# (DAB+). Both are dead weight without a dongle plugged in, and both are
+# from-source builds, so ask once for both rather than separate prompts
+# -- they're only ever used together on the RTL-SDR tab anyway.
+# (The Pagers, POCSAG, P2000, RTL433, ADS-B and ACARS decoders are all
+# plugins: plugins/apps/<id>/setup.sh for each.)
+# `rtl_sdr` (the first of the two) stands in for "already set up" here,
 # same reasoning as arduino-cli/PlatformIO above -- an imperfect proxy
-# for all four sub-pieces, but a safe one: skipping the prompt just
+# for all three sub-pieces, but a safe one: skipping the prompt just
 # defaults to installing, which lets each step's own idempotent check
 # quietly fill in (and announce) anything actually still missing.
 INSTALL_RTLSDR=1
@@ -246,11 +244,11 @@ done
 if [ "$INSTALL_RTLSDR" = "1" ] && ! command -v rtl_sdr &>/dev/null && [ -t 0 ]; then
     echo ""
     echo "Another optional piece: the Radio tab's RTL-SDR listeners (FM/RDS,"
-    echo "P2000/Pagers/POCSAG, DAB+) all need a physical USB RTL-SDR dongle --"
-    echo "without one, installing their decoders (several built from source)"
-    echo "is just wasted time and disk space. Skip it now and re-run this"
-    echo "installer later (without --skip-rtlsdr) to add it once you have a"
-    echo "dongle. (RTL433/ADS-B/ACARS are separate opt-in plugins --"
+    echo "DAB+) need a physical USB RTL-SDR dongle -- without one, installing"
+    echo "their decoders (both built from source) is just wasted time and"
+    echo "disk space. Skip it now and re-run this installer later (without"
+    echo "--skip-rtlsdr) to add it once you have a dongle. (Pagers/POCSAG/"
+    echo "P2000/RTL433/ADS-B/ACARS are all separate opt-in plugins --"
     echo "plugins/apps/*/setup.sh -- not installed by this script at all.)"
     echo ""
     read -r -p "Include RTL-SDR support in this install? [y/N] " rtlsdr_reply || rtlsdr_reply=""
@@ -495,35 +493,7 @@ _DVB_BLACKLIST
         )
     fi
 
-    # ── 8. Install multimon-ng (RTL-SDR digital mode decoder) ─────────
-    #
-    # Decodes POCSAG/AFSK/DTMF/etc out of demodulated audio, fed from
-    # `rtl_fm` piped in. Built from source (EliasOenal/multimon-ng
-    # upstream) via CMake -- the project dropped its old qt4-qmake build
-    # system entirely, so no Qt4 packages are needed (and qt4-qmake isn't
-    # even in current Raspberry Pi OS repos anymore).
-    #
-    # Idempotent: skips the clone+build if the multimon-ng binary already
-    # exists.
-
-    MULTIMON_BUILD_DIR="/opt/multimon-ng"
-
-    if command -v multimon-ng &>/dev/null; then
-        info "multimon-ng already installed, skipping build"
-    else
-        info "Cloning and building multimon-ng..."
-        rm -rf "$MULTIMON_BUILD_DIR"
-        git clone --depth 1 https://github.com/EliasOenal/multimon-ng.git "$MULTIMON_BUILD_DIR"
-        (
-            cd "$MULTIMON_BUILD_DIR"
-            cmake -S . -B build
-            cmake --build build --parallel "$(nproc)"
-            cmake --install build
-            ldconfig
-        )
-    fi
-
-    # ── 9. Install welle.io (DAB+ tab) ────────────────────────────────
+    # ── 8. Install welle.io (DAB+ tab) ────────────────────────────────
     #
     # The Debian/Raspberry Pi OS `welle.io` package ships both the GUI
     # app and the headless `welle-cli` binary Meshpoint's DAB+ tab
@@ -543,16 +513,16 @@ _DVB_BLACKLIST
         apt-get install -y -qq --no-install-recommends welle.io
     fi
 
-    # RTL433 (generic 433/868 OOK/FSK decoder), ADS-B (dump1090) and ACARS
-    # (aircraft VHF datalink) are plugins, not part of core -- their
-    # installs live in plugins/apps/rtl433/setup.sh,
-    # plugins/apps/adsb/setup.sh and plugins/apps/acars/setup.sh. Run
-    # those separately if you want the RTL433 / ADS-B / ACARS tabs.
+    # Pagers, POCSAG, P2000 (all POCSAG-family/FLEX pager decoding),
+    # RTL433 (generic 433/868 OOK/FSK decoder), ADS-B (dump1090) and
+    # ACARS (aircraft VHF datalink) are all plugins, not part of core --
+    # their installs live in plugins/apps/<id>/setup.sh (pagers, pocsag,
+    # p2000, rtl433, adsb, acars). Run whichever ones you want separately.
 else
-    info "Skipping RTL-SDR support (sections 6-9) -- re-run without --skip-rtlsdr, or answer Y next time, to add it later"
+    info "Skipping RTL-SDR support (sections 6-8) -- re-run without --skip-rtlsdr, or answer Y next time, to add it later"
 fi
 
-# ── 10. Install Meshtastic and MeshCore CLI tools ─────────────────
+# ── 9. Install Meshtastic and MeshCore CLI tools ─────────────────
 #
 # Optional command-line tools for poking at connected radios directly
 # from the shell -- not used by Meshpoint itself (which talks to them
@@ -563,7 +533,7 @@ fi
 # already installed as a system package in section 1).
 #
 # Idempotent: each tool skips its own install if its binary already
-# exists, same as sections 7-9 above.
+# exists, same as sections 7-8 above.
 
 if command -v meshtastic &>/dev/null; then
     info "Meshtastic CLI already installed, skipping"
@@ -602,7 +572,7 @@ else
     pipx ensurepath
 fi
 
-# ── 11. Install arduino-cli + ESP32 toolchain (companion firmware flashing) ──
+# ── 10. Install arduino-cli + ESP32 toolchain (companion firmware flashing) ──
 #
 # General-purpose ESP32 build+flash toolchain -- not specific to any one
 # companion. arduino-cli plus the esp32:esp32 board core (which bundles
@@ -727,7 +697,7 @@ else
     info "Skipping arduino-cli/ESP32 toolchain (POCSAG/Pager/RF Environment Compile+Flash won't be available) -- re-run without --skip-arduino, or answer Y next time, to add it later"
 fi
 
-# ── 12. Install PlatformIO toolchain (Reticulum companion firmware) ──
+# ── 11. Install PlatformIO toolchain (Reticulum companion firmware) ──
 #
 # Separate from arduino-cli above: extra/heltec_v4_reticulum_bron's own
 # platformio.ini needs PlatformIO specifically (custom_variant/littlefs/
@@ -772,7 +742,7 @@ else
     info "Skipping PlatformIO toolchain (Reticulum companion firmware Compile+Flash won't be available) -- re-run without --skip-platformio, or answer Y next time, to add it later"
 fi
 
-# ── 13. Build SX1302 HAL ──────────────────────────────────────────
+# ── 12. Build SX1302 HAL ──────────────────────────────────────────
 
 if [ -f "/usr/local/lib/libloragw.so" ]; then
     info "libloragw.so already installed, skipping HAL build"
@@ -1023,7 +993,7 @@ _HALCFG
     info "libloragw.so installed to /usr/local/lib/"
 fi
 
-# ── 14. Apply TX sync word patch ──────────────────────────────────
+# ── 13. Apply TX sync word patch ──────────────────────────────────
 
 HAL_SRC="${HAL_BUILD_DIR}/libloragw/src/loragw_sx1302.c"
 if [ -f "$HAL_SRC" ]; then
@@ -1041,7 +1011,7 @@ if [ -f "$HAL_SRC" ]; then
     MESHPOINT_INSTALL_IN_PROGRESS=1 bash "${SCRIPT_DIR}/scripts/patch_hal.sh"
 fi
 
-# ── 15. Install Meshpoint application ─────────────────────────────
+# ── 14. Install Meshpoint application ─────────────────────────────
 
 info "Installing Meshpoint to ${MESHPOINT_DIR}..."
 mkdir -p "$MESHPOINT_DIR"
@@ -1063,7 +1033,7 @@ rsync -a --exclude='venv' \
 #          --exclude='*.pyc' \
 #          "${SCRIPT_DIR}/" "$MESHPOINT_DIR/"
 
-# ── 16. Remove stale compiled core modules from prior installs ───
+# ── 15. Remove stale compiled core modules from prior installs ───
 # Releases before 0.7.0 shipped .cpython-*.so files alongside the
 # .py source. Python prefers the .so at import time, so any leftover
 # binary would silently shadow the current source. rsync above does
@@ -1075,7 +1045,7 @@ if find "${MESHPOINT_DIR}/src" -name '*.cpython-*.so' -print -quit | grep -q .; 
     find "${MESHPOINT_DIR}/src" -name '*.cpython-*.so' -delete
 fi
 
-# ── 17. Python virtual environment ────────────────────────────────
+# ── 16. Python virtual environment ────────────────────────────────
 
 info "Setting up Python virtual environment..."
 python3 -m venv "${MESHPOINT_DIR}/venv"
@@ -1086,11 +1056,11 @@ pip install -r "${MESHPOINT_DIR}/requirements.txt" -q
 pip install pyserial -q
 deactivate
 
-# ── 18. Create data directory ─────────────────────────────────────
+# ── 17. Create data directory ─────────────────────────────────────
 
 mkdir -p "${MESHPOINT_DIR}/data"
 
-# ── 19. Create meshpoint system user ──────────────────────────────
+# ── 18. Create meshpoint system user ──────────────────────────────
 
 if ! id -u meshpoint &>/dev/null; then
     info "Creating system user 'meshpoint'..."
@@ -1140,14 +1110,14 @@ info "Installing sudoers rule for service management..."
 cp "${MESHPOINT_DIR}/config/sudoers-meshpoint" /etc/sudoers.d/meshpoint
 chmod 440 /etc/sudoers.d/meshpoint
 
-# ── 20. Configure journald log rotation ───────────────────────────
+# ── 19. Configure journald log rotation ───────────────────────────
 
 info "Configuring journald log limits (100M, 7-day retention)..."
 mkdir -p /etc/systemd/journald.conf.d
 cp "${MESHPOINT_DIR}/config/journald-meshpoint.conf" /etc/systemd/journald.conf.d/meshpoint.conf
 systemctl restart systemd-journald 2>/dev/null || warn "Could not restart journald"
 
-# ── 21. Install systemd service ───────────────────────────────────
+# ── 20. Install systemd service ───────────────────────────────────
 
 info "Installing systemd service..."
 cp "${MESHPOINT_DIR}/${SERVICE_FILE}" /etc/systemd/system/meshpoint.service
@@ -1155,7 +1125,7 @@ systemctl daemon-reload
 systemctl enable meshpoint
 info "Service enabled (will start after 'meshpoint setup')"
 
-# ── 22. Install rnsd service (Reticulum, opt-in) ──────────────────
+# ── 21. Install rnsd service (Reticulum, opt-in) ──────────────────
 #
 # Deliberately NOT a dependency of meshpoint.service (see that unit's
 # own After=rnsd.service comment) -- installed and enabled
@@ -1176,7 +1146,7 @@ else
     info "Skipping rnsd service (Reticulum/LXMF messaging won't be available) -- re-run without --skip-rnsd, or answer Y next time, to add it later"
 fi
 
-# ── 23. Install network watchdog ──────────────────────────────────
+# ── 22. Install network watchdog ──────────────────────────────────
 
 info "Installing WiFi network watchdog..."
 cp "${MESHPOINT_DIR}/${WATCHDOG_SERVICE_FILE}" /etc/systemd/system/network-watchdog.service
@@ -1185,7 +1155,7 @@ systemctl enable network-watchdog
 systemctl start network-watchdog 2>/dev/null || warn "Could not start network-watchdog (will start on next boot)"
 info "Network watchdog enabled"
 
-# ── 24. Install mDNS (Avahi) for meshpoint.local discovery ────────
+# ── 23. Install mDNS (Avahi) for meshpoint.local discovery ────────
 #
 # Lets the Pi be reached as meshpoint.local (or <hostname>.local) on
 # the LAN without knowing its IP -- useful right after a fresh flash
@@ -1206,13 +1176,13 @@ fi
 
 systemctl enable --now avahi-daemon
 
-# ── 25. Install CLI tool ───────────────────────────────────────────
+# ── 24. Install CLI tool ───────────────────────────────────────────
 
 info "Installing meshpoint CLI..."
 chmod +x "${MESHPOINT_DIR}/${CLI_SCRIPT}"
 ln -sf "${MESHPOINT_DIR}/${CLI_SCRIPT}" /usr/local/bin/meshpoint
 
-# ── 26. Add fastfetch login banner ────────────────────────────────
+# ── 25. Add fastfetch login banner ────────────────────────────────
 #
 # Shows a system-info banner on every interactive login shell for the
 # `pi` user. Idempotent: skips if already present.

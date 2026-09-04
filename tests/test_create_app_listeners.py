@@ -24,12 +24,10 @@ from src.api.listener_registry import ListenerSpec
 from src.api.routes import (
     dab_routes,
     listener_routes,
-    pager_routes,
 )
 from src.api.server import _BUILTIN_LISTENERS
-from src.audio.pager_listener import PagerListener
 
-_EXPECTED_NAMES = ["radio", "pagers", "dab"]
+_EXPECTED_NAMES = ["radio", "dab"]
 
 
 class TestBuiltinListenerList(unittest.TestCase):
@@ -44,23 +42,20 @@ class TestBuiltinListenerList(unittest.TestCase):
             self.assertTrue(callable(s.wire))
 
     def test_start_all_wires_every_route_module(self) -> None:
-        for mod in (listener_routes, pager_routes, dab_routes):
+        for mod in (listener_routes, dab_routes):
             getattr(mod, "reset_routes", lambda: None)()
 
         listener_registry.start_all(_BUILTIN_LISTENERS)
         try:
-            # one entry per init_routes call; pagers builds a single
-            # listener now (P2000 and POCSAG both split into their own
-            # plugins, leaving just this one kind here).
+            # one entry per init_routes call. Pagers, P2000 and POCSAG
+            # (the former three kinds src/audio/pager_listener.py used to
+            # cover) are all plugins now -- nothing pager-related is
+            # built-in anymore.
             names = [n for n, _ in listener_registry.live()]
             self.assertEqual(names, _EXPECTED_NAMES)
-            pagers_obj = next(o for n, o in listener_registry.live() if n == "pagers")
-            self.assertIsInstance(pagers_obj, PagerListener)
-            self.assertEqual(pagers_obj.kind, "pagers")
 
             self.assertIsNotNone(listener_routes._listener)
             self.assertIsNotNone(dab_routes._listener)
-            self.assertIsNotNone(pager_routes._pagers)
         finally:
             asyncio.run(listener_registry.stop_all())
 

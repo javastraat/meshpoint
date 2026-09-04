@@ -181,7 +181,7 @@ session gets `401 Unauthorized`. See `src/api/auth/dependencies.py` for the
 
 ## RTL-SDR listeners (Radio tab and friends)
 
-Only one of Radio / Pagers / DAB+ may hold the RTL-SDR dongle at a time (the P2000, POCSAG, RTL433, ADS-B and ACARS plugins join that set when installed -- see their own `plugins/apps/*/README.md`).
+Only one of Radio / DAB+ may hold the RTL-SDR dongle at a time (the Pagers, POCSAG, P2000, RTL433, ADS-B and ACARS plugins join that set when installed -- see their own `plugins/apps/*/README.md`).
 
 | Method | Path | Role | Description |
 |---|---|---|---|
@@ -189,9 +189,6 @@ Only one of Radio / Pagers / DAB+ may hold the RTL-SDR dongle at a time (the P20
 | POST | `/api/listener/tune` | Admin | Tune the RTL-SDR: frequency, mode, squelch, gain, level, optional preset station label |
 | POST | `/api/listener/stop` | Admin | Stop the RTL-SDR listener |
 | GET | `/api/listener/stream` | Viewer | Live MP3 audio stream for the browser player |
-| GET | `/api/pagers/status` | Viewer | Decoder state: running, frequency, decoded messages |
-| POST | `/api/pagers/start` | Admin | Start the decoder |
-| POST | `/api/pagers/stop` | Admin | Stop the decoder |
 | GET | `/api/dab/status` | Viewer | DAB+ listener state: channel, ensemble label, SNR, decoded station list (sid, name, DLS text) |
 | POST | `/api/dab/tune` | Admin | Tune to a DAB+ channel/ensemble (e.g. `12C`) |
 | POST | `/api/dab/stop` | Admin | Stop the DAB+ listener |

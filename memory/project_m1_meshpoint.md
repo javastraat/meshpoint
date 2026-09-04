@@ -9186,6 +9186,16 @@ so the "No messages yet" is a real-world RF reception question (gain/
 antenna/actual on-air traffic), not a regression from this extraction.
 Not chased further -- correctly out of scope for the plugin-split work.
 
+**Later the same day: user confirmed "rtl-sdr pocsag working confirmed"**
+-- real decoded POCSAG512/1200/2400 traffic now showing on the plugin's
+Listener tab, closing out the one open item from the extraction. The
+`PocsagListener` plugin is fully live-verified end to end: plugin
+discovery/loading, listener startup with the correct command, and now
+actual RF decode. The earlier "No messages yet" was exactly what it
+looked like -- a transient real-world reception gap, not a bug -- and
+resolved on its own (or with different antenna/timing conditions)
+without any code change.
+
 **Real bug found and fixed the same session, unrelated to the pager-
 plugin extractions**: user reported (with a screenshot) that clicking
 Settings -> Plugins' "Restart service" button left the WHOLE page looking
@@ -9351,6 +9361,145 @@ override in `frontend/themes/light/theme.css` resetting `color-scheme:
 light` on the same three selectors, rather than touching the base
 dark-first declarations (keeps dark theme's own popup/scrollbar styling
 untouched). New CHANGELOG bullet under v0.8.1 (46 bullets, parser
-re-verified). **Not yet live-verified** -- next session should confirm
-the Updates page scrollbar (and any native `<select>` dropdown, e.g.
-Configuration pages' pickers) renders light in light theme now.
+re-verified).
+
+**LIVE-VERIFIED, user confirmed "theme bugs fixed"**: both light-theme
+CSS bugs from this session -- the permanent grey backdrop tint
+(`.danger-modal__backdrop`'s unconditional `!important` override) and
+the dark Updates-page scrollbar/native-`<select>` popups (unconditional
+`color-scheme: dark`) -- hold up on the real device. Both were root-caused
+by grepping a single CSS custom property/declaration (`--scrim`, then
+`color-scheme`) across the theme files the moment theme-scope was
+suspected, rather than continuing to chase JS state -- worth repeating
+as the go-to first move for any future "looks wrong in [specific theme]
+only" report.
+
+**Pagers extracted to a plugin (2026-09-04, ⚠️ behaviour change, DONE, not
+yet live-verified) -- the sixth tab-by-tab extraction, and the one that
+finally finishes the three-way pager split.** Before starting, user
+asked two good clarifying questions worth remembering the answers to
+(both confirmed by grepping real imports, not assumed):
+1. **Does extracting Pagers break P2000/POCSAG/RTL433/ACARS/ADS-B?** No
+   -- confirmed none of them `import` `src.audio.pager_listener.PagerListener`
+   at all (every "PagerListener" hit in their source was a descriptive
+   comment, not a real import); each is already a fully self-contained
+   copy of its own pipeline logic. The only real shared backend
+   dependency across all of them is `src/audio/sdr_registry.py` (the
+   dongle-contention tracker), which was never going anywhere regardless.
+2. **Shouldn't RTL433 (etc.) carry their own copy of `window.PagerPanel`
+   instead of depending on core?** No, and this was already effectively
+   true today, not something extracting Pagers would change: `PagerPanel`
+   loads via a plain `<script>` tag in `index.html` BEFORE the
+   `<!-- meshpoint:plugin-panels -->` injection point, so it's always
+   present regardless of which plugins are enabled -- verified by
+   grepping the actual line numbers, not assumed. Framed the distinction
+   for the user as: `PagerPanel` (UI class, core, shared) vs "Pagers"
+   (the P2000-era feature/tab, now itself a plugin) are different things
+   that happen to share a name from history -- `PagerPanel` is the same
+   category as `window.registerListenerPanel`/`DangerousModal`, generic
+   framework surface, not duplicated per-plugin the way `PagerListener`'s
+   actual protocol-specific backend logic correctly was.
+
+**This is the LAST of the three, so unlike the P2000/POCSAG splits (which
+trimmed `src/audio/pager_listener.py`/`src/api/routes/pager_routes.py`
+but kept them alive), this one deletes both files from core entirely** --
+closer in shape to ACARS/RTL433/ADS-B's clean lift-and-shift than to the
+P2000/POCSAG "split, don't move" pattern, since nothing else was left in
+`_KINDS` to justify keeping the shared files around. New
+`plugins/apps/pagers/`: `PagersListener` (POCSAG512/1200/2400 on 172.45
+MHz -- identical decoding to POCSAG's plugin, just a different frequency
+constant), single-router `routes.py`, 7 new tests (mirrors POCSAG's
+fixture shape exactly, different frequency), tiny `frontend/pagers_panel.js`
+reusing core `PagerPanel`. `plugin.toml` has no `apt` list (multimon-ng's
+build deps already covered by `scripts/install.sh`'s base packages, same
+shape as every other multimon-ng-based plugin) -- `setup.sh` is genuinely
+the one doing real work now for whichever of Pagers/POCSAG/P2000 gets set
+up first (previously P2000's/POCSAG's own copies were "usually a no-op"
+since Pagers staying core meant `install.sh` still built it; that's no
+longer true for any of the three).
+
+`server.py`: `_BUILTIN_LISTENERS` loses the `"pagers"` `ListenerSpec`
+entirely (down to just `radio`/`dab`, matching the two-item list this
+file will presumably stay at unless DAB+ is ever extracted too);
+`pager_routes`/`PagerListener` imports removed outright rather than
+trimmed. `listener_panel.js`: the `pagers` builtin entry AND the now-dead
+`pager()` helper function + `const P = window.PagerPanel` variable both
+removed (nothing else in `builtins` used them once P2000/POCSAG were
+already gone) -- `builtins` is down to just `dab`/`dabconfig`.
+Confirmed `window.PagerPanel`'s own `<script>` tag in `index.html` is
+untouched (still core, now serving five plugins instead of four).
+`tests/test_create_app_listeners.py`: dropped the `pager_routes`/
+`PagerListener` imports and every pager-specific assertion,
+`_EXPECTED_NAMES` down to `["radio", "dab"]`.
+
+`scripts/install.sh`: removed the multimon-ng build section entirely
+(was section 8), renumbered welle.io 9->8 and cascaded 10-26 down to
+9-25 via the same Python-script-matching-`# ── N. `-headings approach as
+every prior pass. **Extra scope this time, deliberately, since the
+RTL-SDR block shrank to just 3 sub-tools**: rewrote the block's own
+summary comment ("three decoders" -> "two", the multimon-ng line
+removed, "four sub-pieces" -> "three"), fixed both `section 11` cross-
+references for arduino-cli (now section 10, confirmed via grep after the
+heading-only renumber script -- same class of miss as the P2000 session's
+"forgot cascading cross-references" lesson, caught proactively this time
+by grepping `section [0-9]` immediately after the renumber instead of
+waiting for it to surface later), and rewrote both the top-of-file
+`--skip-rtlsdr` usage comment and its interactive echo prompt (both still
+said "P2000/Pagers/POCSAG" as if core, and "sections 6-9"/"6-8" needed
+fixing to match the new 3-section block) -- deliberately did NOT touch
+the unrelated `--skip-arduino` prompt's own "POCSAG/Pager/RF Environment"
+mentions, confirmed those are about the completely different
+`pocsag_companion`/`pager_client` DAPNET/emergency-pager firmware-
+flashing feature, not this extraction, same distinction held throughout
+this whole session.
+
+Docs: `docs/API-ENDPOINTS.md`'s RTL-SDR section header line and the
+`/api/pagers/*` rows both removed (nothing pager-related left to
+document there at all now -- Radio and DAB+ are the only two RTL-SDR
+listeners left in core). `README.md` got the heaviest rewrite of any
+pass so far, since Pagers finishing the split meant the "Radio has N
+built-in decode tabs" framing itself was stale: added a Pagers tab
+bullet (never had one before -- it predated the "what's different"
+bullet convention, unlike P2000/POCSAG/RTL433/ADS-B/ACARS which all
+already had one), fixed the P2000/POCSAG bullets' own stale "Pagers
+(still core)"/"Pagers staying core" phrasing, restructured the big
+RTL-SDR paragraph's "One more tab alongside Radio" framing into "Radio
+and DAB+ are the only two built into core now, everything else is a
+plugin", merged the three near-duplicate Pagers/POCSAG/P2000
+manual-install bullets (each previously pointing at "the Pagers bullet
+above" for the real multimon-ng instructions, which no longer made sense
+once Pagers itself became just another plugin-pointer) into one bullet
+covering all three symmetrically, and folded the last dedicated
+`/api/pagers/*` summary-table rows into the shared plugin-shape row.
+`docs/CONFIGURATION.md` had nothing Pagers-specific to touch (confirmed
+by grep, same as every prior pass). Left the CHANGELOG's own historical
+POCSAG-extraction bullet's "Pagers staying core" phrasing alone
+deliberately -- it was true at the time that bullet was written, and
+CHANGELOG entries are a point-in-time record, not retroactively edited
+to match later state (established convention from earlier in this same
+session).
+
+**Verified on the Mac**: `py_compile` clean on every touched/new Python
+file; grepped for stale `PagerListener("pagers")`/`pager_routes._pagers`/
+`pagers_router` references -- zero hits anywhere in src/tests/frontend/
+docs. `pytest plugins/` -- 46/46 pass (all six plugins + hello-world
+together). `node --check` clean on `listener_panel.js` and the new
+`pagers_panel.js`. `bash -n` clean on `install.sh` after the renumbering
+and cross-reference fixes. `ChangelogParser.parse_file` re-parse: 47
+bullets in v0.8.1, new Pagers bullet present.
+
+**NOT yet done / next steps**: **not live-verified on the Pi** -- next
+session should pull, restart, confirm Pagers is gone from the Listener
+page until enabled, then `sudo meshpoint plugin setup pagers` +
+`plugins.pagers.enabled: true` + restart, confirm the Pagers tab decodes
+again, and spot-check that P2000/POCSAG/RTL433/ACARS/ADS-B are all still
+completely unaffected (per the pre-extraction dependency analysis, they
+should be, but this is the first time ALL SIX RTL-SDR-family plugins
+plus hello-world coexist -- worth a real `meshpoint plugin list` +
+Listener-page pass confirming all six show up correctly and don't
+interfere with each other via `sdr_registry`'s shared dongle-contention
+logic). **This closes out the entire three-way P2000/POCSAG/Pagers
+split** -- of the original tab-by-tab candidates, only **DAB+** remains
+(Config sub-tab, more work than any of the six done so far); plain-FM
+**Radio stays explicitly out of scope** (different seam entirely -- would
+need the "sidebar" capability plus streamed audio, neither ever built).

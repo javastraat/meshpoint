@@ -57,7 +57,6 @@ from src.api.routes import (
     hardware_config_routes,
     identity_routes,
     listener_routes,
-    pager_routes,
     emergency_pager_routes,
     lorawan_routes,
     lorawan_config_routes,
@@ -107,7 +106,6 @@ from src.api.update import ReleaseChannelRegistry, UpdateApplier
 from src.api.update.rollback_state import resolve_rollback_state_path
 from src.api.upstream_client import UpstreamClient
 from src.audio.dab_listener import DabListener
-from src.audio.pager_listener import PagerListener
 from src.audio.rtl_listener import RtlListener
 from src.api.websocket_manager import WebSocketManager
 from src.config import AppConfig, SerialDeviceConfig, load_config, validate_activation
@@ -211,7 +209,6 @@ _BUILTIN_ROUTERS: list[tuple] = [
     (reticulum_config_routes.router, False),
     (emergency_pager_routes.router, False),
     (listener_routes.router, False),
-    (pager_routes.pagers_router, False),
     (dab_routes.router, False),
     (spectrum_routes.router, False),
     (meshtastic_routes.router, False),
@@ -228,11 +225,6 @@ _BUILTIN_ROUTERS: list[tuple] = [
 _BUILTIN_LISTENERS: list[listener_registry.ListenerSpec] = [
     listener_registry.ListenerSpec(
         "radio", RtlListener, listener_routes.init_routes,
-    ),
-    listener_registry.ListenerSpec(
-        "pagers",
-        lambda: PagerListener("pagers"),
-        pager_routes.init_routes,
     ),
     listener_registry.ListenerSpec("dab", DabListener, dab_routes.init_routes),
 ]

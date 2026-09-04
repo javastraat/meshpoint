@@ -376,10 +376,6 @@ class ListenerPanel {
         })();
         this._tunedCat = null;   // category index of the currently-tuned preset
         this._tunedKey = null;   // "freq|mode" of the currently-tuned preset
-        // Pagers tab -- separate pipeline, same RTL-SDR dongle (see
-        // src/audio/sdr_registry.py), so only one of Radio/Pagers can be
-        // active at a time. Kept as a sibling panel rather than folded
-        // into this already-large file.
         this._activeTab = 'radio';
 
         // Every non-radio Listener sub-tab, in tabbar order. Each entry is
@@ -388,17 +384,15 @@ class ListenerPanel {
         // default branch, not from here. Plugins append their own entries via
         // window.registerListenerPanel (see listener_panel_registry.js) and
         // render after these built-ins.
-        // 'pagers' shares the one RTL-SDR dongle (src/audio/sdr_registry.py)
-        // so only one of Radio/Pagers/DAB+ runs at a time (the
-        // P2000/POCSAG/RTL433/ACARS/ADS-B plugins join that set when
-        // installed); 'dabconfig' is a read-only view over the
-        // channel-scan JSON and sits out that dance.
-        const P = window.PagerPanel;
-        const pager = (tab, label, prefix, title, rowFn) =>
-            (P ? { tab, label, panel: new P(tab, prefix, title, rowFn) } : null);
+        // `dab` shares the one RTL-SDR dongle (src/audio/sdr_registry.py) with
+        // Radio, so only one of Radio/DAB+ runs at a time among these two
+        // built-ins (the Pagers/POCSAG/P2000/RTL433/ACARS/ADS-B plugins join
+        // that same set when installed -- none of those built-in anymore,
+        // window.PagerPanel itself stays core purely as shared UI those
+        // plugins' own tiny frontend files instantiate); 'dabconfig' is a
+        // read-only view over the channel-scan JSON and sits out that dance.
         const builtins = [
             { tab: 'dab', label: 'DAB+', panel: window.DabPanel ? new window.DabPanel() : null },
-            pager('pagers', 'Pagers', '/api/pagers', 'Pagers'),
             { tab: 'dabconfig', label: 'DAB+ Config', panel: window.DabConfigPanel ? new window.DabConfigPanel() : null },
         ];
         const plugins = (window.LISTENER_PANELS || []).map((d) => ({
