@@ -30,6 +30,8 @@ provides = ["sidebar"]
 route = "hello-world"     # URL route id
 label = "Hello World"     # sidebar link text
 category = "networks"     # networks | radio | ops | configuration | settings
+icon = "message"          # optional, default "plug" -- here, reusing the
+                           # Messages page's own icon rather than the default
 ```
 
 `src/plugins/manifest.py` parses and validates this; `src/plugins/assets.py`
@@ -51,4 +53,5 @@ Full write-up: [docs/PLUGINS.md](../../../docs/PLUGINS.md).
 plugin.toml                 manifest ([sidebar] table, [frontend])
 backend/__init__.py         register(reg) -- a no-op; nothing to register
 frontend/hello_world.js     the page content (registerSidebarPage)
+frontend/hello_world.css    demonstrates [frontend].styles -- a themed badge
 ```

@@ -214,12 +214,13 @@ script:
 
    [frontend]
    scripts = ["frontend/hello_world.js"]
+   styles = ["frontend/hello_world.css"]   # optional -- omit if you have no CSS
 
    [sidebar]
    route = "hello-world"     # -> #/hello-world
    label = "Hello World"     # sidebar link text
    category = "networks"     # networks | radio | ops | configuration | settings
-   icon = "plug"             # optional, default "plug" -- see below
+   icon = "message"          # optional, default "plug" -- see below
    ```
 
    `category` must be an *existing* sidebar section — you're placing your

@@ -18,9 +18,10 @@ window.registerSidebarPage({
                     <h2>Hello, World.</h2>
                     <p>This page is rendered entirely by a plugin --
                     <code>plugins/apps/hello-world/</code>. Its position in the
-                    sidebar (under Networks) comes from <code>plugin.toml</code>'s
-                    <code>[sidebar]</code> table, not from anything hardcoded in
-                    the dashboard.</p>
+                    sidebar (under Networks), its icon, and its title all come
+                    from <code>plugin.toml</code>'s <code>[sidebar]</code>
+                    table, not from anything hardcoded in the dashboard.</p>
+                    <span class="hello-world-badge">Styled by hello_world.css</span>
                 </div>
             `;
         },

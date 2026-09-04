@@ -1,0 +1,15 @@
+/* Hello World -- demonstrates plugin.toml's [frontend].styles working.
+   Uses the app's own theme variables (--accent-cyan etc.) so it looks
+   right in every theme, light and dark, without any plugin-side theme
+   handling -- the same tokens frontend/css/dashboard.css defines. */
+
+.hello-world-badge {
+    display: inline-block;
+    margin-top: 16px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--accent-cyan);
+    color: var(--accent-cyan);
+    font-size: 13px;
+    font-weight: 600;
+}

@@ -8519,10 +8519,56 @@ specifically, always regenerate programmatically from the source of truth
 (or diff against it after) rather than trusting a manual transcription,
 even a careful one.
 
-**Not yet live-verified** (both the icon field and its expanded set) --
-the shipped `hello-world` still uses the default `plug` icon (already
-confirmed working live), so this only needs a Pi check if/when a
-*different* icon key is actually used by some plugin.
+**Immediate follow-on, same session -- hello-world became a fuller
+template**: user asked (a) whether hello-world's `plugin.toml` demonstrates
+every possible field -- audited it against the schema: missing
+`[frontend].styles` and `[sidebar].icon` (both genuinely N/A before, now
+addable), `[deps]` and the non-`sidebar` `provides` values correctly still
+absent (ACARS already demonstrates those, hello-world is deliberately
+sidebar-only); (b) asked to add a CSS file "that should be in the sample I
+think"; (c) asked for the `icon` options to be documented inline in the
+TOML itself, not just in docs, so a builder copying the template sees
+everything without leaving the file. Did all three: new
+`plugins/apps/hello-world/frontend/hello_world.css` (one themed badge class
+using `var(--accent-cyan)` etc., so it reads correctly in every theme with
+zero plugin-side theme handling), `hello_world.js` mounts a
+`.hello-world-badge` span so a builder can immediately SEE the CSS actually
+loaded (silent failure would otherwise look identical to success); `plugin.
+toml` gained `styles = [...]` and `icon = "message"` (deliberately
+non-default, and one of the reused-from-app icons -- ties the "hello,
+world" greeting theme to the Messages page's own icon, and doubles as a
+live demo of the icon-reuse feature from two turns earlier) plus long
+inline comments spelling out every `category` and every `icon` option
+directly in the file. Verified end to end with the REAL unmodified
+`hello_world.js` this time (not a test double) via jsdom: icon renders the
+exact Messages speech-bubble path (not the plug fallback), badge element
+and its text both present in the mounted section. `parse_manifest()` +
+`inject_plugin_assets()` re-confirmed against the real file on disk --
+`<link rel="stylesheet" href="/plugins/apps/hello-world/frontend/
+hello_world.css">` now appears correctly in the injected HTML, ahead of the
+`<script>` tag, matching `plugin_asset_tags()`'s established css-before-js
+ordering. `docs/PLUGINS.md`'s illustrative TOML/JS snippets updated to
+match (icon/styles added) since that doc explicitly promises to mirror the
+real file. 1534 tests still pass, `ruff` clean -- no test changes needed,
+this was pure content/example polish, no schema change.
+
+**One more round, immediately after**: user asked for `provides = ["sidebar"]`
+to get the same inline-documentation treatment -- added a comment block
+listing all four `KNOWN_PROVIDES` values (`listener`/`routes`/`panel`/
+`sidebar`) with a one-line description and the matching `PluginRegistry`
+method each unlocks, plus a pointer to ACARS for the listener+routes+panel
+case hello-world deliberately doesn't demonstrate. `plugin.toml` is now
+comment-documented on every field that has a constrained option set
+(`provides`, `category`, `icon`) directly in the file itself, not just in
+`docs/PLUGINS.md`. Re-parsed to confirm the comment block doesn't break
+anything (TOML comments are fine here since every continuation line has its
+own leading `#` -- confirmed by re-running `parse_manifest()` against the
+real file, still resolves `provides=('sidebar',)` and the same `SidebarSpec`
+as before). Pure comments, no schema/behavior change, no test updates
+needed. **Not yet live-verified on a real Pi** -- the shipped plugin now
+uses a non-default icon (`message`) and a CSS file for the first time, so
+this is worth an actual browser check next time, not just the jsdom
+simulation.
 
 **Settings → Plugins: "Restart service" button (2026-09-04, DONE, not yet
 live-verified)**: User asked for a one-click way to apply a pending

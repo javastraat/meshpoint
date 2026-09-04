@@ -1,16 +1,60 @@
 name = "hello-world"
 version = "0.1.0"
 meshpoint_api = 1
-provides = ["sidebar"]
+provides = ["sidebar"]    # capabilities this plugin uses -- non-empty subset of:
+                           #   listener  register an RTL-SDR subprocess listener
+                           #             (shares the one physical dongle with
+                           #             every other listener) -- reg.add_listener()
+                           #   routes    mount a FastAPI router under /api/<...>
+                           #             -- reg.add_router()
+                           #   panel     add a sub-tab to the Listener page
+                           #             (window.registerListenerPanel)
+                           #   sidebar   add a whole top-level sidebar page of
+                           #             your own (this plugin) -- see [sidebar]
+                           #             below and window.registerSidebarPage()
+                           # Using a capability not listed here raises at
+                           # register-time (PluginRegistry._require). See
+                           # docs/PLUGINS.md and the ACARS plugin for a
+                           # listener + routes + panel worked example.
 locked = true  # shipped with this fork -- not user-installed, can't be deleted
 
 [frontend]
 scripts = ["frontend/hello_world.js"]
+styles = ["frontend/hello_world.css"]
 
 [sidebar]
-route = "hello-world"
-label = "Hello World"
-category = "networks"
+route = "hello-world"     # URL route id -- becomes #/hello-world (bare
+                           # slug [a-z0-9-]). Under configuration/settings
+                           # below, it'd nest as #/<category>/<route> instead.
+label = "Hello World"     # sidebar link text
+category = "networks"     # which EXISTING sidebar section to place the page
+                           # in -- one of:
+                           #   networks       flat item run (LoRaWAN, Radio, ...)
+                           #   radio          flat item run (RF Environment, ...)
+                           #   ops            flat item run (Terminal, ...)
+                           #   configuration  collapsible submenu, route nests
+                           #                  as "configuration/<route>"
+                           #   settings       collapsible submenu, route nests
+                           #                  as "settings/<route>"
+icon = "message"           # optional, default "plug" if omitted. One of:
+                           #   plug      generic plugin/module glyph (the default)
+                           #   antenna   generic wifi/signal glyph
+                           #   map       generic map-pin glyph
+                           #   list      generic list-with-dots glyph
+                           #   chart     = the built-in Stats page's icon
+                           #   message   = the built-in Messages page's icon
+                           #   terminal  = the built-in Terminal page's icon
+                           #   grid      = the built-in Dashboard page's icon
+                           #   topology  = the built-in Topology page's icon
+                           #   rf        = the built-in RF Environment icon
+                           #   pager     = the built-in Pager page's icon
+                           #   dapnet    = the built-in DAPNET page's icon
+                           #   reticulum = the built-in Reticulum page's icon
+                           #   lorawan   = the built-in LoRaWAN page's icon
+                           #   gear      = the built-in Settings group's icon
+                           # A name, not raw SVG -- plugin.toml can't inject
+                           # arbitrary markup into every viewer's sidebar.
+                           # An unrecognized key silently falls back to "plug".
 
 [meta]
 description = "Minimal example plugin: a top-level sidebar page that just says hello. Reference for the sidebar-page seam -- see docs/PLUGINS.md."
