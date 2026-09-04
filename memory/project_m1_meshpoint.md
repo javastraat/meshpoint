@@ -8565,10 +8565,17 @@ anything (TOML comments are fine here since every continuation line has its
 own leading `#` -- confirmed by re-running `parse_manifest()` against the
 real file, still resolves `provides=('sidebar',)` and the same `SidebarSpec`
 as before). Pure comments, no schema/behavior change, no test updates
-needed. **Not yet live-verified on a real Pi** -- the shipped plugin now
-uses a non-default icon (`message`) and a CSS file for the first time, so
-this is worth an actual browser check next time, not just the jsdom
-simulation.
+needed.
+
+**LIVE-VERIFIED 2026-09-04**: user restarted and screenshotted the real
+page -- Messages-style speech-bubble icon rendering correctly next to
+"Hello World" (not the plug fallback), correctly positioned in Networks
+between Topology and the Radio header, and the "Styled by hello_world.css"
+badge showing the cyan-bordered pill exactly as designed, proving
+`[frontend].styles` actually loads and applies on real hardware, not just
+in the jsdom simulation. Non-default icon + CSS file both confirmed working
+end to end. Nothing outstanding on the sidebar seam or its Hello World
+reference plugin.
 
 **Settings → Plugins: "Restart service" button (2026-09-04, DONE, not yet
 live-verified)**: User asked for a one-click way to apply a pending

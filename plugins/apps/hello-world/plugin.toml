@@ -36,7 +36,7 @@ category = "networks"     # which EXISTING sidebar section to place the page
                            #                  as "configuration/<route>"
                            #   settings       collapsible submenu, route nests
                            #                  as "settings/<route>"
-icon = "message"           # optional, default "plug" if omitted. One of:
+icon = "plug"           # optional, default "plug" if omitted. One of:
                            #   plug      generic plugin/module glyph (the default)
                            #   antenna   generic wifi/signal glyph
                            #   map       generic map-pin glyph
