@@ -114,8 +114,15 @@ class PluginsPanelController {
         const badgeMod = plugin.source === 'builtin' ? 'builtin' : 'community';
         const badgeLabel = plugin.source === 'builtin' ? 'Built-in' : 'Community';
         const provides = (plugin.provides || []).join(', ') || '-';
-        const depsNote = (plugin.apt_deps || []).length
-            ? `<p class="plugin-row__deps">Requires: <code>${this._escape(plugin.apt_deps.join(', '))}</code>${plugin.setup_script ? ` — run <code>sudo meshpoint plugin setup ${this._escape(plugin.id)}</code> on the device` : ''}</p>`
+        // A plugin can need setup.sh with no apt packages at all (e.g. a
+        // from-source build like dump1090 -- its build tools are already
+        // covered by scripts/install.sh's base system packages), so this
+        // must show whenever EITHER is present, not just apt_deps being
+        // non-empty -- otherwise the hint silently vanishes for exactly the
+        // plugins that most need one run before enabling.
+        const aptDeps = plugin.apt_deps || [];
+        const depsNote = (aptDeps.length || plugin.setup_script)
+            ? `<p class="plugin-row__deps">Requires: ${aptDeps.length ? `<code>${this._escape(aptDeps.join(', '))}</code>` : 'a build step'}${plugin.setup_script ? ` — run <code>sudo meshpoint plugin setup ${this._escape(plugin.id)}</code> on the device` : ''}</p>`
             : '';
         const byLine = [
             plugin.author ? this._escape(plugin.author) : '',

@@ -8906,3 +8906,26 @@ before. Per the user's plan, **Pagers and DAB+ are the remaining
 extraction candidates** (DAB+ still the most work, Config sub-tab);
 plain-FM **Radio still explicitly not planned** -- different seam
 entirely.
+
+**Real bug found immediately from the Settings → Plugins screenshot,
+same day (2026-09-04): ADS-B's row showed no "Requires:" hint at all**,
+unlike ACARS/RTL433 right above it. Root cause, found by reading
+`plugins_panel_controller.js` directly: the hint (`Requires: <apt
+list> -- run sudo meshpoint plugin setup <id>`) was keyed on
+`plugin.apt_deps.length`, but ADS-B's `plugin.toml` has an empty
+`[deps].apt` -- `dump1090`'s build tools (git, make, gcc) are already
+covered by `scripts/install.sh`'s base system packages, so nothing
+apt-specific was ever needed, unlike ACARS (cmake/libcjson/etc) or
+RTL433 (`rtl-433` itself). The hint's existence was accidentally coupled
+to *which kind* of dependency a plugin has, when it should trigger on
+*whether setup.sh needs running at all* -- exactly backwards for ADS-B,
+which needs it MORE (skip it and the listener is just broken, not merely
+missing an apt package). Fixed: the condition now shows the note
+whenever either `apt_deps` or `setup_script` is present, with a
+"Requires: a build step -- run ..." fallback wording when there's no
+apt list to show. Verified all four shapes with a throwaway node
+snippet (apt+setup like ACARS, no-apt+setup like ADS-B, neither like
+hello-world, apt-without-setup as a theoretical edge case) -- each
+renders correctly, including hello-world still showing nothing.
+`node --check` clean. New CHANGELOG bullet under v0.8.1, right after the
+ADS-B extraction bullet (41 bullets total now, parser re-verified).
