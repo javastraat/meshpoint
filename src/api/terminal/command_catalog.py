@@ -151,7 +151,7 @@ DEFAULT_CATALOG: tuple[CommandEntry, ...] = (
     CommandEntry(
         id="dab-scan-full",
         label="DAB+ scan: full (default timeout)",
-        command="/opt/meshpoint/scripts/dab_channel_scan.py",
+        command="/opt/meshpoint/plugins/apps/dab/dab_channel_scan.py",
         category=CATEGORY_DAB,
         description=(
             "Scans all 38 Band III channels (5A-13F) at the default "
@@ -165,7 +165,7 @@ DEFAULT_CATALOG: tuple[CommandEntry, ...] = (
     CommandEntry(
         id="dab-scan-full-60s",
         label="DAB+ scan: full (60s timeout)",
-        command="/opt/meshpoint/scripts/dab_channel_scan.py --timeout 60",
+        command="/opt/meshpoint/plugins/apps/dab/dab_channel_scan.py --timeout 60",
         category=CATEGORY_DAB,
         description=(
             "Same full 38-channel scan, but a longer 60s/channel timeout "
@@ -176,7 +176,7 @@ DEFAULT_CATALOG: tuple[CommandEntry, ...] = (
     CommandEntry(
         id="dab-scan-known-60s",
         label="DAB+ scan: known channels (60s timeout)",
-        command="/opt/meshpoint/scripts/dab_channel_scan.py --channels 7D 8B 9C 11C 12C --timeout 60",
+        command="/opt/meshpoint/plugins/apps/dab/dab_channel_scan.py --channels 7D 8B 9C 11C 12C --timeout 60",
         category=CATEGORY_DAB,
         description=(
             "Rescans just the 5 channels already confirmed live at this "

@@ -14,8 +14,9 @@
  * return an object with mount(rootEl) / show() / hide() (PagerPanel, AdsbPanel,
  * DabPanel all satisfy this).
  *
- * Built-in tabs are NOT registered here -- they stay a greppable list in
- * listener_panel.js. Plugin tabs render after the built-ins.
+ * The `radio` tab is the only one NOT registered here -- it's bespoke
+ * (audio element + skins) and stays hardcoded in listener_panel.js. Every
+ * other Listener tab, including DAB+, is a plugin using this seam.
  */
 window.LISTENER_PANELS = window.LISTENER_PANELS || [];
 

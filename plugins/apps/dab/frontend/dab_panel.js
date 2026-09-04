@@ -5,7 +5,7 @@
  * picker and station list below since DAB+ needs a genuinely different
  * model: pick a channel/ensemble first (it carries several stations at
  * once), wait for welle-cli to decode the station list, then pick one --
- * see src/audio/dab_listener.py.
+ * see backend/listener.py.
  */
 const _DAB_DONGLE_OWNER_LABELS = {
     radio: 'Radio', p2000: 'P2000', pagers: 'Pagers', pocsag: 'POCSAG', rtl433: 'RTL433', dab: 'DAB+',
@@ -46,9 +46,9 @@ class DabPanel {
         // to see immediately rather than an empty tab needing a click.
         this._activeChannelTab = 'favorites';
         // Channel tabs between Favorites and Manual -- loaded from
-        // scripts/dab_channel_scan.py's JSON output (GET /api/dab/scan-
-        // results) instead of a hardcoded list, so they reflect whatever
-        // this antenna actually found rather than one location's presets.
+        // dab_channel_scan.py's JSON output (GET /api/dab/scan-results)
+        // instead of a hardcoded list, so they reflect whatever this
+        // antenna actually found rather than one location's presets.
         // { channel, name } per entry; name is the DAB+ Config tab's
         // custom_name override when set, else the scanned ensemble label.
         this._channelPresets = [];
@@ -165,7 +165,7 @@ class DabPanel {
                 this._pendingPlay = {
                     channel: presetPlayBtn.dataset.dabPresetChannel,
                     // A sid captured by the scan script (see
-                    // scripts/dab_channel_scan.py) lets this resolve by
+                    // dab_channel_scan.py) lets this resolve by
                     // exact identity below instead of the name-normalize
                     // fallback -- null for a station scanned before that
                     // change, or one welle-cli never handed a sid for.
@@ -236,7 +236,7 @@ class DabPanel {
                         channel: c.channel,
                         name: c.custom_name || c.ensemble || c.channel,
                         // {name, sid} per station -- sid is the DAB SId
-                        // captured by scripts/dab_channel_scan.py (may be
+                        // captured by dab_channel_scan.py (may be
                         // null for a station scanned before that existed).
                         // A click here tunes in and resolves by sid when
                         // known, else by name once decoded -- same
@@ -880,7 +880,7 @@ class DabPanel {
 
     // A station known from the last scan, on a channel not currently
     // tuned. `station` is {name, sid} -- sid is the DAB SId captured by
-    // scripts/dab_channel_scan.py (broadcaster-assigned, stable across
+    // dab_channel_scan.py (broadcaster-assigned, stable across
     // scans/days), so favoriting/playing from here can match by exact
     // identity below instead of only the name-normalize fallback (still
     // used for a station scanned before sid capture existed, or one
@@ -971,3 +971,13 @@ class DabPanel {
 }
 
 window.DabPanel = DabPanel;
+
+if (typeof window.registerListenerPanel === 'function') {
+    window.registerListenerPanel({
+        tab: 'dab',
+        label: 'DAB+',
+        make: () => new DabPanel(),
+    });
+} else {
+    console.warn('DAB+ plugin: listener panel registry missing');
+}

@@ -9503,3 +9503,199 @@ split** -- of the original tab-by-tab candidates, only **DAB+** remains
 (Config sub-tab, more work than any of the six done so far); plain-FM
 **Radio stays explicitly out of scope** (different seam entirely -- would
 need the "sidebar" capability plus streamed audio, neither ever built).
+
+**LIVE-VERIFIED on the Pi, same day**: screenshot shows the Listener page
+with only `Radio`/`DAB+`/`DAB+ Config`/`Pagers` tabs (confirming the
+other five RTL-SDR plugins were simply not enabled for this check, not
+a problem), Pagers tab active and "listening on 172.4500 MHz" (correct
+frequency, Start/Stop/Clear all correctly stateful), and a real decoded
+message: `POCSAG1200 | 1000 | POCSAG1200: Address: 1000 Function: 3` --
+a genuine edge case (a tone-only page, Function 3 with no Alpha/Numeric
+text) correctly falling back to displaying the raw multimon-ng line
+since `message` parsed empty, exactly matching `_rowHtml`'s
+`m.message || m.raw` fallback design. All six RTL-SDR-family plugins
+(Pagers/POCSAG/P2000/RTL433/ACARS/ADS-B) are now confirmed individually
+working; only a side-by-side multi-enabled check remains as a nice-to-have,
+not a blocker.
+
+---
+
+## DAB+ extraction (plugins/apps/dab/) — the last RTL-SDR tab-by-tab candidate
+
+Same session, next task: "next should be naturaly dab+ + his config page
+thing we made." DAB+ was the last of the original tab-by-tab extraction
+candidates -- after this, Radio is the only Listener tab left built into
+core. Biggest of the seven extractions this session: a stream-proxying
+listener (welle-cli's own `/mp3/<sid>` piped through), an audit-logged
+NDJSON subprocess scan endpoint, two separate frontend panel classes
+(~1350 lines combined), a ~297-line CSS block, and a standalone script
+being relocated.
+
+**One design question asked and answered**: whether `scripts/
+dab_channel_scan.py` (a standalone, README-documented diagnostic script,
+runnable directly over SSH) should move into the plugin folder or stay in
+`scripts/`. User picked "Move into the plugin (Recommended)" -- matches
+every other plugin's self-containment principle even though it changes a
+path a user might reference directly. Moved via `git mv` to
+`plugins/apps/dab/dab_channel_scan.py`, its own docstring's `Usage:`
+examples updated to the new path, and its `--output` default is a
+hardcoded absolute path (`/opt/meshpoint/config/dab_channel_scan.json`)
+independent of its own file location, so no path-resolution change was
+needed there.
+
+**Backend**: `src/audio/dab_listener.py` -> `plugins/apps/dab/backend/
+listener.py` (near-verbatim -- `DabListener` doesn't reference the scan
+script at all, only `routes.py` does) and `src/api/routes/dab_routes.py`
+-> `plugins/apps/dab/backend/routes.py`, with the scan-script subprocess
+path changed from `resolve_meshpoint_root() / "scripts" / "dab_channel_
+scan.py"` to `Path(__file__).resolve().parent.parent / "dab_channel_
+scan.py"` (routes.py lives in `backend/`, so `.parent.parent` reaches the
+plugin root where the script now lives). `server.py`: removed the
+`dab_routes` import, the `DabListener` import, the `(dab_routes.router,
+False)` row from `_BUILTIN_ROUTERS`, and the `dab` `ListenerSpec` from
+`_BUILTIN_LISTENERS` (down to just `radio` now -- matches the pattern
+established across all six prior extractions this session).
+
+**Extra, not-previously-flagged reference found and fixed**: `src/api/
+terminal/command_catalog.py` had three hardcoded `/opt/meshpoint/scripts/
+dab_channel_scan.py` command strings (the Terminal tab's quick-command
+catalog, DAB+ scan presets) -- grepped every other plugin's category
+constants first to confirm this catalog has no similar entries for any
+of the other six extracted plugins (DAB+ was the only one with a
+standalone script referenced there), then updated all three to `/opt/
+meshpoint/plugins/apps/dab/dab_channel_scan.py`.
+
+**Tests**: `tests/test_dab_scan_route.py` (FastAPI-dependent, the scan
+route's 503/claim-release/command-construction tests) moved to `plugins/
+apps/dab/backend/tests/test_routes.py`, import path updated to `from
+plugins.apps.dab.backend import routes as dab_routes`. New `backend/
+tests/test_listener.py` written from scratch (DabListener never had unit
+tests at the core level before this extraction) -- 8 tests covering
+tune()/invalid-channel/missing-binary/dongle-contention, status() shape,
+the `_mux_poll_loop`'s ensemble-label/SNR/service-list parsing (including
+that a data-only service with no `url_mp3`, e.g. TPEG, is correctly
+skipped from the station list), stale-poll-doesn't-blank-existing-data,
+stop() clearing state, and a retune releasing+reclaiming the dongle
+correctly. Modeled directly on `plugins/apps/adsb/backend/tests/
+test_listener.py`'s fake-subprocess-with-real-StreamReader pattern.
+
+**Frontend**: `dab_panel.js` (973 lines, fully self-contained -- does NOT
+use `window.PagerPanel`, unlike Pagers/POCSAG/P2000/RTL433/ACARS) and
+`dab_config_panel.js` (378 lines) moved to `plugins/apps/dab/frontend/`,
+each gaining a `window.registerListenerPanel({tab, label, make})` call at
+the bottom (`dab`/`DAB+` and `dabconfig`/`DAB+ Config` respectively) --
+the same seam RTL433's plugin frontend already uses. `listener_panel.js`
+had a hardcoded `builtins` array (`{tab:'dab', panel: new
+window.DabPanel()}`, `{tab:'dabconfig', ...}`) that no other extraction
+this session needed to touch, since DAB+ was the only listener still
+wired that way (everyone else was already plugin-registered by the time
+this session started) -- replaced with `this._subPanels = (window.
+LISTENER_PANELS || []).map(...)`, i.e. now fully plugin-sourced with zero
+hardcoded entries; the `const dab = this._subPanels.find(...)` /
+`window.dabPanel = dab.panel` wiring right after it (used by
+`SidebarTelemetryRail`'s mini-player) needed no change since it already
+looked up by tab name generically. `listener_panel_registry.js`'s own
+doc comment ("Built-in tabs are NOT registered here") was now inaccurate
+(there ARE no more built-in-via-hardcoding tabs besides bespoke `radio`
+itself) -- reworded.
+
+**CSS**: confirmed via `awk`/grep that `frontend/css/listener.css`'s
+final 297 lines (902-1198) were an exclusively `.dab-`/`.dabcfg-`
+contiguous block (comment header at 902 makes the boundary obvious) --
+moved wholesale into `plugins/apps/dab/frontend/dab_panel.css`,
+`listener.css` truncated to 901 lines.
+
+**`scripts/install.sh` renumbering -- hit and caught my own bug this
+time**: first attempt processed the down-shift in DESCENDING order
+(25->24, 24->23, ...) which cascades wrong -- each pass re-matches
+headings already renamed by the previous pass (since e.g. after 25->24,
+there are now TWO headings labeled "24", so the next pass's "24->23"
+turns both into 23, etc.), collapsing every section from 9-25 down to a
+single "8". Caught via `grep -n "^# ── [0-9]"` showing eighteen headings
+all reading "8." before running `bash -n`. **Fixed by reverting the file
+via `git checkout` and redoing the whole edit set from scratch**, this
+time shifting in ASCENDING order (9->8, 10->9, ..., 25->24) so each
+rename target is already "settled" outside the remaining range before
+the next number is processed -- verified after with a Python sequential-
+number check (`nums == list(range(1, len(nums)+1))`) in addition to the
+usual `grep "section [0-9]"` cross-reference sweep (caught two more
+stale prose mentions: arduino-cli's own "section 10 below" x2, now
+section 9; "same as sections 7-8 above" for the redsea/welle.io
+idempotency note, now just "section 7"). **Lesson for next time a
+section needs removing**: renumber in the direction that shrinks the
+range first (ascending for a down-shift, descending for an up-shift),
+never the direction that grows collisions.
+
+Also removed the welle.io apt-install block (was section 8) entirely,
+rewrote the RTL-SDR block's own summary comment ("two decoders" ->
+"one", welle.io line removed, "for all three sub-pieces" -> "for both
+sub-pieces"), and rewrote both the top-of-file `--skip-rtlsdr` usage
+comment and its interactive echo prompt (both still said "FM/RDS, DAB+"
+as if DAB+ were core). RTL-SDR block is now down to 2 sub-tools
+(rtl-sdr lib, redsea) -- the smallest it's been across all seven
+extractions.
+
+Docs: `docs/API-ENDPOINTS.md` folded the four dedicated `/api/dab/*` rows
+into one generic row alongside the other six plugins' shared row
+(matching the established fold-into-shared-row pattern), and its RTL-SDR
+section intro sentence changed from "Only one of Radio / DAB+ ..." to
+"Only Radio holds the RTL-SDR dongle by default (... DAB+ plugins join
+that set ...)". `README.md`: removed the two dedicated DAB+/DAB+ Config
+bullets from the "What's Different" list and added one new bundled-plugin
+bullet in the same style as ACARS/RTL433/ADS-B/P2000/POCSAG/Pagers;
+rewrote the big RTL-SDR paragraph's "Radio and DAB+ (below) are the only
+two Listener tabs built into core now" -> "Radio is the only Listener tab
+built into core now", folded the previously-separate "Another tab, DAB+,
+wraps..." sentence into the same enumeration as ACARS/RTL433/ADS-B, and
+added `plugins/apps/dab/` to the bundled-plugins folder list; the
+`## Local API` endpoint table got the same fold as API-ENDPOINTS.md; the
+`### Optional: RTL-SDR Radio Listener` section's old "DAB+ (optional):
+install welle.io... installed automatically by scripts/install.sh"
+paragraph rewritten to match the RTL433/ADS-B plugin-install bullet
+style (`sudo bash plugins/apps/dab/setup.sh` / `sudo meshpoint plugin
+setup dab`); the "App plugins" architecture-overview paragraph's example
+list gained `**DAB+** (\`plugins/apps/dab/\`)` with a closing note that
+it was the last RTL-SDR tab extracted. `docs/CONFIGURATION.md` had
+nothing DAB+-specific to touch (confirmed by grep, same as every prior
+pass -- plugin config is documented generically there via the ACARS
+manifest example, not per-plugin).
+
+**Verified on the Mac**: `py_compile` clean on every touched/new Python
+file. **Correction to a standing assumption from every prior extraction
+this session**: the `pytest` binary on `PATH` (`/opt/homebrew/bin/
+pytest`, backed by a Python 3.11 install) actually DOES have `fastapi`
+resolvable -- confirmed by `pytest plugins/ -q` collecting and passing
+the new `test_routes.py` (FastAPI TestClient-based) alongside every
+stdlib-only plugin test, 61/61 green. It does NOT have `aiosqlite`,
+though -- `pytest tests/ -q` still fails to collect anything that
+imports `src.storage.database` (including the updated `tests/
+test_create_app_listeners.py` itself), consistent with the standing "no
+aiosqlite on the Mac" note; that specific file's own logic was verified
+by `py_compile` plus mirroring the exact working pattern from six prior
+passes, not by an actual live run -- still needs a CI/Pi run to confirm.
+`node --check` clean on `listener_panel.js`, `listener_panel_registry.js`,
+and both plugin frontend files. `bash -n` clean on `install.sh` after
+the (twice-redone) renumbering. Grepped the whole repo for every stale
+`src/audio/dab_listener` / `src/api/routes/dab_routes` / `scripts/
+dab_channel_scan.py` reference after the fact -- first pass caught the
+big ones (server.py, tests, install.sh, docs); a second, later sweep
+caught four more stale `scripts/dab_channel_scan.py` mentions sitting
+inside dab_panel.js/dab_config_panel.js's own inline comments (not
+docstrings, easy to miss) -- fixed those too, then re-swept clean.
+`ChangelogParser.parse_file` re-parse: v0.8.1 now has 48 bullets (was 47),
+new DAB+ bullet present.
+
+**NOT yet done / next steps**: **not live-verified on the Pi** -- next
+session should pull, restart, confirm DAB+/DAB+ Config are gone from the
+Listener page until enabled, then `sudo meshpoint plugin setup dab` +
+`plugins.dab.enabled: true` + restart, confirm both tabs work again
+(tune a channel, confirm station list decodes, confirm MP3 playback,
+confirm DAB+ Config's scan-results list and run-a-scan panel both work),
+and spot-check that Radio and any other currently-enabled plugins are
+unaffected. **This closes out the entire tab-by-tab RTL-SDR extraction
+project** -- all seven original candidates (RTL433, ADS-B, P2000,
+POCSAG, Pagers, then DAB+) are now plugins; Radio is the only Listener
+tab left in core, and no further extraction target has been identified.
+Plain-FM Radio itself stays explicitly out of scope for the same reason
+noted in every prior entry (different seam entirely -- would need the
+unbuilt "sidebar" capability plus streamed audio).

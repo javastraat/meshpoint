@@ -181,7 +181,7 @@ session gets `401 Unauthorized`. See `src/api/auth/dependencies.py` for the
 
 ## RTL-SDR listeners (Radio tab and friends)
 
-Only one of Radio / DAB+ may hold the RTL-SDR dongle at a time (the Pagers, POCSAG, P2000, RTL433, ADS-B and ACARS plugins join that set when installed -- see their own `plugins/apps/*/README.md`).
+Only Radio holds the RTL-SDR dongle by default (the Pagers, POCSAG, P2000, RTL433, ADS-B, ACARS and DAB+ plugins join that set when installed -- see their own `plugins/apps/*/README.md`).
 
 | Method | Path | Role | Description |
 |---|---|---|---|
@@ -189,12 +189,6 @@ Only one of Radio / DAB+ may hold the RTL-SDR dongle at a time (the Pagers, POCS
 | POST | `/api/listener/tune` | Admin | Tune the RTL-SDR: frequency, mode, squelch, gain, level, optional preset station label |
 | POST | `/api/listener/stop` | Admin | Stop the RTL-SDR listener |
 | GET | `/api/listener/stream` | Viewer | Live MP3 audio stream for the browser player |
-| GET | `/api/dab/status` | Viewer | DAB+ listener state: channel, ensemble label, SNR, decoded station list (sid, name, DLS text) |
-| POST | `/api/dab/tune` | Admin | Tune to a DAB+ channel/ensemble (e.g. `12C`) |
-| POST | `/api/dab/stop` | Admin | Stop the DAB+ listener |
-| GET | `/api/dab/stream/{sid}` | Viewer | Live MP3 audio stream for one DAB+ station, proxied from welle-cli |
-| GET | `/api/dab/scan-results` | Viewer | Channels found by `scripts/dab_channel_scan.py`, read from its JSON output |
-| PUT | `/api/dab/scan-results/{channel}/name` | Admin | Set (or, with an empty string, clear) a custom display name for a scanned channel |
 
 ---
 

@@ -1,7 +1,7 @@
 /**
- * DAB+ Config tab -- shows what scripts/dab_channel_scan.py found (read
- * from its JSON output via GET /api/dab/scan-results) and lets an admin
- * set a friendlier display name per channel (PUT .../scan-results/{ch}/name),
+ * DAB+ Config tab -- shows what dab_channel_scan.py found (read from its
+ * JSON output via GET /api/dab/scan-results) and lets an admin set a
+ * friendlier display name per channel (PUT .../scan-results/{ch}/name),
  * layered on top of the raw broadcast ensemble label without touching it.
  * Also runs the scan itself (POST /api/dab/scan/stream) with live output,
  * instead of CLI-only over SSH.
@@ -291,7 +291,7 @@ class DabConfigPanel {
         });
     }
 
-    /** Runs scripts/dab_channel_scan.py via POST /api/dab/scan/stream and
+    /** Runs dab_channel_scan.py via POST /api/dab/scan/stream and
      * streams its output live -- same NDJSON pattern as the Meshtastic/
      * MeshCore/POCSAG firmware-flash cards (window.UpdateStreamClient).
      * On success, reloads the channel list below so newly-scanned content
@@ -376,3 +376,13 @@ class DabConfigPanel {
 }
 
 window.DabConfigPanel = DabConfigPanel;
+
+if (typeof window.registerListenerPanel === 'function') {
+    window.registerListenerPanel({
+        tab: 'dabconfig',
+        label: 'DAB+ Config',
+        make: () => new DabConfigPanel(),
+    });
+} else {
+    console.warn('DAB+ plugin: listener panel registry missing');
+}

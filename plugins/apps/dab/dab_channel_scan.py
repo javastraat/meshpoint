@@ -15,9 +15,9 @@ sdr_registry.py) -- if another listener is running, welle-cli will just
 fail to open the device for every channel.
 
 Usage:
-    python3 scripts/dab_channel_scan.py                  # all 38 channels, 30s each
-    python3 scripts/dab_channel_scan.py --channels 12C 11C 9C
-    python3 scripts/dab_channel_scan.py --timeout 45     # slower/weaker antenna
+    python3 plugins/apps/dab/dab_channel_scan.py                  # all 38 channels, 30s each
+    python3 plugins/apps/dab/dab_channel_scan.py --channels 12C 11C 9C
+    python3 plugins/apps/dab/dab_channel_scan.py --timeout 45     # slower/weaker antenna
 
 Results merge into --output by default: rerunning against a single channel
 (or any subset) only updates those channels' entries in the existing JSON

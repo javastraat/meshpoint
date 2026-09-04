@@ -25,9 +25,9 @@ pocsag_firmware_routes.py's board-select handling, just a numeric
 literal instead of a comment-toggle.
 
 ``_ndjson``/``_stream_subprocess`` are duplicated from pocsag_firmware_routes.py
-rather than shared -- matches the existing convention (dab_routes.py,
-meshcore_firmware_routes.py, and meshtastic_firmware_routes.py each keep
-their own copy too), not a new pattern introduced here.
+rather than shared -- matches the existing convention (the DAB+ plugin's
+routes.py, meshcore_firmware_routes.py, and meshtastic_firmware_routes.py
+each keep their own copy too), not a new pattern introduced here.
 """
 
 from __future__ import annotations

@@ -1,0 +1,18 @@
+name = "dab"
+version = "1.0.0"
+meshpoint_api = 1
+provides = ["listener", "routes", "panel"]
+locked = true  # shipped with this fork -- not user-installed, can't be deleted
+
+[deps]
+apt = ["welle.io"]
+setup = "setup.sh"
+
+[frontend]
+scripts = ["frontend/dab_panel.js", "frontend/dab_config_panel.js"]
+styles = ["frontend/dab_panel.css"]
+
+[meta]
+description = "DAB/DAB+ digital radio via welle-cli -- channel scan, live tuning/playback, and per-channel display names"
+homepage = "https://github.com/AlbrechtL/welle.io"
+author = "Einstein PD2EMC"

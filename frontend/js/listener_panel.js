@@ -381,24 +381,17 @@ class ListenerPanel {
         // Every non-radio Listener sub-tab, in tabbar order. Each entry is
         // {tab, label, panel} where panel has mount(el)/show()/hide(). The
         // `radio` tab is bespoke (audio element + skins) and handled as the
-        // default branch, not from here. Plugins append their own entries via
-        // window.registerListenerPanel (see listener_panel_registry.js) and
-        // render after these built-ins.
-        // `dab` shares the one RTL-SDR dongle (src/audio/sdr_registry.py) with
-        // Radio, so only one of Radio/DAB+ runs at a time among these two
-        // built-ins (the Pagers/POCSAG/P2000/RTL433/ACARS/ADS-B plugins join
-        // that same set when installed -- none of those built-in anymore,
-        // window.PagerPanel itself stays core purely as shared UI those
-        // plugins' own tiny frontend files instantiate); 'dabconfig' is a
-        // read-only view over the channel-scan JSON and sits out that dance.
-        const builtins = [
-            { tab: 'dab', label: 'DAB+', panel: window.DabPanel ? new window.DabPanel() : null },
-            { tab: 'dabconfig', label: 'DAB+ Config', panel: window.DabConfigPanel ? new window.DabConfigPanel() : null },
-        ];
-        const plugins = (window.LISTENER_PANELS || []).map((d) => ({
-            tab: d.tab, label: d.label, panel: d.make ? d.make() : d.panel,
-        }));
-        this._subPanels = [...builtins, ...plugins].filter((d) => d && d.panel);
+        // default branch, not from here. Radio is the only RTL-SDR listener
+        // still built into core -- every other tab (DAB+/DAB+ Config/Pagers/
+        // POCSAG/P2000/RTL433/ACARS/ADS-B) is a plugin appending its own
+        // entry via window.registerListenerPanel (see
+        // listener_panel_registry.js); window.PagerPanel stays core purely
+        // as shared UI several of those plugins' own tiny frontend files
+        // instantiate. All of them share the one RTL-SDR dongle
+        // (src/audio/sdr_registry.py) with Radio, so only one runs at a time.
+        this._subPanels = (window.LISTENER_PANELS || [])
+            .map((d) => ({ tab: d.tab, label: d.label, panel: d.make ? d.make() : d.panel }))
+            .filter((d) => d && d.panel);
 
         // Exposed so SidebarTelemetryRail's mini-player can show/control
         // DAB+ playback too -- mirrors window.listenerPanel below.

@@ -49,7 +49,6 @@ from src.api.routes import (
     auth_config_routes,
     auth_routes,
     config_routes,
-    dab_routes,
     dangerous_routes,
     device,
     device_config_routes,
@@ -105,7 +104,6 @@ from src.api.terminal import CommandCatalog, SessionManager
 from src.api.update import ReleaseChannelRegistry, UpdateApplier
 from src.api.update.rollback_state import resolve_rollback_state_path
 from src.api.upstream_client import UpstreamClient
-from src.audio.dab_listener import DabListener
 from src.audio.rtl_listener import RtlListener
 from src.api.websocket_manager import WebSocketManager
 from src.config import AppConfig, SerialDeviceConfig, load_config, validate_activation
@@ -209,7 +207,6 @@ _BUILTIN_ROUTERS: list[tuple] = [
     (reticulum_config_routes.router, False),
     (emergency_pager_routes.router, False),
     (listener_routes.router, False),
-    (dab_routes.router, False),
     (spectrum_routes.router, False),
     (meshtastic_routes.router, False),
     (meshcore_routes.router, False),
@@ -226,7 +223,6 @@ _BUILTIN_LISTENERS: list[listener_registry.ListenerSpec] = [
     listener_registry.ListenerSpec(
         "radio", RtlListener, listener_routes.init_routes,
     ),
-    listener_registry.ListenerSpec("dab", DabListener, dab_routes.init_routes),
 ]
 
 

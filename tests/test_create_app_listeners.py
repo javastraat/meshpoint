@@ -21,13 +21,10 @@ from fastapi.testclient import TestClient
 
 from src.api import listener_registry
 from src.api.listener_registry import ListenerSpec
-from src.api.routes import (
-    dab_routes,
-    listener_routes,
-)
+from src.api.routes import listener_routes
 from src.api.server import _BUILTIN_LISTENERS
 
-_EXPECTED_NAMES = ["radio", "dab"]
+_EXPECTED_NAMES = ["radio"]
 
 
 class TestBuiltinListenerList(unittest.TestCase):
@@ -42,20 +39,18 @@ class TestBuiltinListenerList(unittest.TestCase):
             self.assertTrue(callable(s.wire))
 
     def test_start_all_wires_every_route_module(self) -> None:
-        for mod in (listener_routes, dab_routes):
+        for mod in (listener_routes,):
             getattr(mod, "reset_routes", lambda: None)()
 
         listener_registry.start_all(_BUILTIN_LISTENERS)
         try:
-            # one entry per init_routes call. Pagers, P2000 and POCSAG
-            # (the former three kinds src/audio/pager_listener.py used to
-            # cover) are all plugins now -- nothing pager-related is
-            # built-in anymore.
+            # one entry per init_routes call. Pagers/P2000/POCSAG/RTL433/
+            # ADS-B/DAB+ (the RTL-SDR tabs that used to be built-in) are
+            # all plugins now -- radio is the only built-in listener left.
             names = [n for n, _ in listener_registry.live()]
             self.assertEqual(names, _EXPECTED_NAMES)
 
             self.assertIsNotNone(listener_routes._listener)
-            self.assertIsNotNone(dab_routes._listener)
         finally:
             asyncio.run(listener_registry.stop_all())
 
@@ -63,9 +58,9 @@ class TestBuiltinListenerList(unittest.TestCase):
         listener_registry.start_all(_BUILTIN_LISTENERS)
         try:
             app = FastAPI()
-            app.include_router(dab_routes.router)
+            app.include_router(listener_routes.router)
             client = TestClient(app)
-            resp = client.get("/api/dab/status")
+            resp = client.get("/api/listener/status")
             self.assertEqual(resp.status_code, 200)
             self.assertFalse(resp.json().get("running"))
         finally:
@@ -101,7 +96,7 @@ class TestBuiltinListenerRouterAlignment(unittest.TestCase):
         from src.api.server import _BUILTIN_ROUTERS
 
         prefixes = {getattr(r, "prefix", "") for r, _ in _BUILTIN_ROUTERS}
-        self.assertIn("/api/dab", prefixes)
+        self.assertIn("/api/listener", prefixes)
 
 
 if __name__ == "__main__":  # pragma: no cover
