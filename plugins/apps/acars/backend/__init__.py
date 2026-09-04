@@ -16,4 +16,13 @@ def register(reg) -> None:
     from .routes import init_routes, router
 
     reg.add_router(router)
-    reg.add_listener("acars", AcarsListener, init_routes)
+    cfg = reg.config
+
+    def build() -> AcarsListener:
+        return AcarsListener(
+            frequencies=cfg.get("freqs"),
+            gain=cfg.get("gain"),
+            device=cfg.get("device"),
+        )
+
+    reg.add_listener("acars", build, init_routes)

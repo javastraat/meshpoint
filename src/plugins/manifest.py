@@ -51,7 +51,7 @@ MANIFEST_NAME = "plugin.toml"
 
 _SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]{1,38}$")
 
-KNOWN_PROVIDES = frozenset({"listener", "routes", "panel", "config"})
+KNOWN_PROVIDES = frozenset({"listener", "routes", "panel"})
 
 # Where a plugin folder was found. Built-ins ship in the repo under
 # src/plugins/apps/ and load unless explicitly disabled; community drop-ins

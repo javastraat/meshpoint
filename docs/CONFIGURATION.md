@@ -1186,8 +1186,12 @@ plugins:
     # frequencies, gain, RTL device, etc. Meshpoint stores it verbatim and
     # hands it to the plugin; it is never checked against the core schema, so
     # a typo here won't show up in the "unknown config key" warning.
+    #
+    # ACARS reads these three (all optional, shown here at their defaults —
+    # the European channel set / airband gain / first RTL-SDR device):
     freqs: [131.525, 131.725, 131.800, 131.825]
     gain: 34
+    device: 0
 ```
 
 A plugin folder holds a `plugin.toml` manifest:

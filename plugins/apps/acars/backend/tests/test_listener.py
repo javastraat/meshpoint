@@ -105,7 +105,7 @@ class TestAcarsListener(unittest.IsolatedAsyncioTestCase):
             {"running", "frequencies", "message_count", "messages",
              "last_error", "dongle_owner"},
         )
-        self.assertEqual(st["frequencies"], acars_listener._FREQUENCIES)
+        self.assertEqual(st["frequencies"], acars_listener._DEFAULT_FREQUENCIES)
         self.assertEqual(st["message_count"], 2)
 
     async def test_clear_empties_buffer(self) -> None:
@@ -123,6 +123,65 @@ class TestAcarsListener(unittest.IsolatedAsyncioTestCase):
         sdr_registry.claim("adsb")
         with self.assertRaises(RuntimeError):
             await AcarsListener().start()
+
+    async def test_config_overrides_are_used_in_the_command_line(self) -> None:
+        proc = _FakeProc(_reader(eof=False), _reader())
+        lis = AcarsListener(frequencies=["136.900"], gain="20", device="1")
+        captured = {}
+
+        async def _fake_exec(*args, **kwargs):
+            captured["args"] = args
+            return proc
+
+        with mock.patch("asyncio.create_subprocess_exec", new=_fake_exec):
+            with mock.patch.object(acars_listener, "_START_CHECK_SECS", 0.02):
+                await lis.start()
+        await lis.stop()
+
+        self.assertEqual(captured["args"][captured["args"].index("-g") + 1], "20")
+        self.assertEqual(
+            captured["args"][captured["args"].index("--rtlsdr") + 1], "1",
+        )
+        self.assertEqual(captured["args"][-1], "136.900")
+        self.assertEqual(lis.status()["frequencies"], ["136.900"])
+
+
+class TestNormalizeFrequencies(unittest.TestCase):
+    def test_none_falls_back_to_default(self) -> None:
+        self.assertEqual(
+            acars_listener._normalize_frequencies(None),
+            acars_listener._DEFAULT_FREQUENCIES,
+        )
+
+    def test_empty_list_falls_back_to_default(self) -> None:
+        self.assertEqual(
+            acars_listener._normalize_frequencies([]),
+            acars_listener._DEFAULT_FREQUENCIES,
+        )
+
+    def test_blank_entries_are_dropped(self) -> None:
+        self.assertEqual(
+            acars_listener._normalize_frequencies(["131.725", "", "  ", "131.800"]),
+            ["131.725", "131.800"],
+        )
+
+    def test_all_blank_falls_back_to_default(self) -> None:
+        self.assertEqual(
+            acars_listener._normalize_frequencies(["", "  "]),
+            acars_listener._DEFAULT_FREQUENCIES,
+        )
+
+    def test_non_string_entries_are_stringified(self) -> None:
+        self.assertEqual(
+            acars_listener._normalize_frequencies([131.725, 131.8]),
+            ["131.725", "131.8"],
+        )
+
+    def test_not_a_list_falls_back_to_default(self) -> None:
+        self.assertEqual(
+            acars_listener._normalize_frequencies("131.725"),
+            acars_listener._DEFAULT_FREQUENCIES,
+        )
 
 
 if __name__ == "__main__":  # pragma: no cover

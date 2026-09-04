@@ -35,6 +35,24 @@ routes and its dashboard tab, all under `plugins/apps/acars/`, wired through
 Shares the one RTL-SDR dongle with the FM / Pager / RTL433 / DAB+ / ADS-B
 listeners (only one active at a time; stop the other one first).
 
+## Configuration
+
+All optional, under `plugins.acars` in `local.yaml` (restart to apply):
+
+```yaml
+plugins:
+  acars:
+    enabled: true
+    freqs: [131.525, 131.725, 131.800, 131.825]  # default: the EU channels above
+    gain: 34                                     # default: 34 (not AGC -- airband
+                                                   # AGC overloads on strong ground stations)
+    device: 0                                    # default: 0 (RTL-SDR device index)
+```
+
+An unset or invalid `freqs` (missing key, not a list, all-blank entries) falls
+back to the default EU channel set rather than starting acarsdec with no
+channels at all.
+
 ## Layout
 
 ```

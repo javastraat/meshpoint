@@ -8007,20 +8007,26 @@ AFTER `app.js`'s `new ListenerPanel()`, so the tab never registered. Now
 plain `<script>` (matches every other dashboard script, runs at the marker
 before app.js). Backend loaded fine throughout (`plugins: 1 of 1 loaded (acars)`).
 
-**B5 Pi verification checklist (as of 2026-09-02 — deployed, backend confirmed
-`loaded community plugin acars v1.0.0`; tab/decode still to confirm after a
-hard browser refresh):**
-| Check | How | Expect |
-|---|---|---|
-| Tab appears | hard-refresh dashboard (Ctrl-Shift-R) -> Listener | ACARS tab next to ADS-B |
-| Assets load | DevTools Network, filter `acars` | `acars_panel.js` + `.css` both 200, not 404 |
-| Decoding | ACARS tab -> Start listening | messages arrive; ADS-C/POS rows render (coord link + details toggle) |
-| setup.sh idempotent | `sudo bash plugins/apps/acars/setup.sh` | "acarsdec already installed ... nothing to do", exit 0 |
-| setup.sh build path (optional) | `sudo rm -rf /opt/acarsdec /opt/libacars /usr/local/bin/acarsdec /usr/local/lib/libacars*; sudo ldconfig; sudo bash plugins/apps/acars/setup.sh` | clone+cmake+make ~2-3min, then `acarsdec --version` works |
-| Disable path | `plugins.acars.enabled: false`, restart | log: `acars ... present but not enabled`; tab gone; boot clean |
+**B5 Pi verification checklist — LIVE-VERIFIED 2026-09-03.** Tab, assets, and
+decode path all confirmed on real traffic (Schiphol approach, poor
+line-of-sight for aircraft still low/inbound but clean once over Amsterdam --
+receiver had a long quiet stretch first, not a bug). 3 real messages: a KLM
+POS report (`KL0843 PH-BQH`, full lat/lon/alt/fuel line, coord-linkable) and
+two raw H1 telemetry frames from a Singapore Airlines aircraft (`SQ7352
+9V-SFK`) -- H1 correctly stayed raw/undecoded (carrier-proprietary, by
+design, not a gap). Start/Stop/Clear all exercised via the Settings-adjacent
+B6 work session.
+| Check | How | Expect | Result |
+|---|---|---|---|
+| Tab appears | Listener -> ACARS | ACARS tab next to ADS-B | ✅ |
+| Assets load | Start listening actually reached the backend | `acars_panel.js`/`.css` loaded | ✅ (implied by working Start button) |
+| Decoding | ACARS tab -> Start listening | messages arrive; POS renders, H1 raw | ✅ real traffic, both message shapes correct |
+| setup.sh idempotent | `sudo bash plugins/apps/acars/setup.sh` | "already installed ... nothing to do" | not re-tested this session (already run 2026-09-02) |
+| setup.sh build path (optional) | full rebuild from clean | `acarsdec --version` works | not re-tested this session |
+| Disable path | `plugins.acars.enabled: false`, restart | tab gone, clean boot | not re-tested this session (still enabled + working, no reason to toggle) |
 
 There is NO `meshpoint plugin` CLI yet -- that's B4d (not built). Nothing CLI
-to test for B5.
+to test for B5. **B5 is now fully done, tab-to-decode, nothing outstanding.**
 
 **B6 — Plugins management page (2026-09-02, DONE, not yet live-verified)**:
 Settings → Plugins sub-page. Backend: `src/api/routes/plugin_routes.py`
@@ -8076,19 +8082,66 @@ own), `_bootPluginsPanel(router)` wired in next to `_bootDangerousPanel`, a
 command-palette entry added. `node --check`ed both JS files; CSS brace count
 balanced (212/212).
 
-**Not yet live-verified** — needs a Pi reload to confirm: the page lists
-ACARS (currently deployed) with correct enabled/loaded state, the toggle
-actually flips `plugins.acars.enabled` in `local.yaml` and survives a
-restart, a 403 surfaces correctly for a non-admin session (viewer role can't
-reach Settings at all per the existing route guard, so this may only be
-testable by temporarily demoting the admin session), and the `.r-switch`
-CSS renders correctly across at least the dark theme (never previously
-exercised in a real layout).
+**Live-verified 2026-09-04**: page lists ACARS with correct enabled/loaded
+state, dark-theme table layout confirmed matching the Themes page style
+(after two rounds of CSS fixes — the `.r-switch` translucent-fill issue and
+the missing card wrapper). **Toggle off + restart round-trip confirmed by
+the user**: flipping the switch off persisted `plugins.acars.enabled: false`
+to `local.yaml`, and after a restart the plugin no longer shows up under
+RTL-SDR/the listener list at all — exactly the intended "disabled = not
+loaded" behavior. Still open: a 403 for a non-admin session (untested —
+viewer role can't reach Settings at all per the existing route guard, so
+this may only be testable by temporarily demoting the admin session), and
+light/high-contrast theme rendering after the final CSS fixes (only dark
+was re-screenshotted after the switch-color + card-wrapper fixes landed).
+
+**B7 — ACARS freqs/gain/device are now real config, "config" provides
+dropped (2026-09-04, DONE, not yet live-verified)**: `plugins/apps/acars/
+backend/listener.py` — `AcarsListener.__init__` now takes `frequencies`/
+`gain`/`device` (all optional), replacing the module constants `_FREQUENCIES`/
+`_GAIN`/`_DEVICE` with `_DEFAULT_FREQUENCIES`/`_DEFAULT_GAIN`/
+`_DEFAULT_DEVICE` used as fallbacks. New `_normalize_frequencies(value)`:
+anything not a non-empty list of stringifiable, non-blank entries falls back
+to the default EU channel set — an unset/typo'd `freqs` degrades to the old
+hardcoded behaviour instead of starting `acarsdec` with zero channels.
+`backend/__init__.py`'s `register(reg)` now builds the listener via a closure
+reading `reg.config.get("freqs"/"gain"/"device")` (the plugin's own opaque
+`plugins.acars.*` config, already generically plumbed since B4b — no new
+capability needed). Decided the "wire or drop" question in the memory note
+by dropping: removed `"config"` from `KNOWN_PROVIDES` in
+`src/plugins/manifest.py` — nothing ever gated behaviour on it (unlike
+`"routes"`/`"listener"` which gate `add_router`/`add_listener`, or `"panel"`
+which manifest-parse-time-validates `frontend_scripts`), every plugin already
+gets `reg.config` unconditionally regardless of `provides`, and no plugin
+anywhere declared it — so it was a schema placeholder with zero behaviour
+that only invited confusion. Docs: `docs/CONFIGURATION.md`'s plugins example
+extended with `device: 0`; new "## Configuration" section in
+`plugins/apps/acars/README.md` documenting all three keys and the
+fallback-on-invalid behaviour. Tests: `test_listener.py` gained
+`test_config_overrides_are_used_in_the_command_line` (asserts `-g`/
+`--rtlsdr`/the frequency argv actually reflect constructor overrides) and a
+new `TestNormalizeFrequencies` class (6 cases: None, empty list, blank
+entries dropped, all-blank fallback, non-string coercion, non-list
+fallback); existing `test_status_shape` updated for the `_DEFAULT_FREQUENCIES`
+rename. All 51 plugin-related tests (`test_plugin_loader.py` +
+`test_plugin_manifest.py` + the acars listener tests, including the
+FastAPI-gated `TestShippedAcarsPlugin` which exercises the real
+`register(reg)` closure end-to-end) pass in a throwaway venv matching CI's
+FastAPI 0.141/Starlette 1.6. `ruff check` clean on all changed files.
+**Not yet live-verified** — needs a Pi restart + a check that `local.yaml`
+overrides (e.g. a non-default `gain`) actually show up in the `acarsdec`
+startup log line the user already knows to look for
+(`ACARS listener starting: acarsdec ...`).
 
 **Remaining plugin work** (full write-up: "Plugin system — remaining work" in
 `memory/plugin-architecture-review.md`; sketches in `memory/themes-next-todo.md`):
-- **B7** — plugin config schema (stop ACARS hardcoding freqs/gain; wire or drop
-  `provides=["config"]`). Next up.
+- **B6 leftovers (open)** — user deliberately deferred these, not forgotten:
+  a 403 check for a non-admin session hitting `PUT /api/plugins/{id}`
+  (untested — viewer role can't reach Settings at all per the existing route
+  guard, so this may only be testable by temporarily demoting the admin
+  session), and re-screenshotting light/high-contrast theme rendering after
+  the two post-launch CSS fixes (`.r-switch` solid fill, `.auth-card`
+  wrapper) — only dark was re-confirmed after those landed.
 - **B4d** — `meshpoint plugin setup <id>` deps-consent CLI + `plugins list`.
   Optional/low priority (setup.sh already works as `sudo bash`).
 - **B8** — community plugin uninstall button (delete `plugins/apps/<id>/`).

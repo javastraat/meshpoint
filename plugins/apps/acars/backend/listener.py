@@ -43,11 +43,12 @@ _OWNER = "acars"
 
 # The primary European ACARS VHF channels. 131.725 is the primary EU
 # frequency; 131.800 is the ARINC channel heavily used around Schiphol.
-# Hardcoded like Rtl433Listener's 433.92 default -- one region's channels,
-# tunable later if it ever needs to be.
-_FREQUENCIES = ["131.525", "131.725", "131.800", "131.825"]
-_GAIN = "34"     # not AGC -- airband AGC overloads on strong ground stations
-_DEVICE = "0"
+# Used when plugins.acars.freqs/gain/device aren't set in local.yaml --
+# still one region's channels by default, but now overridable per-deployment
+# instead of a recompile-to-change constant.
+_DEFAULT_FREQUENCIES = ["131.525", "131.725", "131.800", "131.825"]
+_DEFAULT_GAIN = "34"  # not AGC -- airband AGC overloads on strong ground stations
+_DEFAULT_DEVICE = "0"
 
 _ERROR_RE = re.compile(
     r"failed|error|cannot|could not|invalid|no supported|usb_|no data from",
@@ -55,10 +56,24 @@ _ERROR_RE = re.compile(
 )
 
 
+def _normalize_frequencies(value) -> list:
+    """``plugins.acars.freqs`` from YAML -> a list of non-empty strings for
+    acarsdec's argv. Falls back to the default channel set on anything not
+    a non-empty list (missing key, wrong type, all-blank entries) rather
+    than starting acarsdec with no channels at all."""
+    if not isinstance(value, list):
+        return list(_DEFAULT_FREQUENCIES)
+    freqs = [str(f).strip() for f in value if str(f).strip()]
+    return freqs or list(_DEFAULT_FREQUENCIES)
+
+
 class AcarsListener:
     """Owns one acarsdec process decoding ACARS messages as JSON events."""
 
-    def __init__(self) -> None:
+    def __init__(self, frequencies=None, gain=None, device=None) -> None:
+        self._frequencies = _normalize_frequencies(frequencies)
+        self._gain = str(gain).strip() if gain not in (None, "") else _DEFAULT_GAIN
+        self._device = str(device).strip() if device not in (None, "") else _DEFAULT_DEVICE
         self._proc: Optional[asyncio.subprocess.Process] = None
         self._reader_task: Optional[asyncio.Task] = None
         self._stderr_task: Optional[asyncio.Task] = None
@@ -105,7 +120,7 @@ class AcarsListener:
     def status(self) -> dict:
         return {
             "running": self.running,
-            "frequencies": _FREQUENCIES,
+            "frequencies": self._frequencies,
             "message_count": len(self.messages),
             "messages": list(self.messages),
             "last_error": self._last_error,
@@ -120,10 +135,10 @@ class AcarsListener:
         cmd = [
             "acarsdec",
             "--output", "json:file:path=-",
-            "-g", _GAIN,
+            "-g", self._gain,
             "-e",  # drop empty / Q0 keep-alive frames
-            "--rtlsdr", _DEVICE,
-            *_FREQUENCIES,
+            "--rtlsdr", self._device,
+            *self._frequencies,
         ]
         logger.info("ACARS listener starting: %s", " ".join(cmd))
         self._last_error = ""
