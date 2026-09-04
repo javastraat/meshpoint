@@ -8199,7 +8199,7 @@ plugin-related tests total, all pass in the throwaway venv (FastAPI
 0.141/Starlette 1.6). `ruff check` clean; `node --check` clean.
 
 **B4d — `meshpoint plugin list` / `meshpoint plugin setup <id>`
-(2026-09-04, DONE, not yet live-verified)**: User revisited this after B8,
+(2026-09-04, DONE, LIVE-VERIFIED)**: User revisited this after B8,
 wanting it usable from the dashboard's web Terminal too -- no new work
 needed there since that Terminal is a real login shell on the device
 (`os.forkpty()`, `src/api/terminal/pty_session.py`); once `meshpoint` picks
@@ -8252,23 +8252,65 @@ the exact expected argv, a non-zero exit code is propagated) --
 both are deferred-imported inside the function body, so patching the
 source name (not a `plugin_command.`-qualified one) is what actually takes
 effect. Full suite re-run after this change: 1516 passed (up from 1487),
-`ruff check` + `node --check` still clean. **Not yet live-verified** — the
-Mac has no `sudo`/apt/a real `meshpoint` symlink to test the actual
-install-and-confirm flow or the web-Terminal angle end to end; needs a Pi
-check of `meshpoint plugin list` (with the service running) and `sudo
-meshpoint plugin setup <some-community-plugin>` from both an SSH shell and
-the dashboard's own Terminal tab.
+`ruff check` + `node --check` still clean.
+
+**LIVE-VERIFIED 2026-09-04** (from a real Pi SSH shell): `meshpoint plugin
+list` showed acars correctly as `community`, `enabled, loaded`, with the
+apt-deps hint pointing at `meshpoint plugin setup acars`. `meshpoint plugin
+setup acars` confirmed BOTH branches for real: run once with `acarsdec`
+already on `PATH` -> correctly no-opped (`acarsdec already installed ...
+nothing to do`) after a `y` confirm; user then deliberately `sudo rm
+/usr/local/bin/acarsdec` and re-ran it -> the full clone+cmake+build+install
+path (libacars fully built and installed, acarsdec's own clone+cmake
+starting) streamed live to the terminal exactly as designed, output only
+cut off by the paste's own length limit, not an error. Confirms the y/N
+confirm, deps/script display, and live-streamed `sudo bash` output all work
+end to end on real hardware. (Not separately re-tested from the dashboard's
+own web Terminal tab specifically, but that's just a regular login shell --
+already covered by the "it's `/usr/local/bin/meshpoint`, works from any
+shell" reasoning, not expected to differ.)
 
 **Remaining plugin work** (full write-up: "Plugin system — remaining work" in
 `memory/plugin-architecture-review.md`; sketches in `memory/themes-next-todo.md`):
-- **B6 leftovers (open)** — user deliberately deferred these, not forgotten:
-  a 403 check for a non-admin session hitting `PUT /api/plugins/{id}`
-  (untested — viewer role can't reach Settings at all per the existing route
-  guard, so this may only be testable by temporarily demoting the admin
-  session), and re-screenshotting light/high-contrast theme rendering after
-  the two post-launch CSS fixes (`.r-switch` solid fill, `.auth-card`
-  wrapper) — only dark was re-confirmed after those landed.
-- Unfinished capability surface (decoder/capture-source/sidebar-page seams,
-  sidebar badge label) + docs debt (`docs/PLUGINS.md`) — see the review doc.
+- **B6 leftover, open** — a 403 check for a non-admin session hitting `PUT
+  /api/plugins/{id}` (untested — viewer role can't reach Settings at all per
+  the existing route guard, so this may only be testable by temporarily
+  demoting the admin session).
+- **B6 light/high-contrast re-screenshot — LIVE-VERIFIED 2026-09-04.** User
+  posted both: light theme shows a solid teal switch + white knob (matches
+  the `.r-switch` fix), high-contrast shows it in bright cyan against the
+  near-black background (the original "almost not visible" complaint this
+  fix targeted) — both clearly legible, `auth-card` wrapper and badge
+  styling holding up consistently across themes.
+- **`docs/PLUGINS.md` — DONE 2026-09-04.** New "how to write a plugin"
+  guide (author-facing, separate from `docs/CONFIGURATION.md`'s § Plugins
+  which stays admin/user-facing "how to use one"). Sections: what a plugin
+  can/can't do, directory layout + tier (`src/plugins/apps/` builtin vs
+  `plugins/apps/` community), full `plugin.toml` field reference (including
+  `locked`), the `register(reg)`/`PluginRegistry` API (`add_router`,
+  `add_listener`, `reg.config`) with the real ACARS `backend/__init__.py`
+  as the worked snippet, adding a Listener-tab panel
+  (`window.registerListenerPanel`), a plugin's own opaque `plugins.<id>`
+  config (again using ACARS's `_normalize_frequencies` as the
+  validate-and-fall-back worked example), `setup.sh` conventions, testing
+  (deferred imports so `backend.*` unit-tests without fastapi; the
+  `_HAS_FASTAPI` skip-gate pattern from `test_plugin_loader.py`), and
+  Settings→Plugins/the CLI as the operator-facing management surface.
+  Closes with **Current limitations** explicitly naming the four unbuilt
+  seams (decoder, non-RTL-SDR capture source, top-level sidebar page,
+  plugin-contributed settings sub-page) as *don't build around these,
+  extend the seam instead* — framed as anticipated (not hypothetical) since
+  **the user flagged LoRaWAN/Pager as likely candidates to eventually
+  extract into plugins the same way ACARS was**, which is exactly the kind
+  of real need that would justify actually building one of these seams
+  later. Cross-linked from `README.md`'s Plugins bullet and
+  `CONFIGURATION.md`'s § Plugins intro. Every code snippet/factual claim
+  checked against the real files before writing (KNOWN_PROVIDES, CI
+  command, `__init__.py` layout, the exact `registerListenerPanel` call
+  ACARS actually makes) rather than written from memory. **No code
+  written** — this was explicitly a docs-only ask; the four seams
+  themselves are still not built, correctly still deferred until a
+  concrete plugin (LoRaWAN/Pager extraction or otherwise) actually needs
+  one.
 - NOT planned unless external demand: out-of-tree install, pip deps, subprocess
   isolation, SemVer contract.

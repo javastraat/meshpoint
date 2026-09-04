@@ -1,0 +1,311 @@
+# Writing a Meshpoint Plugin
+
+A how-to for building a new app plugin from scratch. For *using* an
+already-written plugin (enabling it, setting its config, the Settings →
+Plugins page, the `meshpoint plugin` CLI), see
+[docs/CONFIGURATION.md § Plugins](CONFIGURATION.md#plugins) instead — this
+doc is for the plugin author.
+
+The canonical worked example is the shipped **ACARS** plugin —
+[`plugins/apps/acars/`](../plugins/apps/acars/). Every section below points
+at the real file that does the thing being described. When in doubt, go
+read that file; it's real, tested, shipped code, not a toy example.
+
+---
+
+## What a plugin can do today
+
+An app plugin is out-of-core code that hooks three seams:
+
+- **Routes** — mount a FastAPI `APIRouter` under `/api/<whatever>`.
+- **Listener** — register an RTL-SDR subprocess listener (built idle at
+  startup, started on demand by its own `/start` route, sharing the one
+  physical dongle with every other listener — see
+  `src/audio/sdr_registry.py`).
+- **Panel** — add a sub-tab to the dashboard's Listener page.
+
+That's it. A plugin **cannot** (yet) add a packet *decoder* hooked into an
+existing capture source, a new *capture source* of its own (non-RTL-SDR), a
+top-level *sidebar page*, or a *plugin-contributed settings sub-page* — see
+[Current limitations](#current-limitations) at the bottom before you start,
+in case what you want to build needs one of those.
+
+## Directory layout
+
+```
+plugins/apps/<your-id>/
+    plugin.toml              # the manifest -- required
+    setup.sh                 # optional: installs system deps (apt + build)
+    README.md                # recommended: install/config/layout, like this
+    backend/
+        __init__.py          # required: register(reg) entry point
+        <whatever>.py         # your listener/routes/decode logic
+        tests/
+            __init__.py
+            test_<whatever>.py
+    frontend/
+        <your-id>_panel.js    # required if you add a "panel"
+        <your-id>_panel.css   # optional
+```
+
+`<your-id>` is both the folder name and `plugin.toml`'s `name` — they must
+match exactly (`src/plugins/manifest.py` rejects a mismatch), lowercase
+`[a-z0-9-]`, 2–39 chars.
+
+**Where it lives** decides its tier:
+
+- `src/plugins/apps/<id>/` — **built-in**. Ships in the repo, loads
+  automatically unless `plugins.<id>.enabled: false`. Use this for
+  first-party plugins bundled with a fork.
+- `plugins/apps/<id>/` — **community**. A drop-in folder (yours or
+  someone else's), loads only when `plugins.<id>.enabled: true`. This is
+  where you'll put a new plugin while developing it, and where ACARS lives
+  (it's the reference *community* plugin on purpose, to prove that tier
+  actually works end to end).
+
+A built-in id always wins an id collision with a community folder of the
+same name.
+
+## `plugin.toml`
+
+```toml
+name = "acars"
+version = "1.0.0"
+meshpoint_api = 1
+provides = ["listener", "routes", "panel"]
+locked = false                            # optional, default false -- see below
+
+[deps]                                    # optional
+apt = ["cmake", "pkg-config"]
+setup = "setup.sh"                        # relative path, must exist
+
+[frontend]                                # required when "panel" in provides
+scripts = ["frontend/acars_panel.js"]     # relative paths, must exist
+styles  = ["frontend/acars_panel.css"]    # optional
+
+[meta]                                    # optional, all strings
+description = "Aircraft VHF datalink (ACARS) decoding via acarsdec + libacars"
+homepage = "https://github.com/f00b4r0/acarsdec"
+author = "Your Name"
+```
+
+| Field | Required | Notes |
+|---|---|---|
+| `name` | yes | Must equal the folder name. |
+| `version` | yes | Free-form string, shown on Settings → Plugins. |
+| `meshpoint_api` | yes | Integer. Currently `1` (`PLUGIN_API_VERSION` in `src/plugins/manifest.py`). A manifest targeting a higher number than this build supports is refused, not crashed. |
+| `provides` | yes | Non-empty subset of `listener`, `routes`, `panel`. Calling a `PluginRegistry` method for a capability you didn't declare raises at register time — see [The `register(reg)` entry point](#the-registerreg-entry-point). |
+| `locked` | no, default `false` | Only meaningful for **community** plugins. `true` marks a shipped/bundled community plugin (git-tracked, not a real user drop-in) so Settings → Plugins refuses to offer a Delete button for it — the same protection `plugins/themes/*/theme.json`'s `"locked": true` already gives the bundled theme pack. ACARS sets this. If you're writing a plugin someone else will `git clone` into their own `plugins/apps/`, leave it `false` (default) so they can delete it if they want to. |
+| `[deps].apt` / `.setup` | no | System packages + a build script. **Never installed automatically** — the operator runs it themselves (`sudo bash plugins/apps/<id>/setup.sh` or `sudo meshpoint plugin setup <id>`, which just wraps the same script after showing what it does). |
+| `[frontend].scripts` / `.styles` | scripts required iff `panel` in `provides` | Served at `/plugins/apps/<id>/<path>` — **only** the exact files listed here, from either tier, nothing else in the folder is reachable (`src/plugins/assets.py:resolve_plugin_asset`). |
+| `[meta].*` | no | Shown on Settings → Plugins: description, a clickable homepage link, author. |
+
+## The `register(reg)` entry point
+
+`backend/__init__.py` must define a module-level `register(reg)`, called
+once at startup (`src/plugins/loader.py`) if the plugin is enabled. Keep
+imports of anything heavy (FastAPI, your listener class) *inside*
+`register()`, not at module top level — this is what lets
+`backend/<whatever>.py` unit-test on a machine with no FastAPI installed
+(see [Testing](#testing)):
+
+```python
+# plugins/apps/acars/backend/__init__.py
+from __future__ import annotations
+
+
+def register(reg) -> None:
+    from .listener import AcarsListener
+    from .routes import init_routes, router
+
+    reg.add_router(router)
+
+    def build() -> AcarsListener:
+        return AcarsListener(
+            frequencies=reg.config.get("freqs"),
+            gain=reg.config.get("gain"),
+            device=reg.config.get("device"),
+        )
+
+    reg.add_listener("acars", build, init_routes)
+```
+
+`reg` is a `PluginRegistry` (`src/plugins/registry.py`):
+
+- `reg.manifest` — the parsed `PluginManifest`.
+- `reg.name` — the plugin id.
+- `reg.config` — a plain `dict`, a copy of `config.plugins["<id>"]` from
+  `local.yaml`. **Opaque and unconditional** — every plugin gets this
+  regardless of what it declared in `provides`, it's never checked against
+  the core config schema, and Meshpoint hands it to you verbatim. This is
+  how ACARS reads its own `freqs`/`gain`/`device` keys (see
+  [Your plugin's own config](#your-plugins-own-config) below).
+- `reg.add_router(router, *, public=False)` — requires `"routes"` in
+  `provides`. Mounts a FastAPI `APIRouter` the same way every core route
+  gets mounted, behind `Depends(require_auth)` unless `public=True`.
+- `reg.add_listener(name, build, wire=None)` — requires `"listener"` in
+  `provides`. `build` is a zero-arg callable returning your listener
+  instance (or a tuple of several — see the built-in pager listener in
+  `src/api/server.py`'s `_BUILTIN_LISTENERS` for that shape). It's called
+  once at startup; the listener stays idle until its own `/start` route is
+  hit. `wire`, if given, is called with whatever `build()` returned, so you
+  can inject it into your routes module's module-level state (that's what
+  `init_routes(listener)` does above).
+
+Calling `add_router`/`add_listener` for a capability not in `provides`
+raises `PluginRegistryError` — caught by the loader, logged, and the whole
+plugin is skipped (one bad plugin never aborts the others or the app). See
+`src/plugins/loader.py::load_plugins`.
+
+## Adding a dashboard tab (`"panel"`)
+
+1. List your id in `provides` and your JS (and optionally CSS) under
+   `[frontend]`.
+2. Your script runs at a fixed point in `index.html` — after
+   `listener_panel_registry.js` (which defines the hook below) and before
+   `app.js` builds `ListenerPanel` — so call this at your script's top
+   level, not inside a DOMContentLoaded handler:
+
+   ```js
+   // plugins/apps/acars/frontend/acars_panel.js
+   window.registerListenerPanel({
+       tab: 'acars',                 // unique slug; becomes #lsn-tab-acars
+       label: 'ACARS',               // tab button text
+       make: () => new window.PagerPanel('acars', '/api/acars', 'ACARS', renderRow),
+   });
+   ```
+
+   `make` is called once when `ListenerPanel` is constructed; it must
+   return an object with `mount(rootEl)` / `show()` / `hide()`. ACARS reuses
+   the core `PagerPanel` (start/stop/clear + a live message list) since its
+   shape already fit; you can hand it any object satisfying that trio.
+3. Your assets are served from `/plugins/apps/<id>/<path>` — exactly the
+   paths you listed in `[frontend]`, nothing else. No manual wiring needed
+   beyond step 2; `src/plugins/assets.py:inject_plugin_assets` injects the
+   `<script>`/`<link>` tags automatically for every *loaded* panel plugin.
+
+## Your plugin's own config
+
+`plugins.<id>` in `local.yaml` is entirely yours — Meshpoint only ever
+reads `plugins.<id>.enabled` (the loader's enable gate); everything else is
+opaque and handed to `reg.config` verbatim, never validated against the
+core schema:
+
+```yaml
+plugins:
+  acars:
+    enabled: true
+    freqs: [131.525, 131.725, 131.800, 131.825]   # your own keys
+    gain: 34
+    device: 0
+```
+
+Validate what you read from `reg.config` yourself and fall back sanely —
+config is user-edited YAML, a typo shouldn't crash your plugin. ACARS's
+`_normalize_frequencies()` (`plugins/apps/acars/backend/listener.py`) is a
+small worked example: anything that isn't a non-empty list of stringifiable
+entries falls back to a sane default instead of starting `acarsdec` with no
+channels.
+
+There's no plugin-contributed settings *UI* yet (see
+[Current limitations](#current-limitations)) — for now, document your keys
+in your plugin's `README.md` and expect the operator to hand-edit
+`local.yaml` or use `docs/CONFIGURATION.md`'s pattern as a model.
+
+## System dependencies
+
+If your plugin needs anything beyond Python (`acarsdec`/`libacars` for
+ACARS), write a `setup.sh` and list its apt packages in `[deps]`. It's
+**never** run automatically. The operator runs it once, either directly:
+
+```sh
+sudo bash plugins/apps/<id>/setup.sh
+```
+
+or through the friendlier CLI wrapper, which shows the apt list + script
+path and confirms first:
+
+```sh
+sudo meshpoint plugin setup <id>
+```
+
+Make your script idempotent — `setup.sh` should check whether it already
+did its job (ACARS checks `shutil.which`-equivalent for `acarsdec` on
+`PATH`) and exit cleanly instead of reinstalling every time it's re-run.
+
+## Testing
+
+Keep your listener/decode logic importable without FastAPI, so it unit-tests
+on a machine that doesn't have the full dependency stack installed (this
+project's own dev Mac included) — that's the entire reason `register()`
+defers its imports (see above). `backend/tests/test_<whatever>.py` should
+import straight from `backend.<whatever>`, not through `backend/__init__.py`:
+
+```python
+# plugins/apps/acars/backend/tests/test_listener.py
+from plugins.apps.acars.backend.listener import AcarsListener
+```
+
+If you do need to test something that touches FastAPI (a routes module),
+gate the test class behind a `fastapi` import check — mirrors
+`tests/test_plugin_loader.py::TestShippedAcarsPlugin`:
+
+```python
+try:
+    import fastapi  # noqa: F401
+    _HAS_FASTAPI = True
+except ImportError:
+    _HAS_FASTAPI = False
+
+
+@unittest.skipUnless(_HAS_FASTAPI, "needs fastapi (CI / Pi only)")
+class TestSomethingThatNeedsFastapi(unittest.TestCase):
+    ...
+```
+
+CI runs `ruff check src/ tests/ plugins/` and `pytest tests/ plugins/` —
+your plugin's tests are part of the same run, so `plugins/apps/<id>/`,
+`backend/`, and `backend/tests/` all need an `__init__.py` to be importable.
+
+## Managing your plugin once it's installed
+
+An operator doesn't need to touch YAML by hand for the common cases:
+
+- **Settings → Plugins** in the dashboard lists every discovered plugin,
+  toggles `plugins.<id>.enabled`, shows apt-deps + the setup-script hint,
+  and (for a community, non-`locked` plugin) offers a Delete button that
+  removes `plugins/apps/<id>/` outright.
+- `meshpoint plugin list` / `sudo meshpoint plugin setup <id>` — the CLI
+  equivalents, usable from SSH or the dashboard's own web Terminal (it's a
+  real shell on the device).
+
+Both are read from `discover_plugins()` fresh each time, so nothing needs
+telling about a new plugin beyond it existing on disk with a valid
+`plugin.toml`.
+
+## Current limitations
+
+Don't build around these — if you need one, that's a signal to extend the
+core seam (`src/plugins/registry.py`, `src/plugins/manifest.py`'s
+`KNOWN_PROVIDES`), not to work around it inside a plugin:
+
+- **No decoder seam.** A plugin can't hook into an *existing* capture
+  source's packet stream (the way, say, a LoRaWAN-style decoder would) —
+  only a new listener it owns entirely.
+- **No non-RTL-SDR capture source seam.** `add_listener` is RTL-SDR-shaped
+  specifically (shares `src/audio/sdr_registry.py`'s one-dongle-at-a-time
+  claim). A plugin reading from a different physical source (another
+  serial protocol, say) has no seam yet.
+- **No top-level sidebar page seam.** `"panel"` only adds a sub-tab under
+  the existing Listener page (`window.registerListenerPanel`) — there's no
+  way for a plugin to add its own top-level nav item the way Configuration
+  or Stats are.
+- **No plugin-contributed settings sub-page seam.** Beyond raw
+  `plugins.<id>` YAML (see above), a plugin can't render its own
+  Configuration-style settings UI.
+
+These are anticipated, not hypothetical — the current best guess is
+they'll matter when protocols like LoRaWAN or Pager eventually get
+extracted into plugins the same way ACARS was. Until a real plugin needs
+one, though, building the seam speculatively risks guessing the wrong
+shape. Full background: `memory/plugin-architecture-review.md`.

@@ -1165,7 +1165,10 @@ If you leave `require_auth: true`, Prometheus needs to authenticate on every scr
 ## Plugins
 
 App plugins are out-of-core features (an extra listener + its API routes + a
-dashboard tab). They load from two places:
+dashboard tab). This section covers using one that's already installed —
+see [docs/PLUGINS.md](PLUGINS.md) instead if you want to write a new one.
+
+They load from two places:
 
 * **Built-in** — `src/plugins/apps/<id>/`, ships in the repo. Loads
   automatically **unless** you set `plugins.<id>.enabled: false`.
