@@ -1,0 +1,36 @@
+name = "hello-world-hook"
+version = "0.1.0"
+meshpoint_api = 1
+provides = ["hook"]    # capabilities this plugin uses -- non-empty subset of:
+                        #   listener  register an RTL-SDR subprocess listener
+                        #             (shares the one physical dongle with
+                        #             every other listener) -- reg.add_listener()
+                        #   routes    mount a FastAPI router under /api/<...>
+                        #             -- reg.add_router()
+                        #   panel     add a sub-tab to the Listener page
+                        #             (window.registerListenerPanel)
+                        #   sidebar   add a whole top-level sidebar page of
+                        #             your own -- window.registerSidebarPage()
+                        #   hook      inject content into ANOTHER plugin's
+                        #             page (this plugin) -- see [hook] below
+                        #             and window.registerPageHook()
+                        # Using a capability not listed here raises at
+                        # register-time (PluginRegistry._require). See
+                        # docs/PLUGINS.md and the ACARS plugin for a
+                        # listener + routes + panel worked example.
+locked = true  # shipped with this fork -- not user-installed, can't be deleted
+
+[frontend]
+scripts = ["frontend/hello_world_hook.js"]
+styles = ["frontend/hello_world_hook.css"]
+
+[hook]
+host = "hello-world"    # target host's [sidebar].route -- see
+                         # plugins/apps/hello-world/plugin.toml. This plugin's
+                         # content is injected into that page instead of
+                         # owning a page of its own.
+
+[meta]
+description = "Minimal example plugin: injects a message into the Hello World page instead of owning a page of its own. Reference for the hook seam -- see docs/PLUGINS.md."
+homepage = "https://github.com/KMX415/meshpoint"
+author = "Einstein PD2EMC"

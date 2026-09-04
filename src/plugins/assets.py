@@ -1,12 +1,15 @@
-"""Inject a loaded panel/sidebar plugin's frontend files into the dashboard
-HTML.
+"""Inject a loaded panel/sidebar/hook plugin's frontend files into the
+dashboard HTML.
 
 The counterpart of ``src.api.theme_registry.inject_theme_links``: at serve
 time, ``server.serve_dashboard_root`` calls :func:`inject_plugin_assets` so a
 plugin's ``<script>`` runs before ``app.js`` builds ``ListenerPanel`` and its
-``window.registerListenerPanel(...)`` call lands (a ``panel`` plugin), or
-before ``app.js`` calls ``window.mountPluginSidebarPages()`` (a ``sidebar``
-plugin).
+``window.registerListenerPanel(...)`` call lands (a ``panel`` plugin), before
+``app.js`` calls ``window.mountPluginSidebarPages()`` (a ``sidebar`` plugin),
+or before that same call reaches a host page's own ``mount()`` and its
+``window.mountPageHooks(...)`` call (a ``hook`` plugin -- it must register
+before the host looks up what's registered for it, see
+``frontend/sidebar/page_hook_registry.js``).
 
 Assets are served by a scoped route in ``server.py`` at
 ``/plugins/apps/<id>/<rel-path>`` (only files the manifest declared, from
@@ -67,7 +70,11 @@ def sidebar_descriptor_tags(manifests: list[PluginManifest]) -> str:
 def plugin_asset_tags(manifests: list[PluginManifest]) -> str:
     tags: list[str] = []
     for m in manifests:
-        if "panel" not in m.provides and "sidebar" not in m.provides:
+        if (
+            "panel" not in m.provides
+            and "sidebar" not in m.provides
+            and "hook" not in m.provides
+        ):
             continue
         for css in m.frontend_styles:
             tags.append(
@@ -76,11 +83,12 @@ def plugin_asset_tags(manifests: list[PluginManifest]) -> str:
         for js in m.frontend_scripts:
             # Plain <script>, matching every other dashboard script: runs in
             # document order at the marker -- after listener_panel_registry.js
-            # / sidebar_plugin_registry.js (define registerListenerPanel /
-            # registerSidebarPage), before app.js. Guarantees the plugin is
-            # registered before any app code runs, without depending on
-            # app.js constructing panels lazily (a deferred script runs
-            # after app.js, so it would only work while that stays true).
+            # / sidebar_plugin_registry.js / page_hook_registry.js (define
+            # registerListenerPanel / registerSidebarPage / registerPageHook),
+            # before app.js. Guarantees the plugin is registered before any
+            # app code runs, without depending on app.js constructing panels
+            # lazily (a deferred script runs after app.js, so it would only
+            # work while that stays true).
             tags.append(
                 f'<script src="{plugin_asset_url(m.name, js)}"></script>'
             )

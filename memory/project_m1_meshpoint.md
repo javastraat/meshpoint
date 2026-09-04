@@ -9699,3 +9699,212 @@ tab left in core, and no further extraction target has been identified.
 Plain-FM Radio itself stays explicitly out of scope for the same reason
 noted in every prior entry (different seam entirely -- would need the
 unbuilt "sidebar" capability plus streamed audio).
+
+**LIVE-VERIFIED on the Pi, later same day**: user confirmed DAB+ working.
+
+---
+
+## Next design direction: generalized "hookable page" plugin capability
+
+User confirmed on a break, after being shown the DAB+ extraction's investigation
+findings above, that Radio staying core isn't really "the last RTL-SDR tab
+needing extraction" -- it's blocked on something more specific: `ListenerPanel`
+(`frontend/js/listener_panel.js`) is simultaneously "the Radio implementation"
+AND the tabbar host/shell every plugin tab (DAB+ included) already attaches to
+via `window.registerListenerPanel`. Confirmed via a dedicated investigation
+agent this session (see the Part 2 findings a few sections up) -- Radio's
+*backend* (`RtlListener`/`listener_routes.py`) is exactly as extractable as
+DAB's was, but the *frontend* isn't, because something has to keep owning
+`#listener-panel`, the tabbar markup, and `window.LISTENER_PANELS` consumption
+even after Radio itself becomes a plugin.
+
+User's proposed shape for this, three ordered pieces:
+
+1. **A neutral host/shell page, not owned by any one tab.** Rename/reframe
+   the Listener page as an **"rtlsdr"** page (name reflects its real job --
+   drivers, kernel DVB blacklist, librtlsdr, `sdr_registry`'s shared
+   dongle-exclusivity -- the hardware-enablement layer, not any specific
+   decoder). Radio becomes just one more plugin hooking into it exactly like
+   DAB+/P2000/RTL433/etc. do today via `registerListenerPanel`. **Remember
+   for later**: the bare host page, with zero listener plugins enabled,
+   should show a real placeholder ("activate a plugin to get started" or
+   similar) instead of rendering empty -- not yet designed, just noted so it
+   isn't forgotten when this piece actually gets built.
+2. **A formal plugin-depends-on-plugin/host check**, later still -- a hook
+   plugin could check whether its declared host is actually present/active
+   before allowing itself to load/run, rather than just assuming core wired
+   it in correctly.
+3. **Prototype the general mechanism first, away from RTL-SDR's hardware
+   complexity**: a trivial **"hello-world-hook"** plugin that hooks into the
+   existing `hello-world` sidebar page and renders something there. THIS IS
+   THE STARTING POINT the user picked ("start with 3").
+
+Important asymmetry surfaced during the discussion, worth remembering: the
+Listener page's host-and-attachees mechanism (`registerListenerPanel` /
+`window.LISTENER_PANELS`, `frontend/js/listener_panel_registry.js`) **already
+exists and works** -- proof the general pattern is sound. But **sidebar**
+pages have no equivalent -- each sidebar plugin (hello-world included) fully
+owns and renders its own single page via `window.registerSidebarPage`, and
+nothing today lets a second plugin inject UI into a first plugin's already-
+registered sidebar page. So "hello-world-hook" isn't copying an existing
+seam, it's **designing the first one for sidebar pages** -- the real
+questions to work out there: how a host page (hello-world) declares itself
+hookable, how a hook plugin declares which host it targets, what the
+`plugin.toml` schema looks like for this (a new `provides` capability,
+likely `"hook"`, alongside the existing `listener`/`routes`/`panel`/
+`sidebar`), and registration ordering (host's own script must run and
+expose its hook-registration function before any hook plugin's script runs
+-- same load-order constraint `listener_panel_registry.js` already has
+relative to `app.js`).
+
+**Not yet started as of this note** -- next session should begin with the
+hello-world-hook prototype (item 3), following whatever `plugin.toml`
+capability shape gets designed for it, and should re-read this note plus
+the Part 2 investigation findings above before starting, since they
+capture the full reasoning for why this path was chosen over a more naive
+"just move Radio into a plugin folder" attempt.
+
+---
+
+## Item 3 DONE, same session: the "hook" plugin capability + hello-world-hook
+
+User confirmed "start with 3" immediately, plus one instruction to remember
+for later (item 1, when the rtlsdr shell eventually gets built): the bare
+host page with nothing hooked in should show a real "activate a plugin"
+placeholder instead of rendering empty -- **not yet designed or built,
+purely a note-for-later, captured above.**
+
+Built the whole thing this session, backend + frontend + docs + tests, all
+Mac-verified:
+
+**Manifest (`src/plugins/manifest.py`)**: new `"hook"` in `KNOWN_PROVIDES`;
+new frozen `HookSpec(host: str)` dataclass (mirrors `SidebarSpec` exactly);
+`PluginManifest.hook` field; `_parse_hook()` (mirrors `_parse_sidebar()` --
+required iff `"hook"` in `provides`, `host` validated against the same
+`_ROUTE_RE` slug pattern `[sidebar].route` uses, no backend validation that
+the target host plugin actually exists -- that's resolved at runtime in the
+browser, matching how a dangling `registerSidebarPage()` call just logs a
+console warning rather than failing to load). `frontend.scripts` required-
+if-declared check extended from `"panel" or "sidebar"` to also include
+`"hook"`.
+
+**Asset injection (`src/plugins/assets.py`)**: `plugin_asset_tags()`'s gate
+(`if "panel" not in m.provides and "sidebar" not in m.provides: continue`)
+extended to also check `"hook"` -- without this a hook-only plugin's JS/CSS
+would never get `<script>`/`<link>` tags injected at all, silently doing
+nothing. Caught by *reading* the function before writing any hook plugin,
+not by a failed test -- the kind of easy-to-miss gate this repo's plugin
+system has a few of (same class of thing as the "Requires:" hint bug from
+earlier this session, where two independent code paths both needed the
+identical fix).
+
+**New generic seam (`frontend/sidebar/page_hook_registry.js`)**:
+`window.registerPageHook({host, make})` (called by a hook plugin's script,
+queues into `window.MESHPOINT_PAGE_HOOKS`) + `window.mountPageHooks(hostId,
+containerEl)` (called by a HOST page's own `mount()`, filters the queue by
+host id, mounts each match into the given container, returns the mounted
+panel objects so a host that wants to propagate show()/hide() into its
+hooks later can). Load-order requirement identical to
+`listener_panel_registry.js`/`sidebar_plugin_registry.js`: must load before
+the `<!-- meshpoint:plugin-panels -->` marker -- added right after
+`sidebar_plugin_registry.js` in `index.html`. Verified with a real Node
+harness (`eval()`'d the actual source, faked `window`/DOM elements as plain
+objects) covering: a registered hook mounts into the right host's
+container; a hook registered for a DIFFERENT host doesn't leak in; a host
+with zero registered hooks gets an empty result, not a throw; calling
+`mountPageHooks` with a null container doesn't throw.
+
+**Hello World becomes the reference HOST, not just the sidebar reference**:
+`hello_world.js`'s `mount()` now checks `window.MESHPOINT_PAGE_HOOKS.some(h
+=> h.host === 'hello-world')` BEFORE deciding whether to render the extra
+hook-container `<div>` at all -- so with no hook plugin installed the page
+renders byte-identical to before (this mattered enough to the user's
+original framing -- "activate a plugin" placeholder idea for item 1 above
+-- to make the same "cost nothing when unused" property a hard requirement
+here too, one level down). New `.hello-world-hooks` CSS (border-top
+divider, only relevant when the container actually renders).
+
+**New reference plugin (`plugins/apps/hello-world-hook/`)**: `provides =
+["hook"]`, `[hook] host = "hello-world"`, `locked = true` (shipped
+reference, same as hello-world itself). `backend/__init__.py`'s
+`register()` is a no-op (identical reasoning/wording to hello-world's own
+-- nothing to register, the seam is fully declarative). Frontend renders a
+small dashed-border box explaining what it is and that it was injected by
+a second, independent plugin. Full directory: `plugin.toml`,
+`backend/__init__.py`, `frontend/hello_world_hook.js`,
+`frontend/hello_world_hook.css`, `README.md` (mirrors hello-world's own
+README structure/voice).
+
+**Docs**: `docs/PLUGINS.md` -- capability count "four seams" -> "five
+seams" in the intro bullet list, `plugin.toml` example block gets `[hook]`,
+the field table gets a `[hook].host` row, a full new `## Injecting into
+another page ("hook")` section (mirrors the sidebar section's structure:
+numbered steps, full code examples) PLUS a `### Making your own page
+hookable` subsection for anyone writing the HOST side, not just the hook
+side -- this second half didn't exist for any prior capability (sidebar
+pages never needed to document "how do I become hookable" before now).
+Top-of-doc worked-examples line gains Hello World Hook alongside ACARS/
+Hello World. `README.md`'s "App plugins" bullet (which, discovered along
+the way, had NEVER actually mentioned the `"sidebar"` capability or Hello
+World at all despite that shipping in an earlier session -- a pre-existing
+gap, not something this pass introduced) extended to mention sidebar/hook
+both, with Hello World and Hello World Hook as their reference examples.
+`docs/CONFIGURATION.md` deliberately left untouched -- confirmed it
+documents plugin config generically via the ACARS manifest example, same
+"no capability-specific detail belongs here" reasoning applied consistently
+since the DAB+ pass earlier this session.
+
+**Tests**: `tests/test_plugin_manifest.py` gains 7 new cases mirroring the
+existing sidebar test shape exactly (valid table, provides-without-table
+rejected, table-without-provides rejected, needs-frontend-scripts,
+bad-slug host, missing host) -- 41/41 pass. Verified end-to-end beyond just
+the manifest parser too: `discover_plugins()` finds both new/changed
+plugins with the right `hook`/`sidebar` fields populated; `plugin_asset_tags()`
++ `inject_plugin_assets()` actually emit the hook plugin's `<script>`/
+`<link>` tags now (would NOT have, pre-fix); `resolve_plugin_asset()` serves
+the hook's declared files and correctly 404s (returns `None`) for anything
+not declared; `load_plugins()` imports and registers both plugins cleanly
+end to end. All of `tests/test_plugin_manifest.py`, `test_plugin_loader.py`,
+`test_plugin_assets.py`, `test_plugin_registry_facade.py`,
+`test_plugin_routes.py`, `test_plugin_command.py` (57+48 total) still pass
+-- confirms the `assets.py` gate change didn't regress `panel`/`sidebar`
+plugins. `pytest plugins/` still 61/61 (hello-world-hook has no backend
+tests of its own -- pure frontend-injection plugin, nothing to unit-test
+Python-side beyond the no-op `register()` already covered by the loader
+test above).
+
+**A real bug caught mid-pass, worth remembering generally**: the new
+CHANGELOG bullet initially used italic `*another*` INSIDE the bolded
+headline span (`- **...into *another* plugin's...**`). `docs/api/update/
+release_notes.py`'s `_BULLET_RE` is `^-\s+\*\*(?P<headline>[^*]+?)\*\*...` --
+the headline capture group is `[^*]+?`, which explicitly EXCLUDES any `*`
+character, so a lone unmatched `*` inside the bold headline (before its
+closing `**`) breaks the match silently -- the bullet just doesn't show up
+in `ChangelogParser.parse_file()`'s output at all, no error, no exception,
+just missing (confirmed: bullet count stayed at 48 instead of becoming 49
+until fixed). **Lesson: never use italic emphasis (single `*.../*`) inside
+a changelog bullet's bold headline** -- the first `**...**` span specifically,
+detail text after it is unconstrained (`.*`) and fine. Always re-parse and
+check the bullet COUNT went up by exactly the number of bullets added, not
+just "parse succeeded without exception" -- a silently-dropped bullet still
+"succeeds."
+
+**Verified on the Mac**: `py_compile` clean on every touched/new Python
+file. `node --check` clean on `page_hook_registry.js`, updated
+`hello_world.js`, new `hello_world_hook.js`. `ChangelogParser.parse_file`
+re-parse: v0.8.1 now has 49 bullets (was 48), new hook-capability bullet
+present and correctly parsed after the italic-in-headline fix.
+
+**NOT yet done / next steps**: **not live-verified on the Pi** -- next
+session should pull, restart, enable `hello-world` + `hello-world-hook`
+both, confirm Networks -> Hello World shows the usual content plus the
+injected box below it; then disable just `hello-world-hook` and confirm
+Hello World's page renders exactly as before (no stray empty container).
+After that: **item 1** from the design note above (the neutral "rtlsdr"
+host shell + Radio becoming a plugin like every other RTL-SDR tab) is the
+next real target for this direction, now that the underlying "plugin
+attaches into another plugin's page" mechanism is proven on a trivial
+example -- remember the "activate a plugin" placeholder idea for the bare
+host page when that work starts. **Item 2** (formal host-presence/
+dependency checking for a hook plugin) stays explicitly deferred until
+there's a second real use case beyond hello-world-hook to design it against.

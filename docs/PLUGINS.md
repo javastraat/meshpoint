@@ -8,17 +8,20 @@ doc is for the plugin author.
 
 The canonical worked example is the shipped **ACARS** plugin —
 [`plugins/apps/acars/`](../plugins/apps/acars/) — for routes/listener/panel,
-and the minimal **Hello World** plugin —
+the minimal **Hello World** plugin —
 [`plugins/apps/hello-world/`](../plugins/apps/hello-world/) — for the
-sidebar seam specifically. Every section below points at the real file that
-does the thing being described. When in doubt, go read that file; it's
-real, tested, shipped code, not a toy example.
+sidebar seam specifically, and **Hello World Hook** —
+[`plugins/apps/hello-world-hook/`](../plugins/apps/hello-world-hook/) — for
+the hook seam, injecting content into Hello World's own page. Every section
+below points at the real file that does the thing being described. When in
+doubt, go read that file; it's real, tested, shipped code, not a toy
+example.
 
 ---
 
 ## What a plugin can do today
 
-An app plugin is out-of-core code that hooks four seams:
+An app plugin is out-of-core code that hooks five seams:
 
 - **Routes** — mount a FastAPI `APIRouter` under `/api/<whatever>`.
 - **Listener** — register an RTL-SDR subprocess listener (built idle at
@@ -28,6 +31,9 @@ An app plugin is out-of-core code that hooks four seams:
 - **Panel** — add a sub-tab to the dashboard's *Listener* page specifically.
 - **Sidebar** — add a whole new top-level page of your own, placed under an
   existing sidebar section (Networks, Radio, Ops, Configuration, Settings).
+- **Hook** — inject content into *another* plugin's already-rendered page,
+  instead of owning a page/tab of your own. The other plugin has to opt in
+  as a host (see [Injecting into another page](#injecting-into-another-page-hook)).
 
 That's it. A plugin **cannot** (yet) add a packet *decoder* hooked into an
 existing capture source, a new *capture source* of its own (non-RTL-SDR), or
@@ -95,6 +101,11 @@ label = "Hello World"                     # sidebar link text
 category = "networks"                     # networks | radio | ops | configuration | settings
 icon = "plug"                             # optional, default "plug" -- see KNOWN_SIDEBAR_ICONS
 
+[hook]                                    # required when "hook" in provides
+host = "hello-world"                      # another plugin's [sidebar].route -- this
+                                           # plugin's content is injected into that
+                                           # page instead of owning one of its own
+
 [meta]                                    # optional, all strings
 description = "Aircraft VHF datalink (ACARS) decoding via acarsdec + libacars"
 homepage = "https://github.com/f00b4r0/acarsdec"
@@ -106,12 +117,13 @@ author = "Your Name"
 | `name` | yes | Must equal the folder name. |
 | `version` | yes | Free-form string, shown on Settings → Plugins. |
 | `meshpoint_api` | yes | Integer. Currently `1` (`PLUGIN_API_VERSION` in `src/plugins/manifest.py`). A manifest targeting a higher number than this build supports is refused, not crashed. |
-| `provides` | yes | Non-empty subset of `listener`, `routes`, `panel`, `sidebar`. Calling a `PluginRegistry` method for a capability you didn't declare raises at register time — see [The `register(reg)` entry point](#the-registerreg-entry-point). |
+| `provides` | yes | Non-empty subset of `listener`, `routes`, `panel`, `sidebar`, `hook`. Calling a `PluginRegistry` method for a capability you didn't declare raises at register time — see [The `register(reg)` entry point](#the-registerreg-entry-point). |
 | `locked` | no, default `false` | Only meaningful for **community** plugins. `true` marks a shipped/bundled community plugin (git-tracked, not a real user drop-in) so Settings → Plugins refuses to offer a Delete button for it — the same protection `plugins/themes/*/theme.json`'s `"locked": true` already gives the bundled theme pack. ACARS sets this. If you're writing a plugin someone else will `git clone` into their own `plugins/apps/`, leave it `false` (default) so they can delete it if they want to. |
 | `[deps].apt` / `.setup` | no | System packages + a build script. **Never installed automatically** — the operator runs it themselves (`sudo bash plugins/apps/<id>/setup.sh` or `sudo meshpoint plugin setup <id>`, which just wraps the same script after showing what it does). |
-| `[frontend].scripts` / `.styles` | scripts required iff `panel` or `sidebar` in `provides` | Served at `/plugins/apps/<id>/<path>` — **only** the exact files listed here, from either tier, nothing else in the folder is reachable (`src/plugins/assets.py:resolve_plugin_asset`). |
+| `[frontend].scripts` / `.styles` | scripts required iff `panel`, `sidebar` or `hook` in `provides` | Served at `/plugins/apps/<id>/<path>` — **only** the exact files listed here, from either tier, nothing else in the folder is reachable (`src/plugins/assets.py:resolve_plugin_asset`). |
 | `[sidebar].route` / `.label` / `.category` | required iff `sidebar` in `provides` | See [Adding a top-level sidebar page](#adding-a-top-level-sidebar-page-sidebar) below. `category` must be one of `KNOWN_SIDEBAR_CATEGORIES` in `src/plugins/manifest.py`. |
 | `[sidebar].icon` | no, default `"plug"` | One of `KNOWN_SIDEBAR_ICONS` (`src/plugins/manifest.py`) — a curated key, not raw SVG. See [Adding a top-level sidebar page](#adding-a-top-level-sidebar-page-sidebar). |
+| `[hook].host` | required iff `hook` in `provides` | Another plugin's `[sidebar].route` — not validated against real plugins at parse time (resolved at runtime in the browser). See [Injecting into another page](#injecting-into-another-page-hook). |
 | `[meta].*` | no | Shown on Settings → Plugins: description, a clickable homepage link, author. |
 
 ## The `register(reg)` entry point
@@ -273,6 +285,101 @@ script:
    A page declared in `plugin.toml` whose script never calls
    `registerSidebarPage()` logs a console warning and is silently skipped
    (never blocks the rest of the app).
+
+## Injecting into another page (`"hook"`)
+
+`"panel"` and `"sidebar"` both give your plugin its own space — a Listener
+sub-tab, or a whole top-level page. `"hook"` is different: it lets your
+plugin inject content into a page **another plugin owns**, instead of
+having a page of your own. The other plugin has to opt in as a *host* first
+— see [Making your own page hookable](#making-your-own-page-hookable) below
+if you're the one writing the host, not just the hook.
+
+The reference pair is **Hello World** (the host —
+[`plugins/apps/hello-world/`](../plugins/apps/hello-world/)) and **Hello
+World Hook** (the hook —
+[`plugins/apps/hello-world-hook/`](../plugins/apps/hello-world-hook/)).
+With both enabled, opening the Hello World page shows its usual content
+plus a second box below it, rendered by the hook plugin.
+
+1. List `"hook"` in `provides` and fill in `[hook]` with the target host's
+   id — another plugin's `[sidebar].route`:
+
+   ```toml
+   # plugins/apps/hello-world-hook/plugin.toml
+   provides = ["hook"]
+
+   [frontend]
+   scripts = ["frontend/hello_world_hook.js"]
+   styles = ["frontend/hello_world_hook.css"]   # optional
+
+   [hook]
+   host = "hello-world"      # must match the host's own [sidebar].route
+   ```
+
+   Not validated against real plugins at parse time — if the host doesn't
+   exist, or isn't enabled, or never calls `mountPageHooks()` (see below),
+   your hook just never renders anywhere. No error, same "silently skipped"
+   philosophy `registerSidebarPage()` already uses for a dangling
+   descriptor.
+
+2. Your frontend script registers content for that host — same
+   `mount(rootEl)`/`show()`/`hide()` shape `"panel"`/`"sidebar"` both use:
+
+   ```js
+   // plugins/apps/hello-world-hook/frontend/hello_world_hook.js
+   window.registerPageHook({
+       host: 'hello-world',        // must match plugin.toml's [hook].host
+       make: () => ({
+           mount(rootEl) {
+               rootEl.innerHTML = '<p>Hello from a hook.</p>';
+           },
+           show() {},
+           hide() {},
+       }),
+   });
+   ```
+
+3. That's it on the hook side — no manual wiring. `frontend/sidebar/
+   page_hook_registry.js` is the seam: every plugin's frontend script runs
+   before `app.js` (same guarantee `"panel"`/`"sidebar"` already rely on),
+   so your `registerPageHook()` call has always landed before any host
+   looks up what's registered for it.
+
+### Making your own page hookable
+
+If you're writing the **host** — a `"sidebar"` (or, later, another kind of)
+page you want other plugins to be able to attach into — call
+`window.mountPageHooks(hostId, containerEl)` once from inside your own
+`mount(rootEl)`, after rendering your own content, passing an element for
+hook content to render into:
+
+```js
+// plugins/apps/hello-world/frontend/hello_world.js
+mount(rootEl) {
+    const hasHooks = (window.MESHPOINT_PAGE_HOOKS || [])
+        .some((h) => h.host === 'hello-world');
+    rootEl.innerHTML = `
+        <div class="plugin-page">
+            <h2>Hello, World.</h2>
+            ${hasHooks ? '<div data-hooks></div>' : ''}
+        </div>
+    `;
+    if (hasHooks) {
+        window.mountPageHooks('hello-world', rootEl.querySelector('[data-hooks]'));
+    }
+},
+```
+
+`hostId` is whatever your page is known by — for a `"sidebar"` plugin,
+that's your own `[sidebar].route`. Checking `window.MESHPOINT_PAGE_HOOKS`
+first and only adding the extra container when something's actually
+registered means your page renders identically to before for anyone who
+hasn't installed a hook plugin targeting it — a host plugin costs nothing
+extra when nobody hooks into it. `mountPageHooks()` itself is a no-op if
+you pass it `null`/no hooks are registered, so skipping that check and
+always calling it is also safe, just leaves a stray empty container element
+in your markup.
 
 ## Your plugin's own config
 

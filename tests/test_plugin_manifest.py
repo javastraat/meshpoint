@@ -300,6 +300,58 @@ styles = ["frontend/panel.css"]
             self._code("acars", toml, extra_files=("frontend/x.js",)), "sidebar",
         )
 
+    def _hook_toml(self, hook_table: str) -> str:
+        return (
+            _VALID.replace(
+                'provides = ["listener", "routes"]', 'provides = ["hook"]',
+            )
+            + '\n[frontend]\nscripts = ["frontend/x.js"]\n'
+            + hook_table
+        )
+
+    def test_valid_hook_table(self) -> None:
+        toml = self._hook_toml('\n[hook]\nhost = "hello-world"\n')
+        d = _write_plugin(self.root, "acars", toml, extra_files=("frontend/x.js",))
+        m = parse_manifest(d)
+        self.assertEqual(m.hook.host, "hello-world")
+        self.assertIsNone(m.sidebar)
+
+    def test_hook_provides_without_table_is_rejected(self) -> None:
+        toml = (
+            _VALID.replace(
+                'provides = ["listener", "routes"]', 'provides = ["hook"]',
+            )
+            + '\n[frontend]\nscripts = ["frontend/x.js"]\n'
+        )
+        self.assertEqual(
+            self._code("acars", toml, extra_files=("frontend/x.js",)), "hook",
+        )
+
+    def test_hook_table_without_provides_is_rejected(self) -> None:
+        toml = _VALID + '\n[hook]\nhost = "hello-world"\n'
+        self.assertEqual(self._code("acars", toml), "hook")
+
+    def test_hook_needs_frontend_scripts(self) -> None:
+        toml = (
+            _VALID.replace(
+                'provides = ["listener", "routes"]', 'provides = ["hook"]',
+            )
+            + '\n[hook]\nhost = "hello-world"\n'
+        )
+        self.assertEqual(self._code("acars", toml), "frontend")
+
+    def test_hook_bad_host_slug(self) -> None:
+        toml = self._hook_toml('\n[hook]\nhost = "Hello World"\n')
+        self.assertEqual(
+            self._code("acars", toml, extra_files=("frontend/x.js",)), "hook",
+        )
+
+    def test_hook_missing_host(self) -> None:
+        toml = self._hook_toml('\n[hook]\n')
+        self.assertEqual(
+            self._code("acars", toml, extra_files=("frontend/x.js",)), "hook",
+        )
+
 
 class TestDiscoverPlugins(unittest.TestCase):
     def setUp(self) -> None:

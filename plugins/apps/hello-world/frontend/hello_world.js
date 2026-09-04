@@ -8,11 +8,19 @@
  * actual sidebar <li> + <section>). This script only supplies the content:
  * a mount()/show()/hide() object, same shape the Listener-tab ("panel")
  * seam already uses.
+ *
+ * Also the reference HOST for the "hook" seam (frontend/sidebar/
+ * page_hook_registry.js): a hook mount point is only added to the page
+ * when at least one hook plugin actually targets 'hello-world' (see
+ * plugins/apps/hello-world-hook/), so this page renders identically to
+ * before for anyone who hasn't installed one.
  */
 window.registerSidebarPage({
     route: 'hello-world',
     make: () => ({
         mount(rootEl) {
+            const hasHooks = (window.MESHPOINT_PAGE_HOOKS || [])
+                .some((h) => h.host === 'hello-world');
             rootEl.innerHTML = `
                 <div class="plugin-page">
                     <h2>Hello, World.</h2>
@@ -22,8 +30,12 @@ window.registerSidebarPage({
                     from <code>plugin.toml</code>'s <code>[sidebar]</code>
                     table, not from anything hardcoded in the dashboard.</p>
                     <span class="hello-world-badge">Styled by hello_world.css</span>
+                    ${hasHooks ? '<div class="hello-world-hooks" data-hello-world-hooks></div>' : ''}
                 </div>
             `;
+            if (hasHooks && typeof window.mountPageHooks === 'function') {
+                window.mountPageHooks('hello-world', rootEl.querySelector('[data-hello-world-hooks]'));
+            }
         },
         show() {},
         hide() {},

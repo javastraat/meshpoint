@@ -1,0 +1,20 @@
+/* Hello World Hook -- demonstrates plugin.toml's [frontend].styles working
+   for a "hook" plugin the same way it does for "panel"/"sidebar". Uses the
+   app's own theme variables so it looks right in every theme, light and
+   dark, without any plugin-side theme handling. */
+
+.hello-world-hook {
+    margin-top: 4px;
+    padding: 12px 14px;
+    border-radius: 8px;
+    border: 1px dashed var(--accent-amber);
+    background: var(--overlay-weak);
+    font-size: 13.5px;
+    line-height: 1.5;
+}
+
+.hello-world-hook code {
+    background: var(--overlay-med);
+    padding: 1px 5px;
+    border-radius: 4px;
+}

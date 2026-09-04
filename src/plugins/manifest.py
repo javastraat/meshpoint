@@ -36,6 +36,12 @@ Manifest shape::
     category = "networks"          # one of: networks, radio, ops, configuration, settings
     icon = "plug"                  # optional, default "plug" -- one of KNOWN_SIDEBAR_ICONS
 
+    [hook]                         # required when "hook" in provides
+    host = "hello-world"           # target host page's id (a "sidebar" plugin's
+                                    # own [sidebar].route) -- window.registerPageHook()
+                                    # injects this plugin's content into that host's
+                                    # page instead of owning a page of its own.
+
     [meta]                         # optional, all strings
     description = "..."
     homepage = "..."
@@ -60,7 +66,7 @@ MANIFEST_NAME = "plugin.toml"
 _SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]{1,38}$")
 _ROUTE_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,58}$")
 
-KNOWN_PROVIDES = frozenset({"listener", "routes", "panel", "sidebar"})
+KNOWN_PROVIDES = frozenset({"listener", "routes", "panel", "sidebar", "hook"})
 
 # The existing top-level sidebar sections a plugin's page can be placed
 # under -- "networks"/"radio"/"ops" are flat item runs (LoRaWAN, Radio, the
@@ -114,6 +120,18 @@ class SidebarSpec:
 
 
 @dataclass(frozen=True)
+class HookSpec:
+    """A plugin's ``[hook]`` table -- which host page it injects content
+    into via ``window.registerPageHook()``, instead of owning a page of
+    its own. ``host`` is another plugin's ``[sidebar].route`` (no backend
+    validation that the host actually exists -- resolved at runtime in the
+    browser, same as a dangling ``registerSidebarPage()`` call just logs a
+    console warning rather than failing to load)."""
+
+    host: str
+
+
+@dataclass(frozen=True)
 class PluginManifest:
     name: str
     version: str
@@ -135,6 +153,8 @@ class PluginManifest:
     locked: bool = False
     # Set iff "sidebar" in provides.
     sidebar: SidebarSpec | None = None
+    # Set iff "hook" in provides.
+    hook: HookSpec | None = None
 
     @property
     def setup_path(self) -> Path | None:
@@ -260,14 +280,15 @@ def parse_manifest(
         raise PluginManifestError("frontend", "'[frontend]' must be a table.")
     scripts = _rel_paths(frontend.get("scripts", []), plugin_dir, "scripts")
     styles = _rel_paths(frontend.get("styles", []), plugin_dir, "styles")
-    if ("panel" in provides or "sidebar" in provides) and not scripts:
+    if ("panel" in provides or "sidebar" in provides or "hook" in provides) and not scripts:
         raise PluginManifestError(
             "frontend",
-            "a 'panel' or 'sidebar' plugin must list at least one "
+            "a 'panel', 'sidebar' or 'hook' plugin must list at least one "
             "'frontend.scripts' file.",
         )
 
     sidebar = _parse_sidebar(data.get("sidebar"), provides)
+    hook = _parse_hook(data.get("hook"), provides)
 
     return PluginManifest(
         name=name,
@@ -285,6 +306,7 @@ def parse_manifest(
         source=source,
         locked=locked,
         sidebar=sidebar,
+        hook=hook,
     )
 
 
@@ -330,6 +352,31 @@ def _parse_sidebar(value, provides: list) -> SidebarSpec | None:
         )
 
     return SidebarSpec(route=route, label=label.strip(), category=category, icon=icon)
+
+
+def _parse_hook(value, provides: list) -> HookSpec | None:
+    """Validate ``[hook]``. Required iff ``"hook"`` is in ``provides``; an
+    error either way if the two disagree, same reasoning as ``_parse_sidebar``."""
+    if "hook" not in provides:
+        if value is not None:
+            raise PluginManifestError(
+                "hook", "'[hook]' is set but 'hook' is not in 'provides'.",
+            )
+        return None
+
+    if not isinstance(value, dict):
+        raise PluginManifestError(
+            "hook", "'hook' is in 'provides' but '[hook]' is missing.",
+        )
+
+    host = value.get("host")
+    if not isinstance(host, str) or not _ROUTE_RE.match(host):
+        raise PluginManifestError(
+            "hook",
+            "'hook.host' must be lowercase [a-z0-9-], starting alphanumeric.",
+        )
+
+    return HookSpec(host=host)
 
 
 def _scan_dir(apps_dir: Path, source: str, seen: set[str]) -> list[PluginManifest]:

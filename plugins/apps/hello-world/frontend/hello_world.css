@@ -13,3 +13,12 @@
     font-size: 13px;
     font-weight: 600;
 }
+
+/* Only rendered when a "hook" plugin (e.g. hello-world-hook) actually
+   targets this page -- see hello_world.js. A simple divider separates
+   this page's own content from whatever a hook plugin injects below it. */
+.hello-world-hooks {
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid var(--hairline);
+}
