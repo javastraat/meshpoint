@@ -383,6 +383,7 @@ window.DabConfigPanel = DabConfigPanel;
 if (typeof window.registerPageHook === 'function') {
     window.registerPageHook({
         host: 'rtlsdr',
+        label: 'DAB+ Config',
         make: () => new DabConfigPanel(),
     });
 } else {

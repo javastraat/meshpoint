@@ -980,6 +980,7 @@ window.DabPanel = DabPanel;
 if (typeof window.registerPageHook === 'function') {
     window.registerPageHook({
         host: 'rtlsdr',
+        label: 'DAB+',
         make: () => {
             const panel = new DabPanel();
             // Exposed for SidebarTelemetryRail's mini-player

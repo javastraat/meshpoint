@@ -22,11 +22,21 @@ entirely.
 migration: it dropped `"panel"` from its `provides` and no longer appears
 on the Listener page's tabbar at all. Both its player
 (`plugins/apps/dab/frontend/dab_panel.js`) and its Config panel
-(`dab_config_panel.js`) hook into this page instead, stacked one below the
-other. Moved wholesale rather than duplicated deliberately — DAB+'s player
-looks up its `<audio>` element by a hardcoded id (`document.
+(`dab_config_panel.js`) hook into this page instead, each its own labeled
+tab (`window.mountPageHooks()` builds a small internal tabbar
+automatically once a host has more than one hook — see `docs/PLUGINS.md`).
+Moved wholesale rather than duplicated deliberately — DAB+'s player looks
+up its `<audio>` element by a hardcoded id (`document.
 getElementById('dab-audio')`, not scoped to its own mounted root), so two
 live instances at once (old tab + new hook) would have fought over it.
+
+DAB+ moving here also surfaced two real bugs in the hook mechanism itself
+(fixed, not DAB+-specific): `mountPageHooks()` used to hand every hook the
+same container element directly, so a second hook's `mount()` silently
+erased the first's content; and nothing ever called a mounted hook's
+`show()`, so any hook depending on that lifecycle for data loading (like
+DAB+'s Config panel) never did anything. Both fixed generically, so every
+future plugin migrating here benefits automatically.
 
 Once every RTL-SDR plugin (and Radio) has migrated, `scripts/install.sh`'s
 RTL-SDR section (librtlsdr build, kernel DVB blacklist) moves into this

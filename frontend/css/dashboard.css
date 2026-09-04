@@ -121,6 +121,39 @@ html, body {
     line-height: 1.5;
 }
 
+/* Auto-built by window.mountPageHooks() (frontend/sidebar/
+   page_hook_registry.js) whenever 2+ "hook" plugins target the same host
+   page -- same visual language as the Listener page's own .lsn-tabbar,
+   since this is standing in for the same "which sub-panel is active"
+   concept, just on a different kind of host. A single hook renders with
+   no tabbar at all, so this only ever appears once a host has more than
+   one. */
+.page-hook-tabbar {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 12px;
+}
+
+.page-hook-tabbar__btn {
+    background: none;
+    border: 1px solid var(--hairline);
+    border-radius: 8px;
+    color: var(--text-secondary);
+    font-size: 13px;
+    padding: 6px 14px;
+    cursor: pointer;
+}
+
+.page-hook-tabbar__btn:hover {
+    color: var(--text-primary);
+}
+
+.page-hook-tabbar__btn--active {
+    background: rgba(52, 211, 153, 0.12);
+    border-color: rgba(52, 211, 153, 0.4);
+    color: var(--accent-green);
+}
+
 @keyframes sectionFadeIn {
     from { opacity: 0; transform: translateY(4px); }
     to { opacity: 1; transform: translateY(0); }

@@ -308,10 +308,12 @@ time. The shipped **DAB+** plugin is the first to move — it dropped
 `"panel"` from `provides` and no longer appears on the Listener page at
 all; both its player and its Config panel now hook into the RTL-SDR page
 instead (`plugins/apps/dab/frontend/dab_panel.js` /
-`dab_config_panel.js`). Moving wholesale rather than duplicating mattered
-here for a concrete reason, not just tidiness: DAB+'s player looks up its
-`<audio>` element by a hardcoded id, not scoped to its own mounted root,
-so two live instances at once would have fought over it.
+`dab_config_panel.js`), each with its own `label` (see below) so they show
+up as two switchable tabs rather than one long stacked page. Moving
+wholesale rather than duplicating mattered here for a concrete reason, not
+just tidiness: DAB+'s player looks up its `<audio>` element by a hardcoded
+id, not scoped to its own mounted root, so two live instances at once
+would have fought over it.
 
 1. List `"hook"` in `provides` and fill in `[hook]` with the target host's
    id — another plugin's `[sidebar].route`:
@@ -341,6 +343,7 @@ so two live instances at once would have fought over it.
    // plugins/apps/hello-world-hook/frontend/hello_world_hook.js
    window.registerPageHook({
        host: 'hello-world',        // must match plugin.toml's [hook].host
+       label: 'My Plugin',         // optional -- see below
        make: () => ({
            mount(rootEl) {
                rootEl.innerHTML = '<p>Hello from a hook.</p>';
@@ -350,6 +353,14 @@ so two live instances at once would have fought over it.
        }),
    });
    ```
+
+   `label` only matters if the host ends up with more than one hook
+   registered against it — with just yours, it renders directly, no tab
+   chrome at all. Two or more get an automatic small tabbar (built by
+   `mountPageHooks()` itself, nothing the host has to do), `label` as the
+   button text — falls back to `"Plugin N"` if you skip it, so still
+   worth setting once you know you might share a host with something
+   else.
 
 3. That's it on the hook side — no manual wiring. `frontend/sidebar/
    page_hook_registry.js` is the seam: every plugin's frontend script runs
@@ -396,26 +407,28 @@ in your markup.
 container automatically — you never need to worry about two hooks' `mount()`
 calls colliding (a panel's `mount(el)` typically does `el.innerHTML = ...`,
 which would wipe out a sibling's content if two hooks shared one element
-directly).
+directly). With two or more hooks it also builds the small tabbar
+mentioned above, keeping only the active one's panel visible and "live".
 
 **If your page has its own `show()`/`hide()`** (called by the router on
 navigation, unlike `mount()` which runs once at boot regardless of
 visibility) **and a hook you host depends on that lifecycle** — e.g. its
 own `show()` is what kicks off a data fetch or starts status polling, the
 same way `panel`-seam tabs already work — you need to propagate it
-yourself. `mountPageHooks()` returns the mounted panel objects for exactly
-this:
+yourself. `mountPageHooks()` returns `{show(), hide()}` for exactly this
+(with multiple hooks, these forward to whichever tab is currently active;
+switching tabs handles hide()-the-old/show()-the-new on its own):
 
 ```js
 make: () => {
-    let hookPanels = [];   // closure-scoped so show()/hide() below can reach it
+    let hookGroup = null;   // closure-scoped so show()/hide() below can reach it
     return {
         mount(rootEl) {
             // ...render your own content...
-            hookPanels = window.mountPageHooks('your-host-id', hookContainerEl);
+            hookGroup = window.mountPageHooks('your-host-id', hookContainerEl);
         },
-        show() { hookPanels.forEach((p) => p.show && p.show()); },
-        hide() { hookPanels.forEach((p) => p.hide && p.hide()); },
+        show() { if (hookGroup) hookGroup.show(); },
+        hide() { if (hookGroup) hookGroup.hide(); },
     };
 },
 ```

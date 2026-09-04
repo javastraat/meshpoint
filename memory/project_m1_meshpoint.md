@@ -10277,3 +10277,92 @@ migration -- good thing to check this thoroughly before the NEXT plugin
 (Pagers/POCSAG/P2000/RTL433/ADS-B/ACARS) migrates the same way, since
 they'll all go through this exact same `mountPageHooks()` +
 show()/hide()-propagation path, now fixed for all of them at once.
+
+**LIVE-VERIFIED on the Pi, both bug fixes confirmed working**: user tested
+live -- "tested playing dab radio works" (full playback confirmed, not
+just that the UI renders) and both cards (player + Config, Config now
+populated with real scanned channel data instead of stuck on "Loading…")
+render correctly, stacked. One remaining note from the user: "its pure
+visual now" -- functionally solid, purely a presentation follow-up left.
+
+---
+
+## Follow-up: hooks on one host now auto-tab instead of stacking forever
+
+User's remaining observation, screenshots attached: DAB+'s player and
+Config panel both work now, but render as one long vertical scroll
+instead of the two switchable tabs they had on the old Listener page --
+"better but the scan and config is not on another tab... have a look
+please." Correctly framed as a real concern, not just cosmetics: every
+future RTL-SDR plugin migrating onto this same `rtlsdr` host page will
+make an unstructured stack progressively worse. Asked the user via
+AskUserQuestion whether to build tab support into the mechanism now
+(generic, benefits every future migration) vs. leave it stacked for now
+vs. something else -- picked "build tabs now."
+
+**Design**: extended `registerPageHook({host, label, make})` with an
+optional `label`. Rewrote `window.mountPageHooks()`:
+- **One hook for a host** (e.g. hello-world-hook, still the only
+  consumer with just one) -- renders directly into its own wrapper, no
+  tab chrome at all, byte-identical to before. Explicitly verified this
+  doesn't regress via harness re-test.
+- **Two or more hooks** -- builds a small internal tabbar (visually
+  matching `.lsn-tabbar`/`.lsn-tabbar__btn` from `listener.css`, new
+  `.page-hook-tabbar`/`.page-hook-tabbar__btn` twin added to
+  `frontend/css/dashboard.css` near `.plugin-page` since this is generic
+  core infra, not rtlsdr-specific), one panel visible at a time
+  (`display:none` on the rest), clicking a tab calls `hide()` on the
+  outgoing panel and `show()` on the incoming one -- mirrors
+  `ListenerPanel._switchTab()`'s own established pattern exactly.
+
+**Return contract changed** from "array of mounted panels" to `{show(),
+hide()}` -- cleaner for hosts to consume (no need to know whether there's
+1 or N panels underneath, or which one is "active"), and correctly scopes
+propagation to only the currently-active tab rather than blindly calling
+`show()` on every panel including hidden ones (which would have wasted
+resources polling/loading data for a tab nobody's looking at, and
+resurfaced a variant of the original stacking bug). `rtlsdr_panel.js`
+updated to match -- stores the returned `{show, hide}` in its closure
+instead of an array, forwards its own show()/hide() straight through.
+DAB+'s two hook registrations gained `label: 'DAB+'` / `label: 'DAB+
+Config'` matching their old Listener-page tab names exactly, so the
+migration is visually a wash once this ships, not just functionally.
+
+**Verified**: two Node harness tests -- (1) single-hook case renders
+directly, no tabbar, `{show,hide}` still callable without throwing; (2)
+two-hook case builds a tabbar + 2 panels, first active by default, host-
+level `show()` reaches only the active panel, clicking the second tab's
+button correctly calls `hide()` on the first panel/`show()` on the second
+and swaps visibility, and a subsequent host-level `show()` now reaches
+only the (new) active panel. Re-ran the hello-world-hook harness from
+earlier in this session to confirm zero regression for the original
+single-hook scenario. `node --check` clean on every touched JS file; CSS
+brace-balance sanity check on `dashboard.css` (no real CSS linter
+available, but a config easy enough to eyeball-verify given how small the
+addition is).
+
+**Docs**: `docs/PLUGINS.md`'s hook section -- `label` documented in the
+`registerPageHook()` example, the DAB+/rtlsdr worked-example paragraph
+updated to mention tabs instead of stacking, and the "Making your own
+page hookable" subsection's show()/hide()-propagation example rewritten
+for the new `{show,hide}` contract (was an array + `.forEach()` before
+this pass, now matches the real current API). `plugins/apps/dab/README.md`
+and `plugins/apps/rtlsdr/README.md` both updated from "stacked" to
+"tabbed" language, with the rtlsdr README additionally documenting both
+prior bugs (collision + missing show()) as historical context for why the
+mechanism looks the way it does now. New CHANGELOG bullet (53rd in
+v0.8.1) describing the tabbing addition as a direct, immediate follow-up
+to the previous bullet's two bug fixes, not a separate unrelated feature.
+
+**NOT yet done / next steps**: **not live-verified on the Pi yet** -- next
+session should pull, restart, confirm the RTL-SDR Plugins page now shows
+a "DAB+" / "DAB+ Config" tabbar exactly matching the old Listener-page
+tab names, switching between them works, and only the active tab's
+content actually polls/loads (can spot-check via Network tab -- Config's
+`/api/dab/scan-results` fetch should only fire once its own tab is first
+opened, not both immediately on page load). Once confirmed, this closes
+out DAB+'s migration completely, functionally AND visually equivalent to
+what it replaced -- genuinely done, not just "good enough." Next
+candidates to migrate the same way remain Pagers/POCSAG/P2000/RTL433/
+ADS-B/ACARS (each single-hook, so no tab-labeling decisions needed unless
+a plugin adds a second hook later) then eventually Radio itself.

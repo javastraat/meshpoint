@@ -14,13 +14,15 @@
 window.registerSidebarPage({
     route: 'rtlsdr',
     make: () => {
-        // Hook panels mounted below -- kept in this closure so show()/hide()
-        // (called by the router on navigation, unlike mount() which runs
-        // once at boot regardless of visibility) can propagate into them.
-        // Required, not optional: a hook whose own show() kicks off data
-        // loading or status polling (e.g. DAB+'s panels) never would
-        // otherwise, since mount() alone never calls it.
-        let hookPanels = [];
+        // mountPageHooks() returns {show(), hide()} -- kept in this closure
+        // so our own show()/hide() (called by the router on navigation,
+        // unlike mount() which runs once at boot regardless of visibility)
+        // can forward into it. Required, not optional: a hook whose own
+        // show() kicks off data loading or status polling (e.g. DAB+'s
+        // panels) never would otherwise, since mount() alone never calls
+        // it. With multiple hooks sharing this page (auto-tabbed), this
+        // only ever reaches whichever tab is currently active.
+        let hookGroup = null;
         return {
             mount(rootEl) {
                 const hasHooks = (window.MESHPOINT_PAGE_HOOKS || [])
@@ -37,15 +39,11 @@ window.registerSidebarPage({
                     </div>
                 `;
                 if (hasHooks && typeof window.mountPageHooks === 'function') {
-                    hookPanels = window.mountPageHooks('rtlsdr', rootEl.querySelector('[data-rtlsdr-hooks]'));
+                    hookGroup = window.mountPageHooks('rtlsdr', rootEl.querySelector('[data-rtlsdr-hooks]'));
                 }
             },
-            show() {
-                hookPanels.forEach((p) => { if (p && typeof p.show === 'function') p.show(); });
-            },
-            hide() {
-                hookPanels.forEach((p) => { if (p && typeof p.hide === 'function') p.hide(); });
-            },
+            show() { if (hookGroup) hookGroup.show(); },
+            hide() { if (hookGroup) hookGroup.hide(); },
         };
     },
 });

@@ -7,7 +7,10 @@ doesn't live on the built-in Listener page — it renders on the
 [RTL-SDR Plugins](../rtlsdr/) page instead, via the `"hook"` seam
 (`plugin.toml`'s `[hook] host = "rtlsdr"`), first to move off ahead of
 Radio itself (see [`plugins/apps/rtlsdr/README.md`](../rtlsdr/README.md)
-for why). Two pieces, stacked on that page:
+for why). Two pieces, shown as switchable tabs on that page (each hook
+registration carries its own `label` — see `docs/PLUGINS.md`'s hook seam
+docs for how `mountPageHooks()` turns that into a small tabbar
+automatically once more than one hook shares a host):
 
 - **The player** — pick a channel (Favorites, a scanned-channel tab, or
   Manual), tune it, and welle-cli progressively decodes the ensemble's
