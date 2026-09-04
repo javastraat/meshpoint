@@ -1,0 +1,17 @@
+name = "acars-test"
+version = "1.1.1"
+meshpoint_api = 1
+provides = ["listener", "routes", "panel"]
+
+[deps]
+apt = ["cmake", "pkg-config", "libcjson-dev", "zlib1g-dev", "libxml2-dev", "libsndfile1-dev"]
+setup = "setup.sh"
+
+[frontend]
+scripts = ["frontend/acars_panel.js"]
+styles = ["frontend/acars_panel.css"]
+
+[meta]
+description = "Aircraft VHF datalink (ACARS) decoding via acarsdec + libacars"
+homepage = "https://github.com/f00b4r0/acarsdec"
+author = "Einstein"
