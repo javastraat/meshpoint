@@ -1469,7 +1469,13 @@ capture:               # what packet sources to read from
     - concentrator
     - meshcore_usb
     # - serial           # optional: Meshtastic node on USB (e.g. 433 MHz)
-  rtl_sdr_page_enabled: true  # shows/hides the RTL-SDR sidebar page; UI-only, no dongle required
+  rtl_sdr_page_enabled: true  # now inert/vestigial: used to gate the old built-in
+                               # "RTL-SDR" sidebar link, which no longer exists
+                               # (Radio -- its last tab -- moved to the rtlsdr
+                               # plugin). The Configuration -> Peripherals
+                               # checkbox for this still exists but currently
+                               # has no visible effect; use plugins.rtlsdr.enabled
+                               # to actually show/hide the RTL-SDR sidebar page now.
   meshcore_usb:          # list — up to 4 companions, each with a label
     - serial_port: null  # null + auto_detect finds /dev/ttyACM*
       baud_rate: 115200

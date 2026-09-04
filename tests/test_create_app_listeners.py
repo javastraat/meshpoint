@@ -16,15 +16,17 @@ from __future__ import annotations
 import asyncio
 import unittest
 
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-
 from src.api import listener_registry
 from src.api.listener_registry import ListenerSpec
-from src.api.routes import listener_routes
 from src.api.server import _BUILTIN_LISTENERS
 
-_EXPECTED_NAMES = ["radio"]
+# Empty -- Radio was the last built-in RTL-SDR listener, and it moved out
+# to plugins/apps/radio/ the same way every other one already had
+# (Pagers/P2000/POCSAG/RTL433/ADS-B/ACARS/DAB+). Kept as a named constant
+# (rather than inlining `[]` below) so a future built-in re-added here
+# updates one obvious place, matching the convention every prior version
+# of this test already used.
+_EXPECTED_NAMES: list[str] = []
 
 
 class TestBuiltinListenerList(unittest.TestCase):
@@ -38,31 +40,10 @@ class TestBuiltinListenerList(unittest.TestCase):
             self.assertTrue(callable(s.build))
             self.assertTrue(callable(s.wire))
 
-    def test_start_all_wires_every_route_module(self) -> None:
-        for mod in (listener_routes,):
-            getattr(mod, "reset_routes", lambda: None)()
-
+    def test_start_all_with_zero_builtins_is_a_no_op(self) -> None:
         listener_registry.start_all(_BUILTIN_LISTENERS)
         try:
-            # one entry per init_routes call. Pagers/P2000/POCSAG/RTL433/
-            # ADS-B/DAB+ (the RTL-SDR tabs that used to be built-in) are
-            # all plugins now -- radio is the only built-in listener left.
-            names = [n for n, _ in listener_registry.live()]
-            self.assertEqual(names, _EXPECTED_NAMES)
-
-            self.assertIsNotNone(listener_routes._listener)
-        finally:
-            asyncio.run(listener_registry.stop_all())
-
-    def test_status_routes_answer_after_start_all_not_running(self) -> None:
-        listener_registry.start_all(_BUILTIN_LISTENERS)
-        try:
-            app = FastAPI()
-            app.include_router(listener_routes.router)
-            client = TestClient(app)
-            resp = client.get("/api/listener/status")
-            self.assertEqual(resp.status_code, 200)
-            self.assertFalse(resp.json().get("running"))
+            self.assertEqual(listener_registry.live(), [])
         finally:
             asyncio.run(listener_registry.stop_all())
 
@@ -86,17 +67,6 @@ class TestBuiltinListenerList(unittest.TestCase):
 class _NoopListener:
     async def stop(self) -> None:
         pass
-
-
-class TestBuiltinListenerRouterAlignment(unittest.TestCase):
-    """Every listener route module is also in the router list (else its tab
-    would 404 even though the listener runs)."""
-
-    def test_router_prefixes_present(self) -> None:
-        from src.api.server import _BUILTIN_ROUTERS
-
-        prefixes = {getattr(r, "prefix", "") for r, _ in _BUILTIN_ROUTERS}
-        self.assertIn("/api/listener", prefixes)
 
 
 if __name__ == "__main__":  # pragma: no cover

@@ -1,5 +1,5 @@
 /**
- * RTL-SDR web listener panel.
+ * Radio -- FM/AM/SSB broadcast & utility radio listener.
  *
  * Architecture: one shared CONTROLLER (state, tune/stop, status poll, RDS,
  * Web Audio VU) drives a swappable DISPLAY SKIN. Two skins implement the same
@@ -7,6 +7,20 @@
  * reset }: DigitalSkin (VFD-style readout + segmented VU) and AnalogueSkin
  * (slide-rule dial + swinging needle VU). The <audio> element lives in the
  * shell (not a skin) so the Web Audio graph survives skin switches.
+ *
+ * Lives on the RTL-SDR Plugins page (plugins/apps/rtlsdr/) via the "hook"
+ * seam, not a built-in Listener page -- that page no longer exists. Radio
+ * was the last RTL-SDR listener still built into core; this plugin closes
+ * out that migration (see plugins/apps/rtlsdr/README.md for the full
+ * history: DAB+ moved first and proved the mechanism/found two real bugs
+ * in it, then Pagers/POCSAG/P2000/RTL433/ACARS/ADS-B followed).
+ *
+ * Unlike those, `mount(rootEl)` here builds its DOM eagerly and every
+ * element lookup is scoped to `this._root` (`this._root.querySelector`),
+ * not `document.getElementById` -- the original built-in version used
+ * bare ids since there was only ever one Listener page in the whole app;
+ * scoping properly here costs nothing and matches how every other
+ * migrated panel already works.
  */
 
 function fmtFreq4(mhz) {
@@ -249,7 +263,7 @@ class AnalogueSkin {
             html += `<div class="lsn-ana__tlabel" style="left:${pos}%">${txt}</div>`;
         }
         // Preset flags: any preset frequency that falls inside this band.
-        for (const g of ListenerPanel.PRESET_GROUPS) {
+        for (const g of RadioPanel.PRESET_GROUPS) {
             for (const [label, freq] of g.items) {
                 if (freq >= band.min && freq <= band.max) {
                     const pos = ((freq - band.min) / span) * 100;
@@ -336,9 +350,9 @@ class AnalogueSkin {
 
 /* ───────────────────────── Controller ─────────────────────────── */
 
-class ListenerPanel {
+class RadioPanel {
     constructor() {
-        this._mounted = false;
+        this._root = null;
         this._statusTimer = null;
         this._playing = false;
         this._station = '';
@@ -376,31 +390,6 @@ class ListenerPanel {
         })();
         this._tunedCat = null;   // category index of the currently-tuned preset
         this._tunedKey = null;   // "freq|mode" of the currently-tuned preset
-        this._activeTab = 'radio';
-
-        // Every non-radio Listener sub-tab, in tabbar order. Each entry is
-        // {tab, label, panel} where panel has mount(el)/show()/hide(). The
-        // `radio` tab is bespoke (audio element + skins) and handled as the
-        // default branch, not from here. `this._subPanels` is empty as of
-        // this comment -- every RTL-SDR plugin that used to append an
-        // entry here via window.registerListenerPanel (DAB+, Pagers,
-        // POCSAG, P2000, RTL433, ACARS, ADS-B) has migrated onto the
-        // RTL-SDR Plugins page instead (plugins/apps/rtlsdr/), via the
-        // DIFFERENT "hook" seam (frontend/sidebar/page_hook_registry.js).
-        // Radio is the only RTL-SDR listener left built into core, and the
-        // Listener page currently shows only its own "Radio" tab as a
-        // result -- this mechanism (and window.PagerPanel, still core
-        // purely as shared UI those plugins' own frontend files
-        // instantiate on the new page) is left in place rather than
-        // deleted, since Radio itself is expected to migrate here too
-        // eventually, at which point this whole page goes away.
-        this._subPanels = (window.LISTENER_PANELS || [])
-            .map((d) => ({ tab: d.tab, label: d.label, panel: d.make ? d.make() : d.panel }))
-            .filter((d) => d && d.panel);
-    }
-
-    _subPanel(tab) {
-        return this._subPanels.find((d) => d.tab === tab) || null;
     }
 
     _loadFavs() {
@@ -417,31 +406,25 @@ class ListenerPanel {
     }
 
     show() {
-        if (!this._mounted) { this._mount(); this._mounted = true; }
-        this._showActiveTab();
+        this._refreshStatus();
+        this._statusTimer = setInterval(() => this._refreshStatus(), 500);
     }
 
     /**
      * Reconcile audio connection state from a status object polled by
-     * something OTHER than this panel's own (route-gated) poll loop --
+     * something OTHER than this panel's own (visibility-gated) poll loop --
      * specifically SidebarTelemetryRail, which polls /api/listener/status
-     * continuously regardless of which page is showing. Without this,
-     * reconnecting only happens once you actually visit the Listener
-     * page again: the <audio> element doesn't even exist until _mount()
-     * runs, which only happens via show(). Mounts on demand (cheap --
-     * just builds hidden markup, no network calls) so the very first
-     * external poll after a page load/reload can reconnect immediately
-     * even if the Listener tab is never visited this session.
+     * continuously regardless of which page is showing. mount() has
+     * already run by the time this is ever externally reachable (the hook
+     * mechanism calls it synchronously right after constructing this
+     * panel, before anything else gets a chance to run), so there's no
+     * "not mounted yet" case to guard here the way the old built-in
+     * Listener page's lazy-mount version had to.
      */
     syncAudioFromStatus(status) {
         if (status.running) {
-            if (!this._mounted) { this._mount(); this._mounted = true; }
             if (!this._audioConnected) this._startAudio();
-        } else if (this._mounted) {
-            // Only reset if we've ever mounted -- otherwise this is a
-            // no-op default anyway, and mounting just to set a flag
-            // would build the whole (hidden) Listener page's DOM for a
-            // session that never touched RTL-SDR at all.
+        } else {
             this._audioConnected = false;
         }
     }
@@ -449,63 +432,12 @@ class ListenerPanel {
     hide() {
         clearInterval(this._statusTimer);
         this._statusTimer = null;
-        this._subPanels.forEach((d) => d.panel.hide());
     }
 
-    _showActiveTab() {
-        const d = this._subPanel(this._activeTab);
-        if (d) {
-            d.panel.show();
-            return;
-        }
-        // radio tab (the default) -- no sibling panel, poll our own status
-        this._refreshStatus();
-        this._statusTimer = setInterval(() => this._refreshStatus(), 500);
-    }
-
-    _switchTab(tab) {
-        if (tab === this._activeTab) return;
-        clearInterval(this._statusTimer);
-        this._statusTimer = null;
-        const prev = this._subPanel(this._activeTab);
-        if (prev) prev.panel.hide();
-
-        this._activeTab = tab;
-        const root = document.getElementById('listener-panel');
-        if (root) {
-            root.querySelectorAll('.lsn-tab-content').forEach((el) => {
-                el.style.display = el.dataset.tab === tab ? '' : 'none';
-            });
-            root.querySelectorAll('.lsn-tabbar__btn').forEach((btn) => {
-                btn.classList.toggle('lsn-tabbar__btn--active', btn.dataset.tab === tab);
-            });
-        }
-        this._showActiveTab();
-    }
-
-    _mount() {
-        const root = document.getElementById('listener-panel');
-        if (!root) return;
-        const esc = (s) => String(s).replace(/[&<>"]/g, (c) => (
-            { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]
-        ));
-        const tabBtns = this._subPanels.map((d) => (
-            `<button type="button" class="lsn-tabbar__btn" data-tab="${esc(d.tab)}">${esc(d.label)}</button>`
-        )).join('\n                ');
-        const tabDivs = this._subPanels.map((d) => (
-            `<div class="lsn-tab-content" data-tab="${esc(d.tab)}" style="display:none" id="lsn-tab-${esc(d.tab)}"></div>`
-        )).join('\n            ');
+    mount(rootEl) {
+        this._root = rootEl;
+        const root = rootEl;
         root.innerHTML = `
-            <header class="lsn-panel__head">
-                <h2 class="lsn-panel__title">Listener</h2>
-            </header>
-
-            <div class="lsn-tabbar" id="lsn-tabbar">
-                <button type="button" class="lsn-tabbar__btn lsn-tabbar__btn--active" data-tab="radio">Radio</button>
-                ${tabBtns}
-            </div>
-
-            <div class="lsn-tab-content" data-tab="radio">
             <section class="lsn-section">
                 <div class="panel lsn-radio">
                     <div class="panel__header">
@@ -587,19 +519,7 @@ class ListenerPanel {
                     </div>
                 </div>
             </section>
-            </div>
-
-            ${tabDivs}
         `;
-
-        this._subPanels.forEach((d) => {
-            d.panel.mount(root.querySelector('#lsn-tab-' + d.tab));
-        });
-
-        root.querySelector('#lsn-tabbar').addEventListener('click', (ev) => {
-            const btn = ev.target.closest('[data-tab]');
-            if (btn) this._switchTab(btn.dataset.tab);
-        });
 
         this._mountSkin(this._skinName);
 
@@ -663,36 +583,36 @@ class ListenerPanel {
     }
 
     _mountSkin(name) {
-        const container = document.getElementById('lsn-display');
+        const container = this._root.querySelector('#lsn-display');
         if (!container) return;
         this._skinName = (name === 'analogue') ? 'analogue' : 'digital';
         try { localStorage.setItem('meshpoint.listenerSkin', this._skinName); } catch (_e) { /* ignore */ }
         this._skin = this._skinName === 'analogue' ? new AnalogueSkin() : new DigitalSkin();
         this._skin.mount(container);
         // Highlight the active toggle button.
-        document.querySelectorAll('#lsn-skins button').forEach((b) =>
+        this._root.querySelectorAll('#lsn-skins button').forEach((b) =>
             b.classList.toggle('active', b.dataset.skin === this._skinName));
         // Repaint the new skin from the last known state.
         if (this._lastStatus) this._applyStatus(this._lastStatus);
-        else this._skin.setFreq(parseFloat(document.getElementById('lsn-freq')?.value));
+        else this._skin.setFreq(parseFloat(this._root.querySelector('#lsn-freq')?.value));
     }
 
     _resetLevel() {
-        const vol = document.getElementById('lsn-volume');
-        const volVal = document.getElementById('lsn-volume-val');
-        if (vol) vol.value = ListenerPanel.DEFAULT_LEVEL;
-        if (volVal) volVal.textContent = ListenerPanel.DEFAULT_LEVEL.toFixed(2);
+        const vol = this._root.querySelector('#lsn-volume');
+        const volVal = this._root.querySelector('#lsn-volume-val');
+        if (vol) vol.value = RadioPanel.DEFAULT_LEVEL;
+        if (volVal) volVal.textContent = RadioPanel.DEFAULT_LEVEL.toFixed(2);
     }
 
     async _tune() {
-        const freq = parseFloat(document.getElementById('lsn-freq').value);
+        const freq = parseFloat(this._root.querySelector('#lsn-freq').value);
         if (!Number.isFinite(freq)) { this._setStatus(false, 'enter a frequency'); return; }
-        const gainRaw = document.getElementById('lsn-gain').value;
+        const gainRaw = this._root.querySelector('#lsn-gain').value;
         const body = {
             frequency_mhz: freq,
-            mode: document.getElementById('lsn-mode').value,
-            squelch: parseInt(document.getElementById('lsn-squelch').value, 10) || 0,
-            volume: parseFloat(document.getElementById('lsn-volume').value) || ListenerPanel.DEFAULT_LEVEL,
+            mode: this._root.querySelector('#lsn-mode').value,
+            squelch: parseInt(this._root.querySelector('#lsn-squelch').value, 10) || 0,
+            volume: parseFloat(this._root.querySelector('#lsn-volume').value) || RadioPanel.DEFAULT_LEVEL,
             station_label: this._station || '',
         };
         if (gainRaw !== '') body.gain = parseFloat(gainRaw);
@@ -745,7 +665,7 @@ class ListenerPanel {
     }
 
     _startAudio() {
-        const audio = document.getElementById('lsn-audio');
+        const audio = this._root.querySelector('#lsn-audio');
         if (!audio) return;
         this._audioConnected = true;
         audio.src = '/api/listener/stream?t=' + Date.now();
@@ -754,7 +674,7 @@ class ListenerPanel {
     }
 
     _stopAudio() {
-        const audio = document.getElementById('lsn-audio');
+        const audio = this._root.querySelector('#lsn-audio');
         this._audioConnected = false;
         if (!audio) return;
         audio.pause();
@@ -763,7 +683,7 @@ class ListenerPanel {
     }
 
     _ensureAudioGraph() {
-        const audio = document.getElementById('lsn-audio');
+        const audio = this._root.querySelector('#lsn-audio');
         if (!audio) return false;
         try {
             if (!this._audioCtx) {
@@ -824,18 +744,18 @@ class ListenerPanel {
     _applyStatus(st) {
         this._lastStatus = st;
         // Sync the preset label from the backend (single source of truth
-        // now -- see src/audio/rtl_listener.py's station_label) so a page
-        // reload restores it instead of falling back to bare frequency
-        // for stations without RDS. Harmless to keep re-syncing after a
-        // local preset click too, since tune()'s own response already
-        // echoes back the exact label just sent.
+        // now -- see plugins/apps/radio/backend/listener.py's
+        // station_label) so a page reload restores it instead of falling
+        // back to bare frequency for stations without RDS. Harmless to
+        // keep re-syncing after a local preset click too, since tune()'s
+        // own response already echoes back the exact label just sent.
         if (st.running && typeof st.station_label === 'string') {
             this._station = st.station_label;
         }
         // Volume slider sync (skip while the user is dragging it).
         if (typeof st.volume === 'number') {
-            const vol = document.getElementById('lsn-volume');
-            const volVal = document.getElementById('lsn-volume-val');
+            const vol = this._root.querySelector('#lsn-volume');
+            const volVal = this._root.querySelector('#lsn-volume-val');
             if (vol && document.activeElement !== vol) {
                 vol.value = st.volume;
                 if (volVal) volVal.textContent = (+st.volume).toFixed(2);
@@ -844,7 +764,7 @@ class ListenerPanel {
 
         const freq = st.running
             ? st.frequency_mhz
-            : parseFloat(document.getElementById('lsn-freq')?.value);
+            : parseFloat(this._root.querySelector('#lsn-freq')?.value);
         if (this._skin) {
             this._skin.setFreq(freq);
             this._skin.setMode(st.mode);
@@ -869,7 +789,7 @@ class ListenerPanel {
         // Only P2000/Pagers can be "in the way" from Radio's point of view --
         // dongle_owner === 'radio' just means we're the one running.
         const busyOwner = (st.dongle_owner && st.dongle_owner !== 'radio') ? st.dongle_owner : null;
-        const tuneBtn = document.getElementById('lsn-tune-btn');
+        const tuneBtn = this._root.querySelector('#lsn-tune-btn');
         if (tuneBtn) tuneBtn.disabled = !!busyOwner;
 
         if (st.running) {
@@ -896,8 +816,8 @@ class ListenerPanel {
     }
 
     _setStatus(running, text, busy = false) {
-        const dot = document.getElementById('lsn-status-dot');
-        const label = document.getElementById('lsn-status-text');
+        const dot = this._root.querySelector('#lsn-status-dot');
+        const label = this._root.querySelector('#lsn-status-text');
         if (dot) {
             dot.classList.toggle('lsn-status__dot--on', !!running);
             dot.classList.toggle('lsn-status__dot--busy', !!busy);
@@ -906,7 +826,7 @@ class ListenerPanel {
     }
 
     _setActivePreset(btn) {
-        document.querySelectorAll('#lsn-presets .lsn-preset--active')
+        this._root.querySelectorAll('#lsn-presets .lsn-preset--active')
             .forEach((b) => b.classList.remove('lsn-preset--active'));
         if (btn) btn.classList.add('lsn-preset--active');
     }
@@ -1009,9 +929,9 @@ class ListenerPanel {
     }
 
     _repaintPresets() {
-        const tabs = document.getElementById('lsn-preset-tabs');
-        const view = document.getElementById('lsn-presets');
-        const search = document.getElementById('lsn-preset-search');
+        const tabs = this._root.querySelector('#lsn-preset-tabs');
+        const view = this._root.querySelector('#lsn-presets');
+        const search = this._root.querySelector('#lsn-preset-search');
         if (tabs) tabs.innerHTML = this._renderPresetTabs();
         if (view) view.innerHTML = this._renderPresetChannels(search ? search.value : '');
     }
@@ -1026,10 +946,10 @@ class ListenerPanel {
         let html = `<button type="button" data-cat="fav" class="lsn-preset-tab lsn-preset-tab--fav`
             + `${this._activeCat === 'fav' ? ' active' : ''}">★ Favorites`
             + `${favCount ? ` (${favCount})` : ''}</button>`;
-        html += ListenerPanel.PRESET_GROUPS.map((g, i) => {
+        html += RadioPanel.PRESET_GROUPS.map((g, i) => {
             const dot = (i === this._tunedCat) ? '<span class="lsn-preset-tab__dot"></span>' : '';
             return `<button type="button" data-cat="${i}" class="lsn-preset-tab`
-                 + `${i === this._activeCat ? ' active' : ''}">${ListenerPanel._tabLabel(g.name)}${dot}</button>`;
+                 + `${i === this._activeCat ? ' active' : ''}">${RadioPanel._tabLabel(g.name)}${dot}</button>`;
         }).join('');
         return html;
     }
@@ -1037,7 +957,7 @@ class ListenerPanel {
     // No filter -> the active category (or Favorites). With a filter -> matching
     // station presets across every category, grouped for context.
     _renderPresetChannels(filter) {
-        const groups = ListenerPanel.PRESET_GROUPS;
+        const groups = RadioPanel.PRESET_GROUPS;
         const favs = this._loadFavs();
         const f = (filter || '').trim().toLowerCase();
         if (f) {
@@ -1071,4 +991,23 @@ class ListenerPanel {
     }
 }
 
-window.ListenerPanel = ListenerPanel;
+window.RadioPanel = RadioPanel;
+
+if (typeof window.registerPageHook === 'function') {
+    window.registerPageHook({
+        host: 'rtlsdr',
+        label: 'Radio',
+        make: () => {
+            const panel = new RadioPanel();
+            // Exposed for SidebarTelemetryRail's mini-player
+            // (syncAudioFromStatus, called on every /api/listener/status
+            // poll regardless of which page is showing) -- previously set
+            // by app.js's _bootListenerPanel() when Radio was the
+            // built-in Listener page.
+            window.radioPanel = panel;
+            return panel;
+        },
+    });
+} else {
+    console.warn('Radio plugin: page hook registry missing');
+}

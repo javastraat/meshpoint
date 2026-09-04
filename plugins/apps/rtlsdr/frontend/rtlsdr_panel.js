@@ -1,15 +1,12 @@
 /**
- * RTL-SDR Plugins -- the future RTL-SDR host page, under construction.
+ * RTL-SDR -- the shared host page every RTL-SDR plugin hooks a tab into.
  *
- * The built-in Listener page (Radio + every RTL-SDR plugin's tab via
- * window.registerListenerPanel) is still core, but RTL-SDR plugins are
- * migrating off it onto THIS page instead, one at a time, via a DIFFERENT
- * seam -- a plugin injecting content into another plugin's page via
- * window.registerPageHook() (see frontend/sidebar/page_hook_registry.js
- * and docs/PLUGINS.md). DAB+ (plugins/apps/dab/) was the first to move --
- * see its own README for why. The plan is for every other RTL-SDR plugin,
- * and eventually Radio itself, to follow, at which point the built-in
- * Listener page goes away entirely.
+ * The old built-in Listener page (which used to own Radio directly plus
+ * every other RTL-SDR plugin's tab via window.registerListenerPanel) is
+ * gone. Every RTL-SDR plugin, Radio included, now injects its own tab into
+ * THIS page instead via window.registerPageHook() (see
+ * frontend/sidebar/page_hook_registry.js and docs/PLUGINS.md). DAB+
+ * (plugins/apps/dab/) was the first to move -- see its own README for why.
  */
 window.registerSidebarPage({
     route: 'rtlsdr',

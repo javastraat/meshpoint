@@ -179,9 +179,11 @@ session gets `401 Unauthorized`. See `src/api/auth/dependencies.py` for the
 
 ---
 
-## RTL-SDR listeners (Radio tab and friends)
+## RTL-SDR listeners (Radio and friends)
 
-Only Radio holds the RTL-SDR dongle by default (the Pagers, POCSAG, P2000, RTL433, ADS-B, ACARS and DAB+ plugins join that set when installed -- see their own `plugins/apps/*/README.md`).
+Nothing RTL-SDR-related is built in by default anymore -- Radio, Pagers, POCSAG, P2000, RTL433, ADS-B, ACARS and DAB+ are all opt-in plugins (`plugins.rtlsdr.enabled: true` plus whichever of these you want; see their own `plugins/apps/*/README.md`). Only one of them holds the RTL-SDR dongle at a time regardless of which are installed.
+
+The routes below are provided by the **Radio** plugin (`plugins/apps/radio/`) and kept at their original `/api/listener/*` prefix from before Radio was extracted out of core.
 
 | Method | Path | Role | Description |
 |---|---|---|---|

@@ -10475,3 +10475,204 @@ that finally lets the built-in Listener page (and its now-legacy
 `listener_panel_registry.js` seam) be deleted entirely. That's the
 natural final step of this whole multi-session direction, whenever
 picked up next.
+
+**LIVE-VERIFIED on the Pi**: screenshot confirms all 8 tabs render on the
+RTL-SDR Plugins page (ACARS, ADS-B, DAB+, DAB+ Config, P2000, Pagers,
+POCSAG, RTL433), matching the harness-predicted lineup exactly. ADS-B tab
+shown active with a fully live, working table -- 5 real tracked aircraft
+with ICAO/flight/squawk/altitude/speed/track/position/msgs/seen all
+populated, Metric units checkbox, Start listening/Stop, and Map button all
+present and correctly enabled/disabled per running state. Sidebar's own
+live status badge next to "RTL-SDR" correctly shows "ADS-B" (green dot),
+confirming `sdr_registry`'s dongle-owner reporting also works unaffected
+by the page relocation. Batch migration fully confirmed working end to
+end, not just on paper -- closes out this entire six-plugin pass.
+
+**Second live confirmation, P2000 tab**: real decoded FLEX traffic showing
+in the Messages log ("test", capcode 001120113), Hide idle frames
+checkbox, Start listening/Stop/Clear all present and working -- the shared
+`window.PagerPanel` component (Pagers/POCSAG/P2000/RTL433/ACARS) confirmed
+working live on the new page too, not just ADS-B's bespoke `AdsbPanel`.
+Two structurally different plugin frontends (shared-component vs.
+bespoke), both proven live -- good coverage for calling this batch done.
+
+## Radio migrates too -- the last RTL-SDR tab, built-in Listener page deleted entirely
+
+User: "yes lets do radio (fm) next with all the stuff it needs vu analog
+switch etc" -- the natural final step flagged at the end of the six-plugin
+batch above. Radio is the biggest of all the RTL-SDR migrations: VU meter,
+Digital/Analogue skin switch, tuner, presets, RDS, all needing to survive
+the move from a page-owning `ListenerPanel` to a hook-mounted `RadioPanel`.
+
+**Two design decisions confirmed via AskUserQuestion**: (1) default-enabled
+state -- user picked "Opt-in, like every other plugin", so Radio goes off
+by default for the first time ever (a real ⚠️ behaviour change, unlike the
+other extractions which all already defaulted off). (2) API prefix -- user
+initially answered "rename to /api/radio", then immediately corrected with
+"sorry qe two weas leave as is recommend changed my mind" -- reverted to
+the recommended choice, keeping `/api/listener` unchanged, since renaming
+would've meant touching the sidebar mini-player, the telemetry rail, the
+`<audio>` stream URL, and every doc mentioning it for a purely cosmetic
+win. Confirmed both back to the user before proceeding.
+
+**Backend move**, same pattern as every prior extraction:
+`src/audio/rtl_listener.py` -> `plugins/apps/radio/backend/listener.py`
+(content unchanged); `src/api/routes/listener_routes.py` ->
+`plugins/apps/radio/backend/routes.py` (router prefix untouched at
+`/api/listener`, import fixed to relative `.listener`, added
+`reset_routes()` for test-parity with every other plugin, which didn't
+exist before). `server.py`'s `_BUILTIN_ROUTERS` and `_BUILTIN_LISTENERS`
+both go fully empty for the first time -- zero built-in RTL-SDR anything
+left in core. `tests/test_create_app_listeners.py` rewritten:
+`_EXPECTED_NAMES = []`, dropped the fastapi/TestClient imports entirely,
+replaced the "every built-in router wired" test with a "zero builtins is a
+no-op" test, deleted the whole `TestBuiltinListenerRouterAlignment` class
+(its premise -- matching a built-in listener to a built-in router --
+doesn't exist anymore with zero of either).
+
+**Frontend conversion**: `ListenerPanel` (renamed `RadioPanel`) -- removed
+the now-dead multi-tab-hosting machinery (`_subPanels`, `_switchTab`, the
+page-level header/tabbar markup, the `data-tab="radio"` wrapper) and
+converted EVERY internal DOM lookup from `document.getElementById`/
+`document.querySelector` to `this._root.querySelector(...)`, unlike DAB+'s
+original extraction which only partially did this (missed `dab-audio`).
+Verified via grep: zero real hits left, only a doc-comment mention.
+`mount(rootEl)` now runs eagerly at boot (matching DAB+), but network
+activity (status polling) stays gated behind `show()`/`hide()`, matching
+Radio's own original, more conservative behavior (DAB+ does fire an eager
+network fetch from `mount()`; Radio doesn't).
+
+**One real test bug found and fixed, architecturally different from
+DAB+'s own gotcha**: `test_status_shape_and_defaults` and
+`test_retune_releases_and_reclaims_dongle` both failed with
+`dongle_owner: None` instead of `"radio"`. Root cause: `RtlListener`'s
+`_read_loop()` reads `proc.stdout` DIRECTLY as its own fan-out source
+(unlike `DabListener`, whose `stream()` proxies through a separate
+per-client `curl` process decoupled from the listener's own lifecycle) --
+so the test's `_FakeProc.stdout` being an immediately-EOF'd
+`asyncio.StreamReader()` looked exactly like "the process died" to
+`_read_loop()`, releasing the dongle and exhausting all 3 retry attempts.
+Fixed by making `_FakeProc.stdout` a plain `asyncio.StreamReader()` with
+`feed_eof()` never called (reads just stay pending forever -- harmless,
+nothing asserts on real fan-out bytes). All 11 tests pass after the fix.
+Documented inline in the test file so the next RTL-SDR plugin's test
+author doesn't rediscover this the hard way.
+
+**Built-in Listener page deleted entirely**, since Radio was its last
+tab: `frontend/js/listener_panel.js`, `frontend/js/listener_panel_registry.js`
+(the `window.registerListenerPanel`/`window.LISTENER_PANELS` seam --
+finally fully dead, zero remaining consumers, unlike earlier in this
+session when it was deliberately kept "just in case Radio migrates too"),
+and `frontend/sidebar/listener_badge.js` all deleted outright.
+`index.html` loses the `<section data-section="listener">`, the sidebar
+`<li>` (with its USB-dongle SVG, `data-badge-for="listener"`), and the 3
+now-dead `<script>` tags. `app.js` loses `'listener'` from `allowedRoutes`,
+the `ListenerBadge` boot block, and `_bootListenerPanel()` entirely.
+`telemetry_rail.js`'s `window.listenerPanel` -> `window.radioPanel`, plus
+3 stale comment references fixed and its top docstring rewritten.
+`frontend/css/listener.css` deliberately KEPT in core -- explained to the
+user when they asked ("why is this shared... cant it go into the rtlsdr
+plugin?") that its `.lsn-*` classes are a hard dependency of DAB+ (and now
+Radio) both, and a plugin's own `[frontend]` assets only load when THAT
+plugin is enabled, so moving shared CSS into any one plugin would silently
+break every other plugin depending on it whenever the "owning" plugin gets
+disabled -- worse coupling than a hook simply having no host to render
+into. Same reasoning applies to `window.PagerPanel`, also left in core.
+
+**`listener_badge.js`'s retirement is a real, acknowledged feature
+regression**, not fixed with new infrastructure: it polled
+`/api/listener/status`'s `dongle_owner` field to show which RTL-SDR
+listener currently held the dongle, next to the (now-deleted) sidebar
+link. A general "badge slot on any plugin sidebar link" mechanism in
+`sidebar_plugin_registry.js` would be the right fix, but was out of scope
+for an already-massive migration -- flagged in `telemetry_rail.js`'s own
+docstring and in the plugin's README as a place a future fix could start.
+
+**New `usb` sidebar icon**, prompted directly by the user mid-task ("qe
+for our rtl-sdr we had nice nice usb dongle icon we still have this as a
+icon for our page icon somehow ?", with the old Listener page's own
+USB-dongle SVG pasted): added to `KNOWN_SIDEBAR_ICONS` in
+`src/plugins/manifest.py` and `_ICON_PATHS` in `sidebar_plugin_registry.js`,
+plus a new `_ICON_VIEWBOX` per-icon override mechanism (`{ usb: '0 0
+122.83 122.88' }`) since this glyph -- a direct `fill="currentColor"` path
+in its own much larger native coordinate space -- doesn't fit every other
+icon's shared `viewBox="0 0 24 24"` stroke-based rendering. `rtlsdr`'s own
+`plugin.toml` label also settled back to plain "RTL-SDR" (dropping the
+"Plugins" suffix it briefly needed to avoid colliding with the old built-in
+page's identical label) now that the collision no longer exists -- this
+happened via an external edit mid-task, recognized as the correct
+intentional end-state per the plan already noted in this file, not
+reverted.
+
+**`scripts/install.sh` cleanup**: removed the `--skip-rtlsdr` flag, its
+whole prompt/parsing block, and the entire old "6. Install RTL-SDR
+support" + nested "7. Install redsea" section (librtlsdr build, kernel DVB
+blacklist, redsea meson build) -- that work now lives in
+`plugins/apps/rtlsdr/setup.sh` (librtlsdr + blacklist) and
+`plugins/apps/radio/setup.sh` (redsea) respectively. Remaining sections
+8-24 renumbered down to 6-22, iterating in ASCENDING order (the lesson
+from an earlier session mistake this same overall effort already
+documented -- descending order collapses everything to the same lowest
+number since each pass re-matches targets the previous pass already
+renamed). Stale prose cross-references (`section 9` -> `section 7` x2, a
+self-referential `section 7 above` -> removed entirely since it was
+pointing at itself) caught via the mandatory `grep -n "section
+[0-9]\|sections [0-9]"` sweep this file has flagged before as necessary
+since heading-only renumbering misses inline prose mentions.
+
+**Verified on the Mac**: `node --check` clean on every touched JS file;
+`python3 -m py_compile` clean on every touched Python file;
+`pytest plugins/apps/radio/backend/tests/test_listener.py` -- 11/11 pass;
+`discover_plugins(Path('src/plugins/apps'), Path('plugins/apps'))` lists
+all 11 plugins including `radio` with the right `provides`;
+`load_plugins()` with all 11 enabled loads every one cleanly in one
+combined run; `bash -n scripts/install.sh` clean, sections sequential
+1-22. `pytest tests/test_create_app_listeners.py` hits a PRE-EXISTING,
+unrelated collection error on this Mac's Homebrew fastapi version
+(`AssertionError: Status code 204 must not have a response body`, from
+`auth_routes.py`'s logout route) -- confirmed via `git stash` that this
+same error already happens on the unmodified tree, so it's an environment
+mismatch (Homebrew fastapi stricter than the app's code expects), not a
+regression from this work.
+
+**Docs**: new `plugins/apps/radio/README.md` (didn't exist before, follows
+the same template as `dab`'s). `plugins/apps/rtlsdr/README.md` rewritten
+past-tense throughout -- no longer "ending with Radio itself eventually",
+now the completed story including the built-in Listener page's deletion,
+`listener_badge.js`'s regression, and the `usb` icon. `docs/PLUGINS.md`'s
+`"panel"` capability section rewritten as explicitly unused/deprecated in
+favor of `"hook"` (no shipped plugin uses `"panel"` anymore, though
+`PluginRegistry`/the manifest schema still technically accept it -- left
+alone rather than removed, matching this session's general "flag, don't
+expand scope" pattern for now-dead-but-harmless code), its `plugin.toml`
+worked example fixed (was still showing ACARS with `provides =
+["listener", "routes", "panel"]`, stale since ACARS itself moved to
+`"hook"` earlier this session), and its hook-seam narrative extended to
+name Radio as the final migration. `README.md`'s big RTL-SDR section fully
+restructured -- the old "built-in Listener page" vs. "RTL-SDR Plugins
+page" split collapses into one paragraph per section, since there's no
+more built-in side to describe separately; Radio now appears as a bullet
+alongside DAB+/P2000/Pagers/POCSAG/RTL433/ACARS/ADS-B rather than
+introducing the whole feature. `docs/API-ENDPOINTS.md`'s "Only Radio holds
+the RTL-SDR dongle by default" sentence rewritten since nothing is
+built-in by default anymore. `docs/CONFIGURATION.md`'s
+`capture.rtl_sdr_page_enabled` comment updated to flag it as now
+inert/vestigial -- it used to gate the old built-in page's sidebar `<li>`,
+which no longer exists; the Configuration -> Peripherals checkbox for it
+still exists but currently has no visible effect (left in place rather
+than pursuing a full config-schema removal, given the scope already
+involved). Two new CHANGELOG bullets under `### v0.8.1` (56 total now, up
+from 54 -- verified via `ChangelogParser.parse_file()` before/after diff,
+exactly +2 matching the +2 bullets added).
+
+**NOT yet done / next steps**: **not live-verified on the Pi yet** -- next
+session should pull, restart, enable `plugins.rtlsdr.enabled: true` and
+`plugins.radio.enabled: true` (a real behaviour change now -- Radio no
+longer starts enabled by default), confirm Radio -> RTL-SDR now shows all
+9 tabs (Radio joining the existing ACARS/ADS-B/DAB+/DAB+ Config/P2000/
+Pagers/POCSAG/RTL433 lineup), confirm the VU meter/skin switch/presets/RDS
+all work identically to before, and confirm the old "RTL-SDR" sidebar
+link and "Listener" page are both fully gone with no dead links left
+behind. This closes out the entire multi-session "extract every RTL-SDR
+tab into its own plugin" effort -- nothing RTL-SDR-related is built into
+core anymore.

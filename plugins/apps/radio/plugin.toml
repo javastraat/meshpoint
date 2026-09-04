@@ -1,0 +1,21 @@
+name = "radio"
+version = "1.0.0"
+meshpoint_api = 1
+provides = ["listener", "routes", "hook"]
+locked = true  # shipped with this fork -- not user-installed, can't be deleted
+
+[deps]
+setup = "setup.sh"
+
+[frontend]
+scripts = ["frontend/radio_panel.js"]
+
+[hook]
+host = "rtlsdr"    # lives on the rtlsdr plugin's page, not the built-in
+                    # Listener page -- that page no longer exists, this
+                    # was the last RTL-SDR listener still built into core.
+
+[meta]
+description = "FM/AM/SSB broadcast & utility radio listener via rtl_fm + ffmpeg, with RDS on FM via redsea -- Digital and Analogue display skins, a preset stations picker, and a Web Audio VU meter"
+homepage = "https://github.com/KMX415/meshpoint"
+author = "Einstein PD2EMC"

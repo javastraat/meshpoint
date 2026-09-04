@@ -82,11 +82,13 @@ KNOWN_SIDEBAR_CATEGORIES = frozenset({
 # person authored). frontend/sidebar/sidebar_plugin_registry.js owns the
 # actual glyphs; this is just the set of valid keys. "plug" (the original,
 # only, generic icon) stays the default. topology/rf/pager/dapnet/
-# reticulum/lorawan/gear are exact copies of Meshpoint's own existing
-# sidebar icons for those pages -- reuse, not new geometry.
+# reticulum/lorawan/gear/usb are exact copies of Meshpoint's own existing
+# sidebar icons for those pages -- reuse, not new geometry ("usb" is the
+# RTL-SDR page's own dongle glyph, inherited from the built-in Listener
+# page's nav item once that page was deleted).
 KNOWN_SIDEBAR_ICONS = frozenset({
     "plug", "antenna", "chart", "message", "terminal", "map", "list", "grid",
-    "topology", "rf", "pager", "dapnet", "reticulum", "lorawan", "gear",
+    "topology", "rf", "pager", "dapnet", "reticulum", "lorawan", "gear", "usb",
 })
 _DEFAULT_SIDEBAR_ICON = "plug"
 

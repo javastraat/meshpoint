@@ -7,7 +7,7 @@ Plugins page, the `meshpoint plugin` CLI), see
 doc is for the plugin author.
 
 The canonical worked example is the shipped **ACARS** plugin —
-[`plugins/apps/acars/`](../plugins/apps/acars/) — for routes/listener/panel,
+[`plugins/apps/acars/`](../plugins/apps/acars/) — for routes/listener/hook,
 the minimal **Hello World** plugin —
 [`plugins/apps/hello-world/`](../plugins/apps/hello-world/) — for the
 sidebar seam specifically, and **Hello World Hook** —
@@ -28,7 +28,13 @@ An app plugin is out-of-core code that hooks five seams:
   startup, started on demand by its own `/start` route, sharing the one
   physical dongle with every other listener — see
   `src/audio/sdr_registry.py`).
-- **Panel** — add a sub-tab to the dashboard's *Listener* page specifically.
+- **Panel** — add a sub-tab to another plugin's dashboard page. Technically
+  still supported (`"panel"` in `provides`, see
+  [`src/plugins/manifest.py`](../src/plugins/manifest.py)) but no shipped
+  plugin uses it anymore — the built-in *Listener* page it originally
+  targeted is gone, and every former panel (DAB+, Pagers, POCSAG, P2000,
+  RTL433, ACARS, ADS-B, Radio) now uses **Hook** below instead, which does
+  the same job without requiring a specific page to exist in core.
 - **Sidebar** — add a whole new top-level page of your own, placed under an
   existing sidebar section (Networks, Radio, Ops, Configuration, Settings).
 - **Hook** — inject content into *another* plugin's already-rendered page,
@@ -84,14 +90,14 @@ same name.
 name = "acars"
 version = "1.0.0"
 meshpoint_api = 1
-provides = ["listener", "routes", "panel"]
+provides = ["listener", "routes", "hook"]
 locked = false                            # optional, default false -- see below
 
 [deps]                                    # optional
 apt = ["cmake", "pkg-config"]
 setup = "setup.sh"                        # relative path, must exist
 
-[frontend]                                # required when "panel" or "sidebar" in provides
+[frontend]                                # required when "panel", "sidebar" or "hook" in provides
 scripts = ["frontend/acars_panel.js"]     # relative paths, must exist
 styles  = ["frontend/acars_panel.css"]    # optional
 
@@ -183,40 +189,28 @@ raises `PluginRegistryError` — caught by the loader, logged, and the whole
 plugin is skipped (one bad plugin never aborts the others or the app). See
 `src/plugins/loader.py::load_plugins`.
 
-## Adding a dashboard tab (`"panel"`)
+## Adding a dashboard tab (`"panel"`, unused — use `"hook"` instead)
 
-1. List your id in `provides` and your JS (and optionally CSS) under
-   `[frontend]`.
-2. Your script runs at a fixed point in `index.html` — after
-   `listener_panel_registry.js` (which defines the hook below) and before
-   `app.js` builds `ListenerPanel` — so call this at your script's top
-   level, not inside a DOMContentLoaded handler:
-
-   ```js
-   // plugins/apps/acars/frontend/acars_panel.js
-   window.registerListenerPanel({
-       tab: 'acars',                 // unique slug; becomes #lsn-tab-acars
-       label: 'ACARS',               // tab button text
-       make: () => new window.PagerPanel('acars', '/api/acars', 'ACARS', renderRow),
-   });
-   ```
-
-   `make` is called once when `ListenerPanel` is constructed; it must
-   return an object with `mount(rootEl)` / `show()` / `hide()`. ACARS reuses
-   the core `PagerPanel` (start/stop/clear + a live message list) since its
-   shape already fit; you can hand it any object satisfying that trio.
-3. Your assets are served from `/plugins/apps/<id>/<path>` — exactly the
-   paths you listed in `[frontend]`, nothing else. No manual wiring needed
-   beyond step 2; `src/plugins/assets.py:inject_plugin_assets` injects the
-   `<script>`/`<link>` tags automatically for every *loaded* panel plugin.
+`"panel"` (`window.registerListenerPanel`) added a sub-tab to one specific
+built-in page — the dashboard's *Listener* page. That page is gone (its last
+tab, Radio, moved to a plugin like everything else RTL-SDR), and
+`window.registerListenerPanel` was deleted along with it, so `"panel"` has
+no working frontend counterpart left even though `PluginRegistry` and the
+manifest schema still technically accept it. Every plugin that used to be a
+panel (ACARS, RTL433, ADS-B, Pagers, POCSAG, P2000, DAB+, Radio) now uses
+**Hook** instead (see [Injecting into another page](#injecting-into-another-page-hook)
+below) — it does the same job (a tab inside someone else's already-rendered
+page) without needing that page to be a specific built-in one, since any
+plugin can opt in as a host. Write a new dashboard-tab plugin against `hook`,
+not `panel`.
 
 ## Adding a top-level sidebar page (`"sidebar"`)
 
-Unlike `"panel"` (a sub-tab inside the existing Listener page), `"sidebar"`
-gives your plugin its own top-level nav entry, placed in an existing
-sidebar section. There's no `reg.add_sidebar(...)` call — it's entirely
-declarative, driven by `[sidebar]` in `plugin.toml` plus your own frontend
-script:
+Unlike `"hook"` (a tab injected into another plugin's already-rendered
+page), `"sidebar"` gives your plugin its own top-level nav entry, placed in
+an existing sidebar section. There's no `reg.add_sidebar(...)` call — it's
+entirely declarative, driven by `[sidebar]` in `plugin.toml` plus your own
+frontend script:
 
 1. List `"sidebar"` in `provides` and fill in `[sidebar]`:
 
@@ -248,9 +242,12 @@ script:
    `KNOWN_SIDEBAR_ICONS` in `src/plugins/manifest.py`) — currently `plug`
    (default), `antenna`, `map`, `list` (generic), plus `chart`, `message`,
    `terminal`, `grid`, `topology`, `rf`, `pager`, `dapnet`, `reticulum`,
-   `lorawan`, `gear` (exact copies of Meshpoint's own existing sidebar
+   `lorawan`, `gear`, `usb` (exact copies of Meshpoint's own existing sidebar
    icons for those pages — reuse one that already fits your plugin's
-   domain). Deliberately a name, not raw SVG from the manifest — that would
+   domain; `usb` is a single fill-path glyph in its own larger viewBox
+   rather than the standard 24x24 stroke style every other entry shares,
+   handled via `_ICON_VIEWBOX` if you're adding something similarly
+   unusual). Deliberately a name, not raw SVG from the manifest — that would
    let a plugin's `plugin.toml` inject arbitrary markup into every viewer's
    sidebar. An unrecognized key falls back to `plug` rather than breaking
    the page.
@@ -288,10 +285,10 @@ script:
 
 ## Injecting into another page (`"hook"`)
 
-`"panel"` and `"sidebar"` both give your plugin its own space — a Listener
-sub-tab, or a whole top-level page. `"hook"` is different: it lets your
-plugin inject content into a page **another plugin owns**, instead of
-having a page of your own. The other plugin has to opt in as a *host* first
+`"sidebar"` gives your plugin its own space — a whole top-level page.
+`"hook"` is different: it lets your plugin inject content into a page
+**another plugin owns**, instead of having a page of your own. The other
+plugin has to opt in as a *host* first
 — see [Making your own page hookable](#making-your-own-page-hookable) below
 if you're the one writing the host, not just the hook.
 
@@ -302,21 +299,25 @@ World Hook** (the hook —
 With both enabled, opening the Hello World page shows its usual content
 plus a second box below it, rendered by the hook plugin.
 
-A second, less toy example: **RTL-SDR** (`plugins/apps/rtlsdr/`) is
-replacing the built-in Listener page entirely, one plugin at a time.
-**DAB+** moved first — it dropped `"panel"` from `provides`; both its
-player and its Config panel hook into the RTL-SDR page instead
-(`plugins/apps/dab/frontend/dab_panel.js` / `dab_config_panel.js`), each
-with its own `label` (see below) so they show up as two switchable tabs
-rather than one long stacked page. Moving wholesale rather than
+A second, less toy example: **RTL-SDR** (`plugins/apps/rtlsdr/`) is the
+shared host page every RTL-SDR decoder plugin hooks a tab into — the
+built-in Listener page these all used to live on directly (via `"panel"`)
+is gone entirely now. **DAB+** moved first — it dropped `"panel"` from
+`provides`; both its player and its Config panel hook into the RTL-SDR page
+instead (`plugins/apps/dab/frontend/dab_panel.js` / `dab_config_panel.js`),
+each with its own `label` (see below) so they show up as two switchable
+tabs rather than one long stacked page. Moving wholesale rather than
 duplicating mattered here for a concrete reason, not just tidiness: DAB+'s
 player looks up its `<audio>` element by a hardcoded id, not scoped to its
-own mounted root, so two live instances at once would have fought over
-it. **P2000, Pagers, POCSAG, RTL433, ACARS and ADS-B followed** once the
-mechanism was proven on DAB+ — six mechanical single-hook migrations
-(each just drops `"panel"`, adds `"hook"` with `host = "rtlsdr"`, and
-swaps `registerListenerPanel` for `registerPageHook`), leaving Radio as
-the only tab left on the built-in Listener page.
+own mounted root, so two live instances at once would have fought over it.
+**P2000, Pagers, POCSAG, RTL433, ACARS, ADS-B and finally Radio itself
+followed** once the mechanism was proven on DAB+ — each a mechanical
+single-hook migration (drop `"panel"`, add `"hook"` with `host = "rtlsdr"`,
+swap `registerListenerPanel` for `registerPageHook`, and — Radio only —
+convert every DOM lookup from `document.getElementById` to
+`this._root.querySelector` since a hooked panel no longer owns the whole
+page). Radio moving off it was the last piece; nothing RTL-SDR-related is
+built into core anymore.
 
 1. List `"hook"` in `provides` and fill in `[hook]` with the target host's
    id — another plugin's `[sidebar].route`:

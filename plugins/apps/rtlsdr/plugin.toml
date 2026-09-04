@@ -23,10 +23,9 @@ provides = ["sidebar"]    # capabilities this plugin uses -- non-empty subset of
 locked = true  # shipped with this fork -- not user-installed, can't be deleted
 
 [deps]
-setup = "setup.sh"    # currently a no-op placeholder -- reserved for the
-                       # eventual librtlsdr build + kernel DVB blacklist step
-                       # once this becomes the real RTL-SDR host page (see
-                       # its own comment for the full plan)
+setup = "setup.sh"    # builds librtlsdr from source + blacklists the
+                       # kernel DVB-T stack -- the one shared, hardware-
+                       # level dependency every RTL-SDR plugin needs
 
 [frontend]
 scripts = ["frontend/rtlsdr_panel.js"]
@@ -34,15 +33,20 @@ styles = ["frontend/rtlsdr_panel.css"]
 
 [sidebar]
 route = "rtlsdr"          # -> #/rtlsdr
-label = "RTL-SDR Plugins" # sidebar link text -- NOT "RTL-SDR": the built-in
-                           # Listener page (route "listener") already uses
-                           # that exact label, and the two showing up as
-                           # identical-looking sidebar entries was genuinely
-                           # confusing in practice (caught live on the Pi).
-category = "radio"        # same section the built-in Listener page sits in
-icon = "antenna"          # generic wifi/signal glyph
+label = "RTL-SDR"         # sidebar link text -- briefly had to be "RTL-SDR
+                           # Plugins" instead while the built-in Listener
+                           # page's own nav item (same label) still existed
+                           # alongside this one (caught live on the Pi --
+                           # two identical-looking entries was confusing).
+                           # Radio migrating here too and that page being
+                           # deleted freed the plain label back up.
+category = "radio"        # same sidebar section Radio's old nav item sat in
+icon = "usb"              # exact copy of that old nav item's own USB
+                           # dongle glyph -- RTL-SDR is literally a USB
+                           # stick, kept when its own sidebar item was
+                           # deleted so this page could inherit it
 
 [meta]
-description = "Staging ground for the eventual RTL-SDR host page -- other plugins hook their own content into it via the 'hook' seam (see the DAB+ plugin for a worked example) instead of the built-in Listener page's tabbar seam."
+description = "The RTL-SDR host page -- every RTL-SDR plugin (Radio, DAB+, P2000, Pagers, POCSAG, RTL433, ADS-B, ACARS) hooks its own tab into this page via the 'hook' seam instead of owning a page of its own."
 homepage = "https://github.com/KMX415/meshpoint"
 author = "Einstein PD2EMC"

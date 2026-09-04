@@ -55,7 +55,6 @@ from src.api.routes import (
     gps_status,
     hardware_config_routes,
     identity_routes,
-    listener_routes,
     emergency_pager_routes,
     lorawan_routes,
     lorawan_config_routes,
@@ -104,7 +103,6 @@ from src.api.terminal import CommandCatalog, SessionManager
 from src.api.update import ReleaseChannelRegistry, UpdateApplier
 from src.api.update.rollback_state import resolve_rollback_state_path
 from src.api.upstream_client import UpstreamClient
-from src.audio.rtl_listener import RtlListener
 from src.api.websocket_manager import WebSocketManager
 from src.config import AppConfig, SerialDeviceConfig, load_config, validate_activation
 from src.plugins.assets import inject_plugin_assets, resolve_plugin_asset
@@ -206,7 +204,6 @@ _BUILTIN_ROUTERS: list[tuple] = [
     (reticulum_routes.router, False),
     (reticulum_config_routes.router, False),
     (emergency_pager_routes.router, False),
-    (listener_routes.router, False),
     (spectrum_routes.router, False),
     (meshtastic_routes.router, False),
     (meshcore_routes.router, False),
@@ -217,13 +214,11 @@ _BUILTIN_ROUTERS: list[tuple] = [
 
 # Every built-in RTL-SDR subprocess listener, in startup order. `True`-less:
 # `build` runs at lifespan startup; the listener is NOT .start()ed (its /start
-# route does that on demand). Plugins never appear here -- they append via
+# route does that on demand). Empty now -- Radio was the last one, and it
+# moved out to plugins/apps/radio/ the same way every other RTL-SDR
+# listener already had. Plugins never appear here -- they append via
 # src.api.listener_registry, built right after this list. See that module.
-_BUILTIN_LISTENERS: list[listener_registry.ListenerSpec] = [
-    listener_registry.ListenerSpec(
-        "radio", RtlListener, listener_routes.init_routes,
-    ),
-]
+_BUILTIN_LISTENERS: list[listener_registry.ListenerSpec] = []
 
 
 def create_app(config: AppConfig | None = None) -> FastAPI:

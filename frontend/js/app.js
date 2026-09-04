@@ -48,7 +48,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const router = new Router({
         defaultRoute: 'dashboard',
         allowedRoutes: [
-            'dashboard', 'meshtastic', 'meshcore', 'lorawan', 'dapnet', 'reticulum', 'pager', 'listener', 'stats', 'rf', 'repeaters', 'topology', 'messages', 'radio', 'terminal',
+            'dashboard', 'meshtastic', 'meshcore', 'lorawan', 'dapnet', 'reticulum', 'pager', 'stats', 'rf', 'repeaters', 'topology', 'messages', 'radio', 'terminal',
             'configuration/identity', 'configuration/radio',
             'configuration/channels', 'configuration/transmit',
             'configuration/mqtt',
@@ -78,12 +78,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         const updateCheckBadge = new UpdateCheckBadge(sidebar);
         updateCheckBadge.init();
         window.updateCheckBadge = updateCheckBadge;
-    }
-
-    if (window.ListenerBadge) {
-        const listenerBadge = new ListenerBadge(sidebar);
-        listenerBadge.init();
-        window.listenerBadge = listenerBadge;
     }
 
     if (window.SinceLineController && window.lastVisitTracker) {
@@ -162,7 +156,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     _bootLoRaWANPanel(router);
     _bootDapnetPanel(router, identity);
     _bootPagerPanel(router, identity);
-    _bootListenerPanel(router);
     _bootRepeatersPanel(router);
     _bootTopologyPanel(router);
     _bootMeshtasticPanel(router);
@@ -491,20 +484,6 @@ function _bootPagerPanel(router, identity) {
     const panel = new window.PagerDashboardPanel(identity);
     router.onRouteChange((route) => {
         if (route === 'pager') panel.show();
-        else panel.hide();
-    });
-}
-
-function _bootListenerPanel(router) {
-    if (!window.ListenerPanel) return;
-    const panel = new window.ListenerPanel();
-    // Exposed so SidebarTelemetryRail can call syncAudioFromStatus() from
-    // its own route-independent poll -- reconnects the RTL-SDR audio
-    // stream on any page (not just after visiting Listener again) when
-    // the backend is already running from before a reload.
-    window.listenerPanel = panel;
-    router.onRouteChange((route) => {
-        if (route === 'listener') panel.show();
         else panel.hide();
     });
 }

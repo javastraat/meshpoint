@@ -17,19 +17,21 @@
  * Mini radio player: when the Radio/RTL-SDR FM listener OR the DAB+
  * listener is actively running, the noise-floor block swaps out for a
  * compact player (station name/frequency, mute, stop) so you can control
- * playback from any page without navigating back to the Listener tab.
- * Swaps back to the noise floor the moment playback stops. Scoped to
- * Radio/DAB+ only -- P2000/Pagers/POCSAG/RTL433 have no audio to
- * control, and already get their own sidebar "in use" badge
- * (listener_badge.js). Radio and DAB+ share one RTL-SDR dongle
- * (src/audio/sdr_registry.py) so at most one is ever running -- polls
- * both /api/listener/status and /api/dab/status independently (own 5s
- * interval, same convention as every other sidebar module) and shows
- * whichever one is actually running. Mute toggles the active <audio>
- * element's own client-side volume directly (instant, no server round-
- * trip) -- a different knob from the Radio page's own Level slider,
- * which is a server-side pre-encode gain that requires a full retune to
- * change.
+ * playback from any page without navigating back to the RTL-SDR Plugins
+ * page. Swaps back to the noise floor the moment playback stops. Scoped
+ * to Radio/DAB+ only -- P2000/Pagers/POCSAG/RTL433 have no audio to
+ * control (no sidebar "in use" badge for those exists anymore either --
+ * the old listener_badge.js it used to live in was retired along with
+ * the built-in Listener page it targeted; see plugins/apps/rtlsdr/
+ * README.md for a possible future replacement). Radio and DAB+ share one
+ * RTL-SDR dongle (src/audio/sdr_registry.py) so at most one is ever
+ * running -- polls both /api/listener/status and /api/dab/status
+ * independently (own 5s interval, same convention as every other sidebar
+ * module) and shows whichever one is actually running. Mute toggles the
+ * active <audio> element's own client-side volume directly (instant, no
+ * server round-trip) -- a different knob from the Radio tab's own Level
+ * slider, which is a server-side pre-encode gain that requires a full
+ * retune to change.
  */
 class SidebarTelemetryRail {
     constructor(rootEl, dashboardWs) {
@@ -129,11 +131,12 @@ class SidebarTelemetryRail {
             this._fetchJson('/api/dab/status'),
         ]);
         // This poll runs regardless of which page is showing, unlike
-        // ListenerPanel's own poll (only active while the Listener route
-        // is actually mounted) -- so it's the one place that can catch
-        // "backend still running, but this page's <audio> element was
-        // never (re)connected" after a reload on some other page.
-        if (fmStatus && window.listenerPanel) window.listenerPanel.syncAudioFromStatus(fmStatus);
+        // RadioPanel's own poll (only active while its hook is actually
+        // shown -- see plugins/apps/radio/frontend/radio_panel.js) -- so
+        // it's the one place that can catch "backend still running, but
+        // this page's <audio> element was never (re)connected" after a
+        // reload on some other page.
+        if (fmStatus && window.radioPanel) window.radioPanel.syncAudioFromStatus(fmStatus);
 
         if (fmStatus && fmStatus.running) {
             this._applyPlayer('radio', fmStatus);
@@ -167,10 +170,10 @@ class SidebarTelemetryRail {
         this._applyMuteIcon(!!(audio && audio.muted));
     }
 
-    // Same priority order as listener_panel.js's own setStation()
-    // fallback chain: RDS station (+ RadioText) first, then whichever
-    // preset was tuned (persisted server-side as station_label -- see
-    // src/audio/rtl_listener.py), then bare frequency + mode.
+    // Same priority order as radio_panel.js's own setStation() fallback
+    // chain: RDS station (+ RadioText) first, then whichever preset was
+    // tuned (persisted server-side as station_label -- see
+    // plugins/apps/radio/backend/listener.py), then bare frequency + mode.
     _fmPlayerText(status) {
         const ps = (status.rds_ps || '').trim();
         if (ps) {
@@ -199,7 +202,7 @@ class SidebarTelemetryRail {
     }
 
     // Marquees the text when it's too long to fit -- same measure/toggle
-    // approach as listener_panel.js's own setStation() (DigitalSkin/
+    // approach as radio_panel.js's own setStation() (DigitalSkin/
     // AnalogueSkin), reusing its @keyframes lsn-marquee (listener.css,
     // loaded globally) via the shared "scroll" class trigger.
     _setPlayerText(text) {
@@ -259,7 +262,7 @@ class SidebarTelemetryRail {
     }
 }
 
-// Matches listener_panel.js's own fmtFreq4 -- duplicated per this repo's
+// Matches radio_panel.js's own fmtFreq4 -- duplicated per this repo's
 // small-helper convention rather than importing across sidebar/js modules.
 function _fmtFreq(mhz) {
     return Number.isFinite(mhz) ? mhz.toFixed(4) : '--.----';
