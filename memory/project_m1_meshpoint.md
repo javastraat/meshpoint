@@ -8148,8 +8148,15 @@ the field silently showed nothing. Added `author = "Einstein PD2EMC"` to
 author + a `target="_blank" rel="noopener noreferrer"` homepage link, styled
 via new `.plugin-row__version a` rules in `settings.css`.
 
-**B8 — community plugin uninstall (2026-09-04, DONE, not yet
-live-verified)**: User flagged the exact same bundled-vs-user-dropped-in
+**B8 — community plugin uninstall (2026-09-04, DONE, LIVE-VERIFIED)**: User
+copied ACARS's plugin folder to a second (unlocked) community plugin,
+deleted it through the Settings → Plugins UI, and independently confirmed
+over SSH that the folder was actually gone from disk -- Delete button,
+confirm-to-delete modal, `DELETE /api/plugins/{id}`, and `shutil.rmtree` all
+confirmed working end to end. (ACARS itself, `locked = true`, wasn't
+re-tested for refusing deletion in this pass -- covered by
+`test_locked_community_plugin_cannot_be_deleted`, not separately live-checked.)
+User flagged the exact same bundled-vs-user-dropped-in
 problem the theme pack already solved with `theme.json`'s `"locked": true`
 -- ACARS lives in `plugins/apps/` (community tier by directory, same as
 `plugins/themes/`) despite being git-tracked and shipped with the fork, so a
@@ -8191,6 +8198,67 @@ locked/deletable correctly; delete succeeds + cleans up config; built-in
 plugin-related tests total, all pass in the throwaway venv (FastAPI
 0.141/Starlette 1.6). `ruff check` clean; `node --check` clean.
 
+**B4d — `meshpoint plugin list` / `meshpoint plugin setup <id>`
+(2026-09-04, DONE, not yet live-verified)**: User revisited this after B8,
+wanting it usable from the dashboard's web Terminal too -- no new work
+needed there since that Terminal is a real login shell on the device
+(`os.forkpty()`, `src/api/terminal/pty_session.py`); once `meshpoint` picks
+up the new subcommand system-wide (`/usr/local/bin/meshpoint` ->
+`scripts/meshpoint` -> `venv/bin/python -m src.cli.main`), it's usable from
+any shell including that one. New `src/cli/plugin_command.py`: `list`
+queries the *running service's* `GET /api/plugins` via the existing
+`CliApiClient` (`src/cli/api_client.py`) -- deliberately mirrors
+`report_command.py`'s exact auth-retry shape (ServiceDown -> tell them to
+start it; AuthRequired -> try `login_local_root()` (root/service-user reads
+the JWT secret straight off disk, no prompt) -> fall back to
+`login_interactive()`), rewritten as `_fetch_plugins() -> list | None`
+returning `None` (after printing why) instead of the original's `if not
+data.status` truthiness check, since `[]` is a legitimately valid "zero
+plugins" response for this endpoint and would otherwise have been
+misread as an unauthenticated failure. `setup <id>` is deliberately pure
+local filesystem + subprocess -- **no running service required**, since
+installing a plugin's system deps is independent of whether Meshpoint
+itself is up (in fact typically happens *before* first enabling it): loads
+config directly (`src.config.load_config()`), calls
+`discover_plugins(builtin_dir, community_dir)` the same way
+`plugin_routes.py`/`loader.py` do, shows `[deps].apt` + the resolved
+`setup_path`, `y/N` confirms (`-y`/`--yes` skips), then
+`subprocess.run(["sudo", "bash", str(setup_path)], check=False)` with
+inherited stdout/stderr so a multi-minute cmake+make build streams live
+(matches `cmd_restart`'s style in `main.py`). Wired into `main.py` as a
+nested `plugin` subparser (`plugin list` / `plugin setup <id> [-y]`) --
+chose consistent `plugin <verb>` naming over the review doc's literal
+`meshpoint plugin setup` + `meshpoint plugins list` (singular/plural
+mismatch in the original spec text). No-subcommand case
+(`meshpoint plugin` alone) prints the subparser's own help via
+`plugin_parser.set_defaults(plugin_parser=plugin_parser)` (argparse trick
+for reaching a nested parser from its own dispatch handler) + exit 1,
+matching every other unknown-command path in `main.py`. Verified by hand on
+the Mac (no real Pi CLI environment available): `--help` renders correctly
+at both levels; `plugin setup acars` correctly discovers the real shipped
+manifest, shows its apt deps + `plugins/apps/acars/setup.sh`, and exits 1
+cleanly when `sudo bash` has no TTY/password here (expected off-Pi, not a
+bug); `plugin setup nonexistent-plugin` 1-exits with a clear message;
+`plugin list` correctly prints "service not running" when nothing's
+listening on :8080. New `tests/test_plugin_command.py` (14 tests, pure
+Python, no fastapi needed): `_confirm()`'s four y/n/default paths,
+`_print_plugin_row()`'s five formatting cases (enabled+loaded,
+restart-required, disabled, apt-deps hint shown/hidden), and
+`run_plugin_setup()`'s five behavioural paths (unknown id, no setup step,
+declined confirmation never calls `subprocess.run`, confirmed run passes
+the exact expected argv, a non-zero exit code is propagated) --
+`discover_plugins`/`load_config` mocked at their *source* module attributes
+(`src.plugins.manifest.discover_plugins` / `src.config.load_config`) since
+both are deferred-imported inside the function body, so patching the
+source name (not a `plugin_command.`-qualified one) is what actually takes
+effect. Full suite re-run after this change: 1516 passed (up from 1487),
+`ruff check` + `node --check` still clean. **Not yet live-verified** — the
+Mac has no `sudo`/apt/a real `meshpoint` symlink to test the actual
+install-and-confirm flow or the web-Terminal angle end to end; needs a Pi
+check of `meshpoint plugin list` (with the service running) and `sudo
+meshpoint plugin setup <some-community-plugin>` from both an SSH shell and
+the dashboard's own Terminal tab.
+
 **Remaining plugin work** (full write-up: "Plugin system — remaining work" in
 `memory/plugin-architecture-review.md`; sketches in `memory/themes-next-todo.md`):
 - **B6 leftovers (open)** — user deliberately deferred these, not forgotten:
@@ -8200,14 +8268,6 @@ plugin-related tests total, all pass in the throwaway venv (FastAPI
   session), and re-screenshotting light/high-contrast theme rendering after
   the two post-launch CSS fixes (`.r-switch` solid fill, `.auth-card`
   wrapper) — only dark was re-confirmed after those landed.
-- **B8 not yet live-verified** — needs a Pi restart + a real delete: drop a
-  throwaway test folder under `plugins/apps/`, confirm it shows a Delete
-  button and ACARS doesn't, delete it via the UI, confirm the folder and its
-  `plugins.<id>` entry (if any) are actually gone, and confirm the
-  confirm-to-delete modal renders correctly (first real use of
-  `DangerousModal` from this page).
-- **B4d** — `meshpoint plugin setup <id>` deps-consent CLI + `plugins list`.
-  Optional/low priority (setup.sh already works as `sudo bash`).
 - Unfinished capability surface (decoder/capture-source/sidebar-page seams,
   sidebar badge label) + docs debt (`docs/PLUGINS.md`) — see the review doc.
 - NOT planned unless external demand: out-of-tree install, pip deps, subprocess

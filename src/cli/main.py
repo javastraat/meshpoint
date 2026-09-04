@@ -66,6 +66,18 @@ def cmd_version(_args: argparse.Namespace) -> None:
     print(f"  Meshpoint v{VERSION}")
 
 
+def cmd_plugin(args: argparse.Namespace) -> None:
+    from src.cli.plugin_command import run_plugin_list, run_plugin_setup
+
+    if args.plugin_command == "list":
+        run_plugin_list()
+    elif args.plugin_command == "setup":
+        sys.exit(run_plugin_setup(args.id, skip_confirm=args.yes))
+    else:
+        args.plugin_parser.print_help()
+        sys.exit(1)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="meshpoint",
@@ -101,6 +113,20 @@ def main() -> None:
 
     sub.add_parser("version", help="Print version information")
 
+    plugin_parser = sub.add_parser("plugin", help="Manage app plugins (list, install deps)")
+    plugin_sub = plugin_parser.add_subparsers(dest="plugin_command")
+    plugin_sub.add_parser("list", help="List discovered app plugins and their state")
+    plugin_setup = plugin_sub.add_parser(
+        "setup", help="Install a plugin's system dependencies (apt + its setup.sh)",
+    )
+    plugin_setup.add_argument(
+        "id", help="Plugin id (its folder name under plugins/apps/ or src/plugins/apps/)",
+    )
+    plugin_setup.add_argument(
+        "-y", "--yes", action="store_true", help="Skip the confirmation prompt",
+    )
+    plugin_parser.set_defaults(plugin_parser=plugin_parser)
+
     args = parser.parse_args()
 
     dispatch = {
@@ -113,6 +139,7 @@ def main() -> None:
         "meshcore-radio": cmd_meshcore_radio,
         "reset-password": cmd_reset_password,
         "version": cmd_version,
+        "plugin": cmd_plugin,
     }
 
     handler = dispatch.get(args.command)

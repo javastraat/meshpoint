@@ -20,6 +20,8 @@ wouldn't stick past the next `Update` anyway).
 
    ```sh
    sudo bash plugins/apps/acars/setup.sh
+   # or, for the apt list + a confirmation prompt first:
+   sudo meshpoint plugin setup acars
    ```
 
    Builds `szpajder/libacars` and `f00b4r0/acarsdec` from source into `/opt`.
