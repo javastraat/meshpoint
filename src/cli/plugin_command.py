@@ -94,7 +94,14 @@ def run_plugin_setup(plugin_id: str, *, skip_confirm: bool = False) -> int:
 
     config = load_config()
     builtin_dir = Path(__file__).resolve().parents[1] / "plugins" / "apps"
-    community_dir = Path(config.dashboard.plugins_dir) / "apps"
+    # .resolve() (not just Path(...)) -- config.dashboard.plugins_dir is
+    # CWD-relative by convention ("plugins", same as static_dir), and a
+    # relative setup_path here would get passed to `sudo bash` as a
+    # relative argv, which config/sudoers-meshpoint's NOPASSWD rule (an
+    # absolute path pattern, matching this file's own path-discipline
+    # convention) would never match -- silently falling back to a
+    # password prompt in a non-interactive context.
+    community_dir = Path(config.dashboard.plugins_dir).resolve() / "apps"
 
     manifest = next(
         (m for m in discover_plugins(builtin_dir, community_dir) if m.name == plugin_id),

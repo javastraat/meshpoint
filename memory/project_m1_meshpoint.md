@@ -8598,5 +8598,71 @@ touched at all -- pure reuse. **Not yet live-verified** -- needs a real
 click-through on the Pi to confirm the confirm-modal wording reads well and
 the dashboard actually reconnects cleanly after the detached restart.
 
+**`meshpoint plugin setup` sudo password bug -- found + fixed 2026-09-04
+(DONE, not yet live-verified)**: User tried `meshpoint plugin setup acars`
+on a genuinely clean machine (not this dev box) via the web Terminal and
+hit `[sudo] password for meshpoint:` -- a hard blocker for CLI/web-Terminal
+automation (nothing to type a password into non-interactively). Root-caused
+as **two compounding bugs**, not one:
+1. `config/sudoers-meshpoint` (the real NOPASSWD grant file, installed to
+   `/etc/sudoers.d/meshpoint`, self-syncing on every service start via
+   `meshpoint.service`'s `ExecStartPre` and on every update via
+   `post_update.sh`) never had a line for a plugin's `setup.sh` at all --
+   only `systemctl`/`git`/the update-apply scripts were covered.
+2. Even after adding that grant, it still wouldn't have worked: audited
+   `src/cli/plugin_command.py::run_plugin_setup` and found `community_dir
+   = Path(config.dashboard.plugins_dir) / "apps"` was never `.resolve()`d
+   (unlike `builtin_dir`, which correctly uses an absolute `Path(__file__)
+   .resolve()...`) -- `config.dashboard.plugins_dir` is CWD-relative by
+   convention (default `"plugins"`, same as `static_dir`), so a
+   *community* plugin's `setup_path` (e.g. ACARS) reached `subprocess.run(
+   ["sudo", "bash", str(setup_path)])` as a **relative** path. Confirmed
+   directly (not assumed): ran the real function and printed the exact
+   path it was about to pass to sudo -- `plugins/apps/acars/setup.sh`, no
+   leading `/`. Sudo matches argv literally and can't resolve a relative
+   path against an unknown cwd, so *any* NOPASSWD rule pinned to the
+   absolute form (matching this file's own explicit "always pin absolute
+   paths" discipline) would silently never have matched -- bug #1's fix
+   alone would NOT have solved the user's actual problem.
+
+Asked the user directly (a real security-tradeoff, not something to guess
+silently) whether the sudoers grant should be a wildcard covering
+`plugins/apps/*/setup.sh` for every current/future plugin, or exact-pinned
+per plugin (matching the file's stated discipline more literally but
+needing a new sudoers line + service restart for every future community
+plugin). **User picked the wildcard** -- reasoning documented in the
+sudoers file itself: an enabled plugin already runs arbitrary Python with
+full service privileges in-process, so a passwordless-root setup script at
+a known path pattern doesn't meaningfully raise the bar beyond what
+enabling a plugin at all already means.
+
+Fixed both: `config/sudoers-meshpoint` gained two NOPASSWD lines
+(`/opt/meshpoint/plugins/apps/*/setup.sh` and the `src/plugins/apps/*/...`
+built-in equivalent) with a comment explaining the wildcard-vs-pin
+tradeoff and the decision; `plugin_command.py`'s `community_dir` now
+`.resolve()`s, matching `builtin_dir`'s existing correct handling. **Wrote
+a regression test and verified it actually catches the bug**, not just
+that it passes: `test_community_dir_is_resolved_to_absolute` (sets a
+relative `plugins_dir` matching the real default, asserts the dir handed
+to `discover_plugins` is absolute) -- confirmed by temporarily reverting
+the fix and watching the test fail with the exact real bug's symptom
+(`community_dir` = `plugins/apps`, not absolute), then restoring the fix
+and confirming it passes again. `visudo -cf` (available on this Mac)
+syntax-checked the sudoers file directly. Docs updated everywhere the
+manual `sudo bash plugins/apps/<id>/setup.sh` form was documented
+(`docs/PLUGINS.md`, `docs/CONFIGURATION.md`, ACARS's own README) to the
+absolute form + an explanation of why it matters; the Settings → Plugins
+page's inline "Requires:" hint (`plugins_panel_controller.js`) changed
+from showing a raw (previously relative, now would've needed to become
+absolute) `sudo bash` command to recommending `sudo meshpoint plugin setup
+<id>` instead -- sidesteps the whole absolute-path requirement for anyone
+reading the hint off the dashboard, since the CLI always resolves it
+correctly now. New CHANGELOG bullet (v0.8.1). 1535 tests total (was 1534),
+`ruff check` clean, sudoers re-verified with `visudo -cf` after the doc
+pass too. **Not yet live-verified** -- needs the user's actual clean
+machine: pull, restart (so `meshpoint.service`'s `ExecStartPre` picks up
+the new sudoers file), then re-run `meshpoint plugin setup acars` and
+confirm it now runs straight through with no password prompt.
+
 - NOT planned unless external demand: out-of-tree install, pip deps, subprocess
   isolation, SemVer contract.

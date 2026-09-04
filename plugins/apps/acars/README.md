@@ -19,10 +19,16 @@ wouldn't stick past the next `Update` anyway).
 1. Build the decoder (once, needs sudo — apt + `make install`):
 
    ```sh
-   sudo bash plugins/apps/acars/setup.sh
+   sudo bash /opt/meshpoint/plugins/apps/acars/setup.sh
    # or, for the apt list + a confirmation prompt first:
    sudo meshpoint plugin setup acars
    ```
+
+   The absolute path matters if you want this passwordless: `config/
+   sudoers-meshpoint`'s NOPASSWD grant for plugin setup scripts matches
+   the absolute path exactly (`sudo bash plugins/apps/acars/setup.sh`,
+   relative, still works but prompts for a password even from
+   `/opt/meshpoint`). `meshpoint plugin setup` always resolves it for you.
 
    Builds `szpajder/libacars` and `f00b4r0/acarsdec` from source into `/opt`.
    Idempotent — skips if `acarsdec` is already on `PATH`.

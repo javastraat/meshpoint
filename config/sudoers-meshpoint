@@ -59,6 +59,19 @@ meshpoint ALL=(ALL) NOPASSWD: /usr/bin/git rev-parse HEAD
 meshpoint ALL=(ALL) NOPASSWD: /usr/bin/git rev-parse *
 meshpoint ALL=(ALL) NOPASSWD: /usr/bin/git -c safe.directory=/opt/meshpoint rev-parse *
 
+# ── Plugin system deps (meshpoint plugin setup <id> / manual `sudo bash
+#    plugins/apps/<id>/setup.sh`) ──────────────────────────────────────
+# Wildcarded on the plugin id and tier, unlike every other line in this
+# file which pins the exact binary -- deliberate: a plugin's own setup.sh
+# is only ever consulted once that plugin is explicitly enabled
+# (plugins.<id>.enabled), at which point it already runs arbitrary Python
+# in-process with the service's full privileges anyway (see docs/PLUGINS.md
+# and README.md's "Plugins" section), so this grant doesn't raise the bar
+# beyond what enabling a plugin at all already means. Covers both tiers:
+# built-in (src/plugins/apps/) and community drop-ins (plugins/apps/).
+meshpoint ALL=(ALL) NOPASSWD: /bin/bash /opt/meshpoint/plugins/apps/*/setup.sh
+meshpoint ALL=(ALL) NOPASSWD: /bin/bash /opt/meshpoint/src/plugins/apps/*/setup.sh
+
 # ── Post-update hooks ─────────────────────────────────────────────────
 meshpoint ALL=(ALL) NOPASSWD: /opt/meshpoint/venv/bin/pip install *
 meshpoint ALL=(ALL) NOPASSWD: /bin/bash /opt/meshpoint/scripts/install.sh

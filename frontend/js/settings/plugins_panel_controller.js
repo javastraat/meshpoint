@@ -115,7 +115,7 @@ class PluginsPanelController {
         const badgeLabel = plugin.source === 'builtin' ? 'Built-in' : 'Community';
         const provides = (plugin.provides || []).join(', ') || '-';
         const depsNote = (plugin.apt_deps || []).length
-            ? `<p class="plugin-row__deps">Requires: <code>${this._escape(plugin.apt_deps.join(', '))}</code>${plugin.setup_script ? ` — run <code>sudo bash plugins/apps/${this._escape(plugin.id)}/${this._escape(plugin.setup_script)}</code> on the device` : ''}</p>`
+            ? `<p class="plugin-row__deps">Requires: <code>${this._escape(plugin.apt_deps.join(', '))}</code>${plugin.setup_script ? ` — run <code>sudo meshpoint plugin setup ${this._escape(plugin.id)}</code> on the device` : ''}</p>`
             : '';
         const byLine = [
             plugin.author ? this._escape(plugin.author) : '',

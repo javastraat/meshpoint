@@ -91,6 +91,23 @@ class TestRunPluginSetup(unittest.TestCase):
             code = run_plugin_setup("nope", skip_confirm=True)
         self.assertEqual(code, 1)
 
+    def test_community_dir_is_resolved_to_absolute(self) -> None:
+        """A relative config.dashboard.plugins_dir (the real default,
+        "plugins") must not reach discover_plugins/setup_path as relative --
+        sudo matches argv literally, and config/sudoers-meshpoint's NOPASSWD
+        rule for a plugin's setup.sh is an absolute-path pattern, so a
+        relative setup_path silently falls back to a password prompt in the
+        non-interactive CLI (the actual bug this test guards against)."""
+        self.config.dashboard.plugins_dir = "plugins"  # relative, like the real default
+        with patch("src.config.load_config", return_value=self.config), \
+             patch("src.plugins.manifest.discover_plugins", return_value=[]) as mock_discover:
+            run_plugin_setup("nope", skip_confirm=True)
+        community_dir = mock_discover.call_args[0][1]
+        self.assertTrue(
+            community_dir.is_absolute(),
+            f"community_dir must be absolute, got {community_dir}",
+        )
+
     def test_no_setup_step_returns_0(self) -> None:
         manifest = _manifest(setup=None)
         with patch("src.config.load_config", return_value=self.config), \

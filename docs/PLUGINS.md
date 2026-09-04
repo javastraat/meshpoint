@@ -309,7 +309,7 @@ ACARS), write a `setup.sh` and list its apt packages in `[deps]`. It's
 **never** run automatically. The operator runs it once, either directly:
 
 ```sh
-sudo bash plugins/apps/<id>/setup.sh
+sudo bash /opt/meshpoint/plugins/apps/<id>/setup.sh
 ```
 
 or through the friendlier CLI wrapper, which shows the apt list + script
@@ -318,6 +318,14 @@ path and confirms first:
 ```sh
 sudo meshpoint plugin setup <id>
 ```
+
+Either is passwordless: `config/sudoers-meshpoint` grants NOPASSWD for
+`/opt/meshpoint/plugins/apps/*/setup.sh` and `/opt/meshpoint/src/plugins/
+apps/*/setup.sh` (both tiers) -- **but only for the absolute path**, since
+sudo matches argv literally and can't resolve a relative one against an
+unknown cwd. `sudo bash plugins/apps/<id>/setup.sh` (relative, even from
+`/opt/meshpoint`) still works, just prompts for a password.
+`meshpoint plugin setup` always passes the resolved absolute path.
 
 Make your script idempotent — `setup.sh` should check whether it already
 did its job (ACARS checks `shutil.which`-equivalent for `acarsdec` on

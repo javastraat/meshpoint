@@ -1227,9 +1227,11 @@ file; those `.js`/`.css` files (and only those) are served under
 registers itself. A manifest that targets a newer `meshpoint_api` than this
 build supports, or is otherwise invalid, is logged and skipped. System
 dependencies (`[deps]`) are **not** installed automatically — run the plugin's
-setup step yourself first, either `sudo bash plugins/apps/<id>/setup.sh`
-directly or `sudo meshpoint plugin setup <id>` (shows the apt package list +
-script path, confirms, then runs it — same script either way). `meshpoint
+setup step yourself first, either `sudo bash /opt/meshpoint/plugins/apps/<id>/
+setup.sh` directly (the absolute path — sudoers' NOPASSWD grant only matches
+that, not a relative one, even run from `/opt/meshpoint`) or `sudo meshpoint
+plugin setup <id>` (shows the apt package list + script path, confirms, then
+runs it, and always resolves the absolute path for you). `meshpoint
 plugin list` shows every discovered plugin's enabled/loaded state from the
 terminal (works from the dashboard's web Terminal too, since that's a real
 shell on the device) — it queries the running service's `GET /api/plugins`,
