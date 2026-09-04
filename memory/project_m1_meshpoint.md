@@ -9321,3 +9321,36 @@ it in under a minute. **For a UI bug that looks like a stuck overlay:
 ask about theme/browser/reproducibility scope EARLY**, not after
 exhausting the obvious JS suspects -- it narrows the search space far
 faster than reading more source top-to-bottom.
+
+**LIVE-VERIFIED immediately after, same session**: user pulled commit
+`0bda66f` (the backdrop fix), confirmed via the Updates page's own commit
+log ("Up to date", installed==upstream==0.8.1), and screenshotted
+Settings -> Plugins in light theme after a real restart -- fully clean,
+no tint, "Reconnected -- plugin list refreshed." showing correctly.
+Confirms the CSS root-cause diagnosis was right, not just plausible.
+
+**Same screenshot turned up a second, related light-theme bug, found in
+under a minute this time** (direct payoff of the "ask about theme scope
+early" lesson just above): a dark vertical scrollbar on the Settings ->
+Updates page specifically, in light theme. Grepped `color-scheme` across
+`frontend/css/*.css` straight away (same instinct as the `--scrim` grep
+that cracked the backdrop bug) and found exactly 3 hits, all hardcoded
+`color-scheme: dark` with no light-theme reset anywhere:
+`.update-panel` (settings.css) and two native `<select>` rules
+(`select.cfg-field__input` in configuration.css, `select.update-field__input`
+in settings.css) -- all three added deliberately (real comments explain
+why: without `color-scheme`, Chrome/Windows paints native `<select>`
+option popups white-on-light regardless of the app's own dark theme).
+`color-scheme` governs more than just form-control popups though -- it
+also drives the NATIVE SCROLLBAR of whichever box is the actual
+scrolling container in that subtree, so `.update-panel` (which wraps the
+whole Updates page and IS that scrolling container) darkened the page's
+own scrollbar too, in light theme specifically, matching the report
+exactly. Fixed the same way as the backdrop bug: added a light-theme
+override in `frontend/themes/light/theme.css` resetting `color-scheme:
+light` on the same three selectors, rather than touching the base
+dark-first declarations (keeps dark theme's own popup/scrollbar styling
+untouched). New CHANGELOG bullet under v0.8.1 (46 bullets, parser
+re-verified). **Not yet live-verified** -- next session should confirm
+the Updates page scrollbar (and any native `<select>` dropdown, e.g.
+Configuration pages' pickers) renders light in light theme now.

@@ -308,3 +308,19 @@ html[data-theme="light"] .topbar [class$="__brand"],
 html[data-theme="light"] .topbar [class$="__sep--bar"] {
     border-color: #d5dce6;
 }
+
+/* Settings -> Updates panel and native <select> dropdowns hardcode
+ * `color-scheme: dark` (settings.css / configuration.css) so Chrome/Windows
+ * paint the OS-native option popup with light-on-dark text matching this
+ * app's dark-first baseline, instead of a mismatched white popup with
+ * inherited light text. `color-scheme` also drives every *other* native
+ * UI Chrome renders within that element's box -- notably the page's own
+ * scrollbar when the element is (or contains) the scrolling container --
+ * so left unscoped, the Updates page's scrollbar (and native <select>
+ * popups app-wide) render dark even in light theme. Reset back to the
+ * theme's actual polarity here. */
+html[data-theme="light"] .update-panel,
+html[data-theme="light"] select.cfg-field__input,
+html[data-theme="light"] select.update-field__input {
+    color-scheme: light;
+}
