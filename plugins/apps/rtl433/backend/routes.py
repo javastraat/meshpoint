@@ -1,9 +1,9 @@
-"""rtl_433 (generic RTL-SDR OOK/FSK decoder) endpoints: start / stop / status.
+"""rtl_433 (generic RTL-SDR OOK/FSK decoder) endpoints: start / stop / status / clear.
 
-See src/audio/rtl433_listener.py for the listener class, and
-src/audio/sdr_registry.py for why starting this can fail with a 503
-while the FM listener or a pager kind is active (only one process can
-hold the RTL-SDR dongle at a time; manual stop required by design).
+See ``listener.py`` for the listener class, and ``src/audio/sdr_registry.py``
+for why starting this can fail with a 503 while the FM listener, a pager
+kind, ACARS, DAB+ or ADS-B is active (only one process can hold the
+RTL-SDR dongle at a time; manual stop required by design).
 """
 
 from __future__ import annotations
@@ -14,7 +14,8 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from src.api.auth.dependencies import require_admin
 from src.api.auth.jwt_session import SessionClaims
-from src.audio.rtl433_listener import Rtl433Listener
+
+from .listener import Rtl433Listener
 
 router = APIRouter(prefix="/api/rtl433", tags=["rtl433"])
 

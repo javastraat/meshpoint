@@ -220,18 +220,19 @@ if [ "$INSTALL_RNSD" = "1" ] && ! systemctl is-enabled rnsd &>/dev/null && [ -t 
     esac
 fi
 
-# Sections 6-11 below are all downstream of one physical USB RTL-SDR
+# Sections 6-10 below are all downstream of one physical USB RTL-SDR
 # dongle: the rtl-sdr userspace library + kernel DVB blacklist, then
-# five decoders built/installed on top of it -- redsea (RDS), multimon-ng
-# (POCSAG/P2000/pager digital modes), rtl_433 (generic 433/868 OOK/FSK
-# sensors), dump1090 (ADS-B air traffic), and welle.io (DAB+). Every one
-# of them is dead weight without a dongle plugged in, and several are
-# from-source builds, so ask once for all of them rather than separate
-# prompts -- they're only ever used together on the RTL-SDR tab anyway.
-# (The ACARS decoder is a plugin: plugins/apps/acars/setup.sh.)
-# `rtl_sdr` (the first of the five) stands in for "already set up" here,
+# four decoders built/installed on top of it -- redsea (RDS), multimon-ng
+# (POCSAG/P2000/pager digital modes), dump1090 (ADS-B air traffic), and
+# welle.io (DAB+). Every one of them is dead weight without a dongle
+# plugged in, and several are from-source builds, so ask once for all of
+# them rather than separate prompts -- they're only ever used together
+# on the RTL-SDR tab anyway.
+# (The RTL433 and ACARS decoders are plugins: plugins/apps/rtl433/setup.sh
+# and plugins/apps/acars/setup.sh.)
+# `rtl_sdr` (the first of the four) stands in for "already set up" here,
 # same reasoning as arduino-cli/PlatformIO above -- an imperfect proxy
-# for all six sub-pieces, but a safe one: skipping the prompt just
+# for all five sub-pieces, but a safe one: skipping the prompt just
 # defaults to installing, which lets each step's own idempotent check
 # quietly fill in (and announce) anything actually still missing.
 INSTALL_RTLSDR=1
@@ -519,28 +520,7 @@ _DVB_BLACKLIST
         )
     fi
 
-    # ── 9. Install rtl_433 (RTL-SDR generic OOK/FSK decoder) ──────────
-    #
-    # Decodes a broad range of 433/315/868 MHz OOK/FSK devices (weather
-    # stations, TPMS, remote sensors, etc.) from the RTL-SDR dongle --
-    # wider device coverage than the P2000/Pagers/POCSAG multimon-ng
-    # pipelines above, which only cover FLEX/POCSAG paging protocols.
-    # Installed via apt (unlike rtl-sdr/redsea/multimon-ng above, which
-    # are built from source because their distro packages lag upstream
-    # too far) -- the Raspberry Pi OS `rtl-433` package is small (~500 KB)
-    # and current enough for this. --no-install-recommends skips the
-    # optional soapysdr module packages, which nothing here uses.
-    #
-    # Idempotent: skips the apt install if the rtl_433 binary already exists.
-
-    if command -v rtl_433 &>/dev/null; then
-        info "rtl_433 already installed, skipping"
-    else
-        info "Installing rtl_433..."
-        apt-get install -y -qq --no-install-recommends rtl-433
-    fi
-
-    # ── 10. Install dump1090 (RTL-SDR ADS-B air traffic decoder) ─────
+    # ── 9. Install dump1090 (RTL-SDR ADS-B air traffic decoder) ──────
     #
     # Decodes 1090ES ADS-B squitters from aircraft transponders off the
     # RTL-SDR dongle, on top of the librtlsdr built in section 6. Built
@@ -570,7 +550,7 @@ _DVB_BLACKLIST
         )
     fi
 
-    # ── 11. Install welle.io (DAB+ tab) ───────────────────────────────
+    # ── 10. Install welle.io (DAB+ tab) ───────────────────────────────
     #
     # The Debian/Raspberry Pi OS `welle.io` package ships both the GUI
     # app and the headless `welle-cli` binary Meshpoint's DAB+ tab
@@ -590,9 +570,10 @@ _DVB_BLACKLIST
         apt-get install -y -qq --no-install-recommends welle.io
     fi
 
-    # ACARS (aircraft VHF datalink) is a plugin, not part of core --
-    # its acarsdec + libacars build lives in plugins/apps/acars/setup.sh.
-    # Run that separately if you want the ACARS tab.
+    # RTL433 (generic 433/868 OOK/FSK decoder) and ACARS (aircraft VHF
+    # datalink) are plugins, not part of core -- their installs live in
+    # plugins/apps/rtl433/setup.sh and plugins/apps/acars/setup.sh. Run
+    # those separately if you want the RTL433 / ACARS tabs.
 else
     info "Skipping RTL-SDR support (sections 6-11) -- re-run without --skip-rtlsdr, or answer Y next time, to add it later"
 fi

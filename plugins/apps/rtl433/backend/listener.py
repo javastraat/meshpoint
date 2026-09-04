@@ -7,6 +7,10 @@ RTL-SDR dongle directly: a single self-contained process, same as
 RtlListener's rtl_fm but with its own built-in decoders for hundreds
 of device protocols instead of one fixed demodulation mode.
 
+Same shape as AcarsListener (plugins/apps/acars/backend/listener.py):
+one self-contained process talking to the RTL-SDR dongle directly,
+emitting one JSON object per decoded event on stdout.
+
 `-F json` makes rtl_433 emit one JSON object per line per decoded
 event on stdout (its own recommended machine-readable format --
 tuner-detection/info logging stays on stderr) instead of the default

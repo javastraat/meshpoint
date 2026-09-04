@@ -26,11 +26,10 @@ from src.api.routes import (
     dab_routes,
     listener_routes,
     pager_routes,
-    rtl433_routes,
 )
 from src.api.server import _BUILTIN_LISTENERS
 
-_EXPECTED_NAMES = ["radio", "pagers", "rtl433", "dab", "adsb"]
+_EXPECTED_NAMES = ["radio", "pagers", "dab", "adsb"]
 
 
 class TestBuiltinListenerList(unittest.TestCase):
@@ -45,7 +44,7 @@ class TestBuiltinListenerList(unittest.TestCase):
             self.assertTrue(callable(s.wire))
 
     def test_start_all_wires_every_route_module(self) -> None:
-        for mod in (listener_routes, pager_routes, rtl433_routes, dab_routes,
+        for mod in (listener_routes, pager_routes, dab_routes,
                     adsb_routes):
             getattr(mod, "reset_routes", lambda: None)()
 
@@ -58,7 +57,6 @@ class TestBuiltinListenerList(unittest.TestCase):
             self.assertEqual(len(pagers_obj), 3)
 
             self.assertIsNotNone(listener_routes._listener)
-            self.assertIsNotNone(rtl433_routes._listener)
             self.assertIsNotNone(dab_routes._listener)
             self.assertIsNotNone(adsb_routes._listener)
             self.assertIsNotNone(pager_routes._p2000)
@@ -71,11 +69,10 @@ class TestBuiltinListenerList(unittest.TestCase):
         listener_registry.start_all(_BUILTIN_LISTENERS)
         try:
             app = FastAPI()
-            for r in (rtl433_routes.router, dab_routes.router,
-                      adsb_routes.router):
+            for r in (dab_routes.router, adsb_routes.router):
                 app.include_router(r)
             client = TestClient(app)
-            for prefix in ("/api/rtl433", "/api/dab", "/api/adsb"):
+            for prefix in ("/api/dab", "/api/adsb"):
                 resp = client.get(f"{prefix}/status")
                 self.assertEqual(resp.status_code, 200, prefix)
                 self.assertFalse(resp.json().get("running"), prefix)
@@ -112,7 +109,7 @@ class TestBuiltinListenerRouterAlignment(unittest.TestCase):
         from src.api.server import _BUILTIN_ROUTERS
 
         prefixes = {getattr(r, "prefix", "") for r, _ in _BUILTIN_ROUTERS}
-        for p in ("/api/rtl433", "/api/dab", "/api/adsb"):
+        for p in ("/api/dab", "/api/adsb"):
             self.assertIn(p, prefixes)
 
 

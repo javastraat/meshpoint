@@ -60,7 +60,6 @@ from src.api.routes import (
     listener_routes,
     pager_routes,
     emergency_pager_routes,
-    rtl433_routes,
     lorawan_routes,
     lorawan_config_routes,
     dapnet_routes,
@@ -111,7 +110,6 @@ from src.api.upstream_client import UpstreamClient
 from src.audio.adsb_listener import AdsbListener
 from src.audio.dab_listener import DabListener
 from src.audio.pager_listener import PagerListener
-from src.audio.rtl433_listener import Rtl433Listener
 from src.audio.rtl_listener import RtlListener
 from src.api.websocket_manager import WebSocketManager
 from src.config import AppConfig, SerialDeviceConfig, load_config, validate_activation
@@ -218,7 +216,6 @@ _BUILTIN_ROUTERS: list[tuple] = [
     (pager_routes.p2000_router, False),
     (pager_routes.pagers_router, False),
     (pager_routes.pocsag_router, False),
-    (rtl433_routes.router, False),
     (dab_routes.router, False),
     (adsb_routes.router, False),
     (spectrum_routes.router, False),
@@ -245,9 +242,6 @@ _BUILTIN_LISTENERS: list[listener_registry.ListenerSpec] = [
             PagerListener("pocsag"),
         ),
         lambda trio: pager_routes.init_routes(*trio),
-    ),
-    listener_registry.ListenerSpec(
-        "rtl433", Rtl433Listener, rtl433_routes.init_routes,
     ),
     listener_registry.ListenerSpec("dab", DabListener, dab_routes.init_routes),
     listener_registry.ListenerSpec(

@@ -1,16 +1,17 @@
 /**
- * P2000/Pagers/RTL433 tab content -- a live-scrolling decoded message
- * log with Start/Stop controls. Reused across kinds (parameterized)
- * since the pipeline/UI shape is identical, just a different backend
- * endpoint prefix, page title, and (for rtl_433, whose decoded field
- * set varies wildly by device model instead of a fixed protocol/
- * capcode/message shape) row layout -- see src/audio/pager_listener.py
- * and src/audio/rtl433_listener.py.
+ * P2000/Pagers/RTL433/ACARS tab content -- a live-scrolling decoded
+ * message log with Start/Stop controls. Reused across kinds
+ * (parameterized) since the pipeline/UI shape is identical, just a
+ * different backend endpoint prefix, page title, and (for rtl_433,
+ * whose decoded field set varies wildly by device model instead of a
+ * fixed protocol/capcode/message shape, and for ACARS) row layout --
+ * see src/audio/pager_listener.py, plugins/apps/rtl433/backend/listener.py
+ * and plugins/apps/acars/backend/listener.py.
  *
- * Only one of Radio/P2000/Pagers/POCSAG/RTL433 can hold the RTL-SDR
- * dongle at a time (manual-stop-required design, 2026-07-12): starting
- * this while another is active returns an error from the backend,
- * shown inline rather than silently stopping the other one.
+ * Only one of Radio/P2000/Pagers/POCSAG/RTL433/ACARS can hold the
+ * RTL-SDR dongle at a time (manual-stop-required design, 2026-07-12):
+ * starting this while another is active returns an error from the
+ * backend, shown inline rather than silently stopping the other one.
  */
 // Matches src/audio/sdr_registry.py's owner names.
 const _DONGLE_OWNER_LABELS = {

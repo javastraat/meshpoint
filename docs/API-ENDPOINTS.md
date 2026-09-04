@@ -181,7 +181,7 @@ session gets `401 Unauthorized`. See `src/api/auth/dependencies.py` for the
 
 ## RTL-SDR listeners (Radio tab and friends)
 
-Only one of Radio / P2000 / Pagers / POCSAG / RTL433 / DAB+ may hold the RTL-SDR dongle at a time.
+Only one of Radio / P2000 / Pagers / POCSAG / DAB+ may hold the RTL-SDR dongle at a time (the RTL433 and ACARS plugins join that set when installed -- see their own `plugins/apps/*/README.md`).
 
 | Method | Path | Role | Description |
 |---|---|---|---|
@@ -189,9 +189,9 @@ Only one of Radio / P2000 / Pagers / POCSAG / RTL433 / DAB+ may hold the RTL-SDR
 | POST | `/api/listener/tune` | Admin | Tune the RTL-SDR: frequency, mode, squelch, gain, level, optional preset station label |
 | POST | `/api/listener/stop` | Admin | Stop the RTL-SDR listener |
 | GET | `/api/listener/stream` | Viewer | Live MP3 audio stream for the browser player |
-| GET | `/api/p2000/status` · `/api/pagers/status` · `/api/pocsag/status` · `/api/rtl433/status` | Viewer | Decoder state: running, frequency, decoded messages |
-| POST | `/api/p2000/start` · `/api/pagers/start` · `/api/pocsag/start` · `/api/rtl433/start` | Admin | Start the given decoder |
-| POST | `/api/p2000/stop` · `/api/pagers/stop` · `/api/pocsag/stop` · `/api/rtl433/stop` | Admin | Stop the given decoder |
+| GET | `/api/p2000/status` · `/api/pagers/status` · `/api/pocsag/status` | Viewer | Decoder state: running, frequency, decoded messages |
+| POST | `/api/p2000/start` · `/api/pagers/start` · `/api/pocsag/start` | Admin | Start the given decoder |
+| POST | `/api/p2000/stop` · `/api/pagers/stop` · `/api/pocsag/stop` | Admin | Stop the given decoder |
 | GET | `/api/dab/status` | Viewer | DAB+ listener state: channel, ensemble label, SNR, decoded station list (sid, name, DLS text) |
 | POST | `/api/dab/tune` | Admin | Tune to a DAB+ channel/ensemble (e.g. `12C`) |
 | POST | `/api/dab/stop` | Admin | Stop the DAB+ listener |

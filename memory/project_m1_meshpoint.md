@@ -8659,10 +8659,107 @@ absolute) `sudo bash` command to recommending `sudo meshpoint plugin setup
 reading the hint off the dashboard, since the CLI always resolves it
 correctly now. New CHANGELOG bullet (v0.8.1). 1535 tests total (was 1534),
 `ruff check` clean, sudoers re-verified with `visudo -cf` after the doc
-pass too. **Not yet live-verified** -- needs the user's actual clean
-machine: pull, restart (so `meshpoint.service`'s `ExecStartPre` picks up
-the new sudoers file), then re-run `meshpoint plugin setup acars` and
-confirm it now runs straight through with no password prompt.
+pass too. **LIVE-VERIFIED 2026-09-04** -- user confirmed on the actual
+clean machine: `meshpoint plugin setup acars` now runs straight through
+with no password prompt. Both bugs (missing sudoers grant, relative path
+passed to sudo) genuinely fixed, not just theorized.
 
 - NOT planned unless external demand: out-of-tree install, pip deps, subprocess
   isolation, SemVer contract.
+
+**RTL433 extracted to a plugin (2026-09-04, ⚠️ behaviour change, DONE, not yet
+live-verified)**: Same day, direct continuation of the ACARS-plugin work
+above. User asked for a full survey of the remaining built-in RTL-SDR tabs
+(RTL433/ADS-B/Pagers/DAB+/Radio) as app-plugin candidates before picking one;
+verdict: RTL433, ADS-B, Pagers, DAB+ are all the proven ACARS shape (listener
++ routes + panel, mechanical extraction), DAB+ carries extra work for its
+Config sub-tab, and plain-FM Radio is a genuinely different shape (would need
+the new "sidebar" seam plus streamed audio, not JSON polling — not attempted
+here). **User picked RTL433 first** (smallest, same shape as ACARS almost
+exactly) with an explicit "then maybe step by step (tab by tab)" for the
+others afterward — so ADS-B/Pagers/DAB+ are the natural next candidates,
+Radio is not (different seam, bigger job).
+
+Session got interrupted right after the todo list was written, before any
+file touched landed — picked back up cold in a fresh conversation and
+re-derived the same plan from the repo (no work had actually started despite
+the todo list existing).
+
+Mechanical extraction, mirroring ACARS exactly: moved `src/audio/
+rtl433_listener.py` -> `plugins/apps/rtl433/backend/listener.py` and
+`src/api/routes/rtl433_routes.py` -> `plugins/apps/rtl433/backend/routes.py`
+(owner string `"rtl433"` unchanged, `sdr_registry` import unchanged); new
+`backend/__init__.py` (`register(reg)`, no config needed -- `Rtl433Listener`
+takes no constructor args, unlike ACARS's freqs/gain/device); new `plugin.toml`
+(`locked = true`, `apt = ["rtl-433"]`, no build needed unlike acarsdec); new
+`setup.sh` (plain idempotent apt install); new `README.md`. Frontend:
+`_rtl433RowHtml` moved out of `frontend/js/listener_panel.js` into a new
+`plugins/apps/rtl433/frontend/rtl433_panel.js` registering via
+`window.registerListenerPanel` (same pattern as `acars_panel.js`), and the
+`rtl433` entry dropped from `listener_panel.js`'s built-in `_subPanels` list.
+`src/api/server.py`: removed the `rtl433_routes`/`Rtl433Listener` imports and
+their `_BUILTIN_ROUTERS`/`_BUILTIN_LISTENERS` entries. `tests/
+test_create_app_listeners.py` updated (`_EXPECTED_NAMES` drops `"rtl433"`,
+router/listener assertions drop the `/api/rtl433` prefix and
+`rtl433_routes._listener` check) -- no dedicated core-level RTL433 listener
+test existed before (confirmed by grep), so nothing else needed deleting.
+New `plugins/apps/rtl433/backend/tests/test_listener.py` (8 tests, mirrors
+`acars`'s test shape), since none existed for RTL433 before either.
+`scripts/install.sh`: removed section 9 (the `rtl_433` apt install),
+renumbered dump1090/welle.io from 10/11 to 9/10, updated the "Sections 6-11 /
+five decoders / six sub-pieces" summary comment to "6-10 / four decoders /
+five sub-pieces", combined the trailing RTL433+ACARS "these are plugins, run
+their own setup.sh" note. Docs: `docs/API-ENDPOINTS.md` dropped `/api/rtl433`
+from the core RTL-SDR table (matching that ACARS's routes were never
+documented there either -- plugin routes live in the plugin's own README, not
+this core doc); `README.md` got a new RTL433 plugin bullet next to ACARS's,
+the big RTL-SDR paragraph rewritten (three built-in decode tabs now, not
+four; RTL433 described alongside ACARS as a bundled plugin), the manual-
+install section's RTL433 bullet rewritten to point at `plugins/apps/rtl433/
+setup.sh` instead of a `scripts/install.sh`-automatic apt install, and the
+API-endpoints summary table split into a builtin row (`p2000,pagers,pocsag`)
+and a separate plugin row (`rtl433,acars`). `docs/CONFIGURATION.md` had no
+existing RTL433-specific section to update (confirmed by grep -- it was
+always-on with no config keys, so nothing was ever documented there).
+CHANGELOG: new `v0.8.1` bullet right after the ACARS one, same "⚠️ Behaviour
+change" framing (RTL433 was always-on with no config gate before; now off by
+default like every other plugin, needs `plugins.rtl433.enabled: true` +
+`setup.sh`).
+
+**Real, user-facing behaviour change worth flagging explicitly**: unlike
+ACARS (which was born as a plugin, so nothing regresses for existing users),
+RTL433 was previously always-on out of the box. After this change, an
+existing deployment that pulls this update will **lose the RTL433 tab**
+until the user runs `plugins/apps/rtl433/setup.sh` (a no-op if `rtl_433` is
+already installed) and sets `plugins.rtl433.enabled: true` in `local.yaml`.
+This is called out in both the CHANGELOG bullet and `plugins/apps/rtl433/
+README.md`.
+
+**Verified on the Mac (fastapi/aiosqlite genuinely absent here, per this
+file's documented Mac/Pi split)**: `py_compile` clean on every touched/new
+Python file; grepped the whole tree for stale `rtl433_listener`/
+`rtl433_routes` path references after the move -- only one stale docstring
+mention left (`frontend/js/pager_panel.js`'s file-path comment), fixed.
+`pytest plugins/apps/rtl433/backend/tests/test_listener.py` -- 6/6 pass
+(stdlib + `sdr_registry` only, no fastapi needed, same as ACARS's own test
+file). `pytest plugins/` -- 19/19 pass (ACARS + RTL433 + hello-world
+together, nothing cross-broke). Attempted a stubbed-aiosqlite import of
+`src.api.server` to sanity-check the edit didn't break the import chain --
+hit a **pre-existing, unrelated** `fastapi` version-mismatch assertion error
+inside `auth_routes.py` (this Mac's installed fastapi is newer than what the
+project expects) before ever reaching anything touched here, confirming it's
+an environment limitation and not a regression from this change.
+`ChangelogParser.parse_file` re-parse: 31 sections, new RTL433 bullet present
+under the real `v0.8.1` section (not "Unreleased" -- matches this file's own
+`src/version.py`-driven convention).
+
+**NOT yet done / next steps**: **not live-verified on the Pi** -- next
+session should pull, restart, confirm RTL433 is gone from the Listener page
+until enabled, then run `sudo meshpoint plugin setup rtl433` (or `setup.sh`
+directly) + `plugins.rtl433.enabled: true` + restart, and confirm the tab
+comes back working exactly as before (start/stop/clear, live decoded-message
+log, shared-dongle busy behaviour against Radio/Pagers/ACARS/DAB+/ADS-B).
+Per the user's "tab by tab" plan, **ADS-B, Pagers, and DAB+ are the next
+extraction candidates** (DAB+ is more work, its Config sub-tab needs a second
+panel); plain-FM **Radio is explicitly not next** -- different shape
+entirely (needs the sidebar seam + streamed audio, not the panel seam).

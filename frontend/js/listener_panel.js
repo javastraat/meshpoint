@@ -13,31 +13,6 @@ function fmtFreq4(mhz) {
     return Number.isFinite(mhz) ? mhz.toFixed(4) : '--.----';
 }
 
-// rtl_433's decoded field set varies wildly by device model (a
-// temperature sensor and a remote control share almost no fields), so
-// unlike the fixed protocol/capcode/message row PagerPanel renders by
-// default, this just shows the model name plus whatever other keys a
-// given event happens to carry.
-function _rtl433RowHtml(m, esc) {
-    const time = m.received_at
-        ? new Date(m.received_at * 1000).toLocaleTimeString([], {
-            hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
-        })
-        : '';
-    const skip = new Set(['time', 'model', 'received_at']);
-    const fields = Object.keys(m)
-        .filter((k) => !skip.has(k) && m[k] !== null && m[k] !== undefined && m[k] !== '')
-        .map((k) => `${k}: ${m[k]}`)
-        .join('  ·  ');
-    return `
-        <div class="pager-row">
-            <span class="pager-row__time">${esc(time)}</span>
-            <span class="pager-row__proto">${esc(m.model || '')}</span>
-            <span class="pager-row__msg">${esc(fields)}</span>
-        </div>
-    `;
-}
-
 /* ───────────────────────── Digital skin ───────────────────────── */
 
 class DigitalSkin {
@@ -401,11 +376,10 @@ class ListenerPanel {
         })();
         this._tunedCat = null;   // category index of the currently-tuned preset
         this._tunedKey = null;   // "freq|mode" of the currently-tuned preset
-        // P2000/Pagers/POCSAG/RTL433 tabs -- separate pipelines, same
-        // RTL-SDR dongle (see src/audio/sdr_registry.py), so only one
-        // of Radio/P2000/Pagers/POCSAG/RTL433 can be active at a time.
-        // Kept as sibling panels rather than folded into this
-        // already-large file.
+        // P2000/Pagers/POCSAG tabs -- separate pipelines, same RTL-SDR
+        // dongle (see src/audio/sdr_registry.py), so only one of
+        // Radio/P2000/Pagers/POCSAG can be active at a time. Kept as
+        // sibling panels rather than folded into this already-large file.
         this._activeTab = 'radio';
 
         // Every non-radio Listener sub-tab, in tabbar order. Each entry is
@@ -415,9 +389,9 @@ class ListenerPanel {
         // window.registerListenerPanel (see listener_panel_registry.js) and
         // render after these built-ins.
         // 'pocsag' etc. share the one RTL-SDR dongle (src/audio/sdr_registry.py)
-        // so only one of Radio/P2000/Pagers/POCSAG/RTL433/DAB+/ADS-B runs at a
-        // time (the ACARS plugin joins that set when installed); 'dabconfig' is
-        // a read-only view over the channel-scan JSON and sits out that dance.
+        // so only one of Radio/P2000/Pagers/POCSAG/DAB+/ADS-B runs at a time
+        // (the RTL433/ACARS plugins join that set when installed); 'dabconfig'
+        // is a read-only view over the channel-scan JSON and sits out that dance.
         const P = window.PagerPanel;
         const pager = (tab, label, prefix, title, rowFn) =>
             (P ? { tab, label, panel: new P(tab, prefix, title, rowFn) } : null);
@@ -426,7 +400,6 @@ class ListenerPanel {
             pager('p2000', 'P2000', '/api/p2000', 'P2000'),
             pager('pagers', 'Pagers', '/api/pagers', 'Pagers'),
             pager('pocsag', 'POCSAG', '/api/pocsag', 'POCSAG'),
-            pager('rtl433', 'RTL433', '/api/rtl433', 'RTL433', _rtl433RowHtml),
             { tab: 'adsb', label: 'ADS-B', panel: window.AdsbPanel ? new window.AdsbPanel() : null },
             { tab: 'dabconfig', label: 'DAB+ Config', panel: window.DabConfigPanel ? new window.DabConfigPanel() : null },
         ];
