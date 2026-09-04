@@ -57,6 +57,59 @@ def _make_plugin_dir(
     return d
 
 
+def _make_sidebar_plugin_dir(apps: Path, name: str, *, route: str | None = None) -> Path:
+    """A minimal 'sidebar' plugin -- the kind a 'hook' plugin depends on."""
+    d = apps / name
+    d.mkdir(parents=True)
+    (d / "plugin.toml").write_text(textwrap.dedent(f"""\
+        name = "{name}"
+        version = "1.0.0"
+        meshpoint_api = 1
+        provides = ["sidebar"]
+
+        [frontend]
+        scripts = ["frontend/panel.js"]
+
+        [sidebar]
+        route = "{route or name}"
+        label = "{name}"
+        category = "networks"
+        """), encoding="utf-8")
+    (d / "frontend").mkdir()
+    (d / "frontend" / "panel.js").write_text("", encoding="utf-8")
+    (d / "backend").mkdir()
+    (d / "backend" / "__init__.py").write_text(
+        "def register(reg): pass\n", encoding="utf-8",
+    )
+    return d
+
+
+def _make_hook_plugin_dir(apps: Path, name: str, *, host: str) -> Path:
+    """A minimal 'hook' plugin -- depends on whichever plugin's
+    [sidebar].route matches ``host``."""
+    d = apps / name
+    d.mkdir(parents=True)
+    (d / "plugin.toml").write_text(textwrap.dedent(f"""\
+        name = "{name}"
+        version = "1.0.0"
+        meshpoint_api = 1
+        provides = ["hook"]
+
+        [frontend]
+        scripts = ["frontend/hook.js"]
+
+        [hook]
+        host = "{host}"
+        """), encoding="utf-8")
+    (d / "frontend").mkdir()
+    (d / "frontend" / "hook.js").write_text("", encoding="utf-8")
+    (d / "backend").mkdir()
+    (d / "backend" / "__init__.py").write_text(
+        "def register(reg): pass\n", encoding="utf-8",
+    )
+    return d
+
+
 class _PluginRoutesTestBase(unittest.TestCase):
     def setUp(self) -> None:
         self._tmp = tempfile.TemporaryDirectory()
@@ -184,6 +237,118 @@ class TestUpdatePlugin(_PluginRoutesTestBase):
         ):
             resp = self.client.put("/api/plugins/acars", json={"enabled": True})
         self.assertEqual(resp.status_code, 403)
+
+
+class TestHookDependency(_PluginRoutesTestBase):
+    """A 'hook' plugin depends on whichever plugin's [sidebar].route
+    matches its own [hook].host -- enabling it without that host enabled
+    would leave it loaded with nowhere to render."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        _make_sidebar_plugin_dir(self.community, "rtlsdr")
+        _make_hook_plugin_dir(self.community, "radio", host="rtlsdr")
+
+    def _init_with(self, plugins_config: dict) -> TestClient:
+        config = MagicMock()
+        config.plugins = plugins_config
+        self._init(config)
+        self.config = config
+        return TestClient(_build_app())
+
+    def test_list_reports_dependency_and_host_state(self) -> None:
+        client = self._init_with({"rtlsdr": {"enabled": False}})
+        by_id = {p["id"]: p for p in client.get("/api/plugins").json()["plugins"]}
+        self.assertIsNone(by_id["rtlsdr"]["dependency"])
+        dep = by_id["radio"]["dependency"]
+        self.assertEqual(dep, {"host_route": "rtlsdr", "host_id": "rtlsdr", "host_enabled": False})
+
+    def test_enabling_hook_without_host_enabled_is_rejected(self) -> None:
+        client = self._init_with({"rtlsdr": {"enabled": False}, "radio": {"enabled": False}})
+        with patch("src.api.routes.plugin_routes.save_section_to_yaml"):
+            resp = client.put("/api/plugins/radio", json={"enabled": True})
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("rtlsdr", resp.json()["detail"])
+        self.assertFalse(self.config.plugins["radio"]["enabled"])  # never flipped
+
+    def test_enabling_hook_with_host_already_enabled_succeeds(self) -> None:
+        client = self._init_with({"rtlsdr": {"enabled": True}, "radio": {"enabled": False}})
+        with patch("src.api.routes.plugin_routes.save_section_to_yaml"):
+            resp = client.put("/api/plugins/radio", json={"enabled": True})
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.json()["plugin"]["enabled"])
+        self.assertEqual(resp.json()["also_disabled"], [])
+
+    def test_enabling_hook_with_missing_host_plugin_is_rejected(self) -> None:
+        # host route matches no known plugin at all (deleted, or a typo).
+        _make_hook_plugin_dir(self.community, "orphan-hook", host="nonexistent")
+        client = self._init_with({"rtlsdr": {"enabled": True}})
+        with patch("src.api.routes.plugin_routes.save_section_to_yaml"):
+            resp = client.put("/api/plugins/orphan-hook", json={"enabled": True})
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("nonexistent", resp.json()["detail"])
+
+    def test_disabling_host_cascades_to_enabled_dependents(self) -> None:
+        client = self._init_with({"rtlsdr": {"enabled": True}, "radio": {"enabled": True}})
+        with patch("src.api.routes.plugin_routes.save_section_to_yaml"):
+            resp = client.put("/api/plugins/rtlsdr", json={"enabled": False})
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+        self.assertEqual(body["also_disabled"], ["radio"])
+        self.assertFalse(self.config.plugins["radio"]["enabled"])
+        self.assertFalse(self.config.plugins["rtlsdr"]["enabled"])
+
+    def test_disabling_host_does_not_touch_already_disabled_dependents(self) -> None:
+        client = self._init_with({"rtlsdr": {"enabled": True}, "radio": {"enabled": False}})
+        with patch("src.api.routes.plugin_routes.save_section_to_yaml"):
+            resp = client.put("/api/plugins/rtlsdr", json={"enabled": False})
+        self.assertEqual(resp.json()["also_disabled"], [])
+
+    def test_disabling_a_non_host_plugin_cascades_nothing(self) -> None:
+        client = self._init_with({"rtlsdr": {"enabled": True}, "radio": {"enabled": True}})
+        with patch("src.api.routes.plugin_routes.save_section_to_yaml"):
+            resp = client.put("/api/plugins/radio", json={"enabled": False})
+        self.assertEqual(resp.json()["also_disabled"], [])
+        # rtlsdr (the host, not a dependent of radio) is untouched.
+        self.assertTrue(self.config.plugins["rtlsdr"]["enabled"])
+
+    def test_cascade_is_transitive_through_a_hook_of_a_hook(self) -> None:
+        # dab hooks into rtlsdr; dab-extra hooks into dab itself (nothing
+        # ships like this today, but the manifest schema allows it, and a
+        # hook plugin can itself declare [sidebar] + be a host).
+        d = self.community / "dab"
+        d.mkdir(parents=True)
+        (d / "plugin.toml").write_text(textwrap.dedent("""\
+            name = "dab"
+            version = "1.0.0"
+            meshpoint_api = 1
+            provides = ["hook", "sidebar"]
+
+            [frontend]
+            scripts = ["frontend/panel.js"]
+
+            [sidebar]
+            route = "dab"
+            label = "DAB+"
+            category = "networks"
+
+            [hook]
+            host = "rtlsdr"
+            """), encoding="utf-8")
+        (d / "frontend").mkdir()
+        (d / "frontend" / "panel.js").write_text("", encoding="utf-8")
+        (d / "backend").mkdir()
+        (d / "backend" / "__init__.py").write_text("def register(reg): pass\n", encoding="utf-8")
+        _make_hook_plugin_dir(self.community, "dab-extra", host="dab")
+
+        client = self._init_with({
+            "rtlsdr": {"enabled": True}, "dab": {"enabled": True},
+            "dab-extra": {"enabled": True}, "radio": {"enabled": True},
+        })
+        with patch("src.api.routes.plugin_routes.save_section_to_yaml"):
+            resp = client.put("/api/plugins/rtlsdr", json={"enabled": False})
+        self.assertEqual(set(resp.json()["also_disabled"]), {"dab", "dab-extra", "radio"})
+        self.assertFalse(self.config.plugins["dab-extra"]["enabled"])
 
 
 class TestDeletePlugin(_PluginRoutesTestBase):

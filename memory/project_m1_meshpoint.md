@@ -10846,3 +10846,120 @@ reset (DTR pulse or physical unplug/replug) while a configured repeater's
 own advert interval is known to be long, to actually observe the
 roster-miss -> re-inject -> immediate-success sequence happen for real
 rather than just in the mocked test fakes above.
+
+## Plugin dependency enforcement: a "hook" can't be enabled without its host, disabling a host cascades (2026-09-05)
+
+User, looking at `rtlsdr_panel.js` in the IDE: "can we do dependencies, fe
+if plugin a (rtl-sdr) is not enabled dont let the dependent plugins be
+witchable and turn off in config... a user build something to hook into
+fe hello world but hello world is not on then the hook cant be turned on
+and show the depency ?" -- correctly identifying a real gap: `[hook] host
+= "..."` in a plugin.toml is a real dependency (see the whole RTL-SDR
+migration above), but nothing ever enforced it. A hook plugin could
+always be enabled with its host off, loading successfully but rendering
+nowhere -- silent, no error, no indication why.
+
+**Asked which of three enforcement levels before building** (block-only /
+block+cascade-disable / warn-only) -- user picked block+cascade but asked
+"what do you think tell me first" before I built it. Recommended doing
+all three together but making the cascade VISIBLE (returned in the API
+response + shown in the UI) rather than a silent config mutation, which
+the user accepted without further changes.
+
+**Key correctness detail, easy to get wrong**: `[hook].host` matches
+another plugin's `[sidebar].route`, NOT necessarily that plugin's own
+`name` (they're identical in every plugin actually shipped so far, but
+the manifest schema (`src/plugins/manifest.py`'s `HookSpec`/`SidebarSpec`)
+doesn't force it). Built `_route_map()`/`_host_manifest()` in
+`src/api/routes/plugin_routes.py` to resolve through the route, not a
+direct name lookup, specifically so this stays correct if a community
+plugin's route and id ever diverge.
+
+**Backend (`src/api/routes/plugin_routes.py`)**: `PUT /api/plugins/{id}`
+now discovers all manifests once per request (was calling
+`discover_plugins()` twice -- once via `_find_manifest()`, once inline --
+consolidated into one call, `route_map` built from it) and:
+- Enabling a hook plugin whose resolved host isn't currently enabled ->
+  400 with a specific message naming the host (`"Enable 'rtlsdr' first --
+  ... hooks into its page and has nowhere to render without it."`). A
+  `host` string matching no known plugin at all (deleted, or a typo) also
+  400s, with its own message naming the unresolved route.
+- Disabling any plugin runs a new `_cascade_disable_dependents()` -- a
+  BFS-style frontier walk (not just one level) over every OTHER manifest's
+  `[hook].host`, disabling (and persisting) each currently-enabled
+  dependent it finds, feeding newly-disabled names back in as the next
+  frontier so a hook-of-a-hook chain (nothing ships like this today, but
+  the schema allows a hook plugin to also `provide = ["hook", "sidebar"]`
+  and be a host itself) cascades all the way through, not just one hop.
+  Returns the disabled-id list as `also_disabled` in the PUT response.
+- `GET /api/plugins` (and the same `_describe()` used by PUT's own
+  response) gains a `dependency` field per plugin: `null` for anything
+  without `[hook]`, else `{host_route, host_id, host_enabled}` --
+  `host_id` is `null` if the route doesn't resolve to any plugin at all
+  (distinct from `host_id` set but `host_enabled: false`).
+
+**Frontend (`frontend/js/settings/plugins_panel_controller.js`)**: each
+row now shows a "Depends on: rtlsdr (not enabled)" note (red text via new
+`.plugin-row__dep--unmet` in `settings.css`) whenever `dependency` is
+non-null, and the toggle itself gets `disabled` (native HTML attribute,
+not just visually) plus a `title` tooltip naming the host whenever
+`dependency.host_enabled` is false and the plugin isn't already on --
+new `.r-switch input:disabled + .r-switch__track { opacity: 0.4;
+cursor: not-allowed; }` in `radio.css` (that component had no disabled
+styling at all before this). A 400 rejection now surfaces the backend's
+actual `detail` message in the row's result text instead of a bare
+"Failed (HTTP 400)".
+
+**The `also_disabled` UX decision**: rather than hand-patching every
+affected row's local state (tried this first, abandoned it -- `_render()`
+rebuilds the whole `<tbody>`, so any `resultEl`/`toggle` reference grabbed
+before calling it goes stale/detached immediately after, and there's no
+cheap way to also know whether some UNRELATED row's dependency now reads
+differently, e.g. a hook's greyed-out toggle un-greying the moment its
+host gets turned on elsewhere), `_setEnabled()` now just calls
+`this.refresh()` (a full re-fetch + full re-render) after every
+successful PUT, queuing a one-shot `this._pendingMessage = {id, kind,
+text}` that `_render()` applies to the right row's `[data-result]` once
+and clears -- guarantees every row's dependency/greyed state is always
+server-truth-correct with no separate client-side dependency graph to
+keep in sync, at the cost of one extra `GET /api/plugins` round trip per
+toggle (a low-frequency admin action, not worth optimizing away).
+
+**Tests, 8 new in `tests/test_plugin_routes.py` (20/20 pass, up from
+12)**: new `_make_sidebar_plugin_dir()`/`_make_hook_plugin_dir()` fixture
+helpers (a minimal real `plugin.toml` + a real, on-disk empty
+`frontend/*.js` file each, since `parse_manifest()` validates both) in a
+new `TestHookDependency` class -- covers `GET`'s `dependency` shape,
+enabling a hook without/with its host enabled, enabling a hook whose host
+route resolves to nothing at all, disabling a host cascading to an
+enabled dependent (and NOT touching an already-disabled one), disabling a
+non-host plugin cascading nothing, and one synthetic transitive case
+(`dab` hooks into `rtlsdr` AND is itself a sidebar host that `dab-extra`
+hooks into -- disabling `rtlsdr` must cascade through both hops).
+Real-world sanity check (not just synthetic fixtures) against the actual
+`plugins/apps/` directory: ran `_route_map()`/`_host_manifest()` directly
+against all 9 real plugins, confirmed all 8 RTL-SDR hooks resolve to
+`rtlsdr` and `hello-world-hook` resolves to `hello-world`, correctly.
+
+**Docs**: `docs/PLUGINS.md`'s hook-authoring section's claim that a
+missing/disabled host just "silently never renders, no error" was
+half-stale -- fixed to explain enable-time enforcement now exists
+(parse-time still can't check, since a manifest alone can't know what
+other plugins exist) while keeping the "still not caught" cases (host
+exists but never calls `mountPageHooks()`, or a `host` string that
+matches nothing) accurately scoped as the remaining silent-failure edges.
+`docs/CONFIGURATION.md`'s Plugins section: fixed the same stale ACARS
+`provides = [..., "panel"]`/`[frontend] # required when "panel"` example
+this file's own earlier DAB+/RTL-SDR migration pass had already fixed in
+PLUGINS.md but missed here (still said `"panel"`, since ACARS itself
+moved to `"hook"` mid-session, before this dependency work started) --
+updated to `"hook"` + a `[hook]` table, and added a new paragraph
+explaining the enforcement in plain terms. New CHANGELOG bullet under
+`### v0.8.1` (60 bullets now, up from 59 -- verified via
+`ChangelogParser.parse_file()`).
+
+**NOT yet done**: not live-verified on the Pi -- next session should
+confirm a hook's toggle actually shows greyed-out + tooltipped in the
+real Settings → Plugins page when its host is off, and that turning a
+host off for real cascades and shows the "Also disabled: ..." message
+inline.

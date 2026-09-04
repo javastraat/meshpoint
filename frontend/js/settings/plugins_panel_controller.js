@@ -134,6 +134,21 @@ class PluginsPanelController {
         this._plugins.forEach((plugin) => {
             tbody.appendChild(this._renderRow(plugin));
         });
+        // A message queued by _setEnabled() just before its own
+        // refresh()-triggered re-render -- applied once here, then
+        // cleared, so it doesn't reappear on some later unrelated render.
+        if (this._pendingMessage) {
+            const { id, kind, text } = this._pendingMessage;
+            this._pendingMessage = null;
+            const row = Array.from(tbody.querySelectorAll('tr')).find(
+                (tr) => tr.querySelector('.plugin-row__name')?.textContent === id,
+            );
+            const resultEl = row && row.querySelector('[data-result]');
+            if (resultEl) {
+                resultEl.dataset.kind = kind;
+                resultEl.textContent = text;
+            }
+        }
     }
 
     _renderRow(plugin) {
@@ -151,6 +166,15 @@ class PluginsPanelController {
         const depsNote = (aptDeps.length || plugin.setup_script)
             ? `<p class="plugin-row__deps">Requires: ${aptDeps.length ? `<code>${this._escape(aptDeps.join(', '))}</code>` : 'a build step'}${plugin.setup_script ? ` — run <code>sudo meshpoint plugin setup ${this._escape(plugin.id)}</code> on the device` : ''}</p>`
             : '';
+        // A "hook" plugin (dependency != null) has nowhere to render
+        // without its host enabled -- shown here regardless of current
+        // state, and the toggle itself is disabled below when the host
+        // isn't on, so the reason is visible before anyone tries.
+        const dep = plugin.dependency;
+        const depNote = dep
+            ? `<p class="plugin-row__dep${dep.host_enabled ? '' : ' plugin-row__dep--unmet'}">Depends on: <code>${this._escape(dep.host_id || dep.host_route)}</code>${dep.host_id ? (dep.host_enabled ? ' (enabled)' : ' (not enabled)') : ' — not installed'}</p>`
+            : '';
+        const depBlocksEnable = !!dep && !dep.host_enabled && !plugin.enabled;
         const byLine = [
             plugin.author ? this._escape(plugin.author) : '',
             plugin.homepage ? `<a href="${this._escape(plugin.homepage)}" target="_blank" rel="noopener noreferrer">homepage</a>` : '',
@@ -165,10 +189,11 @@ class PluginsPanelController {
                 ${this._escape(plugin.description) || 'No description provided.'}
                 <p class="plugin-row__provides">${this._escape(provides)}</p>
                 ${depsNote}
+                ${depNote}
             </td>
             <td class="plugin-row__act">
-                <label class="r-switch">
-                    <input type="checkbox" data-toggle ${plugin.enabled ? 'checked' : ''}>
+                <label class="r-switch" title="${depBlocksEnable ? `Enable ${this._escape(dep.host_id || dep.host_route)} first` : ''}">
+                    <input type="checkbox" data-toggle ${plugin.enabled ? 'checked' : ''} ${depBlocksEnable ? 'disabled' : ''}>
                     <span class="r-switch__track"></span>
                 </label>
                 ${plugin.deletable ? `<button type="button" class="plugin-row__del" data-delete>Delete</button>` : ''}
@@ -198,19 +223,34 @@ class PluginsPanelController {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ enabled }),
             });
+            const body = await response.json().catch(() => ({}));
             if (!response.ok) {
                 toggle.checked = !enabled;
                 resultEl.dataset.kind = 'error';
+                // A dependency rejection (missing/disabled host) comes back
+                // as a 400 with a specific, already-user-facing `detail` --
+                // show that instead of a bare status code.
                 resultEl.textContent = response.status === 403
                     ? 'Admin role required.'
-                    : `Failed (HTTP ${response.status}).`;
+                    : (body.detail || `Failed (HTTP ${response.status}).`);
                 return;
             }
-            const body = await response.json();
-            plugin.enabled = body.plugin.enabled;
-            plugin.restart_required = body.plugin.restart_required;
-            resultEl.dataset.kind = 'success';
-            resultEl.textContent = 'Saved. Restart to apply.';
+            const alsoDisabled = body.also_disabled || [];
+            // Enabling/disabling a plugin can change OTHER rows' dependency
+            // state too -- a host coming on un-greys its dependents'
+            // toggles, disabling one cascades to every enabled dependent
+            // (see also_disabled). Re-fetching the whole list rather than
+            // patching this one row's local state keeps every row's
+            // greyed-out/enabled reality correct with no separate
+            // client-side dependency-graph bookkeeping to keep in sync.
+            this._pendingMessage = {
+                id: plugin.id,
+                kind: 'success',
+                text: alsoDisabled.length
+                    ? `Saved. Also disabled: ${alsoDisabled.join(', ')} (they hook into this page). Restart to apply.`
+                    : 'Saved. Restart to apply.',
+            };
+            await this.refresh();
         } catch (_e) {
             toggle.checked = !enabled;
             resultEl.dataset.kind = 'error';

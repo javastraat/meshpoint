@@ -9,6 +9,17 @@ effect on the next restart (plugins are loaded once at ``create_app`` time),
 so the response always reports both the *configured* state and whether the
 plugin is actually ``loaded`` in this running process.
 
+A ``"hook"`` plugin (``[hook] host = "..."``) has a real dependency on
+whichever plugin provides that ``[sidebar].route`` -- with nothing enforcing
+it, a hook could be enabled with its host off and end up permanently
+orphaned (enabled, loaded, but nowhere to render). ``PUT`` refuses to enable
+a hook plugin unless its host is already enabled, and disabling a host
+plugin cascades: every enabled plugin that hooks into it (directly, or
+transitively through another hook) gets disabled right along with it,
+reported back as ``also_disabled`` so it's never a silent side effect.
+``GET`` surfaces the same relationship per plugin as a ``dependency`` field
+so the UI can grey out a not-yet-enableable toggle before anyone touches it.
+
 An admin can also delete a community plugin's folder outright (an
 "uninstall") -- refused for built-ins and for a ``locked`` community plugin
 (a shipped/bundled one, like ACARS, that ``git`` tracks; deleting it
@@ -66,11 +77,44 @@ def reset_routes() -> None:
     _loaded_plugins = []
 
 
-def _describe(manifest: PluginManifest, loaded_names: set[str]) -> dict:
+def _is_enabled(manifest: PluginManifest) -> bool:
     conf = _config.plugins.get(manifest.name)
     conf = conf if isinstance(conf, dict) else {}
-    enabled = is_plugin_enabled(manifest, conf)
+    return is_plugin_enabled(manifest, conf)
+
+
+def _route_map(manifests: list[PluginManifest]) -> dict[str, PluginManifest]:
+    """Every sidebar-providing plugin's route -> its manifest -- what a
+    hook plugin's ``[hook].host`` actually resolves against (a route, not
+    necessarily the same string as the host's own plugin id)."""
+    return {m.sidebar.route: m for m in manifests if m.sidebar is not None}
+
+
+def _host_manifest(
+    manifest: PluginManifest, route_map: dict[str, PluginManifest]
+) -> PluginManifest | None:
+    """The host this plugin hooks into, or None if it isn't a hook plugin
+    or its declared host route doesn't match any known plugin."""
+    if manifest.hook is None:
+        return None
+    return route_map.get(manifest.hook.host)
+
+
+def _describe(
+    manifest: PluginManifest,
+    loaded_names: set[str],
+    route_map: dict[str, PluginManifest],
+) -> dict:
+    enabled = _is_enabled(manifest)
     loaded = manifest.name in loaded_names
+    host = _host_manifest(manifest, route_map)
+    dependency = None
+    if manifest.hook is not None:
+        dependency = {
+            "host_route": manifest.hook.host,
+            "host_id": host.name if host else None,
+            "host_enabled": _is_enabled(host) if host else False,
+        }
     return {
         "id": manifest.name,
         "version": manifest.version,
@@ -86,6 +130,7 @@ def _describe(manifest: PluginManifest, loaded_names: set[str]) -> dict:
         "restart_required": enabled != loaded,
         "locked": manifest.locked,
         "deletable": manifest.source == SOURCE_COMMUNITY and not manifest.locked,
+        "dependency": dependency,
     }
 
 
@@ -96,6 +141,49 @@ def _find_manifest(plugin_id: str) -> PluginManifest:
     raise HTTPException(404, f"No plugin {plugin_id!r} found")
 
 
+def _save_enabled(plugin_id: str, enabled: bool) -> None:
+    existing = _config.plugins.get(plugin_id)
+    existing = dict(existing) if isinstance(existing, dict) else {}
+    existing["enabled"] = enabled
+    _config.plugins[plugin_id] = existing
+    try:
+        save_section_to_yaml("plugins", {plugin_id: existing})
+    except PermissionError as exc:
+        raise HTTPException(403, str(exc)) from exc
+
+
+def _cascade_disable_dependents(
+    disabled_id: str,
+    manifests: list[PluginManifest],
+    route_map: dict[str, PluginManifest],
+) -> list[str]:
+    """Disable every currently-enabled plugin that hooks into
+    ``disabled_id``, directly or transitively (a hook could itself be
+    someone else's host, though nothing ships like that today) -- a
+    plugin left enabled with its host off would just sit there loaded
+    with nowhere to render. Returns the ids actually disabled, in the
+    order they were processed, so the caller can report it rather than
+    letting it happen silently.
+    """
+    disabled: list[str] = []
+    frontier = {disabled_id}
+    while frontier:
+        newly_disabled: set[str] = set()
+        for m in manifests:
+            if m.name in disabled or m.name in frontier or m.hook is None:
+                continue
+            host = route_map.get(m.hook.host)
+            if host is None or host.name not in frontier:
+                continue
+            if not _is_enabled(m):
+                continue
+            _save_enabled(m.name, False)
+            disabled.append(m.name)
+            newly_disabled.add(m.name)
+        frontier = newly_disabled
+    return disabled
+
+
 @router.get("")
 async def list_plugins():
     """Every discovered plugin, built-ins first, with its config + load state."""
@@ -103,7 +191,8 @@ async def list_plugins():
         raise HTTPException(503, "Config not loaded")
     loaded_names = {p.manifest.name for p in _loaded_plugins}
     manifests = discover_plugins(_builtin_dir, _community_dir)
-    return {"plugins": [_describe(m, loaded_names) for m in manifests]}
+    route_map = _route_map(manifests)
+    return {"plugins": [_describe(m, loaded_names, route_map) for m in manifests]}
 
 
 class PluginUpdate(BaseModel):
@@ -117,34 +206,61 @@ async def update_plugin(
     _claims: SessionClaims = Depends(require_admin),
     audit: AuditLogWriter = Depends(get_audit_writer),
 ):
-    """Persist ``plugins.<id>.enabled``. Takes effect on the next restart."""
+    """Persist ``plugins.<id>.enabled``. Takes effect on the next restart.
+
+    Enabling a hook plugin whose host isn't enabled is refused outright --
+    it would just load with nowhere to render. Disabling a plugin cascades
+    to every enabled plugin that hooks into it (see
+    :func:`_cascade_disable_dependents`), reported back as
+    ``also_disabled``.
+    """
     if _config is None:
         raise HTTPException(503, "Config not loaded")
 
-    manifest = _find_manifest(plugin_id)
+    manifests = discover_plugins(_builtin_dir, _community_dir)
+    route_map = _route_map(manifests)
+    manifest = next((m for m in manifests if m.name == plugin_id), None)
+    if manifest is None:
+        raise HTTPException(404, f"No plugin {plugin_id!r} found")
+
+    also_disabled: list[str] = []
 
     with audit.timed_action(
         user=_claims.subject,
         action="config.plugin_update",
         params={"plugin_id": plugin_id, "enabled": req.enabled},
     ):
-        existing = _config.plugins.get(plugin_id)
-        existing = dict(existing) if isinstance(existing, dict) else {}
-        existing["enabled"] = req.enabled
-        _config.plugins[plugin_id] = existing
+        if req.enabled and manifest.hook is not None:
+            host = _host_manifest(manifest, route_map)
+            if host is None:
+                raise HTTPException(
+                    400,
+                    f"{plugin_id!r} hooks into {manifest.hook.host!r}, but no "
+                    "installed plugin provides that page.",
+                )
+            if not _is_enabled(host):
+                raise HTTPException(
+                    400,
+                    f"Enable {host.name!r} first -- {plugin_id!r} hooks into "
+                    "its page and has nowhere to render without it.",
+                )
 
-        try:
-            save_section_to_yaml("plugins", {plugin_id: existing})
-        except PermissionError as exc:
-            raise HTTPException(403, str(exc)) from exc
+        _save_enabled(plugin_id, req.enabled)
+        if not req.enabled:
+            also_disabled = _cascade_disable_dependents(plugin_id, manifests, route_map)
 
-    logger.info("plugin %s enabled=%s (restart required)", plugin_id, req.enabled)
+    logger.info(
+        "plugin %s enabled=%s (restart required)%s",
+        plugin_id, req.enabled,
+        f"; also disabled: {', '.join(also_disabled)}" if also_disabled else "",
+    )
 
     loaded_names = {p.manifest.name for p in _loaded_plugins}
     return {
         "saved": True,
         "restart_required": True,
-        "plugin": _describe(manifest, loaded_names),
+        "plugin": _describe(manifest, loaded_names, route_map),
+        "also_disabled": also_disabled,
     }
 
 

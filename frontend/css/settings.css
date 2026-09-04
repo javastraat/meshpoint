@@ -1277,6 +1277,16 @@ select.update-field__input option:checked {
     margin-top: 3px;
 }
 
+.plugin-row__dep {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    margin-top: 3px;
+}
+
+.plugin-row__dep--unmet {
+    color: var(--accent-red);
+}
+
 .plugin-row__act {
     text-align: right;
     white-space: nowrap;

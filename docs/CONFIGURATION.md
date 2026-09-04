@@ -1203,7 +1203,7 @@ A plugin folder holds a `plugin.toml` manifest:
 name = "acars"
 version = "0.1.0"
 meshpoint_api = 1
-provides = ["listener", "routes", "panel"]
+provides = ["listener", "routes", "hook"]
 locked = true                             # optional, default false. Community-tier
                                            # only -- refuses the Plugins page's Delete
                                            # button. For a shipped/bundled plugin like
@@ -1213,29 +1213,33 @@ locked = true                             # optional, default false. Community-t
 apt = ["cmake", "libcjson-dev"]
 setup = "setup.sh"
 
-[frontend]                                # required when "panel" in provides
+[frontend]                                # required when "sidebar" or "hook" in provides
 scripts = ["frontend/acars_panel.js"]     # served from /plugins/apps/acars/...
 styles  = ["frontend/acars_panel.css"]    # optional
+
+[hook]                                    # required when "hook" in provides -- see below
+host = "rtlsdr"                           # another plugin's [sidebar].route
 
 [meta]                                     # optional
 description = "Aircraft VHF datalink (ACARS)"
 ```
 
-A plugin with `panel` in `provides` must list at least one `[frontend].scripts`
-file; those `.js`/`.css` files (and only those) are served under
-`/plugins/apps/<id>/` and injected into the dashboard so the plugin's tab
-registers itself. A manifest that targets a newer `meshpoint_api` than this
-build supports, or is otherwise invalid, is logged and skipped. System
-dependencies (`[deps]`) are **not** installed automatically — run the plugin's
-setup step yourself first, either `sudo bash /opt/meshpoint/plugins/apps/<id>/
-setup.sh` directly (the absolute path — sudoers' NOPASSWD grant only matches
-that, not a relative one, even run from `/opt/meshpoint`) or `sudo meshpoint
-plugin setup <id>` (shows the apt package list + script path, confirms, then
-runs it, and always resolves the absolute path for you). `meshpoint
-plugin list` shows every discovered plugin's enabled/loaded state from the
-terminal (works from the dashboard's web Terminal too, since that's a real
-shell on the device) — it queries the running service's `GET /api/plugins`,
-so it needs `meshpoint status` to show the service as running first.
+A plugin with `sidebar` or `hook` in `provides` must list at least one
+`[frontend].scripts` file; those `.js`/`.css` files (and only those) are
+served under `/plugins/apps/<id>/` and injected into the dashboard so the
+plugin's tab registers itself. A manifest that targets a newer
+`meshpoint_api` than this build supports, or is otherwise invalid, is
+logged and skipped. System dependencies (`[deps]`) are **not** installed
+automatically — run the plugin's setup step yourself first, either `sudo
+bash /opt/meshpoint/plugins/apps/<id>/setup.sh` directly (the absolute
+path — sudoers' NOPASSWD grant only matches that, not a relative one,
+even run from `/opt/meshpoint`) or `sudo meshpoint plugin setup <id>`
+(shows the apt package list + script path, confirms, then runs it, and
+always resolves the absolute path for you). `meshpoint plugin list` shows
+every discovered plugin's enabled/loaded state from the terminal (works
+from the dashboard's web Terminal too, since that's a real shell on the
+device) — it queries the running service's `GET /api/plugins`, so it
+needs `meshpoint status` to show the service as running first.
 
 **Settings → Plugins** in the dashboard (admin-only) lists every discovered
 plugin and lets you flip `plugins.<id>.enabled` without editing `local.yaml`
@@ -1243,6 +1247,15 @@ by hand — `GET /api/plugins` / `PUT /api/plugins/{id}`. Since plugins load
 once at startup, the toggle only changes what a restart will load; the page
 shows both the saved setting and whether the plugin is actually loaded right
 now, and flags "restart required" when they disagree.
+
+A `hook` plugin (`[hook] host = "..."` above) can't be enabled ahead of its
+host — ACARS above hooks into `rtlsdr`, so enabling `plugins.acars.enabled`
+while `plugins.rtlsdr.enabled` is off (or unset) is rejected, both from the
+API (400) and the dashboard (the toggle greys out with a tooltip explaining
+why). Going the other direction, turning a host **off** while a dependent is
+still on automatically turns the dependent off too, rather than leaving it
+enabled with nowhere left to render — the response (and the page) reports
+exactly what else just got disabled.
 
 A community plugin you dropped in yourself also gets a **Delete** button —
 `DELETE /api/plugins/{id}` removes its folder under `plugins/apps/<id>/` and

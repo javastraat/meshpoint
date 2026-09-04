@@ -334,9 +334,17 @@ built into core anymore.
    host = "hello-world"      # must match the host's own [sidebar].route
    ```
 
-   Not validated against real plugins at parse time — if the host doesn't
-   exist, or isn't enabled, or never calls `mountPageHooks()` (see below),
-   your hook just never renders anywhere. No error, same "silently skipped"
+   Not validated against real plugins at manifest *parse* time — `plugin.toml`
+   alone can't know what other plugins exist. It IS enforced at *enable*
+   time though: `PUT /api/plugins/{id}` (Settings → Plugins) refuses to
+   enable a hook plugin whose host isn't currently enabled, and disabling
+   a host cascades to disable every plugin hooking into it, reported back
+   so it's never a silent side effect (`src/api/routes/plugin_routes.py`).
+   The Settings → Plugins page greys out a hook's toggle with a tooltip
+   until its host is on. A host that exists but never calls
+   `mountPageHooks()` (see below), or a `host` string matching no
+   installed plugin's route at all, still isn't caught until then — the
+   plugin loads fine, it just renders nowhere, same "silently skipped"
    philosophy `registerSidebarPage()` already uses for a dangling
    descriptor.
 
