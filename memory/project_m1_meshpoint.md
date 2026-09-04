@@ -8312,5 +8312,122 @@ shell" reasoning, not expected to differ.)
   themselves are still not built, correctly still deferred until a
   concrete plugin (LoRaWAN/Pager extraction or otherwise) actually needs
   one.
+
+**New "sidebar" plugin capability + Hello World reference plugin
+(2026-09-04, DONE, not yet live-verified)**: Same session, immediately
+after `docs/PLUGINS.md` shipped -- user picked the *first* of the two
+"current limitations" they wanted addressed now (top-level sidebar page;
+explicitly deferred the decoder/capture-source/settings-sub-page ones),
+motivated by wanting to eventually extract LoRaWAN/Pager into plugins the
+way ACARS was. User was mid-conversation confused why `src/plugins/
+manifest.py` (core) needed editing for a single new plugin -- clarified
+this is one-time framework plumbing (same category as `[frontend]`/`locked`
+already in that file), not something a plugin author ever touches; they
+write TOML only. Also confirmed placement: `plugins/apps/hello-world/`
+(community tier, matching ACARS's own "prove the community path" precedent)
+was correct, not `src/plugins/hello_world`.
+
+Design: category is declarative in `plugin.toml`'s new `[sidebar]` table
+(`route`/`label`/`category`), not duplicated in JS -- single source of
+truth, unlike the older `panel` seam where the Listener tab's label lives
+only in JS. `category` must be one of 5 *existing* sidebar sections
+(`KNOWN_SIDEBAR_CATEGORIES` in manifest.py: `networks`/`radio`/`ops` are
+flat item runs; `configuration`/`settings` are the two collapsible
+submenus, route nested as `<category>/<route>` matching the built-in
+subitems' own convention, e.g. `settings/plugins`) -- a plugin places a
+page into an existing section, doesn't invent a new one.
+
+Backend: `src/plugins/manifest.py` -- new `SidebarSpec` frozen dataclass
+(route/label/category), `PluginManifest.sidebar: SidebarSpec | None`,
+`"sidebar"` added to `KNOWN_PROVIDES`, `_parse_sidebar()` validates the
+route as a URL-safe slug, requires the table exist iff `"sidebar"` in
+`provides` (and rejects the reverse mismatch too -- table present without
+the capability declared), extends the existing "panel needs
+frontend.scripts" rule to also require it for `"sidebar"` (a page needs a
+script to render into it). `src/plugins/assets.py` -- new
+`sidebar_descriptor_tags()` emits one `<script>` JSON-pushing every
+sidebar-plugin's `{id,route,label,category}` onto
+`window.MESHPOINT_SIDEBAR_PLUGINS` (`</script>`-escaped defensively even
+though the source is a plugin's own TOML, not attacker input), injected
+*before* the per-plugin asset `<script>` tags at the same
+`<!-- meshpoint:plugin-panels -->` marker; `plugin_asset_tags()`'s
+panel-only gate widened to `"panel" or "sidebar"` so a sidebar plugin's own
+JS actually gets served too. No `server.py` change needed -- both funnel
+through the already-generic `inject_plugin_assets()` call site.
+
+Frontend: new `frontend/sidebar/sidebar_plugin_registry.js` -- exposes
+`window.registerSidebarPage({route, make})` (plugin script calls this,
+mirroring `registerListenerPanel`'s shape) and
+`window.mountPluginSidebarPages()`, which cross-references the injected
+descriptors against registered factories, builds the real `<li>` (flat
+`sidebar__item` w/ a shared generic plug-icon SVG, or nested
+`sidebar__subitem` for configuration/settings) inserted at the correct spot
+(`_findInsertionTarget`: end of a flat section's existing item run, found
+via a new `data-category` attribute on that section's
+`.sidebar__group-header`; or the collapsible group's own `.sidebar__sublist`
+via its existing `data-group` attribute), plus a `<section data-section>`
+appended to `#app-content`, then calls `make()` and `mount(section)`. A
+descriptor with no matching `registerSidebarPage()` call logs a console
+warning and is skipped rather than crashing anything else. `app.js`:
+`mountPluginSidebarPages()` called *before* `new Router(...)` (its route
+ids folded into `allowedRoutes` -- an unlisted route silently redirects to
+default) and before `new SidebarController(...)` (whose constructor
+snapshots `[data-section]`/`.sidebar__link[data-route]` once, so the
+plugin's DOM must already exist by then -- it does, this ordering
+guarantees it); new `_bootPluginSidebarPages(router, mounted)` wires
+show/hide via `router.onRouteChange`, same shape as every other `_boot*`
+helper. `index.html`: three `data-category` attributes added to the
+Networks/Radio/Ops section headers (previously nothing distinguished them
+programmatically -- only visible text); one new script tag for the
+registry file, placed before the plugin-panels marker. New shared
+`.plugin-page` CSS class (`dashboard.css`) -- optional convenience padding/
+typography for whatever a plugin's `mount()` renders.
+
+**Verification**: backend fully proven against the real shipped files, not
+mocks -- `parse_manifest()` on the real `plugins/apps/hello-world/
+plugin.toml`, `load_plugins()` actually loading it, and
+`inject_plugin_assets()` producing the exact expected `<script>` HTML, all
+run directly against disk. Frontend logic verified with a **real DOM**, not
+a hand-stub -- installed `jsdom` into the scratchpad (no repo
+`package.json`/JS test framework exists, so this was a one-off, nothing
+added to the repo), loaded the actual `index.html` + the actual
+`sidebar_plugin_registry.js` unmodified, and exercised the real
+`mountPluginSidebarPages()`: confirmed the flat-category case lands between
+Topology and the Radio header (i.e. actually inside the Networks run, not
+spilled into the next section), the nested-category case (tested with a
+synthetic `configuration` descriptor) lands inside that group's own
+sublist as a `subitem` with the `category/route` id, sections default
+hidden with the mounted content present, and the "declared but never
+registered" path produces neither a link nor a section (not a crash).
+Tests: `test_plugin_manifest.py` +8 (valid sidebar table; provides/table
+mismatch both directions; missing frontend.scripts; bad category; bad
+route slug; blank label), `test_plugin_assets.py` +5 (descriptor pushed
+correctly; empty when no sidebar plugins; skipped when sidebar not in
+provides; `</script>` escaping; descriptor injected before the plugin's own
+script), `test_plugin_loader.py` +2 (new `TestShippedHelloWorldPlugin`,
+ungated -- hello-world's `register()` is FastAPI-free unlike ACARS's, so
+this runs on the Mac directly, not just in the CI-matching venv). 1531
+tests total pass (up from 1487 pre-B7-session), `ruff check` clean on every
+changed Python file. `docs/PLUGINS.md` updated in the same pass: fourth
+seam added to "What a plugin can do today", new "Adding a top-level
+sidebar page" section (mirrors "Adding a dashboard tab"'s structure,
+Hello World as the worked example instead of ACARS), `plugin.toml`
+reference table extended, "Current limitations" trimmed to the two seams
+still not built with a note explaining the sidebar one used to be listed
+there. `CHANGELOG.md` bullet added (v0.8.1 section).
+
+**User also (separately, mid-build) added `locked = true` to
+`plugins/apps/hello-world/plugin.toml`** on their own, matching ACARS's
+"shipped reference plugin, not user-installed" convention from B8 -- caught
+via a file-changed system note, not asked for; re-verified `parse_manifest`
++ the loader test still pass with it in place (they do; `locked` is
+orthogonal to `sidebar`/`provides`).
+
+**Not yet live-verified** -- needs a Pi restart with `plugins.hello-world.
+enabled: true`: does "Hello World" actually render under Networks in a
+real browser, in the correct DOM position, with the shared plug icon
+looking reasonable, and does clicking it show/hide correctly via the real
+Router (not just the jsdom simulation above)?
+
 - NOT planned unless external demand: out-of-tree install, pip deps, subprocess
   isolation, SemVer contract.

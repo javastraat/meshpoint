@@ -26,9 +26,14 @@ Manifest shape::
     apt = ["cmake", "pkg-config"]
     setup = "setup.sh"             # relative to the plugin dir, must exist
 
-    [frontend]                     # required when "panel" in provides
+    [frontend]                     # required when "panel" or "sidebar" in provides
     scripts = ["frontend/acars_panel.js"]   # rel paths, must exist
     styles  = ["frontend/acars_panel.css"]  # optional
+
+    [sidebar]                      # required when "sidebar" in provides
+    route = "hello-world"          # url route id (bare slug, [a-z0-9-])
+    label = "Hello World"          # sidebar link text
+    category = "networks"          # one of: networks, radio, ops, configuration, settings
 
     [meta]                         # optional, all strings
     description = "..."
@@ -52,8 +57,18 @@ PLUGIN_API_VERSION = 1
 MANIFEST_NAME = "plugin.toml"
 
 _SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]{1,38}$")
+_ROUTE_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,58}$")
 
-KNOWN_PROVIDES = frozenset({"listener", "routes", "panel"})
+KNOWN_PROVIDES = frozenset({"listener", "routes", "panel", "sidebar"})
+
+# The existing top-level sidebar sections a plugin's page can be placed
+# under -- "networks"/"radio"/"ops" are flat item runs (LoRaWAN, Radio, the
+# Terminal link, ...); "configuration"/"settings" are the two collapsible
+# submenus, where a plugin's route is nested as "<category>/<route>" the
+# same way the built-in subitems are (e.g. "settings/plugins").
+KNOWN_SIDEBAR_CATEGORIES = frozenset({
+    "networks", "radio", "ops", "configuration", "settings",
+})
 
 # Where a plugin folder was found. Built-ins ship in the repo under
 # src/plugins/apps/ and load unless explicitly disabled; community drop-ins
@@ -71,6 +86,16 @@ class PluginManifestError(Exception):
     def __init__(self, code: str, message: str) -> None:
         super().__init__(message)
         self.code = code
+
+
+@dataclass(frozen=True)
+class SidebarSpec:
+    """A plugin's ``[sidebar]`` table -- where it wants a top-level nav
+    entry placed. See :data:`KNOWN_SIDEBAR_CATEGORIES`."""
+
+    route: str
+    label: str
+    category: str
 
 
 @dataclass(frozen=True)
@@ -93,6 +118,8 @@ class PluginManifest:
     # can refuse to delete it. Meaningless for built-ins, which are never
     # offered a delete button regardless of this flag.
     locked: bool = False
+    # Set iff "sidebar" in provides.
+    sidebar: SidebarSpec | None = None
 
     @property
     def setup_path(self) -> Path | None:
@@ -218,11 +245,14 @@ def parse_manifest(
         raise PluginManifestError("frontend", "'[frontend]' must be a table.")
     scripts = _rel_paths(frontend.get("scripts", []), plugin_dir, "scripts")
     styles = _rel_paths(frontend.get("styles", []), plugin_dir, "styles")
-    if "panel" in provides and not scripts:
+    if ("panel" in provides or "sidebar" in provides) and not scripts:
         raise PluginManifestError(
             "frontend",
-            "a 'panel' plugin must list at least one 'frontend.scripts' file.",
+            "a 'panel' or 'sidebar' plugin must list at least one "
+            "'frontend.scripts' file.",
         )
+
+    sidebar = _parse_sidebar(data.get("sidebar"), provides)
 
     return PluginManifest(
         name=name,
@@ -239,7 +269,45 @@ def parse_manifest(
         path=plugin_dir,
         source=source,
         locked=locked,
+        sidebar=sidebar,
     )
+
+
+def _parse_sidebar(value, provides: list) -> SidebarSpec | None:
+    """Validate ``[sidebar]``. Required iff ``"sidebar"`` is in ``provides``;
+    an error either way if the two disagree (present-but-not-declared is
+    almost always a typo in ``provides``, not intentional)."""
+    if "sidebar" not in provides:
+        if value is not None:
+            raise PluginManifestError(
+                "sidebar", "'[sidebar]' is set but 'sidebar' is not in 'provides'.",
+            )
+        return None
+
+    if not isinstance(value, dict):
+        raise PluginManifestError(
+            "sidebar", "'sidebar' is in 'provides' but '[sidebar]' is missing.",
+        )
+
+    route = value.get("route")
+    if not isinstance(route, str) or not _ROUTE_RE.match(route):
+        raise PluginManifestError(
+            "sidebar",
+            "'sidebar.route' must be lowercase [a-z0-9-], starting alphanumeric.",
+        )
+
+    label = value.get("label")
+    if not isinstance(label, str) or not label.strip():
+        raise PluginManifestError("sidebar", "'sidebar.label' must be a non-empty string.")
+
+    category = value.get("category")
+    if category not in KNOWN_SIDEBAR_CATEGORIES:
+        raise PluginManifestError(
+            "sidebar",
+            f"'sidebar.category' must be one of {sorted(KNOWN_SIDEBAR_CATEGORIES)}.",
+        )
+
+    return SidebarSpec(route=route, label=label.strip(), category=category)
 
 
 def _scan_dir(apps_dir: Path, source: str, seen: set[str]) -> list[PluginManifest]:

@@ -213,6 +213,74 @@ styles = ["frontend/panel.css"]
         toml = _VALID + '\nlocked = "yes"\n'
         self.assertEqual(self._code("acars", toml), "locked")
 
+    def _sidebar_toml(self, sidebar_table: str) -> str:
+        return (
+            _VALID.replace(
+                'provides = ["listener", "routes"]', 'provides = ["sidebar"]',
+            )
+            + '\n[frontend]\nscripts = ["frontend/x.js"]\n'
+            + sidebar_table
+        )
+
+    def test_valid_sidebar_table(self) -> None:
+        toml = self._sidebar_toml(
+            '\n[sidebar]\nroute = "hello-world"\nlabel = "Hello World"\n'
+            'category = "networks"\n',
+        )
+        d = _write_plugin(self.root, "acars", toml, extra_files=("frontend/x.js",))
+        m = parse_manifest(d)
+        self.assertEqual(m.sidebar.route, "hello-world")
+        self.assertEqual(m.sidebar.label, "Hello World")
+        self.assertEqual(m.sidebar.category, "networks")
+
+    def test_sidebar_provides_without_table_is_rejected(self) -> None:
+        toml = (
+            _VALID.replace(
+                'provides = ["listener", "routes"]', 'provides = ["sidebar"]',
+            )
+            + '\n[frontend]\nscripts = ["frontend/x.js"]\n'
+        )
+        self.assertEqual(
+            self._code("acars", toml, extra_files=("frontend/x.js",)), "sidebar",
+        )
+
+    def test_sidebar_table_without_provides_is_rejected(self) -> None:
+        toml = _VALID + '\n[sidebar]\nroute = "x"\nlabel = "X"\ncategory = "networks"\n'
+        self.assertEqual(self._code("acars", toml), "sidebar")
+
+    def test_sidebar_needs_frontend_scripts(self) -> None:
+        toml = (
+            _VALID.replace(
+                'provides = ["listener", "routes"]', 'provides = ["sidebar"]',
+            )
+            + '\n[sidebar]\nroute = "x"\nlabel = "X"\ncategory = "networks"\n'
+        )
+        self.assertEqual(self._code("acars", toml), "frontend")
+
+    def test_sidebar_bad_category(self) -> None:
+        toml = self._sidebar_toml(
+            '\n[sidebar]\nroute = "x"\nlabel = "X"\ncategory = "nope"\n',
+        )
+        self.assertEqual(
+            self._code("acars", toml, extra_files=("frontend/x.js",)), "sidebar",
+        )
+
+    def test_sidebar_bad_route_slug(self) -> None:
+        toml = self._sidebar_toml(
+            '\n[sidebar]\nroute = "Hello World"\nlabel = "X"\ncategory = "networks"\n',
+        )
+        self.assertEqual(
+            self._code("acars", toml, extra_files=("frontend/x.js",)), "sidebar",
+        )
+
+    def test_sidebar_blank_label(self) -> None:
+        toml = self._sidebar_toml(
+            '\n[sidebar]\nroute = "x"\nlabel = "   "\ncategory = "networks"\n',
+        )
+        self.assertEqual(
+            self._code("acars", toml, extra_files=("frontend/x.js",)), "sidebar",
+        )
+
 
 class TestDiscoverPlugins(unittest.TestCase):
     def setUp(self) -> None:

@@ -1,0 +1,17 @@
+name = "hello-world"
+version = "0.1.0"
+meshpoint_api = 1
+provides = ["sidebar"]
+locked = true  # shipped with this fork -- not user-installed, can't be deleted
+
+[frontend]
+scripts = ["frontend/hello_world.js"]
+
+[sidebar]
+route = "hello-world"
+label = "Hello World"
+category = "networks"
+
+[meta]
+description = "Minimal example plugin: a top-level sidebar page that just says hello. Reference for the sidebar-page seam -- see docs/PLUGINS.md."
+author = "Einstein PD2EMC"

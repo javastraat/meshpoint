@@ -7,28 +7,34 @@ Plugins page, the `meshpoint plugin` CLI), see
 doc is for the plugin author.
 
 The canonical worked example is the shipped **ACARS** plugin —
-[`plugins/apps/acars/`](../plugins/apps/acars/). Every section below points
-at the real file that does the thing being described. When in doubt, go
-read that file; it's real, tested, shipped code, not a toy example.
+[`plugins/apps/acars/`](../plugins/apps/acars/) — for routes/listener/panel,
+and the minimal **Hello World** plugin —
+[`plugins/apps/hello-world/`](../plugins/apps/hello-world/) — for the
+sidebar seam specifically. Every section below points at the real file that
+does the thing being described. When in doubt, go read that file; it's
+real, tested, shipped code, not a toy example.
 
 ---
 
 ## What a plugin can do today
 
-An app plugin is out-of-core code that hooks three seams:
+An app plugin is out-of-core code that hooks four seams:
 
 - **Routes** — mount a FastAPI `APIRouter` under `/api/<whatever>`.
 - **Listener** — register an RTL-SDR subprocess listener (built idle at
   startup, started on demand by its own `/start` route, sharing the one
   physical dongle with every other listener — see
   `src/audio/sdr_registry.py`).
-- **Panel** — add a sub-tab to the dashboard's Listener page.
+- **Panel** — add a sub-tab to the dashboard's *Listener* page specifically.
+- **Sidebar** — add a whole new top-level page of your own, placed under an
+  existing sidebar section (Networks, Radio, Ops, Configuration, Settings).
 
 That's it. A plugin **cannot** (yet) add a packet *decoder* hooked into an
-existing capture source, a new *capture source* of its own (non-RTL-SDR), a
-top-level *sidebar page*, or a *plugin-contributed settings sub-page* — see
-[Current limitations](#current-limitations) at the bottom before you start,
-in case what you want to build needs one of those.
+existing capture source, a new *capture source* of its own (non-RTL-SDR), or
+a *plugin-contributed settings sub-page* (something more structured than raw
+`plugins.<id>` YAML) — see [Current limitations](#current-limitations) at
+the bottom before you start, in case what you want to build needs one of
+those.
 
 ## Directory layout
 
@@ -79,9 +85,14 @@ locked = false                            # optional, default false -- see below
 apt = ["cmake", "pkg-config"]
 setup = "setup.sh"                        # relative path, must exist
 
-[frontend]                                # required when "panel" in provides
+[frontend]                                # required when "panel" or "sidebar" in provides
 scripts = ["frontend/acars_panel.js"]     # relative paths, must exist
 styles  = ["frontend/acars_panel.css"]    # optional
+
+[sidebar]                                 # required when "sidebar" in provides
+route = "hello-world"                     # url route id, bare slug [a-z0-9-]
+label = "Hello World"                     # sidebar link text
+category = "networks"                     # networks | radio | ops | configuration | settings
 
 [meta]                                    # optional, all strings
 description = "Aircraft VHF datalink (ACARS) decoding via acarsdec + libacars"
@@ -94,10 +105,11 @@ author = "Your Name"
 | `name` | yes | Must equal the folder name. |
 | `version` | yes | Free-form string, shown on Settings → Plugins. |
 | `meshpoint_api` | yes | Integer. Currently `1` (`PLUGIN_API_VERSION` in `src/plugins/manifest.py`). A manifest targeting a higher number than this build supports is refused, not crashed. |
-| `provides` | yes | Non-empty subset of `listener`, `routes`, `panel`. Calling a `PluginRegistry` method for a capability you didn't declare raises at register time — see [The `register(reg)` entry point](#the-registerreg-entry-point). |
+| `provides` | yes | Non-empty subset of `listener`, `routes`, `panel`, `sidebar`. Calling a `PluginRegistry` method for a capability you didn't declare raises at register time — see [The `register(reg)` entry point](#the-registerreg-entry-point). |
 | `locked` | no, default `false` | Only meaningful for **community** plugins. `true` marks a shipped/bundled community plugin (git-tracked, not a real user drop-in) so Settings → Plugins refuses to offer a Delete button for it — the same protection `plugins/themes/*/theme.json`'s `"locked": true` already gives the bundled theme pack. ACARS sets this. If you're writing a plugin someone else will `git clone` into their own `plugins/apps/`, leave it `false` (default) so they can delete it if they want to. |
 | `[deps].apt` / `.setup` | no | System packages + a build script. **Never installed automatically** — the operator runs it themselves (`sudo bash plugins/apps/<id>/setup.sh` or `sudo meshpoint plugin setup <id>`, which just wraps the same script after showing what it does). |
-| `[frontend].scripts` / `.styles` | scripts required iff `panel` in `provides` | Served at `/plugins/apps/<id>/<path>` — **only** the exact files listed here, from either tier, nothing else in the folder is reachable (`src/plugins/assets.py:resolve_plugin_asset`). |
+| `[frontend].scripts` / `.styles` | scripts required iff `panel` or `sidebar` in `provides` | Served at `/plugins/apps/<id>/<path>` — **only** the exact files listed here, from either tier, nothing else in the folder is reachable (`src/plugins/assets.py:resolve_plugin_asset`). |
+| `[sidebar].route` / `.label` / `.category` | required iff `sidebar` in `provides` | See [Adding a top-level sidebar page](#adding-a-top-level-sidebar-page-sidebar) below. `category` must be one of `KNOWN_SIDEBAR_CATEGORIES` in `src/plugins/manifest.py`. |
 | `[meta].*` | no | Shown on Settings → Plugins: description, a clickable homepage link, author. |
 
 ## The `register(reg)` entry point
@@ -183,6 +195,73 @@ plugin is skipped (one bad plugin never aborts the others or the app). See
    paths you listed in `[frontend]`, nothing else. No manual wiring needed
    beyond step 2; `src/plugins/assets.py:inject_plugin_assets` injects the
    `<script>`/`<link>` tags automatically for every *loaded* panel plugin.
+
+## Adding a top-level sidebar page (`"sidebar"`)
+
+Unlike `"panel"` (a sub-tab inside the existing Listener page), `"sidebar"`
+gives your plugin its own top-level nav entry, placed in an existing
+sidebar section. There's no `reg.add_sidebar(...)` call — it's entirely
+declarative, driven by `[sidebar]` in `plugin.toml` plus your own frontend
+script:
+
+1. List `"sidebar"` in `provides` and fill in `[sidebar]`:
+
+   ```toml
+   # plugins/apps/hello-world/plugin.toml
+   provides = ["sidebar"]
+
+   [frontend]
+   scripts = ["frontend/hello_world.js"]
+
+   [sidebar]
+   route = "hello-world"     # -> #/hello-world
+   label = "Hello World"     # sidebar link text
+   category = "networks"     # networks | radio | ops | configuration | settings
+   ```
+
+   `category` must be an *existing* sidebar section — you're placing your
+   page into one, not creating a new section. `networks`/`radio`/`ops` are
+   flat item runs (your page becomes a sibling of LoRaWAN, Radio, Terminal,
+   ...); `configuration`/`settings` are the two collapsible submenus, and
+   your route gets nested as `<category>/<route>` the same way the built-in
+   subitems are (e.g. `settings/plugins`) — so `category = "settings"` with
+   `route = "hello-world"` ends up at `#/settings/hello-world`.
+
+2. Your frontend script supplies the page content — same
+   `mount(rootEl)`/`show()`/`hide()` shape `"panel"` uses:
+
+   ```js
+   // plugins/apps/hello-world/frontend/hello_world.js
+   window.registerSidebarPage({
+       route: 'hello-world',       // must match plugin.toml's sidebar.route
+       make: () => ({
+           mount(rootEl) {
+               rootEl.innerHTML = '<div class="plugin-page"><h2>Hello, World.</h2></div>';
+           },
+           show() {},
+           hide() {},
+       }),
+   });
+   ```
+
+   `.plugin-page` (`frontend/css/dashboard.css`) gives you sane padding and
+   base typography for free — optional, use your own markup/CSS if you'd
+   rather.
+
+3. That's it — no manual route registration. `src/plugins/assets.py`'s
+   `sidebar_descriptor_tags()` pushes your `{route, label, category}` onto
+   `window.MESHPOINT_SIDEBAR_PLUGINS` at serve time; `frontend/sidebar/
+   sidebar_plugin_registry.js`'s `mountPluginSidebarPages()` (called from
+   `app.js`, *before* the Router/sidebar are built) reads that plus your
+   `registerSidebarPage()` call and builds the actual `<li>` + `<section>`.
+   A page declared in `plugin.toml` whose script never calls
+   `registerSidebarPage()` logs a console warning and is silently skipped
+   (never blocks the rest of the app).
+
+   All sidebar-page plugins currently share one generic icon — there's no
+   per-plugin icon field yet (would mean either trusting arbitrary SVG from
+   a manifest, or a curated icon-name enum; not worth the complexity for
+   the first plugin using this seam).
 
 ## Your plugin's own config
 
@@ -296,16 +375,16 @@ core seam (`src/plugins/registry.py`, `src/plugins/manifest.py`'s
   specifically (shares `src/audio/sdr_registry.py`'s one-dongle-at-a-time
   claim). A plugin reading from a different physical source (another
   serial protocol, say) has no seam yet.
-- **No top-level sidebar page seam.** `"panel"` only adds a sub-tab under
-  the existing Listener page (`window.registerListenerPanel`) — there's no
-  way for a plugin to add its own top-level nav item the way Configuration
-  or Stats are.
 - **No plugin-contributed settings sub-page seam.** Beyond raw
   `plugins.<id>` YAML (see above), a plugin can't render its own
-  Configuration-style settings UI.
+  Configuration-style settings UI. (The `"sidebar"` seam above gets a
+  plugin its own top-level *page* — this is specifically about a
+  Configuration/Settings-style *form* wired to `plugins.<id>`.)
 
 These are anticipated, not hypothetical — the current best guess is
 they'll matter when protocols like LoRaWAN or Pager eventually get
-extracted into plugins the same way ACARS was. Until a real plugin needs
-one, though, building the seam speculatively risks guessing the wrong
-shape. Full background: `memory/plugin-architecture-review.md`.
+extracted into plugins the same way ACARS was (the top-level sidebar page
+seam that used to be listed here was built for exactly that reason, proven
+out with the Hello World reference plugin). Until a real plugin needs one
+of the two above, though, building the seam speculatively risks guessing
+the wrong shape. Full background: `memory/plugin-architecture-review.md`.

@@ -98,7 +98,7 @@
                             <span class="sidebar__label">Dashboard</span>
                         </a>
                     </li>
-                    <li class="sidebar__group-header" aria-hidden="true">
+                    <li class="sidebar__group-header" aria-hidden="true" data-category="networks">
                         <span class="sidebar__group-header-label">Networks</span>
                     </li>
                     <li class="sidebar__item">
@@ -231,7 +231,7 @@
                             <span class="sidebar__label">Topology</span>
                         </a>
                     </li>
-                    <li class="sidebar__group-header" aria-hidden="true">
+                    <li class="sidebar__group-header" aria-hidden="true" data-category="radio">
                         <span class="sidebar__group-header-label">Radio</span>
                     </li>
                     <li class="sidebar__item">
@@ -301,7 +301,7 @@
                             <span class="sidebar__label">Repeaters</span>
                         </a>
                     </li>
-                    <li class="sidebar__group-header" aria-hidden="true" data-requires-section="terminal configuration.identity settings">
+                    <li class="sidebar__group-header" aria-hidden="true" data-category="ops" data-requires-section="terminal configuration.identity settings">
                         <span class="sidebar__group-header-label">Ops</span>
                     </li>
                     <li class="sidebar__item" data-requires-section="terminal">
@@ -1240,6 +1240,7 @@
     <script src="js/terminal/terminal_splash.js"></script>
     <script src="js/terminal/terminal_panel.js"></script>
     <script src="sidebar/router.js"></script>
+    <script src="sidebar/sidebar_plugin_registry.js"></script>
     <script src="sidebar/sidebar_controller.js"></script>
     <script src="sidebar/sidebar_logo_pip.js"></script>
     <script src="sidebar/noise_floor_sparkline.js"></script>

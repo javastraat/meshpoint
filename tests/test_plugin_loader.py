@@ -196,6 +196,41 @@ class TestLoadPlugins(unittest.TestCase):
         self.assertTrue(any("1 of 2 loaded" in m for m in logs.output))
 
 
+class TestShippedHelloWorldPlugin(unittest.TestCase):
+    """The real plugins/apps/hello-world/ folder loads cleanly. FastAPI-free
+    (its register() has nothing to do), so this runs on the Mac too --
+    unlike TestShippedAcarsPlugin below."""
+
+    def setUp(self) -> None:
+        route_registry.reset()
+        listener_registry.reset()
+        self._community = Path(__file__).resolve().parents[1] / "plugins" / "apps"
+
+    def tearDown(self) -> None:
+        for name in [m for m in list(sys.modules) if m.startswith("meshpoint_plugin_")]:
+            del sys.modules[name]
+        route_registry.reset()
+        listener_registry.reset()
+
+    def test_hello_world_loads_when_enabled(self) -> None:
+        loaded = load_plugins(
+            self._community / "nonexistent-builtin",
+            self._community,
+            {"hello-world": {"enabled": True}},
+        )
+        self.assertIn("hello-world", [p.manifest.name for p in loaded])
+        manifest = next(p.manifest for p in loaded if p.manifest.name == "hello-world")
+        self.assertEqual(manifest.provides, ("sidebar",))
+        self.assertEqual(manifest.sidebar.route, "hello-world")
+        self.assertEqual(manifest.sidebar.category, "networks")
+
+    def test_hello_world_skipped_when_not_enabled(self) -> None:
+        loaded = load_plugins(
+            self._community / "nonexistent-builtin", self._community, {},
+        )
+        self.assertNotIn("hello-world", [p.manifest.name for p in loaded])
+
+
 try:
     import fastapi  # noqa: F401
     _HAS_FASTAPI = True

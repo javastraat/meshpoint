@@ -38,6 +38,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const identity = await _loadIdentity();
 
+    // Must run before the Router/SidebarController below are constructed --
+    // it builds the plugin sidebar <li>/<section> DOM those two snapshot at
+    // construction time, and its routes need to be in allowedRoutes from
+    // the start (an unrecognized route silently redirects to the default).
+    const pluginSidebarPages = window.mountPluginSidebarPages
+        ? window.mountPluginSidebarPages() : [];
+
     const router = new Router({
         defaultRoute: 'dashboard',
         allowedRoutes: [
@@ -51,6 +58,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             'configuration/pocsag-serial', 'configuration/firmware',
             'configuration/repeater-poll', 'configuration/metrics',
             'settings/updates', 'settings/themes', 'settings/auth', 'settings/dangerous', 'settings/storage', 'settings/plugins',
+            ...pluginSidebarPages.map((p) => p.routeId),
         ],
         guard: _buildRouteGuard(identity),
         onDenied: _toastAdminRequired,
@@ -58,6 +66,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const sidebar = new SidebarController({ router, identity });
     sidebar.bind();
     window.sidebar = sidebar;
+    _bootPluginSidebarPages(router, pluginSidebarPages);
 
     if (window.RadioTxBadge) {
         const radioTxBadge = new RadioTxBadge(sidebar);
@@ -407,6 +416,17 @@ function _registerThemeToggle(topbar) {
     // Long-press on touch would otherwise also raise the OS/browser
     // context menu on top of ours.
     btn.addEventListener('contextmenu', (e) => e.preventDefault());
+}
+
+function _bootPluginSidebarPages(router, mounted) {
+    if (!mounted.length) return;
+    router.onRouteChange((route) => {
+        mounted.forEach(({ routeId, panel }) => {
+            if (!panel) return;
+            if (route === routeId) { if (panel.show) panel.show(); }
+            else if (panel.hide) panel.hide();
+        });
+    });
 }
 
 function _bootDangerousPanel(router) {

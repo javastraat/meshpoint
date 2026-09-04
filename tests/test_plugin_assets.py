@@ -10,20 +10,21 @@ from src.plugins.assets import (
     inject_plugin_assets,
     plugin_asset_tags,
     resolve_plugin_asset,
+    sidebar_descriptor_tags,
 )
-from src.plugins.manifest import PluginManifest
+from src.plugins.manifest import PluginManifest, SidebarSpec
 
 _HTML = "<html><head></head><body><script src='app.js'></script>\n" \
         "<!-- meshpoint:plugin-panels -->\n</body></html>"
 
 
 def _m(name: str, *, provides=("panel",), scripts=("frontend/p.js",),
-       styles=()) -> PluginManifest:
+       styles=(), sidebar=None) -> PluginManifest:
     return PluginManifest(
         name=name, version="1", api_version=1, provides=tuple(provides),
         apt=(), setup=None, description="", homepage="", author="",
         frontend_scripts=tuple(scripts), frontend_styles=tuple(styles),
-        path=Path("/x") / name,
+        path=Path("/x") / name, sidebar=sidebar,
     )
 
 
@@ -62,6 +63,50 @@ class TestInjectPluginAssets(unittest.TestCase):
             _m("bbb", scripts=("frontend/b.js",)),
         ])
         self.assertLess(out.index("aaa"), out.index("bbb"))
+
+    def test_sidebar_plugin_assets_are_served_too(self) -> None:
+        out = plugin_asset_tags([
+            _m("hello-world", provides=("sidebar",), scripts=("frontend/h.js",)),
+        ])
+        self.assertIn('/plugins/apps/hello-world/frontend/h.js', out)
+
+
+class TestSidebarDescriptorTags(unittest.TestCase):
+    def _sidebar_plugin(self, **kw) -> PluginManifest:
+        spec = SidebarSpec(
+            route=kw.pop("route", "hello-world"),
+            label=kw.pop("label", "Hello World"),
+            category=kw.pop("category", "networks"),
+        )
+        return _m("hello-world", provides=("sidebar",), sidebar=spec, **kw)
+
+    def test_descriptor_pushed_for_sidebar_plugin(self) -> None:
+        out = sidebar_descriptor_tags([self._sidebar_plugin()])
+        self.assertIn("window.MESHPOINT_SIDEBAR_PLUGINS", out)
+        self.assertIn('"id":"hello-world"', out)
+        self.assertIn('"route":"hello-world"', out)
+        self.assertIn('"label":"Hello World"', out)
+        self.assertIn('"category":"networks"', out)
+
+    def test_no_sidebar_plugins_returns_empty(self) -> None:
+        self.assertEqual(sidebar_descriptor_tags([_m("acars")]), "")
+
+    def test_non_sidebar_plugin_with_no_spec_is_skipped(self) -> None:
+        # "sidebar" not in provides -> sidebar is None, must not crash/include.
+        self.assertEqual(sidebar_descriptor_tags([_m("acars", provides=("panel",))]), "")
+
+    def test_script_close_tag_is_escaped(self) -> None:
+        spec = SidebarSpec(route="x", label="</script><script>evil()", category="ops")
+        out = sidebar_descriptor_tags([_m("x", provides=("sidebar",), sidebar=spec)])
+        self.assertNotIn("</script><script>evil()", out)
+        self.assertIn("<\\/script>", out)
+
+    def test_injected_before_plugin_scripts(self) -> None:
+        out = inject_plugin_assets(_HTML, [self._sidebar_plugin()])
+        self.assertLess(
+            out.index("MESHPOINT_SIDEBAR_PLUGINS"),
+            out.index("/plugins/apps/hello-world/frontend/p.js"),
+        )
 
 
 class TestResolvePluginAsset(unittest.TestCase):
