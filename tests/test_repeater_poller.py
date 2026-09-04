@@ -147,6 +147,105 @@ class PollerTelemetryTest(unittest.TestCase):
         self.assertFalse(p.latest["da0b77f13bc7"]["ok"])
 
 
+class _RosterMissThenFoundTx:
+    """Simulates a companion reset that wiped the roster: poll_repeater()
+    fails with "contact not in companion roster" until add_contact() is
+    called to re-inject it, then subsequent polls succeed."""
+
+    def __init__(self, cached_contact=None, add_contact_ok=True):
+        self.calls = 0
+        self.add_contact_calls: list = []
+        self._injected = False
+        self._add_contact_ok = add_contact_ok
+        self.cached_contact = cached_contact or {"public_key": "da0b77f13bc700", "adv_name": "R"}
+
+    async def poll_repeater(self, key, password=""):
+        self.calls += 1
+        if not self._injected:
+            return {"ok": False, "error": "contact not in companion roster"}
+        return {
+            "ok": True, "status": {"bat": 4119}, "telemetry": None,
+            "contact": self.cached_contact, "error": "",
+        }
+
+    async def add_contact(self, contact):
+        self.add_contact_calls.append(contact)
+        if self._add_contact_ok:
+            self._injected = True
+        return self._add_contact_ok
+
+
+class ContactCacheRepeaterReconnectTest(unittest.TestCase):
+    """The proactive-vs-reactive repeater-reconnect fix: repeater_poller
+    caches each repeater's full roster record on a successful poll, and
+    re-injects it via add_contact() when a later poll fails specifically
+    with "contact not in companion roster" -- instead of waiting for the
+    repeater's own next RF advertisement, which can be hours away."""
+
+    def setUp(self):
+        self._tmp = tempfile.mkdtemp()
+
+    def test_no_cache_yet_falls_back_to_normal_retry_and_gives_up(self):
+        # First-ever run: nothing cached, so there's nothing to inject --
+        # must behave exactly like the pre-existing retry/backoff path.
+        tx = _RosterMissThenFoundTx()
+        p = _poller(tx, _FakeTelemetryRepo(), self._tmp)
+        asyncio.run(p._poll_one(p._repeaters[0]))
+        self.assertEqual(tx.add_contact_calls, [])
+        self.assertEqual(tx.calls, rp_mod.POLL_ATTEMPTS)
+        self.assertFalse(p.latest["da0b77f13bc7"]["ok"])
+
+    def test_cached_contact_is_reinjected_and_poll_succeeds(self):
+        tx = _RosterMissThenFoundTx()
+        p = _poller(tx, _FakeTelemetryRepo(), self._tmp)
+        p._contact_cache["da0b77f13bc7"] = {"public_key": "da0b77f13bc700", "adv_name": "R"}
+        asyncio.run(p._poll_one(p._repeaters[0]))
+        self.assertEqual(len(tx.add_contact_calls), 1)
+        self.assertTrue(p.latest["da0b77f13bc7"]["ok"])
+        # Retried immediately in the same attempt budget, not a fresh one.
+        self.assertLessEqual(tx.calls, rp_mod.POLL_ATTEMPTS)
+
+    def test_reinjection_failure_falls_back_to_normal_retry_and_gives_up(self):
+        tx = _RosterMissThenFoundTx(add_contact_ok=False)
+        p = _poller(tx, _FakeTelemetryRepo(), self._tmp)
+        p._contact_cache["da0b77f13bc7"] = {"public_key": "da0b77f13bc700", "adv_name": "R"}
+        asyncio.run(p._poll_one(p._repeaters[0]))
+        self.assertGreaterEqual(len(tx.add_contact_calls), 1)
+        self.assertFalse(p.latest["da0b77f13bc7"]["ok"])
+
+    def test_successful_poll_caches_contact_and_persists(self):
+        result = {
+            "ok": True, "status": {"bat": 4119}, "telemetry": None,
+            "contact": {"public_key": "da0b77f13bc700", "adv_name": "R"}, "error": "",
+        }
+        p = _poller(_FakeTx(result), _FakeTelemetryRepo(), self._tmp)
+        asyncio.run(p._poll_one(p._repeaters[0]))
+        self.assertEqual(
+            p._contact_cache["da0b77f13bc7"],
+            {"public_key": "da0b77f13bc700", "adv_name": "R"},
+        )
+        # A fresh poller loads the persisted contact cache on init, same
+        # as it already does for self.latest.
+        p2 = _poller(_FakeTx(result), _FakeTelemetryRepo(), self._tmp)
+        self.assertEqual(
+            p2._contact_cache["da0b77f13bc7"],
+            {"public_key": "da0b77f13bc700", "adv_name": "R"},
+        )
+
+    def test_contact_cached_even_when_rest_of_poll_fails(self):
+        # A login timeout after a successful roster lookup still proves
+        # the record is current -- worth caching regardless of the rest
+        # of the poll's outcome.
+        result = {
+            "ok": False, "status": None, "telemetry": None,
+            "contact": {"public_key": "da0b77f13bc700", "adv_name": "R"},
+            "error": "login failed or timed out",
+        }
+        p = _poller(_FakeTx(result), _FakeTelemetryRepo(), self._tmp)
+        asyncio.run(p._poll_one(p._repeaters[0]))
+        self.assertIn("da0b77f13bc7", p._contact_cache)
+
+
 class PollRepeaterShapeTest(unittest.TestCase):
     """req_telemetry_sync returns the LPP list directly; poll_repeater
     must normalize it to {"lpp": [...]} so readers find the sensors."""
@@ -187,6 +286,29 @@ class PollRepeaterShapeTest(unittest.TestCase):
         out = asyncio.run(client.poll_repeater("da0b77f13bc7", "pw"))
         self.assertTrue(out["ok"])                 # status still succeeded
         self.assertIsNone(out["telemetry"])
+
+    def test_contact_record_included_when_found_in_roster(self):
+        # repeater_poller caches this so a later companion reset (which
+        # wipes the roster) can re-inject it instead of waiting for the
+        # repeater's own next RF advertisement.
+        client = self._client_with_fakes(None)
+        out = asyncio.run(client.poll_repeater("da0b77f13bc7", "pw"))
+        self.assertEqual(out["contact"], {"public_key": "da0b77f13bc700", "adv_name": "R"})
+
+    def test_contact_not_in_roster_omits_contact_key(self):
+        from src.transmit.meshcore_tx_client import MeshCoreTxClient
+
+        class _Mc:
+            def get_contact_by_key_prefix(self, key):
+                return None
+
+        client = MeshCoreTxClient()
+        client._owned_mc = _Mc()
+        client._owned_connected = True
+        out = asyncio.run(client.poll_repeater("da0b77f13bc7", "pw"))
+        self.assertFalse(out["ok"])
+        self.assertEqual(out["error"], "contact not in companion roster")
+        self.assertNotIn("contact", out)
 
 
 if __name__ == "__main__":

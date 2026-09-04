@@ -366,6 +366,82 @@ class TestSetCompanionName(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result.success)
 
 
+class TestAddContact(unittest.IsolatedAsyncioTestCase):
+    """Re-injecting a cached contact record into the companion roster
+    (repeater-reconnect fix: a companion reset wipes its roster, and a
+    repeater's own re-advert can be hours away, so repeater_poller
+    re-injects a previously-cached full record instead of waiting)."""
+
+    async def asyncSetUp(self):
+        self.client = MeshCoreTxClient()
+        self.mc = MagicMock()
+        self.add_contact_mock = AsyncMock()
+        self.mc.commands.add_contact = self.add_contact_mock
+        self.client.set_connection(self.mc)
+        self.client._run_post_command = AsyncMock()
+        self._meshcore_mod = MagicMock(EventType=_FakeEventType)
+        self.contact = {
+            "public_key": "aabbcc" + "00" * 29,
+            "type": 2,
+            "flags": 0,
+            "out_path": "",
+            "out_path_len": -1,
+            "out_path_hash_mode": -1,
+            "adv_name": "R",
+            "last_advert": 1234,
+            "adv_lat": 52.0,
+            "adv_lon": 5.0,
+        }
+
+    def _ok_result(self):
+        result = MagicMock()
+        result.type = _FakeEventType.OK
+        return result
+
+    def _error_result(self):
+        result = MagicMock()
+        result.type = _FakeEventType.ERROR
+        return result
+
+    async def _run(self):
+        async def immediate_wait_for(coro, timeout):
+            return await coro
+
+        with patch.dict("sys.modules", {"meshcore": self._meshcore_mod}):
+            with patch(
+                "src.transmit.meshcore_tx_client.asyncio.wait_for",
+                side_effect=immediate_wait_for,
+            ):
+                return await self.client.add_contact(self.contact)
+
+    async def test_not_connected_short_circuits(self):
+        client = MeshCoreTxClient()
+        result = await client.add_contact(self.contact)
+        self.assertFalse(result)
+        self.add_contact_mock.assert_not_called()
+
+    async def test_ok_result_returns_true(self):
+        self.add_contact_mock.return_value = self._ok_result()
+        result = await self._run()
+        self.assertTrue(result)
+        self.add_contact_mock.assert_awaited_once_with(self.contact)
+
+    async def test_error_result_returns_false(self):
+        self.add_contact_mock.return_value = self._error_result()
+        result = await self._run()
+        self.assertFalse(result)
+
+    async def test_exception_returns_false(self):
+        self.add_contact_mock.side_effect = RuntimeError("boom")
+        result = await self._run()
+        self.assertFalse(result)
+
+    async def test_runs_post_command_even_on_exception(self):
+        self.add_contact_mock.side_effect = RuntimeError("boom")
+        await self._run()
+        self.client._run_post_command.assert_awaited_once()
+
+
 class TestSendSetRadioParams(unittest.IsolatedAsyncioTestCase):
     """Cover send_set_radio_params(): local range validation, the
     set_radio()+reboot() sequence, ERROR/timeout handling. Standalone

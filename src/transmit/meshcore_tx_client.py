@@ -519,9 +519,9 @@ class MeshCoreTxClient:
         Same calls meshcore-cli's ``req_status``/``req_telemetry`` make,
         through the companion Meshpoint already holds. ``key`` is the
         node's public-key prefix (== its node_id). Returns
-        ``{ok, status, telemetry, neighbours, error}`` with the raw payload dicts;
-        req_status needs a prior login on this firmware, so a login
-        failure short-circuits.
+        ``{ok, status, telemetry, neighbours, contact, error}`` with the
+        raw payload dicts; req_status needs a prior login on this
+        firmware, so a login failure short-circuits.
         """
         if not self.connected:
             return {"ok": False, "error": "companion not connected"}
@@ -533,7 +533,18 @@ class MeshCoreTxClient:
         if contact is None:
             return {"ok": False, "error": "contact not in companion roster"}
 
-        out = {"ok": False, "status": None, "telemetry": None, "neighbours": None, "error": ""}
+        # A full copy (not the library's own live reference, which keeps
+        # getting mutated in place -- e.g. reset_path() below rewrites
+        # out_path fields on this same object) of the raw roster record,
+        # already JSON-safe (hex strings / ints / floats, no bytes -- see
+        # meshcore's reader.py CONTACT parsing). Callers (repeater_poller)
+        # cache this so a later companion reset that wipes the roster can
+        # re-inject it via add_contact() below instead of waiting for the
+        # repeater's next RF advertisement, which can be hours away.
+        out = {
+            "ok": False, "status": None, "telemetry": None, "neighbours": None,
+            "contact": dict(contact), "error": "",
+        }
         try:
             if password:
                 login = await asyncio.wait_for(
@@ -826,3 +837,49 @@ class MeshCoreTxClient:
                 continue
         logger.info("get_contacts: %d contacts parsed", len(contacts))
         return contacts
+
+    async def add_contact(self, contact: dict) -> bool:
+        """Re-inject a full contact record into the companion's roster.
+
+        A companion reset (e.g. the DTR-pulse reconnect in
+        meshcore_usb_source.py) wipes its local contact roster entirely --
+        it only repopulates a given contact once it hears a fresh
+        advertisement over RF, which for a repeater can be hours away
+        (confirmed live). ``contact`` needs to be a full raw roster
+        record as returned by poll_repeater()'s ``"contact"`` key or
+        get_contacts()'s underlying entries (public_key, type, flags,
+        out_path/out_path_len/out_path_hash_mode, adv_name, last_advert,
+        adv_lat, adv_lon) -- not the trimmed {index, name, public_key,
+        last_seen} shape get_contacts() itself returns to its own
+        callers. Wraps the meshcore library's own CMD_ADD_UPDATE_CONTACT
+        (commands.add_contact -> update_contact with path=None, so it
+        writes the record as-is rather than recomputing a path); a stale
+        cached out_path that no longer routes is caught the same way any
+        other poll failure is -- poll_repeater()'s own reset_path() in
+        its finally block already resets it for the next attempt.
+        """
+        if not self.connected:
+            return False
+        try:
+            result = await asyncio.wait_for(
+                self._mc.commands.add_contact(contact), timeout=10.0,
+            )
+        except Exception:
+            logger.exception(
+                "add_contact failed for %s", contact.get("public_key", "?"),
+            )
+            return False
+        finally:
+            await self._run_post_command()
+
+        try:
+            from meshcore import EventType
+        except Exception:
+            return False
+        ok = hasattr(result, "type") and result.type == EventType.OK
+        if not ok:
+            logger.warning(
+                "add_contact rejected for %s: %r",
+                contact.get("public_key", "?"), result,
+            )
+        return ok

@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 # Gap between repeaters within one poll round (active TX, be polite).
 PER_REPEATER_GAP_S = 5.0
 STATE_FILENAME = "repeater_status.json"
+CONTACT_CACHE_FILENAME = "repeater_contacts.json"
 
 # A poll (login + req_status + req_telemetry) fails transiently when the
 # companion's command channel is momentarily busy -- retry a couple of
@@ -74,9 +75,20 @@ class RepeaterPoller:
         self._node_repo = node_repo
         self._packet_repo = packet_repo
         self._state_path = Path(data_dir) / STATE_FILENAME
+        self._contact_cache_path = Path(data_dir) / CONTACT_CACHE_FILENAME
         self._task: Optional[asyncio.Task] = None
         self.latest: dict[str, dict] = {}
+        # Full raw roster record per configured repeater (public_key,
+        # type, flags, out_path*, adv_name, last_advert, adv_lat/lon) --
+        # cached the last time poll_repeater() actually found the
+        # repeater in the companion's roster, and persisted so it
+        # survives a Meshpoint restart, not just a companion reset. Lets
+        # _poll_one() re-inject a repeater into the roster (see
+        # meshcore_tx_client.add_contact()) instead of waiting for its
+        # next RF advertisement, which can be hours away.
+        self._contact_cache: dict[str, dict] = {}
         self._load_state()
+        self._load_contact_cache()
 
     async def start(self) -> None:
         logger.info(
@@ -177,8 +189,43 @@ class RepeaterPoller:
             except Exception:
                 logger.exception("Repeater poll raised for %s", name)
                 result = {"ok": False, "error": "exception"}
+
+            contact = result.get("contact")
+            if contact:
+                # Found in the roster this round -- refresh the cache
+                # unconditionally (even if the rest of this poll failed,
+                # e.g. a login timeout), since this proves the record is
+                # current and worth keeping for a future re-injection.
+                self._contact_cache[key] = contact
+                self._save_contact_cache()
+
             if result.get("ok"):
                 break
+
+            if (
+                result.get("error") == "contact not in companion roster"
+                and key in self._contact_cache
+            ):
+                logger.info(
+                    "Repeater %s missing from companion roster -- "
+                    "re-injecting cached contact record instead of "
+                    "waiting for its next advertisement", name,
+                )
+                try:
+                    injected = await self._tx.add_contact(self._contact_cache[key])
+                except Exception:
+                    logger.exception("add_contact raised for %s", name)
+                    injected = False
+                if injected:
+                    # Retry right away against the freshly-injected
+                    # contact rather than burning a full RETRY_DELAY_S on
+                    # a wait that has nothing to do with this failure.
+                    continue
+                logger.warning(
+                    "Failed to re-inject cached contact for %s -- falling "
+                    "back to the normal retry/backoff", name,
+                )
+
             if attempt < POLL_ATTEMPTS:
                 logger.info(
                     "Repeater %s poll attempt %d/%d failed (%s), retrying "
@@ -298,6 +345,21 @@ class RepeaterPoller:
             self._state_path.write_text(json.dumps(self.latest))
         except Exception:
             logger.debug("Repeater state save failed", exc_info=True)
+
+    def _load_contact_cache(self) -> None:
+        try:
+            if self._contact_cache_path.exists():
+                self._contact_cache = json.loads(self._contact_cache_path.read_text())
+        except Exception:
+            logger.debug("Repeater contact cache load failed", exc_info=True)
+            self._contact_cache = {}
+
+    def _save_contact_cache(self) -> None:
+        try:
+            self._contact_cache_path.parent.mkdir(parents=True, exist_ok=True)
+            self._contact_cache_path.write_text(json.dumps(self._contact_cache))
+        except Exception:
+            logger.debug("Repeater contact cache save failed", exc_info=True)
 
 
 def _iter_lpp(telemetry):

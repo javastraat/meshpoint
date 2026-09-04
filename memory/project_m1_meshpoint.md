@@ -10676,3 +10676,173 @@ link and "Listener" page are both fully gone with no dead links left
 behind. This closes out the entire multi-session "extract every RTL-SDR
 tab into its own plugin" effort -- nothing RTL-SDR-related is built into
 core anymore.
+
+**LIVE-VERIFIED on the Pi (2026-09-04)**: screenshot confirms all 9 tabs
+render on the RTL-SDR page (ACARS/ADS-B/DAB+/DAB+ Config/P2000/Pagers/
+POCSAG/Radio/RTL433), Radio's Digital skin fully working -- VU meter, RDS
+("SLAM! -- BOOST YOUR LIFE" scrolling text, 100% signal, POP MUSIC PTY),
+98.0000 MHz WFM, native `<audio>` playback, "1 listening" counter. Closes
+out the Radio migration end to end, not just on paper.
+
+## Sidebar "in use by" pill restored (plugin-agnostic this time) + RTL-SDR empty-state text fix (2026-09-04)
+
+User, after seeing the live screenshot above: "before we had a little pill
+on the sidebar item showing wich rtl was used, can you check if we can
+have that pill back ?" -- the `listener_badge.js` regression flagged (and
+deliberately not fixed) during the Radio migration above.
+
+**Why the old approach can't just come back as-is**: `listener_badge.js`
+polled `/api/listener/status` specifically and read its `dongle_owner`
+field, exploiting the fact that field was shared across all four
+Listener-page tabs' status endpoints (any one would do). Radio is now an
+opt-in plugin like everything else, so `/api/listener/status` might not
+even exist depending on what's enabled -- polling one arbitrary plugin's
+route to represent a cross-plugin shared resource is exactly the kind of
+coupling this whole migration was removing everywhere else.
+
+**Real fix: a new core-owned endpoint for the shared registry itself.**
+`src/api/routes/sdr_status_routes.py` -- `GET /api/sdr/status`, returns
+`{"dongle_owner": sdr_registry.current_owner()}` directly from
+`src/audio/sdr_registry.py` (unchanged, always-present core module).
+Registered in `server.py`'s `_BUILTIN_ROUTERS` (behind normal
+`require_auth`, matching the old route's viewer-level access). Verified
+standalone (`sdr_registry.claim('radio')` then calling the route function
+directly) and via a full `load_plugins()` re-run with all 9 plugins
+enabled -- no collisions, still loads clean.
+
+New `frontend/sidebar/sdr_status_badge.js` (`SdrStatusBadge` class,
+structurally a straight port of the deleted `ListenerBadge` -- same
+5s poll, same `_OWNER_LABELS` map keyed by `sdr_registry.claim()`'s owner
+strings, cross-checked against every plugin's own `_OWNER`/`_SDR_OWNER`
+constant to make sure the label map didn't drift) polls the new endpoint
+and calls `sidebar.setStatusBadge('rtlsdr', label, 'live')`. Booted in
+`app.js` right next to `RadioTxBadge`/`UpdateCheckBadge` (same
+`if (window.X) { ... }` pattern). `.sidebar__badge--live`'s CSS (the green
+pulsing dot) was already sitting unused in `sidebar.css` since
+`listener_badge.js`'s deletion never touched styles -- no CSS changes
+needed at all.
+
+**One piece of NEW infrastructure, not just a port**: the badge `<span
+data-badge-for="...">` slot didn't exist on plugin-built sidebar `<li>`s
+at all -- `sidebar_plugin_registry.js`'s `_buildLink()` only ever emitted
+icon + label. Added a `<span class="sidebar__badge" data-badge-for="${routeId}"
+style="display:none">` to every plugin sidebar link generically (matches
+the exact markup shape of the built-in `data-badge-for="radio"`/`"messages"`
+spans in index.html), so any future plugin page gets a working badge slot
+for free via `SidebarController.setStatusBadge(routeId, ...)` -- today
+only `rtlsdr` actually populates one, but the seam is generic per the
+follow-up already flagged in this file and the CHANGELOG.
+
+**Second issue caught in the same round-trip, different screenshot**: RTL-SDR
+page still showed "Enable RTL-SDR plugins to see their content here..."
+even with Radio's tab fully rendered and active. Root cause:
+`rtlsdr_panel.js`'s `mount()` always rendered that `<p>` unconditionally,
+only gating the *hooks container* on `hasHooks`, not the placeholder text
+itself. Fixed: the paragraph now only renders in the `!hasHooks` branch
+(genuine empty state), reworded since it used to reference the
+now-deleted "Listener page" ("Plugins are migrating onto this page one at
+a time -- anything not listed here yet still runs on the Listener page
+...") -- now just lists the plugins to enable. `node --check` clean.
+
+## Repeater-reconnect fix, finally built: re-inject a wiped MeshCore contact instead of waiting for its next advert (2026-09-04)
+
+User: "the fixes i guess" -- picking the queued 2026-08-10 TODO over doing
+small cleanup on the just-finished RTL-SDR work, after I framed it as a
+concrete choice (see that TODO entry above for the original investigation
+-- this session builds exactly the "planned shape" already scoped there,
+no new design decisions needed beyond what was already written down).
+
+**Re-confirmed the `meshcore` library's API before writing anything**,
+same diligence as the original investigation: reinstalled it into a fresh
+throwaway venv (`/tmp/.../scratchpad/mc_lib_check`, same pattern as
+2026-08-10's `/tmp/mc_lib_check`) and read `commands/contact.py` directly.
+Confirmed `add_contact(contact)` is a thin wrapper over
+`update_contact(contact)` (called with `path=None`, so it writes the
+record fields as-is rather than recomputing a route), and traced exactly
+which fields it needs (`public_key`, `type`, `flags`, `out_path`,
+`out_path_len`, `out_path_hash_mode`, `adv_name`, `last_advert`,
+`adv_lat`, `adv_lon`) back through `reader.py`'s CONTACT-packet parsing --
+confirmed every one of those fields is already a JSON-safe primitive
+(hex strings / ints / floats, no bytes), so caching the raw dict to a
+JSON file needs no special encoding, unlike some other MeshCore payloads
+elsewhere in this codebase that need `_json_safe()`'s bytes->hex pass.
+
+**The key realization that simplified the whole implementation**:
+`poll_repeater()` already does `contact = self._mc.get_contact_by_key_prefix(key)`
+on every call, and that IS the full raw roster record -- no separate
+`get_contacts()` round trip needed to obtain a cacheable copy. Just had
+to stop discarding it: `poll_repeater()` now includes `"contact": dict(contact)`
+(a copy, not the library's own live reference -- `reset_path()` mutates
+that object in place, so a live reference would drift after the fact) in
+its return dict whenever the roster lookup succeeds, regardless of
+whether the rest of that poll (login/status/telemetry) does.
+
+**New `MeshCoreTxClient.add_contact(contact) -> bool`**: wraps
+`commands.add_contact()`, same timeout/exception/EventType-OK-check shape
+as every other raw-command wrapper in this file (`send_set_radio_params`,
+`send_set_companion_name`, etc), same lazy `from meshcore import EventType`
+import pattern.
+
+**`RepeaterPoller` changes**: new `self._contact_cache: dict[str, dict]`,
+persisted to a new sibling file `data/repeater_contacts.json` (exact same
+`_load_state()`/`_save_state()` pattern already used for `self.latest` --
+`repeater_status.json`, just a second independent file rather than
+folding contact records into the existing one, since they're
+conceptually different: one is live display state, the other is a
+roster-recovery cache that changes far less often). `_poll_one()`:
+caches `result["contact"]` into `self._contact_cache[key]` + persists,
+unconditionally, on every poll where it's present. When a poll's error is
+exactly `"contact not in companion roster"` and a cached record exists
+for that key, calls `self._tx.add_contact(cached)`; on success, `continue`s
+the same attempt loop immediately (no `RETRY_DELAY_S` sleep -- this
+failure has nothing to do with a busy command channel, the normal reason
+for that delay) instead of waiting out the existing 3-attempt budget or
+the next scheduled poll round. Deliberately reuses the existing
+`POLL_ATTEMPTS` budget rather than adding a separate one, matching the
+"reactive, simple" plan chosen back on 2026-08-10 over a proactive
+right-after-reconnect version.
+
+**The "stale out_path" open question from 2026-08-10 turned out to need
+no new code at all**: `poll_repeater()`'s existing `finally` block already
+calls `reset_path()` whenever a password login was attempted and the poll
+still ended in error -- which covers exactly the case where a re-injected
+contact's cached `out_path` no longer resolves (that retry attempt fails
+too, `reset_path()` fires, the NEXT attempt falls back to flood routing).
+No separate explicit reset needed after `add_contact()` specifically --
+recognized this only after tracing the existing finally-block's gating
+condition (`password and out["error"]`) rather than assuming it needed
+new handling.
+
+**Tests, 12 new (59/59 total, up from 47)**: `TestAddContact` in
+`tests/test_meshcore_tx_client.py` (not-connected short-circuit, OK/ERROR
+results, exception handling, post-command callback still runs on
+exception) -- 5 tests, same `MagicMock`+`patch.dict("sys.modules", ...)`
+pattern `TestSetCompanionName` already established for mocking
+`from meshcore import EventType` without a real install. Two new cases in
+`PollRepeaterShapeTest` (`tests/test_repeater_poller.py`) confirming
+`poll_repeater()`'s new `"contact"` key appears when found and is absent
+(not just falsy) when the roster lookup fails. New
+`ContactCacheRepeaterReconnectTest` (5 tests) covering the full
+`_poll_one()` flow end to end via a new `_RosterMissThenFoundTx` fake
+(mimics "fails until add_contact() is called, then succeeds"): no cache
+yet falls back to normal retry+backoff unchanged; a cached contact gets
+re-injected and the poll succeeds within the same attempt budget; a
+failed re-injection still falls back to normal retry/backoff and gives up
+cleanly; a successful poll's contact gets cached AND persists across a
+fresh `RepeaterPoller` instance (same persistence-survives-restart check
+`test_latest_and_persistence` already does for `self.latest`); a poll that
+finds the contact but fails for an unrelated reason (login timeout) still
+caches it.
+
+**Checked for accidental leakage**: `_poll_one()`'s `entry` dict (what
+actually lands in `self.latest`/`repeater_status.json`, and by extension
+`GET /api/meshcore/repeaters`) explicitly whitelists its own fields --
+confirmed the new `result["contact"]` key (which includes lat/lon) never
+gets copied into `entry`, so this doesn't change what the Repeaters tab
+or its API response expose.
+
+**NOT yet done**: not live-verified on the Pi -- needs a real companion
+reset (DTR pulse or physical unplug/replug) while a configured repeater's
+own advert interval is known to be long, to actually observe the
+roster-miss -> re-inject -> immediate-success sequence happen for real
+rather than just in the mocked test fakes above.
