@@ -13,26 +13,39 @@
  */
 window.registerSidebarPage({
     route: 'rtlsdr',
-    make: () => ({
-        mount(rootEl) {
-            const hasHooks = (window.MESHPOINT_PAGE_HOOKS || [])
-                .some((h) => h.host === 'rtlsdr');
-            rootEl.innerHTML = `
-                <div class="plugin-page">
-                    <h2>RTL-SDR Plugins</h2>
-                    <p>Enable RTL-SDR plugins to see their content here.
-                    Plugins are migrating onto this page one at a time --
-                    anything not listed here yet still runs on the
-                    Listener page (in the sidebar, under this same
-                    section) instead.</p>
-                    ${hasHooks ? '<div class="rtlsdr-hooks" data-rtlsdr-hooks></div>' : ''}
-                </div>
-            `;
-            if (hasHooks && typeof window.mountPageHooks === 'function') {
-                window.mountPageHooks('rtlsdr', rootEl.querySelector('[data-rtlsdr-hooks]'));
-            }
-        },
-        show() {},
-        hide() {},
-    }),
+    make: () => {
+        // Hook panels mounted below -- kept in this closure so show()/hide()
+        // (called by the router on navigation, unlike mount() which runs
+        // once at boot regardless of visibility) can propagate into them.
+        // Required, not optional: a hook whose own show() kicks off data
+        // loading or status polling (e.g. DAB+'s panels) never would
+        // otherwise, since mount() alone never calls it.
+        let hookPanels = [];
+        return {
+            mount(rootEl) {
+                const hasHooks = (window.MESHPOINT_PAGE_HOOKS || [])
+                    .some((h) => h.host === 'rtlsdr');
+                rootEl.innerHTML = `
+                    <div class="plugin-page">
+                        <h2>RTL-SDR Plugins</h2>
+                        <p>Enable RTL-SDR plugins to see their content here.
+                        Plugins are migrating onto this page one at a time --
+                        anything not listed here yet still runs on the
+                        Listener page (in the sidebar, under this same
+                        section) instead.</p>
+                        ${hasHooks ? '<div class="rtlsdr-hooks" data-rtlsdr-hooks></div>' : ''}
+                    </div>
+                `;
+                if (hasHooks && typeof window.mountPageHooks === 'function') {
+                    hookPanels = window.mountPageHooks('rtlsdr', rootEl.querySelector('[data-rtlsdr-hooks]'));
+                }
+            },
+            show() {
+                hookPanels.forEach((p) => { if (p && typeof p.show === 'function') p.show(); });
+            },
+            hide() {
+                hookPanels.forEach((p) => { if (p && typeof p.hide === 'function') p.hide(); });
+            },
+        };
+    },
 });

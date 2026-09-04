@@ -10172,3 +10172,108 @@ anymore -- next candidates to migrate the same way, whenever picked up:
 any of Pagers/POCSAG/P2000/RTL433/ADS-B/ACARS, then eventually Radio
 itself (the biggest one, and the one that finally lets the built-in
 Listener page + its shell get deleted entirely).
+
+---
+
+## Two real bugs in the "hook" mechanism itself, found immediately by DAB+ actually using it for real
+
+User tried the migrated page live on the Pi (screenshots): RTL-SDR
+Plugins showed a "Scan for DAB+ Channels" card and a "DAB+ Config" card
+stuck on "Loading…" -- but NO player at all (no channel tabs, no
+favorites, no VU meter, nothing). "where are all my channels and the
+display etc we have barely what it was before" and "all my favorites, tab
+wich channels and tab config, also just all is not there" -- confirmed
+this wasn't a partial/cosmetic issue, DabPanel's content was completely
+absent, not just misplaced.
+
+**Root-caused both bugs by actually loading the real files in Node and
+exercising them** (not just re-reading source and reasoning about it --
+a fake-DOM harness with `document.getElementById`/`querySelector`
+returning cheap stub objects caught both):
+
+1. **`window.mountPageHooks()` handed every hook the SAME container
+   element directly.** `DabPanel.mount(root)` and `DabConfigPanel.mount(root)`
+   both do `root.innerHTml = \`...\`` unconditionally -- assigning
+   `innerHTML` REPLACES a node's entire content. Mounting DabPanel first
+   (into the shared container) then DabConfigPanel second (into that
+   SAME container) meant DabConfigPanel's `mount()` call silently erased
+   DabPanel's just-rendered content the instant it ran. This is exactly
+   why only the LAST-registered hook's content ever survived -- matches
+   what the screenshots showed precisely (DabConfigPanel's two cards
+   only, DabPanel gone entirely). Never surfaced with hello-world-hook,
+   the only hook that existed before this, because there was only ever
+   ONE hook registered for that host -- nothing to collide with. **Every
+   other multi-child mounting mechanism in this codebase already gives
+   each child its own wrapper element** (`sidebar_plugin_registry.js`'s
+   `mountPluginSidebarPages()` creates a fresh `<section>` per plugin;
+   `listener_panel.js`'s tabbar creates a fresh `<div data-tab>` per
+   sub-panel) -- I missed applying that same pattern when I designed
+   `page_hook_registry.js` from scratch, since the prototype only ever
+   had one hook to think about. **Fixed**: `mountPageHooks()` now creates
+   a `document.createElement('div')` wrapper per hook, appends it to the
+   container, and mounts into THAT instead of the container directly.
+
+2. **Nothing ever called a mounted hook's `show()`.** Traced why
+   DabConfigPanel showed its shell but stayed on "Loading…" forever:
+   `DabConfigPanel.show()` (not `mount()`) is what calls `this._refresh()`,
+   the method that actually fetches and renders the channel list --
+   `mount()` alone only builds the static shell markup. `DabPanel`'s own
+   status-polling `setInterval` is ALSO started in `show()`, stopped in
+   `hide()` (matching the established convention every other panel class
+   in this codebase already follows -- PagerPanel, AdsbPanel,
+   ListenerPanel itself). But `rtlsdr_panel.js`'s own `show()`/`hide()`
+   were both literal no-ops (copied from hello-world, which never needed
+   more since its own content is static) -- so even once bug #1 was
+   fixed, DabPanel's polling and DabConfigPanel's data load would STILL
+   never trigger. **Fixed**: `rtlsdr_panel.js`'s `make()` now keeps the
+   array `mountPageHooks()` returns in its own closure, and its own
+   `show()`/`hide()` (called by the router on navigation -- confirmed
+   this actually happens via `sidebar_plugin_registry.js`'s own docstring:
+   "`app.js` can fold the route ids into the Router's allowedRoutes and
+   wire show/hide") forward into every mounted hook panel's `show()`/
+   `hide()`.
+
+**Both bugs were in the generic mechanism I built (`page_hook_registry.js`
++ `rtlsdr_panel.js`), not in DAB+'s own code** -- DabPanel/DabConfigPanel
+were correct all along (proven: they worked fine on the old Listener page
+before this migration, and still do, per the earlier live-verification
+screenshot). The hello-world-hook prototype was too simple (one hook,
+static content, no lifecycle needs) to have ever caught either issue --
+DAB+ was the first "hook" consumer with (a) more than one hook targeting
+the same host and (b) a real dependency on the show()/hide() lifecycle.
+**Lesson: a prototype that proves a mechanism CAN work isn't the same as
+one that proves it works under realistic conditions** -- multiple
+consumers, real lifecycle needs -- and the gap between them is exactly
+where bugs like these hide until the next real consumer hits them.
+
+**Verified**: two targeted Node harnesses (fake DOM elements, not the
+real classes -- these bugs were in the generic plumbing, not DAB+-specific
+logic, so no need to re-verify DabPanel/DabConfigPanel's own internals)
+confirm (1) two hooks targeting one host now get separate wrapper
+elements with independent content, container itself never has innerHTML
+set directly, and (2) `rtlsdr_panel.js`'s `show()`/`hide()` correctly
+propagate into both mounted panels. Re-ran the original hello-world-hook
+single-hook scenario too, to confirm the wrapper-element change didn't
+regress it -- still mounts and renders correctly. `node --check` clean on
+every touched file.
+
+**Docs**: `docs/PLUGINS.md`'s "Making your own page hookable" section
+gains two new paragraphs -- the wrapper-per-hook behavior (automatic,
+nothing a host author needs to do) and the show()/hide()-propagation
+requirement (NOT automatic, a host must wire it up itself if any hook it
+carries depends on that lifecycle), with a code example showing the
+closure-scoped `hookPanels` pattern now used in `rtlsdr_panel.js`. New
+CHANGELOG bullet describing both fixes, framed as surfaced by DAB+'s real
+usage rather than caught in the original hook-capability work (accurate --
+the original bullets describe what was true when written, not
+retroactively fixed).
+
+**NOT yet done / next steps**: **not live-verified on the Pi yet** -- next
+session should pull, restart, confirm the RTL-SDR Plugins page now shows
+the full DAB+ player (channel tabs, favorites, VU meter, station list)
+ABOVE the Config panel, both fully functional, Config no longer stuck on
+"Loading…". This was caught before being called "done" for the DAB+
+migration -- good thing to check this thoroughly before the NEXT plugin
+(Pagers/POCSAG/P2000/RTL433/ADS-B/ACARS) migrates the same way, since
+they'll all go through this exact same `mountPageHooks()` +
+show()/hide()-propagation path, now fixed for all of them at once.

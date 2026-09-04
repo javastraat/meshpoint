@@ -392,6 +392,39 @@ you pass it `null`/no hooks are registered, so skipping that check and
 always calling it is also safe, just leaves a stray empty container element
 in your markup.
 
+`mountPageHooks()` gives each hook its own wrapper `<div>` under your
+container automatically — you never need to worry about two hooks' `mount()`
+calls colliding (a panel's `mount(el)` typically does `el.innerHTML = ...`,
+which would wipe out a sibling's content if two hooks shared one element
+directly).
+
+**If your page has its own `show()`/`hide()`** (called by the router on
+navigation, unlike `mount()` which runs once at boot regardless of
+visibility) **and a hook you host depends on that lifecycle** — e.g. its
+own `show()` is what kicks off a data fetch or starts status polling, the
+same way `panel`-seam tabs already work — you need to propagate it
+yourself. `mountPageHooks()` returns the mounted panel objects for exactly
+this:
+
+```js
+make: () => {
+    let hookPanels = [];   // closure-scoped so show()/hide() below can reach it
+    return {
+        mount(rootEl) {
+            // ...render your own content...
+            hookPanels = window.mountPageHooks('your-host-id', hookContainerEl);
+        },
+        show() { hookPanels.forEach((p) => p.show && p.show()); },
+        hide() { hookPanels.forEach((p) => p.hide && p.hide()); },
+    };
+},
+```
+
+Easy to miss — a hook that never receives `show()` will render its initial
+markup fine but silently never load any data, with no error anywhere. Not
+needed if your own page has no meaningful `show()`/`hide()` of its own
+(Hello World's are no-ops, so the simpler example above skips this).
+
 ## Your plugin's own config
 
 `plugins.<id>` in `local.yaml` is entirely yours — Meshpoint only ever

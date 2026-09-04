@@ -39,11 +39,18 @@ window.registerPageHook = function registerPageHook({ host, make }) {
 };
 
 /**
- * Mounts every hook registered for *hostId* into *containerEl*, in
- * registration order. Returns the mounted panel objects (each has
- * mount/show/hide) so a host that wants to propagate its own show()/hide()
- * lifecycle into its hooks can -- hello-world doesn't need this (its own
- * show/hide are no-ops), so it's opt-in, not required.
+ * Mounts every hook registered for *hostId* under *containerEl*, in
+ * registration order -- each into its OWN child wrapper element, never
+ * directly into containerEl itself. A panel's mount(el) typically does
+ * `el.innerHTML = ...`, which would wipe out any sibling hook's content
+ * if two hooks were both handed the same element directly (only ever
+ * mattered once a host had more than one hook registered -- the original
+ * single-hook hello-world-hook case never surfaced it).
+ *
+ * Returns the mounted panel objects (each has mount/show/hide) so a host
+ * can propagate its own show()/hide() lifecycle into its hooks -- REQUIRED
+ * for any hook whose own show() kicks off data loading or polling (e.g.
+ * the DAB+ plugin's panels), not just optional polish.
  */
 window.mountPageHooks = function mountPageHooks(hostId, containerEl) {
     const mounted = [];
@@ -53,7 +60,9 @@ window.mountPageHooks = function mountPageHooks(hostId, containerEl) {
         .forEach(({ make }) => {
             try {
                 const panel = make();
-                if (panel && typeof panel.mount === 'function') panel.mount(containerEl);
+                const wrapper = document.createElement('div');
+                containerEl.appendChild(wrapper);
+                if (panel && typeof panel.mount === 'function') panel.mount(wrapper);
                 mounted.push(panel);
             } catch (err) {
                 console.error(`Page hook for host "${hostId}" failed to mount:`, err);
