@@ -48,15 +48,14 @@ class TestBuiltinListenerList(unittest.TestCase):
 
         listener_registry.start_all(_BUILTIN_LISTENERS)
         try:
-            # one entry per init_routes call, pagers builds a 3-tuple
+            # one entry per init_routes call, pagers builds a 2-tuple
             names = [n for n, _ in listener_registry.live()]
             self.assertEqual(names, _EXPECTED_NAMES)
             pagers_obj = next(o for n, o in listener_registry.live() if n == "pagers")
-            self.assertEqual(len(pagers_obj), 3)
+            self.assertEqual(len(pagers_obj), 2)
 
             self.assertIsNotNone(listener_routes._listener)
             self.assertIsNotNone(dab_routes._listener)
-            self.assertIsNotNone(pager_routes._p2000)
             self.assertIsNotNone(pager_routes._pagers)
             self.assertIsNotNone(pager_routes._pocsag)
         finally:

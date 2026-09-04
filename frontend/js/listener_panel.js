@@ -376,10 +376,10 @@ class ListenerPanel {
         })();
         this._tunedCat = null;   // category index of the currently-tuned preset
         this._tunedKey = null;   // "freq|mode" of the currently-tuned preset
-        // P2000/Pagers/POCSAG tabs -- separate pipelines, same RTL-SDR
-        // dongle (see src/audio/sdr_registry.py), so only one of
-        // Radio/P2000/Pagers/POCSAG can be active at a time. Kept as
-        // sibling panels rather than folded into this already-large file.
+        // Pagers/POCSAG tabs -- separate pipelines, same RTL-SDR dongle
+        // (see src/audio/sdr_registry.py), so only one of
+        // Radio/Pagers/POCSAG can be active at a time. Kept as sibling
+        // panels rather than folded into this already-large file.
         this._activeTab = 'radio';
 
         // Every non-radio Listener sub-tab, in tabbar order. Each entry is
@@ -389,15 +389,15 @@ class ListenerPanel {
         // window.registerListenerPanel (see listener_panel_registry.js) and
         // render after these built-ins.
         // 'pocsag' etc. share the one RTL-SDR dongle (src/audio/sdr_registry.py)
-        // so only one of Radio/P2000/Pagers/POCSAG/DAB+ runs at a time (the
-        // RTL433/ACARS/ADS-B plugins join that set when installed); 'dabconfig'
-        // is a read-only view over the channel-scan JSON and sits out that dance.
+        // so only one of Radio/Pagers/POCSAG/DAB+ runs at a time (the
+        // P2000/RTL433/ACARS/ADS-B plugins join that set when installed);
+        // 'dabconfig' is a read-only view over the channel-scan JSON and
+        // sits out that dance.
         const P = window.PagerPanel;
         const pager = (tab, label, prefix, title, rowFn) =>
             (P ? { tab, label, panel: new P(tab, prefix, title, rowFn) } : null);
         const builtins = [
             { tab: 'dab', label: 'DAB+', panel: window.DabPanel ? new window.DabPanel() : null },
-            pager('p2000', 'P2000', '/api/p2000', 'P2000'),
             pager('pagers', 'Pagers', '/api/pagers', 'Pagers'),
             pager('pocsag', 'POCSAG', '/api/pocsag', 'POCSAG'),
             { tab: 'dabconfig', label: 'DAB+ Config', panel: window.DabConfigPanel ? new window.DabConfigPanel() : null },

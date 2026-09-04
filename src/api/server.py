@@ -211,7 +211,6 @@ _BUILTIN_ROUTERS: list[tuple] = [
     (reticulum_config_routes.router, False),
     (emergency_pager_routes.router, False),
     (listener_routes.router, False),
-    (pager_routes.p2000_router, False),
     (pager_routes.pagers_router, False),
     (pager_routes.pocsag_router, False),
     (dab_routes.router, False),
@@ -234,11 +233,10 @@ _BUILTIN_LISTENERS: list[listener_registry.ListenerSpec] = [
     listener_registry.ListenerSpec(
         "pagers",
         lambda: (
-            PagerListener("p2000"),
             PagerListener("pagers"),
             PagerListener("pocsag"),
         ),
-        lambda trio: pager_routes.init_routes(*trio),
+        lambda duo: pager_routes.init_routes(*duo),
     ),
     listener_registry.ListenerSpec("dab", DabListener, dab_routes.init_routes),
 ]

@@ -8947,3 +8947,129 @@ CHANGELOG bullet updated in place to cover both fixes together (still
 both `plugins_panel_controller.js` (web) and `plugin_command.py` (CLI)
 together** -- they render the same plugin metadata independently and
 have already drifted once.
+
+**P2000 extracted to a plugin (2026-09-04, ⚠️ behaviour change, DONE, not
+yet live-verified)**: Fourth tab-by-tab extraction, but the first genuine
+*split* rather than a full standalone-tab move. User asked for Pagers next,
+then reconsidered mid-conversation: **proposed three separate plugins
+(P2000/Pagers/POCSAG) instead of one combined "pagers" plugin**, so a user
+could install just the one protocol they want rather than all three
+together. Verified the idea against the real code before agreeing: routing
+was *already* split three ways (`p2000_router`/`pagers_router`/
+`pocsag_router`, three separate `/api/*` prefixes in `pager_routes.py`) --
+only the listener-building step in `server.py` bundled all three into one
+`ListenerSpec` returning a 3-tuple. Recommended proceeding (matches the
+existing per-plugin-one-decoder shape of ACARS/RTL433/ADS-B; P2000/FLEX,
+Pagers/POCSAG512-2400@172.45, POCSAG/POCSAG512-2400@439.9875 are three
+real distinct use-cases, not cosmetic variants) with the acknowledged cost
+of duplicating `PagerListener`'s ~150-line body per protocol -- accepted as
+consistent with this codebase's established "plugins stay self-contained,
+duplicate rather than cross-import" convention ([[thermal-scripts-standalone]]
+precedent). **User's actual ask: check the shape first with just one,
+then continue one by one** -- picked P2000 (FLEX-only, cleanest split;
+Pagers/POCSAG share the exact same POCSAG-family multimon_args and stay
+combined, at least for now).
+
+Real complexity this time, unlike ACARS/RTL433/ADS-B's clean lift-and-shift:
+P2000 wasn't a standalone file, it was one of 3 `kind` values inside a
+SHARED `PagerListener` class (`src/audio/pager_listener.py`) and one of 3
+routers wired through one combined `pager_routes.init_routes(p2000, pagers,
+pocsag)` call. Had to perform actual surgery on files that remain core,
+not just move-and-delete:
+- `pager_listener.py`: removed `"p2000"` from the `_KINDS` lookup table,
+  and -- important, would have been dead code otherwise -- removed the
+  now-unreachable `_FLEX_RE` regex and its branch in `_parse_line()`
+  (Pagers/POCSAG only ever pass `-a POCSAG512/1200/2400` to multimon-ng,
+  never `-a FLEX`, so nothing remaining in this file could ever produce a
+  FLEX-format line once P2000 left). Docstring rewritten to describe just
+  the two remaining POCSAG-family kinds, cross-referencing the new plugin.
+- `pager_routes.py`: removed `p2000_router`/`_p2000`, `init_routes()` now
+  takes 2 listeners instead of 3, docstring "Three nearly-identical REST
+  surfaces" -> "Two".
+- `server.py`: the `"pagers"` `ListenerSpec`'s build lambda -- 3-tuple
+  `(PagerListener("p2000"), PagerListener("pagers"), PagerListener("pocsag"))`
+  -> 2-tuple (p2000 line dropped); `_BUILTIN_ROUTERS` lost the
+  `p2000_router` entry.
+- `listener_panel.js`: dropped the `pager('p2000', ...)` builtin entry
+  and its comments; `window.PagerPanel` (`frontend/js/pager_panel.js`)
+  stays in core UNTOUCHED -- confirmed it's a shared dependency ACARS and
+  RTL433's plugin frontends already `new window.PagerPanel(...)` against,
+  so it can never move into any one plugin.
+- `tests/test_create_app_listeners.py`: `pagers_obj` tuple-length
+  assertion 3->2, dropped the `pager_routes._p2000` check. No dedicated
+  core-level pager test file existed before (confirmed by grep, same as
+  every prior extraction) -- nothing else to delete.
+
+New `plugins/apps/p2000/`: `backend/listener.py` is a simplified,
+FLEX-only rewrite of the shared class -- `P2000Listener` (no `kind` param,
+frequency/multimon_args hardcoded, `_parse_line` keeps only the FLEX
+branch and its "recognized-prefix-but-bad-format" fallback, dropped the
+POCSAG branch entirely since P2000 never sees POCSAG-format lines).
+`backend/routes.py` is a single-router version of the old 3-router
+factory (no `_add_endpoints` generic needed for just one). `plugin.toml`
+has no `apt` list -- multimon-ng's build deps (cmake/libpulse-dev/
+libx11-dev) are already covered by `scripts/install.sh`'s section-1 base
+packages, same "a build step" no-apt-deps shape as ADS-B's dump1090 (the
+"Requires:" hint bug fixed two entries above this one already covers this
+case correctly). `setup.sh` explicitly documents that it's usually a
+no-op on a normal Pi install, since Pagers/POCSAG staying core means
+`scripts/install.sh` already builds the identical `multimon-ng` binary
+unconditionally -- kept self-contained anyway so the plugin doesn't
+silently assume Pagers/POCSAG stay core forever. `frontend/p2000_panel.js`
+is tiny -- just `window.registerListenerPanel({tab: 'p2000', ...,
+make: () => new window.PagerPanel('p2000', '/api/p2000', 'P2000')})`,
+reusing core PagerPanel with zero custom row renderer (FLEX rows already
+fit PagerPanel's default protocol/capcode/message shape). No CSS to
+extract -- P2000 never had any dedicated styling, all shared
+`.pager-*`/`.lsn-*` rules already core. New `backend/tests/test_listener.py`
+(7 tests, real captured FLEX line from the original code's own docstring
+used as the test fixture) -- no dedicated P2000 test existed before either.
+
+`scripts/install.sh` deliberately NOT touched this time -- multimon-ng
+(section 8) is still genuinely needed there for Pagers/POCSAG, which
+remain core. Docs: `docs/API-ENDPOINTS.md`'s RTL-SDR section header line
+and its Pagers/POCSAG-only endpoint rows updated (P2000 dropped from the
+combined `/api/{p2000,pagers,pocsag}/...` rows -- back to a plain
+`pagers`/`pocsag` pair, matching that file's own pipe-separated-path
+convention rather than importing README's brace-glob style by mistake,
+caught and fixed before finalizing). `README.md`: new dedicated P2000
+plugin bullet next to ACARS/RTL433/ADS-B's, the big RTL-SDR paragraph
+split (Pagers/POCSAG's "three tabs" language -> "two tabs" plus a new
+P2000 sentence), the old combined "P2000 / Pagers / POCSAG (optional)"
+manual-install bullet split into a Pagers/POCSAG-only bullet (still the
+real from-source multimon-ng build instructions, since that part is
+still accurate) plus a new plugin-pointer P2000 bullet matching RTL433/
+ADS-B's shape, the App-plugins example list and the API-endpoints summary
+table both extended. `docs/CONFIGURATION.md` had nothing P2000-specific
+to update (confirmed by grep, same as every prior extraction).
+
+CHANGELOG: new `v0.8.1` bullet right after ADS-B's, same "⚠️ Behaviour
+change" framing but explicitly calling out that this one is a *split*,
+not a lift-and-shift -- Pagers/POCSAG are unaffected either way.
+
+**Verified on the Mac**: `py_compile` clean on every touched/new Python
+file (`pager_listener.py`, `pager_routes.py`, `server.py`, the new plugin
+files, the updated test file); grepped the whole tree for stale
+`PagerListener("p2000")`/`pager_routes._p2000`/`p2000_router` references
+after the split -- zero hits. `pytest plugins/apps/p2000/backend/tests/
+test_listener.py` -- 7/7 pass. `pytest plugins/` -- 32/32 pass (ACARS +
+RTL433 + hello-world + ADS-B + P2000 together, nothing cross-broke,
+including that Pagers/POCSAG's own remaining logic in `pager_listener.py`
+wasn't accidentally broken by removing the FLEX branch). `node --check`
+clean on `listener_panel.js` and the new `p2000_panel.js`.
+`ChangelogParser.parse_file` re-parse: 42 sections, new P2000 bullet
+present under the real v0.8.1 section.
+
+**NOT yet done / next steps**: **not live-verified on the Pi** -- next
+session should pull, restart, confirm P2000 is gone from the Listener
+page until enabled (while Pagers/POCSAG keep working exactly as before,
+important to confirm since this was a split of shared code, not an
+isolated move), then run `sudo meshpoint plugin setup p2000` +
+`plugins.p2000.enabled: true` + restart, and confirm the P2000 tab comes
+back working (FLEX decode, same shared-dongle busy behaviour). **Pagers
+and POCSAG remain the next two extraction candidates** if the user wants
+to keep going down this same "three separate plugins" path -- each would
+need the same kind of split-not-move treatment done here, now against an
+even smaller shared `pager_listener.py`/`pager_routes.py` (already down
+to just those two kinds). DAB+ is still the other original candidate
+(Config sub-tab, more work); plain-FM Radio still explicitly out of scope.

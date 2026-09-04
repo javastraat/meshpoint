@@ -1,0 +1,16 @@
+name = "p2000"
+version = "1.0.0"
+meshpoint_api = 1
+provides = ["listener", "routes", "panel"]
+locked = true  # shipped with this fork -- not user-installed, can't be deleted
+
+[deps]
+setup = "setup.sh"
+
+[frontend]
+scripts = ["frontend/p2000_panel.js"]
+
+[meta]
+description = "Dutch emergency dispatch (P2000, FLEX on 169.65 MHz) decoding via rtl_fm + multimon-ng"
+homepage = "https://github.com/EliasOenal/multimon-ng"
+author = "Einstein PD2EMC"
