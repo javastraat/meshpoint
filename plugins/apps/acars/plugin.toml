@@ -1,7 +1,7 @@
 name = "acars"
 version = "1.0.0"
 meshpoint_api = 1
-provides = ["listener", "routes", "panel"]
+provides = ["listener", "routes", "hook"]
 locked = true  # shipped with this fork -- not user-installed, can't be deleted
 
 [deps]
@@ -11,6 +11,10 @@ setup = "setup.sh"
 [frontend]
 scripts = ["frontend/acars_panel.js"]
 styles = ["frontend/acars_panel.css"]
+
+[hook]
+host = "rtlsdr"    # lives on the rtlsdr plugin's page, not the built-in
+                    # Listener page -- see plugins/apps/rtlsdr/README.md
 
 [meta]
 description = "Aircraft VHF datalink (ACARS) decoding via acarsdec + libacars"

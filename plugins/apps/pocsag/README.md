@@ -1,15 +1,15 @@
 # POCSAG plugin
 
 Decodes POCSAG512/1200/2400 pager traffic on 439.9875 MHz off the shared
-RTL-SDR dongle via `rtl_fm | multimon-ng`, and adds a **POCSAG** tab to the
-Listener page — start/stop/clear + a live decoded-message log, same shape
-as the Pagers/P2000/RTL433/ACARS tabs (reuses the core `PagerPanel`
-component as-is, no custom row renderer needed).
+RTL-SDR dongle via `rtl_fm | multimon-ng`, and hooks a **POCSAG** tab into
+the [RTL-SDR Plugins](../rtlsdr/) page — start/stop/clear + a live
+decoded-message log, same shape as the Pagers/P2000/RTL433/ACARS tabs
+(reuses the core `PagerPanel` component as-is, no custom row renderer
+needed).
 
-Split out of `src/audio/pager_listener.py` (which still covers the
-"pagers" kind — the same POCSAG-family decoders, just on 172.45 MHz
-instead — still core, not yet a plugin), the second of the three former
-pager kinds to become its own plugin (after P2000). It ships `locked =
+Split out of `src/audio/pager_listener.py`, which is gone now — Pagers and
+P2000 (the other two former kinds that file used to cover) are both their
+own plugins too, nothing pager-related left in core. It ships `locked =
 true` in its `plugin.toml`, so it won't offer a Delete button on Settings
 → Plugins (it's git-tracked, so deleting it wouldn't stick past the next
 `Update` anyway), but it is off by default like every other plugin.
@@ -30,22 +30,25 @@ true` in its `plugin.toml`, so it won't offer a Delete button on Settings
    the absolute path exactly. `meshpoint plugin setup` always resolves it
    for you.
 
-   **Note:** Pagers (still core, not a plugin yet) uses this exact same
-   `multimon-ng` binary, and `scripts/install.sh` already builds it
-   unconditionally as part of RTL-SDR setup — so on a normal Pi install
-   this script is usually a no-op (idempotent: skips if `multimon-ng` is
-   already on `PATH`). It stays self-contained anyway so the POCSAG
-   plugin doesn't silently depend on Pagers staying core.
+   **Note:** Pagers and P2000 (both separate plugins now too) use this
+   exact same `multimon-ng` binary — idempotent regardless: skips if
+   `multimon-ng` is already on `PATH` (e.g. from one of those plugins'
+   own copy of this same script already having run). It stays
+   self-contained anyway so the POCSAG plugin doesn't silently depend on
+   another plugin's setup order.
 
-2. Enable it in `local.yaml` and restart Meshpoint:
+2. Enable it (and [`rtlsdr`](../rtlsdr/), its host page) in `local.yaml`
+   and restart Meshpoint:
 
    ```yaml
    plugins:
+     rtlsdr:
+       enabled: true
      pocsag:
        enabled: true
    ```
 
-3. Open the dashboard → Listener → **POCSAG** → Start.
+3. Open the dashboard → Radio → **RTL-SDR Plugins** → **POCSAG** → Start.
 
 Shares the one RTL-SDR dongle with the FM / Pagers / P2000 / RTL433 /
 ACARS / DAB+ / ADS-B listeners (only one active at a time; stop the other
@@ -59,5 +62,5 @@ setup.sh                     multimon-ng build (usually a no-op, see above)
 backend/listener.py          rtl_fm|multimon-ng pipeline + POCSAG parse (PocsagListener)
 backend/routes.py            /api/pocsag  status / start / stop / clear
 backend/__init__.py          register(reg)
-frontend/pocsag_panel.js     the POCSAG Listener tab (reuses core PagerPanel)
+frontend/pocsag_panel.js     the POCSAG tab (RTL-SDR Plugins page, reuses core PagerPanel)
 ```

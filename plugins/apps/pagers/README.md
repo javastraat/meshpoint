@@ -1,10 +1,11 @@
 # Pagers plugin
 
 Decodes POCSAG512/1200/2400 pager traffic on 172.45 MHz off the shared
-RTL-SDR dongle via `rtl_fm | multimon-ng`, and adds a **Pagers** tab to the
-Listener page — start/stop/clear + a live decoded-message log, same shape
-as the POCSAG/P2000/RTL433/ACARS tabs (reuses the core `PagerPanel`
-component as-is, no custom row renderer needed).
+RTL-SDR dongle via `rtl_fm | multimon-ng`, and hooks a **Pagers** tab into
+the [RTL-SDR Plugins](../rtlsdr/) page — start/stop/clear + a live
+decoded-message log, same shape as the POCSAG/P2000/RTL433/ACARS tabs
+(reuses the core `PagerPanel` component as-is, no custom row renderer
+needed).
 
 The third and last of the former combined `src/audio/pager_listener.py`
 kinds to become its own plugin, after P2000 and POCSAG — that shared core
@@ -37,15 +38,18 @@ anyway), but it is off by default like every other plugin.
    P2000 or POCSAG plugin's own copy of this same script already having
    run).
 
-2. Enable it in `local.yaml` and restart Meshpoint:
+2. Enable it (and [`rtlsdr`](../rtlsdr/), its host page) in `local.yaml`
+   and restart Meshpoint:
 
    ```yaml
    plugins:
+     rtlsdr:
+       enabled: true
      pagers:
        enabled: true
    ```
 
-3. Open the dashboard → Listener → **Pagers** → Start.
+3. Open the dashboard → Radio → **RTL-SDR Plugins** → **Pagers** → Start.
 
 Shares the one RTL-SDR dongle with the FM / POCSAG / P2000 / RTL433 /
 ACARS / DAB+ / ADS-B listeners (only one active at a time; stop the other
@@ -59,5 +63,5 @@ setup.sh                    multimon-ng build
 backend/listener.py         rtl_fm|multimon-ng pipeline + POCSAG parse (PagersListener)
 backend/routes.py           /api/pagers  status / start / stop / clear
 backend/__init__.py         register(reg)
-frontend/pagers_panel.js    the Pagers Listener tab (reuses core PagerPanel)
+frontend/pagers_panel.js    the Pagers tab (RTL-SDR Plugins page, reuses core PagerPanel)
 ```

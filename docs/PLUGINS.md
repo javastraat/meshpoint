@@ -302,18 +302,21 @@ World Hook** (the hook —
 With both enabled, opening the Hello World page shows its usual content
 plus a second box below it, rendered by the hook plugin.
 
-A second, less toy example: **RTL-SDR** (`plugins/apps/rtlsdr/`) is meant
-to eventually replace the built-in Listener page entirely, one plugin at a
-time. The shipped **DAB+** plugin is the first to move — it dropped
-`"panel"` from `provides` and no longer appears on the Listener page at
-all; both its player and its Config panel now hook into the RTL-SDR page
-instead (`plugins/apps/dab/frontend/dab_panel.js` /
-`dab_config_panel.js`), each with its own `label` (see below) so they show
-up as two switchable tabs rather than one long stacked page. Moving
-wholesale rather than duplicating mattered here for a concrete reason, not
-just tidiness: DAB+'s player looks up its `<audio>` element by a hardcoded
-id, not scoped to its own mounted root, so two live instances at once
-would have fought over it.
+A second, less toy example: **RTL-SDR** (`plugins/apps/rtlsdr/`) is
+replacing the built-in Listener page entirely, one plugin at a time.
+**DAB+** moved first — it dropped `"panel"` from `provides`; both its
+player and its Config panel hook into the RTL-SDR page instead
+(`plugins/apps/dab/frontend/dab_panel.js` / `dab_config_panel.js`), each
+with its own `label` (see below) so they show up as two switchable tabs
+rather than one long stacked page. Moving wholesale rather than
+duplicating mattered here for a concrete reason, not just tidiness: DAB+'s
+player looks up its `<audio>` element by a hardcoded id, not scoped to its
+own mounted root, so two live instances at once would have fought over
+it. **P2000, Pagers, POCSAG, RTL433, ACARS and ADS-B followed** once the
+mechanism was proven on DAB+ — six mechanical single-hook migrations
+(each just drops `"panel"`, adds `"hook"` with `host = "rtlsdr"`, and
+swaps `registerListenerPanel` for `registerPageHook`), leaving Radio as
+the only tab left on the built-in Listener page.
 
 1. List `"hook"` in `provides` and fill in `[hook]` with the target host's
    id — another plugin's `[sidebar].route`:

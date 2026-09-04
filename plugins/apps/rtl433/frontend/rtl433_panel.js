@@ -34,13 +34,15 @@
         `;
     }
 
-    if (typeof window.registerListenerPanel !== 'function' || !window.PagerPanel) {
-        console.warn('RTL433 plugin: listener panel registry or PagerPanel missing');
+    if (typeof window.registerPageHook !== 'function' || !window.PagerPanel) {
+        console.warn('RTL433 plugin: page hook registry or PagerPanel missing');
         return;
     }
 
-    window.registerListenerPanel({
-        tab: 'rtl433',
+    // Lives on the RTL-SDR Plugins page (plugins/apps/rtlsdr/) via the
+    // "hook" seam, not the built-in Listener page's tabbar.
+    window.registerPageHook({
+        host: 'rtlsdr',
         label: 'RTL433',
         make: () => new window.PagerPanel('rtl433', '/api/rtl433', 'RTL433', _rtl433RowHtml),
     });

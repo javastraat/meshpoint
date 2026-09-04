@@ -11,13 +11,15 @@
 (function () {
     'use strict';
 
-    if (typeof window.registerListenerPanel !== 'function' || !window.PagerPanel) {
-        console.warn('P2000 plugin: listener panel registry or PagerPanel missing');
+    if (typeof window.registerPageHook !== 'function' || !window.PagerPanel) {
+        console.warn('P2000 plugin: page hook registry or PagerPanel missing');
         return;
     }
 
-    window.registerListenerPanel({
-        tab: 'p2000',
+    // Lives on the RTL-SDR Plugins page (plugins/apps/rtlsdr/) via the
+    // "hook" seam, not the built-in Listener page's tabbar.
+    window.registerPageHook({
+        host: 'rtlsdr',
         label: 'P2000',
         make: () => new window.PagerPanel('p2000', '/api/p2000', 'P2000'),
     });

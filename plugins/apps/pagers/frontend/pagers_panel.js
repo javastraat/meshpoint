@@ -10,13 +10,15 @@
 (function () {
     'use strict';
 
-    if (typeof window.registerListenerPanel !== 'function' || !window.PagerPanel) {
-        console.warn('Pagers plugin: listener panel registry or PagerPanel missing');
+    if (typeof window.registerPageHook !== 'function' || !window.PagerPanel) {
+        console.warn('Pagers plugin: page hook registry or PagerPanel missing');
         return;
     }
 
-    window.registerListenerPanel({
-        tab: 'pagers',
+    // Lives on the RTL-SDR Plugins page (plugins/apps/rtlsdr/) via the
+    // "hook" seam, not the built-in Listener page's tabbar.
+    window.registerPageHook({
+        host: 'rtlsdr',
         label: 'Pagers',
         make: () => new window.PagerPanel('pagers', '/api/pagers', 'Pagers'),
     });

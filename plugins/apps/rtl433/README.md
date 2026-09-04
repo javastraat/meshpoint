@@ -2,11 +2,11 @@
 
 Decodes hundreds of 433/315/868 MHz OOK/FSK devices (weather stations, TPMS,
 remote sensors, and more) off the shared RTL-SDR dongle via
-[`rtl_433`](https://github.com/merbanan/rtl_433), and adds an **RTL433** tab
-to the Listener page — start/stop/clear + a live decoded-message log, same
-shape as the P2000/Pagers/POCSAG/ACARS tabs. The decoded field set varies
-wildly by device model, so each row just shows the model name plus whatever
-other keys a given event happens to carry.
+[`rtl_433`](https://github.com/merbanan/rtl_433), and hooks an **RTL433**
+tab into the [RTL-SDR Plugins](../rtlsdr/) page — start/stop/clear + a live
+decoded-message log, same shape as the P2000/Pagers/POCSAG/ACARS tabs. The
+decoded field set varies wildly by device model, so each row just shows
+the model name plus whatever other keys a given event happens to carry.
 
 Extracted from core into a plugin (was previously always-on, no config
 gate); it now ships `locked = true` in its `plugin.toml`, so it won't offer
@@ -31,15 +31,18 @@ like every other plugin.
 
    Idempotent — skips the apt install if `rtl_433` is already on `PATH`.
 
-2. Enable it in `local.yaml` and restart Meshpoint:
+2. Enable it (and [`rtlsdr`](../rtlsdr/), its host page) in `local.yaml`
+   and restart Meshpoint:
 
    ```yaml
    plugins:
+     rtlsdr:
+       enabled: true
      rtl433:
        enabled: true
    ```
 
-3. Open the dashboard → Listener → **RTL433** → Start.
+3. Open the dashboard → Radio → **RTL-SDR Plugins** → **RTL433** → Start.
 
 Shares the one RTL-SDR dongle with the FM / Pager / ACARS / DAB+ / ADS-B
 listeners (only one active at a time; stop the other one first).
@@ -52,5 +55,5 @@ setup.sh                    rtl_433 apt install
 backend/listener.py         rtl_433 subprocess + JSON parse (Rtl433Listener)
 backend/routes.py           /api/rtl433  status / start / stop / clear
 backend/__init__.py         register(reg)
-frontend/rtl433_panel.js    the RTL433 Listener tab (reuses core PagerPanel)
+frontend/rtl433_panel.js    the RTL433 tab (RTL-SDR Plugins page, reuses core PagerPanel)
 ```

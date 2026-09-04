@@ -1,47 +1,52 @@
 # RTL-SDR plugin
 
-The future RTL-SDR host page, under construction. Adds an **RTL-SDR
-Plugins** page under the sidebar's Radio section (next to the built-in
-Listener page, labeled just "RTL-SDR" — deliberately a different label,
-since the two looked confusingly identical in the sidebar when this first
-shipped) with placeholder text plus a mount point other plugins inject
-content into via the `"hook"` seam.
+The future RTL-SDR host page. Adds an **RTL-SDR Plugins** page under the
+sidebar's Radio section (next to the built-in Listener page, labeled just
+"RTL-SDR" — deliberately a different label, since the two looked
+confusingly identical in the sidebar when this first shipped) that every
+RTL-SDR plugin now hooks its tab into.
 
 ## Why this exists
 
-The built-in Listener page (`frontend/js/listener_panel.js`) is currently
+The built-in Listener page (`frontend/js/listener_panel.js`) used to be
 *both* Radio's own implementation *and* the tabbar host every other
-RTL-SDR plugin attaches to via `window.registerListenerPanel`. The plan is
-for RTL-SDR plugins to migrate off it one at a time, onto this page instead
-(via `"hook"`, not `"panel"` — see [Hello World Hook](../hello-world-hook/)
-for the seam's own minimal reference), ending with Radio itself becoming
-an ordinary plugin here too and the built-in Listener page going away
+RTL-SDR plugin attached to via `window.registerListenerPanel`. RTL-SDR
+plugins are migrating off it onto this page instead, one at a time (via
+`"hook"`, not `"panel"` — see [Hello World Hook](../hello-world-hook/) for
+the seam's own minimal reference), ending with Radio itself becoming an
+ordinary plugin here too and the built-in Listener page going away
 entirely.
 
-**[DAB+](../dab/) is the first to move** — not a toy test, a real
-migration: it dropped `"panel"` from its `provides` and no longer appears
-on the Listener page's tabbar at all. Both its player
-(`plugins/apps/dab/frontend/dab_panel.js`) and its Config panel
-(`dab_config_panel.js`) hook into this page instead, each its own labeled
-tab (`window.mountPageHooks()` builds a small internal tabbar
-automatically once a host has more than one hook — see `docs/PLUGINS.md`).
-Moved wholesale rather than duplicated deliberately — DAB+'s player looks
-up its `<audio>` element by a hardcoded id (`document.
-getElementById('dab-audio')`, not scoped to its own mounted root), so two
-live instances at once (old tab + new hook) would have fought over it.
+**[DAB+](../dab/) moved first** — not a toy test, a real migration: it
+dropped `"panel"` from its `provides`. Both its player and its Config
+panel hook into this page as their own labeled tabs
+(`window.mountPageHooks()` builds a small internal tabbar automatically
+once a host has more than one hook — see `docs/PLUGINS.md`). Moved
+wholesale rather than duplicated deliberately — DAB+'s player looks up
+its `<audio>` element by a hardcoded id, not scoped to its own mounted
+root, so two live instances at once (old tab + new hook) would have
+fought over it.
 
-DAB+ moving here also surfaced two real bugs in the hook mechanism itself
-(fixed, not DAB+-specific): `mountPageHooks()` used to hand every hook the
-same container element directly, so a second hook's `mount()` silently
-erased the first's content; and nothing ever called a mounted hook's
-`show()`, so any hook depending on that lifecycle for data loading (like
-DAB+'s Config panel) never did anything. Both fixed generically, so every
-future plugin migrating here benefits automatically.
+DAB+ moving first also surfaced two real bugs in the hook mechanism
+itself (fixed, not DAB+-specific, before anything else migrated):
+`mountPageHooks()` used to hand every hook the same container element
+directly, so a second hook's `mount()` silently erased the first's
+content; and nothing ever called a mounted hook's `show()`, so any hook
+depending on that lifecycle for data loading (like DAB+'s Config panel)
+never did anything. Both fixed generically, and the automatic tabbar
+(built in response to DAB+'s two-tab needs) is what every subsequent
+plugin's tab now renders through too.
 
-Once every RTL-SDR plugin (and Radio) has migrated, `scripts/install.sh`'s
-RTL-SDR section (librtlsdr build, kernel DVB blacklist) moves into this
-plugin's `setup.sh` (currently a no-op placeholder), and the built-in
-Listener page is deleted.
+**P2000, Pagers, POCSAG, RTL433, ACARS and ADS-B followed once the
+mechanism was proven** — all six single-hook migrations, mechanical
+copies of the same pattern (drop `"panel"`, add `"hook"` with
+`host = "rtlsdr"`, swap `registerListenerPanel` for `registerPageHook`).
+Radio is now the only tab left on the built-in Listener page.
+
+Once Radio has migrated too, `scripts/install.sh`'s RTL-SDR section
+(librtlsdr build, kernel DVB blacklist) moves into this plugin's
+`setup.sh` (currently a no-op placeholder), and the built-in Listener page
+is deleted.
 
 ## Enable it
 
@@ -52,9 +57,12 @@ plugins:
 ```
 
 Restart, then Radio → RTL-SDR Plugins in the sidebar (not "RTL-SDR" —
-that's the built-in Listener page). Also enable `dab` (see
-[`plugins/apps/dab/`](../dab/)) to get the DAB+ player and Config panel on
-this page — without it enabled, the page is just the placeholder text.
+that's the built-in Listener page, still Radio-only). Enable whichever
+RTL-SDR plugins you want alongside it — each shows up as its own tab here
+once enabled (see each plugin's own README): [`dab`](../dab/),
+[`p2000`](../p2000/), [`pagers`](../pagers/), [`pocsag`](../pocsag/),
+[`rtl433`](../rtl433/), [`acars`](../acars/), [`adsb`](../adsb/). With
+none enabled, the page is just the placeholder text.
 
 ## Layout
 

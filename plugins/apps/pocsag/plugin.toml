@@ -1,7 +1,7 @@
 name = "pocsag"
 version = "1.0.0"
 meshpoint_api = 1
-provides = ["listener", "routes", "panel"]
+provides = ["listener", "routes", "hook"]
 locked = true  # shipped with this fork -- not user-installed, can't be deleted
 
 [deps]
@@ -9,6 +9,10 @@ setup = "setup.sh"
 
 [frontend]
 scripts = ["frontend/pocsag_panel.js"]
+
+[hook]
+host = "rtlsdr"    # lives on the rtlsdr plugin's page, not the built-in
+                    # Listener page -- see plugins/apps/rtlsdr/README.md
 
 [meta]
 description = "POCSAG512/1200/2400 pager decoding on 439.9875 MHz via rtl_fm + multimon-ng"

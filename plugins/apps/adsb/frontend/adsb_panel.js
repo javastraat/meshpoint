@@ -238,13 +238,18 @@
         }
     }
 
-    if (typeof window.registerListenerPanel !== 'function') {
-        console.warn('ADS-B plugin: listener panel registry missing');
+    if (typeof window.registerPageHook !== 'function') {
+        console.warn('ADS-B plugin: page hook registry missing');
         return;
     }
 
-    window.registerListenerPanel({
-        tab: 'adsb',
+    // Lives on the RTL-SDR Plugins page (plugins/apps/rtlsdr/) via the
+    // "hook" seam, not the built-in Listener page's tabbar. The map/
+    // flight-detail modals are unaffected either way -- both are
+    // singletons appending directly to document.body, independent of
+    // wherever AdsbPanel itself is mounted.
+    window.registerPageHook({
+        host: 'rtlsdr',
         label: 'ADS-B',
         make: () => new AdsbPanel(),
     });

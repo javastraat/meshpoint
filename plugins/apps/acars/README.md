@@ -1,11 +1,12 @@
 # ACARS plugin
 
-Decodes aircraft VHF datalink (ACARS) off the shared RTL-SDR dongle and adds
-an **ACARS** tab to the Listener page — same start/stop/clear + live message
-log as the RTL433 and Pager tabs. ADS-C position contracts and plain-text POS
-reports collapse to a one-line summary with the coordinate linked to
-OpenStreetMap; the full decode sits behind a "details" toggle. Airline
-telemetry (label H1) stays raw — it's carrier-proprietary.
+Decodes aircraft VHF datalink (ACARS) off the shared RTL-SDR dongle and
+hooks an **ACARS** tab into the [RTL-SDR Plugins](../rtlsdr/) page — same
+start/stop/clear + live message log as the RTL433 and Pager tabs. ADS-C
+position contracts and plain-text POS reports collapse to a one-line
+summary with the coordinate linked to OpenStreetMap; the full decode sits
+behind a "details" toggle. Airline telemetry (label H1) stays raw — it's
+carrier-proprietary.
 
 This is Meshpoint's reference **community plugin**: a listener, its `/api/acars`
 routes and its dashboard tab, all under `plugins/apps/acars/`, wired through
@@ -33,15 +34,18 @@ wouldn't stick past the next `Update` anyway).
    Builds `szpajder/libacars` and `f00b4r0/acarsdec` from source into `/opt`.
    Idempotent — skips if `acarsdec` is already on `PATH`.
 
-2. Enable it in `local.yaml` and restart Meshpoint:
+2. Enable it (and [`rtlsdr`](../rtlsdr/), its host page) in `local.yaml`
+   and restart Meshpoint:
 
    ```yaml
    plugins:
+     rtlsdr:
+       enabled: true
      acars:
        enabled: true
    ```
 
-3. Open the dashboard → Listener → **ACARS** → Start.
+3. Open the dashboard → Radio → **RTL-SDR Plugins** → **ACARS** → Start.
 
 Shares the one RTL-SDR dongle with the FM / Pager / RTL433 / DAB+ / ADS-B
 listeners (only one active at a time; stop the other one first).
@@ -72,6 +76,6 @@ setup.sh                    acarsdec + libacars build
 backend/listener.py         acarsdec subprocess + JSON parse (AcarsListener)
 backend/routes.py           /api/acars  status / start / stop / clear
 backend/__init__.py         register(reg)
-frontend/acars_panel.js     the ACARS Listener tab (reuses core PagerPanel)
+frontend/acars_panel.js     the ACARS tab (RTL-SDR Plugins page, reuses core PagerPanel)
 frontend/acars_panel.css    acars row styling
 ```

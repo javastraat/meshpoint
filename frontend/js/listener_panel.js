@@ -381,17 +381,19 @@ class ListenerPanel {
         // Every non-radio Listener sub-tab, in tabbar order. Each entry is
         // {tab, label, panel} where panel has mount(el)/show()/hide(). The
         // `radio` tab is bespoke (audio element + skins) and handled as the
-        // default branch, not from here. Radio is the only RTL-SDR listener
-        // still built into core -- every other tab (Pagers/POCSAG/P2000/
-        // RTL433/ACARS/ADS-B) is a plugin appending its own entry via
-        // window.registerListenerPanel (see listener_panel_registry.js);
-        // window.PagerPanel stays core purely as shared UI several of
-        // those plugins' own tiny frontend files instantiate. DAB+ used to
-        // be one of these too, but now lives entirely on the RTL-SDR
-        // Plugins page (plugins/apps/rtlsdr/) via the "hook" seam instead
-        // -- first RTL-SDR plugin off this page ahead of Radio itself.
-        // Everything still registered here shares the one RTL-SDR dongle
-        // (src/audio/sdr_registry.py) with Radio, so only one runs at a time.
+        // default branch, not from here. `this._subPanels` is empty as of
+        // this comment -- every RTL-SDR plugin that used to append an
+        // entry here via window.registerListenerPanel (DAB+, Pagers,
+        // POCSAG, P2000, RTL433, ACARS, ADS-B) has migrated onto the
+        // RTL-SDR Plugins page instead (plugins/apps/rtlsdr/), via the
+        // DIFFERENT "hook" seam (frontend/sidebar/page_hook_registry.js).
+        // Radio is the only RTL-SDR listener left built into core, and the
+        // Listener page currently shows only its own "Radio" tab as a
+        // result -- this mechanism (and window.PagerPanel, still core
+        // purely as shared UI those plugins' own frontend files
+        // instantiate on the new page) is left in place rather than
+        // deleted, since Radio itself is expected to migrate here too
+        // eventually, at which point this whole page goes away.
         this._subPanels = (window.LISTENER_PANELS || [])
             .map((d) => ({ tab: d.tab, label: d.label, panel: d.make ? d.make() : d.panel }))
             .filter((d) => d && d.panel);

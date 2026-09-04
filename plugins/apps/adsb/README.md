@@ -1,9 +1,10 @@
 # ADS-B plugin
 
 Live air traffic tracking off the shared RTL-SDR dongle via
-[`dump1090`](https://github.com/MalcolmRobb/dump1090), and adds an **ADS-B**
-tab to the Listener page. Unlike the P2000/Pagers/POCSAG/RTL433/ACARS tabs
-(each a scrolling decoded-message log), dump1090 hands back a full snapshot
+[`dump1090`](https://github.com/MalcolmRobb/dump1090), and hooks an
+**ADS-B** tab into the [RTL-SDR Plugins](../rtlsdr/) page. Unlike the
+P2000/Pagers/POCSAG/RTL433/ACARS tabs (each a scrolling decoded-message
+log), dump1090 hands back a full snapshot
 of currently-tracked aircraft on every poll of its own `/data.json`, so this
 renders as a table keyed by ICAO hex that updates in place — a "Metric
 units" checkbox (on by default) passes dump1090's own `--metric` flag, and a
@@ -43,15 +44,18 @@ like every other plugin.
    Builds `MalcolmRobb/dump1090` from source into `/opt/dump1090`.
    Idempotent — skips if `dump1090` is already on `PATH`.
 
-2. Enable it in `local.yaml` and restart Meshpoint:
+2. Enable it (and [`rtlsdr`](../rtlsdr/), its host page) in `local.yaml`
+   and restart Meshpoint:
 
    ```yaml
    plugins:
+     rtlsdr:
+       enabled: true
      adsb:
        enabled: true
    ```
 
-3. Open the dashboard → Listener → **ADS-B** → Start.
+3. Open the dashboard → Radio → **RTL-SDR Plugins** → **ADS-B** → Start.
 
 Shares the one RTL-SDR dongle with the FM / Pager / RTL433 / ACARS / DAB+
 listeners (only one active at a time; stop the other one first).
@@ -64,7 +68,7 @@ setup.sh                        dump1090 build (from source)
 backend/listener.py             dump1090 subprocess + /data.json poll (AdsbListener)
 backend/routes.py               /api/adsb  status / start / stop
 backend/__init__.py             register(reg)
-frontend/adsb_panel.js          the ADS-B Listener tab (aircraft table)
+frontend/adsb_panel.js          the ADS-B tab (RTL-SDR Plugins page, aircraft table)
 frontend/adsb_map_modal.js      live Leaflet map of tracked aircraft
 frontend/adsb_flight_modal.js   per-aircraft detail modal (hexdb.io + planespotters.net)
 frontend/adsb_panel.css         table/map/marker styling

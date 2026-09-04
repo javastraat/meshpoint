@@ -10366,3 +10366,112 @@ what it replaced -- genuinely done, not just "good enough." Next
 candidates to migrate the same way remain Pagers/POCSAG/P2000/RTL433/
 ADS-B/ACARS (each single-hook, so no tab-labeling decisions needed unless
 a plugin adds a second hook later) then eventually Radio itself.
+
+**LIVE-VERIFIED on the Pi**: screenshot confirms the RTL-SDR Plugins page
+now shows exactly the "DAB+" / "DAB+ Config" tabbar as designed -- DAB+
+tab active (green highlight), full player underneath (channel tabs incl.
+Favorites/MTVNL/N-H Flevo/Throwback/Commercial/NPO/Manual, VU meter,
+audio player, station list with Play buttons), visually indistinguishable
+from how it looked on the old Listener page before the migration. This
+closes out DAB+'s migration completely -- functionally AND visually
+equivalent to what it replaced, not just "good enough."
+
+---
+
+## The remaining six migrate in one batch: P2000/Pagers/POCSAG/RTL433/ACARS/ADS-B
+
+User: "so next i guess Pagers/POCSAG/P2000/RTL433/ADS-B/ACARS ?" -- yes,
+confirmed as the natural next batch now that DAB+'s migration (mechanism +
+both bugs + auto-tabbing) is fully proven. Asked via AskUserQuestion
+whether to pace this as all six at once vs one at a time (matching the
+original tab-by-tab extraction pacing) -- user picked all six at once,
+since the pattern is now mechanical with no new design decisions per
+plugin (unlike the original extractions, which each had genuinely
+different code to write).
+
+**Pre-flight check, same diligence as DAB+'s own audio-id investigation
+before assuming safety**: grepped `frontend/js/pager_panel.js` (the shared
+`window.PagerPanel` component P2000/Pagers/POCSAG/RTL433/ACARS all
+instantiate) for `getElementById` -- zero hits, everything properly
+scoped via `this._root.querySelector(...)`. Confirmed safe for all five
+before touching any of them. ADS-B is bespoke (`AdsbPanel` + two modal
+classes, not `PagerPanel`) so checked separately: also zero
+`getElementById` hits across all three files, and both
+`AdsbMapModal`/`AdsbFlightModal` are singletons (`window.AdsbMapModal =
+new AdsbMapModal()` at each file's own bottom) that build their own
+overlay `appendChild`ed straight onto `document.body`, completely
+independent of wherever `AdsbPanel` itself ends up mounted. No DAB+-style
+collision risk anywhere in this batch.
+
+**Changes, one mechanical pattern applied six times**: each plugin's
+`plugin.toml` -- `provides` drops `"panel"`, adds `"hook"`; new `[hook]
+host = "rtlsdr"` table (identical comment across all six, copy-pasted
+deliberately for consistency: "lives on the rtlsdr plugin's page, not the
+built-in Listener page"). Each plugin's frontend script -- bottom
+`window.registerListenerPanel({tab, label, make})` block swapped for
+`window.registerPageHook({host: 'rtlsdr', label, make})`, same `label`
+text as the old `label` (so DAB+'s tab-naming precedent -- matching old
+tab names exactly -- carries through here too), warning-log text updated
+from "listener panel registry" to "page hook registry" in the
+already-existing `if (typeof window.registerListenerPanel !== 'function'
+...)` guards each file already had.
+
+**Core cleanup**: `frontend/js/listener_panel.js`'s constructor comment
+block and `frontend/js/listener_panel_registry.js`'s own file-level
+doc comment both rewritten -- `this._subPanels` is now explicitly
+documented as "empty as of this comment" (every plugin that used to
+register here has migrated), Radio is the only tab left on the built-in
+Listener page, and the registry mechanism itself is explicitly kept
+rather than deleted since Radio is expected to migrate the same way
+eventually (at which point the whole page and this seam both go away
+together, not separately).
+
+**Verified**: `discover_plugins()` re-confirms all six manifests parse
+with the right `provides`/`hook`/`frontend_scripts`. `load_plugins()` (via
+the fastapi-capable interpreter) loads all eight RTL-SDR plugins
+(rtlsdr+dab+six) cleanly end to end in one combined run. New Node harness
+specifically simulating the FULL eventual lineup -- all 8 hooks
+(`DAB+`/`DAB+ Config`/`Pagers`/`POCSAG`/`P2000`/`RTL433`/`ACARS`/`ADS-B`)
+registered against `rtlsdr` at once -- confirms `mountPageHooks()` builds
+exactly 8 tab buttons with matching labels in order, 8 panels with only
+the first visible, matching the exact old Listener-page tab lineup
+recreated on the new host. `node --check` clean on every touched file
+(14 total across this pass). `pytest plugins/
+tests/test_plugin_manifest.py tests/test_plugin_loader.py
+tests/test_plugin_assets.py` -- 134/134 still pass, confirming none of
+the six frontend-only migrations touched anything backend-testable.
+
+**Docs, also found and fixed some PRE-EXISTING staleness while in these
+files anyway**: all six plugin READMEs -- "adds a tab to the Listener
+page" -> "hooks a tab into the RTL-SDR Plugins page", install steps now
+enable `rtlsdr` alongside each plugin, Layout table entries reworded.
+Along the way, found P2000's and POCSAG's READMEs both still claimed
+Pagers was "still core, not a plugin yet" -- stale since EARLIER this
+same session (Pagers was extracted before DAB+ even started) but never
+caught until now since nothing had reason to touch those specific
+sentences again until this pass. Fixed both while already editing
+those files, not a separate detour. `plugins/apps/rtlsdr/README.md`
+substantially rewritten -- no longer framed as "DAB+ is the first to
+move, not done yet" but as a completed batch, with Radio named as the
+one remaining tab on the old page. `docs/PLUGINS.md`'s worked-example
+paragraph extended with one sentence covering the batch. `README.md`'s
+big RTL-SDR paragraph fully restructured: the old paragraph's six
+inline tab descriptions (Pagers/POCSAG/P2000/ACARS/RTL433/ADS-B) moved
+out of the "built-in Listener page" paragraph entirely and into the
+"RTL-SDR Plugins page" paragraph where they now actually live, leaving
+the Listener-page paragraph describing only Radio. New CHANGELOG bullet
+(54th in v0.8.1) covering all six as one batch, since that's how the
+work actually happened, not six separate bullets for one mechanical
+pattern.
+
+**NOT yet done / next steps**: **not live-verified on the Pi yet** -- next
+session should pull, restart, enable `rtlsdr` plus all six plugins (and
+`dab`, if not already), confirm Radio -> RTL-SDR Plugins now shows all
+8 tabs matching the exact old Listener-page lineup, each fully functional,
+and confirm the built-in Listener page itself now shows ONLY "Radio" with
+no other tabs at all. Once confirmed, **the only RTL-SDR listener left
+to migrate is Radio itself** -- the biggest and last one, and the one
+that finally lets the built-in Listener page (and its now-legacy
+`listener_panel_registry.js` seam) be deleted entirely. That's the
+natural final step of this whole multi-session direction, whenever
+picked up next.

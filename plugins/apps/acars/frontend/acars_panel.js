@@ -85,13 +85,15 @@
         `;
     }
 
-    if (typeof window.registerListenerPanel !== 'function' || !window.PagerPanel) {
-        console.warn('ACARS plugin: listener panel registry or PagerPanel missing');
+    if (typeof window.registerPageHook !== 'function' || !window.PagerPanel) {
+        console.warn('ACARS plugin: page hook registry or PagerPanel missing');
         return;
     }
 
-    window.registerListenerPanel({
-        tab: 'acars',
+    // Lives on the RTL-SDR Plugins page (plugins/apps/rtlsdr/) via the
+    // "hook" seam, not the built-in Listener page's tabbar.
+    window.registerPageHook({
+        host: 'rtlsdr',
         label: 'ACARS',
         make: () => new window.PagerPanel('acars', '/api/acars', 'ACARS', _acarsRowHtml),
     });
