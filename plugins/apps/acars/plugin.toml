@@ -14,3 +14,4 @@ styles = ["frontend/acars_panel.css"]
 [meta]
 description = "Aircraft VHF datalink (ACARS) decoding via acarsdec + libacars"
 homepage = "https://github.com/f00b4r0/acarsdec"
+author = "Einstein PD2EMC"

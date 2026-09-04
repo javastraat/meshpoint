@@ -1221,6 +1221,15 @@ select.update-field__input option:checked {
     margin-top: 2px;
 }
 
+.plugin-row__version a {
+    color: var(--accent-cyan);
+    text-decoration: none;
+}
+
+.plugin-row__version a:hover {
+    text-decoration: underline;
+}
+
 .plugin-row__badge {
     display: inline-block;
     padding: 1px 7px;

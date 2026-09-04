@@ -60,10 +60,14 @@ class PluginsPanelController {
         const depsNote = (plugin.apt_deps || []).length
             ? `<p class="plugin-row__deps">Requires: <code>${this._escape(plugin.apt_deps.join(', '))}</code>${plugin.setup_script ? ` — run <code>sudo bash plugins/apps/${this._escape(plugin.id)}/${this._escape(plugin.setup_script)}</code> on the device` : ''}</p>`
             : '';
+        const byLine = [
+            plugin.author ? this._escape(plugin.author) : '',
+            plugin.homepage ? `<a href="${this._escape(plugin.homepage)}" target="_blank" rel="noopener noreferrer">homepage</a>` : '',
+        ].filter(Boolean).join(' &middot; ');
         row.innerHTML = `
             <td>
                 <span class="plugin-row__name">${this._escape(plugin.id)}</span>
-                <span class="plugin-row__version">v${this._escape(plugin.version)}${plugin.author ? ` &middot; ${this._escape(plugin.author)}` : ''}</span>
+                <span class="plugin-row__version">v${this._escape(plugin.version)}${byLine ? ` &middot; ${byLine}` : ''}</span>
             </td>
             <td><span class="plugin-row__badge plugin-row__badge--${badgeMod}">${badgeLabel}</span></td>
             <td class="plugin-row__meta">
