@@ -63,7 +63,6 @@ from src.api.routes import (
     emergency_pager_routes,
     lorawan_routes,
     lorawan_config_routes,
-    dapnet_routes,
     meshtastic_routes,
     meshcore_routes,
     messages,
@@ -79,9 +78,7 @@ from src.api.routes import (
     metrics_config_routes,
     repeater_config_routes,
     serial_config_routes,
-    dapnet_config_routes,
     rfenv_companion_config_routes,
-    pocsag_firmware_routes,
     pager_firmware_routes,
     rfenv_companion_firmware_routes,
     reticulum_companion_firmware_routes,
@@ -191,10 +188,8 @@ _BUILTIN_ROUTERS: list[tuple] = [
     (metrics_config_routes.router, False),
     (meshcore_config_routes.router, False),
     (serial_config_routes.router, False),
-    (dapnet_config_routes.router, False),
     (rfenv_companion_config_routes.router, False),
     (plugin_routes.router, False),
-    (pocsag_firmware_routes.router, False),
     (pager_firmware_routes.router, False),
     (rfenv_companion_firmware_routes.router, False),
     (reticulum_companion_firmware_routes.router, False),
@@ -206,7 +201,6 @@ _BUILTIN_ROUTERS: list[tuple] = [
     (theme_routes.router, True),
     (lorawan_routes.router, False),
     (lorawan_config_routes.router, False),
-    (dapnet_routes.router, False),
     (reticulum_routes.router, False),
     (reticulum_config_routes.router, False),
     (emergency_pager_routes.router, False),
@@ -682,8 +676,6 @@ def _build_pipeline(config: AppConfig) -> PipelineCoordinator:
             _add_concentrator_source(coordinator, config)
         elif source_name == "meshcore_usb":
             _add_meshcore_usb_source(coordinator, config)
-        elif source_name == "pocsag_serial":
-            _add_dapnet_source(coordinator, config)
 
     # Plugin-registered capture sources (src.api.capture_source_registry) --
     # must run before this function returns, since the caller calls
@@ -714,19 +706,6 @@ def _add_serial_source(coordinator: PipelineCoordinator, config: AppConfig):
             SerialCaptureSource(
                 port=dev.serial_port, baud=dev.serial_baud, label=dev.label,
                 long_name=dev.long_name, short_name=dev.short_name,
-            )
-        )
-
-
-def _add_dapnet_source(coordinator: PipelineCoordinator, config: AppConfig):
-    """Add one DapnetSerialSource per configured POCSAG companion."""
-    from src.capture.dapnet_source import DapnetSerialSource
-
-    for dev in config.capture.pocsag_serial:
-        coordinator.capture_coordinator.add_source(
-            DapnetSerialSource(
-                serial_port=dev.serial_port, serial_baud=dev.serial_baud, label=dev.label,
-                status_poll_interval_s=config.dapnet.status_poll_interval_s,
             )
         )
 
@@ -1303,19 +1282,6 @@ def _find_serial_sources(coord: PipelineCoordinator) -> list:
     return [
         src for src in coord.capture_coordinator._sources
         if src.name.startswith("serial")
-    ]
-
-
-def _find_dapnet_sources(coord: PipelineCoordinator) -> list:
-    """All DAPNET/POCSAG companion capture sources, in configured order.
-
-    Same "one badge per device" reasoning as _find_serial_sources --
-    each companion is an independent passive capture source, no single
-    "primary" to pick.
-    """
-    return [
-        src for src in coord.capture_coordinator._sources
-        if src.name.startswith("dapnet")
     ]
 
 
@@ -1955,7 +1921,6 @@ def _init_routes(
         channel_hash_resolver=channel_hash_resolver,
         serial_sources=_find_serial_sources(coord),
         meshcore_sources=_find_meshcore_sources(coord),
-        dapnet_sources=_find_dapnet_sources(coord),
     )
     mqtt_config_routes.init_routes(
         config=config,
@@ -1964,7 +1929,7 @@ def _init_routes(
     upstream_config_routes.init_routes(config=config)
     device_config_routes.init_routes(config=config, identity=identity)
     gps_status.init_routes(location_source=coord.location_source)
-    system_config_routes.init_routes(config=config, packet_repo=coord.packet_repo)
+    system_config_routes.init_routes(config=config)
     hardware_config_routes.init_routes(config=config)
     repeater_config_routes.init_routes(config=config)
     metrics_config_routes.init_routes(config=config)
@@ -1972,7 +1937,6 @@ def _init_routes(
         config=config, tx_service=tx_service, meshcore_sources=_find_meshcore_sources(coord),
     )
     serial_config_routes.init_routes(config=config, serial_sources=_find_serial_sources(coord))
-    dapnet_config_routes.init_routes(dapnet_sources=_find_dapnet_sources(coord))
     rfenv_companion_config_routes.init_routes(config=config, service=_rfenv_companion_service)
     plugin_routes.init_routes(
         config=config,
@@ -1980,13 +1944,11 @@ def _init_routes(
         community_dir=Path(config.dashboard.plugins_dir) / "apps",
         loaded_plugins=_loaded_plugins,
     )
-    pocsag_firmware_routes.init_routes(config=config, dapnet_sources=_find_dapnet_sources(coord))
     meshtastic_firmware_routes.init_routes(config=config, serial_sources=_find_serial_sources(coord))
     meshcore_firmware_routes.init_routes(config=config, meshcore_sources=_find_meshcore_sources(coord))
     _dev_name = config.device.device_name or "meshpoint"
     lorawan_routes.init_routes(coord.packet_repo, device_name=_dev_name)
     lorawan_config_routes.init_routes(config=config, keystore=coord.lorawan_keystore)
-    dapnet_routes.init_routes(coord.packet_repo, device_name=_dev_name)
     if reticulum_service is not None and message_repo is not None:
         reticulum_routes.init_routes(reticulum_service, message_repo)
     reticulum_config_routes.init_routes(config=config)

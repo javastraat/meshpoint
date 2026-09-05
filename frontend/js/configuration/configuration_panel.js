@@ -156,14 +156,6 @@ class ConfigurationPanel {
                 card.mount(host);
                 this._cards.set('serial', card);
             }
-        } else if (section === 'pocsag-serial' && window.PocsagSerialConfigCard) {
-            const host = document.getElementById('cfg-pocsag-serial-panel');
-            if (host) {
-                host.innerHTML = '';
-                const card = new window.PocsagSerialConfigCard(api);
-                card.mount(host);
-                this._cards.set('pocsag-serial', card);
-            }
         } else if (section === 'firmware') {
             const host = document.getElementById('cfg-firmware-panel');
             if (host) {

@@ -48,19 +48,6 @@ def _add_serial_source(coordinator: PipelineCoordinator, config) -> None:
         )
 
 
-def _add_dapnet_source(coordinator: PipelineCoordinator, config) -> None:
-    """Add one DapnetSerialSource per configured POCSAG companion."""
-    from src.capture.dapnet_source import DapnetSerialSource
-
-    for dev in config.capture.pocsag_serial:
-        coordinator.capture_coordinator.add_source(
-            DapnetSerialSource(
-                serial_port=dev.serial_port, serial_baud=dev.serial_baud, label=dev.label,
-                status_poll_interval_s=config.dapnet.status_poll_interval_s,
-            )
-        )
-
-
 def _add_concentrator_source(coordinator: PipelineCoordinator, config) -> None:
     try:
         from src.capture.concentrator_source import ConcentratorCaptureSource
@@ -110,8 +97,6 @@ async def run_standalone() -> None:
             _add_concentrator_source(coordinator, config)
         elif source_name == "meshcore_usb":
             _add_meshcore_usb_source(coordinator, config)
-        elif source_name == "pocsag_serial":
-            _add_dapnet_source(coordinator, config)
 
     if (
         "meshcore_usb" not in config.capture.sources

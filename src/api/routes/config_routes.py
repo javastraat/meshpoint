@@ -48,7 +48,6 @@ _identity: DeviceIdentity | None = None
 _channel_hash_resolver = None
 _serial_sources: list = []
 _meshcore_sources: list = []
-_dapnet_sources: list = []
 
 
 def init_routes(
@@ -59,10 +58,9 @@ def init_routes(
     channel_hash_resolver=None,
     serial_sources: list | None = None,
     meshcore_sources: list | None = None,
-    dapnet_sources: list | None = None,
 ) -> None:
     global _config, _crypto, _tx_service, _identity, _channel_hash_resolver
-    global _serial_sources, _meshcore_sources, _dapnet_sources
+    global _serial_sources, _meshcore_sources
     _config = config
     _crypto = crypto
     _tx_service = tx_service
@@ -70,7 +68,6 @@ def init_routes(
     _channel_hash_resolver = channel_hash_resolver
     _serial_sources = serial_sources or []
     _meshcore_sources = meshcore_sources or []
-    _dapnet_sources = dapnet_sources or []
 
 
 def _refresh_channel_hash_map() -> None:
@@ -195,35 +192,6 @@ def _serial_status_entry(src) -> dict:
     }
 
 
-def _dapnet_status_entry(src) -> dict:
-    """Topbar status for one DAPNET/POCSAG companion capture source.
-
-    Board/callsign/freq/hostname/wifi_ip/tx_count/last_tx_ok/uptime_ms
-    all come from the source's cached reply to its {"cmd":"status"}
-    query (see DapnetSerialSource.status) -- {} until the first reply
-    arrives (or if the companion's firmware predates the "cmd"
-    handler). tx_count/last_tx_ok/uptime_ms only stay current because
-    this query now repeats periodically (DapnetConfig.
-    status_poll_interval_s) rather than firing once at connect --
-    board/callsign/freq/hostname/wifi_ip would already be safe as a
-    one-shot value, these wouldn't.
-    """
-    status = getattr(src, "status", {}) or {}
-    return {
-        "name": src.name,
-        "connected": bool(getattr(src, "connected", False)),
-        "board": status.get("board"),
-        "callsign": status.get("callsign"),
-        "frequency_mhz": status.get("freq"),
-        "hostname": status.get("hostname"),
-        "wifi_ssid": status.get("wifi_ssid"),
-        "wifi_ip": status.get("wifi_ip"),
-        "tx_count": status.get("tx_count"),
-        "last_tx_ok": status.get("last_tx_ok"),
-        "uptime_ms": status.get("uptime_ms"),
-    }
-
-
 async def _meshcore_companion_status_entry(src) -> dict:
     """Live status for one MeshCore USB companion capture source.
 
@@ -338,7 +306,6 @@ async def get_config(claims: SessionClaims = Depends(require_auth)):
     )
 
     serial_status = [_serial_status_entry(src) for src in _serial_sources]
-    dapnet_status = [_dapnet_status_entry(src) for src in _dapnet_sources]
     # One entry per configured MeshCore companion (own connection, own
     # radio/device readouts) -- unlike mc_status above, which only ever
     # reflects company[0] (the single companion _tx_service._meshcore_tx
@@ -423,7 +390,6 @@ async def get_config(claims: SessionClaims = Depends(require_auth)):
         "channels": channels,
         "meshcore": mc_status,
         "serial": serial_status,
-        "dapnet_status": dapnet_status,
         "duty_cycle": duty_info,
         "presets": all_presets_list(),
         "regions": [

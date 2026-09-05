@@ -21,7 +21,7 @@ example.
 
 ## What a plugin can do today
 
-An app plugin is out-of-core code that hooks five seams:
+An app plugin is out-of-core code that hooks seven seams:
 
 - **Routes** — mount a FastAPI `APIRouter` under `/api/<whatever>`.
 - **Listener** — register an RTL-SDR subprocess listener (built idle at
@@ -40,12 +40,19 @@ An app plugin is out-of-core code that hooks five seams:
 - **Hook** — inject content into *another* plugin's already-rendered page,
   instead of owning a page/tab of your own. The other plugin has to opt in
   as a host (see [Injecting into another page](#injecting-into-another-page-hook)).
+- **Capture** — register a `CaptureSource` that isn't RTL-SDR-shaped (a
+  serial-connected device, say), joining the core packet pipeline
+  unconditionally at boot rather than on-demand via a `/start` route.
+- **Protocol** — own decode and post-decode classification for a protocol
+  identity your plugin introduces, one that isn't a member of the closed
+  `Protocol` enum. Kept separate from Capture since a plugin might need
+  only one of the two (see
+  [Adding a non-RTL-SDR capture source + protocol](#adding-a-non-rtl-sdr-capture-source--protocol-captureprotocol)).
 
-That's it. A plugin **cannot** (yet) add a packet *decoder* hooked into an
-existing capture source, a new *capture source* of its own (non-RTL-SDR), or
-a *plugin-contributed settings sub-page* (something more structured than raw
-`plugins.<id>` YAML) — see [Current limitations](#current-limitations) at
-the bottom before you start, in case what you want to build needs one of
+That's it. A plugin **cannot** (yet) add a *plugin-contributed settings
+sub-page* inside core's own Configuration section, or a *generic topbar
+status chip* — see [Current limitations](#current-limitations) at the
+bottom before you start, in case what you want to build needs one of
 those.
 
 ## Directory layout
@@ -123,7 +130,7 @@ author = "Your Name"
 | `name` | yes | Must equal the folder name. |
 | `version` | yes | Free-form string, shown on Settings → Plugins. |
 | `meshpoint_api` | yes | Integer. Currently `1` (`PLUGIN_API_VERSION` in `src/plugins/manifest.py`). A manifest targeting a higher number than this build supports is refused, not crashed. |
-| `provides` | yes | Non-empty subset of `listener`, `routes`, `panel`, `sidebar`, `hook`. Calling a `PluginRegistry` method for a capability you didn't declare raises at register time — see [The `register(reg)` entry point](#the-registerreg-entry-point). |
+| `provides` | yes | Non-empty subset of `listener`, `routes`, `panel`, `sidebar`, `hook`, `capture`, `protocol`. Calling a `PluginRegistry` method for a capability you didn't declare raises at register time — see [The `register(reg)` entry point](#the-registerreg-entry-point). |
 | `locked` | no, default `false` | Only meaningful for **community** plugins. `true` marks a shipped/bundled community plugin (git-tracked, not a real user drop-in) so Settings → Plugins refuses to offer a Delete button for it — the same protection `plugins/themes/*/theme.json`'s `"locked": true` already gives the bundled theme pack. ACARS sets this. If you're writing a plugin someone else will `git clone` into their own `plugins/apps/`, leave it `false` (default) so they can delete it if they want to. |
 | `[deps].apt` / `.setup` | no | System packages + a build script. **Never installed automatically** — the operator runs it themselves (`sudo bash plugins/apps/<id>/setup.sh` or `sudo meshpoint plugin setup <id>`, which just wraps the same script after showing what it does). |
 | `[frontend].scripts` / `.styles` | scripts required iff `panel`, `sidebar` or `hook` in `provides` | Served at `/plugins/apps/<id>/<path>` — **only** the exact files listed here, from either tier, nothing else in the folder is reachable (`src/plugins/assets.py:resolve_plugin_asset`). |
@@ -183,11 +190,34 @@ def register(reg) -> None:
   hit. `wire`, if given, is called with whatever `build()` returned, so you
   can inject it into your routes module's module-level state (that's what
   `init_routes(listener)` does above).
+- `reg.add_capture_source(name, build, wire=None)` — requires `"capture"`
+  in `provides`. For a capture source that isn't RTL-SDR-shaped and
+  doesn't share the one-dongle-at-a-time listener lifecycle — a serial
+  device, say. `build` is a zero-arg callable returning your `CaptureSource`
+  (or a tuple of several, one per configured device); unlike a listener it
+  joins the pipeline **unconditionally at boot**, no `/start` route. `wire`,
+  if given, is called once `pipeline.start()` has completed (so
+  `pipeline.packet_repo` is safe to read) with whatever `build()` returned
+  plus the live `pipeline` — this is how a plugin's own routes get a
+  `PacketRepository` handle. See [Adding a non-RTL-SDR capture
+  source + protocol](#adding-a-non-rtl-sdr-capture-source--protocol-captureprotocol)
+  below.
+- `reg.add_protocol(protocol, *, capture_prefix, adapt, tier=None)` —
+  requires `"protocol"` in `provides`. Lets your plugin own decode and
+  post-decode classification for a protocol identity it introduces (not
+  one of the closed `Protocol` enum's members) — `protocol` is a plain
+  string, matched against `packet.protocol` after decode; `capture_prefix`
+  is matched against `raw.capture_source.startswith(...)` to decide when
+  your `adapt(raw) -> Packet | None` runs instead of the core decoder.
+  `tier(packet) -> "ignore" | "blacklist" | None`, if given, is checked
+  right after decode — `"ignore"` drops the packet entirely (not even
+  shown live), `"blacklist"` shows it live but never persists it, `None`
+  is normal handling. See the same section below.
 
-Calling `add_router`/`add_listener` for a capability not in `provides`
-raises `PluginRegistryError` — caught by the loader, logged, and the whole
-plugin is skipped (one bad plugin never aborts the others or the app). See
-`src/plugins/loader.py::load_plugins`.
+Calling `add_router`/`add_listener`/`add_capture_source`/`add_protocol` for
+a capability not in `provides` raises `PluginRegistryError` — caught by the
+loader, logged, and the whole plugin is skipped (one bad plugin never
+aborts the others or the app). See `src/plugins/loader.py::load_plugins`.
 
 ## Adding a dashboard tab (`"panel"`, unused — use `"hook"` instead)
 
@@ -450,6 +480,91 @@ markup fine but silently never load any data, with no error anywhere. Not
 needed if your own page has no meaningful `show()`/`hide()` of its own
 (Hello World's are no-ops, so the simpler example above skips this).
 
+## Adding a non-RTL-SDR capture source + protocol (`"capture"`/`"protocol"`)
+
+`"listener"` assumes RTL-SDR: a subprocess sharing one dongle, idle until
+its own `/start` route fires. A capture source that's genuinely different
+hardware (a serial-connected device, say) and introduces a protocol
+identity that isn't one of the closed `Protocol` enum's members needs two
+separate capabilities instead — kept separate, not combined, since a
+plugin might only need one (a new protocol classifying packets that arrive
+over an *existing* capture source, or a new capture source producing
+packets in an *existing* protocol shape). `plugins/apps/dapnet/` is the
+real, shipped example both are built from — DAPNET/POCSAG paging over a
+serial-connected companion board, the first plugin to use either seam:
+
+```python
+# plugins/apps/dapnet/backend/__init__.py
+from __future__ import annotations
+
+
+def register(reg) -> None:
+    from . import config_routes, decode, firmware_routes, routes, settings_routes, state
+    from .listener import DapnetSerialSource
+
+    state.init(reg.config)
+    reg.add_router(routes.router)
+    reg.add_router(config_routes.router)
+    reg.add_router(firmware_routes.router)
+    reg.add_router(settings_routes.router)
+
+    def build() -> tuple[DapnetSerialSource, ...]:
+        return tuple(
+            DapnetSerialSource(
+                serial_port=dev.get("serial_port"), serial_baud=dev.get("serial_baud", 115200),
+                label=dev.get("label", ""), status_poll_interval_s=state.status_poll_interval_s(),
+            )
+            for dev in state.devices()
+        )
+
+    def wire(sources, pipeline) -> None:
+        routes.init_routes(pipeline.packet_repo)
+        config_routes.init_routes(dapnet_sources=list(sources))
+        firmware_routes.init_routes(dapnet_sources=list(sources))
+        settings_routes.init_routes(
+            dapnet_sources=list(sources), packet_repo=pipeline.packet_repo,
+        )
+
+    reg.add_capture_source("dapnet", build, wire)
+    reg.add_protocol(
+        "dapnet", capture_prefix="dapnet",
+        adapt=lambda raw: decode.adapt_event(raw.payload, signal=raw.signal),
+        tier=state.tier,
+    )
+```
+
+A few things that only matter for this pair:
+
+- **`build()` runs before `wire()`, and before the pipeline starts.**
+  `add_capture_source`'s sources are drained into the pipeline's capture
+  coordinator *before* `pipeline.start()` is called (a source added after
+  that point never gets a reader task); `wire()` only runs once
+  `pipeline.start()` has completed, since `pipeline.packet_repo` raises
+  until then. You never need to sequence this yourself — the core wiring
+  (`src/api/server.py`'s `_build_pipeline`/`lifespan`) already calls
+  `build_all()`/`wire_all()` at the right points.
+- **Your `Packet`s need an identity that isn't a real `Protocol`/`PacketType`
+  member.** Construct them with `OpenProtocol("dapnet")` /
+  `OpenPacketType("dapnet_alpha")` (`src/models/packet.py`) instead —
+  plain-string subclasses that expose `.value` and behave identically to a
+  real enum member (`==`, hashing, f-strings, DB storage) at every one of
+  the ~20 existing `packet.protocol.value`-style call sites across the
+  codebase, with zero changes needed at any of them. `Protocol.parse(value)`
+  / `PacketType.parse(value)` (used when reconstructing a `Packet` from
+  storage) already fall back to these for a value the closed enum doesn't
+  recognize — you don't call them yourself, `PacketRepository` does.
+- **`capture_prefix` is a `str.startswith()` match, checked in registration
+  order.** `raw.capture_source` for a capture-source-owning plugin's own
+  sources is that source's `.name` (e.g. `"dapnet"`, or `"dapnet_ttgo"` for
+  a labeled second device) — `capture_prefix="dapnet"` matches both.
+- **`tier`'s two outcomes are for noise, not errors.** `"ignore"` is for
+  traffic nobody ever wants to see (return early, nothing stored, nothing
+  shown); `"blacklist"` is for traffic worth confirming is still arriving
+  live (shown over the WebSocket feed) but not worth keeping in the
+  packets table forever (DAPNET's own network housekeeping/time-sync
+  beacons, in its case). Anything else — the normal case — return `None`
+  and the packet is stored and broadcast exactly like any other protocol's.
+
 ## Your plugin's own config
 
 `plugins.<id>` in `local.yaml` is entirely yours — Meshpoint only ever
@@ -563,23 +678,27 @@ Don't build around these — if you need one, that's a signal to extend the
 core seam (`src/plugins/registry.py`, `src/plugins/manifest.py`'s
 `KNOWN_PROVIDES`), not to work around it inside a plugin:
 
-- **No decoder seam.** A plugin can't hook into an *existing* capture
-  source's packet stream (the way, say, a LoRaWAN-style decoder would) —
-  only a new listener it owns entirely.
-- **No non-RTL-SDR capture source seam.** `add_listener` is RTL-SDR-shaped
-  specifically (shares `src/audio/sdr_registry.py`'s one-dongle-at-a-time
-  claim). A plugin reading from a different physical source (another
-  serial protocol, say) has no seam yet.
 - **No plugin-contributed settings sub-page seam.** Beyond raw
   `plugins.<id>` YAML (see above), a plugin can't render its own
-  Configuration-style settings UI. (The `"sidebar"` seam above gets a
-  plugin its own top-level *page* — this is specifically about a
-  Configuration/Settings-style *form* wired to `plugins.<id>`.)
+  Configuration-style settings UI *inside the core Configuration page*.
+  (The `"sidebar"` seam gets a plugin its own top-level *page*, and DAPNET's
+  own "Settings" tab on that page is one way around this for a plugin
+  that already has a page of its own — this is specifically about a
+  Configuration/Settings-*style form living in core's own Configuration
+  section*, for a plugin with no page to hang a tab off of.)
+- **No generic topbar-chip seam.** A plugin has no way to show a persistent,
+  glance-from-anywhere status badge in the topbar the way core's own
+  Meshtastic/MeshCore/Serial/Pager/Reticulum chips do — DAPNET's own status
+  card at the top of its page is the deliberate substitute, a real,
+  acknowledged trade-off (see its CHANGELOG entry). Same reasoning as the
+  RTL-SDR family's sidebar "in use" badge before `sdr_status_badge.js` was
+  built: don't guess a shared seam's shape from one caller.
 
-These are anticipated, not hypothetical — the current best guess is
-they'll matter when protocols like LoRaWAN or Pager eventually get
-extracted into plugins the same way ACARS was (the top-level sidebar page
-seam that used to be listed here was built for exactly that reason, proven
-out with the Hello World reference plugin). Until a real plugin needs one
-of the two above, though, building the seam speculatively risks guessing
-the wrong shape. Full background: `memory/plugin-architecture-review.md`.
+The non-RTL-SDR capture source + decoder-ownership gaps that used to be
+listed here are solved — see [Adding a non-RTL-SDR capture source +
+protocol](#adding-a-non-rtl-sdr-capture-source--protocol-captureprotocol)
+above, proven out by DAPNET actually moving out of core onto it. Don't
+build around the two above either — if you need one, that's a signal to
+extend the core seam (`src/plugins/registry.py`,
+`src/plugins/manifest.py`'s `KNOWN_PROVIDES`), not to work around it
+inside a plugin. Full background: `memory/plugin-architecture-review.md`.

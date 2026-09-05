@@ -315,5 +315,46 @@ class TestShippedAcarsPlugin(unittest.TestCase):
         self.assertNotIn("acars", [p.manifest.name for p in loaded])
 
 
+class TestShippedDapnetPlugin(unittest.TestCase):
+    """The real plugins/apps/dapnet/ folder loads and registers its
+    capture source + protocol, in addition to routes -- the first
+    non-RTL-SDR-shaped plugin to exercise both of those capabilities."""
+
+    def setUp(self) -> None:
+        route_registry.reset()
+        listener_registry.reset()
+        capture_source_registry.reset()
+        protocol_registry.reset()
+        self._community = Path(__file__).resolve().parents[1] / "plugins" / "apps"
+
+    def tearDown(self) -> None:
+        for name in [m for m in list(sys.modules) if m.startswith("meshpoint_plugin_")]:
+            del sys.modules[name]
+        route_registry.reset()
+        listener_registry.reset()
+        capture_source_registry.reset()
+        protocol_registry.reset()
+
+    def test_dapnet_loads_when_enabled(self) -> None:
+        loaded = load_plugins(
+            self._community / "nonexistent-builtin",
+            self._community,
+            {"dapnet": {"enabled": True}},
+        )
+        self.assertIn("dapnet", [p.manifest.name for p in loaded])
+        self.assertTrue(
+            any(getattr(s.router, "prefix", "") == "/api/dapnet"
+                for s in route_registry.registered())
+        )
+        self.assertIn("dapnet", [s.name for s in capture_source_registry.plugin_specs()])
+        self.assertIsNotNone(protocol_registry.for_protocol("dapnet"))
+
+    def test_dapnet_skipped_when_not_enabled(self) -> None:
+        loaded = load_plugins(
+            self._community / "nonexistent-builtin", self._community, {},
+        )
+        self.assertNotIn("dapnet", [p.manifest.name for p in loaded])
+
+
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()

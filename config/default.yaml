@@ -81,14 +81,6 @@ capture:                  # what packet sources to read from
   #     label: "433"
   #   - serial_port: "/dev/ttyUSB1"
   #     label: "868"
-  # pocsag_serial -- extra/pocsag_companion (DAPNET bridge), one entry per
-  # board. Everything else (callsign, screen timeout) is set on the
-  # device's own WiFi web dashboard, not here. Also add "pocsag_serial"
-  # to sources: above to enable it.
-  pocsag_serial: []
-  # pocsag_serial:
-  #   - serial_port: "/dev/ttyUSB2"
-  #     label: "dapnet"
   # rfenv_companion -- extra/rfenv_companion, a Heltec V3 with its own
   # SX1262 that feeds the RF Environment page's histogram/Band Spectrum
   # on hardware with no working SX1261 (e.g. RAK2287/RAK V2). Fallback

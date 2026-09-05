@@ -7,7 +7,7 @@ so CI-only, not runnable on the Mac dev machine (no aiosqlite there).
 import unittest
 from datetime import datetime, timezone
 
-from src.models.packet import Packet, PacketType, Protocol
+from src.models.packet import OpenPacketType, OpenProtocol, Packet
 from src.storage.database import DatabaseManager
 from src.storage.packet_repository import PacketRepository
 
@@ -29,8 +29,8 @@ class TestDeleteDapnetCapcodes(unittest.IsolatedAsyncioTestCase):
             packet_id=f"pkt-{capcode}",
             source_id="broadcast",
             destination_id=capcode,
-            protocol=Protocol.DAPNET,
-            packet_type=PacketType.DAPNET_ALPHA,
+            protocol=OpenProtocol("dapnet"),
+            packet_type=OpenPacketType("dapnet_alpha"),
             timestamp=datetime.now(timezone.utc),
         ))
 

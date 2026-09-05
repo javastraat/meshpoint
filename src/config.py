@@ -245,40 +245,6 @@ def _coerce_serial_devices(value) -> list[SerialDeviceConfig]:
 
 
 @dataclass
-class PocsagSerialDeviceConfig:
-    """POCSAG companion (``extra/pocsag_companion``) -- one entry per board.
-
-    Connection info only: callsign, screen timeout, and everything else
-    protocol-level is configured on the device's own WiFi web dashboard
-    (``pocsag-companion.local``), not here. No identity/advert concept --
-    unlike the Meshtastic/MeshCore companions, this board isn't itself a
-    mesh node with a nameable identity.
-    """
-
-    serial_port: Optional[str] = None
-    serial_baud: int = 115200
-    label: str = ""   # e.g. "ttgo" or "heltec" — shown in logs and capture_source tag
-    name: str = ""    # free-text display name shown in the dashboard UI
-
-
-_POCSAG_SERIAL_DEVICE_FIELDS: frozenset[str] = frozenset(
-    {"serial_port", "serial_baud", "label", "name"}
-)
-
-
-def _coerce_pocsag_serial_devices(value) -> list[PocsagSerialDeviceConfig]:
-    """Parse the multi-device ``capture.pocsag_serial`` list (same shape as ``serial``)."""
-    def _from_dict(d: dict) -> PocsagSerialDeviceConfig:
-        return PocsagSerialDeviceConfig(
-            **{k: v for k, v in d.items() if k in _POCSAG_SERIAL_DEVICE_FIELDS}
-        )
-
-    if isinstance(value, list):
-        return [_from_dict(d) for d in value if isinstance(d, dict)]
-    return []
-
-
-@dataclass
 class RfEnvCompanionDeviceConfig:
     """RF Environment companion (``extra/rfenv_companion``) -- one entry per
     board. A Heltec V3 with its own SX1262, polled over USB serial for a
@@ -303,7 +269,7 @@ _RFENV_COMPANION_DEVICE_FIELDS: frozenset[str] = frozenset(
 
 
 def _coerce_rfenv_companion_devices(value) -> list[RfEnvCompanionDeviceConfig]:
-    """Parse the multi-device ``capture.rfenv_companion`` list (same shape as ``pocsag_serial``)."""
+    """Parse the multi-device ``capture.rfenv_companion`` list (same shape as ``serial``)."""
     def _from_dict(d: dict) -> RfEnvCompanionDeviceConfig:
         return RfEnvCompanionDeviceConfig(
             **{k: v for k, v in d.items() if k in _RFENV_COMPANION_DEVICE_FIELDS}
@@ -352,7 +318,6 @@ class CaptureConfig:
     serial_port: Optional[str] = None
     serial_baud: int = 115200
     serial: list[SerialDeviceConfig] = field(default_factory=list)
-    pocsag_serial: list[PocsagSerialDeviceConfig] = field(default_factory=list)
     rfenv_companion: list[RfEnvCompanionDeviceConfig] = field(default_factory=list)
     concentrator_spi_device: str = "/dev/spidev0.0"
     meshcore_usb: list[MeshcoreUsbConfig] = field(
@@ -705,36 +670,6 @@ class UpdateCheckConfig:
 
 
 @dataclass
-class DapnetConfig:
-    """DAPNET/POCSAG companion capture (extra/pocsag_companion) settings.
-
-    Not a connection setting (that's ``capture.pocsag_serial``) -- this
-    is what happens to a decoded page once received. Two independent
-    tiers, both user-editable from Configuration -> POCSAG:
-
-    - ``blacklist_capcodes``: DAPNET's own network housekeeping/time-
-      sync beacons (real capcodes, confirmed) repeat every couple of
-      minutes -- worth seeing live (confirms the decoder/network are
-      still alive) but not worth persisting. Shown on the live DAPNET
-      page but never written to the packets table.
-    - ``ignore_capcodes``: pure noise the user never wants to see at
-      all -- neither persisted nor shown live.
-
-    ``status_poll_interval_s`` is unrelated to either tier -- it's how
-    often (in seconds) DapnetSerialSource re-sends its {"cmd":"status"}
-    query after the initial one-shot at connect, to keep tx_count/
-    last_tx_ok/uptime_ms fresh. Global, not per-device -- no real
-    reason one companion would want a different cadence than another.
-    """
-
-    blacklist_capcodes: list[int] = field(
-        default_factory=lambda: [200, 208, 216, 224]
-    )
-    ignore_capcodes: list[int] = field(default_factory=lambda: [4512, 4520])
-    status_poll_interval_s: int = 60
-
-
-@dataclass
 class ReticulumConfig:
     """Native Reticulum/LXMF messaging (companion to extra/heltec_v4_reticulum_bron).
 
@@ -819,7 +754,6 @@ class AppConfig:
     button: ButtonConfig = field(default_factory=ButtonConfig)
     repeater_poll: RepeaterPollConfig = field(default_factory=RepeaterPollConfig)
     update_check: UpdateCheckConfig = field(default_factory=UpdateCheckConfig)
-    dapnet: DapnetConfig = field(default_factory=DapnetConfig)
     reticulum: ReticulumConfig = field(default_factory=ReticulumConfig)
     # Per-plugin config, keyed by plugin id (folder name under
     # plugins/apps/). Opaque: each plugin owns its own sub-schema. The
@@ -918,11 +852,7 @@ def _apply_yaml(cfg: AppConfig, path: Path) -> None:
     # scalars keep working untouched when this key is absent.
     if isinstance(cap_raw, dict) and "serial" in cap_raw:
         cfg.capture.serial = _coerce_serial_devices(cap_raw.pop("serial"))
-    # pocsag_serial is a list-of-dicts, same shape as serial; pop it before
-    # the generic merge so _merge_dataclass doesn't store raw dicts.
-    if isinstance(cap_raw, dict) and "pocsag_serial" in cap_raw:
-        cfg.capture.pocsag_serial = _coerce_pocsag_serial_devices(cap_raw.pop("pocsag_serial"))
-    # rfenv_companion is a list-of-dicts, same shape as pocsag_serial; pop
+    # rfenv_companion is a list-of-dicts, same shape as serial; pop
     # it before the generic merge so _merge_dataclass doesn't store raw dicts.
     if isinstance(cap_raw, dict) and "rfenv_companion" in cap_raw:
         cfg.capture.rfenv_companion = _coerce_rfenv_companion_devices(cap_raw.pop("rfenv_companion"))
@@ -958,7 +888,6 @@ def _apply_yaml(cfg: AppConfig, path: Path) -> None:
         "button": cfg.button,
         "repeater_poll": cfg.repeater_poll,
         "update_check": cfg.update_check,
-        "dapnet": cfg.dapnet,
         "reticulum": cfg.reticulum,
     }
 

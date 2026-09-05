@@ -5,7 +5,6 @@
  *   - TopbarMeshtasticChip  (WS lamp · short name · region · MHz · preset)
  *   - TopbarMeshcoreChip    (companion lamp · name · MHz · channel)
  *   - TopbarSerialChip      (one badge per Meshtastic USB serial device)
- *   - TopbarDapnetChip      (one badge per DAPNET/POCSAG companion device)
  *   - TopbarPagerChip       (single badge, emergency pager project)
  *   - TopbarReticulumChip   (own address · peer count, own 15s poll -- runtime state, not config)
  *   - TopbarActions         (right-side quick-action buttons)
@@ -25,9 +24,6 @@ class TopbarController {
         );
         this._serial = new TopbarSerialChip(
             rootEl.querySelector('#topbar-serial-group'),
-        );
-        this._dapnet = new TopbarDapnetChip(
-            rootEl.querySelector('#topbar-dapnet-group'),
         );
         this._pager = new TopbarPagerChip(
             rootEl.querySelector('#topbar-pager-group'),
@@ -57,31 +53,26 @@ class TopbarController {
             this._meshtastic.setConnectionState('offline');
             this._meshcore.setDashboardReachable(false);
             this._serial.setDashboardReachable(false);
-            this._dapnet.setDashboardReachable(false);
             return;
         }
         this._ws.on('connected', () => {
             this._meshtastic.setConnectionState('online');
             this._meshcore.setDashboardReachable(true);
             this._serial.setDashboardReachable(true);
-            this._dapnet.setDashboardReachable(true);
             this._refreshConfig();
         });
         this._ws.on('disconnected', () => {
             this._meshtastic.setConnectionState('reconnecting');
             this._meshcore.setDashboardReachable(false);
             this._serial.setDashboardReachable(false);
-            this._dapnet.setDashboardReachable(false);
         });
         if (this._ws.socket && this._ws.socket.readyState === 1) {
             this._meshtastic.setConnectionState('online');
             this._meshcore.setDashboardReachable(true);
             this._serial.setDashboardReachable(true);
-            this._dapnet.setDashboardReachable(true);
         } else {
             this._meshcore.setDashboardReachable(false);
             this._serial.setDashboardReachable(false);
-            this._dapnet.setDashboardReachable(false);
         }
     }
 
@@ -101,7 +92,6 @@ class TopbarController {
             });
             this._meshcore.setMeshcore(cfg.meshcore || null);
             this._serial.setSerial(cfg.serial || []);
-            this._dapnet.setDapnet(cfg.dapnet_status || []);
             this._pager.setPager(cfg.radio_pager || null);
             this._reticulum.setReticulum(cfg.reticulum || null);
             document.dispatchEvent(

@@ -75,8 +75,6 @@ session gets `401 Unauthorized`. See `src/api/auth/dependencies.py` for the
 | GET | `/api/config/serial/firmware-check` | Viewer | Compare a Meshtastic USB stick's firmware against the latest `meshtastic/firmware` release (cached 5 min) |
 | PUT | `/api/config/serial/identity` | Admin | Rename one Meshtastic USB stick's long/short name (label-scoped) |
 | POST | `/api/config/serial/advert` | Admin | Send a NodeInfo broadcast from one specific Meshtastic USB stick (label-scoped) |
-| PUT | `/api/config/capture/pocsag-serial-devices` | Admin | Replace full POCSAG companion (DAPNET) USB device list (max 4) |
-| PUT | `/api/config/dapnet` | Admin | Replace DAPNET blacklist/ignore capcode lists (applies immediately, no restart) |
 | PUT | `/api/config/nodeinfo` | Admin | Update NodeInfo broadcast interval |
 | POST | `/api/config/nodeinfo/send` | Admin | Send a NodeInfo broadcast now |
 | PUT | `/api/config/position` | Admin | Set position broadcast interval |
@@ -119,7 +117,7 @@ session gets `401 Unauthorized`. See `src/api/auth/dependencies.py` for the
 | GET | `/api/stats/summary` | Viewer | Dashboard stats-bar summary |
 | GET | `/api/topology/graph` | Viewer | Mesh topology graph: nodes + edges from traceroutes, direct receptions, and neighbour imports |
 
-## Per-protocol data (LoRaWAN / DAPNET / Meshtastic / MeshCore)
+## Per-protocol data (LoRaWAN / Meshtastic / MeshCore)
 
 | Method | Path | Role | Description |
 |---|---|---|---|
@@ -128,11 +126,6 @@ session gets `401 Unauthorized`. See `src/api/auth/dependencies.py` for the
 | GET | `/api/lorawan/stats` | Viewer | LoRaWAN totals: packets, unique devices, by frame type |
 | GET | `/api/lorawan/export/packets.csv` | Viewer | Download all LoRaWAN packets as CSV |
 | GET | `/api/lorawan/export/devices.csv` | Viewer | Download the LoRaWAN device census as CSV |
-| GET | `/api/dapnet/capcodes` | Viewer | DAPNET capcode roster (frame count, last text, first/last seen) |
-| GET | `/api/dapnet/packets` | Viewer | Recent DAPNET page log (max 1000) |
-| GET | `/api/dapnet/stats` | Viewer | DAPNET totals: pages, unique capcodes, by page type |
-| GET | `/api/dapnet/export/packets.csv` | Viewer | Download all DAPNET pages as CSV |
-| GET | `/api/dapnet/export/capcodes.csv` | Viewer | Download the DAPNET capcode roster as CSV |
 | GET | `/api/meshtastic/nodes` | Viewer | Meshtastic node list |
 | GET | `/api/meshtastic/packets` | Viewer | Recent Meshtastic packet log |
 | GET | `/api/meshtastic/stats` | Viewer | Meshtastic totals |
@@ -144,6 +137,30 @@ session gets `401 Unauthorized`. See `src/api/auth/dependencies.py` for the
 | GET | `/api/meshcore/repeaters` | Viewer | Known MeshCore repeaters (contact roster) |
 | GET | `/api/meshcore/export/packets.csv` | Viewer | Download all MeshCore packets as CSV |
 | GET | `/api/meshcore/export/contacts.csv` | Viewer | Download the MeshCore contact census as CSV |
+
+## DAPNET (plugin)
+
+Provided by the **DAPNET** plugin (`plugins/apps/dapnet/`, `plugins.dapnet.enabled: true`) — DAPNET/POCSAG amateur-radio paging via a serial-connected companion board. Unlike the RTL-SDR plugins below, DAPNET is a real `CaptureSource` joining the core packet pipeline directly (the `"capture"`/`"protocol"` plugin seams — see `docs/PLUGINS.md`), not an on-demand subprocess listener.
+
+| Method | Path | Role | Description |
+|---|---|---|---|
+| GET | `/api/dapnet/capcodes` | Viewer | DAPNET capcode roster (frame count, last text, first/last seen) |
+| GET | `/api/dapnet/packets` | Viewer | Recent DAPNET page log (max 1000) |
+| GET | `/api/dapnet/stats` | Viewer | DAPNET totals: pages, unique capcodes, by page type |
+| GET | `/api/dapnet/export/packets.csv` | Viewer | Download all DAPNET pages as CSV |
+| GET | `/api/dapnet/export/capcodes.csv` | Viewer | Download the DAPNET capcode roster as CSV |
+| GET | `/api/dapnet/settings` | Viewer | Current device list, capcode filters, and status-poll interval |
+| PUT | `/api/dapnet/settings` | Admin | Replace the device list and/or blacklist/ignore capcode lists and/or poll interval (capcode lists apply immediately; devices/poll interval need a restart) |
+| GET | `/api/dapnet/status` | Viewer | Live per-companion connection status (connected, board, callsign, frequency, hostname, WiFi) — replaces the old core topbar chip, shown on the plugin's own status card instead |
+| PUT | `/api/config/dapnet/callsign` | Admin | Set one companion's callsign over its live serial connection (label-scoped) |
+| PUT | `/api/config/dapnet/web-password` | Admin | Set one companion's web dashboard password over serial (never cached/logged) |
+| POST | `/api/config/dapnet/reset-credentials` | Admin | Reset one companion's callsign + web password to firmware defaults |
+| PUT | `/api/config/dapnet/wifi` | Admin | Set one companion's WiFi SSID/password over serial (takes effect on next reboot) |
+| POST | `/api/config/dapnet/reboot` | Admin | Reboot one companion |
+| POST | `/api/config/dapnet/send` | Admin | Send a page from one companion |
+| GET | `/api/pocsag/firmware/targets` | Viewer | Board targets auto-discovered from the companion sketch's `BOARD_*` defines |
+| POST | `/api/pocsag/firmware/compile/stream` | Admin | Compile the companion sketch for a chosen board (NDJSON stream) |
+| POST | `/api/pocsag/firmware/flash/stream` | Admin | Flash a compiled build to a chosen USB-serial port (NDJSON stream) |
 
 ## Messages (chat)
 

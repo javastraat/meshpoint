@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Optional
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -14,31 +14,21 @@ from src.api.auth.dependencies import require_admin, require_auth
 from src.api.auth.jwt_session import SessionClaims
 from src.config import AppConfig, save_section_to_yaml
 
-if TYPE_CHECKING:
-    # Deferred: importing this at module load drags in src.storage.database,
-    # which imports aiosqlite at the top -- not installed on the Mac dev
-    # machine (see CLAUDE.md), and this route module is otherwise
-    # Mac-testable (test_serial_devices_route.py, test_dapnet_update_route.py).
-    from src.storage.packet_repository import PacketRepository
-
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/config", tags=["config"])
 
 _config: AppConfig | None = None
-_packet_repo: PacketRepository | None = None
 
 
-def init_routes(config: AppConfig, packet_repo: PacketRepository | None = None) -> None:
-    global _config, _packet_repo
+def init_routes(config: AppConfig) -> None:
+    global _config
     _config = config
-    _packet_repo = packet_repo
 
 
 def reset_routes() -> None:
-    global _config, _packet_repo
+    global _config
     _config = None
-    _packet_repo = None
 
 
 class StorageUpdate(BaseModel):
@@ -74,18 +64,6 @@ class SerialDeviceEntry(BaseModel):
 
 class SerialDevicesUpdate(BaseModel):
     devices: list[SerialDeviceEntry] = Field(..., min_length=0, max_length=4)
-    enable_source: Optional[bool] = None
-
-
-class PocsagSerialDeviceEntry(BaseModel):
-    label: str = ""
-    serial_port: Optional[str] = None
-    serial_baud: int = Field(115200, ge=9600, le=921600)
-    name: str = ""
-
-
-class PocsagSerialDevicesUpdate(BaseModel):
-    devices: list[PocsagSerialDeviceEntry] = Field(..., min_length=0, max_length=4)
     enable_source: Optional[bool] = None
 
 
@@ -133,12 +111,6 @@ class RadioPagerUpdate(BaseModel):
     # on every send/receive, no HAL reconfiguration involved), unlike the
     # four fields above which all need a restart to reach the hardware.
     pager_capcode: Optional[int] = Field(None, ge=0, le=0xFFFFFFFF)
-
-
-class DapnetUpdate(BaseModel):
-    blacklist_capcodes: list[int] = Field(..., max_length=200)
-    ignore_capcodes: list[int] = Field(..., max_length=200)
-    status_poll_interval_s: int = Field(60, ge=10, le=3600)
 
 
 @router.get("/serial-ports")
@@ -430,64 +402,6 @@ async def update_serial_devices(
     return {"saved": True, "restart_required": True}
 
 
-@router.put("/capture/pocsag-serial-devices")
-async def update_pocsag_serial_devices(
-    req: PocsagSerialDevicesUpdate,
-    _claims: SessionClaims = Depends(require_admin),
-    audit: AuditLogWriter = Depends(get_audit_writer),
-):
-    """Replace the full POCSAG companion device list (up to 4 entries).
-
-    Mirrors ``update_serial_devices`` -- same shape, minus long_name/
-    short_name (no identity concept here: callsign lives on the device's
-    own WiFi dashboard, not this config page).
-    """
-    from src.config import PocsagSerialDeviceConfig
-    if _config is None:
-        raise HTTPException(503, "Config not loaded")
-
-    new_devices = [
-        PocsagSerialDeviceConfig(
-            label=d.label,
-            serial_port=d.serial_port.strip() if d.serial_port else None,
-            serial_baud=d.serial_baud,
-            name=d.name,
-        )
-        for d in req.devices
-    ]
-    _config.capture.pocsag_serial = new_devices
-
-    yaml_updates: dict = {}
-    capture_updates: dict = {}
-
-    devices_list = [_pocsag_serial_device_dict(d) for d in new_devices]
-    yaml_updates["pocsag_serial"] = devices_list
-
-    sources = list(_config.capture.sources or [])
-    if req.enable_source is not None:
-        has_pocsag = "pocsag_serial" in sources
-        if req.enable_source and not has_pocsag:
-            sources.append("pocsag_serial")
-            capture_updates["sources"] = sources
-            _config.capture.sources = sources
-        elif not req.enable_source and has_pocsag:
-            sources = [s for s in sources if s != "pocsag_serial"]
-            capture_updates["sources"] = sources
-            _config.capture.sources = sources
-
-    with audit.timed_action(
-        user=_claims.subject,
-        action="config.pocsag_serial_devices_update",
-        params={"devices": devices_list},
-    ):
-        try:
-            save_section_to_yaml("capture", {**yaml_updates, **capture_updates})
-        except PermissionError as exc:
-            raise HTTPException(403, str(exc)) from exc
-
-    return {"saved": True, "restart_required": True}
-
-
 @router.put("/relay")
 async def update_relay(
     req: RelayUpdate,
@@ -676,68 +590,6 @@ async def update_radio_advanced(
     return {"saved": True, "restart_required": restart_needed, "updates": updates}
 
 
-@router.put("/dapnet")
-async def update_dapnet(
-    req: DapnetUpdate,
-    _claims: SessionClaims = Depends(require_admin),
-    audit: AuditLogWriter = Depends(get_audit_writer),
-):
-    """Replace the DAPNET blacklist/ignore capcode lists and status-poll interval.
-
-    The capcode lists take effect immediately -- the coordinator reads
-    ``config.dapnet`` fresh on every packet, no capture-source restart
-    needed (unlike the USB device list PUTs above, which reconfigure
-    an already-running connection). ``blacklist_capcodes`` are shown
-    live but never stored; ``ignore_capcodes`` are neither shown nor
-    stored -- but that coordinator-side check only applies to pages
-    captured AFTER this save, so a page for a capcode newly added to
-    EITHER list, already sitting in the packets table from before,
-    would otherwise keep showing up in history forever (Recent Pages
-    reads straight from storage). Purging both lists here (via
-    PacketRepository.delete_dapnet_capcodes) makes "never stored"
-    hold immediately for both tiers, not just going forward.
-
-    ``status_poll_interval_s`` is different: DapnetSerialSource reads
-    it once, at construction, to start its periodic {"cmd":"status"}
-    poll loop -- unlike the capcode lists there's no live re-read, so
-    changing it only takes effect on the next service restart.
-    """
-    if _config is None:
-        raise HTTPException(503, "Config not loaded")
-
-    poll_interval_changed = (
-        req.status_poll_interval_s != _config.dapnet.status_poll_interval_s
-    )
-
-    _config.dapnet.blacklist_capcodes = req.blacklist_capcodes
-    _config.dapnet.ignore_capcodes = req.ignore_capcodes
-    _config.dapnet.status_poll_interval_s = req.status_poll_interval_s
-
-    updates = {
-        "blacklist_capcodes": req.blacklist_capcodes,
-        "ignore_capcodes": req.ignore_capcodes,
-        "status_poll_interval_s": req.status_poll_interval_s,
-    }
-    with audit.timed_action(
-        user=_claims.subject, action="config.dapnet_update", params=updates,
-    ):
-        try:
-            save_section_to_yaml("dapnet", updates)
-        except PermissionError as exc:
-            raise HTTPException(403, str(exc)) from exc
-
-    purged = 0
-    to_purge = sorted(set(req.blacklist_capcodes) | set(req.ignore_capcodes))
-    if _packet_repo is not None and to_purge:
-        purged = await _packet_repo.delete_dapnet_capcodes(to_purge)
-
-    return {
-        "saved": True,
-        "restart_required": poll_interval_changed,
-        "purged": purged,
-    }
-
-
 def _meshcore_usb_dict(mc_usb) -> dict:
     return {
         "serial_port": mc_usb.serial_port,
@@ -755,13 +607,4 @@ def _serial_device_dict(dev) -> dict:
         "label": dev.label,
         "long_name": dev.long_name,
         "short_name": dev.short_name,
-    }
-
-
-def _pocsag_serial_device_dict(dev) -> dict:
-    return {
-        "serial_port": dev.serial_port,
-        "serial_baud": dev.serial_baud,
-        "label": dev.label,
-        "name": dev.name,
     }

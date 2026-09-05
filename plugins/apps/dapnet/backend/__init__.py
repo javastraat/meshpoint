@@ -1,9 +1,11 @@
 """DAPNET plugin -- entry point.
 
 Meshpoint's plugin loader imports this module and calls ``register(reg)``
-when ``plugins.dapnet.enabled`` isn't explicitly ``false`` (built-in,
-locked plugin -- default-on like ACARS/RTL433). See
-``plugins/apps/dapnet/plugin.toml`` and ``docs/CONFIGURATION.md`` (Plugins).
+when ``plugins.dapnet.enabled: true`` is set -- opt-in, same as every
+other shipped plugin (ACARS/RTL433/etc; `locked = true` in
+``plugin.toml`` only means "can't be deleted from Settings -> Plugins",
+not "default-on"). See ``plugins/apps/dapnet/plugin.toml`` and
+``docs/CONFIGURATION.md`` (Plugins).
 
 Unlike the RTL-SDR family (a "listener" built idle, started on demand by
 its own ``/start`` route), DAPNET is a real ``CaptureSource`` joining the

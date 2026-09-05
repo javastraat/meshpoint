@@ -35,11 +35,6 @@ class Protocol(str, Enum):
     MESHTASTIC = "meshtastic"
     MESHCORE = "meshcore"
     LORAWAN = "lorawan"
-    # TODO(dapnet-plugin): DAPNET is being extracted into plugins/apps/dapnet/
-    # (see src/api/protocol_registry.py) -- this member is removed once that
-    # plugin registers OpenProtocol("dapnet") in its place and coordinator.py
-    # no longer references Protocol.DAPNET directly.
-    DAPNET = "dapnet"
     PAGER = "pager"
     UNKNOWN = "unknown"
 
@@ -77,12 +72,6 @@ class PacketType(str, Enum):
     LORAWAN_DATA = "lorawan_data"
     LORAWAN_REJOIN = "lorawan_rejoin"
     NEIGHBOUR_ADVERT = "neighbour_advert"
-    # TODO(dapnet-plugin): removed once plugins/apps/dapnet/ registers
-    # OpenPacketType("dapnet_alpha") etc in their place -- see Protocol.DAPNET.
-    DAPNET_ALPHA = "dapnet_alpha"
-    DAPNET_NUMERIC = "dapnet_numeric"
-    DAPNET_TONE = "dapnet_tone"
-    DAPNET_ACTIVATION = "dapnet_activation"
     # Raw, undecoded bytes from the emergency pager project's own FSK
     # channel (ch9) -- the over-the-air framing isn't designed yet (no
     # Heltec V3 firmware exists to produce it), so a page currently gets

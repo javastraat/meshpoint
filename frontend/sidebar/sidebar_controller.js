@@ -363,9 +363,9 @@ class SidebarController {
     }
 
     /** Hides a nav item entirely when the capture source it depends on
-     * isn't enabled in `capture.sources` -- e.g. the DAPNET link has no
-     * reason to appear until "Include POCSAG capture source" is turned
-     * on in Configuration -> POCSAG. Independent of _applyIdentity's
+     * isn't enabled in `capture.sources` -- e.g. the MeshCore link has no
+     * reason to appear until a MeshCore USB companion is configured.
+     * Independent of _applyIdentity's
      * role-based gating: this is about capture-source state, not who's
      * logged in. Best-effort -- a failed fetch leaves source-gated
      * links at their default (visible) markup state rather than

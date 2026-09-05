@@ -310,7 +310,6 @@
                             <li class="sidebar__subitem"><a href="#/configuration/meshcore" class="sidebar__link" data-route="configuration/meshcore"><span class="sidebar__label">MeshCore</span></a></li>
                             <li class="sidebar__subitem"><a href="#/configuration/reticulum" class="sidebar__link" data-route="configuration/reticulum"><span class="sidebar__label">Reticulum</span></a></li>
                             <li class="sidebar__subitem"><a href="#/configuration/serial" class="sidebar__link" data-route="configuration/serial"><span class="sidebar__label">Serial</span></a></li>
-                            <li class="sidebar__subitem"><a href="#/configuration/pocsag-serial" class="sidebar__link" data-route="configuration/pocsag-serial"><span class="sidebar__label">POCSAG</span></a></li>
                             <li class="sidebar__subitem"><a href="#/configuration/firmware" class="sidebar__link" data-route="configuration/firmware"><span class="sidebar__label">Firmware</span></a></li>
                             <li class="sidebar__group-header" aria-hidden="true">
                                 <span class="sidebar__group-header-label">Network</span>
@@ -437,7 +436,6 @@
                 </div>
                 <div class="topbar__group topbar__group--serial" id="topbar-serial-group" hidden></div>
                 <div class="topbar__group topbar__group--meshcore" id="topbar-meshcore-group" hidden></div>
-                <div class="topbar__group topbar__group--serial" id="topbar-dapnet-group" hidden></div>
                 <div class="topbar__group topbar__group--serial" id="topbar-pager-group" hidden></div>
                 <div class="topbar__group topbar__group--serial" id="topbar-reticulum-group" hidden></div>
                 <div class="topbar__spacer" aria-hidden="true"></div>
@@ -726,7 +724,6 @@
             <section class="section" data-section="configuration/meshcore" style="display:none"><div id="cfg-meshcore-panel" class="section__placeholder"><h2>Configuration · MeshCore</h2><p>Skeleton; companion channel keys + Send Advert.</p></div></section>
             <section class="section" data-section="configuration/reticulum" style="display:none"><div id="cfg-reticulum-panel" class="section__placeholder"><h2>Configuration · Reticulum</h2><p>Loading…</p></div></section>
             <section class="section" data-section="configuration/serial" style="display:none"><div id="cfg-serial-panel" class="section__placeholder"><h2>Configuration · Serial</h2><p>Skeleton; Meshtastic USB device list.</p></div></section>
-            <section class="section" data-section="configuration/pocsag-serial" style="display:none"><div id="cfg-pocsag-serial-panel" class="section__placeholder"><h2>Configuration · POCSAG</h2><p>Skeleton; POCSAG companion USB device list.</p></div></section>
             <section class="section" data-section="configuration/firmware" style="display:none"><div id="cfg-firmware-panel" class="section__placeholder"><h2>Configuration · Firmware</h2><p>Skeleton; flash-a-spare-board cards.</p></div></section>
             <section class="section" data-section="configuration/transmit" style="display:none"><div id="cfg-transmit-panel" class="section__placeholder"><h2>Configuration · Transmit</h2><p>Skeleton; TX power + duty cycle + relay.</p></div></section>
             <section class="section" data-section="configuration/mqtt" style="display:none"><div id="cfg-mqtt-panel" class="section__placeholder"><h2>Configuration · MQTT</h2><p>Loading…</p></div></section>
@@ -1174,7 +1171,6 @@
     <script src="js/configuration/meshcore_card.js"></script>
     <script src="js/configuration/reticulum_config_card.js"></script>
     <script src="js/configuration/serial_card.js"></script>
-    <script src="js/configuration/pocsag_serial_card.js"></script>
     <script src="js/configuration/meshcore_firmware_card.js"></script>
     <script src="js/configuration/meshtastic_firmware_card.js"></script>
     <script src="js/configuration/pocsag_firmware_card.js"></script>
@@ -1221,7 +1217,6 @@
     <script src="topbar/topbar_meshtastic_chip.js"></script>
     <script src="topbar/topbar_meshcore_chip.js"></script>
     <script src="topbar/topbar_serial_chip.js"></script>
-    <script src="topbar/topbar_dapnet_chip.js"></script>
     <script src="topbar/topbar_pager_chip.js"></script>
     <script src="topbar/topbar_reticulum_chip.js"></script>
     <script src="topbar/topbar_actions.js"></script>

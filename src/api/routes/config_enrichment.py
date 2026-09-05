@@ -68,15 +68,6 @@ def enrich_config_payload(cfg: AppConfig, base: dict) -> dict:
             }
             for d in capture.serial
         ],
-        "pocsag_serial": [
-            {
-                "serial_port": d.serial_port,
-                "serial_baud": d.serial_baud,
-                "label": d.label,
-                "name": d.name,
-            }
-            for d in capture.pocsag_serial
-        ],
     }
     base["relay"] = {
         "enabled": relay.enabled,
@@ -98,11 +89,6 @@ def enrich_config_payload(cfg: AppConfig, base: dict) -> dict:
         "rnode_coding_rate": cfg.reticulum.rnode_coding_rate,
         "backbone_host": cfg.reticulum.backbone_host,
         "backbone_port": cfg.reticulum.backbone_port,
-    }
-    base["dapnet"] = {
-        "blacklist_capcodes": list(cfg.dapnet.blacklist_capcodes or []),
-        "ignore_capcodes": list(cfg.dapnet.ignore_capcodes or []),
-        "status_poll_interval_s": cfg.dapnet.status_poll_interval_s,
     }
     base["radio_advanced"] = {
         "spectral_scan_interval_seconds": radio.spectral_scan_interval_seconds,

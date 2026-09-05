@@ -386,12 +386,9 @@ class PipelineCoordinator:
             packet = self._adapt_meshcore_usb(raw)
         elif (proto_spec := protocol_registry.for_capture_source(raw.capture_source)) is not None:
             # A plugin-registered protocol (src.api.protocol_registry) --
-            # checked before the DAPNET branch below so a plugin
-            # registering the "dapnet" prefix (once it moves out of core)
-            # takes over from here with no dispatch change needed.
+            # e.g. plugins/apps/dapnet, which registers the "dapnet"
+            # capture_source prefix.
             packet = proto_spec.adapt(raw)
-        elif raw.capture_source.startswith("dapnet"):
-            packet = self._adapt_dapnet(raw)
         elif raw.protocol_hint == Protocol.PAGER:
             # Routed by protocol_hint, not capture_source -- unlike
             # meshcore_usb/dapnet (genuinely separate USB hardware), the
@@ -424,8 +421,6 @@ class PipelineCoordinator:
         proto_spec = protocol_registry.for_protocol(packet.protocol)
         if proto_spec is not None and proto_spec.tier is not None:
             tier = proto_spec.tier(packet)
-        elif packet.protocol == Protocol.DAPNET:
-            tier = self._dapnet_capcode_tier(packet)
         if tier == "ignore":
             return
         if tier == "blacklist":
@@ -474,27 +469,9 @@ class PipelineCoordinator:
         return adapt_event(raw.payload, signal=raw.signal)
 
     @staticmethod
-    def _adapt_dapnet(raw: RawCapture) -> Optional[Packet]:
-        from src.decode.dapnet_event_adapter import adapt_event
-        return adapt_event(raw.payload, signal=raw.signal)
-
-    @staticmethod
     def _adapt_pager(raw: RawCapture) -> Optional[Packet]:
         from src.decode.pager_event_adapter import adapt_event
         return adapt_event(raw.payload, signal=raw.signal)
-
-    def _dapnet_capcode_tier(self, packet: Packet) -> Optional[str]:
-        """Classify a decoded DAPNET page against the two configured
-        capcode tiers (see ``DapnetConfig``): ``"ignore"`` (never shown,
-        never stored), ``"blacklist"`` (shown live, never stored), or
-        ``None`` (normal handling)."""
-        capcode = (packet.decoded_payload or {}).get("capcode")
-        cfg = self._config.dapnet
-        if capcode in set(cfg.ignore_capcodes or []):
-            return "ignore"
-        if capcode in set(cfg.blacklist_capcodes or []):
-            return "blacklist"
-        return None
 
     async def _store_packet(self, packet: Packet) -> None:
         try:

@@ -337,144 +337,94 @@ available without unplugging the stick into a laptop.
   immediately on the currently connected stick; only the
   swap-a-different-stick-in-later case needs a restart.
 
-### POCSAG Companion / DAPNET (Networks tab)
+### POCSAG Companion / DAPNET (plugin)
 
-`Configuration → POCSAG` edits the USB connection list for
-`extra/pocsag_companion` boards (TTGO LoRa32, Heltec V3) — same
-shape as `capture.serial` above, minus any identity/advert fields:
-this board isn't a mesh node, so it has nothing to rename. Callsign,
-screen timeout, and every other on-device setting stay on the
-board's own WiFi web dashboard (`pocsag-companion.local`), not here.
-
-```yaml
-capture:
-  sources:
-    - pocsag_serial
-  pocsag_serial:
-    - serial_port: "/dev/ttyUSB2"
-      serial_baud: 115200
-      label: "ttgo"
-      name: "Attic POCSAG"
-```
-
-`capture.pocsag_serial` persists via `PUT
-/api/config/capture/pocsag-serial-devices`, and the shared port-picker
-(`GET /api/config/serial-ports`) flags a port already pinned by a
-POCSAG entry, same as it does for Serial/MeshCore. Adding
-`pocsag_serial` to `sources` spins up one `DapnetSerialSource` per
-configured device (`src/capture/dapnet_source.py`), reading
-newline-delimited JSON pages off the board's serial connection —
-decoded traffic shows up on the **Networks → DAPNET** dashboard page
-(named for the real DAPNET paging network the companion talks to, not
-the generic POCSAG modulation — see `frontend/js/dapnet_panel.js`).
-The Networks sidebar link only appears once `pocsag_serial` is in
-`capture.sources` (a new `data-requires-source` sidebar-hiding
-mechanism, independent of the existing role-based
-`data-requires-section` gating).
-
-**Topbar status chip.** `DapnetSerialSource` sends a one-shot
-`{"cmd":"status"}` query right after connecting; the companion (a
-recent-enough build of `extra/pocsag_companion.ino`) replies
-`{"type":"status","board":"ttgo"|"heltec","callsign":"...","freq":439.9875,
-"hostname":"pocsag-companion","wifi_ip":"192.168.x.x"}`, cached and
-exposed via `GET /api/config`'s `dapnet_status` array (one entry per
-configured companion — distinct from the `dapnet` key above, which is
-the saved blacklist/ignore config, not live status). Shows as a small
-topbar badge (callsign, frequency, board), same visual style as the
-Meshtastic USB chip, hidden entirely when no POCSAG companion is
-configured. Older companion firmware without the `"cmd"` handler
-simply never replies — the chip then just shows `----` for
-callsign/board rather than failing.
-
-`hostname`/`wifi_ip` are only shown on the Configuration → POCSAG
-readout tiles (a "Web UI" link straight to the companion's own web
-dashboard), not the topbar chip, which stays compact.
-
-**Periodic status poll (live TX count/uptime).** The status query no
-longer fires only once -- it repeats every `dapnet.status_poll_interval_s`
-seconds (default 60), still strictly request/response (never an
-unsolicited device push), which is what makes genuinely live fields
-like `tx_count`/`last_tx_ok`/`uptime_ms` meaningful instead of frozen
-at whatever they were at connect time. Edit the interval from
-Configuration → POCSAG's "DAPNET settings" card (10-3600s); unlike the
-two capcode lists in that same card, changing it needs a service
-restart (`DapnetSerialSource` only reads it once, at construction).
+⚠️ **DAPNET is a plugin now** (`plugins/apps/dapnet/`), not built-in —
+everything below used to live under `capture.pocsag_serial` + a
+top-level `dapnet:` section and Configuration → POCSAG; all of that is
+gone, replaced by one `plugins.dapnet.*` block plus a **Settings** tab
+on the DAPNET page itself. See `docs/PLUGINS.md`'s [Adding a
+non-RTL-SDR capture source +
+protocol](PLUGINS.md#adding-a-non-rtl-sdr-capture-source--protocol-captureprotocol)
+for the plugin-architecture side of this (the `"capture"`/`"protocol"`
+seams DAPNET is the first plugin to use). **No auto-migration** — move
+your existing config by hand (see the CHANGELOG's `v0.8.1` entry for
+the exact shape), then restart.
 
 ```yaml
-dapnet:
-  status_poll_interval_s: 60   # 10-3600
+plugins:
+  dapnet:
+    enabled: true                          # required -- opt-in like every other plugin
+    status_poll_interval_s: 60             # 10-3600
+    blacklist_capcodes: [200, 208, 216, 224]   # shown live, never stored
+    ignore_capcodes: [4512, 4520]              # neither shown nor stored
+    devices:
+      - serial_port: "/dev/ttyUSB2"
+        serial_baud: 115200
+        label: "ttgo"
+        name: "Attic POCSAG"
 ```
 
-TX Count, Last TX (Never/OK/Failed), and Uptime show up as three more
-readout tiles alongside Callsign/Frequency/Hardware/Web UI. Uptime
-wraps to a small number every ~49.7 days (ESP32 `millis()` overflow)
--- a real device limitation, not a display bug, if it ever shows a
-suspiciously small value on a long-running companion.
+Device connection info (`serial_port`/`serial_baud`/`label`/`name`) and
+the two capcode-filter lists + poll interval, previously two separate
+core config sections, are now one opaque `plugins.dapnet.*` shape —
+same as every other plugin's own `plugins.<id>` sub-schema, never
+core-schema-validated. `devices` and `status_poll_interval_s` changes
+need a service restart (`DapnetSerialSource` reads both once, at
+construction); `blacklist_capcodes`/`ignore_capcodes` take effect
+immediately (`plugins/apps/dapnet/backend/state.py::tier()` is
+consulted fresh on every packet), and — same behavior as before —
+saving either list also purges any already-stored pages for a
+newly-added capcode, not just blocking future ones.
 
-A **WiFi SSID** tile sits next to Web UI, sourced from the same
-periodic status reply -- lets you confirm which network the companion
-is actually connected to right on this page, without needing to open
-its own web dashboard's Connection card.
+Run `plugins/apps/dapnet/setup.sh` (or `sudo meshpoint plugin setup
+dapnet`) once — checks for the shared `arduino-cli`/ESP32 toolchain
+(installed by `scripts/install.sh`) needed for the firmware
+compile/flash card below; nothing else to build. Once
+`plugins.dapnet.enabled: true` is set and at least one device is
+configured, decoded traffic shows up on the **Networks → DAPNET**
+dashboard page (named for the real DAPNET paging network the companion
+talks to, not the generic POCSAG modulation). The Networks sidebar
+link appears whenever the plugin is enabled, regardless of whether any
+device is actually configured yet — unlike the old core page, there's
+no "hide until a device exists" gating (matching every other plugin's
+sidebar link).
 
-**Setting the callsign from the dashboard.** Each connected device's
-readout tile on `Configuration → POCSAG` also has a "Set callsign"
-field — saving it sends `{"cmd":"set_callsign","callsign":"..."}` over
-the same serial connection and waits for the companion's reply (same
-validation the on-device web dashboard's own Callsign card already
-enforces: non-empty, ≤8 chars, not `N0CALL`, must contain a digit).
-Nothing is persisted on the Meshpoint side — the callsign lives
-entirely in the companion's own NVS — but a successful save updates
-the cached status immediately, so the readout tile and topbar chip
-reflect it without waiting for another status query (which only ever
-happens once, at connect). Requires a companion running a firmware
-build with the `set_callsign` command (added alongside the status
-query above); older builds will just time out after 5s with "No reply
-from companion".
+**No topbar chip.** The old core page had a small topbar badge
+(callsign/frequency/board); the plugin doesn't get an equivalent — no
+generic "plugin owns a topbar chip" seam exists yet, and building one
+for a single caller risked guessing its shape wrong. A **status
+card** at the top of the DAPNET page itself shows the same
+connected/board/callsign/frequency/hostname/wifi info instead — a
+real, acknowledged trade-off (glance-from-anywhere becomes
+click-into-the-page), same reasoning already applied to the RTL-SDR
+family's sidebar "in use" badge before it was later rebuilt properly.
 
-**Setting the web dashboard password from the dashboard.** The same
-row also has a "Set web dashboard password" field, sending
-`{"cmd":"set_web_password","password":"..."}` the same way. Unlike the
-callsign, this value is handled as a real secret end to end: the
-companion's reply never echoes it back, Meshpoint never caches,
-persists, or logs it anywhere (not in `local.yaml`, not in the status
-cache, not in an audit-log entry), and the companion's own serial
-console log — which otherwise echoes every incoming command
-verbatim — specifically redacts this one. `WEB_PASSWORD` (the
-`secrets.h` compile-time default) becomes a runtime value the first
-time this is set, persisted in NVS and surviving reboots; until then,
-`checkAuth()` still compares against the `secrets.h` default. The
-companion's own "Clear Settings" button resets it back to that
-default, same as it already does for the callsign.
+**Periodic status poll (live TX count/uptime).** `DapnetSerialSource`
+sends a one-shot `{"cmd":"status"}` query right after connecting, then
+repeats it every `status_poll_interval_s` seconds (default 60) — still
+strictly request/response, never an unsolicited device push — which is
+what keeps `tx_count`/`last_tx_ok`/`uptime_ms` meaningful instead of
+frozen at connect time. A companion running older firmware without the
+`"cmd"` handler simply never replies; the status card then just shows
+`--` for those fields rather than failing. Uptime wraps to a small
+number every ~49.7 days (ESP32 `millis()` overflow) — a real device
+limitation, not a display bug, if it ever shows a suspiciously small
+value on a long-running companion.
 
-**Resetting callsign + password from the dashboard.** A "Reset
-Callsign & Password" button sends `{"cmd":"reset_credentials"}` —
-clears the callsign back to empty and the web password back to the
-`secrets.h` default, without touching screen timeout (deliberately
-narrower than the companion's own "Clear Settings" button, which
-resets all three). Guarded by a browser confirmation dialog since it's
-destructive — TX is blocked again immediately until a new callsign is
-set. A successful reset also clears the readout tile's cached
-callsign right away, rather than waiting for the next status poll.
-
-**Setting WiFi credentials + reboot from the dashboard.** A separate
-"Save WiFi Credentials" field pair sends
-`{"cmd":"set_wifi","ssid":"...","password":"..."}` — this is the
-piece that lets a brand-new companion be configured entirely through
-Meshpoint, without ever hand-editing `secrets.h` before the first
-flash or opening the companion's own web dashboard: USB serial keeps
-working regardless of WiFi state, so a board with blank or wrong WiFi
-credentials is still fully reachable for this. Deliberately its own
-separate action from callsign/password/reset above — changing WiFi
-takes the companion off its current network until it reboots with the
-new credentials, a bigger consequence than any of those.
-
-Saving does **not** reconnect by itself — `setupWifiNtpOta()` only
-ever runs once, at boot — so a successful save offers a confirm-modal
-"reboot now?" prompt, which (if accepted) sends a second command,
-`{"cmd":"reboot"}`, over the same serial connection. The password
-field is handled exactly like the web password: never cached,
-persisted, or logged by Meshpoint, and the companion's reply only ever
-echoes the SSID back (not sensitive), never the password.
+**Setting the callsign, web dashboard password, WiFi credentials, and
+resetting credentials — all still available, now on the DAPNET page's
+Settings tab** instead of Configuration → POCSAG, with identical
+mechanics to before: each sends its own command
+(`set_callsign`/`set_web_password`/`set_wifi`/`reset_credentials`)
+over the companion's live serial connection and waits for its reply.
+Nothing about the security handling changed — the web password and
+WiFi password are still never cached, persisted, or logged by
+Meshpoint anywhere (not in `local.yaml`, not in the status cache, not
+in an audit-log entry), and the companion's own serial console log
+still redacts them. Saving WiFi credentials still offers a "reboot
+now?" follow-up rather than reconnecting automatically, since new
+credentials only take effect on the companion's next reboot.
 
 **Not yet confirmed on real hardware**: whether Meshpoint's own serial
 connection survives the companion's reboot. Both current boards use a
@@ -483,42 +433,28 @@ through an ESP32 reset — but if a board ever used the chip's native
 USB instead, it would re-enumerate and could need a Meshpoint
 **service restart** to reconnect (`DapnetSerialSource` has no
 reconnect loop, matching `SerialCaptureSource`'s own documented
-limitation). If the reboot command times out or the readout tile goes
+limitation). If the reboot command times out or the status card goes
 stale afterward, that's the mechanism to check first.
 
 **Verifying it worked: the companion's own web dashboard.** Open
-`pocsag-companion.local` (or its IP) directly — the login screen now
-shows the saved callsign + hostname before you even enter the
-password (via a new unauthenticated `GET /api/whoami`, nothing
-sensitive), so you can confirm you're looking at the right physical
-board when more than one is on the network. Once logged in, two new
-cards close the loop on the WiFi feature above: **Hardware** (chip
-model/revision/cores/frequency, flash size, free heap, sketch
-space, SDK version) and **Connection** (SSID, IP, gateway, subnet,
-DNS, MAC, RSSI, hostname) — the latter is the actual way to confirm a
-serial-set WiFi credential resolved correctly, rather than assuming.
-This is a `extra/pocsag_companion.ino`-only change; nothing on the
-Meshpoint side reads this data.
+`pocsag-companion.local` (or its IP) directly — the login screen shows
+the saved callsign + hostname before you even enter the password (an
+unauthenticated `GET /api/whoami`, nothing sensitive), so you can
+confirm you're looking at the right physical board when more than one
+is on the network. Once logged in, **Hardware** (chip
+model/revision/cores/frequency, flash size, free heap, sketch space,
+SDK version) and **Connection** (SSID, IP, gateway, subnet, DNS, MAC,
+RSSI, hostname) cards confirm a serial-set WiFi credential resolved
+correctly, rather than assuming. This is a
+`plugins/apps/dapnet/pocsag_companion/pocsag_companion.ino`-only
+feature; nothing on the Meshpoint side reads this data.
 
-**DAPNET capcode filters** (`Configuration → POCSAG`'s second card,
-`dapnet:` config section) — two independent, immediately-applied
-tiers (no restart needed) for decoded pages, keyed on capcode:
-
-```yaml
-dapnet:
-  blacklist_capcodes: [200, 208, 216, 224]   # shown live, never stored
-  ignore_capcodes: [4512, 4520]              # neither shown nor stored
-```
-
-- `blacklist_capcodes` (defaults to DAPNET's own confirmed real
-  network housekeeping/time-sync beacon capcodes) still broadcast to
-  the live DAPNET page over the dashboard WebSocket — useful to
-  confirm the decoder/network are still alive — but are never written
-  to the `packets` table, and never touch relay/MQTT/stats.
-- `ignore_capcodes` are dropped entirely: not shown, not stored, not
-  counted anywhere. Pure noise.
-- Anything not on either list is treated like every other protocol:
-  stored, broadcast live, and included in `/api/dapnet/stats`.
+The companion firmware sketch itself now ships inside the plugin —
+`plugins/apps/dapnet/pocsag_companion/` (moved from the old
+`extra/pocsag_companion/`, since it's DAPNET-specific hardware, not a
+generic `extra/` asset). Configuration → Firmware's compile/flash card
+for it is unchanged (same `/api/pocsag/firmware/*` routes, now served
+by the plugin instead of core).
 
 ```yaml
 capture:

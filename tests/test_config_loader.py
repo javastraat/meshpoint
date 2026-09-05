@@ -242,7 +242,7 @@ class SerialDeviceConfigTest(unittest.TestCase):
 
 class RfEnvCompanionDeviceConfigTest(unittest.TestCase):
     """RF Environment companion (extra/rfenv_companion): opt-in
-    capture.rfenv_companion list, same shape as capture.pocsag_serial."""
+    capture.rfenv_companion list, same shape as capture.serial."""
 
     def _write(self, text: str) -> Path:
         tmp = tempfile.NamedTemporaryFile(
