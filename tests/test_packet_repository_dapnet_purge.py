@@ -7,7 +7,7 @@ so CI-only, not runnable on the Mac dev machine (no aiosqlite there).
 import unittest
 from datetime import datetime, timezone
 
-from src.models.packet import OpenPacketType, OpenProtocol, Packet
+from src.models.packet import OpenPacketType, OpenProtocol, Packet, PacketType, Protocol
 from src.storage.database import DatabaseManager
 from src.storage.packet_repository import PacketRepository
 
