@@ -11176,3 +11176,205 @@ share the `0 0 24 24` viewBox either.
 
 Not started. Pick this up when the user asks for it specifically --
 explicitly deferred tonight in favor of just writing it down.
+
+## DAPNET extraction into a real plugin (plugins/apps/dapnet/) -- the first non-RTL-SDR plugin, two new capabilities built for it (2026-09-04/05)
+
+User: "i think dapnet is a addition we made and should be a plugin nt
+the core software :)" -- unlike every RTL-SDR plugin extracted so far
+(ACARS/RTL433/ADS-B/P2000/POCSAG/Pagers/DAB+/Radio, all self-contained
+subprocess listeners sharing one dongle), DAPNET was the only capture
+source left wired directly into the core packet pipeline
+(`CaptureCoordinator`/`PipelineCoordinator`), same tier as
+Meshtastic/MeshCore/LoRaWAN. Chose the most ambitious of the offered
+options each time asked (AskUserQuestion): build the real capture-source
+seam (not a cosmetic file-move), and "full open protocol identity" (not
+just DAPNET's own narrow seam) -- meaning `Protocol` had to genuinely
+stop being a closed enum. On the topbar-chip question the user first said
+build a generic chip registry, then reconsidered mid-turn after I laid
+out the tradeoffs and picked the smaller move: a status card on the
+plugin's own page instead, explicitly flagged as an acknowledged
+regression (glance-from-anywhere -> click-into-the-page), same shape as
+the earlier RTL-SDR sidebar-badge precedent in this file.
+
+**Architecture, two new plugin capabilities:**
+- `"capture"` (`src/api/capture_source_registry.py`, `reg.add_capture_source
+  (name, build, wire=None)`) -- a plugin's `CaptureSource` joins the
+  pipeline unconditionally at boot, no on-demand `/start` route unlike a
+  listener. `build()` runs before `pipeline.start()` (a source added after
+  that never gets a reader task); `wire(sources, pipeline)` runs after
+  `pipeline.start()` completes, since `pipeline.packet_repo` raises until
+  then -- this is how a plugin's own routes get a `PacketRepository`
+  handle, no new `PluginRegistry` surface needed.
+- `"protocol"` (`src/api/protocol_registry.py`, `reg.add_protocol(protocol,
+  *, capture_prefix, adapt, tier=None)`) -- a plugin owns decode +
+  post-decode classification (`"ignore"`/`"blacklist"` tiers) for a
+  protocol identity it introduces. `coordinator.py`'s `_process_capture`
+  checks the registry first (`protocol_registry.for_capture_source(...)`),
+  same for the capcode-tier check -- this is what let DAPNET keep working
+  through the whole build via the OLD hardcoded path as a fallback, until
+  the plugin registered and made it dead code (deleted in the final step).
+- `src/models/packet.py` gains `_OpenStrEnum(str)` / `OpenProtocol` /
+  `OpenPacketType` -- plain-string subclasses exposing `.value` so a
+  plugin-registered identity behaves identically to a real enum member at
+  every one of the ~20 existing `packet.protocol.value`-style call sites
+  (found via direct grep, not the 2 originally assumed) with zero changes
+  needed at any of them. `Protocol.parse()`/`PacketType.parse()` fall back
+  to these for a value the closed enum doesn't recognize; the one real
+  crash site fixed was `packet_repository.py`'s `_row_to_packet()`
+  (`Protocol(row["protocol"])` -> `Protocol.parse(...)`).
+- Independent bug fix, found during investigation, not DAPNET-specific:
+  `coordinator.py`'s `_update_node`/`_store_telemetry` used to explicitly
+  skip LoRaWAN/DAPNET then fall through an *implicit*
+  `if MESHTASTIC: ... else: meshcore_decoder` -- meaning any THIRD
+  protocol silently got mis-decoded as MeshCore. Fixed to an explicit
+  three-way allowlist before DAPNET's own extraction could have walked
+  straight into the same trap for real.
+
+**`plugins/apps/dapnet/`** now owns everything: `backend/listener.py`
+(`DapnetSerialSource`, moved verbatim), `backend/decode.py` (`adapt_event`,
+now builds `OpenProtocol("dapnet")`/`OpenPacketType("dapnet_alpha")` etc
+instead of the old enum members), `backend/state.py` (new -- devices +
+capcode-filter state, `tier()`, a `_current_saved_config()` merge-safety
+read before `_persist()` so a settings-tab save can't clobber a
+same-session Settings->Plugins enable/disable toggle via
+`save_section_to_yaml`'s shallow per-section `dict.update()`),
+`backend/routes.py`/`config_routes.py`/`firmware_routes.py` (moved
+verbatim, paths unchanged), `backend/settings_routes.py` (new --
+`GET`/`PUT /api/dapnet/settings`, `GET /api/dapnet/status`, replacing
+three old core things: the two system_config_routes PUT routes and
+`config_routes.py`'s `dapnet_status` key). 54 backend tests, all passing.
+
+**Frontend**: `dapnet_panel.js` (converted from the old core page --
+root-scoped, `mount`/`show`/`hide`, identity from the new
+`window.meshpointIdentity` global `app.js` now exposes for exactly this,
+since `registerSidebarPage`'s `make()` has no constructor-argument path a
+core `_boot*Panel(router, identity)` call could use), `dapnet_status_card.js`
+(the status-card decision above), `dapnet_settings_tab.js` (new -- device
+CRUD + capcode filters + poll interval + the full live-serial-command UI
+(callsign/web-password/wifi/reset-credentials/reboot), rebuilt with plain
+`fetch()` since a plugin page has no access to Configuration's own `_api`
+wrapper), `dapnet_packet_format.js` + a new core seam
+`frontend/js/protocol_format_registry.js` (`registerProtocolFormat`/
+`getProtocolFormat`) replacing 5 real `protocol === 'dapnet'` branches
+across `simple_packet_feed.js`/`packet_detail_modal.js` (id formatting,
+row normalization, decrypted-by-default, type-prefix stripping, payload
+summary) -- `capcode_history_modal.js`'s own `dapnet_` prefix-strip was
+left hardcoded on purpose, that modal is DAPNET-only already, not shared
+multi-protocol surface.
+
+**Full core deletion** (once the plugin was live-verified working):
+`src/capture/dapnet_source.py`, `src/decode/dapnet_event_adapter.py`,
+`src/api/routes/{dapnet_routes,dapnet_config_routes,pocsag_firmware_routes}.py`,
+`server.py`/`main.py`'s `_add_dapnet_source`/`_find_dapnet_sources` +
+router entries (`_BUILTIN_ROUTERS` 54->51), `coordinator.py`'s
+`_adapt_dapnet`/`_dapnet_capcode_tier`, `config_routes.py`'s
+`_dapnet_status_entry`/`dapnet_status` key, `system_config_routes.py`'s
+two PUT routes, `Protocol.DAPNET`/`PacketType.DAPNET_*` enum members,
+`src/config.py`'s `PocsagSerialDeviceConfig`/`DapnetConfig`/
+`CaptureConfig.pocsag_serial`/`AppConfig.dapnet` (plus their
+`config/default.yaml` entries -- missed on the first pass, caught by a
+test failure: `test_lorawan_section_is_applied_without_warning` started
+seeing an unexpected "unknown config key... capture.pocsag_serial"
+warning since default.yaml still had the key), `frontend/topbar/
+topbar_dapnet_chip.js` + `topbar_controller.js`'s `_dapnet` field (~10
+references), `frontend/js/{dapnet_panel,configuration/pocsag_serial_card}.js`,
+the Configuration -> POCSAG sidebar subitem + section skeleton,
+`tests/test_dapnet_update_route.py` (superseded by the plugin's own
+`test_settings_routes.py`). `scripts/clear_dapnet_packets.py` moved into
+`plugins/apps/dapnet/` (matching DAB+'s `dab_channel_scan.py` precedent
+-- NOT a `scripts/` subfolder inside the plugin, the plan's own text was
+wrong about that, the real DAB+ precedent is plugin-root).
+
+**A real crash caught late, after the grep-driven cleanup pass**:
+`src/api/routes/config_enrichment.py`'s `enrich_config_payload()` still
+read `cfg.dapnet.blacklist_capcodes`/`capture.pocsag_serial` directly --
+both dataclass attributes I'd just deleted, which would have raised
+`AttributeError` on every `GET /api/config` call the instant this shipped.
+Found via a repo-wide grep for `.dapnet\b`/`.pocsag_serial\b` across
+`src/`, done specifically because the earlier targeted greps (searching
+for the literal strings "dapnet"/"pocsag_serial") had already surfaced
+too many false-positive comment hits to trust blind pattern-matching --
+the follow-up attribute-access-specific grep was what caught this one
+real bug. Lesson for next similar extraction: after deleting a config
+dataclass field, always also grep for `\.<field_name>\b` specifically,
+not just the section-name string.
+
+**The pocsag_companion firmware sketch relocation** (user's own mid-session
+flag: "we copied the pocsag companion firmware ino directory into this
+plugin folder, it shouldnt be in extra i think") -- `extra/pocsag_companion/`
+moved into `plugins/apps/dapnet/pocsag_companion/` via `git mv` (a prior
+turn had already copied it there as an untracked duplicate; this made it
+the single canonical copy instead). Found and fixed a real bug in the
+process: the plugin's own `firmware_routes.py` had `_SKETCH_DIR =
+Path(__file__).resolve().parents[3] / "extra" / "pocsag_companion"` --
+copied verbatim from the old core file without adjusting the parents-index
+math for the plugin's own deeper nesting (`plugins/apps/dapnet/backend/`
+vs `src/api/routes/`), which would have resolved to the nonexistent
+`plugins/extra/pocsag_companion`. Fixed to `parents[1] / "pocsag_companion"`
+(now pointing inside the plugin itself, one parent up from `backend/`).
+Old core's still-live copy of the same route file was repointed at the
+plugin's new sketch location too (`parents[3] / "plugins" / "apps" /
+"dapnet" / "pocsag_companion"`) so nothing broke before the full core
+deletion happened later in the same session.
+
+**A wrong assumption self-corrected mid-session, worth remembering**: I
+initially told the user (based on a stale docstring I'd apparently
+written in an earlier turn, never actually verified against the loader
+code) that this plugin would auto-load as a "builtin, default-enabled"
+plugin. Actually tracing `server.py`'s `load_plugins(builtin_dir=.../src/
+plugins/apps, community_dir=.../plugins/apps, ...)` call showed
+`src/plugins/apps/` is EMPTY -- every shipped plugin (ACARS included)
+actually lives in `plugins/apps/` at the repo root, which is the
+COMMUNITY tier (`is_plugin_enabled`: community requires
+`enabled: true` explicitly; only true `src/plugins/apps/` builtins
+default-enabled unless `false`). `locked = true` in `plugin.toml` only
+means "can't be deleted from Settings -> Plugins," NOT "default-on" --
+this was baked into `plugins/apps/dapnet/backend/__init__.py`'s own
+docstring wrong and got fixed once caught. Corrected the user's guidance
+before they restarted: they needed to add `plugins.dapnet.enabled: true`
+by hand or the DAPNET nav item would vanish entirely (old core UI already
+deleted this session, new plugin UI needs the explicit flag).
+
+**Live-verified on the real Pi** (screenshots, not just local tests):
+Recent Pages/Capcodes/Send tabs all render real data correctly after
+enabling the plugin with just `enabled: true` (no devices/filters
+migrated yet) -- 629 real historical pages, 70 capcodes, all still
+correctly served from the shared `packets` table regardless of which
+decode path (old core vs new plugin) originally wrote a given row.
+Companion status card correctly showed "Not configured" (expected --
+device not yet in `plugins.dapnet.devices`) while the OLD core topbar
+chip kept showing the real live device (PD2EMC, 439.9875 MHz, connected)
+throughout, confirming old and new coexisted safely exactly as designed.
+Settings tab's two cards (POCSAG companions device CRUD + DAPNET capcode
+filters) both rendered and showed the exact expected default values.
+
+**User's real local.yaml, pasted mid-session, revealed the live filter-
+divergence risk was already real, not hypothetical**: their actual
+`dapnet.blacklist_capcodes` had a 5th entry (`8`) beyond the 4 plugin
+defaults, and `ignore_capcodes` had 11 entries beyond the 2 defaults --
+meaning the moment `plugins.dapnet.enabled: true` went live (before this
+session's full core deletion + migration), the registry-first coordinator
+dispatch was ALREADY silently using the plugin's bare defaults instead of
+their real customized filters, since `plugins.dapnet.*` had none of those
+keys yet. Not data loss (only affects live filtering, stored history
+unaffected) but a real, live divergence -- folded into the final
+migration diff handed back to the user (their exact 5+11 capcode values,
+not just the 4+2 defaults) rather than a generic template.
+
+**Status at end of session**: full backend + frontend cutover done, all
+core DAPNET surface deleted, docs updated (CHANGELOG two entries under
+`v0.8.1` -- the coordinator bug fix and the DAPNET/plugin-capability
+entry with a `⚠️` breaking-change callout; PLUGINS.md gains a full
+"Adding a non-RTL-SDR capture source + protocol" section plus fixing a
+stale "five seams"/"cannot yet" intro paragraph that hadn't been updated
+to match; CONFIGURATION.md's whole POCSAG/DAPNET section rewritten for
+the plugin shape; API-ENDPOINTS.md gets a new "DAPNET (plugin)" section,
+also backfilling several routes -- `/api/dapnet/settings`,
+`/api/dapnet/status`, the `/api/config/dapnet/*` live-command routes,
+`/api/pocsag/firmware/*` -- that had never been documented even before
+this session; README.md's plugin list + Features paragraph + Local API
+table updated; new `plugins/apps/dapnet/README.md` written, matching
+ACARS's own README shape, since it didn't exist yet). Exact `local.yaml`
+migration diff (with the user's real 5+11 capcode values) handed back,
+not yet confirmed applied/restarted as of this writing -- that's the
+next thing to check in on.
