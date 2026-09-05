@@ -390,15 +390,18 @@ device is actually configured yet — unlike the old core page, there's
 no "hide until a device exists" gating (matching every other plugin's
 sidebar link).
 
-**No topbar chip.** The old core page had a small topbar badge
-(callsign/frequency/board); the plugin doesn't get an equivalent — no
-generic "plugin owns a topbar chip" seam exists yet, and building one
-for a single caller risked guessing its shape wrong. A **status
-card** at the top of the DAPNET page itself shows the same
-connected/board/callsign/frequency/hostname/wifi info instead — a
-real, acknowledged trade-off (glance-from-anywhere becomes
-click-into-the-page), same reasoning already applied to the RTL-SDR
-family's sidebar "in use" badge before it was later rebuilt properly.
+**Topbar chip + status card, same as the old core page had — plus a
+generic seam other plugins can now use too.** The topbar chip
+(callsign/frequency/board, next to the Meshtastic/MeshCore/Pager chips)
+briefly went away during the plugin extraction — no generic "plugin owns
+a topbar chip" seam existed yet, and building one for a single caller
+risked guessing its shape wrong. It's back now via a real seam
+(`docs/PLUGINS.md`'s [Adding a topbar
+chip](PLUGINS.md#adding-a-topbar-chip-topbar), `window.registerTopbarChip`),
+proven out by DAPNET itself needing it. The page's own **status
+card** (connected/board/callsign/frequency/hostname/wifi) stays too —
+both exist side by side, same as Meshtastic/MeshCore having both a
+compact topbar chip and a detailed page.
 
 **Periodic status poll (live TX count/uptime).** `DapnetSerialSource`
 sends a one-shot `{"cmd":"status"}` query right after connecting, then

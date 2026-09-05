@@ -151,7 +151,7 @@ Provided by the **DAPNET** plugin (`plugins/apps/dapnet/`, `plugins.dapnet.enabl
 | GET | `/api/dapnet/export/capcodes.csv` | Viewer | Download the DAPNET capcode roster as CSV |
 | GET | `/api/dapnet/settings` | Viewer | Current device list, capcode filters, and status-poll interval |
 | PUT | `/api/dapnet/settings` | Admin | Replace the device list and/or blacklist/ignore capcode lists and/or poll interval (capcode lists apply immediately; devices/poll interval need a restart) |
-| GET | `/api/dapnet/status` | Viewer | Live per-companion connection status (connected, board, callsign, frequency, hostname, WiFi) — replaces the old core topbar chip, shown on the plugin's own status card instead |
+| GET | `/api/dapnet/status` | Viewer | Live per-companion connection status (connected, board, callsign, frequency, hostname, WiFi) — polled by both the plugin's own topbar chip and its page-level status card |
 | PUT | `/api/config/dapnet/callsign` | Admin | Set one companion's callsign over its live serial connection (label-scoped) |
 | PUT | `/api/config/dapnet/web-password` | Admin | Set one companion's web dashboard password over serial (never cached/logged) |
 | POST | `/api/config/dapnet/reset-credentials` | Admin | Reset one companion's callsign + web password to firmware defaults |

@@ -21,7 +21,7 @@ example.
 
 ## What a plugin can do today
 
-An app plugin is out-of-core code that hooks seven seams:
+An app plugin is out-of-core code that hooks eight seams:
 
 - **Routes** — mount a FastAPI `APIRouter` under `/api/<whatever>`.
 - **Listener** — register an RTL-SDR subprocess listener (built idle at
@@ -48,12 +48,14 @@ An app plugin is out-of-core code that hooks seven seams:
   `Protocol` enum. Kept separate from Capture since a plugin might need
   only one of the two (see
   [Adding a non-RTL-SDR capture source + protocol](#adding-a-non-rtl-sdr-capture-source--protocol-captureprotocol)).
+- **Topbar** — add your own persistent status chip to the topbar, the same
+  visual language as the built-in Meshtastic/MeshCore/Serial/Pager/
+  Reticulum chips (see [Adding a topbar chip](#adding-a-topbar-chip-topbar)).
 
 That's it. A plugin **cannot** (yet) add a *plugin-contributed settings
-sub-page* inside core's own Configuration section, or a *generic topbar
-status chip* — see [Current limitations](#current-limitations) at the
-bottom before you start, in case what you want to build needs one of
-those.
+sub-page* inside core's own Configuration section — see [Current
+limitations](#current-limitations) at the bottom before you start, in
+case what you want to build needs one.
 
 ## Directory layout
 
@@ -130,10 +132,10 @@ author = "Your Name"
 | `name` | yes | Must equal the folder name. |
 | `version` | yes | Free-form string, shown on Settings → Plugins. |
 | `meshpoint_api` | yes | Integer. Currently `1` (`PLUGIN_API_VERSION` in `src/plugins/manifest.py`). A manifest targeting a higher number than this build supports is refused, not crashed. |
-| `provides` | yes | Non-empty subset of `listener`, `routes`, `panel`, `sidebar`, `hook`, `capture`, `protocol`. Calling a `PluginRegistry` method for a capability you didn't declare raises at register time — see [The `register(reg)` entry point](#the-registerreg-entry-point). |
+| `provides` | yes | Non-empty subset of `listener`, `routes`, `panel`, `sidebar`, `hook`, `capture`, `protocol`, `topbar`. Calling a `PluginRegistry` method for a capability you didn't declare raises at register time — see [The `register(reg)` entry point](#the-registerreg-entry-point). |
 | `locked` | no, default `false` | Only meaningful for **community** plugins. `true` marks a shipped/bundled community plugin (git-tracked, not a real user drop-in) so Settings → Plugins refuses to offer a Delete button for it — the same protection `plugins/themes/*/theme.json`'s `"locked": true` already gives the bundled theme pack. ACARS sets this. If you're writing a plugin someone else will `git clone` into their own `plugins/apps/`, leave it `false` (default) so they can delete it if they want to. |
 | `[deps].apt` / `.setup` | no | System packages + a build script. **Never installed automatically** — the operator runs it themselves (`sudo bash plugins/apps/<id>/setup.sh` or `sudo meshpoint plugin setup <id>`, which just wraps the same script after showing what it does). |
-| `[frontend].scripts` / `.styles` | scripts required iff `panel`, `sidebar` or `hook` in `provides` | Served at `/plugins/apps/<id>/<path>` — **only** the exact files listed here, from either tier, nothing else in the folder is reachable (`src/plugins/assets.py:resolve_plugin_asset`). |
+| `[frontend].scripts` / `.styles` | scripts required iff `panel`, `sidebar`, `hook` or `topbar` in `provides` | Served at `/plugins/apps/<id>/<path>` — **only** the exact files listed here, from either tier, nothing else in the folder is reachable (`src/plugins/assets.py:resolve_plugin_asset`). |
 | `[sidebar].route` / `.label` / `.category` | required iff `sidebar` in `provides` | See [Adding a top-level sidebar page](#adding-a-top-level-sidebar-page-sidebar) below. `category` must be one of `KNOWN_SIDEBAR_CATEGORIES` in `src/plugins/manifest.py`. |
 | `[sidebar].icon` | no, default `"plug"` | One of `KNOWN_SIDEBAR_ICONS` (`src/plugins/manifest.py`) — a curated key, not raw SVG. See [Adding a top-level sidebar page](#adding-a-top-level-sidebar-page-sidebar). |
 | `[hook].host` | required iff `hook` in `provides` | Another plugin's `[sidebar].route` — not validated against real plugins at parse time (resolved at runtime in the browser). See [Injecting into another page](#injecting-into-another-page-hook). |
@@ -480,6 +482,82 @@ markup fine but silently never load any data, with no error anywhere. Not
 needed if your own page has no meaningful `show()`/`hide()` of its own
 (Hello World's are no-ops, so the simpler example above skips this).
 
+## Adding a topbar chip (`"topbar"`)
+
+A persistent status badge in the topbar, the same visual language as the
+built-in Meshtastic/MeshCore/Serial/Pager/Reticulum chips — unlike those,
+which are fed by `TopbarController`'s own shared `GET /api/config` poll,
+a plugin chip has no core-config-driven data source or enabled flag to
+gate on. It's mounted unconditionally the moment your plugin registers it
+(the plugin being loaded at all already means it's enabled), and owns its
+own data fetching and visibility from there — hide yourself (`el.hidden`)
+whenever you have nothing worth showing.
+
+No `[topbar]` TOML table exists — a chip is fully custom-rendered, there's
+no route/label/icon to declare upfront the way `"sidebar"` has. You do
+still need at least one `[frontend].scripts` entry (enforced the same way
+as `panel`/`sidebar`/`hook`), since the chip itself is registered from
+JS, not Python — nothing on the backend needs touching for this seam at
+all.
+
+`plugins/apps/dapnet/frontend/dapnet_topbar_chip.js` is the real, shipped
+example, reusing DAPNET's own `GET /api/dapnet/status` (the same endpoint
+its page-level status card already polls) rather than any new endpoint:
+
+```js
+class MyPluginTopbarChip {
+    mount(rootEl) {
+        this._el = rootEl;
+        this._el.hidden = true;   // nothing to show yet
+    }
+
+    init() {
+        this._refresh();
+        this._timer = setInterval(() => this._refresh(), 10_000);
+    }
+
+    destroy() {
+        clearInterval(this._timer);
+    }
+
+    async _refresh() {
+        const res = await fetch('/api/my-plugin/status', { credentials: 'same-origin' });
+        const data = res.ok ? await res.json() : null;
+        this._el.hidden = !data;
+        if (data) this._el.textContent = data.summary;
+    }
+}
+
+window.registerTopbarChip({ id: 'my-plugin', make: () => new MyPluginTopbarChip() });
+```
+
+`window.registerTopbarChip({ id, make })` — `make()` returns an object
+shaped like every existing chip:
+
+- `mount(rootEl)` — required. `rootEl` is an already-appended, empty
+  wrapper `<span>` — build your initial DOM into it. Reuse the shared
+  `.topbar-serial` classes (brand/lamp/call/sep/freq spans — see
+  `frontend/topbar/topbar_reticulum_chip.js` for the closest existing
+  self-polling precedent this generalizes) if you want the same visual
+  language as the built-in chips, or render whatever you want — nothing
+  enforces the shape.
+- `init()` — optional, called once, immediately after `mount()`. Start
+  your own polling/timers here, not in `mount()` — this ordering
+  guarantee is why `DapnetTopbarChip` above splits the two.
+- `destroy()` — optional, called on teardown. No real teardown path
+  exists in the app today (the dashboard never tears down its own
+  `TopbarController`); kept for symmetry and any future one.
+
+Registration order matches every other frontend seam in this doc — your
+plugin's `<script>` tag runs before `app.js` ever constructs
+`TopbarController`, so `window.registerTopbarChip` calls from any number
+of plugins are all recorded before anything tries to mount them. No
+capability-declaration enforcement happens at runtime the way
+`add_router`/`add_listener` enforce theirs (there's no backend call to
+gate) — declaring `"topbar"` in `provides` is what makes the manifest
+loader require your `[frontend].scripts` entry, which is the real,
+useful check.
+
 ## Adding a non-RTL-SDR capture source + protocol (`"capture"`/`"protocol"`)
 
 `"listener"` assumes RTL-SDR: a subprocess sharing one dongle, idle until
@@ -686,19 +764,15 @@ core seam (`src/plugins/registry.py`, `src/plugins/manifest.py`'s
   that already has a page of its own — this is specifically about a
   Configuration/Settings-*style form living in core's own Configuration
   section*, for a plugin with no page to hang a tab off of.)
-- **No generic topbar-chip seam.** A plugin has no way to show a persistent,
-  glance-from-anywhere status badge in the topbar the way core's own
-  Meshtastic/MeshCore/Serial/Pager/Reticulum chips do — DAPNET's own status
-  card at the top of its page is the deliberate substitute, a real,
-  acknowledged trade-off (see its CHANGELOG entry). Same reasoning as the
-  RTL-SDR family's sidebar "in use" badge before `sdr_status_badge.js` was
-  built: don't guess a shared seam's shape from one caller.
 
 The non-RTL-SDR capture source + decoder-ownership gaps that used to be
 listed here are solved — see [Adding a non-RTL-SDR capture source +
 protocol](#adding-a-non-rtl-sdr-capture-source--protocol-captureprotocol)
-above, proven out by DAPNET actually moving out of core onto it. Don't
-build around the two above either — if you need one, that's a signal to
-extend the core seam (`src/plugins/registry.py`,
-`src/plugins/manifest.py`'s `KNOWN_PROVIDES`), not to work around it
-inside a plugin. Full background: `memory/plugin-architecture-review.md`.
+above, proven out by DAPNET actually moving out of core onto it. The
+generic topbar-chip gap that used to be listed here is solved too — see
+[Adding a topbar chip](#adding-a-topbar-chip-topbar), also proven out by
+DAPNET, which now has one. Don't build around the one above either — if
+you need it, that's a signal to extend the core seam
+(`src/plugins/registry.py`, `src/plugins/manifest.py`'s
+`KNOWN_PROVIDES`), not to work around it inside a plugin. Full
+background: `memory/plugin-architecture-review.md`.

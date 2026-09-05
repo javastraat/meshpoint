@@ -49,6 +49,16 @@
     gap: 0.5rem;
 }
 
+/* Holds zero or more plugin-registered chips (topbar_plugin_registry.js)
+   -- each one is itself a .topbar__group, this is just the row they sit
+   in, same gap as the built-in chips use between each other. */
+.topbar__plugin-chips {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+}
+
 /* Author `display: inline-flex` above beats the browser's built-in
  * `[hidden] { display: none }` UA rule regardless of specificity, so a
  * hidden group stays a zero-content flex item that still eats a `gap`

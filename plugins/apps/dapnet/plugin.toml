@@ -1,7 +1,7 @@
 name = "dapnet"
 version = "1.0.0"
 meshpoint_api = 1
-provides = ["capture", "protocol", "routes", "sidebar"]
+provides = ["capture", "protocol", "routes", "sidebar", "topbar"]
 locked = true  # shipped with this fork -- not user-installed, can't be deleted
 
 [deps]
@@ -13,6 +13,7 @@ scripts = [
     "frontend/dapnet_settings_tab.js",
     "frontend/dapnet_status_card.js",
     "frontend/dapnet_packet_format.js",
+    "frontend/dapnet_topbar_chip.js",
 ]
 styles = ["frontend/dapnet_panel.css"]
 

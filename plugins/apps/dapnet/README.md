@@ -13,10 +13,12 @@ plugin seams (see `docs/PLUGINS.md`): a real `CaptureSource` joins the
 core packet pipeline directly, unconditionally at boot, and it owns
 decode + classification for its own protocol identity
 (`OpenProtocol("dapnet")`, not a member of the closed core `Protocol`
-enum). It ships `locked = true` in its `plugin.toml`, so unlike a plugin
-you drop in yourself it won't offer a Delete button on Settings →
-Plugins (it's git-tracked, so deleting it wouldn't stick past the next
-`Update` anyway).
+enum). It's also the reference for `"topbar"` — its own persistent
+status chip next to the built-in Meshtastic/MeshCore/Pager chips
+(`window.registerTopbarChip`). It ships `locked = true` in its
+`plugin.toml`, so unlike a plugin you drop in yourself it won't offer a
+Delete button on Settings → Plugins (it's git-tracked, so deleting it
+wouldn't stick past the next `Update` anyway).
 
 ## Install
 
@@ -73,23 +75,24 @@ purges any already-stored pages for a newly-added capcode. All of it is
 also editable from the DAPNET page's own **Settings** tab, which is the
 same PUT under the hood (`GET`/`PUT /api/dapnet/settings`).
 
-## No topbar chip
+## Topbar chip + status card
 
-The old core version of this page had a small topbar badge
-(callsign/frequency/board). This plugin doesn't get an equivalent — no
-generic "plugin owns a topbar chip" seam exists yet, and building one
-for a single caller risked guessing its shape wrong. A **status card**
-at the top of the DAPNET page shows the same info instead — a real,
-acknowledged trade-off (glance-from-anywhere becomes click-into-the-page),
-the same reasoning already applied to the RTL-SDR family's sidebar "in
-use" badge before it was later rebuilt properly as a generic seam.
-Revisit building a real topbar-chip registry if a second plugin ever
-wants one too.
+Both exist side by side, same as Meshtastic/MeshCore having both a
+compact topbar chip and a detailed page: a **topbar chip**
+(`dapnet_topbar_chip.js`, callsign/frequency/board, next to the built-in
+Meshtastic/MeshCore/Pager chips) and a **status card** at the top of the
+DAPNET page itself (more detail — hostname, WiFi SSID, TX count,
+uptime). Both poll the same `GET /api/dapnet/status`. The topbar chip
+briefly went away during the plugin extraction (no generic "plugin owns
+a topbar chip" seam existed yet); it's back now via a real one
+(`window.registerTopbarChip`, `docs/PLUGINS.md`'s [Adding a topbar
+chip](../../../docs/PLUGINS.md#adding-a-topbar-chip-topbar)) that any
+other plugin can use too.
 
 ## Layout
 
 ```
-plugin.toml                        manifest (capture/protocol/routes/sidebar, [frontend], meta)
+plugin.toml                        manifest (capture/protocol/routes/sidebar/topbar, [frontend], meta)
 setup.sh                           arduino-cli/ESP32 toolchain check
 pocsag_companion/                  the companion's own Arduino sketch
 backend/listener.py                DapnetSerialSource (threaded pyserial reader)
@@ -102,7 +105,8 @@ backend/settings_routes.py         GET/PUT /api/dapnet/settings, GET /api/dapnet
 backend/__init__.py                register(reg)
 frontend/dapnet_panel.js           the DAPNET page (Recent Pages / Capcodes / Send / Settings tabs)
 frontend/dapnet_settings_tab.js    the Settings tab (device CRUD, capcode filters, live commands)
-frontend/dapnet_status_card.js     the status card replacing the old topbar chip
+frontend/dapnet_status_card.js     the page-level status card
+frontend/dapnet_topbar_chip.js     the topbar chip (window.registerTopbarChip)
 frontend/dapnet_packet_format.js   registers DAPNET's id/type-label/summary quirks with core's
                                     protocol_format_registry.js
 frontend/dapnet_panel.css          empty on purpose -- reuses core's lorawan.css/configuration.css

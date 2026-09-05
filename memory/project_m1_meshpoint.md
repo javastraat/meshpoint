@@ -11376,5 +11376,54 @@ this session; README.md's plugin list + Features paragraph + Local API
 table updated; new `plugins/apps/dapnet/README.md` written, matching
 ACARS's own README shape, since it didn't exist yet). Exact `local.yaml`
 migration diff (with the user's real 5+11 capcode values) handed back,
-not yet confirmed applied/restarted as of this writing -- that's the
-next thing to check in on.
+confirmed applied and working live -- status card showed the real
+device (heltec/PD2EMC/439.9875 MHz/192.168.2.216), Recent Pages/Capcodes
+tabs both correct, Settings tab's capcode fields matched the migrated
+5+13 values.
+
+**Same-session follow-up: the topbar-chip trade-off got reversed.** Once
+the migration was live and the user could actually see the gap (no
+DAPNET pill next to Meshtastic/MeshCore/Pager up top), they asked
+directly: keep the status-card-only trade-off, or build it now? Offered
+three options via AskUserQuestion (keep as-is / a one-off hardcoded chip
+/ the generic registry) and the user picked the generic registry --
+seeing the real gap live changed the calculus from "no second use case
+to validate a shape against" to "here's the second, and it's worth
+building properly." Built `frontend/topbar/topbar_plugin_registry.js`
+(`window.registerTopbarChip({id, make})`, `make()` returns
+`{mount(rootEl), init()?, destroy()?}`) -- mirrors
+`topbar_reticulum_chip.js`'s existing self-poll shape (a plugin chip has
+no `GET /api/config`-driven enabled flag the way core's own chips do, so
+it mounts unconditionally and owns its own visibility/polling). New
+`#topbar-plugin-chips` container in `index.html`, right before
+`.topbar__spacer`; `TopbarController` mounts registered chips in its
+constructor and calls `.destroy?.()` on each in its own `destroy()`.
+`"topbar"` added to `KNOWN_PROVIDES` and to the `[frontend].scripts`-
+required check (same enforcement as panel/sidebar/hook -- a chip is
+registered from JS, nothing backend to gate on). Reused the OLD deleted
+`TopbarDapnetChip`'s exact visual shape wholesale (pulled from git
+history, `git show <commit>~1:frontend/topbar/topbar_dapnet_chip.js`)
+rather than reinventing it, adapted to self-poll the plugin's own
+`GET /api/dapnet/status` instead of being fed by TopbarController's old
+shared config poll. Kept `DapnetStatusCard` (the page-level status card)
+unchanged rather than removing it -- both now shown side by side, same
+as Meshtastic/MeshCore already having both a compact topbar chip and a
+detailed page. Full doc pass to match: PLUGINS.md gains an "Adding a
+topbar chip" section and the "eight seams" intro, the topbar-chip
+"Current limitations" bullet removed; CONFIGURATION.md/README.md/the
+plugin's own README's "No topbar chip" paragraphs all rewritten; one new
+CHANGELOG bullet. 65 python tests passing (manifest + loader + registries
++ plugin backend), JS syntax-checked, HTML tag balance re-verified.
+
+Along the way, answered an unrelated question about why
+`src/audio/sdr_registry.py` stays in core rather than moving into
+`plugins/apps/rtlsdr/`: 8 separate plugins (radio/acars/rtl433/adsb/dab/
+p2000/pocsag/pagers) all import it to arbitrate the one shared RTL-SDR
+dongle, and none of them know about each other -- moving it into any one
+of those plugins would mean the other 7 importing directly from that
+plugin's internal package path, an anti-pattern that breaks the loader's
+"one plugin failing never aborts the others" isolation guarantee. Same
+category as `capture_source_registry.py`/`protocol_registry.py`/
+`listener_registry.py`/`route_registry.py` -- neutral core-owned seams
+plugins register *through*, not code owned by one arbitrarily-chosen
+plugin. No code change, just an explanation.

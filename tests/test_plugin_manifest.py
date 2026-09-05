@@ -160,6 +160,25 @@ author = "Einstein"
         m = parse_manifest(d)
         self.assertEqual(m.provides, ("capture", "protocol", "routes"))
 
+    def test_topbar_is_a_known_provides_value(self) -> None:
+        # No dedicated TOML table (a chip is fully custom-rendered, no
+        # route/label/icon to declare) -- but like panel/sidebar/hook, it
+        # still needs at least one frontend script, since the chip is
+        # registered from JS (window.registerTopbarChip()), not Python.
+        toml = _VALID.replace(
+            'provides = ["listener", "routes"]',
+            'provides = ["topbar", "routes"]',
+        ) + '\n[frontend]\nscripts = ["frontend/x.js"]\n'
+        d = _write_plugin(self.root, "acars", toml, extra_files=("frontend/x.js",))
+        m = parse_manifest(d)
+        self.assertEqual(m.provides, ("topbar", "routes"))
+
+    def test_topbar_without_frontend_scripts_is_rejected(self) -> None:
+        toml = _VALID.replace(
+            'provides = ["listener", "routes"]', 'provides = ["topbar"]',
+        )
+        self.assertEqual(self._code("acars", toml), "frontend")
+
     def test_frontend_table_parsed(self) -> None:
         toml = _VALID.replace(
             'provides = ["listener", "routes"]',

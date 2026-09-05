@@ -30,7 +30,7 @@ Manifest shape::
     apt = ["cmake", "pkg-config"]
     setup = "setup.sh"             # relative to the plugin dir, must exist
 
-    [frontend]                     # required when "panel" or "sidebar" in provides
+    [frontend]                     # required when "panel", "sidebar", "hook" or "topbar" in provides
     scripts = ["frontend/acars_panel.js"]   # rel paths, must exist
     styles  = ["frontend/acars_panel.css"]  # optional
 
@@ -71,7 +71,7 @@ _SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]{1,38}$")
 _ROUTE_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,58}$")
 
 KNOWN_PROVIDES = frozenset({
-    "listener", "routes", "panel", "sidebar", "hook", "capture", "protocol",
+    "listener", "routes", "panel", "sidebar", "hook", "capture", "protocol", "topbar",
 })
 
 # The existing top-level sidebar sections a plugin's page can be placed
@@ -288,11 +288,14 @@ def parse_manifest(
         raise PluginManifestError("frontend", "'[frontend]' must be a table.")
     scripts = _rel_paths(frontend.get("scripts", []), plugin_dir, "scripts")
     styles = _rel_paths(frontend.get("styles", []), plugin_dir, "styles")
-    if ("panel" in provides or "sidebar" in provides or "hook" in provides) and not scripts:
+    if (
+        "panel" in provides or "sidebar" in provides
+        or "hook" in provides or "topbar" in provides
+    ) and not scripts:
         raise PluginManifestError(
             "frontend",
-            "a 'panel', 'sidebar' or 'hook' plugin must list at least one "
-            "'frontend.scripts' file.",
+            "a 'panel', 'sidebar', 'hook' or 'topbar' plugin must list at "
+            "least one 'frontend.scripts' file.",
         )
 
     sidebar = _parse_sidebar(data.get("sidebar"), provides)

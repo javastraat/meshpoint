@@ -7,6 +7,8 @@
  *   - TopbarSerialChip      (one badge per Meshtastic USB serial device)
  *   - TopbarPagerChip       (single badge, emergency pager project)
  *   - TopbarReticulumChip   (own address · peer count, own 15s poll -- runtime state, not config)
+ *   - plugin chips          (topbar_plugin_registry.js -- window.registerTopbarChip,
+ *                            each one self-polling its own status endpoint)
  *   - TopbarActions         (right-side quick-action buttons)
  *
  * Data: /api/config on a 10s cadence; dashboard WebSocket for connection lamp.
@@ -31,6 +33,9 @@ class TopbarController {
         this._reticulum = new TopbarReticulumChip(
             rootEl.querySelector('#topbar-reticulum-group'),
         );
+        this._pluginChips = window.mountTopbarChips
+            ? window.mountTopbarChips(rootEl.querySelector('#topbar-plugin-chips'))
+            : [];
         this._actions = new TopbarActions(
             rootEl.querySelector('.topbar-actions'),
         );
@@ -46,6 +51,7 @@ class TopbarController {
 
     destroy() {
         if (this._refreshTimer) clearInterval(this._refreshTimer);
+        this._pluginChips.forEach((chip) => chip.destroy && chip.destroy());
     }
 
     _wireWebSocket() {

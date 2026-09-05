@@ -2,14 +2,10 @@
  * DAPNET status card -- device connected/board/callsign/freq/hostname/wifi,
  * shown prominently at the top of the plugin's own page.
  *
- * Replaces the old core topbar chip (frontend/topbar/topbar_dapnet_chip.js,
- * deleted along with the rest of core's DAPNET surface) -- this plugin
- * deliberately doesn't get an equivalent, since no generic "plugin owns a
- * topbar chip" seam exists yet and building one for a single plugin risked
- * guessing its shape wrong (see plugins/apps/dapnet/README.md for the full
- * reasoning). Losing the at-a-glance-from-anywhere status is a real,
- * acknowledged trade-off; showing it prominently here instead of behind a
- * click is the mitigation.
+ * Sits alongside dapnet_topbar_chip.js (window.registerTopbarChip), not
+ * in place of it -- same reasoning Meshtastic/MeshCore already show both
+ * a compact topbar chip and a detailed page. This card shows more than
+ * the topbar chip has room for (hostname, WiFi SSID, TX count, uptime).
  *
  * Polls GET /api/dapnet/status (settings_routes.py) directly rather than
  * the old core GET /api/config's dapnet_status key, which no longer exists.
