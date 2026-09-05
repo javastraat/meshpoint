@@ -269,11 +269,17 @@ class MessagingContacts {
         el.dataset.nodeId = convo.node_id;
 
         const isChannel = !!convo.is_broadcast;
+        // Not Meshtastic/MeshCore-only -- this list also carries
+        // Reticulum/Pager conversations from the same shared `messages`
+        // table (see messaging_chat.js's identical note). Anything past
+        // the two known radio protocols falls back to a neutral,
+        // unmodified icon/badge (no color class) rather than being
+        // mislabeled as Meshtastic.
         const iconClass = isChannel
             ? 'msg-convo__icon--channel'
-            : convo.protocol === 'meshcore'
-                ? 'msg-convo__icon--mc'
-                : 'msg-convo__icon--mt';
+            : convo.protocol === 'meshcore' ? 'msg-convo__icon--mc'
+            : convo.protocol === 'meshtastic' ? 'msg-convo__icon--mt'
+            : '';
 
         const iconText = isChannel
             ? '#'
@@ -283,7 +289,10 @@ class MessagingContacts {
             ? convo.node_name || `Ch ${convo.channel || 0}`
             : convo.node_name || convo.node_id;
 
-        const protoBadge = convo.protocol === 'meshcore' ? 'MC' : 'MT';
+        const PROTO_LABELS = { meshtastic: 'MT', meshcore: 'MC', reticulum: 'RT', pager: 'PAGER' };
+        const protoBadge = PROTO_LABELS[convo.protocol] || (convo.protocol || '').toUpperCase() || 'MT';
+        const protoBadgeClass = convo.protocol === 'meshcore' ? 'mc'
+            : convo.protocol === 'meshtastic' ? 'mt' : '';
         const connLabel = this._formatConnectionLabel(convo.capture_source);
         const connBadgeHtml = connLabel
             ? ` <span class="msg-convo__conn-badge" title="Heard via ${this._esc(convo.capture_source)}">${this._esc(connLabel)}</span>`
@@ -310,7 +319,7 @@ class MessagingContacts {
         el.innerHTML = `
             <div class="msg-convo__icon ${iconClass}">${iconText}</div>
             <div class="msg-convo__info">
-                <div class="msg-convo__name"><span class="msg-convo__name-text">${this._esc(displayName)}</span><span class="msg-convo__proto-badge msg-convo__proto-badge--${convo.protocol === 'meshcore' ? 'mc' : 'mt'}">${protoBadge}</span>${connBadgeHtml}</div>
+                <div class="msg-convo__name"><span class="msg-convo__name-text">${this._esc(displayName)}</span><span class="msg-convo__proto-badge${protoBadgeClass ? ' msg-convo__proto-badge--' + protoBadgeClass : ''}">${protoBadge}</span>${connBadgeHtml}</div>
                 <div class="msg-convo__preview">${this._esc(convo.last_message || '')}</div>
             </div>
             <div class="msg-convo__meta">
@@ -370,10 +379,13 @@ class MessagingContacts {
             filtered.forEach(contact => {
                 const item = document.createElement('div');
                 item.className = 'msg-contact';
-                const pClass = contact.protocol === 'meshcore' ? 'msg-contact__protocol--mc' : 'msg-contact__protocol--mt';
+                const pClass = contact.protocol === 'meshcore' ? 'msg-contact__protocol--mc'
+                    : contact.protocol === 'meshtastic' ? 'msg-contact__protocol--mt' : '';
+                const pLabel = { meshtastic: 'MT', meshcore: 'MC', reticulum: 'RT', pager: 'PAGER' }[contact.protocol]
+                    || (contact.protocol || '').toUpperCase() || 'MT';
                 item.innerHTML = `
                     <span class="msg-contact__name">${this._esc(contact.name || contact.node_id)}</span>
-                    <span class="msg-contact__protocol ${pClass}">${contact.protocol === 'meshcore' ? 'MC' : 'MT'}</span>
+                    <span class="msg-contact__protocol ${pClass}">${pLabel}</span>
                 `;
                 item.addEventListener('click', () => {
                     overlay.remove();

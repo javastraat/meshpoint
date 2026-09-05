@@ -50,7 +50,15 @@ class MessagingChat {
         // go out on, so replying stays disabled there.
         const isKeyed = /:keyed:\d+:0x[0-9a-f]+$/i.test(convo.node_id || '');
         const isUnmapped = !isKeyed && (convo.node_id || '').includes(':unmapped:');
-        const proto = convo.protocol === 'meshcore' ? 'MC' : 'MT';
+        // This page's own conversation list isn't Meshtastic/MeshCore-only
+        // -- it reads from the same shared `messages` table Reticulum and
+        // Pager also write to (protocol='reticulum'/'pager') -- so this
+        // can't just be a binary MC/MT choice. Anything else falls back
+        // to its own uppercased protocol name with the neutral badge/
+        // avatar color (no --mt/--mc modifier applied), rather than being
+        // mislabeled as Meshtastic.
+        const PROTO_LABELS = { meshtastic: 'MT', meshcore: 'MC', reticulum: 'RT', pager: 'PAGER' };
+        const proto = PROTO_LABELS[convo.protocol] || (convo.protocol || '').toUpperCase() || 'MT';
 
         this._headerName.textContent = name;
         this._headerName.classList.toggle('msg-chat__name--clickable', !isChannel);
@@ -62,8 +70,11 @@ class MessagingChat {
                     ? 'Public channel · all listeners on this PSK'
                     : 'Direct message';
         this._headerBadge.textContent = proto;
-        this._headerBadge.className = 'msg-chat__protocol-badge ' +
-            (convo.protocol === 'meshcore' ? 'msg-chat__protocol-badge--mc' : 'msg-chat__protocol-badge--mt');
+        this._headerBadge.className = 'msg-chat__protocol-badge ' + (
+            convo.protocol === 'meshcore' ? 'msg-chat__protocol-badge--mc'
+            : convo.protocol === 'meshtastic' ? 'msg-chat__protocol-badge--mt'
+            : '' // reticulum/pager/etc -- neutral badge color, no wrong MT tint
+        );
 
         // Which specific companion/stick this contact was last heard
         // through -- distinct from the protocol badge above, since a
@@ -77,7 +88,8 @@ class MessagingChat {
         this._headerAvatar.className = 'msg-chat__avatar' + (
             isChannel ? ' msg-chat__avatar--channel'
             : convo.protocol === 'meshcore' ? ' msg-chat__avatar--mc'
-            : ' msg-chat__avatar--mt'
+            : convo.protocol === 'meshtastic' ? ' msg-chat__avatar--mt'
+            : '' // reticulum/pager/etc -- neutral avatar color
         );
 
         this._messagesEl.innerHTML = '';

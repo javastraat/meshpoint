@@ -18,6 +18,7 @@ from src.api.auth.jwt_session import ROLE_VIEWER, SessionClaims
 
 from src.api.message_name_resolver import MessageNameResolver
 from src.config import AppConfig
+from src.reticulum.lxmf_service import LxmfService
 from src.storage.message_repository import (
     BROADCAST_NODE_MC,
     BROADCAST_NODE_MT,
@@ -37,6 +38,7 @@ _node_repo = None
 _meshcore_tx: MeshCoreTxClient | None = None
 _config: AppConfig | None = None
 _name_resolver: MessageNameResolver | None = None
+_reticulum_service: LxmfService | None = None
 
 
 def init_routes(
@@ -46,14 +48,17 @@ def init_routes(
     meshcore_tx: MeshCoreTxClient | None = None,
     config: AppConfig | None = None,
     packet_repo: PacketRepository | None = None,
+    reticulum_service: LxmfService | None = None,
 ) -> None:
     global _tx_service, _message_repo, _node_repo, _meshcore_tx, _config, _name_resolver
+    global _reticulum_service
     _tx_service = tx_service
     _message_repo = message_repo
     _node_repo = node_repo
     _meshcore_tx = meshcore_tx
     _config = config
     _name_resolver = MessageNameResolver(node_repo, meshcore_tx, packet_repo)
+    _reticulum_service = reticulum_service
 
 
 class SendRequest(BaseModel):
@@ -83,6 +88,28 @@ async def send_message(
         raise HTTPException(400, "Message text cannot be empty")
     if len(req.text) > 228:
         raise HTTPException(400, "Message too long (max 228 bytes)")
+
+    if req.protocol.lower() == "reticulum":
+        # A completely different send path (LXMF over rnsd, not a
+        # Meshtastic/MeshCore radio TX) -- TxService never learned this
+        # protocol, and never should (see its own module docstring).
+        # send_message() already persists the sent row itself, unlike
+        # the TxService path below, so this returns early rather than
+        # falling through to the generic save_sent() call further down,
+        # which would otherwise double-save it.
+        if _reticulum_service is None or not _reticulum_service.available:
+            raise HTTPException(503, "Reticulum service not available")
+        try:
+            row_id = await _reticulum_service.send_message(req.destination, req.text)
+        except (ValueError, RuntimeError) as exc:
+            return {
+                "success": False, "packet_id": "", "protocol": "reticulum",
+                "timestamp": time.time(), "airtime_ms": 0, "error": str(exc),
+            }
+        return {
+            "success": True, "packet_id": str(row_id), "protocol": "reticulum",
+            "timestamp": time.time(), "airtime_ms": 0, "error": "",
+        }
 
     result = await _tx_service.send_text(
         text=req.text,

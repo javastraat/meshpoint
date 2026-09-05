@@ -325,6 +325,10 @@
     border-radius: 4px;
     color: #16181f;
     flex-shrink: 0;
+    /* Neutral fallback for any protocol without its own --mt/--mc
+       modifier below (reticulum, pager, ...) -- same token the
+       icon/avatar neutral fallbacks already use. */
+    background: var(--msg-text-dim);
 }
 
 .msg-convo__proto-badge--mt { background: var(--msg-mt); }
@@ -955,6 +959,7 @@
     padding: 2px 7px;
     border-radius: 4px;
     color: #16181f;
+    background: var(--msg-text-dim); /* neutral fallback, see .msg-convo__proto-badge */
 }
 
 .msg-contact__protocol--mt { background: var(--msg-mt); }

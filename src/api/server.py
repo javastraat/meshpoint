@@ -1898,6 +1898,7 @@ def _init_routes(
         meshcore_tx=meshcore_tx,
         config=config,
         packet_repo=coord.packet_repo,
+        reticulum_service=reticulum_service,
     )
 
     crypto = coord._crypto if hasattr(coord, "_crypto") else None
