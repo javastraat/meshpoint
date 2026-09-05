@@ -21,7 +21,12 @@ from src.analytics.signal_analyzer import SignalAnalyzer
 from src.analytics.traffic_monitor import TrafficMonitor
 from src.api.audit import AuditLogWriter
 from src.api.html_assets import bust_asset_urls
-from src.api import listener_registry, route_registry
+from src.api import (
+    capture_source_registry,
+    listener_registry,
+    protocol_registry,
+    route_registry,
+)
 from src.api.theme_registry import inject_theme_links, stamp_default_theme
 from src.api.audit import dependencies as audit_deps
 from src.api.auth import dependencies as auth_deps
@@ -233,6 +238,8 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     # so a second create_app() (tests) starts clean.
     route_registry.reset()
     listener_registry.reset()
+    capture_source_registry.reset()
+    protocol_registry.reset()
     global _loaded_plugins
     _loaded_plugins = load_plugins(
         Path(__file__).resolve().parents[1] / "plugins" / "apps",
@@ -304,6 +311,12 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
         await _hydrate_public_keys(pipeline)
 
         await pipeline.start()
+
+        # Plugin capture sources are already in the pipeline (added by
+        # _build_pipeline, above) -- this is the earliest point their own
+        # wire() callback can bind against pipeline.packet_repo etc, which
+        # raise RuntimeError until start() has run.
+        capture_source_registry.wire_all(pipeline)
 
         message_repo = MessageRepository(pipeline.database)
 
@@ -671,6 +684,13 @@ def _build_pipeline(config: AppConfig) -> PipelineCoordinator:
             _add_meshcore_usb_source(coordinator, config)
         elif source_name == "pocsag_serial":
             _add_dapnet_source(coordinator, config)
+
+    # Plugin-registered capture sources (src.api.capture_source_registry) --
+    # must run before this function returns, since the caller calls
+    # pipeline.start() next, and CaptureCoordinator.start() only spawns a
+    # reader task for sources already in its list at that point.
+    for source in capture_source_registry.build_all():
+        coordinator.capture_coordinator.add_source(source)
 
     return coordinator
 

@@ -8,13 +8,52 @@ from typing import Any, Optional
 from src.models.signal import SignalMetrics
 
 
+class _OpenStrEnum(str):
+    """A str-Enum-shaped identity for a value that isn't a member of the
+    real closed enum (a plugin-registered protocol/packet type). Behaves
+    exactly like a plain string everywhere (==, hashing, f-strings,
+    .startswith, DB storage) while also exposing `.value` so every
+    existing `packet.protocol.value` / `packet.packet_type.value` call
+    site across the codebase keeps working unmodified, regardless of
+    whether the object is a real enum member or one of these.
+    """
+
+    @property
+    def value(self) -> str:
+        return str(self)
+
+
+class OpenProtocol(_OpenStrEnum):
+    """A plugin-registered protocol identity, e.g. ``OpenProtocol("dapnet")``."""
+
+
+class OpenPacketType(_OpenStrEnum):
+    """A plugin-registered packet-type identity."""
+
+
 class Protocol(str, Enum):
     MESHTASTIC = "meshtastic"
     MESHCORE = "meshcore"
     LORAWAN = "lorawan"
+    # TODO(dapnet-plugin): DAPNET is being extracted into plugins/apps/dapnet/
+    # (see src/api/protocol_registry.py) -- this member is removed once that
+    # plugin registers OpenProtocol("dapnet") in its place and coordinator.py
+    # no longer references Protocol.DAPNET directly.
     DAPNET = "dapnet"
     PAGER = "pager"
     UNKNOWN = "unknown"
+
+    @classmethod
+    def parse(cls, value: str) -> "Protocol | OpenProtocol":
+        """Reconstruct a protocol identity from storage. A value that
+        isn't one of the core protocols above is a plugin-registered one
+        (e.g. "dapnet") -- return it as an OpenProtocol instead of
+        raising, so a plugin protocol's rows don't crash generic reads
+        like GET /api/packets."""
+        try:
+            return cls(value)
+        except ValueError:
+            return OpenProtocol(value)
 
 
 class PacketType(str, Enum):
@@ -38,6 +77,8 @@ class PacketType(str, Enum):
     LORAWAN_DATA = "lorawan_data"
     LORAWAN_REJOIN = "lorawan_rejoin"
     NEIGHBOUR_ADVERT = "neighbour_advert"
+    # TODO(dapnet-plugin): removed once plugins/apps/dapnet/ registers
+    # OpenPacketType("dapnet_alpha") etc in their place -- see Protocol.DAPNET.
     DAPNET_ALPHA = "dapnet_alpha"
     DAPNET_NUMERIC = "dapnet_numeric"
     DAPNET_TONE = "dapnet_tone"
@@ -50,6 +91,16 @@ class PacketType(str, Enum):
     # channel before a real protocol/decoder is built.
     PAGER_RAW = "pager_raw"
     UNKNOWN = "unknown"
+
+    @classmethod
+    def parse(cls, value: str) -> "PacketType | OpenPacketType":
+        """Same reasoning as Protocol.parse() -- a plugin-registered
+        packet type (e.g. "dapnet_alpha") isn't a member of this enum,
+        return it as an OpenPacketType instead of raising."""
+        try:
+            return cls(value)
+        except ValueError:
+            return OpenPacketType(value)
 
 
 @dataclass

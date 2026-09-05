@@ -37,6 +37,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (await _redirectIfSetupRequired()) return;
 
     const identity = await _loadIdentity();
+    // Exposed globally so a plugin's own frontend script (registerSidebarPage's
+    // make(), which has no way to receive this as a constructor argument the
+    // way a core _boot*Panel(router, identity) call could) can role-gate its
+    // own UI client-side, same as every core panel already does -- the real
+    // security boundary stays server-side either way (an admin-only route
+    // already rejects a non-admin regardless of what the client shows).
+    window.meshpointIdentity = identity;
 
     // Must run before the Router/SidebarController below are constructed --
     // it builds the plugin sidebar <li>/<section> DOM those two snapshot at
@@ -48,7 +55,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const router = new Router({
         defaultRoute: 'dashboard',
         allowedRoutes: [
-            'dashboard', 'meshtastic', 'meshcore', 'lorawan', 'dapnet', 'reticulum', 'pager', 'stats', 'rf', 'repeaters', 'topology', 'messages', 'radio', 'terminal',
+            'dashboard', 'meshtastic', 'meshcore', 'lorawan', 'reticulum', 'pager', 'stats', 'rf', 'repeaters', 'topology', 'messages', 'radio', 'terminal',
             'configuration/identity', 'configuration/radio',
             'configuration/channels', 'configuration/transmit',
             'configuration/mqtt',
@@ -160,7 +167,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     _bootDangerousPanel(router);
     _bootPluginsPanel(router);
     _bootLoRaWANPanel(router);
-    _bootDapnetPanel(router, identity);
     _bootPagerPanel(router, identity);
     _bootRepeatersPanel(router);
     _bootTopologyPanel(router);
@@ -472,15 +478,6 @@ function _bootLoRaWANPanel(router) {
     const panel = new window.LoRaWANPanel();
     router.onRouteChange((route) => {
         if (route === 'lorawan') panel.show();
-        else panel.hide();
-    });
-}
-
-function _bootDapnetPanel(router, identity) {
-    if (!window.DapnetPanel) return;
-    const panel = new window.DapnetPanel(identity);
-    router.onRouteChange((route) => {
-        if (route === 'dapnet') panel.show();
         else panel.hide();
     });
 }

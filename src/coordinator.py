@@ -7,6 +7,7 @@ import logging
 from typing import Any, Callable, Optional
 
 from src.analytics.stats_reporter import StatsReporter
+from src.api import protocol_registry
 from src.capture.capture_coordinator import CaptureCoordinator
 from src.config import AppConfig
 from src.decode.crypto_service import CryptoService
@@ -383,6 +384,12 @@ class PipelineCoordinator:
     async def _process_capture(self, raw: RawCapture) -> None:
         if raw.capture_source.startswith("meshcore_usb"):
             packet = self._adapt_meshcore_usb(raw)
+        elif (proto_spec := protocol_registry.for_capture_source(raw.capture_source)) is not None:
+            # A plugin-registered protocol (src.api.protocol_registry) --
+            # checked before the DAPNET branch below so a plugin
+            # registering the "dapnet" prefix (once it moves out of core)
+            # takes over from here with no dispatch change needed.
+            packet = proto_spec.adapt(raw)
         elif raw.capture_source.startswith("dapnet"):
             packet = self._adapt_dapnet(raw)
         elif raw.protocol_hint == Protocol.PAGER:
@@ -408,17 +415,22 @@ class PipelineCoordinator:
 
         packet.capture_source = raw.capture_source
 
-        if packet.protocol == Protocol.DAPNET:
+        # A plugin-registered protocol's own classification (checked first,
+        # same reasoning as the capture-source dispatch above) may return
+        # "ignore" (pure noise, neither persisted nor shown) or "blacklist"
+        # (worth seeing live -- confirms the decoder/network are still
+        # alive -- but not worth persisting or acting on).
+        tier = None
+        proto_spec = protocol_registry.for_protocol(packet.protocol)
+        if proto_spec is not None and proto_spec.tier is not None:
+            tier = proto_spec.tier(packet)
+        elif packet.protocol == Protocol.DAPNET:
             tier = self._dapnet_capcode_tier(packet)
-            if tier == "ignore":
-                # Pure noise: neither persisted nor shown live.
-                return
-            if tier == "blacklist":
-                # Worth seeing live (confirms the decoder/network are
-                # still alive) but not worth persisting or acting on --
-                # notify only, skip storage/relay/mqtt/stats entirely.
-                self._notify_callbacks(packet)
-                return
+        if tier == "ignore":
+            return
+        if tier == "blacklist":
+            self._notify_callbacks(packet)
+            return
 
         if packet.protocol == Protocol.PAGER:
             our_capcode = self._config.radio.pager_capcode
@@ -493,22 +505,26 @@ class PipelineCoordinator:
             logger.exception("Failed to store packet %s", packet.packet_id)
 
     async def _update_node(self, packet: Packet) -> None:
-        if packet.protocol == Protocol.LORAWAN:
-            # LoRaWAN devices have no Meshtastic node profile; just bump the counter.
-            if packet.source_id:
+        # Explicit allowlist, not an implicit else-means-MeshCore fallthrough
+        # (that used to be the shape here, and silently ran ANY unrecognized
+        # protocol -- including a future plugin-registered one -- through
+        # meshcore_decoder.extract_node_update() as if it were MeshCore-
+        # shaped). LoRaWAN/DAPNET-style protocols have no Meshtastic node
+        # profile at all; they get an explicit, harmless skip instead.
+        if packet.protocol == Protocol.MESHTASTIC:
+            decoder = self._router.meshtastic_decoder
+        elif packet.protocol == Protocol.MESHCORE:
+            decoder = self._router.meshcore_decoder
+        else:
+            if packet.protocol == Protocol.LORAWAN and packet.source_id:
+                # LoRaWAN devices have no Meshtastic node profile; just bump
+                # the counter.
                 await self._node_repo.increment_packet_count(packet.source_id)
-            return
-        if packet.protocol == Protocol.DAPNET:
-            # DAPNET capcodes have no Meshtastic node profile and no nodes
-            # table row to bump -- the capcode roster aggregates straight
+            # DAPNET capcodes (and any other non-node-bearing protocol) have
+            # no nodes table row to bump -- their roster aggregates straight
             # from the packets table (GROUP BY capcode), same as LoRaWAN's
             # device list.
             return
-        decoder = (
-            self._router.meshtastic_decoder
-            if packet.protocol == Protocol.MESHTASTIC
-            else self._router.meshcore_decoder
-        )
         node_update = decoder.extract_node_update(packet)
         if node_update:
             await self._node_repo.upsert(node_update)
@@ -534,13 +550,16 @@ class PipelineCoordinator:
             await self._node_repo.increment_packet_count(packet.source_id)
 
     async def _store_telemetry(self, packet: Packet) -> None:
-        if packet.protocol == Protocol.LORAWAN:
+        # Same explicit-allowlist fix as _update_node above -- LoRaWAN/
+        # DAPNET/any future plugin protocol has no Meshtastic/MeshCore-
+        # shaped telemetry to extract, so it must skip cleanly rather than
+        # silently running through meshcore_decoder.
+        if packet.protocol == Protocol.MESHTASTIC:
+            decoder = self._router.meshtastic_decoder
+        elif packet.protocol == Protocol.MESHCORE:
+            decoder = self._router.meshcore_decoder
+        else:
             return
-        decoder = (
-            self._router.meshtastic_decoder
-            if packet.protocol == Protocol.MESHTASTIC
-            else self._router.meshcore_decoder
-        )
         telemetry = decoder.extract_telemetry(packet)
         if telemetry:
             await self._telemetry_repo.insert(telemetry)

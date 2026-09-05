@@ -183,13 +183,15 @@ class SimplePacketFeed {
 
     _fmtId(id, protocol) {
         if (!id) return '--';
-        // DAPNET has no hex node-ID space -- source/destination are the
-        // literal string "broadcast" or a decimal capcode, so show them
-        // verbatim rather than running Meshtastic's "!" + last-4-hex-char
-        // shortening over them (that mangled e.g. capcode 2041152 into
-        // "!1152" and "broadcast" into "!cast").
-        if (protocol === 'dapnet') {
-            return `<span class="td-node-short">${this._esc(String(id))}</span>`;
+        // A plugin-owned protocol with no hex node-ID space (e.g. DAPNET --
+        // source/destination are the literal string "broadcast" or a
+        // decimal capcode) registers its own formatId() rather than
+        // running Meshtastic's "!" + last-4-hex-char shortening over it
+        // (that mangled e.g. capcode 2041152 into "!1152" and "broadcast"
+        // into "!cast"). See js/protocol_format_registry.js.
+        const fmt = window.getProtocolFormat && window.getProtocolFormat(protocol);
+        if (fmt && fmt.formatId) {
+            return fmt.formatId(id, this._esc.bind(this));
         }
         if (id === 'ffffffff' || id === 'ffff' || id === 'broadcast') {
             return '<span class="td-bcast">!cast</span>';

@@ -16,7 +16,7 @@ import textwrap
 import unittest
 from pathlib import Path
 
-from src.api import listener_registry, route_registry
+from src.api import capture_source_registry, listener_registry, protocol_registry, route_registry
 from src.plugins.loader import load_plugins
 
 _MANIFEST = """\
@@ -50,6 +50,8 @@ class TestLoadPlugins(unittest.TestCase):
         self.apps.mkdir()
         route_registry.reset()
         listener_registry.reset()
+        capture_source_registry.reset()
+        protocol_registry.reset()
         self._mods_before = set(sys.modules)
 
     def _load(self, config: dict):
@@ -61,6 +63,8 @@ class TestLoadPlugins(unittest.TestCase):
                 del sys.modules[name]
         route_registry.reset()
         listener_registry.reset()
+        capture_source_registry.reset()
+        protocol_registry.reset()
         self._tmp.cleanup()
 
     def test_enabled_plugin_registers(self) -> None:
@@ -157,6 +161,33 @@ class TestLoadPlugins(unittest.TestCase):
         self.assertEqual(loaded, [])
         self.assertEqual(listener_registry.plugin_specs(), [])
 
+    def test_plugin_can_register_capture_source_and_protocol(self) -> None:
+        _make_plugin(self.apps, "dapnet-like", """
+            def register(reg):
+                reg.add_capture_source("x", lambda: object())
+                reg.add_protocol("x", capture_prefix="x", adapt=lambda raw: None)
+        """, provides='["capture", "protocol"]')
+
+        loaded = self._load({"dapnet-like": {"enabled": True}})
+
+        self.assertEqual([p.manifest.name for p in loaded], ["dapnet-like"])
+        self.assertEqual(
+            [s.name for s in capture_source_registry.plugin_specs()], ["x"],
+        )
+        self.assertIsNotNone(protocol_registry.for_protocol("x"))
+
+    def test_capture_source_without_capability_is_skipped(self) -> None:
+        _make_plugin(self.apps, "acars", """
+            def register(reg):
+                reg.add_capture_source("x", lambda: object())
+        """, provides='["routes"]')
+
+        with self.assertLogs("src.plugins.loader", level=logging.ERROR):
+            loaded = self._load({"acars": {"enabled": True}})
+
+        self.assertEqual(loaded, [])
+        self.assertEqual(capture_source_registry.plugin_specs(), [])
+
     def test_relative_import_in_backend_resolves(self) -> None:
         _make_plugin(self.apps, "acars", """
             from .helper import ROUTER
@@ -206,6 +237,8 @@ class TestShippedHelloWorldPlugin(unittest.TestCase):
     def setUp(self) -> None:
         route_registry.reset()
         listener_registry.reset()
+        capture_source_registry.reset()
+        protocol_registry.reset()
         self._community = Path(__file__).resolve().parents[1] / "plugins" / "apps"
 
     def tearDown(self) -> None:
@@ -213,6 +246,8 @@ class TestShippedHelloWorldPlugin(unittest.TestCase):
             del sys.modules[name]
         route_registry.reset()
         listener_registry.reset()
+        capture_source_registry.reset()
+        protocol_registry.reset()
 
     def test_hello_world_loads_when_enabled(self) -> None:
         loaded = load_plugins(
@@ -248,6 +283,8 @@ class TestShippedAcarsPlugin(unittest.TestCase):
     def setUp(self) -> None:
         route_registry.reset()
         listener_registry.reset()
+        capture_source_registry.reset()
+        protocol_registry.reset()
         self._community = Path(__file__).resolve().parents[1] / "plugins" / "apps"
 
     def tearDown(self) -> None:
@@ -255,6 +292,8 @@ class TestShippedAcarsPlugin(unittest.TestCase):
             del sys.modules[name]
         route_registry.reset()
         listener_registry.reset()
+        capture_source_registry.reset()
+        protocol_registry.reset()
 
     def test_acars_loads_when_enabled(self) -> None:
         loaded = load_plugins(

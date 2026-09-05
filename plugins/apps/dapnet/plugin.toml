@@ -1,0 +1,28 @@
+name = "dapnet"
+version = "1.0.0"
+meshpoint_api = 1
+provides = ["capture", "protocol", "routes", "sidebar"]
+locked = true  # shipped with this fork -- not user-installed, can't be deleted
+
+[deps]
+setup = "setup.sh"
+
+[frontend]
+scripts = [
+    "frontend/dapnet_panel.js",
+    "frontend/dapnet_settings_tab.js",
+    "frontend/dapnet_status_card.js",
+    "frontend/dapnet_packet_format.js",
+]
+styles = ["frontend/dapnet_panel.css"]
+
+[sidebar]
+route = "dapnet"
+label = "DAPNET"
+category = "networks"
+icon = "dapnet"    # exact copy of the old built-in nav item's own glyph
+
+[meta]
+description = "DAPNET/POCSAG amateur-radio paging via a companion board (pocsag_companion) over USB serial -- Recent Pages, Capcodes, Send, and Settings tabs, plus its own capture source and protocol registered with the core pipeline"
+homepage = "https://hampager.de"
+author = "Einstein PD2EMC"

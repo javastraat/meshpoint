@@ -39,7 +39,7 @@ class PacketDetailModal {
             <header class="pdm-modal__header">
                 <div>
                     <h2 class="pdm-modal__title">Packet detail</h2>
-                    <div class="pdm-modal__meta">${this._esc(timeLabel)} · ${this._esc(this._typeLabel(packet.packet_type))}</div>
+                    <div class="pdm-modal__meta">${this._esc(timeLabel)} · ${this._esc(this._typeLabel(packet.packet_type, packet.protocol))}</div>
                 </div>
                 <button type="button" class="pdm-modal__close" aria-label="Close">&times;</button>
             </header>
@@ -85,21 +85,18 @@ class PacketDetailModal {
         if (e.key === 'Escape') this.close();
     }
 
-    /** DAPNET's /api/dapnet/packets (and dapnet_panel.js's own live-WS
-     * mirror of that shape) return capcode/function/text as top-level
-     * fields rather than the destination_id + nested decoded_payload
-     * object every other protocol's packet rows already have -- reshape
-     * it to the common shape here so the rest of this file doesn't need
-     * a DAPNET-specific branch in every _xRows method below. */
+    /** Some protocols' list-endpoint rows (and their own live-WS mirror of
+     * that shape) return fields flattened at the top level rather than the
+     * destination_id + nested decoded_payload object every other
+     * protocol's packet rows already have -- reshape to the common shape
+     * here so the rest of this file doesn't need a per-protocol branch in
+     * every _xRows method below. A plugin-owned protocol (e.g. DAPNET)
+     * registers its own normalize() -- see js/protocol_format_registry.js. */
     _normalize(packet) {
-        if (packet && packet.protocol === 'dapnet' && !packet.decoded_payload) {
-            return {
-                ...packet,
-                destination_id: packet.capcode,
-                decoded_payload: {
-                    capcode: packet.capcode, function: packet.function, text: packet.text,
-                },
-            };
+        const fmt = packet && window.getProtocolFormat && window.getProtocolFormat(packet.protocol);
+        if (fmt && fmt.normalize) {
+            const normalized = fmt.normalize(packet);
+            if (normalized) return normalized;
         }
         // GET /api/pager/messages rows carry from_capcode/to_capcode/text
         // top-level too (same reasoning as DAPNET above) -- reshape into
@@ -121,14 +118,19 @@ class PacketDetailModal {
         return packet;
     }
 
-    /** DAPNET's packet_type values carry a "dapnet_" prefix (dapnet_alpha,
-     * dapnet_numeric, ...) to stay unambiguous next to Meshtastic/MeshCore's
-     * own type constants in the shared `packets` table -- strip it back
-     * off for display, since every other protocol's types (text, position,
-     * advert, ...) already read as plain words. */
-    _typeLabel(type) {
+    /** Some protocols' packet_type values carry a prefix (DAPNET's
+     * dapnet_alpha, dapnet_numeric, ...) to stay unambiguous next to
+     * Meshtastic/MeshCore's own type constants in the shared `packets`
+     * table -- strip it back off for display, since every other
+     * protocol's types (text, position, advert, ...) already read as
+     * plain words. See js/protocol_format_registry.js's `typePrefix`. */
+    _typeLabel(type, protocol) {
         if (!type) return type;
-        return type.startsWith('dapnet_') ? type.slice('dapnet_'.length) : type;
+        const fmt = window.getProtocolFormat && window.getProtocolFormat(protocol);
+        if (fmt && fmt.typePrefix && type.startsWith(fmt.typePrefix)) {
+            return type.slice(fmt.typePrefix.length);
+        }
+        return type;
     }
 
     _buildLayer(label, rows) {
@@ -256,7 +258,7 @@ class PacketDetailModal {
         const rows = [
             { key: 'From', val: `${fmt(packet.source_id)} (${packet.source_id || 'n/a'})` },
             { key: 'To', val: `${fmt(packet.destination_id)} (${packet.destination_id || 'n/a'})` },
-            { key: 'Type', val: this._typeLabel(packet.packet_type) || 'n/a' },
+            { key: 'Type', val: this._typeLabel(packet.packet_type, packet.protocol) || 'n/a' },
             { key: 'Protocol', val: packet.protocol || 'n/a' },
         ];
         // Hop info is often unknown (MeshCore direct packets, Meshtastic
@@ -305,13 +307,15 @@ class PacketDetailModal {
         // MeshCore adverts/nodeinfo are decoded, not decrypted with a
         // Meshtastic channel key, so the "Decrypt / No matching key" row
         // is meaningless for it -- always show its decoded content. Same
-        // for DAPNET: POCSAG pages are broadcast in the clear, there's no
-        // key/decrypt step to report on at all.
+        // for any plugin-owned protocol broadcast in the clear (e.g.
+        // DAPNET/POCSAG) -- see decryptedByDefault in
+        // js/protocol_format_registry.js.
+        const fmt = window.getProtocolFormat && window.getProtocolFormat(protocol);
         const isMeshcore = protocol === 'meshcore';
-        const isDapnet = protocol === 'dapnet';
+        const decryptedByDefault = !!(fmt && fmt.decryptedByDefault);
         const isLorawan = protocol === 'lorawan';
         const decrypted =
-            isMeshcore || isDapnet || (packet.decrypted !== false && type !== 'encrypted');
+            isMeshcore || decryptedByDefault || (packet.decrypted !== false && type !== 'encrypted');
         const hasObj = p && typeof p === 'object' && Object.keys(p).length > 0;
 
         if (!decrypted && !isLorawan) {
@@ -336,7 +340,7 @@ class PacketDetailModal {
         }
 
         const rows = [];
-        if (!isMeshcore && !isDapnet) {
+        if (!isMeshcore && !decryptedByDefault) {
             if (isLorawan && packet.decrypted === false) {
                 rows.push({ key: 'Decrypt', val: 'No app session keys', valClass: 'bad' });
             } else {
@@ -396,16 +400,20 @@ class PacketDetailModal {
         const p = packet.decoded_payload;
         if (!p || typeof p !== 'object') return '';
 
+        // A plugin-owned protocol's own packet_type values (e.g. DAPNET's
+        // dapnet_alpha/numeric/tone/activation) get first refusal on the
+        // summary text -- see js/protocol_format_registry.js's
+        // `summaryFor`. Falls through to the built-in switch below when
+        // it declines (returns undefined) or no format is registered.
+        const fmt = window.getProtocolFormat && window.getProtocolFormat((packet.protocol || '').toLowerCase());
+        if (fmt && fmt.summaryFor) {
+            const custom = fmt.summaryFor(packet.packet_type, p);
+            if (custom !== undefined) return custom;
+        }
+
         switch (packet.packet_type) {
             case 'text':
                 return p.text || '';
-            case 'dapnet_alpha':
-            case 'dapnet_numeric':
-                return p.text || '';
-            case 'dapnet_tone':
-                return 'Tone-only page (no text)';
-            case 'dapnet_activation':
-                return 'Activation page (no text)';
             case 'position': {
                 const parts = [];
                 if (p.latitude != null) parts.push(`${Number(p.latitude).toFixed(5)}°`);

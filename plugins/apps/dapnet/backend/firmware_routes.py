@@ -1,11 +1,13 @@
-"""Compile and flash extra/pocsag_companion firmware from the dashboard.
+"""Compile and flash the plugin's pocsag_companion firmware from the dashboard.
 
 Wraps ``arduino-cli`` (installed by ``scripts/install.sh``'s "Install
 arduino-cli + ESP32 toolchain" section into a self-contained
-``/opt/arduino-cli``, owned by the ``meshpoint`` service user) to build and
-upload ``extra/pocsag_companion/pocsag_companion.ino`` without an Arduino
-IDE or a separate machine. Two actions, each streamed to the browser as
-NDJSON -- same wire shape as ``src/api/update/streaming.py``'s
+``/opt/arduino-cli``, owned by the ``meshpoint`` service user -- a SHARED
+toolchain the Meshtastic/MeshCore companion flashing also depends on, not
+something this plugin's own ``setup.sh`` installs) to build and upload
+``pocsag_companion/pocsag_companion.ino`` without an Arduino IDE or a
+separate machine. Two actions, each streamed to the browser as NDJSON --
+same wire shape as core's ``src/api/update/streaming.py``'s
 ``stream_update()``, just driven by an arbitrary subprocess's stdout/stderr
 instead of a named git/pip step chain: compile produces a cached build for
 a chosen board target, flash writes that cached build to a chosen USB-
@@ -43,22 +45,21 @@ from src.api.audit import AuditLogWriter
 from src.api.audit.dependencies import get_audit_writer
 from src.api.auth.dependencies import require_admin
 from src.api.auth.jwt_session import SessionClaims
-from src.config import AppConfig
+
+from . import state
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/pocsag/firmware", tags=["config", "dapnet"])
 
-_config: Optional[AppConfig] = None
 _dapnet_sources: list = []
 
-# TODO(dapnet-plugin): this whole file is deleted in favor of
-# plugins/apps/dapnet/backend/firmware_routes.py once the plugin cutover
-# lands (see src/api/protocol_registry.py) -- the sketch itself already
-# moved to plugins/apps/dapnet/pocsag_companion/, this old copy just
-# points at its new home so the still-live core route keeps working
-# until then.
-_SKETCH_DIR = Path(__file__).resolve().parents[3] / "plugins" / "apps" / "dapnet" / "pocsag_companion"
+# The sketch ships INSIDE this plugin (plugins/apps/dapnet/pocsag_companion/)
+# rather than in the repo-wide extra/ folder -- it's DAPNET-specific
+# hardware firmware, nothing else in the codebase depends on it, so it
+# belongs with the plugin that owns it. 1 parent up from backend/ to the
+# plugin root.
+_SKETCH_DIR = Path(__file__).resolve().parents[1] / "pocsag_companion"
 _ARDUINO_CLI_BIN = "arduino-cli"
 _ARDUINO_CLI_CONFIG = "/opt/arduino-cli/arduino-cli.yaml"
 
@@ -81,14 +82,13 @@ _KNOWN_BOARDS: dict[str, dict[str, str]] = {
 _BOARD_DEFINE_RE = re.compile(r"^(//)?(#define[ \t]+(BOARD_\w+))[ \t]*$", re.MULTILINE)
 
 
-def init_routes(config: AppConfig, dapnet_sources=None) -> None:
-    global _config, _dapnet_sources
-    _config = config
-    _dapnet_sources = dapnet_sources or []
+def init_routes(dapnet_sources=None) -> None:
+    global _dapnet_sources
+    _dapnet_sources = list(dapnet_sources) if dapnet_sources else []
 
 
 def _resolve_dapnet_source(label: str):
-    """Mirrors dapnet_config_routes.py's own helper -- same
+    """Mirrors config_routes.py's own helper -- same
     ``dapnet_<label>``/bare ``dapnet`` naming convention."""
     name = f"dapnet_{label}" if label else "dapnet"
     for src in _dapnet_sources:
@@ -147,8 +147,8 @@ def _ndjson(payload: dict) -> bytes:
 async def _stream_subprocess(cmd: list[str]) -> AsyncIterator[bytes]:
     """Run ``cmd``, yielding one NDJSON line per stdout/stderr line as it
     arrives, then a final ``{"type":"result",...}``. Same wire shape as
-    ``src/api/update/streaming.py``'s ``stream_update()``, adapted for an
-    arbitrary subprocess instead of the git/pip apply chain."""
+    core's ``src/api/update/streaming.py``'s ``stream_update()``, adapted
+    for an arbitrary subprocess instead of the git/pip apply chain."""
     yield _ndjson({"type": "started", "cmd": cmd})
     try:
         process = await asyncio.create_subprocess_exec(
@@ -284,13 +284,15 @@ async def flash_firmware_stream(
     live enumeration below (same one GET /api/config/serial-ports uses),
     never trusted as a raw path from the browser.
 
-    If ``port`` happens to match a configured companion's serial_port,
-    that companion's DapnetSerialSource is released before flashing
-    (esptool needs exclusive access to reset+write the board) and
-    re-opened afterward -- without this, a flash triggered here would
-    leave capture silently dead until a manual service restart, the exact
-    gap confirmed live while testing the underlying toolchain by hand. If
-    it doesn't match anything configured, there's nothing to release/
+    If ``port`` happens to match a configured companion's serial_port
+    (looked up in this plugin's own state.devices(), not core config --
+    that's the one thing that changed when this moved out of core), that
+    companion's DapnetSerialSource is released before flashing (esptool
+    needs exclusive access to reset+write the board) and re-opened
+    afterward -- without this, a flash triggered here would leave
+    capture silently dead until a manual service restart, the exact gap
+    confirmed live while testing the underlying toolchain by hand. If it
+    doesn't match anything configured, there's nothing to release/
     restart, which is exactly right for a board that isn't part of this
     box's own config at all.
     """
@@ -312,12 +314,11 @@ async def flash_firmware_stream(
 
     label = ""
     source = None
-    if _config is not None:
-        for d in _config.capture.pocsag_serial:
-            if d.serial_port == port:
-                label = d.label or ""
-                source = _resolve_dapnet_source(label)
-                break
+    for d in state.devices():
+        if d.get("serial_port") == port:
+            label = d.get("label") or ""
+            source = _resolve_dapnet_source(label)
+            break
 
     async def body() -> AsyncIterator[bytes]:
         with audit.timed_action(

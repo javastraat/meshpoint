@@ -2,9 +2,13 @@
 
 An "app" plugin is out-of-core code that hooks the seams built in the plugin
 roadmap so far -- ``src.api.route_registry`` (routes), ``src.api.listener_registry``
-(RTL-SDR listeners) and ``window.registerListenerPanel`` (a Listener tab). This
-module only *reads* the manifest and enumerates the folders; importing the
-plugin and calling its ``register()`` is a later step (B4b).
+(RTL-SDR listeners), ``src.api.capture_source_registry`` (a capture source
+joining the real packet pipeline), ``src.api.protocol_registry`` (decode +
+classification for a protocol the plugin owns end to end), and
+``window.registerSidebarPage``/``window.registerPageHook`` (a top-level page,
+or content injected into another plugin's page). This module only *reads*
+the manifest and enumerates the folders; importing the plugin and calling
+its ``register()`` is a later step (B4b).
 
 ``PLUGIN_API_VERSION`` is the contract number those seams collectively define.
 A manifest declaring a higher ``meshpoint_api`` targets a newer Meshpoint than
@@ -66,7 +70,9 @@ MANIFEST_NAME = "plugin.toml"
 _SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]{1,38}$")
 _ROUTE_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,58}$")
 
-KNOWN_PROVIDES = frozenset({"listener", "routes", "panel", "sidebar", "hook"})
+KNOWN_PROVIDES = frozenset({
+    "listener", "routes", "panel", "sidebar", "hook", "capture", "protocol",
+})
 
 # The existing top-level sidebar sections a plugin's page can be placed
 # under -- "networks"/"radio"/"ops" are flat item runs (LoRaWAN, Radio, the

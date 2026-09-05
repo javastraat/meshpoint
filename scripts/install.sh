@@ -426,7 +426,7 @@ fi
 # any ESP32 target, and esptool alone can write any pre-built .bin
 # straight to a connected board regardless of what produced it. First
 # concrete use planned on top of this is a Networks > DAPNET "flash
-# firmware" button for extra/pocsag_companion/pocsag_companion.ino (an
+# firmware" button for plugins/apps/dapnet/pocsag_companion/pocsag_companion.ino (an
 # Arduino sketch, hence the sketch-specific libraries installed below),
 # but the same toolchain is equally usable later for flashing official
 # prebuilt Meshtastic/MeshCore firmware .bin releases via esptool, or any

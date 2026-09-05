@@ -148,6 +148,18 @@ author = "Einstein"
             "provides",
         )
 
+    def test_capture_and_protocol_are_known_provides_values(self) -> None:
+        # Same precedent as bare "listener": neither needs its own TOML
+        # table -- everything a capture-source/protocol plugin needs comes
+        # from reg.config and closures at register() time.
+        toml = _VALID.replace(
+            'provides = ["listener", "routes"]',
+            'provides = ["capture", "protocol", "routes"]',
+        )
+        d = _write_plugin(self.root, "acars", toml)
+        m = parse_manifest(d)
+        self.assertEqual(m.provides, ("capture", "protocol", "routes"))
+
     def test_frontend_table_parsed(self) -> None:
         toml = _VALID.replace(
             'provides = ["listener", "routes"]',

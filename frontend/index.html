@@ -165,21 +165,6 @@
                             <span class="sidebar__label">Pager</span>
                         </a>
                     </li>
-                    <li class="sidebar__item" data-requires-source="pocsag_serial">
-                        <a href="#/dapnet" class="sidebar__link" data-route="dapnet">
-                            <span class="sidebar__icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                    <path d="M17 7l2-3"/>
-                                    <rect x="5" y="7" width="14" height="13" rx="2"/>
-                                    <rect x="8" y="10" width="8" height="4" rx="0.5"/>
-                                    <circle cx="8" cy="17" r="0.6" fill="currentColor" stroke="none"/>
-                                    <circle cx="12" cy="17" r="0.6" fill="currentColor" stroke="none"/>
-                                    <circle cx="16" cy="17" r="0.6" fill="currentColor" stroke="none"/>
-                                </svg>
-                            </span>
-                            <span class="sidebar__label">DAPNET</span>
-                        </a>
-                    </li>
                     <li class="sidebar__item" data-requires-config="reticulum.enabled">
                         <a href="#/reticulum" class="sidebar__link" data-route="reticulum">
                             <span class="sidebar__icon">
@@ -644,10 +629,6 @@
 
             <section class="section" data-section="lorawan" style="display:none">
                 <div id="lorawan-panel"></div>
-            </section>
-
-            <section class="section" data-section="dapnet" style="display:none">
-                <div id="dapnet-panel"></div>
             </section>
 
             <section class="section" data-section="pager" style="display:none">
@@ -1140,6 +1121,7 @@
     <script src="js/chart_theme.js"></script>
     <script src="js/node_metrics_chart.js"></script>
     <script src="js/node_drawer.js"></script>
+    <script src="js/protocol_format_registry.js"></script>
     <script src="js/packet_detail_modal.js"></script>
     <script src="js/neighbours_modal.js"></script>
     <script src="js/capcode_history_modal.js"></script>
@@ -1258,7 +1240,6 @@
     <script src="js/theme_glyphs.js"></script>
     <script src="js/theme_controller.js"></script>
     <script src="js/lorawan_panel.js"></script>
-    <script src="js/dapnet_panel.js"></script>
     <script src="js/pager_dashboard_panel.js"></script>
     <script src="js/pager_panel.js"></script>
     <script src="js/meshtastic_panel.js"></script>

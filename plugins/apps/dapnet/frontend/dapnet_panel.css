@@ -1,0 +1,8 @@
+/* DAPNET's page (dapnet_panel.js) and Settings tab (dapnet_settings_tab.js)
+   reuse frontend/css/lorawan.css's lw-* classes and frontend/css/
+   configuration.css's cfg-*/terminal-button classes entirely -- both stay
+   core (shared by multiple pages, same reasoning frontend/css/listener.css
+   stayed core for the RTL-SDR family) -- there's no DAPNET-specific
+   styling left to declare here. This file exists only because plugin.toml
+   declares it under [frontend].styles, which the manifest loader requires
+   to exist on disk. */

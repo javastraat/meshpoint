@@ -1,9 +1,10 @@
 """The surface a plugin's ``register()`` is handed.
 
 One stable facade over the low-level seams (``src.api.route_registry``,
-``src.api.listener_registry``) so out-of-core code never imports ``src.api.*``
-directly, and so what a plugin registers is checked against its manifest's
-``provides``.
+``src.api.listener_registry``, ``src.api.capture_source_registry``,
+``src.api.protocol_registry``) so out-of-core code never imports
+``src.api.*`` directly, and so what a plugin registers is checked against
+its manifest's ``provides``.
 
 Kept free of FastAPI imports -- the underlying registries are too, so the
 loader + this facade unit-test on the Mac.
@@ -14,7 +15,12 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from src.api import listener_registry, route_registry
+from src.api import (
+    capture_source_registry,
+    listener_registry,
+    protocol_registry,
+    route_registry,
+)
 from src.plugins.manifest import PluginManifest
 
 logger = logging.getLogger(__name__)
@@ -61,4 +67,33 @@ class PluginRegistry:
         self._require("listener", "add_listener()")
         listener_registry.register_listener(
             listener_registry.ListenerSpec(name, build, wire),
+        )
+
+    def add_capture_source(
+        self, name: str, build: Any, wire: Any = None,
+    ) -> None:
+        """Register a capture source that joins the real packet pipeline.
+        *build* is a zero-arg callable returning a ``CaptureSource`` (or a
+        tuple of them, e.g. one per configured device) -- unlike a
+        listener, it's started unconditionally at boot, no on-demand
+        ``/start`` route. *wire(sources, pipeline)*, if given, runs once
+        the pipeline has started (``pipeline.packet_repo`` etc now exist),
+        so this plugin's own routes can bind against them."""
+        self._require("capture", "add_capture_source()")
+        capture_source_registry.register_capture_source(
+            capture_source_registry.CaptureSourceSpec(name, build, wire),
+        )
+
+    def add_protocol(
+        self, protocol: str, *, capture_prefix: str, adapt: Any, tier: Any = None,
+    ) -> None:
+        """Register decode + classification for a protocol this plugin owns
+        end to end. *adapt(raw)* turns a ``RawCapture`` whose
+        ``capture_source`` starts with *capture_prefix* into a ``Packet``.
+        *tier(packet)*, if given, may return ``"ignore"`` (never shown or
+        stored) or ``"blacklist"`` (shown live, never stored) -- the same
+        two tiers DAPNET's own capcode filters use."""
+        self._require("protocol", "add_protocol()")
+        protocol_registry.register_protocol(
+            protocol_registry.ProtocolSpec(protocol, capture_prefix, adapt, tier),
         )
