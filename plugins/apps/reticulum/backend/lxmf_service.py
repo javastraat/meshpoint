@@ -155,8 +155,9 @@ class LxmfService:
     @property
     def available(self) -> bool:
         """False when rns/lxmf aren't installed -- lets the caller log a
-        clear reason instead of crashing startup when a user enables
-        this before running `pip install -r requirements.txt`."""
+        clear reason instead of crashing startup when a user enables this
+        plugin before running its setup step (`sudo meshpoint plugin
+        setup reticulum`, which `pip install`s lxmf)."""
         return RNS is not None and LXMF is not None
 
     @property
@@ -167,8 +168,8 @@ class LxmfService:
         if not self.available:
             logger.warning(
                 "reticulum plugin is enabled but rns/lxmf are not installed -- "
-                "run `pip install -r requirements.txt` on the Pi. Skipping "
-                "Reticulum startup."
+                "run `sudo meshpoint plugin setup reticulum` on the Pi (installs "
+                "lxmf + the rnsd unit). Skipping Reticulum startup."
             )
             return
 

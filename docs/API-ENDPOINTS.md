@@ -162,6 +162,21 @@ Provided by the **DAPNET** plugin (`plugins/apps/dapnet/`, `plugins.dapnet.enabl
 | POST | `/api/pocsag/firmware/compile/stream` | Admin | Compile the companion sketch for a chosen board (NDJSON stream) |
 | POST | `/api/pocsag/firmware/flash/stream` | Admin | Flash a compiled build to a chosen USB-serial port (NDJSON stream) |
 
+## Reticulum (plugin)
+
+Provided by the **Reticulum** plugin (`plugins/apps/reticulum/`, `plugins.reticulum.enabled: true`) — native Reticulum/LXMF messaging: meshpoint's own LXMF delivery destination (attached to a local `rnsd` shared instance) plus the peer roster built from announces. Uses the `"service"` plugin seam for the `LxmfService` lifecycle (see `docs/PLUGINS.md`). Message *history* is the shared `messages` table (`protocol='reticulum'`), read via the Messages endpoints below.
+
+| Method | Path | Role | Description |
+|---|---|---|---|
+| GET | `/api/reticulum/status` | Viewer | Service state: running, own LXMF address, peer count |
+| GET | `/api/reticulum/peers` | Viewer | Known-destinations roster from announces (`lxmf.delivery` / `lxmf.propagation` / `nomadnetwork.node`), newest first |
+| GET | `/api/reticulum/messages/{destination_hash}` | Viewer | One conversation's message history (from the shared `messages` table) |
+| POST | `/api/reticulum/send` | Admin | Send a direct LXMF message (`destination_hash`, `text`) — the Messages page posts here for `protocol='reticulum'` conversations |
+| POST | `/api/reticulum/announce` | Admin | Re-send meshpoint's own LXMF delivery announce on demand |
+| GET | `/api/config/reticulum` | Admin | Current `plugins.reticulum.*` — display name + RNode radio + TCP backbone (the page's Settings tab loads this) |
+| PUT | `/api/config/reticulum` | Admin | Save display name / RNode / backbone settings (needs a restart, and `rnsd` restart for RNode/backbone) |
+| POST | `/api/config/reticulum/restart-rnsd` | Admin | Restart the `rnsd` systemd unit so it re-reads its generated config |
+
 ## Messages (chat)
 
 | Method | Path | Role | Description |

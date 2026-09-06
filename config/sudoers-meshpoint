@@ -24,9 +24,9 @@ meshpoint ALL=(ALL) NOPASSWD: /usr/bin/systemctl daemon-reload
 meshpoint ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop rnsd
 meshpoint ALL=(ALL) NOPASSWD: /usr/bin/systemctl start rnsd
 meshpoint ALL=(ALL) NOPASSWD: /usr/bin/systemctl is-active rnsd
-# "Restart rnsd" button on Configuration -> Reticulum, applying saved
-# RNode/backbone settings by re-running write_rnsd_config.py (rnsd's
-# own ExecStartPre) without a full meshpoint restart.
+# "Restart rnsd" button on the Reticulum page's Settings tab, applying
+# saved RNode/backbone settings by re-running write_rnsd_config.py
+# (rnsd's own ExecStartPre) without a full meshpoint restart.
 meshpoint ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart rnsd
 
 # ── Self-update apply chain (Settings → Updates) ──────────────────────

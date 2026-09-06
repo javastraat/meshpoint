@@ -183,38 +183,16 @@ if [ "$INSTALL_PLATFORMIO" = "1" ] && ! command -v pio &>/dev/null && [ -t 0 ]; 
     esac
 fi
 
-# rnsd (the Reticulum Network Stack daemon) is genuinely optional --
-# most installs will never touch Reticulum at all (config.reticulum.
-# enabled defaults to false). rns/lxmf are already regular Python deps
-# (requirements.txt), so rnsd itself is already installed into
-# /opt/meshpoint/venv/bin/rnsd by the normal venv setup below with zero
-# extra work here -- this prompt is only about whether to install and
-# enable the systemd service (scripts/rnsd.service) that runs it, not
-# about installing rnsd itself. "systemctl is-enabled" stands in for
-# "already set up", same already-installed-short-circuit reasoning as
-# PlatformIO/arduino-cli above.
-INSTALL_RNSD=1
+# Reticulum/LXMF messaging is a plugin now (plugins/apps/reticulum/).
+# Setting up rnsd -- the systemd unit + `lxmf` -- is the plugin's own
+# setup step: `sudo meshpoint plugin setup reticulum`. This installer no
+# longer prompts for it. `--skip-rnsd` is accepted-and-ignored for
+# backward compatibility with existing update scripts.
 for arg in "$@"; do
     case "$arg" in
-        --skip-rnsd) INSTALL_RNSD=0 ;;
+        --skip-rnsd) ;;   # no-op, see above
     esac
 done
-if [ "$INSTALL_RNSD" = "1" ] && ! systemctl is-enabled rnsd &>/dev/null && [ -t 0 ]; then
-    echo ""
-    echo "One more optional piece: native Reticulum/LXMF messaging"
-    echo "(the dashboard's Reticulum page) needs rnsd running as its own"
-    echo "always-on shared instance -- meshpoint attaches to it as a"
-    echo "client rather than opening the radio itself. Skip this if you"
-    echo "don't have an RNode or don't plan to use Reticulum; re-run this"
-    echo "installer later (without --skip-rnsd) to add it, or enable it"
-    echo "manually with 'systemctl enable --now rnsd'."
-    echo ""
-    read -r -p "Install and enable the rnsd service in this install? [y/N] " rnsd_reply || rnsd_reply=""
-    case "$rnsd_reply" in
-        [yY]*) INSTALL_RNSD=1 ;;
-        *) INSTALL_RNSD=0 ;;
-    esac
-fi
 
 echo ""
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -971,25 +949,24 @@ systemctl daemon-reload
 systemctl enable meshpoint
 info "Service enabled (will start after 'meshpoint setup')"
 
-# ── 18. Install rnsd service (Reticulum, opt-in) ──────────────────
+# ── 18. Migrate the rnsd unit into the reticulum plugin ───────────
 #
-# Deliberately NOT a dependency of meshpoint.service (see that unit's
-# own After=rnsd.service comment) -- installed and enabled
-# independently so meshpoint's core service never requires this to
-# exist or succeed. write_rnsd_config.py (rnsd.service's own
-# ExecStartPre) generates rnsd's config from local.yaml's reticulum:
-# section on every start, so nothing needs configuring here beyond the
-# service itself -- the RNode serial port etc. get set later via
-# local.yaml/the dashboard.
-
-if [ "$INSTALL_RNSD" = "1" ]; then
-    info "Installing rnsd service..."
-    cp "${MESHPOINT_DIR}/scripts/rnsd.service" /etc/systemd/system/rnsd.service
-    systemctl daemon-reload
-    systemctl enable rnsd
-    info "rnsd service enabled (will start on next boot, or 'systemctl start rnsd' now)"
-else
-    info "Skipping rnsd service (Reticulum/LXMF messaging won't be available) -- re-run without --skip-rnsd, or answer Y next time, to add it later"
+# Reticulum moved out of core into plugins/apps/reticulum/, taking
+# rnsd.service + write_rnsd_config.py with it. A pre-move install has
+# /etc/systemd/system/rnsd.service pointing at the old
+# scripts/write_rnsd_config.py (now gone) -- its ExecStartPre would fail
+# on the next rnsd restart. Re-copy the unit from its new home so
+# existing Reticulum users keep working across the update, without a
+# prompt. New installs opt in via `sudo meshpoint plugin setup
+# reticulum`, which does the same copy plus `pip install lxmf`.
+# (Removable a few releases out.)
+RNSD_UNIT_SRC="${MESHPOINT_DIR}/plugins/apps/reticulum/rnsd.service"
+if [ -f /etc/systemd/system/rnsd.service ] && [ -f "$RNSD_UNIT_SRC" ]; then
+    if ! cmp -s "$RNSD_UNIT_SRC" /etc/systemd/system/rnsd.service; then
+        info "Updating rnsd.service (moved into the reticulum plugin)..."
+        cp "$RNSD_UNIT_SRC" /etc/systemd/system/rnsd.service
+        systemctl daemon-reload
+    fi
 fi
 
 # ── 19. Install network watchdog ──────────────────────────────────

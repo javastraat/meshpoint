@@ -4,12 +4,12 @@ Documentation=https://github.com/javastraat/meshpoint
 After=network-online.target
 Wants=network-online.target
 # Ordering only, deliberately no Wants=/Requires= -- rnsd.service is an
-# opt-in companion (config.reticulum.enabled defaults to false, and
-# install.sh's own rnsd section is prompted, not automatic). Meshpoint's
-# core function has nothing to do with Reticulum and must start and run
-# fine whether or not rnsd.service exists, is enabled, or fails -- this
-# line only affects boot order on installs where both happen to be
-# active, so a Reticulum-enabled client doesn't race rnsd's own startup.
+# opt-in companion installed by the reticulum plugin's setup.sh, not by
+# default. Meshpoint's core function has nothing to do with Reticulum and
+# must start and run fine whether or not rnsd.service exists, is enabled,
+# or fails (a plugin service that fails to start is logged and skipped) --
+# this line only affects boot order on installs where both happen to be
+# active, so the reticulum plugin's client doesn't race rnsd's own startup.
 After=rnsd.service
 
 [Service]

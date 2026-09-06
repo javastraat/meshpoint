@@ -8,20 +8,23 @@ doc is for the plugin author.
 
 The canonical worked example is the shipped **ACARS** plugin —
 [`plugins/apps/acars/`](../plugins/apps/acars/) — for routes/listener/hook,
-the minimal **Hello World** plugin —
-[`plugins/apps/hello-world/`](../plugins/apps/hello-world/) — for the
-sidebar seam specifically, and **Hello World Hook** —
-[`plugins/apps/hello-world-hook/`](../plugins/apps/hello-world-hook/) — for
-the hook seam, injecting content into Hello World's own page. Every section
-below points at the real file that does the thing being described. When in
-doubt, go read that file; it's real, tested, shipped code, not a toy
-example.
+the minimal **Hello World** / **Hello World Hook** /
+**Hello Service** plugins —
+[`plugins/apps/hello-world/`](../plugins/apps/hello-world/) (sidebar),
+[`plugins/apps/hello-world-hook/`](../plugins/apps/hello-world-hook/) (hook),
+[`plugins/apps/hello-service/`](../plugins/apps/hello-service/) (service) —
+each isolating one seam, and **DAPNET**
+([`plugins/apps/dapnet/`](../plugins/apps/dapnet/)) and **Reticulum**
+([`plugins/apps/reticulum/`](../plugins/apps/reticulum/)) as full
+multi-seam plugins extracted out of core. Every section below points at
+the real file that does the thing being described. When in doubt, go read
+that file; it's real, tested, shipped code, not a toy example.
 
 ---
 
 ## What a plugin can do today
 
-An app plugin is out-of-core code that hooks eight seams:
+An app plugin is out-of-core code that hooks nine seams:
 
 - **Routes** — mount a FastAPI `APIRouter` under `/api/<whatever>`.
 - **Listener** — register an RTL-SDR subprocess listener (built idle at
@@ -49,8 +52,13 @@ An app plugin is out-of-core code that hooks eight seams:
   only one of the two (see
   [Adding a non-RTL-SDR capture source + protocol](#adding-a-non-rtl-sdr-capture-source--protocol-captureprotocol)).
 - **Topbar** — add your own persistent status chip to the topbar, the same
-  visual language as the built-in Meshtastic/MeshCore/Serial/Pager/
-  Reticulum chips (see [Adding a topbar chip](#adding-a-topbar-chip-topbar)).
+  visual language as the built-in Meshtastic/MeshCore/Serial/Pager chips
+  (see [Adding a topbar chip](#adding-a-topbar-chip-topbar)).
+- **Service** — register a lifespan-managed async background service (an
+  object with `async start()` / `async stop()`), for a plugin that just
+  needs to *run something* for the life of the app — not a subprocess
+  listener, not a packet-pipeline source. See [Adding a background
+  service](#adding-a-background-service-service).
 
 That's it. A plugin **cannot** (yet) add a *plugin-contributed settings
 sub-page* inside core's own Configuration section — see [Current
@@ -132,7 +140,7 @@ author = "Your Name"
 | `name` | yes | Must equal the folder name. |
 | `version` | yes | Free-form string, shown on Settings → Plugins. |
 | `meshpoint_api` | yes | Integer. Currently `1` (`PLUGIN_API_VERSION` in `src/plugins/manifest.py`). A manifest targeting a higher number than this build supports is refused, not crashed. |
-| `provides` | yes | Non-empty subset of `listener`, `routes`, `panel`, `sidebar`, `hook`, `capture`, `protocol`, `topbar`. Calling a `PluginRegistry` method for a capability you didn't declare raises at register time — see [The `register(reg)` entry point](#the-registerreg-entry-point). |
+| `provides` | yes | Non-empty subset of `listener`, `routes`, `panel`, `sidebar`, `hook`, `capture`, `protocol`, `topbar`, `service`. Calling a `PluginRegistry` method for a capability you didn't declare raises at register time — see [The `register(reg)` entry point](#the-registerreg-entry-point). |
 | `locked` | no, default `false` | Only meaningful for **community** plugins. `true` marks a shipped/bundled community plugin (git-tracked, not a real user drop-in) so Settings → Plugins refuses to offer a Delete button for it — the same protection `plugins/themes/*/theme.json`'s `"locked": true` already gives the bundled theme pack. ACARS sets this. If you're writing a plugin someone else will `git clone` into their own `plugins/apps/`, leave it `false` (default) so they can delete it if they want to. |
 | `[deps].apt` / `.setup` | no | System packages + a build script. **Never installed automatically** — the operator runs it themselves (`sudo bash plugins/apps/<id>/setup.sh` or `sudo meshpoint plugin setup <id>`, which just wraps the same script after showing what it does). |
 | `[frontend].scripts` / `.styles` | scripts required iff `panel`, `sidebar`, `hook` or `topbar` in `provides` | Served at `/plugins/apps/<id>/<path>` — **only** the exact files listed here, from either tier, nothing else in the folder is reachable (`src/plugins/assets.py:resolve_plugin_asset`). |
@@ -215,11 +223,21 @@ def register(reg) -> None:
   right after decode — `"ignore"` drops the packet entirely (not even
   shown live), `"blacklist"` shows it live but never persists it, `None`
   is normal handling. See the same section below.
+- `reg.add_service(name, build, wire=None)` — requires `"service"` in
+  `provides`. For a plugin that runs a lifespan-managed async service (an
+  object with `async start()` / `async stop()`) rather than a subprocess
+  listener or a pipeline source. `build(context)` returns the service (or
+  `None` to opt out); `context` is a `ServiceContext` exposing the live
+  `pipeline`, the shared `ws_manager` and the full `AppConfig`. Started
+  right after `pipeline.start()`, stopped on shutdown. A service whose
+  `start()` raises is logged and skipped — it never aborts meshpoint. See
+  [Adding a background service](#adding-a-background-service-service) below.
 
-Calling `add_router`/`add_listener`/`add_capture_source`/`add_protocol` for
-a capability not in `provides` raises `PluginRegistryError` — caught by the
-loader, logged, and the whole plugin is skipped (one bad plugin never
-aborts the others or the app). See `src/plugins/loader.py::load_plugins`.
+Calling `add_router`/`add_listener`/`add_capture_source`/`add_protocol`/
+`add_service` for a capability not in `provides` raises
+`PluginRegistryError` — caught by the loader, logged, and the whole plugin
+is skipped (one bad plugin never aborts the others or the app). See
+`src/plugins/loader.py::load_plugins`.
 
 ## Adding a dashboard tab (`"panel"`, unused — use `"hook"` instead)
 
@@ -537,10 +555,10 @@ shaped like every existing chip:
 - `mount(rootEl)` — required. `rootEl` is an already-appended, empty
   wrapper `<span>` — build your initial DOM into it. Reuse the shared
   `.topbar-serial` classes (brand/lamp/call/sep/freq spans — see
-  `frontend/topbar/topbar_reticulum_chip.js` for the closest existing
-  self-polling precedent this generalizes) if you want the same visual
-  language as the built-in chips, or render whatever you want — nothing
-  enforces the shape.
+  `plugins/apps/reticulum/frontend/reticulum_topbar_chip.js` or
+  `plugins/apps/dapnet/frontend/dapnet_topbar_chip.js` for shipped
+  self-polling examples) if you want the same visual language as the
+  built-in chips, or render whatever you want — nothing enforces the shape.
 - `init()` — optional, called once, immediately after `mount()`. Start
   your own polling/timers here, not in `mount()` — this ordering
   guarantee is why `DapnetTopbarChip` above splits the two.
@@ -557,6 +575,64 @@ capability-declaration enforcement happens at runtime the way
 gate) — declaring `"topbar"` in `provides` is what makes the manifest
 loader require your `[frontend].scripts` entry, which is the real,
 useful check.
+
+## Adding a background service (`"service"`)
+
+`"listener"` is an RTL-SDR subprocess. `"capture"` is a source feeding the
+packet pipeline. `"service"` is neither — it's for a plugin that just
+needs to **run something async for the life of the app**: attach to an
+external daemon, hold a connection open, poll a device, run a router. The
+shipped example is **Reticulum** (`plugins/apps/reticulum/`), whose
+`LxmfService` attaches to a local `rnsd` shared instance as an RNS/LXMF
+client; **Hello Service** (`plugins/apps/hello-service/`) is the minimal
+one — a no-op that just logs when it starts and stops.
+
+Backend-only: no `[service]` TOML table, no frontend script required.
+`backend/__init__.py`:
+
+```python
+def register(reg) -> None:
+    from .my_service import MyService
+
+    def build(context):
+        # context is a src.api.service_registry.ServiceContext:
+        #   .pipeline    -- the live packet pipeline (.database, .packet_repo)
+        #   .ws_manager  -- the shared WebSocketManager
+        #   .config      -- the full AppConfig
+        return MyService(
+            db=context.pipeline.database,
+            ws_manager=context.ws_manager,
+            # ... your own plugins.<id>.* config from reg.config ...
+        )
+
+    def wire(service, context):
+        # optional -- runs between build() and start(), e.g. to hand the
+        # built service to your routes module's module-level state
+        routes.init_routes(service)
+
+    reg.add_service("my-plugin", build, wire)
+```
+
+Your service object needs `async start()` and `async stop()`:
+
+- **`build(context)` is called once**, right after `pipeline.start()` — so
+  `context.pipeline.packet_repo` is safe to read (it raises before then).
+  Return `None` to opt out (e.g. an optional dependency isn't installed).
+- **`start()` runs immediately** after `wire()`. **`stop()` runs on
+  shutdown**, newest-registered service first.
+- **A failure is isolated.** If `build`/`wire`/`start` raises, it's logged
+  (`plugin service <name> failed to start -- skipping it`) and meshpoint
+  starts normally — the same guarantee the loader gives `register()`. A
+  `stop()` that raises doesn't hold up the rest of shutdown either.
+- **This runs in-process**, on the server's event loop — an async
+  `start()` that blocks blocks startup. A one-time synchronous init
+  (Reticulum's `RNS.Reticulum()`, which must run on the main thread) is
+  acceptable to block on briefly; anything ongoing belongs in a task the
+  service spawns and cancels in `stop()`.
+
+Keep the service class importable without FastAPI (defer heavy imports
+into `register()`) so `backend/tests/` can exercise it on a dev machine —
+see [Testing](#testing).
 
 ## Adding a non-RTL-SDR capture source + protocol (`"capture"`/`"protocol"`)
 
@@ -771,7 +847,11 @@ protocol](#adding-a-non-rtl-sdr-capture-source--protocol-captureprotocol)
 above, proven out by DAPNET actually moving out of core onto it. The
 generic topbar-chip gap that used to be listed here is solved too — see
 [Adding a topbar chip](#adding-a-topbar-chip-topbar), also proven out by
-DAPNET, which now has one. Don't build around the one above either — if
+DAPNET. And the "no seam for a plain background service" gap is solved —
+see [Adding a background service](#adding-a-background-service-service),
+proven out by **Reticulum** moving out of core onto it (its whole
+`LxmfService` — RNS/LXMF client, announce handlers, peer roster — is now a
+`"service"` plugin). Don't build around the one above either — if
 you need it, that's a signal to extend the core seam
 (`src/plugins/registry.py`, `src/plugins/manifest.py`'s
 `KNOWN_PROVIDES`), not to work around it inside a plugin. Full

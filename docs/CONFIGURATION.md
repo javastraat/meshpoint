@@ -175,43 +175,83 @@ WiFi SSID/password and the Reticulum backbone host/port (default `node.reticulum
 
 Requires the PlatformIO toolchain, installed via `scripts/install.sh`'s separate opt-in prompt (`--skip-platformio` to skip non-interactively) — a second, independent toolchain from arduino-cli's, since this is the only companion firmware in this repo that needs it. Installed self-contained under `/opt/platformio` (its own venv; `PLATFORMIO_CORE_DIR` is set in `meshpoint.service`, same `--no-create-home` `meshpoint` service-user reasoning as arduino-cli's own `XDG_CACHE_HOME`/`/opt/arduino-cli`). Unlike arduino-cli's board core, PlatformIO downloads its ESP32 platform/toolchain lazily on first `pio run`, not during `install.sh` — so that step itself is quick, and the real multi-hundred-MB download happens the first time the card is actually used.
 
-### Reticulum (native LXMF messaging)
+### Reticulum (native LXMF messaging) — a plugin
 
-> **Moved to a plugin.** Native Reticulum/LXMF is now `plugins/apps/reticulum/`,
-> not core. Config lives under **`plugins.reticulum.*`** (not the top-level
-> `reticulum:` shown below), enabled with `plugins.reticulum.enabled: true`,
-> and the RNode/backbone settings are the **Settings** tab on the Reticulum
-> page (Configuration → Reticulum is gone). The RNode firmware flasher and the
-> Heltec-V4 node firmware card stay in core. See
-> [`plugins/apps/reticulum/README.md`](../plugins/apps/reticulum/README.md).
-> The rest of this section is being rewritten for the plugin shape.
+Separate from the standalone companion above — this is meshpoint's own
+[Reticulum](https://reticulum.network/)/[LXMF](https://github.com/markqvist/LXMF)
+client: its own LXMF delivery destination, the peer roster built from announces,
+and the **Reticulum** sidebar page (Peers · Messages · Send · Settings) plus a
+topbar pill.
 
-Separate from the standalone companion above — this is meshpoint's own [Reticulum](https://reticulum.network/)/[LXMF](https://github.com/markqvist/LXMF) client, the **Reticulum** sidebar page (Peers, Messages, Send, Settings). Off by default:
+It lives in **`plugins/apps/reticulum/`** (`provides = ["service", "routes",
+"sidebar", "topbar"]`), not core — enable it like any plugin, under `plugins:`:
 
 ```yaml
-reticulum:
-  enabled: false                              # opt-in
-  display_name: "Meshpoint"
-  reticulum_config_dir: "data/reticulum/rns_config"
-  identity_path: "data/reticulum/identity"
-  lxmf_storage_dir: "data/reticulum/lxmf"
-  rnode_serial_port: ""                       # stable /dev/serial/by-id/... path, blank = no RNode
-  rnode_frequency_hz: 869463000
-  rnode_bandwidth_hz: 125000
-  rnode_tx_power: 20
-  rnode_spreading_factor: 8
-  rnode_coding_rate: 5
-  backbone_host: "node.reticulumnet.nl"
-  backbone_port: 4242
+plugins:
+  reticulum:
+    enabled: true                              # opt-in
+    display_name: "Meshpoint"
+    rnode_serial_port: ""                       # stable /dev/serial/by-id/... path, blank = no RNode
+    rnode_frequency_hz: 869463000
+    rnode_bandwidth_hz: 125000
+    rnode_tx_power: 20
+    rnode_spreading_factor: 8
+    rnode_coding_rate: 5
+    backbone_host: "node.reticulumnet.nl"
+    backbone_port: 4242
+    # storage paths — defaults shown; only set to override:
+    # reticulum_config_dir: "data/reticulum/rns_config"
+    # identity_path: "data/reticulum/identity"
+    # lxmf_storage_dir: "data/reticulum/lxmf"
 ```
 
-**Configuration → Reticulum** now edits `enabled`/`display_name`/`rnode_*`/`backbone_*` directly from the dashboard (`rnode_serial_port` is a dropdown drawing from the same USB-device enumeration every other companion's port picker uses) — hand-editing `local.yaml` is no longer required for these. Saving there only updates `local.yaml`; the RNode/backbone fields still need `rnsd` itself to restart before they take effect (see below), which the card's own "Restart rnsd" button does directly, without restarting meshpoint.
+> **Upgrading from a build where Reticulum was in core:** move your old
+> top-level `reticulum:` block under `plugins:` and rename it to
+> `plugins.reticulum` — keys are otherwise unchanged. The top-level
+> `reticulum:` key is no longer recognised (you'll see an "unknown config
+> key" warning until you move it). Same LXMF address/identity (paths default
+> the same), same peer roster (the `reticulum_peers` table is untouched).
 
-**Why `enabled` defaults to `false`**: meshpoint's own `RNS.Reticulum()` call attaches to a locally-running `rnsd` shared instance as a client rather than opening a radio interface itself — but if `rnsd` isn't already running when meshpoint starts, `RNS.Reticulum()` falls back to opening whatever interfaces are configured in `reticulum_config_dir` directly, which would then fight `rnsd` for them once it starts. Only turn this on once `rnsd` (see below) is reliably running before meshpoint does.
+The RNode radio + TCP backbone fields (and `display_name`) are also editable
+from the **Settings** tab on the Reticulum page — `rnode_serial_port` is a
+dropdown drawing from the same USB-device enumeration every companion's port
+picker uses. Saving there only updates `local.yaml`; the RNode/backbone fields
+also need `rnsd` to restart (see below), which the tab's **Restart rnsd**
+button does directly. There is no "enabled" checkbox on the tab — Settings →
+Plugins' own toggle is the single on/off switch.
 
-**`rnsd` itself** runs as its own opt-in systemd service (`scripts/rnsd.service`, installed via `install.sh`'s own prompt, or manually: `sudo systemctl enable --now rnsd`) — deliberately **not** a dependency of `meshpoint.service` (ordering only, `After=rnsd.service`, no `Wants=`/`Requires=`), so Reticulum being off has zero effect on meshpoint's core service. Its own interfaces config gets regenerated from the `reticulum.rnode_*`/`backbone_*` keys above on every `rnsd` start (`scripts/write_rnsd_config.py`, run as `rnsd.service`'s own `ExecStartPre`) — written into `reticulum_config_dir`, the **same directory** meshpoint's own client uses. That's not just tidiness: the shared-instance RPC channel authenticates per-configdir, so meshpoint and `rnsd` sharing one directory is what makes the client/master split actually work reliably.
+**Why it's opt-in**: meshpoint's `RNS.Reticulum()` call attaches to a
+locally-running `rnsd` shared instance as a *client*, never opening a radio
+interface itself — but if `rnsd` isn't already running when meshpoint starts,
+RNS falls back to opening whatever interfaces `reticulum_config_dir` defines
+directly, which then fights `rnsd` for them. On a normal boot the systemd
+ordering (`After=rnsd.service`) handles this; a plugin service that fails to
+start is logged and skipped, not fatal — meshpoint starts normally and you
+restart it once `rnsd` is up.
 
-`rnode_serial_port` needs a physical RNode already flashed and plugged in — see the RNode firmware card below if you need to flash one. Leaving it blank still gives you a working Reticulum node over the `backbone_host`/`backbone_port` TCP link alone, no LoRa hardware required.
+**Set it up with `sudo meshpoint plugin setup reticulum`** (or `sudo bash
+/opt/meshpoint/plugins/apps/reticulum/setup.sh`) — that `pip install`s `lxmf`
+into the venv and installs + enables the `rnsd` systemd unit
+(`plugins/apps/reticulum/rnsd.service`). `rns` (the Reticulum stack, the `rnsd`
+binary, and `rnodeconf` for the RNode flasher) stays a core dependency;
+`lxmf` is Reticulum-messaging-only, so it's part of this step.
+
+**`rnsd` itself** runs as its own systemd service — deliberately **not** a
+dependency of `meshpoint.service` (ordering only, `After=rnsd.service`, no
+`Wants=`/`Requires=`). Its interfaces config is regenerated from the
+`plugins.reticulum.rnode_*`/`backbone_*` keys on every `rnsd` start
+(`plugins/apps/reticulum/write_rnsd_config.py`, run as `rnsd.service`'s
+`ExecStartPre`) — written into `reticulum_config_dir`, the **same directory**
+meshpoint's own client uses. That's not just tidiness: the shared-instance RPC
+channel authenticates per-configdir, so meshpoint and `rnsd` sharing one
+directory is what makes the client/master split work.
+
+`rnode_serial_port` needs a physical RNode already flashed and plugged in — see
+the RNode firmware card below. Blank still gives a working Reticulum node over
+the `backbone_host`/`backbone_port` TCP link alone, no LoRa hardware required.
+
+Maintenance: `python3 plugins/apps/reticulum/clear_reticulum_packets.py`
+(`--apply`) wipes stored reticulum messages and/or the peer roster.
 
 **Configuration → Firmware** also has a card for flashing real [RNode firmware](https://github.com/markqvist/RNode_Firmware) onto a board to use as `rnode_serial_port` above — 13 supported boards (Heltec LoRa32 v2/v3/v4, Heltec T114, LilyGO LoRa32 v1.0/v2.0/v2.1, LilyGO LoRa T3S3, LilyGO T-Beam, LilyGO T-Beam Supreme, LilyGO T-Deck, LilyGO T-Echo, RAK4631), each with its own band/model variants. Wraps `rnodeconf` (bundled with the `rns` pip package, already a meshpoint dependency — no separate install) server-side rather than the browser-side Web Serial flasher some other Reticulum tools use, since the board is physically on the Pi, not necessarily the machine your browser is on. One command (`rnodeconf --autoinstall`) flashes the firmware, provisions the EEPROM, and sets the firmware hash together — firmware itself is fetched live from the internet by `rnodeconf`, not vendored in this repo, so the Pi needs internet access at flash time.
 

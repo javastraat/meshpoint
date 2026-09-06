@@ -5,7 +5,8 @@ Shared by two callers: the RNode firmware flasher
 (``src/api/routes/rnode_firmware_routes.py``), which stops/starts ``rnsd``
 around a flash so it releases the serial port, and the Reticulum plugin's
 config routes, which restart ``rnsd`` so it re-runs
-``scripts/write_rnsd_config.py`` after an RNode/backbone settings change.
+``plugins/apps/reticulum/write_rnsd_config.py`` after an RNode/backbone
+settings change.
 
 Anything outside the exact ``rnsd`` subcommands listed in
 ``config/sudoers-meshpoint`` will prompt for a password rather than run.
