@@ -11649,7 +11649,12 @@ RNS-installed-on-Mac reason as before). `node --check` clean on
 bullets (extended the same bullet rather than adding new ones, since it's
 all fixes to the feature just shipped in this same uncommitted change-set).
 
-**Still not committed, still not live-verified after this second round of
-fixes** -- next step when deployed is re-confirming the wordmark renders
-correctly (not just "doesn't fragment") and the GitHub link opens from
-both the dashboard's own Browse tab and a real external NomadNet client.
+**LIVE-VERIFIED on the real RAK V2 device (`ti-meshpoint`), same session**:
+two screenshots via the dashboard's own Browse tab. `/page/info.mu` renders
+correctly (real numbers: v0.8.1, 11543 Reticulum peers, 1131 NomadNet
+nodes, working Nodes/Home links). `/page/index.mu` renders correctly too:
+blue "MESHPOINT" wordmark (no fragmentation), blurb correctly reads
+"RAK2287 + Raspberry Pi 4" (confirms `hardware_description` threading
+works end to end on real hardware, not just in tests), and both Links
+render as proper clickable blue-underlined links. Still not committed --
+still the user's call when to commit this batch.
