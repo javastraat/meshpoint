@@ -1,12 +1,19 @@
 {
 	"folders": [
 		{
+			"name": "meshpoint",
 			"path": "."
 		},
 		{
+			"name": "meshpoint_app",
 			"path": "../flutter/meshpoint_app"
 		},
 		{
+			"name": "reticulum-meshchat",
+			"path": "../reticulum-meshchat"
+		},
+		{
+			"name": "basicstation-docker",
 			"path": "../basicstation-docker"
 		}
 	],
