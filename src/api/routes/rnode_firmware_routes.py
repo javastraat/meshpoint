@@ -359,23 +359,30 @@ async def _stream_eeprom_wipe(port: str) -> AsyncIterator[bytes]:
 
 
 
+def _rnsd_configured_port() -> str:
+    """The RNode serial port rnsd is configured to hold, from
+    ``plugins.reticulum.rnode_serial_port`` (an opaque per-plugin dict --
+    the reticulum plugin owns this key now that Reticulum moved out of
+    core). Empty string if unset or the plugin isn't configured."""
+    if _config is None:
+        return ""
+    plugin_cfg = _config.plugins.get("reticulum", {})
+    return str(plugin_cfg.get("rnode_serial_port") or "") if isinstance(plugin_cfg, dict) else ""
+
+
 def _rnsd_owns_port(port_aliases: set) -> bool:
     """``port_aliases`` should be every known alias (device/stable_path/
     by_id/by_path) of the *matched* device, not just the single string
-    the client submitted -- ``reticulum.rnode_serial_port`` in
+    the client submitted -- ``plugins.reticulum.rnode_serial_port`` in
     local.yaml and whatever alias the dashboard's own port picker
-    happened to submit are both valid identifiers for the same
-    physical device, but rarely the same literal string (e.g. one's a
-    by-id path, the other's by-path). Comparing only the submitted
-    string against the configured one produced a real live bug:
-    rnsd's port genuinely matched but this returned False, so rnsd
-    never got released and the flash failed with "Could not find
-    specified port" (rnsd still had it open) -- confirmed live."""
-    return bool(
-        _config is not None
-        and _config.reticulum.rnode_serial_port
-        and _config.reticulum.rnode_serial_port in port_aliases
-    )
+    happened to submit are both valid identifiers for the same physical
+    device, but rarely the same literal string (e.g. one's a by-id path,
+    the other's by-path). Comparing only the submitted string against
+    the configured one produced a real live bug: rnsd's port genuinely
+    matched but this returned False, so rnsd never got released and the
+    flash failed with "Could not find specified port" -- confirmed live."""
+    configured = _rnsd_configured_port()
+    return bool(configured and configured in port_aliases)
 
 
 @router.get("/targets")

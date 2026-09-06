@@ -28,6 +28,6 @@ category = "networks"
 icon = "reticulum"    # exact copy of the old built-in nav item's own glyph
 
 [meta]
-description = "Native Reticulum/LXMF messaging -- meshpoint's own LXMF delivery destination on the local rnsd shared instance, the peer roster built from announces, and a compact topbar pill. Being extracted from core; not user-visible until enabled (Phase 4)."
+description = "Native Reticulum/LXMF messaging -- meshpoint's own LXMF delivery destination on the local rnsd shared instance, the peer roster built from announces, the Reticulum page (Peers/Messages/Send/Settings) and a compact topbar pill."
 homepage = "https://reticulum.network"
 author = "Einstein PD2EMC"

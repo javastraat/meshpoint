@@ -2,11 +2,11 @@
  * Topbar plugin chip registry.
  *
  * Lets a plugin add its own status chip to the topbar, the same visual
- * shape as the built-in Meshtastic/MeshCore/Serial/Pager/Reticulum chips
- * (reuse the shared `.topbar-serial` classes -- see
- * topbar_reticulum_chip.js for the closest existing precedent: a chip
- * that runs its own status poll rather than reading the shared
- * GET /api/config blob every core chip otherwise reads from).
+ * shape as the built-in Meshtastic/MeshCore/Serial/Pager chips (reuse the
+ * shared `.topbar-serial` classes). A plugin chip runs its own status
+ * poll rather than reading the shared GET /api/config blob every core
+ * chip otherwise reads from -- see the reticulum plugin's
+ * frontend/reticulum_topbar_chip.js and dapnet's dapnet_topbar_chip.js.
  *
  * Unlike core's own chips, a plugin chip has no GET /api/config-driven
  * enabled flag to gate visibility on -- the plugin being loaded at all

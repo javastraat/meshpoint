@@ -11493,6 +11493,44 @@ with a valid ServiceContext at the right point.
 - `config_routes.py` + `_run_systemctl` lift moved to Phase 2 (coupled to
   the settings tab + the `write_rnsd_config.py` question).
 
-**Next:** Phase 2 -- plugin frontend (`registerSidebarPage` page,
-`registerTopbarChip` pill, settings tab), move `config_routes.py` in, add
-`sidebar`+`topbar` to `provides`.
+**Phase 2 shipped** (2a: sidebar page + topbar pill, `provides +=
+sidebar,topbar`; 2b: Settings tab + `backend/config_routes.py` writing
+`plugins.reticulum.*`, `_run_systemctl` lifted to `src/api/systemctl.py`)
+-- all dormant while plugin disabled. **Phase 3 shipped** --
+`messaging.js` posts reticulum replies to `/api/reticulum/send` directly
+(core `messages.py` branch kept as fallback). Both Pi-verified (2a/2b:
+no change; 3: a reply sent from the Messages page round-tripped).
+
+**Also this session, unrelated fixes** (all Pi-verified): upstream client
+no longer dumps a traceback per reconnect when the platform is
+unreachable; unconfigured LoRaWAN devices (the `YOUR_DEVICE_EUI_HEX`
+placeholder shipped in default.yaml, now `devices: {}`) no longer
+traceback each boot + a clear "no keys configured" line; RNS/LXMF logging
+routed through Python `logging` with the noisy "could not decode display
+name" LXMF line demoted to DEBUG.
+
+**Phase 4 + 5 shipped (code) -- THE CUTOVER.** Core reticulum deleted:
+`src/reticulum/` (dir), `reticulum_routes.py`, `reticulum_config_routes.py`,
+`reticulum_peer_repository.py`, `test_messages_reticulum_send.py`;
+`clear_reticulum_packets.py` -> plugin. `server.py`/`messages.py`/
+`config_enrichment.py` lost their reticulum wiring; `config.py` lost
+`ReticulumConfig` + `AppConfig.reticulum`. AttributeError trap caught:
+`rnode_firmware_routes._rnsd_owns_port()` read `_config.reticulum.*` ->
+new helper reads `_config.plugins["reticulum"]`; `identity_routes`
+`_ADMIN_SECTIONS` lost `"configuration.reticulum"`. `write_rnsd_config.py`
+repointed to `cfg.plugins["reticulum"]` (kept in `scripts/` next to
+`rnsd.service` -- moving both into the plugin is a later cleanup, needs a
+"update the installed unit" step). Frontend: 3 files deleted, `index.html`
+/ `app.js` / `topbar_controller.js` / `configuration_panel.js` de-wired.
+Kept: `reticulum_peers` table, both firmware cards + routes, the
+`[data-section="reticulum"]` / `.topbar-reticulum` CSS, the `reticulum`
+sidebar icon glyph. `_BUILTIN_ROUTERS` 51 -> 49. CHANGELOG has the
+⚠️ breaking-config entry; CONFIGURATION.md got a stub redirect note (full
+rewrite = Phase 6). 89 passed on the Mac subset.
+
+**Next:** the atomic Pi flip -- user edits `local.yaml` (`reticulum:` ->
+`plugins.reticulum:` + `enabled: true`, migration diff in
+`memory/plugin-reticulum.md`), `restart meshpoint` + `restart rnsd`,
+verify page (4th Settings tab) / pill / send / settings / rnsd restart.
+Then Phase 6 = full docs (CONFIGURATION.md §, README, PLUGINS.md
+"nine seams", API-ENDPOINTS.md).

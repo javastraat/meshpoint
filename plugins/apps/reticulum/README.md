@@ -1,60 +1,79 @@
 # Reticulum plugin
 
 Native **Reticulum / LXMF** messaging — meshpoint's own LXMF delivery
-destination on the local `rnsd` shared instance, plus the peer roster built
-from received announces.
+destination on the local `rnsd` shared instance, the peer roster built
+from received announces, the Reticulum page, and a compact topbar pill.
 
-> **Status: Phase 1 scaffold.** This plugin is being extracted from core
-> (`src/reticulum/`, `src/api/routes/reticulum_routes.py`, …). Core's own
-> Reticulum service and routes are still authoritative and still what a
-> normal install runs. Do **not** enable this plugin on a device that has
-> `reticulum.enabled: true` in `local.yaml` — you'd get two RNS client
-> attachments fighting over the same identity. The migration (disable
-> core, enable plugin, move config) is Phase 4. See
-> [`memory/plugin-reticulum.md`](../../../memory/plugin-reticulum.md).
+Extracted from core (`src/reticulum/`, `src/api/routes/reticulum_routes.py`,
+Configuration → Reticulum, …) — that code is gone; this plugin is the whole
+implementation now. `enabled: false` by default like every shipped plugin.
 
-## What it provides (Phase 1)
+## What it provides
 
 | Seam | What |
 |---|---|
 | `service` | `LxmfService` — RNS/LXMF client attach, started right after the packet pipeline is up (`src.api.service_registry`), stopped on shutdown |
-| `routes` | `/api/reticulum/{status,peers,messages,send,announce}` |
+| `routes` | `/api/reticulum/{status,peers,messages,send,announce}` + `GET`/`PUT /api/config/reticulum` + `POST /api/config/reticulum/restart-rnsd` |
+| `sidebar` | the **Reticulum** page under Networks — Peers / Messages / Send / Settings tabs |
+| `topbar` | the compact status pill (own address · peer count), self-polling `/api/reticulum/status` |
 
-Coming in Phase 2: the Reticulum **page** (`sidebar`) and the **topbar
-pill** (`topbar`), plus the RNode/backbone settings tab (`config_routes`).
-
-## Config
-
-`plugins.reticulum.*` — the same shape core's `AppConfig.reticulum` has
-today (`backend/state.py` documents every key and its default). Nothing is
-read from core's `reticulum:` section by this plugin.
+## Enable it
 
 ```yaml
 plugins:
   reticulum:
     enabled: true
     display_name: "Meshpoint"
-    reticulum_config_dir: data/reticulum/rns_config
-    identity_path: data/reticulum/identity
-    lxmf_storage_dir: data/reticulum/lxmf
+    # RNode radio + TCP backbone (also editable from the page's Settings tab):
+    rnode_serial_port: ""            # by-id/by-path; blank = TCP backbone only
+    rnode_frequency_hz: 869463000
+    rnode_bandwidth_hz: 125000
+    rnode_tx_power: 20
+    rnode_spreading_factor: 8
+    rnode_coding_rate: 5
+    backbone_host: node.reticulumnet.nl
+    backbone_port: 4242
+    # storage paths — defaults shown; only set to override:
+    # reticulum_config_dir: data/reticulum/rns_config
+    # identity_path: data/reticulum/identity
+    # lxmf_storage_dir: data/reticulum/lxmf
 ```
 
-The `rnode_*` / `backbone_*` keys are held in `state.py` for Phase 2's
-settings tab; they're consumed by `scripts/write_rnsd_config.py` (rnsd's
-own interfaces), which still reads core's `reticulum:` section until
-Phase 5.
+`backend/state.py` documents every key + default. Restart meshpoint after
+editing. The `rnode_*` / `backbone_*` keys are also consumed by
+`scripts/write_rnsd_config.py` (rnsd's `ExecStartPre`) — those need an
+`rnsd` restart too, which the Settings tab's **Restart rnsd** button does.
+
+## `rnsd`
+
+meshpoint's `LxmfService` attaches to a locally-running `rnsd` shared
+instance as a *client* — it never opens a radio interface itself. `rnsd`
+runs as its own opt-in systemd unit (`scripts/rnsd.service`,
+`sudo systemctl enable --now rnsd`), deliberately **not** a dependency of
+`meshpoint.service`. `reticulum_config_dir` must be the same directory
+`rnsd` uses — the shared-instance RPC channel authenticates per-configdir.
+
+The **RNode firmware flasher** and the **Heltec-V4 Reticulum-node firmware
+card** stay in core (Configuration → Firmware) — they're hardware
+provisioning, usable with or without this plugin.
 
 ## Layout
 
 ```
-plugin.toml                 manifest (provides = ["service", "routes"])
+plugin.toml                    provides = ["service", "routes", "sidebar", "topbar"]
+clear_reticulum_packets.py     maintenance: wipe reticulum messages / peer roster
 backend/
-  __init__.py               register(reg) -- add_router + add_service
-  state.py                  plugins.reticulum.* config (defaults mirror core)
-  lxmf_service.py           the RNS/LXMF client (moved from src/reticulum/)
-  peer_repo.py              reticulum_peers table access (moved from src/storage/)
-  routes.py                 /api/reticulum/* (moved from src/api/routes/)
+  __init__.py                  register(reg) -- add_router x2 + add_service
+  state.py                     plugins.reticulum.* config + set_config/_persist
+  lxmf_service.py              the RNS/LXMF client + RNS-log bridge
+  peer_repo.py                 reticulum_peers access (table schema stays in core)
+  routes.py                    /api/reticulum/*
+  config_routes.py             /api/config/reticulum (Settings tab)
   tests/
+frontend/
+  reticulum_panel.js           the page (registerSidebarPage)
+  reticulum_settings_tab.js    the Settings tab
+  reticulum_topbar_chip.js     the pill (registerTopbarChip)
 ```
 
 Full write-up: [docs/PLUGINS.md](../../../docs/PLUGINS.md).

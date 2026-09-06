@@ -165,19 +165,6 @@
                             <span class="sidebar__label">Pager</span>
                         </a>
                     </li>
-                    <li class="sidebar__item" data-requires-config="reticulum.enabled">
-                        <a href="#/reticulum" class="sidebar__link" data-route="reticulum">
-                            <span class="sidebar__icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                    <circle cx="5" cy="6" r="2"/>
-                                    <circle cx="19" cy="6" r="2"/>
-                                    <circle cx="12" cy="18" r="2"/>
-                                    <path d="M6.7 7.3 10.3 16.3M17.3 7.3 13.7 16.3M7 6h10"/>
-                                </svg>
-                            </span>
-                            <span class="sidebar__label">Reticulum</span>
-                        </a>
-                    </li>
                     <li class="sidebar__item">
                         <a href="#/messages" class="sidebar__link" data-route="messages">
                             <span class="sidebar__icon">
@@ -308,7 +295,6 @@
                                 <span class="sidebar__group-header-label">Companions</span>
                             </li>
                             <li class="sidebar__subitem"><a href="#/configuration/meshcore" class="sidebar__link" data-route="configuration/meshcore"><span class="sidebar__label">MeshCore</span></a></li>
-                            <li class="sidebar__subitem"><a href="#/configuration/reticulum" class="sidebar__link" data-route="configuration/reticulum"><span class="sidebar__label">Reticulum</span></a></li>
                             <li class="sidebar__subitem"><a href="#/configuration/serial" class="sidebar__link" data-route="configuration/serial"><span class="sidebar__label">Serial</span></a></li>
                             <li class="sidebar__subitem"><a href="#/configuration/firmware" class="sidebar__link" data-route="configuration/firmware"><span class="sidebar__label">Firmware</span></a></li>
                             <li class="sidebar__group-header" aria-hidden="true">
@@ -437,7 +423,6 @@
                 <div class="topbar__group topbar__group--serial" id="topbar-serial-group" hidden></div>
                 <div class="topbar__group topbar__group--meshcore" id="topbar-meshcore-group" hidden></div>
                 <div class="topbar__group topbar__group--serial" id="topbar-pager-group" hidden></div>
-                <div class="topbar__group topbar__group--serial" id="topbar-reticulum-group" hidden></div>
                 <div class="topbar__plugin-chips" id="topbar-plugin-chips"></div>
                 <div class="topbar__spacer" aria-hidden="true"></div>
                 <div class="topbar-actions" role="toolbar" aria-label="Quick actions"></div>
@@ -622,10 +607,6 @@
                 <div id="meshcore-panel"></div>
             </section>
 
-            <section class="section" data-section="reticulum" style="display:none">
-                <div id="reticulum-panel"></div>
-            </section>
-
             <section class="section" data-section="lorawan" style="display:none">
                 <div id="lorawan-panel"></div>
             </section>
@@ -723,7 +704,6 @@
             <section class="section" data-section="configuration/radio" style="display:none"><div id="cfg-radio-panel" class="section__placeholder"><h2>Configuration · Radio</h2><p>Skeleton; controls migrate from the Radio tab.</p></div></section>
             <section class="section" data-section="configuration/channels" style="display:none"><div id="cfg-channels-panel" class="section__placeholder"><h2>Configuration · Channels</h2><p>Skeleton; PSK list + add/remove.</p></div></section>
             <section class="section" data-section="configuration/meshcore" style="display:none"><div id="cfg-meshcore-panel" class="section__placeholder"><h2>Configuration · MeshCore</h2><p>Skeleton; companion channel keys + Send Advert.</p></div></section>
-            <section class="section" data-section="configuration/reticulum" style="display:none"><div id="cfg-reticulum-panel" class="section__placeholder"><h2>Configuration · Reticulum</h2><p>Loading…</p></div></section>
             <section class="section" data-section="configuration/serial" style="display:none"><div id="cfg-serial-panel" class="section__placeholder"><h2>Configuration · Serial</h2><p>Skeleton; Meshtastic USB device list.</p></div></section>
             <section class="section" data-section="configuration/firmware" style="display:none"><div id="cfg-firmware-panel" class="section__placeholder"><h2>Configuration · Firmware</h2><p>Skeleton; flash-a-spare-board cards.</p></div></section>
             <section class="section" data-section="configuration/transmit" style="display:none"><div id="cfg-transmit-panel" class="section__placeholder"><h2>Configuration · Transmit</h2><p>Skeleton; TX power + duty cycle + relay.</p></div></section>
@@ -1170,7 +1150,6 @@
     <script src="js/configuration/quick_deploy_card.js"></script>
     <script src="js/configuration/channels_card.js"></script>
     <script src="js/configuration/meshcore_card.js"></script>
-    <script src="js/configuration/reticulum_config_card.js"></script>
     <script src="js/configuration/serial_card.js"></script>
     <script src="js/configuration/meshcore_firmware_card.js"></script>
     <script src="js/configuration/meshtastic_firmware_card.js"></script>
@@ -1219,7 +1198,6 @@
     <script src="topbar/topbar_meshcore_chip.js"></script>
     <script src="topbar/topbar_serial_chip.js"></script>
     <script src="topbar/topbar_pager_chip.js"></script>
-    <script src="topbar/topbar_reticulum_chip.js"></script>
     <script src="topbar/topbar_plugin_registry.js"></script>
     <script src="topbar/topbar_actions.js"></script>
     <script src="topbar/topbar_controller.js"></script>
@@ -1241,7 +1219,6 @@
     <script src="js/pager_panel.js"></script>
     <script src="js/meshtastic_panel.js"></script>
     <script src="js/meshcore_panel.js"></script>
-    <script src="js/reticulum_panel.js"></script>
     <!-- meshpoint:plugin-panels -->
     <script src="js/app.js"></script>
 </body>

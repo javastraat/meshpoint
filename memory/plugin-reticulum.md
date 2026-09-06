@@ -18,9 +18,9 @@ Update this block as phases land. `[ ]` todo, `[~]` in progress, `[x]` done.
 - [x] **Phase 1** — plugin backend scaffold ✅ (commit pending). `service` + `routes` only; `config_routes.py` + `_run_systemctl` lift **moved to Phase 2** (coupled to the settings tab + the rnsd-config question).
 - [x] **Phase 2** — plugin frontend. **2a** (commit): sidebar page + **topbar pill**, `sidebar`+`topbar` in `provides`. **2b** (commit): Settings tab (`reticulum_settings_tab.js`) + `backend/config_routes.py` (`GET`/`PUT /api/config/reticulum` → `plugins.reticulum.*` via `state.set_config`/`_persist`, `POST .../restart-rnsd`) + `_run_systemctl` lifted → `src/api/systemctl.py`.
 - [x] **Phase 3** — Messages page routes reticulum sends to `/api/reticulum/send` (commit). `messaging.js._onSendMessage` early-returns to a new `_sendReticulumMessage()` for `protocol==='reticulum'`. Core `messages.py` branch LEFT in place as a fallback (deleted Phase 4). Works live now — core already serves `/api/reticulum/send`.
-- [ ] **Phase 4** — live-verify on the Pi (atomic config flip — see note), screenshots
-- [ ] **Phase 5** — delete core reticulum service/routes/config/frontend. **Includes** repointing `scripts/write_rnsd_config.py` off `config.reticulum` → `config.plugins["reticulum"]` (can't do it earlier — would break the live Pi's rnsd, which reads the old path until the atomic Phase 4 flip).
-- [ ] **Phase 6** — docs (CHANGELOG v0.8.1, PLUGINS.md, CONFIGURATION.md, README, API-ENDPOINTS, plugin README)
+- [x] **Phase 4 + 5** — core deleted + `write_rnsd_config.py` repointed to `config.plugins["reticulum"]` (commit `feat: reticulum is now a plugin ...`). Awaiting atomic Pi flip (migration diff below) + screenshots.
+- [~] **Phase 6** — docs. CHANGELOG ⚠️ entry + a CONFIGURATION.md stub note landed with Phase 4. TODO: full CONFIGURATION.md § rewrite, README "What's Different", PLUGINS.md ("service" seam / "nine seams"), API-ENDPOINTS.md "(plugin)" heading.
+- [ ] **Future cleanup** (not blocking): move `scripts/write_rnsd_config.py` + `scripts/rnsd.service` into the plugin — needs an "update the installed systemd unit + daemon-reload" step, so kept out of the cutover.
 
 **Decisions locked with the user (2026-09-06):**
 - **Firmware stays in core** (option C) — RNode + Heltec-V4 flashers are
@@ -293,6 +293,95 @@ Verified: manifest parses (3 scripts), `node --check` all 3 JS, py compile,
 - **Live now:** core already serves `/api/reticulum/send` (its
   `reticulum_routes.init_routes` runs whenever `config.reticulum.enabled`), so
   the reroute works immediately and keeps working after the plugin takes over.
+
+### Phase 4 + 5 — core deleted — ✅ DONE (code); awaiting Pi flip
+
+**Deleted:** `src/reticulum/` (whole dir), `src/api/routes/reticulum_routes.py`,
+`reticulum_config_routes.py`, `src/storage/reticulum_peer_repository.py`,
+`tests/test_messages_reticulum_send.py`. `scripts/clear_reticulum_packets.py`
+→ `plugins/apps/reticulum/`.
+
+**Edited:**
+- `server.py`: dropped the `LxmfService`/`ReticulumPeerRepository` imports, the
+  `_reticulum_service` global + lifespan start/stop, 2 `_BUILTIN_ROUTERS`
+  entries (→ 49), the `_init_routes`/`messages.init_routes` reticulum params.
+- `messages.py`: dropped `LxmfService` import, `_reticulum_service` global +
+  param, the `protocol == "reticulum"` branch (frontend hits `/api/reticulum/send`).
+- `config_enrichment.py`: dropped `base["reticulum"]`.
+- `config.py`: dropped `ReticulumConfig`, `AppConfig.reticulum`, the section_map
+  entry. (`config/default.yaml` never had a `reticulum:` block — nothing to remove.)
+- **AttributeError trap caught:** `rnode_firmware_routes.py`'s `_rnsd_owns_port()`
+  read `_config.reticulum.rnode_serial_port` → new `_rnsd_configured_port()`
+  helper reads `_config.plugins.get("reticulum", {})`. Also `identity_routes.py`
+  `_ADMIN_SECTIONS` lost `"configuration.reticulum"`.
+- `scripts/write_rnsd_config.py`: `cfg.reticulum.*` → `cfg.plugins["reticulum"]`
+  dict with a local `_DEFAULTS` fallback.
+- Frontend: deleted `reticulum_panel.js`, `topbar_reticulum_chip.js`,
+  `configuration/reticulum_config_card.js`; `index.html` lost 3 `<script>` tags
+  + the `#/reticulum` nav `<li>` + `#/configuration/reticulum` subitem + 2
+  `<section>`s + `#topbar-reticulum-group`; `app.js` lost `_bootReticulumPanel`
+  + 3 route-list/command-palette entries; `topbar_controller.js` lost the
+  `TopbarReticulumChip` construct + `setReticulum` call; `configuration_panel.js`
+  lost the `section === 'reticulum'` branch.
+
+**Kept (verified):** `reticulum_peers` table in `database.py`;
+`rnode_firmware_routes.py` + `reticulum_companion_firmware_routes.py` + both
+cards + their `configuration_panel.js` firmware-page slots; `frontend/css/
+lorawan.css`'s `[data-section="reticulum"]` + `topbar.css`'s `.topbar-reticulum`
+(the plugin's page/chip still use both); `sidebar_plugin_registry.js`'s
+`reticulum:` icon glyph; `scripts/rnsd.service`.
+
+**Tests:** `test_create_app_routers.py` 51 → 49; `test_messages_advert_route.py`
+dropped a `_reticulum_service` reset line. `TestShippedReticulumPlugin` stays
+`@skipUnless(_HAS_FASTAPI)`. 135 passed / 12 skipped on the Mac subset.
+
+---
+
+## Migration diff for the Pi (Phase 4 flip)
+
+In `local.yaml`: **delete the top-level `reticulum:` block** and add its
+contents under `plugins:` as `reticulum:` with `enabled: true`. The user's
+current real block:
+
+```yaml
+# DELETE this top-level block:
+reticulum:
+  enabled: true
+  rnode_serial_port: /dev/serial/by-path/platform-fd500000.pcie-pci-0000:01:00.0-usb-0:1.1:1.0
+  rnode_frequency_hz: 869463000
+  rnode_bandwidth_hz: 125000
+  rnode_tx_power: 20
+  rnode_spreading_factor: 8
+  rnode_coding_rate: 5
+  backbone_host: node.reticulumnet.nl
+  backbone_port: 4242
+  display_name: PD2EMC Meshpoint
+
+# ADD under plugins: (alongside hello-service etc)
+plugins:
+  reticulum:
+    enabled: true
+    display_name: PD2EMC Meshpoint
+    rnode_serial_port: /dev/serial/by-path/platform-fd500000.pcie-pci-0000:01:00.0-usb-0:1.1:1.0
+    rnode_frequency_hz: 869463000
+    rnode_bandwidth_hz: 125000
+    rnode_tx_power: 20
+    rnode_spreading_factor: 8
+    rnode_coding_rate: 5
+    backbone_host: node.reticulumnet.nl
+    backbone_port: 4242
+```
+
+Storage-path keys (`reticulum_config_dir`/`identity_path`/`lxmf_storage_dir`)
+were on defaults → the plugin defaults match → same identity, no need to copy.
+`sudo systemctl restart meshpoint` (and, since rnsd's config generator now
+reads the new path, `sudo systemctl restart rnsd` so it picks up the RNode
+keys from their new location).
+
+Verify: `#/reticulum` page loads with the 4th **Settings** tab, topbar pill
+shows `5771b31b… · N peers`, a reply from the Messages page round-trips,
+Settings tab loads current values + saves, `Restart rnsd` works, peer count
+keeps climbing.
 
 ### Phase 4 — live-verify on the Pi (gate before any deletion)
 

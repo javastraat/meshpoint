@@ -43,7 +43,6 @@ def _reset_module_state() -> None:
     messages_module._node_repo = None
     messages_module._meshcore_tx = None
     messages_module._config = None
-    messages_module._reticulum_service = None
 
 
 class TestSendMeshCoreAdvertEndpoint(unittest.TestCase):

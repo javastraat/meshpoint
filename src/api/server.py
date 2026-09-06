@@ -83,8 +83,6 @@ from src.api.routes import (
     pager_firmware_routes,
     rfenv_companion_firmware_routes,
     reticulum_companion_firmware_routes,
-    reticulum_config_routes,
-    reticulum_routes,
     rnode_firmware_routes,
     sdr_status_routes,
     meshtastic_firmware_routes,
@@ -115,9 +113,7 @@ from src.coordinator import PipelineCoordinator
 from src.log_format import print_banner, print_packet, setup_logging
 from src.models.device_identity import DeviceIdentity, _stable_device_id
 from src.models.packet import Packet
-from src.reticulum.lxmf_service import LxmfService
 from src.storage.message_repository import MessageRepository
-from src.storage.reticulum_peer_repository import ReticulumPeerRepository
 from src.api.telemetry.noise_floor import NoiseFloorTracker
 from src.api.telemetry.spectral_scan_service import SpectralScanService
 from src.api.telemetry.rfenv_companion_scan_service import RfEnvCompanionScanService
@@ -142,7 +138,6 @@ noise_floor_tracker = NoiseFloorTracker()
 _noise_floor_emitter_task = None
 _spectral_scan_service: SpectralScanService | None = None
 _rfenv_companion_service: RfEnvCompanionScanService | None = None
-_reticulum_service: LxmfService | None = None
 _fan_controller_task = None
 _fan_controller = None
 _temp_sampler_task = None
@@ -202,8 +197,6 @@ _BUILTIN_ROUTERS: list[tuple] = [
     (theme_routes.router, True),
     (lorawan_routes.router, False),
     (lorawan_config_routes.router, False),
-    (reticulum_routes.router, False),
-    (reticulum_config_routes.router, False),
     (emergency_pager_routes.router, False),
     (spectrum_routes.router, False),
     (meshtastic_routes.router, False),
@@ -325,19 +318,6 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
                 pipeline=pipeline, ws_manager=ws_manager, config=config,
             )
         )
-
-        global _reticulum_service
-        if config.reticulum.enabled:
-            _reticulum_service = LxmfService(
-                display_name=config.reticulum.display_name,
-                reticulum_config_dir=config.reticulum.reticulum_config_dir,
-                identity_path=config.reticulum.identity_path,
-                lxmf_storage_dir=config.reticulum.lxmf_storage_dir,
-                message_repo=message_repo,
-                peer_repo=ReticulumPeerRepository(pipeline.database),
-                ws_manager=ws_manager,
-            )
-            await _reticulum_service.start()
 
         tx_service = _build_tx_service(config, pipeline)
         mc_source = _find_meshcore_source(pipeline)
@@ -514,7 +494,6 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
             tx_service,
             message_repo,
             channel_hash_resolver=channel_hash_resolver,
-            reticulum_service=_reticulum_service,
         )
         _init_dangerous_registry(pipeline)
         listener_registry.start_all(_BUILTIN_LISTENERS)
@@ -527,8 +506,6 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
             await _spectral_scan_service.stop()
         if _rfenv_companion_service is not None:
             await _rfenv_companion_service.stop()
-        if _reticulum_service is not None:
-            await _reticulum_service.stop()
         if _noise_floor_emitter_task is not None:
             _noise_floor_emitter_task.cancel()
             try:
@@ -1856,7 +1833,6 @@ def _init_routes(
     tx_service: TxService | None = None,
     message_repo: MessageRepository | None = None,
     channel_hash_resolver=None,
-    reticulum_service: LxmfService | None = None,
 ) -> None:
     identity_routes.init_routes(identity, auth_subsystem.service)
     network_mapper = NetworkMapper(coord.node_repo)
@@ -1911,7 +1887,6 @@ def _init_routes(
         meshcore_tx=meshcore_tx,
         config=config,
         packet_repo=coord.packet_repo,
-        reticulum_service=reticulum_service,
     )
 
     crypto = coord._crypto if hasattr(coord, "_crypto") else None
@@ -1963,9 +1938,6 @@ def _init_routes(
     _dev_name = config.device.device_name or "meshpoint"
     lorawan_routes.init_routes(coord.packet_repo, device_name=_dev_name)
     lorawan_config_routes.init_routes(config=config, keystore=coord.lorawan_keystore)
-    if reticulum_service is not None and message_repo is not None:
-        reticulum_routes.init_routes(reticulum_service, message_repo)
-    reticulum_config_routes.init_routes(config=config)
     rnode_firmware_routes.init_routes(config=config)
     emergency_pager_routes.init_routes(
         packet_repo=coord.packet_repo,

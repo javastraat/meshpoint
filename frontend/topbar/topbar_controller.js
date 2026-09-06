@@ -6,8 +6,8 @@
  *   - TopbarMeshcoreChip    (companion lamp · name · MHz · channel)
  *   - TopbarSerialChip      (one badge per Meshtastic USB serial device)
  *   - TopbarPagerChip       (single badge, emergency pager project)
- *   - TopbarReticulumChip   (own address · peer count, own 15s poll -- runtime state, not config)
  *   - plugin chips          (topbar_plugin_registry.js -- window.registerTopbarChip,
+ *                            e.g. the reticulum plugin's own address · peer count chip;
  *                            each one self-polling its own status endpoint)
  *   - TopbarActions         (right-side quick-action buttons)
  *
@@ -29,9 +29,6 @@ class TopbarController {
         );
         this._pager = new TopbarPagerChip(
             rootEl.querySelector('#topbar-pager-group'),
-        );
-        this._reticulum = new TopbarReticulumChip(
-            rootEl.querySelector('#topbar-reticulum-group'),
         );
         this._pluginChips = window.mountTopbarChips
             ? window.mountTopbarChips(rootEl.querySelector('#topbar-plugin-chips'))
@@ -99,7 +96,6 @@ class TopbarController {
             this._meshcore.setMeshcore(cfg.meshcore || null);
             this._serial.setSerial(cfg.serial || []);
             this._pager.setPager(cfg.radio_pager || null);
-            this._reticulum.setReticulum(cfg.reticulum || null);
             document.dispatchEvent(
                 new CustomEvent('meshpoint:configUpdated', { detail: cfg }),
             );

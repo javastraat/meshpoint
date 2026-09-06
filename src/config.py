@@ -669,68 +669,6 @@ class UpdateCheckConfig:
     interval_minutes: int = 60
 
 
-@dataclass
-class ReticulumConfig:
-    """Native Reticulum/LXMF messaging (companion to extra/heltec_v4_reticulum_bron).
-
-    Disabled by default, and deliberately so: meshpoint's own
-    ``RNS.Reticulum()`` call must only ever run *after* ``rnsd`` is
-    already up as the local shared instance -- attach as a client, same
-    as reticulum-meshchat does. If rnsd isn't running yet when this
-    starts, RNS falls back to reading this same configdir itself and
-    opening the RNode/TCP interfaces directly, which would then fight
-    rnsd for them once it starts. ``scripts/rnsd.service`` (opt-in,
-    not installed by default) plus a soft ``After=rnsd.service`` on
-    meshpoint's own unit (ordering only, no hard dependency --
-    meshpoint must never require rnsd to exist) covers this once a
-    user opts in to both; until then this config flag alone keeps a
-    routine meshpoint restart from silently grabbing the radio.
-
-    ``reticulum_config_dir`` deliberately does NOT default to
-    ``~/.reticulum`` (RNS's own default): the ``meshpoint`` systemd
-    user is ``--no-create-home``, so ``$HOME`` resolves to a
-    ``/home/meshpoint`` that doesn't exist and can't be created --
-    confirmed live (``PermissionError`` on ``RNS.Reticulum()`` at
-    startup). Pointing this at meshpoint's own writable ``data/`` tree
-    instead sidesteps that entirely.
-
-    Correction to an earlier assumption (found live, not guessed): this
-    directory is NOT "purely local client-side cache, independent of
-    the shared instance." The local-client RPC channel to the shared
-    instance appears to authenticate per-configdir (confirmed against
-    a real "digest received was wrong" error reproduced live when
-    meshpoint's client used a different configdir than rnsd's) --
-    meshpoint's own client and rnsd MUST share the exact same
-    ``reticulum_config_dir`` for that RPC channel to work reliably.
-    ``scripts/write_rnsd_config.py`` writes rnsd's own config file into
-    this same directory for exactly that reason -- one shared configdir,
-    not two independent ones that happen to have similar content.
-
-    ``rnode_*``/``backbone_*`` fields are consumed by
-    ``scripts/write_rnsd_config.py``, not by meshpoint's own
-    ``LxmfService`` -- they describe rnsd's own interfaces (the
-    physical RNode + the community TCP backbone), which meshpoint
-    itself never touches directly. Defaults match the already-reserved
-    ch7 Reticulum frequency from the earlier concentrator investigation
-    (869.463 MHz) and the community backbone
-    ``reticulum-meshchat``/the Heltec V4 companion firmware already use.
-    """
-
-    enabled: bool = False
-    display_name: str = "Meshpoint"
-    reticulum_config_dir: str = "data/reticulum/rns_config"
-    identity_path: str = "data/reticulum/identity"
-    lxmf_storage_dir: str = "data/reticulum/lxmf"
-
-    rnode_serial_port: str = ""  # stable path (by-id/by-path); blank = not configured
-    rnode_frequency_hz: int = 869_463_000
-    rnode_bandwidth_hz: int = 125_000
-    rnode_tx_power: int = 20
-    rnode_spreading_factor: int = 8
-    rnode_coding_rate: int = 5
-    backbone_host: str = "node.reticulumnet.nl"
-    backbone_port: int = 4242
-
 
 @dataclass
 class AppConfig:
@@ -754,7 +692,6 @@ class AppConfig:
     button: ButtonConfig = field(default_factory=ButtonConfig)
     repeater_poll: RepeaterPollConfig = field(default_factory=RepeaterPollConfig)
     update_check: UpdateCheckConfig = field(default_factory=UpdateCheckConfig)
-    reticulum: ReticulumConfig = field(default_factory=ReticulumConfig)
     # Per-plugin config, keyed by plugin id (folder name under
     # plugins/apps/). Opaque: each plugin owns its own sub-schema. The
     # loader only reads plugins.<id>.enabled (default false -- an
@@ -888,7 +825,6 @@ def _apply_yaml(cfg: AppConfig, path: Path) -> None:
         "button": cfg.button,
         "repeater_poll": cfg.repeater_poll,
         "update_check": cfg.update_check,
-        "reticulum": cfg.reticulum,
     }
 
     unknown_keys: list[str] = []

@@ -55,13 +55,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     const router = new Router({
         defaultRoute: 'dashboard',
         allowedRoutes: [
-            'dashboard', 'meshtastic', 'meshcore', 'lorawan', 'reticulum', 'pager', 'stats', 'rf', 'repeaters', 'topology', 'messages', 'radio', 'terminal',
+            'dashboard', 'meshtastic', 'meshcore', 'lorawan', 'pager', 'stats', 'rf', 'repeaters', 'topology', 'messages', 'radio', 'terminal',
             'configuration/identity', 'configuration/radio',
             'configuration/channels', 'configuration/transmit',
             'configuration/mqtt',
             'configuration/gps',
             'configuration/peripherals',
-            'configuration/meshcore', 'configuration/reticulum', 'configuration/serial',
+            'configuration/meshcore', 'configuration/serial',
             'configuration/firmware',
             'configuration/repeater-poll', 'configuration/metrics',
             'settings/updates', 'settings/themes', 'settings/auth', 'settings/dangerous', 'settings/storage', 'settings/plugins',
@@ -172,7 +172,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     _bootTopologyPanel(router);
     _bootMeshtasticPanel(router);
     _bootMeshCorePanel(router);
-    _bootReticulumPanel(router, identity);
 
     const nodeMap = new NodeMap('map');
     const packetFeed = new SimplePacketFeed('packet-tbody');
@@ -519,15 +518,6 @@ function _bootMeshCorePanel(router) {
     const panel = new window.MeshCorePanel();
     router.onRouteChange((route) => {
         if (route === 'meshcore') panel.show();
-        else panel.hide();
-    });
-}
-
-function _bootReticulumPanel(router, identity) {
-    if (!window.ReticulumPanel) return;
-    const panel = new window.ReticulumPanel(identity);
-    router.onRouteChange((route) => {
-        if (route === 'reticulum') panel.show();
         else panel.hide();
     });
 }
@@ -929,7 +919,6 @@ function _bootCommandPaletteAndKeymap(router) {
         ['configuration/radio', 'Go to Configuration · Radio', 'Configuration'],
         ['configuration/channels', 'Go to Configuration · Channels', 'Configuration'],
         ['configuration/meshcore', 'Go to Configuration · MeshCore', 'Configuration'],
-        ['configuration/reticulum', 'Go to Configuration · Reticulum', 'Configuration'],
         ['configuration/serial', 'Go to Configuration · Serial', 'Configuration'],
         ['configuration/firmware', 'Go to Configuration · Firmware', 'Configuration'],
         ['configuration/peripherals', 'Go to Configuration · Peripherals', 'Configuration'],

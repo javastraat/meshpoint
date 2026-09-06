@@ -4,7 +4,8 @@
 Reticulum messages reuse the shared `messages` table (protocol
 'reticulum'), and the peer roster lives in its own `reticulum_peers`
 table (built from announces, keyed on destination_hash) -- see
-src/storage/reticulum_peer_repository.py. Clears both by default;
+plugins/apps/reticulum/backend/peer_repo.py (the table schema itself
+stays in core's src/storage/database.py). Clears both by default;
 --messages-only/--peers-only narrow it to one. Neither table is
 referenced by anything else (no foreign keys pointing at reticulum_peers
 from packets/nodes/telemetry), so wiping either is safe in isolation --

@@ -17,9 +17,9 @@ Imports are deferred into ``register()`` so ``backend.state`` /
 ``backend.lxmf_service`` / ``backend.peer_repo`` can be imported for their
 own tests without pulling in FastAPI.
 
-Phase 1 scaffold -- see ``memory/plugin-reticulum.md``. Core's own
-Reticulum service/routes stay authoritative until this plugin is
-live-verified and the atomic config flip happens (Phase 4).
+Extracted from core -- ``src/reticulum/`` and the core reticulum routes
+are gone; this is the whole implementation. See
+``memory/plugin-reticulum.md``.
 """
 
 from __future__ import annotations

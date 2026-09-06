@@ -24,9 +24,18 @@ user a migration diff moving their real ``reticulum:`` values here:
 
 The ``rnode_*`` / ``backbone_*`` fields are consumed by
 ``scripts/write_rnsd_config.py`` (rnsd's own interfaces), not by
-``LxmfService`` -- they're held here so Phase 2's settings tab has a
-single place to read/write them. Defaults below mirror core's
-``ReticulumConfig`` exactly so an unset key behaves identically.
+``LxmfService`` -- they're held here so the Settings tab has a single
+place to read/write them. Defaults below match what core's old
+``ReticulumConfig`` dataclass used, so an unset key behaves identically.
+
+``reticulum_config_dir`` MUST be the same directory ``rnsd`` uses (that's
+why ``write_rnsd_config.py`` writes rnsd's config into it): the
+shared-instance RPC channel authenticates per-configdir -- a mismatch
+produces a real, reproducible "digest received was wrong" RPC error
+(confirmed live). It deliberately is NOT ``~/.reticulum``: the
+``meshpoint`` systemd user is ``--no-create-home``, so ``$HOME`` resolves
+to a path that doesn't exist and RNS crashes trying to create storage
+there.
 """
 
 from __future__ import annotations

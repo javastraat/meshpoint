@@ -51,7 +51,6 @@ _ADMIN_SECTIONS: tuple[str, ...] = (
     "configuration.radio",
     "configuration.channels",
     "configuration.meshcore",
-    "configuration.reticulum",
     "configuration.serial",
     "configuration.pocsag-serial",
     "configuration.firmware",

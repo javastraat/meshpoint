@@ -177,7 +177,16 @@ Requires the PlatformIO toolchain, installed via `scripts/install.sh`'s separate
 
 ### Reticulum (native LXMF messaging)
 
-Separate from the standalone companion above — this is meshpoint's own [Reticulum](https://reticulum.network/)/[LXMF](https://github.com/markqvist/LXMF) client, built into the dashboard as the **Reticulum** sidebar page (Peers, Messages, Send). Off by default:
+> **Moved to a plugin.** Native Reticulum/LXMF is now `plugins/apps/reticulum/`,
+> not core. Config lives under **`plugins.reticulum.*`** (not the top-level
+> `reticulum:` shown below), enabled with `plugins.reticulum.enabled: true`,
+> and the RNode/backbone settings are the **Settings** tab on the Reticulum
+> page (Configuration → Reticulum is gone). The RNode firmware flasher and the
+> Heltec-V4 node firmware card stay in core. See
+> [`plugins/apps/reticulum/README.md`](../plugins/apps/reticulum/README.md).
+> The rest of this section is being rewritten for the plugin shape.
+
+Separate from the standalone companion above — this is meshpoint's own [Reticulum](https://reticulum.network/)/[LXMF](https://github.com/markqvist/LXMF) client, the **Reticulum** sidebar page (Peers, Messages, Send, Settings). Off by default:
 
 ```yaml
 reticulum:
