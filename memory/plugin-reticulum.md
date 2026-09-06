@@ -15,8 +15,8 @@ which this extraction's frontend work delivers naturally).
 Update this block as phases land. `[ ]` todo, `[~]` in progress, `[x]` done.
 
 - [x] **Phase 0** — `add_service` core seam ✅ (commit pending). `write_rnsd_config.py` repoint + `_run_systemctl` lift **deferred** — see notes below.
-- [ ] **Phase 1** — plugin backend scaffold (service + routes + peer repo + state), disabled by default. **Includes** lifting `_run_systemctl` out of `rnode_firmware_routes.py` into a shared `src/api/` helper (plugin `config_routes.py` needs it).
-- [ ] **Phase 2** — plugin frontend (sidebar page, **topbar pill**, settings tab)
+- [x] **Phase 1** — plugin backend scaffold ✅ (commit pending). `service` + `routes` only; `config_routes.py` + `_run_systemctl` lift **moved to Phase 2** (coupled to the settings tab + the rnsd-config question).
+- [ ] **Phase 2** — plugin frontend (sidebar page, **topbar pill**, settings tab) + move `config_routes.py` in (`/api/config/reticulum/*`, adapted to `plugins.reticulum.*` writes like dapnet's `state._persist()`) + lift `_run_systemctl` → `src/api/systemctl.py`, add `sidebar`+`topbar` to `provides`
 - [ ] **Phase 3** — Messages page routes reticulum sends to `/api/reticulum/send`
 - [ ] **Phase 4** — live-verify on the Pi (atomic config flip — see note), screenshots
 - [ ] **Phase 5** — delete core reticulum service/routes/config/frontend. **Includes** repointing `scripts/write_rnsd_config.py` off `config.reticulum` → `config.plugins["reticulum"]` (can't do it earlier — would break the live Pi's rnsd, which reads the old path until the atomic Phase 4 flip).
@@ -137,28 +137,51 @@ needs `fastapi`, not installed on the Mac — confirmed fails identically on a c
 - `scripts/write_rnsd_config.py` repoint → **Phase 5** (repointing now breaks the
   live Pi's rnsd, which reads `config.reticulum` until the atomic Phase 4 flip)
 
-### Phase 1 — plugin backend scaffold (coexists, `enabled: false` default)
+### Phase 1 — plugin backend scaffold — ✅ DONE
+
+Shipped as `feat: reticulum plugin — Phase 1 backend scaffold ...`. What landed:
 
 ```
 plugins/apps/reticulum/
-  plugin.toml          provides = ["service", "routes", "sidebar", "topbar"]
-                       locked = true
-                       [sidebar] route="reticulum" label="Reticulum"
-                                 category="networks" icon="reticulum"
-                       [frontend] scripts = [panel, topbar_chip, settings_tab]
+  __init__.py           (empty, pytest importability)
+  plugin.toml           provides = ["service", "routes"], locked = true, [meta]
+                        (sidebar/topbar deferred to Phase 2 — declaring them
+                        without the frontend files would fail manifest parse)
   backend/
-    __init__.py        register(reg): state.init(reg.config);
-                       add_router(routes.router); add_router(config_routes.router);
-                       add_service("reticulum", build, wire)
-    lxmf_service.py    ← src/reticulum/lxmf_service.py (keep deferred RNS/LXMF imports)
-    peer_repo.py       ← src/storage/reticulum_peer_repository.py
-    routes.py          ← src/api/routes/reticulum_routes.py
-    config_routes.py   ← src/api/routes/reticulum_config_routes.py
-    state.py           reads reg.config: display_name, dirs, rnode_*, backbone_*
-                       (mirror dapnet/backend/state.py)
+    __init__.py         register(): state.init(reg.config); add_router(routes.router);
+                        add_service("reticulum", build, wire)
+                          build(context)  -> LxmfService(state.*, MessageRepository(
+                                             context.pipeline.database),
+                                             ReticulumPeerRepository(...), context.ws_manager)
+                          wire(svc, ctx)  -> routes.init_routes(svc, MessageRepository(...))
+    state.py            plugins.reticulum.* — defaults mirror core ReticulumConfig
+                        EXACTLY (display_name/dirs + rnode_*/backbone_* held for Ph2)
+    lxmf_service.py     ← src/reticulum/lxmf_service.py, VERBATIM logic; only edits:
+                          - WebSocketManager/MessageRepository imports -> TYPE_CHECKING
+                            (annotation-only) so it imports on the Mac
+                          - ReticulumPeerRepository from .peer_repo
+                          - added reset_routes() to routes.py
+    peer_repo.py        ← src/storage/reticulum_peer_repository.py, verbatim
+                          (table schema stays in core database.py)
+    routes.py           ← src/api/routes/reticulum_routes.py; only the LxmfService
+                          import path changed (.lxmf_service) + reset_routes()
     tests/
-  README.md            like plugins/apps/dapnet/README.md
+      test_state.py         4 tests (pure, Mac)
+      test_lxmf_service.py  5 tests (not-available path — RNS is None on Mac)
+  README.md            "Phase 1 scaffold" banner + don't-enable-alongside-core warning
 ```
+
+**Core untouched.** Zero `src/` changes. `src/reticulum/`, `reticulum_routes.py`,
+`reticulum_config_routes.py`, `reticulum_peer_repository.py` all still present and
+authoritative — deleted in Phase 5.
+
+**test_plugin_loader.py:** +`TestShippedReticulumPlugin` (2 tests, `@skipUnless(_HAS_FASTAPI)`).
+Also gated `TestShippedDapnetPlugin` the same way — it was failing (not skipping) on
+the Mac, now matches `TestShippedAcarsPlugin`. Suite is fully green on the Mac now.
+
+Verified: `pytest plugins/apps/reticulum/ tests/test_plugin_loader.py tests/test_service_registry.py`
+→ 35 passed, 6 skipped. `ruff check src/ tests/ plugins/` clean. Manifest parses
+(`provides=('service','routes') locked=True`). CHANGELOG parses (v0.8.1, 69 bullets).
 
 ### Phase 2 — plugin frontend (coexists)
 

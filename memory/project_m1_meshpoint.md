@@ -11466,7 +11466,33 @@ can't ride the packet pipeline for its start/stop lifecycle the way
 - Deferred: `_run_systemctl` lift -> Phase 1; `write_rnsd_config.py`
   repoint -> Phase 5 (repointing now breaks the live Pi's rnsd).
 
-**Next:** Phase 1 -- scaffold `plugins/apps/reticulum/` backend (move
-`lxmf_service.py` / `reticulum_routes.py` / `reticulum_config_routes.py` /
-`reticulum_peer_repository.py` in, add `state.py`), `enabled: false`
-default, core still authoritative.
+**Phase 0 verified live on the Pi** (2026-09-06): `hello-service` enabled,
+`journalctl` showed `hello-service started (context: pipeline=True
+ws_manager=True)` -- the lifespan wiring calls a plugin service's start()
+with a valid ServiceContext at the right point.
+
+**Phase 1 shipped** -- `plugins/apps/reticulum/` backend scaffold
+(`provides = ["service", "routes"]`, locked, **disabled by default**):
+- `backend/lxmf_service.py` <- `src/reticulum/lxmf_service.py` (verbatim
+  logic; WebSocketManager/MessageRepository imports -> TYPE_CHECKING so it
+  imports on the Mac; peer repo from `.peer_repo`).
+- `backend/peer_repo.py` <- `src/storage/reticulum_peer_repository.py`
+  (verbatim; `reticulum_peers` table schema stays in core `database.py`).
+- `backend/routes.py` <- `src/api/routes/reticulum_routes.py` (only the
+  LxmfService import path changed).
+- `backend/state.py` -- `plugins.reticulum.*`, defaults mirror core
+  `ReticulumConfig` exactly.
+- `backend/__init__.py` -- `register()`: `add_router` + `add_service`;
+  `build(context)` constructs LxmfService from `context.pipeline.database`
+  + `context.ws_manager` + state; `wire()` binds routes.
+- Tests: `test_state.py` (4), `test_lxmf_service.py` (5, not-available
+  path), `TestShippedReticulumPlugin` (2, fastapi-gated). Also fixed
+  `TestShippedDapnetPlugin` to `@skipUnless(_HAS_FASTAPI)` -- was failing
+  on the Mac, now the whole suite is green there.
+- **Zero `src/` changes.** Core Reticulum untouched + authoritative.
+- `config_routes.py` + `_run_systemctl` lift moved to Phase 2 (coupled to
+  the settings tab + the `write_rnsd_config.py` question).
+
+**Next:** Phase 2 -- plugin frontend (`registerSidebarPage` page,
+`registerTopbarChip` pill, settings tab), move `config_routes.py` in, add
+`sidebar`+`topbar` to `provides`.
