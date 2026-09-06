@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 import websockets
-from websockets.exceptions import ConnectionClosed
+from websockets.exceptions import ConnectionClosed, WebSocketException
 
 from src.analytics.stats_reporter import StatsReporter
 from src.config import UpstreamConfig
@@ -136,6 +136,18 @@ class UpstreamClient:
                 logger.warning(
                     f" {CYAN}--{RESET} {RED}UPSTREAM{RESET}  "
                     f"connection closed"
+                )
+            except (OSError, WebSocketException) as exc:
+                # Expected transient failures: upstream host down/refused
+                # ([Errno 111]/[Errno 113]), DNS miss, open timeout
+                # (TimeoutError is an OSError since 3.10), handshake
+                # rejection. One line, not a full traceback on every
+                # retry -- a stack trace here reads as a crash when you're
+                # tailing the log; it isn't. The loop below just waits and
+                # reconnects on its own once upstream is reachable again.
+                logger.warning(
+                    f" {CYAN}--{RESET} {YELLOW}UPSTREAM{RESET}  "
+                    f"connection failed: {type(exc).__name__}: {exc}"
                 )
             except Exception:
                 logger.exception(
