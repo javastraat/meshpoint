@@ -38,6 +38,16 @@ class TestLoRaWANKeyStore(unittest.TestCase):
         with self.assertRaises(ValueError):
             store.add_device("70:B3:D5:7E:D0:07:8B:FD", "1234", "20" * 16)
 
+    def test_non_hex_key_rejected_with_a_clear_message(self):
+        store = LoRaWANKeyStore()
+        with self.assertRaises(ValueError) as ctx:
+            store.add_device("70:B3:D5:7E:D0:07:8B:FD", "YOUR_APP_KEY_HEX", "20" * 16)
+        msg = str(ctx.exception)
+        self.assertIn("70:B3:D5:7E:D0:07:8B:FD", msg)
+        self.assertIn("hex", msg.lower())
+        # not the bare "non-hexadecimal number found in fromhex()" surprise
+        self.assertNotEqual(msg, "non-hexadecimal number found in fromhex() arg at position 0")
+
     def test_session_key_round_trip(self):
         store = LoRaWANKeyStore()
         self.assertIsNone(store.session_key_for(0x260BA627))

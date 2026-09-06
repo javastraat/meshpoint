@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from pathlib import Path
 from typing import Optional
 
@@ -49,6 +50,53 @@ _ANNOUNCE_ASPECTS = ("lxmf.delivery", "lxmf.propagation", "nomadnetwork.node")
 # request indefinitely for a genuinely offline/unknown peer.
 _PATH_REQUEST_RETRIES = 5
 _PATH_REQUEST_POLL_INTERVAL_S = 1.0
+
+
+# --- RNS/LXMF log bridge ------------------------------------------------------
+# RNS and LXMF do their own logging (RNS.log -> stdout, "[timestamp] [Level]
+# msg" format), bypassing Python's logging entirely -- which is why those
+# lines look different in journald. Route them through logging instead, with
+# levels mapped, and quiet one known-noisy LXMF line.
+# (Duplicated in plugins/apps/reticulum/backend/lxmf_service.py during the
+# core->plugin extraction; this copy goes away when core's does.)
+_RNS_LOG_PREFIX_RE = re.compile(r"^\[[^\]]*\]\s*\[([A-Za-z]+)\]\s*(.*)$", re.DOTALL)
+_RNS_LEVEL_MAP = {
+    "critical": logging.CRITICAL, "error": logging.ERROR,
+    "warning": logging.WARNING, "notice": logging.INFO,
+    "info": logging.INFO, "verbose": logging.DEBUG,
+    "debug": logging.DEBUG, "extreme": logging.DEBUG,
+}
+# LXMF logs this at ERROR whenever a peer's announce carries app_data its own
+# display-name decoder can't parse -- common on a busy public network, not
+# actionable, and it recovers on its own. Demote to DEBUG.
+_RNS_DEMOTE = ("could not decode display name in included announce data",)
+
+_rns_logger = logging.getLogger("RNS")
+
+
+def _route_rns_log(formatted: str) -> None:
+    match = _RNS_LOG_PREFIX_RE.match(formatted)
+    if match:
+        level = _RNS_LEVEL_MAP.get(match.group(1).lower(), logging.INFO)
+        text = match.group(2).strip()
+    else:
+        level, text = logging.INFO, formatted.strip()
+    if any(s in text.lower() for s in _RNS_DEMOTE):
+        level = logging.DEBUG
+    _rns_logger.log(level, "%s", text)
+
+
+def _install_rns_log_bridge() -> None:
+    """Point RNS's logging at :func:`_route_rns_log`. Idempotent; a no-op if
+    RNS isn't installed or its logging API isn't shaped as expected. Call
+    after ``RNS.Reticulum()`` so it wins over any config-driven logdest."""
+    if RNS is None:
+        return
+    try:
+        RNS.logdest = RNS.LOG_CALLBACK
+        RNS.logcall = _route_rns_log
+    except AttributeError:
+        logger.debug("RNS logging API not as expected -- leaving RNS logs as-is")
 
 
 class _AnnounceHandler:
@@ -135,6 +183,7 @@ class LxmfService:
         # init earlier in this same lifespan -- acceptable to block on
         # briefly here.
         reticulum = RNS.Reticulum(configdir=str(self._reticulum_config_dir))
+        _install_rns_log_bridge()
         logger.info(
             "Reticulum instance ready (config dir: %s)", reticulum.configdir
         )

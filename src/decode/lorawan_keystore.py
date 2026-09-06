@@ -47,8 +47,14 @@ class LoRaWANKeyStore:
         FPort, since FPort is just an app-chosen channel number with no
         fixed meaning across devices.
         """
-        app_key = bytes.fromhex(app_key_hex)
-        nwk_key = bytes.fromhex(nwk_key_hex)
+        try:
+            app_key = bytes.fromhex(app_key_hex)
+            nwk_key = bytes.fromhex(nwk_key_hex)
+        except (ValueError, TypeError) as exc:
+            raise ValueError(
+                f"LoRaWAN keys for {dev_eui} must be hex strings "
+                f"(32 hex chars = 16 bytes each): {exc}"
+            ) from exc
         if len(app_key) != 16 or len(nwk_key) != 16:
             raise ValueError(
                 f"LoRaWAN keys must be 16 bytes (32 hex chars): "

@@ -38,6 +38,19 @@ _SOURCE_LABELS = {
 }
 
 
+def _is_lorawan_placeholder(dev_eui: str, keys: Any) -> bool:
+    """The example LoRaWAN device shipped in ``config/default.yaml`` used
+    ``YOUR_DEVICE_EUI_HEX`` / ``YOUR_*_KEY_HEX`` sentinels -- present in
+    every merged config until a user replaces it. Skip it silently: it's a
+    "not configured yet" marker, not a malformed real device worth warning
+    about. (default.yaml now ships ``devices: {}``; this stays for configs
+    written before that change.)"""
+    values = [dev_eui]
+    if isinstance(keys, dict):
+        values += [keys.get("app_key"), keys.get("nwk_key")]
+    return any(isinstance(v, str) and v.startswith("YOUR_") for v in values)
+
+
 class PipelineCoordinator:
     """Wires the full capture -> decode -> store -> broadcast pipeline."""
 
@@ -669,15 +682,29 @@ class PipelineCoordinator:
         for name, key in self._config.meshcore.channel_keys.items():
             key_b64 = base64.b64encode(binascii.unhexlify(key)).decode()
             self._crypto.add_channel_key(name, key_b64)
+        loaded = 0
         for dev_eui, keys in self._config.lorawan.devices.items():
+            if _is_lorawan_placeholder(dev_eui, keys):
+                continue  # the example device from config/default.yaml -- not an error
             try:
                 self._lorawan_keystore.add_device(
                     dev_eui, keys["app_key"], keys["nwk_key"],
                     payload_fields=keys.get("payload_fields"),
                 )
-                logger.info("LoRaWAN: root keys loaded for DevEUI=%s", dev_eui)
-            except (KeyError, ValueError):
-                logger.exception("LoRaWAN: skipping malformed device config for %s", dev_eui)
+            except (KeyError, ValueError) as exc:
+                logger.warning(
+                    "LoRaWAN: skipping device %s -- malformed config (%s)",
+                    dev_eui, exc,
+                )
+                continue
+            loaded += 1
+            logger.info("LoRaWAN: root keys loaded for DevEUI=%s", dev_eui)
+        if loaded == 0:
+            logger.info(
+                "LoRaWAN: no device keys configured -- captured Data Up frames "
+                "stay undecrypted (add keys under lorawan.devices; see "
+                "docs/CONFIGURATION.md)"
+            )
 
     def _setup_location_banner(self) -> None:
         """One-line startup banner matching the RELAY/MQTT/PIPELINE rows."""

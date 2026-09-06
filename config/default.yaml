@@ -316,14 +316,18 @@ update_check:              # background check for a newer version on GitHub
   # is a real `git fetch`, not a cheap request.
   interval_minutes: 60
 lorawan:
-  devices:
-    "YOUR_DEVICE_EUI_HEX":
-      app_key: "YOUR_APP_KEY_HEX"
-      nwk_key: "YOUR_NWK_KEY_HEX"
-      payload_fields:
-        - name: temperature_c
-          type: int16_be
-          scale: 0.01
+  # Per-device OTAA root keys, from TTN Console -- see docs/CONFIGURATION.md.
+  # Left empty by default: with no devices here, captured LoRaWAN Data Up
+  # frames stay undecrypted (still shown, just not decoded). Example:
+  #   devices:
+  #     "70:B3:D5:7E:D0:07:8B:FD":
+  #       app_key: "<32 hex chars>"
+  #       nwk_key: "<32 hex chars>"
+  #       payload_fields:                 # optional
+  #         - name: temperature_c
+  #           type: int16_be
+  #           scale: 0.01
+  devices: {}
 
 # App plugins (plugins/apps/<id>/). Everything under plugins.<id> is that
 # plugin's own config; only `enabled` is read by the loader. Built-in

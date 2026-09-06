@@ -171,9 +171,18 @@ plugins/apps/reticulum/
   README.md            "Phase 1 scaffold" banner + don't-enable-alongside-core warning
 ```
 
-**Core untouched.** Zero `src/` changes. `src/reticulum/`, `reticulum_routes.py`,
+**Core untouched by the scaffold.** `src/reticulum/`, `reticulum_routes.py`,
 `reticulum_config_routes.py`, `reticulum_peer_repository.py` all still present and
 authoritative — deleted in Phase 5.
+
+**Side fix (separate commit, not a phase): RNS/LXMF log bridge.** `_route_rns_log`
++ `_install_rns_log_bridge()` added to **both** `lxmf_service.py` copies (core +
+plugin) — routes RNS's stdout logging through Python `logging` under an `RNS`
+logger, levels mapped, and demotes the noisy `Could not decode display name in
+included announce data` LXMF line to DEBUG. Called in `start()` right after
+`RNS.Reticulum(...)`. The core copy goes away with core in Phase 5; the plugin
+copy is self-contained (deliberately inlined, not a shared import). Same commit
+also fixed the LoRaWAN `YOUR_DEVICE_EUI_HEX` placeholder traceback (unrelated).
 
 **test_plugin_loader.py:** +`TestShippedReticulumPlugin` (2 tests, `@skipUnless(_HAS_FASTAPI)`).
 Also gated `TestShippedDapnetPlugin` the same way — it was failing (not skipping) on
