@@ -44,13 +44,14 @@ def reset_routes() -> None:
 async def reticulum_status():
     if _service is None:
         return {"enabled": False, "running": False}
-    peer_count = len(await _service.list_peers()) if _service.own_address else 0
+    peer_count = await _service.peer_count() if _service.own_address else 0
     return {
         "enabled": True,
         "running": _service.own_address is not None,
         "available": _service.available,
         "own_address": _service.own_address,
         "peer_count": peer_count,
+        "node": _service.node_status(),   # None unless hosting a NomadNet node
     }
 
 

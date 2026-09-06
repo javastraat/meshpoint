@@ -139,6 +139,8 @@ class LxmfService:
         message_repo: "MessageRepository",
         peer_repo: "ReticulumPeerRepository",
         ws_manager: "WebSocketManager",
+        node_cfg: Optional[dict] = None,
+        node_stats_provider=None,
     ):
         self._display_name = display_name
         self._reticulum_config_dir = Path(reticulum_config_dir)
@@ -147,6 +149,9 @@ class LxmfService:
         self._message_repo = message_repo
         self._peer_repo = peer_repo
         self._ws_manager = ws_manager
+        self._node_cfg = node_cfg or {"enabled": False}
+        self._node_stats_provider = node_stats_provider
+        self._node = None
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._router = None
         self._source = None
@@ -225,21 +230,48 @@ class LxmfService:
             "Reticulum LXMF service started -- address %s", self.own_address
         )
 
+        if self._node_cfg.get("enabled"):
+            from .nomad_node import NomadNode
+            self._node = NomadNode(
+                identity=self._identity,
+                name=self._node_cfg.get("name") or self._display_name,
+                pages_dir=self._node_cfg.get("pages_dir", "data/reticulum/pages"),
+                announce_interval_s=self._node_cfg.get("announce_interval_s", 21600),
+                stats_provider=self._node_stats_provider,
+            )
+            await self._node.start()
+
     async def stop(self) -> None:
         # Neither RNS nor LXMF expose a clean per-client detach -- process
         # exit is how meshchat.py itself relies on state being flushed too.
+        if self._node is not None:
+            await self._node.stop()
+            self._node = None
         self._router = None
         self._source = None
+
+    def node_status(self) -> Optional[dict]:
+        return self._node.status() if self._node is not None else None
 
     def _on_announce(
         self, aspect: str, destination_hash: bytes, app_data: Optional[bytes],
     ) -> None:
         display_name = ""
         if app_data:
-            try:
-                display_name = LXMF.display_name_from_app_data(app_data) or ""
-            except Exception:
-                display_name = ""
+            if aspect == "nomadnetwork.node":
+                # NomadNet node announces carry the node name as raw UTF-8
+                # (see nomad_node.py / NomadNet's own Node.py) -- not LXMF's
+                # structured app_data, which is why LXMF.display_name_from_
+                # app_data logs "Could not decode" on these.
+                try:
+                    display_name = bytes(app_data).decode("utf-8", errors="replace").strip()
+                except Exception:
+                    display_name = ""
+            else:
+                try:
+                    display_name = LXMF.display_name_from_app_data(app_data) or ""
+                except Exception:
+                    display_name = ""
         dest_hex = RNS.hexrep(destination_hash, delimit=False)
         if self._loop is not None:
             asyncio.run_coroutine_threadsafe(
@@ -348,6 +380,9 @@ class LxmfService:
 
     async def list_peers(self):
         return await self._peer_repo.list_peers()
+
+    async def peer_count(self) -> int:
+        return await self._peer_repo.count()
 
     def announce(self) -> None:
         """Re-sends meshpoint's own delivery announce on demand -- lets

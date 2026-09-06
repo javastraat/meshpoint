@@ -13,7 +13,7 @@ implementation now. `enabled: false` by default like every shipped plugin.
 | Seam | What |
 |---|---|
 | `service` | `LxmfService` — RNS/LXMF client attach, started right after the packet pipeline is up (`src.api.service_registry`), stopped on shutdown |
-| `routes` | `/api/reticulum/{status,peers,messages,send,announce}` + `GET`/`PUT /api/config/reticulum` + `POST /api/config/reticulum/restart-rnsd` |
+| `routes` | `/api/reticulum/{status,peers,messages,send,announce}` + `/api/reticulum/nomad/{nodes,page,file}` + `GET`/`PUT /api/config/reticulum` + `POST /api/config/reticulum/restart-rnsd` |
 | `sidebar` | the **Reticulum** page under Networks — Peers / Messages / Send / Browse / Settings tabs |
 | `topbar` | the compact status pill (own address · peer count), self-polling `/api/reticulum/status` |
 
@@ -63,14 +63,15 @@ provisioning, usable with or without this plugin.
 plugin.toml                    provides = ["service", "routes", "sidebar", "topbar"]
 clear_reticulum_packets.py     maintenance: wipe reticulum messages / peer roster
 backend/
-  __init__.py                  register(reg) -- add_router x2 + add_service
+  __init__.py                  register(reg) -- add_router x3 + add_service
   state.py                     plugins.reticulum.* config + set_config/_persist
   lxmf_service.py              the RNS/LXMF client + RNS-log bridge
   peer_repo.py                 reticulum_peers access (table schema stays in core)
   routes.py                    /api/reticulum/*
   config_routes.py             /api/config/reticulum (Settings tab)
   nomad.py                     NomadNet page fetch over RNS Links
-  nomad_routes.py              /api/reticulum/nomad/{nodes,page}
+  nomad_routes.py              /api/reticulum/nomad/{nodes,page,file}
+  nomad_node.py                host our own nomadnetwork.node destination
   tests/
 frontend/
   reticulum_panel.js           the page (registerSidebarPage)
@@ -90,5 +91,33 @@ RNS `Link`/`Request` primitives (`backend/nomad.py`) and renders them
 MIT). It lives here rather than in a separate plugin because it needs the
 same live `RNS` attach `LxmfService` provides — a second plugin would mean
 a second client attach + a cross-plugin seam to share the handle.
+
+## Hosting a NomadNet node (opt-in)
+
+Off by default. Flip `plugins.reticulum.node_enabled: true` (or the toggle on
+the Settings tab) and meshpoint registers a `nomadnetwork.node` destination
+on the **same identity** as its LXMF address — one hash is both "message me"
+(`lxmf.delivery`) and "browse me" (`nomadnetwork.node`), exactly how the
+NomadNet client works. `backend/nomad_node.py` announces on an interval,
+answers `Link`/`Request` with:
+
+- `/page/index.mu` — generated: version, uptime, Reticulum peer count,
+  NomadNet node count, conversation count, plus an about blurb
+- `/page/nodes.mu` — the recent `nomadnetwork.node` peers as Micron links
+- any `*.mu` file you drop in `node_pages_dir` (`data/reticulum/pages/` by
+  default) — an `index.mu` there overrides the generated one
+- `files/**` under that dir, served at `/file/<relpath>`
+
+```yaml
+plugins:
+  reticulum:
+    node_enabled: true
+    node_name: ""                        # blank = display_name
+    node_pages_dir: data/reticulum/pages
+    node_announce_interval_s: 21600       # 6h; min 600
+```
+
+`GET /api/reticulum/status` reports the live `node` block
+(`hosting`, `name`, `pages`, `requests_served`, `last_announce_s_ago`).
 
 Full write-up: [docs/PLUGINS.md](../../../docs/PLUGINS.md).

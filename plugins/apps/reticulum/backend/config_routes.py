@@ -46,6 +46,10 @@ _VALID_BANDWIDTHS_HZ = frozenset(
 class ReticulumUpdate(BaseModel):
     display_name: str = "Meshpoint"
     nomad_timeout_s: int = Field(20, ge=5, le=120)
+    node_enabled: bool = False
+    node_name: str = ""
+    node_pages_dir: str = "data/reticulum/pages"
+    node_announce_interval_s: int = Field(21600, ge=600, le=604800)
     rnode_serial_port: str = ""
     rnode_frequency_hz: int = Field(..., ge=100_000_000, le=1_000_000_000)
     rnode_bandwidth_hz: int = 125_000
@@ -88,6 +92,10 @@ async def update_reticulum(
     updates = {
         "display_name": req.display_name,
         "nomad_timeout_s": req.nomad_timeout_s,
+        "node_enabled": req.node_enabled,
+        "node_name": req.node_name.strip(),
+        "node_pages_dir": req.node_pages_dir.strip() or "data/reticulum/pages",
+        "node_announce_interval_s": req.node_announce_interval_s,
         "rnode_serial_port": req.rnode_serial_port.strip(),
         "rnode_frequency_hz": req.rnode_frequency_hz,
         "rnode_bandwidth_hz": req.rnode_bandwidth_hz,

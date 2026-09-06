@@ -227,6 +227,24 @@ The **Browse** tab is a minimal NomadNet browser — it fetches
 seconds; bump it for multi-hop LoRa-only nodes, which are much slower than
 the TCP backbone.
 
+**Hosting your own NomadNet node** (opt-in, off by default — toggle on the
+Settings tab, or set the keys directly):
+
+```yaml
+plugins:
+  reticulum:
+    node_enabled: true
+    node_name: ""                          # blank = use display_name
+    node_pages_dir: "data/reticulum/pages"  # your .mu files; files/ -> /file/...
+    node_announce_interval_s: 21600         # 6h
+```
+
+Registers a `nomadnetwork.node` destination on the *same identity* as your
+LXMF address, announces it, and serves a built-in `/page/index.mu` (live
+Meshpoint stats + an about blurb), a `/page/nodes.mu` (other nodes you've
+heard), and any `.mu` file in `node_pages_dir`. Changes need a meshpoint
+restart.
+
 **Why it's opt-in**: meshpoint's `RNS.Reticulum()` call attaches to a
 locally-running `rnsd` shared instance as a *client*, never opening a radio
 interface itself — but if `rnsd` isn't already running when meshpoint starts,

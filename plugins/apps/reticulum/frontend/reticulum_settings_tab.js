@@ -127,6 +127,45 @@ class ReticulumSettingsTab {
                                 </label>
                             </div>
                         </fieldset>
+                        <fieldset class="cfg-fieldset">
+                            <legend class="cfg-fieldset__legend">NomadNet node</legend>
+                            <p class="cfg-field__hint" data-rt-node-status>
+                                Host a NomadNet node — serve Micron pages over Reticulum,
+                                on the same identity as your LXMF address (so you're both
+                                "message me" and "browse me" on one hash). Off by default.
+                            </p>
+                            <label class="cfg-field cfg-field--toggle">
+                                <input type="checkbox" data-rt-node-enabled>
+                                <span class="cfg-field__label">Host a NomadNet node</span>
+                            </label>
+                            <p class="cfg-field__hint">
+                                Turning this on or off takes effect after the next
+                                Meshpoint restart.
+                            </p>
+                            <div class="cfg-row">
+                                <label class="cfg-field">
+                                    <span class="cfg-field__label">Node name</span>
+                                    <input class="cfg-field__input" type="text" maxlength="64"
+                                           placeholder="(defaults to display name)" data-rt-node-name>
+                                </label>
+                                <label class="cfg-field cfg-field--narrow">
+                                    <span class="cfg-field__label">Announce every (s)</span>
+                                    <input class="cfg-field__input" type="number"
+                                           min="600" max="604800" step="60" data-rt-node-interval>
+                                </label>
+                            </div>
+                            <label class="cfg-field">
+                                <span class="cfg-field__label">Pages directory</span>
+                                <input class="cfg-field__input" type="text"
+                                       placeholder="data/reticulum/pages" data-rt-node-pages>
+                                <span class="cfg-field__hint">
+                                    Drop <code>.mu</code> files here for extra pages; files under
+                                    a <code>files/</code> subdir are served at <code>/file/…</code>.
+                                    A built-in index page shows live Meshpoint stats.
+                                    Changes need a restart.
+                                </span>
+                            </label>
+                        </fieldset>
                         <div class="cfg-card__actions">
                             <button class="terminal-button terminal-button--primary" type="submit">
                                 Save Reticulum
@@ -162,6 +201,11 @@ class ReticulumSettingsTab {
         this._cr = this._q('[data-rt-cr]');
         this._backboneHost = this._q('[data-rt-backbone-host]');
         this._backbonePort = this._q('[data-rt-backbone-port]');
+        this._nodeEnabled = this._q('[data-rt-node-enabled]');
+        this._nodeName = this._q('[data-rt-node-name]');
+        this._nodeInterval = this._q('[data-rt-node-interval]');
+        this._nodePages = this._q('[data-rt-node-pages]');
+        this._nodeStatusEl = this._q('[data-rt-node-status]');
         this._statusEl = this._q('[data-rt-status]');
         this._rnsdStatusEl = this._q('[data-rt-rnsd-status]');
 
@@ -191,6 +235,11 @@ class ReticulumSettingsTab {
     _render(rt) {
         if (this._displayName) this._displayName.value = rt.display_name || 'Meshpoint';
         if (this._nomadTimeout) this._nomadTimeout.value = rt.nomad_timeout_s ?? 20;
+        if (this._nodeEnabled) this._nodeEnabled.checked = !!rt.node_enabled;
+        if (this._nodeName) this._nodeName.value = rt.node_name || '';
+        if (this._nodeInterval) this._nodeInterval.value = rt.node_announce_interval_s ?? 21600;
+        if (this._nodePages) this._nodePages.value = rt.node_pages_dir || 'data/reticulum/pages';
+        this._loadNodeStatus();
         if (this._frequency) {
             this._frequency.value = rt.rnode_frequency_hz ?? 869463000;
             this._renderFrequencyHint();
@@ -201,6 +250,24 @@ class ReticulumSettingsTab {
         if (this._cr) this._cr.value = rt.rnode_coding_rate ?? 5;
         if (this._backboneHost) this._backboneHost.value = rt.backbone_host || 'node.reticulumnet.nl';
         if (this._backbonePort) this._backbonePort.value = rt.backbone_port ?? 4242;
+    }
+
+    async _loadNodeStatus() {
+        if (!this._nodeStatusEl) return;
+        let node = null;
+        try {
+            const r = await fetch('/api/reticulum/status', { credentials: 'same-origin' });
+            if (r.ok) node = (await r.json()).node;
+        } catch (_) { return; }
+        if (!node || !node.hosting) return;
+        const ago = node.last_announce_s_ago;
+        const agoStr = ago == null ? 'never'
+            : ago < 90 ? `${ago}s ago`
+            : ago < 5400 ? `${Math.round(ago / 60)}m ago`
+            : `${Math.round(ago / 3600)}h ago`;
+        this._nodeStatusEl.textContent =
+            `Hosting now as "${node.name}" — ${node.pages} page(s), `
+            + `last announce ${agoStr}, ${node.requests_served} request(s) served.`;
     }
 
     _renderFrequencyHint() {
@@ -292,6 +359,10 @@ class ReticulumSettingsTab {
         const payload = {
             display_name: this._displayName.value.trim() || 'Meshpoint',
             nomad_timeout_s: Number(this._nomadTimeout.value) || 20,
+            node_enabled: !!this._nodeEnabled.checked,
+            node_name: this._nodeName.value.trim(),
+            node_pages_dir: this._nodePages.value.trim() || 'data/reticulum/pages',
+            node_announce_interval_s: Number(this._nodeInterval.value) || 21600,
             rnode_serial_port: this._serialPort.value,
             rnode_frequency_hz: Number(this._frequency.value),
             rnode_bandwidth_hz: Number(this._bandwidth.value),

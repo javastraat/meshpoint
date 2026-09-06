@@ -83,10 +83,28 @@ class ReticulumPeerRepository:
             )
         await self._db.commit()
 
-    async def list_peers(self) -> list[ReticulumPeer]:
-        rows = await self._db.fetch_all(
-            "SELECT * FROM reticulum_peers ORDER BY last_seen DESC"
-        )
+    async def count(self, aspect: str | None = None) -> int:
+        if aspect:
+            row = await self._db.fetch_one(
+                "SELECT COUNT(*) AS n FROM reticulum_peers WHERE aspect = ?",
+                (aspect,),
+            )
+        else:
+            row = await self._db.fetch_one("SELECT COUNT(*) AS n FROM reticulum_peers")
+        return int(row["n"]) if row else 0
+
+    async def list_peers(
+        self, aspect: str | None = None, limit: int | None = None,
+    ) -> list[ReticulumPeer]:
+        sql = "SELECT * FROM reticulum_peers"
+        params: tuple = ()
+        if aspect:
+            sql += " WHERE aspect = ?"
+            params = (aspect,)
+        sql += " ORDER BY last_seen DESC"
+        if limit:
+            sql += f" LIMIT {int(limit)}"
+        rows = await self._db.fetch_all(sql, params)
         return [
             ReticulumPeer(
                 destination_hash=r["destination_hash"],

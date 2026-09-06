@@ -58,6 +58,13 @@ _DEFAULTS: dict[str, Any] = {
     # NomadNet "Browse" tab: path/link timeout budget in seconds (request
     # gets 1.5x). 20 suits a TCP backbone; bump for multi-hop LoRa nodes.
     "nomad_timeout_s": 20,
+    # Host a NomadNet node (serve pages) -- opt-in, off by default. Same
+    # RNS identity as LXMF, so you appear as both "message me" and
+    # "browse me" on one hash. Applies on restart.
+    "node_enabled": False,
+    "node_name": "",                       # blank = use display_name
+    "node_pages_dir": "data/reticulum/pages",
+    "node_announce_interval_s": 21600,     # 6h
 }
 
 _config: dict[str, Any] = dict(_DEFAULTS)
@@ -93,6 +100,17 @@ def identity_path() -> str:
 
 def lxmf_storage_dir() -> str:
     return str(_config["lxmf_storage_dir"])
+
+
+def node_config() -> dict[str, Any]:
+    """The NomadNet-node hosting settings, resolved (name falls back to
+    display_name)."""
+    return {
+        "enabled": bool(_config["node_enabled"]),
+        "name": str(_config["node_name"]).strip() or display_name(),
+        "pages_dir": str(_config["node_pages_dir"]),
+        "announce_interval_s": int(_config["node_announce_interval_s"] or 21600),
+    }
 
 
 def to_dict() -> dict[str, Any]:

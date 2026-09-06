@@ -54,6 +54,25 @@ class TestReticulumState(unittest.TestCase):
         state.init({"rnode_serial_port": ""})
         self.assertEqual(state.to_dict()["rnode_serial_port"], "")
 
+    def test_node_config_defaults_off_name_falls_back_to_display_name(self) -> None:
+        state.init({"display_name": "PD2EMC Meshpoint"})
+        nc = state.node_config()
+        self.assertFalse(nc["enabled"])
+        self.assertEqual(nc["name"], "PD2EMC Meshpoint")  # blank node_name -> display_name
+        self.assertEqual(nc["pages_dir"], "data/reticulum/pages")
+
+    def test_node_config_uses_explicit_values(self) -> None:
+        state.init({
+            "display_name": "PD2EMC Meshpoint",
+            "node_enabled": True,
+            "node_name": "PD2EMC BBS",
+            "node_announce_interval_s": 3600,
+        })
+        nc = state.node_config()
+        self.assertTrue(nc["enabled"])
+        self.assertEqual(nc["name"], "PD2EMC BBS")
+        self.assertEqual(nc["announce_interval_s"], 3600)
+
 
 class TestReticulumStateWrites(unittest.TestCase):
     def setUp(self) -> None:
