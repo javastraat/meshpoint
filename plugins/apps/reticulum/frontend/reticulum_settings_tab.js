@@ -174,14 +174,18 @@ class ReticulumSettingsTab {
     _q(sel) { return this._el.querySelector(sel); }
 
     async _load() {
-        const [rt, config] = await Promise.all([
-            this._request('GET', '/api/config/reticulum'),
-            this._request('GET', '/api/config'),
-        ]);
-        this._portUsage = this._buildPortUsageMap(config || {});
+        // The reticulum settings (fast -- just plugins.reticulum.*) render
+        // immediately; the port dropdown + its "used by" hints (which need
+        // the big GET /api/config + a USB rescan) fill in a beat later so
+        // the form isn't blank while those run.
+        const rt = await this._request('GET', '/api/config/reticulum');
         this._pendingPort = (rt && rt.rnode_serial_port) || '';
-        await this._refreshSerialPortsList();
         this._render(rt || {});
+
+        this._request('GET', '/api/config').then((config) => {
+            this._portUsage = this._buildPortUsageMap(config || {});
+            this._refreshSerialPortsList();
+        });
     }
 
     _render(rt) {

@@ -37,13 +37,20 @@ def reset_routes() -> None:
     nomad.reset()
 
 
+# The public network has thousands of nomadnetwork.node announces; the
+# picker only needs the recently-active ones (anything else is still
+# reachable by pasting its hash into the address bar).
+_NODE_LIMIT = 300
+
+
 @router.get("/nodes")
 async def nomad_nodes():
-    """Known `nomadnetwork.node` destinations, newest-seen first."""
+    """The most recently-seen `nomadnetwork.node` destinations (capped)."""
     if _service is None:
         raise HTTPException(503, "Reticulum companion is disabled")
-    peers = await _service.list_peers()
-    return [p.to_dict() for p in peers if p.aspect == "nomadnetwork.node"]
+    peers = await _service.list_peers()  # already sorted last_seen DESC
+    nodes = [p.to_dict() for p in peers if p.aspect == "nomadnetwork.node"]
+    return nodes[:_NODE_LIMIT]
 
 
 class PageRequest(BaseModel):

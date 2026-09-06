@@ -249,8 +249,7 @@ class ReticulumPanel {
             window.concentratorWS.on('reticulum_peer', this._onWsPeer);
             window.concentratorWS.on('reticulum_message', this._onWsMessage);
         }
-        if (this._settingsTab) this._settingsTab.show();
-        if (this._nomadTab) this._nomadTab.show();
+        this._activateSubTab();
     }
 
     hide() {
@@ -261,6 +260,15 @@ class ReticulumPanel {
         // doubled-up refresh, not a real leak (both handlers just reload).
         if (this._settingsTab) this._settingsTab.hide();
         if (this._nomadTab) this._nomadTab.hide();
+    }
+
+    /** Load only the sub-tab that's actually visible -- the Settings and
+     * Browse tabs each do heavy fetches (config + serial ports; a full
+     * peer query + a big node <select>), so firing both on every page
+     * visit made the Reticulum page slow to open. */
+    _activateSubTab() {
+        if (this._tab === 'settings' && this._settingsTab) this._settingsTab.show();
+        else if (this._tab === 'browse' && this._nomadTab) this._nomadTab.show();
     }
 
     /** Open the Browse tab pointed at a specific node (Peers-row "Browse" button). */
@@ -280,6 +288,7 @@ class ReticulumPanel {
         this._tab = tab;
         try { localStorage.setItem(RT_TAB_STORE_KEY, tab); } catch (_) {}
         this._applyTab();
+        this._activateSubTab();
     }
 
     _applyTab() {
