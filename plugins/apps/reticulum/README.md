@@ -101,11 +101,18 @@ on the **same identity** as its LXMF address — one hash is both "message me"
 NomadNet client works. `backend/nomad_node.py` announces on an interval,
 answers `Link`/`Request` with:
 
-- `/page/index.mu` — generated: version, uptime, Reticulum peer count,
-  NomadNet node count, conversation count, plus an about blurb
+- `/page/index.mu` — generated: a branding/landing page (node name, an
+  ASCII SenseCap M1, a short "what is Meshpoint" blurb) linking to
+  `info.mu`. An operator `index.mu` in `node_pages_dir` overrides it
+  entirely.
+- `/page/info.mu` — generated, **always served** regardless of your
+  `index.mu` (a same-named file you drop in `node_pages_dir` is ignored)
+  — version, uptime, Reticulum peer count, NomadNet node count,
+  conversation count, plus an about blurb. Safe to link to from your own
+  `index.mu`.
 - `/page/nodes.mu` — the recent `nomadnetwork.node` peers as Micron links
-- any `*.mu` file you drop in `node_pages_dir` (`data/reticulum/pages/` by
-  default) — an `index.mu` there overrides the generated one
+- any other `*.mu` file you drop in `node_pages_dir` (`data/reticulum/pages/`
+  by default)
 - `files/**` under that dir, served at `/file/<relpath>`
 
 `sample-pages/index.mu` is a copy-me starter page with a Micron cheat-sheet

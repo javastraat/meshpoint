@@ -9,9 +9,10 @@
 #        /opt/meshpoint/data/reticulum/pages/index.mu
 #     sudo systemctl restart meshpoint
 #
-# A file at <node_pages_dir>/index.mu REPLACES the built-in live-stats index.
-# A static file can't show uptime / peer counts - if you want those, delete
-# this index.mu and add other pages instead (about.mu -> /page/about.mu).
+# A file at <node_pages_dir>/index.mu REPLACES the built-in landing page.
+# The built-in live-stats page keeps working either way at /page/info.mu -
+# it's always served, even with a custom index.mu in place, so link to it
+# for uptime / peer counts (see the Links section below).
 #
 # Extra .mu files in the same dir are served at /page/<name>.mu
 # Files under a files/ subdir are served at /file/<relpath>
@@ -42,6 +43,7 @@ You can browse this node here `!and`! message it over LXMF on the same hash.
 
 >Links
 
+`[Live stats & nodes heard`:/page/info.mu]
 `[Nodes this Meshpoint has heard`:/page/nodes.mu]
 `[Meshpoint on GitHub`https://github.com/javastraat/meshpoint]
 

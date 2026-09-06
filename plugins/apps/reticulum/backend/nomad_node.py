@@ -6,12 +6,17 @@ both "message me" (LXMF) and "browse me" (``nomadnetwork.node``) on one
 hash -- exactly how a NomadNet user with a hosted node appears.
 
 Opt-in (``plugins.reticulum.node_enabled``, off by default). Serves:
-  * ``/page/index.mu``  -- generated: node name + live Meshpoint stats +
-    an "about" blurb. An operator ``index.mu`` in ``node_pages_dir``
-    overrides it.
+  * ``/page/index.mu``  -- generated: a branding/landing page (node name,
+    an ASCII SenseCap M1, a short "what is Meshpoint" blurb) linking to
+    ``info.mu``. An operator ``index.mu`` in ``node_pages_dir`` overrides
+    it entirely.
+  * ``/page/info.mu``   -- generated, **always served** regardless of an
+    operator's ``index.mu`` -- a same-named file dropped in
+    ``node_pages_dir`` is ignored, so any custom ``index.mu`` can safely
+    link to ``:/page/info.mu`` for live Meshpoint stats + an "about" blurb.
   * ``/page/nodes.mu``  -- generated: the other ``nomadnetwork.node``
     peers this Meshpoint has heard.
-  * ``/page/<name>.mu`` -- any ``.mu`` file the operator drops in
+  * ``/page/<name>.mu`` -- any other ``.mu`` file the operator drops in
     ``node_pages_dir``.
   * ``/file/<path>``    -- any file under ``node_pages_dir/files/``.
 
@@ -43,6 +48,17 @@ _STATS_REFRESH_S = 300  # the node index page is rarely hit; don't poll hard
 def _esc(s: str) -> str:
     """Micron has no escaping need for plain text except the backtick."""
     return str(s).replace("\\", "\\\\").replace("`", "\\`")
+
+
+_ASCII_M1 = [
+    "        o",
+    "        |",
+    "    ____|____",
+    "   /         \\",
+    "  |  SenseCap |",
+    "  |     M1    |",
+    "  |___________|",
+]
 
 
 class NomadNode:
@@ -133,6 +149,11 @@ class NomadNode:
             allow=RNS.Destination.ALLOW_ALL,
         )
         d.register_request_handler(
+            "/page/info.mu",
+            response_generator=self._serve_info,
+            allow=RNS.Destination.ALLOW_ALL,
+        )
+        d.register_request_handler(
             "/page/nodes.mu",
             response_generator=self._serve_nodes,
             allow=RNS.Destination.ALLOW_ALL,
@@ -140,7 +161,7 @@ class NomadNode:
 
         if pages.is_dir():
             for p in sorted(pages.glob("*.mu")):
-                if p.name in ("index.mu", "nodes.mu"):
+                if p.name in ("index.mu", "nodes.mu", "info.mu"):
                     continue
                 d.register_request_handler(
                     f"/page/{p.name}",
@@ -159,11 +180,11 @@ class NomadNode:
                         )
 
     def _page_count(self) -> int:
-        n = 2  # index + nodes (generated)
+        n = 3  # index (generated or overridden) + info + nodes (both fixed generated)
         if self._pages_dir.is_dir():
             n += sum(
                 1 for p in self._pages_dir.glob("*.mu")
-                if p.name not in ("index.mu", "nodes.mu")
+                if p.name not in ("index.mu", "nodes.mu", "info.mu")
             )
         return n
 
@@ -211,16 +232,41 @@ class NomadNode:
         return _serve
 
     def _serve_index(self, request_path, data, request_id, link_id, remote_identity, requested_at):
+        """Default landing page -- a short "what is this" plus a link to
+        the always-on stats page. An operator's own ``index.mu`` in
+        ``node_pages_dir`` replaces this entirely (see ``sample-pages/``)."""
+        self._requests_served += 1
+        lines = [
+            "`c`F0a0`!" + _esc(self._name) + "`!`f`a",
+            "`ca Meshpoint node`a",
+            "-",
+            "`c" + "\n".join(_ASCII_M1) + "`a",
+            "",
+            "This node runs `!Meshpoint`! on a SenseCap M1 -- it captures and",
+            "relays Meshtastic, MeshCore, LoRaWAN, POCSAG/DAPNET and Reticulum",
+            "traffic, and hosts this NomadNet page on the `!same identity`! as",
+            "its LXMF address, announcing itself as `!nomadnetwork.node`!.",
+            "",
+            "You can browse this node here and message it over LXMF on the",
+            "same hash.",
+            "",
+            ">Links",
+            "`[Live stats & nodes heard`:/page/info.mu]",
+            "`[Meshpoint on GitHub`https://github.com/javastraat/meshpoint]",
+        ]
+        return ("\n".join(lines)).encode("utf-8")
+
+    def _serve_info(self, request_path, data, request_id, link_id, remote_identity, requested_at):
+        """Fixed stats page -- always generated, never overridable by an
+        operator's ``node_pages_dir`` (a same-named file there is ignored
+        by ``_register_handlers``), so any custom ``index.mu`` can safely
+        link to ``:/page/info.mu`` and always get live numbers."""
         self._requests_served += 1
         s = self._stats
         lines = [
             "`c`F0a0`!" + _esc(self._name) + "`!`f`a",
             "`ca Meshpoint node`a",
             "-",
-            "This node announces itself on the Reticulum network as "
-            "`!nomadnetwork.node`!, sharing one identity with its LXMF",
-            "address -- so you can browse it here and message it over LXMF.",
-            "",
             ">Meshpoint",
         ]
         if s.get("version"):
@@ -237,6 +283,7 @@ class NomadNode:
             "",
             ">Pages",
             "`[Nodes this Meshpoint has heard`:/page/nodes.mu]",
+            "`[Home`:/page/index.mu]",
             "",
             ">About Meshpoint",
             "A multi-protocol LoRa mesh gateway + dashboard (Meshtastic,",

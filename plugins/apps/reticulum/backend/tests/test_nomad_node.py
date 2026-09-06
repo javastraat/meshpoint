@@ -49,15 +49,26 @@ class TestNomadNode(unittest.TestCase):
         self.assertEqual(st["name"], "PD2EMC Meshpoint")
         self.assertIn("requests_served", st)
 
-    def test_serve_index_returns_micron_bytes(self) -> None:
+    def test_serve_index_returns_branding_page(self) -> None:
         n = self._node()
-        n._stats = {"version": "0.8.1", "uptime": "3h 12m", "reticulum_peers": 11270}
         out = n._serve_index("/page/index.mu", None, 1, 1, None, 0)
         self.assertIsInstance(out, bytes)
         text = out.decode("utf-8")
         self.assertIn("PD2EMC Meshpoint", text)
-        self.assertIn("11270", text)
+        self.assertIn("SenseCap", text)
         self.assertIn("nomadnetwork.node", text)
+        self.assertIn(":/page/info.mu", text)
+        self.assertEqual(n._requests_served, 1)
+
+    def test_serve_info_returns_micron_bytes(self) -> None:
+        n = self._node()
+        n._stats = {"version": "0.8.1", "uptime": "3h 12m", "reticulum_peers": 11270}
+        out = n._serve_info("/page/info.mu", None, 1, 1, None, 0)
+        self.assertIsInstance(out, bytes)
+        text = out.decode("utf-8")
+        self.assertIn("PD2EMC Meshpoint", text)
+        self.assertIn("11270", text)
+        self.assertIn(":/page/index.mu", text)
         self.assertEqual(n._requests_served, 1)
 
     def test_serve_nodes_lists_recent(self) -> None:

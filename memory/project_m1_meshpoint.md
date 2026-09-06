@@ -11558,3 +11558,47 @@ v0.8.1 NomadNet-hosting bullet extended in place (not a new bullet, matching
 this repo's own precedent of folding a same-feature CI test-skip fix into
 the feature's existing bullet); `ChangelogParser.parse_file()` re-verified
 clean, 80 bullets under v0.8.1.
+
+**Separately, user committed via VS Code's own Source Control panel** (not
+me -- confirmed nothing auto-committed): `1fd5e8fe`, the Reticulum
+Settings-tab stale-hint fix ("Settings → System, or install.sh" ->
+"Settings → Plugins, or `sudo meshpoint plugin setup reticulum`" in
+`reticulum_settings_tab.js`, since `rnsd` setup moved to the plugin's own
+`setup.sh` a while back and the hint never got updated).
+
+**Same session, user's idea (asked "what do you think" first, discussed
+before building, per this session's own norm): NomadNet default landing
+page redesign.** Every hosted node showed the same generated stats page as
+`/page/index.mu` unless an operator fully replaced it -- user wanted a
+nicer default that people would actually leave in place, plus a way for a
+custom `index.mu` to still link to live stats. Decision (user's, asked
+directly): the stats page should be a **fixed, always-served page**
+regardless of what an operator does with `index.mu` -- not overridable.
+Implemented in `plugins/apps/reticulum/backend/nomad_node.py`:
+- New `/page/info.mu` (`_serve_info`) -- the old `_serve_index` stats
+  content (version/uptime/peers/nomad_nodes/conversations + about blurb),
+  now unconditionally registered and excluded from the operator `.mu`-file
+  loop (a same-named file dropped in `node_pages_dir` is silently
+  ignored), so any custom `index.mu` can safely link to `:/page/info.mu`.
+- `/page/index.mu` (`_serve_index`) is now a small branding page instead:
+  node name, a 7-line ASCII SenseCap M1 (`_ASCII_M1`, plain chars only --
+  no backticks, since that's Micron's one escape-sensitive character), a
+  short "what is Meshpoint" blurb, links to `info.mu` and the GitHub repo.
+  Still fully overridable by an operator's own `index.mu`, same as before.
+- `_page_count()` base bumped 2 -> 3 (index + info + nodes, all fixed
+  generated/reserved names now).
+- Tests: renamed/split `test_serve_index_returns_micron_bytes` into
+  `test_serve_index_returns_branding_page` (checks name/SenseCap/
+  nomadnetwork.node/link-to-info) + `test_serve_info_returns_micron_bytes`
+  (the old stats assertions, now against `_serve_info`). All 10 tests green
+  on the Mac (rns is genuinely installed here, so the RNS-unavailable test
+  still correctly skips).
+- Docs: `sample-pages/index.mu`'s comment header + Links section updated
+  (mentions `info.mu` is always-on, adds a link to it); plugin README +
+  `docs/CONFIGURATION.md`'s node-hosting sections updated to describe the
+  index/info split; new CHANGELOG bullet under v0.8.1 (81 bullets,
+  `ChangelogParser` re-verified clean).
+- **Not yet committed** (user's standing instruction this session: don't
+  commit without being asked) and not live-tested on the Pi -- next step
+  when deployed is confirming a real NomadNet client renders the ASCII art
+  and both pages correctly over an actual RNS Link.
