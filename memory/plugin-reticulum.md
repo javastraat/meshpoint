@@ -16,7 +16,7 @@ Update this block as phases land. `[ ]` todo, `[~]` in progress, `[x]` done.
 
 - [x] **Phase 0** — `add_service` core seam ✅ (commit pending). `write_rnsd_config.py` repoint + `_run_systemctl` lift **deferred** — see notes below.
 - [x] **Phase 1** — plugin backend scaffold ✅ (commit pending). `service` + `routes` only; `config_routes.py` + `_run_systemctl` lift **moved to Phase 2** (coupled to the settings tab + the rnsd-config question).
-- [ ] **Phase 2** — plugin frontend (sidebar page, **topbar pill**, settings tab) + move `config_routes.py` in (`/api/config/reticulum/*`, adapted to `plugins.reticulum.*` writes like dapnet's `state._persist()`) + lift `_run_systemctl` → `src/api/systemctl.py`, add `sidebar`+`topbar` to `provides`
+- [~] **Phase 2** — plugin frontend. **2a done** (commit pending): sidebar page + **topbar pill**, `sidebar`+`topbar` added to `provides`. **2b todo**: settings tab + move `config_routes.py` in (`/api/config/reticulum/*` → `plugins.reticulum.*` writes like dapnet's `state._persist()`) + lift `_run_systemctl` → `src/api/systemctl.py`.
 - [ ] **Phase 3** — Messages page routes reticulum sends to `/api/reticulum/send`
 - [ ] **Phase 4** — live-verify on the Pi (atomic config flip — see note), screenshots
 - [ ] **Phase 5** — delete core reticulum service/routes/config/frontend. **Includes** repointing `scripts/write_rnsd_config.py` off `config.reticulum` → `config.plugins["reticulum"]` (can't do it earlier — would break the live Pi's rnsd, which reads the old path until the atomic Phase 4 flip).
@@ -191,6 +191,36 @@ the Mac, now matches `TestShippedAcarsPlugin`. Suite is fully green on the Mac n
 Verified: `pytest plugins/apps/reticulum/ tests/test_plugin_loader.py tests/test_service_registry.py`
 → 35 passed, 6 skipped. `ruff check src/ tests/ plugins/` clean. Manifest parses
 (`provides=('service','routes') locked=True`). CHANGELOG parses (v0.8.1, 69 bullets).
+
+### Phase 2a — sidebar page + topbar pill — ✅ DONE
+
+`plugins/apps/reticulum/frontend/`:
+- `reticulum_panel.js` ← `frontend/js/reticulum_panel.js`, ported: `mount(rootEl)`/`show()`/`hide()`,
+  root-scoped `_q(sel)` helper (no `document.getElementById`), `window.meshpointIdentity?.role`,
+  `window.registerSidebarPage({route:'reticulum', make})`. Behaviour identical (Peers/Messages/Send).
+- `reticulum_topbar_chip.js` ← `frontend/topbar/topbar_reticulum_chip.js`, ported to
+  `window.registerTopbarChip({id:'reticulum', make})` + `mount`/`init`/`destroy`, self-polls
+  `/api/reticulum/status` (mirrors dapnet_topbar_chip.js). Hidden only when `available === false`.
+- `plugin.toml`: `provides = ["service","routes","sidebar","topbar"]`, `[frontend].scripts`,
+  `[sidebar]` (route=reticulum, label=Reticulum, category=networks, icon=reticulum).
+
+**No CSS file needed.** Reuses core shared classes (`lw-*`, `stat-card`, `mt-badge`, `cfg-*`,
+`terminal-button`, `r-toast`, `lw-link-btn`). `lorawan.css`'s `.section[data-section="reticulum"]
+{ overflow-y: auto }` already covers the plugin section (`mountPluginSidebarPages` sets
+`section.dataset.section = "reticulum"`).
+
+**⚠️ Phase 5 note:** when deleting core's reticulum frontend, KEEP the
+`.section[data-section="reticulum"]` line in `frontend/css/lorawan.css` — the plugin section
+still needs it (it's keyed on the same `data-section` value).
+
+**Dormant until Phase 4.** Plugin `enabled: false` → `inject_plugin_assets` / `sidebar_descriptor_tags`
+only run for loaded plugins, so the scripts aren't served and nothing registers. Core frontend
+(index.html nav/section/scripts, `topbar_reticulum_chip.js`, `_bootReticulumPanel`) stays
+authoritative. They CANNOT coexist live (both would add a `#/reticulum` nav entry + a pill), so
+the frontend cutover is atomic with the Phase 4 flip.
+
+Verified: manifest parses (`provides` + `frontend_scripts` + `[sidebar]`), `node --check` both JS
+files, 77 passed / 6 skipped.
 
 ### Phase 2 — plugin frontend (coexists)
 

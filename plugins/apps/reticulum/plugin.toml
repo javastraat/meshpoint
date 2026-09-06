@@ -1,19 +1,34 @@
 name = "reticulum"
 version = "1.0.0"
 meshpoint_api = 1
-provides = ["service", "routes"]   # Phase 1 scaffold -- backend only.
+provides = ["service", "routes", "sidebar", "topbar"]
                                     #   service  the LxmfService (RNS/LXMF
                                     #            client attach), started right
                                     #            after the pipeline is up,
                                     #            stopped on shutdown
                                     #   routes   /api/reticulum/* (status,
                                     #            peers, messages, send, announce)
-                                    # "sidebar" + "topbar" (the page + the
-                                    # topbar pill) land in Phase 2 with the
-                                    # frontend. See memory/plugin-reticulum.md.
+                                    #   sidebar  the Reticulum page (Peers /
+                                    #            Messages / Send tabs)
+                                    #   topbar   the compact status pill
+                                    # RNode/backbone settings (config_routes +
+                                    # a Settings tab) land in Phase 2b. See
+                                    # memory/plugin-reticulum.md.
 locked = true  # shipped with this fork -- not user-installed, can't be deleted
 
+[frontend]
+scripts = [
+    "frontend/reticulum_panel.js",
+    "frontend/reticulum_topbar_chip.js",
+]
+
+[sidebar]
+route = "reticulum"
+label = "Reticulum"
+category = "networks"
+icon = "reticulum"    # exact copy of the old built-in nav item's own glyph
+
 [meta]
-description = "Native Reticulum/LXMF messaging -- meshpoint's own LXMF delivery destination on the local rnsd shared instance, plus the peer roster built from announces. Being extracted from core; not user-visible until enabled (Phase 4)."
+description = "Native Reticulum/LXMF messaging -- meshpoint's own LXMF delivery destination on the local rnsd shared instance, the peer roster built from announces, and a compact topbar pill. Being extracted from core; not user-visible until enabled (Phase 4)."
 homepage = "https://reticulum.network"
 author = "Einstein PD2EMC"
