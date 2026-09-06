@@ -14,12 +14,12 @@ which this extraction's frontend work delivers naturally).
 
 Update this block as phases land. `[ ]` todo, `[~]` in progress, `[x]` done.
 
-- [ ] **Phase 0** — `add_service` core seam + repoint `write_rnsd_config.py`
-- [ ] **Phase 1** — plugin backend scaffold (service + routes + peer repo + state), disabled by default
+- [x] **Phase 0** — `add_service` core seam ✅ (commit pending). `write_rnsd_config.py` repoint + `_run_systemctl` lift **deferred** — see notes below.
+- [ ] **Phase 1** — plugin backend scaffold (service + routes + peer repo + state), disabled by default. **Includes** lifting `_run_systemctl` out of `rnode_firmware_routes.py` into a shared `src/api/` helper (plugin `config_routes.py` needs it).
 - [ ] **Phase 2** — plugin frontend (sidebar page, **topbar pill**, settings tab)
 - [ ] **Phase 3** — Messages page routes reticulum sends to `/api/reticulum/send`
 - [ ] **Phase 4** — live-verify on the Pi (atomic config flip — see note), screenshots
-- [ ] **Phase 5** — delete core reticulum service/routes/config/frontend
+- [ ] **Phase 5** — delete core reticulum service/routes/config/frontend. **Includes** repointing `scripts/write_rnsd_config.py` off `config.reticulum` → `config.plugins["reticulum"]` (can't do it earlier — would break the live Pi's rnsd, which reads the old path until the atomic Phase 4 flip).
 - [ ] **Phase 6** — docs (CHANGELOG v0.8.1, PLUGINS.md, CONFIGURATION.md, README, API-ENDPOINTS, plugin README)
 
 **Decisions locked with the user (2026-09-06):**
@@ -108,25 +108,32 @@ leave both the routes and the cards entirely in core.
 
 ## Phased plan
 
-### Phase 0 — `add_service` core seam (no plugin yet)
+### Phase 0 — `add_service` core seam (no plugin yet) — ✅ DONE
+
+Shipped as `feat: "service" plugin capability ...`. What actually landed:
 
 | File | Change |
 |---|---|
-| `src/api/service_registry.py` | **new** — `ServiceSpec(name, build, wire)`, `register_service()`, `build_all()`, `start_all()`, `stop_all()`, `wire_all(pipeline)`. FastAPI-free (unit-tests on Mac). |
-| `src/plugins/registry.py` | `reg.add_service(name, build, wire=None)` — requires `"service"` in `provides`. `build()` → service object; `wire(service, pipeline)` runs after `pipeline.start()`. |
-| `src/plugins/manifest.py` | `KNOWN_PROVIDES += "service"` |
-| `src/api/server.py` lifespan | `service_registry.build_all()` + `start_all()` where `_reticulum_service.start()` is now; `stop_all()` in shutdown block |
-| `tests/` | `test_service_registry.py`, extend `test_plugin_loader.py` |
+| `src/api/service_registry.py` | **new** — `ServiceSpec(name, build, wire)`, `ServiceContext(pipeline, ws_manager, config)`, `register_service()`, `plugin_specs()`, `live()`, **async** `start_all(context)` / `stop_all()`, `reset()`. FastAPI-free. No `build_all`/`wire_all` split (services build+start together, post-pipeline — unlike capture sources). |
+| `src/plugins/registry.py` | `reg.add_service(name, build, wire=None)` — requires `"service"` in `provides`. `build(context)` → service or `None` to opt out; `wire(service, context)` runs between build and `start()`. |
+| `src/plugins/manifest.py` | `KNOWN_PROVIDES += "service"` (backend-only — NOT added to the frontend-scripts-required list) |
+| `src/api/server.py` | import + `service_registry.reset()` in `create_app`; `await service_registry.start_all(ServiceContext(...))` right after `capture_source_registry.wire_all(pipeline)` + `message_repo`; `await service_registry.stop_all()` in shutdown after `listener_registry.stop_all()` |
+| `tests/test_service_registry.py` | **new**, 8 tests (asyncio.run style, mirrors `test_listener_registry.py`) |
+| `tests/test_plugin_registry_facade.py` | +2 (`add_service` delegates / rejected) |
+| `tests/test_plugin_manifest.py` | +1 (`service` is a known provides value, no frontend script needed) |
+| `docs/CHANGELOG.md` | "Internal:" bullet under `### v0.8.1` |
 
-**Wrinkle:** `scripts/write_rnsd_config.py` runs as **rnsd's `ExecStartPre`**
-(separate process) and does `load_config().reticulum.rnode_*`. Breaks when
-`ReticulumConfig` is deleted. Repoint it at `config.plugins["reticulum"]`
-in this phase (it's already reticulum-specific). Also: `_run_systemctl` is
-imported privately from `rnode_firmware_routes.py` (staying in core) —
-lift it to a shared `src/api/` helper so the plugin doesn't depend on a
-private name.
+Verified: `python3.11 -m pytest tests/test_service_registry.py tests/test_plugin_registry_facade.py
+tests/test_plugin_manifest.py tests/test_plugin_loader.py tests/test_capture_source_registry.py
+tests/test_listener_registry.py tests/test_protocol_registry.py tests/test_route_registry.py`
+→ 103 passed, 2 skipped, **1 pre-existing env failure** (`TestShippedDapnetPlugin::test_dapnet_loads_when_enabled`
+needs `fastapi`, not installed on the Mac — confirmed fails identically on a clean `git stash`).
+`ruff check` clean. CHANGELOG parses (`ChangelogParser.parse_file` → v0.8.1 has 68 bullets).
 
-Ship as its own commit; verify with a no-op test plugin before touching Reticulum.
+**Deferred out of Phase 0** (were listed as "wrinkles" here, moved to their real phases):
+- `_run_systemctl` lift → **Phase 1** (plugin `config_routes.py` is what needs it)
+- `scripts/write_rnsd_config.py` repoint → **Phase 5** (repointing now breaks the
+  live Pi's rnsd, which reads `config.reticulum` until the atomic Phase 4 flip)
 
 ### Phase 1 — plugin backend scaffold (coexists, `enabled: false` default)
 

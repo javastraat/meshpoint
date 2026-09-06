@@ -71,7 +71,8 @@ _SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]{1,38}$")
 _ROUTE_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,58}$")
 
 KNOWN_PROVIDES = frozenset({
-    "listener", "routes", "panel", "sidebar", "hook", "capture", "protocol", "topbar",
+    "listener", "routes", "panel", "sidebar", "hook", "capture", "protocol",
+    "topbar", "service",
 })
 
 # The existing top-level sidebar sections a plugin's page can be placed

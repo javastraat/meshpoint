@@ -20,6 +20,7 @@ from src.api import (
     listener_registry,
     protocol_registry,
     route_registry,
+    service_registry,
 )
 from src.plugins.manifest import PluginManifest
 
@@ -82,6 +83,22 @@ class PluginRegistry:
         self._require("capture", "add_capture_source()")
         capture_source_registry.register_capture_source(
             capture_source_registry.CaptureSourceSpec(name, build, wire),
+        )
+
+    def add_service(
+        self, name: str, build: Any, wire: Any = None,
+    ) -> None:
+        """Register a lifespan-managed background service -- an object with
+        async ``start()`` / ``stop()``, the same shape as core's own
+        ``LxmfService``. *build(context)* returns the service (or ``None``
+        to opt out, e.g. an optional dependency is missing); *context* is a
+        ``ServiceContext`` exposing the live ``pipeline``, ``ws_manager``
+        and ``AppConfig``. *wire(service, context)*, if given, runs between
+        build and ``start()``. Started right after ``pipeline.start()``,
+        stopped on shutdown -- see ``src.api.service_registry``."""
+        self._require("service", "add_service()")
+        service_registry.register_service(
+            service_registry.ServiceSpec(name, build, wire),
         )
 
     def add_protocol(

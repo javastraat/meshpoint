@@ -26,6 +26,7 @@ from src.api import (
     listener_registry,
     protocol_registry,
     route_registry,
+    service_registry,
 )
 from src.api.theme_registry import inject_theme_links, stamp_default_theme
 from src.api.audit import dependencies as audit_deps
@@ -234,6 +235,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     listener_registry.reset()
     capture_source_registry.reset()
     protocol_registry.reset()
+    service_registry.reset()
     global _loaded_plugins
     _loaded_plugins = load_plugins(
         Path(__file__).resolve().parents[1] / "plugins" / "apps",
@@ -313,6 +315,16 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
         capture_source_registry.wire_all(pipeline)
 
         message_repo = MessageRepository(pipeline.database)
+
+        # Plugin-registered background services (src.api.service_registry) --
+        # built + started here, right after the pipeline is up so they can
+        # reach pipeline.database / pipeline.packet_repo, and stopped in the
+        # shutdown block below alongside the other companion services.
+        await service_registry.start_all(
+            service_registry.ServiceContext(
+                pipeline=pipeline, ws_manager=ws_manager, config=config,
+            )
+        )
 
         global _reticulum_service
         if config.reticulum.enabled:
@@ -510,6 +522,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
         logger.info("Meshpoint started -- listening for packets")
         yield
         await listener_registry.stop_all()
+        await service_registry.stop_all()
         if _spectral_scan_service is not None:
             await _spectral_scan_service.stop()
         if _rfenv_companion_service is not None:

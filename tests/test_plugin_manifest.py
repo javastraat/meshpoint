@@ -160,6 +160,18 @@ author = "Einstein"
         m = parse_manifest(d)
         self.assertEqual(m.provides, ("capture", "protocol", "routes"))
 
+    def test_service_is_a_known_provides_value(self) -> None:
+        # Backend-only, like bare "listener"/"capture" -- a lifespan-managed
+        # async service is registered from register() via reg.add_service();
+        # no dedicated TOML table and no frontend script required.
+        toml = _VALID.replace(
+            'provides = ["listener", "routes"]',
+            'provides = ["service", "routes"]',
+        )
+        d = _write_plugin(self.root, "acars", toml)
+        m = parse_manifest(d)
+        self.assertEqual(m.provides, ("service", "routes"))
+
     def test_topbar_is_a_known_provides_value(self) -> None:
         # No dedicated TOML table (a chip is fully custom-rendered, no
         # route/label/icon to declare) -- but like panel/sidebar/hook, it

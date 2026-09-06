@@ -11427,3 +11427,41 @@ category as `capture_source_registry.py`/`protocol_registry.py`/
 `listener_registry.py`/`route_registry.py` -- neutral core-owned seams
 plugins register *through*, not code owned by one arbitrarily-chosen
 plugin. No code change, just an explanation.
+
+---
+
+## 2026-09-06 -- Reticulum core -> plugin extraction: planning + Phase 0
+
+Full plan lives in `memory/plugin-reticulum.md` (phased tracker,
+core-footprint inventory, per-tab UI reference from screenshots). Follows
+the DAPNET precedent. **Decisions with the user:** firmware stays in core
+(RNode + Heltec-V4 flashers are hardware provisioning, work without the
+LXMF service); chat integration = frontend reroute (Messages page POSTs
+reticulum sends to `/api/reticulum/send`, delete core's `messages.py`
+`protocol == "reticulum"` branch).
+
+**Key difference from DAPNET:** Reticulum produces zero packets, so it
+can't ride the packet pipeline for its start/stop lifecycle the way
+`DapnetSerialSource` did. It's a lifespan-managed async service
+(`LxmfService.start()/stop()`). No plugin seam existed for that.
+
+**Phase 0 shipped** -- the `"service"` plugin capability:
+- `src/api/service_registry.py` (new) -- `ServiceSpec`, `ServiceContext`
+  (pipeline + ws_manager + config), async `start_all(context)` /
+  `stop_all()`, `reset()`. No build/wire split (services build+start
+  together post-pipeline, unlike capture sources).
+- `reg.add_service(name, build, wire=None)` in `src/plugins/registry.py`;
+  `"service"` in `KNOWN_PROVIDES` (backend-only, no frontend script req).
+- `server.py`: `start_all()` right after `capture_source_registry.wire_all()`
+  + `message_repo`; `stop_all()` after `listener_registry.stop_all()`.
+- Tests: new `test_service_registry.py` (8), +2 facade, +1 manifest.
+  103 passed / 2 skipped / 1 pre-existing env failure (dapnet loader test
+  needs fastapi, absent on Mac -- fails identically on clean stash).
+- CHANGELOG "Internal:" bullet under v0.8.1.
+- Deferred: `_run_systemctl` lift -> Phase 1; `write_rnsd_config.py`
+  repoint -> Phase 5 (repointing now breaks the live Pi's rnsd).
+
+**Next:** Phase 1 -- scaffold `plugins/apps/reticulum/` backend (move
+`lxmf_service.py` / `reticulum_routes.py` / `reticulum_config_routes.py` /
+`reticulum_peer_repository.py` in, add `state.py`), `enabled: false`
+default, core still authoritative.
