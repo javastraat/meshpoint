@@ -13,12 +13,14 @@ user a migration diff moving their real ``reticulum:`` values here:
         reticulum_config_dir: data/reticulum/rns_config
         identity_path: data/reticulum/identity
         lxmf_storage_dir: data/reticulum/lxmf
+        rnode_enabled: true
         rnode_serial_port: ""
         rnode_frequency_hz: 869463000
         rnode_bandwidth_hz: 125000
         rnode_tx_power: 20
         rnode_spreading_factor: 8
         rnode_coding_rate: 5
+        backbone_enabled: true
         backbone_host: node.reticulumnet.nl
         backbone_port: 4242
 
@@ -47,12 +49,18 @@ _DEFAULTS: dict[str, Any] = {
     "reticulum_config_dir": "data/reticulum/rns_config",
     "identity_path": "data/reticulum/identity",
     "lxmf_storage_dir": "data/reticulum/lxmf",
+    # RF and backbone are independent interfaces rnsd can run at once or
+    # separately -- at least one must stay on (enforced by config_routes.py's
+    # ReticulumUpdate validator), same as NomadNet needs one of them to
+    # actually reach anyone.
+    "rnode_enabled": True,
     "rnode_serial_port": "",
     "rnode_frequency_hz": 869_463_000,
     "rnode_bandwidth_hz": 125_000,
     "rnode_tx_power": 20,
     "rnode_spreading_factor": 8,
     "rnode_coding_rate": 5,
+    "backbone_enabled": True,
     "backbone_host": "node.reticulumnet.nl",
     "backbone_port": 4242,
     # NomadNet "Browse" tab: path/link timeout budget in seconds (request

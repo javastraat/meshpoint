@@ -11658,3 +11658,53 @@ blue "MESHPOINT" wordmark (no fragmentation), blurb correctly reads
 works end to end on real hardware, not just in tests), and both Links
 render as proper clickable blue-underlined links. Still not committed --
 still the user's call when to commit this batch.
+
+**Same session, new feature (user's idea, discussed before building): RNode
+radio and TCP backbone are now independent on/off toggles.** User noticed
+Nomad already had its own enable checkbox and asked whether RF and
+"network" (backbone) should too, so a user could pick any of RF+network,
+RF only, network only, crossed with Nomad on/off (6 valid combos --
+"Nomad alone with nothing underneath" correctly excluded, "both
+interfaces off" is what Settings -> Plugins' own toggle is for).
+Investigated first: RNode already had an *implicit* off-switch (blank
+`rnode_serial_port`), but TCP backbone had **none** -- unconditionally
+written into `rnsd`'s config with a hardcoded `node.reticulumnet.nl`
+fallback even when blank. So "RF only" wasn't actually achievable before
+this, only "network only" was.
+
+Implementation:
+- New `rnode_enabled: true` / `backbone_enabled: true` keys in
+  `backend/state.py`'s `_DEFAULTS` (both default `true` -- every existing
+  install's current always-both-on behaviour is unchanged unless they
+  explicitly flip one off).
+- `plugins/apps/reticulum/write_rnsd_config.py`: extracted the backbone
+  stanza into its own `_BACKBONE_TEMPLATE` (mirroring the existing
+  `_RNODE_TEMPLATE`), both now built conditionally and concatenated via
+  `{rnode_block}{backbone_block}` in `_TEMPLATE` -- verified by hand
+  (not a real pytest, this script isn't unit-tested, matching its
+  existing convention) that all 4 combos (both/RF-only/backbone-only/
+  neither) render byte-for-byte identical to the old hardcoded output
+  for the both-on case, and correctly omit each stanza otherwise.
+- `backend/config_routes.py`'s `ReticulumUpdate`: added both fields
+  (default `True`) + a `model_validator(mode="after")` rejecting a save
+  with both `False` ("At least one of RNode radio or TCP backbone must
+  stay enabled -- disable the whole plugin from Settings -> Plugins
+  instead"). Verified directly in a throwaway venv (`fastapi`+`pydantic`
+  installed fresh, per this repo's own Mac-testing convention since
+  neither is on the Mac's system Python) -- all 4 combos validate
+  correctly, both-off raises with that exact message.
+- `reticulum_settings_tab.js`: a checkbox in each of the RNode/TCP
+  backbone fieldsets (`data-rt-rnode-enabled`/`data-rt-backbone-enabled`),
+  wired into `_render`/`_onSubmit`, plus a client-side guard in
+  `_onSubmit` blocking the request entirely (not just relying on the
+  server 422) when both are unchecked.
+- Tests: `test_state.py` gained
+  `test_rnode_and_backbone_enabled_flags_can_be_turned_off` (confirms
+  `False` isn't mistaken for "unset" the same way `node_enabled` already
+  guards against). `node --check` clean. `ChangelogParser` re-verified
+  clean, 82 bullets under v0.8.1. Docs updated: plugin README, CONFIGURATION.md
+  (two spots -- the YAML block and the Settings-tab prose).
+- **Not committed yet, not live-tested on the Pi** -- next step when
+  deployed is confirming a real `rnsd` restart with each combo actually
+  connects/doesn't connect the expected interface (not just that the
+  generated config file looks right).

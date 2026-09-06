@@ -191,12 +191,17 @@ plugins:
   reticulum:
     enabled: true                              # opt-in
     display_name: "Meshpoint"
-    rnode_serial_port: ""                       # stable /dev/serial/by-id/... path, blank = no RNode
+    # RNode radio and TCP backbone are independent interfaces -- at least
+    # one must stay enabled (Settings tab / API reject turning both off;
+    # use Settings -> Plugins to disable Reticulum entirely instead).
+    rnode_enabled: true
+    rnode_serial_port: ""                       # stable /dev/serial/by-id/... path, blank = no RNode either way
     rnode_frequency_hz: 869463000
     rnode_bandwidth_hz: 125000
     rnode_tx_power: 20
     rnode_spreading_factor: 8
     rnode_coding_rate: 5
+    backbone_enabled: true
     backbone_host: "node.reticulumnet.nl"
     backbone_port: 4242
     # storage paths — defaults shown; only set to override:
@@ -218,8 +223,14 @@ Reticulum page — `rnode_serial_port` is a dropdown drawing from the same
 USB-device enumeration every companion's port picker uses. Saving there only
 updates `local.yaml` (`nomad_timeout_s` applies immediately; the RNode/
 backbone fields also need `rnsd` to restart — the tab's **Restart rnsd**
-button does that). There is no "enabled" checkbox on the tab — Settings →
-Plugins' own toggle is the single on/off switch.
+button does that). There is no plugin-wide "enabled" checkbox on the tab —
+Settings → Plugins' own toggle is that switch. There *is* a checkbox for
+each of the RNode radio and TCP backbone fieldsets (`rnode_enabled` /
+`backbone_enabled`) — both run at once by default, but either can be
+turned off independently (e.g. LoRa-only with no internet backbone, or
+backbone-only with no RNode attached). The save is rejected if you try to
+turn both off — use Settings → Plugins to disable Reticulum entirely
+instead of leaving it running with no interfaces.
 
 The **Browse** tab is a minimal NomadNet browser — it fetches
 `nomadnetwork.node` peers' Micron pages over RNS Links.

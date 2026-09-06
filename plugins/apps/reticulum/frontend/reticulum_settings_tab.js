@@ -66,6 +66,10 @@ class ReticulumSettingsTab {
                         </label>
                         <fieldset class="cfg-fieldset">
                             <legend class="cfg-fieldset__legend">RNode radio</legend>
+                            <label class="cfg-field cfg-field--toggle">
+                                <input type="checkbox" data-rt-rnode-enabled>
+                                <span class="cfg-field__label">Enable RNode radio interface</span>
+                            </label>
                             <label class="cfg-field">
                                 <span class="cfg-field__label">Serial port</span>
                                 <select class="cfg-field__input" data-rt-serial-port></select>
@@ -111,9 +115,14 @@ class ReticulumSettingsTab {
                         </fieldset>
                         <fieldset class="cfg-fieldset">
                             <legend class="cfg-fieldset__legend">TCP backbone</legend>
+                            <label class="cfg-field cfg-field--toggle">
+                                <input type="checkbox" data-rt-backbone-enabled>
+                                <span class="cfg-field__label">Enable TCP backbone interface</span>
+                            </label>
                             <p class="cfg-field__hint">
                                 Community Reticulum backbone hop, reached over the internet
-                                alongside the RNode's LoRa interface.
+                                alongside the RNode's LoRa interface. At least one of the two
+                                interfaces above must stay enabled.
                             </p>
                             <div class="cfg-row">
                                 <label class="cfg-field">
@@ -195,6 +204,7 @@ class ReticulumSettingsTab {
         this._form = this._q('[data-rt-form]');
         this._displayName = this._q('[data-rt-display-name]');
         this._nomadTimeout = this._q('[data-rt-nomad-timeout]');
+        this._rnodeEnabled = this._q('[data-rt-rnode-enabled]');
         this._serialPort = this._q('[data-rt-serial-port]');
         this._frequency = this._q('[data-rt-frequency]');
         this._frequencyMhz = this._q('[data-rt-frequency-mhz]');
@@ -202,6 +212,7 @@ class ReticulumSettingsTab {
         this._txPower = this._q('[data-rt-tx-power]');
         this._sf = this._q('[data-rt-sf]');
         this._cr = this._q('[data-rt-cr]');
+        this._backboneEnabled = this._q('[data-rt-backbone-enabled]');
         this._backboneHost = this._q('[data-rt-backbone-host]');
         this._backbonePort = this._q('[data-rt-backbone-port]');
         this._nodeEnabled = this._q('[data-rt-node-enabled]');
@@ -243,6 +254,7 @@ class ReticulumSettingsTab {
         if (this._nodeInterval) this._nodeInterval.value = rt.node_announce_interval_s ?? 21600;
         if (this._nodePages) this._nodePages.value = rt.node_pages_dir || 'data/reticulum/pages';
         this._loadNodeStatus();
+        if (this._rnodeEnabled) this._rnodeEnabled.checked = rt.rnode_enabled !== false;
         if (this._frequency) {
             this._frequency.value = rt.rnode_frequency_hz ?? 869463000;
             this._renderFrequencyHint();
@@ -251,6 +263,7 @@ class ReticulumSettingsTab {
         if (this._txPower) this._txPower.value = rt.rnode_tx_power ?? 20;
         if (this._sf) this._sf.value = rt.rnode_spreading_factor ?? 8;
         if (this._cr) this._cr.value = rt.rnode_coding_rate ?? 5;
+        if (this._backboneEnabled) this._backboneEnabled.checked = rt.backbone_enabled !== false;
         if (this._backboneHost) this._backboneHost.value = rt.backbone_host || 'node.reticulumnet.nl';
         if (this._backbonePort) this._backbonePort.value = rt.backbone_port ?? 4242;
     }
@@ -359,6 +372,16 @@ class ReticulumSettingsTab {
 
     async _onSubmit(event) {
         event.preventDefault();
+        const rnodeEnabled = !!this._rnodeEnabled.checked;
+        const backboneEnabled = !!this._backboneEnabled.checked;
+        if (!rnodeEnabled && !backboneEnabled) {
+            this._setStatus(
+                'error',
+                'At least one of RNode radio or TCP backbone must stay enabled '
+                + '(disable the whole plugin from Settings → Plugins instead).',
+            );
+            return;
+        }
         const payload = {
             display_name: this._displayName.value.trim() || 'Meshpoint',
             nomad_timeout_s: Number(this._nomadTimeout.value) || 20,
@@ -366,12 +389,14 @@ class ReticulumSettingsTab {
             node_name: this._nodeName.value.trim(),
             node_pages_dir: this._nodePages.value.trim() || 'data/reticulum/pages',
             node_announce_interval_s: Number(this._nodeInterval.value) || 21600,
+            rnode_enabled: rnodeEnabled,
             rnode_serial_port: this._serialPort.value,
             rnode_frequency_hz: Number(this._frequency.value),
             rnode_bandwidth_hz: Number(this._bandwidth.value),
             rnode_tx_power: Number(this._txPower.value),
             rnode_spreading_factor: Number(this._sf.value),
             rnode_coding_rate: Number(this._cr.value),
+            backbone_enabled: backboneEnabled,
             backbone_host: this._backboneHost.value.trim() || 'node.reticulumnet.nl',
             backbone_port: Number(this._backbonePort.value),
         };

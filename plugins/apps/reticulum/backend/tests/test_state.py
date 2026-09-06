@@ -26,6 +26,8 @@ class TestReticulumState(unittest.TestCase):
         self.assertEqual(d["backbone_host"], "node.reticulumnet.nl")
         self.assertEqual(d["backbone_port"], 4242)
         self.assertEqual(d["rnode_serial_port"], "")
+        self.assertIs(d["rnode_enabled"], True)
+        self.assertIs(d["backbone_enabled"], True)
 
     def test_user_values_override_defaults(self) -> None:
         state.init({
@@ -43,6 +45,14 @@ class TestReticulumState(unittest.TestCase):
         self.assertEqual(d["rnode_serial_port"], "/dev/serial/by-id/usb-RNode-x")
         self.assertEqual(d["rnode_frequency_hz"], 867_000_000)
         self.assertEqual(d["backbone_port"], 4243)
+
+    def test_rnode_and_backbone_enabled_flags_can_be_turned_off(self) -> None:
+        # False is a legitimate override, not "unset" -- must not fall back
+        # to the True default (same class of bug as node_enabled/False).
+        state.init({"rnode_enabled": False, "backbone_enabled": False})
+        d = state.to_dict()
+        self.assertIs(d["rnode_enabled"], False)
+        self.assertIs(d["backbone_enabled"], False)
 
     def test_empty_string_and_missing_keys_fall_back_to_defaults(self) -> None:
         # "" is what a cleared YAML field looks like -- treat it as unset.

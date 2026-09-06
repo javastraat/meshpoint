@@ -62,13 +62,7 @@ _TEMPLATE = """\
   [[Default Interface]]
     type = AutoInterface
     enabled = Yes
-{rnode_block}
-  [[ReticulumNet Internet]]
-    type = TCPClientInterface
-    enabled = Yes
-    target_host = {backbone_host}
-    target_port = {backbone_port}
-"""
+{rnode_block}{backbone_block}"""
 
 _RNODE_TEMPLATE = """
   [[RNode LoRa]]
@@ -83,15 +77,25 @@ _RNODE_TEMPLATE = """
     codingrate = {rnode_coding_rate}
 """
 
+_BACKBONE_TEMPLATE = """
+  [[ReticulumNet Internet]]
+    type = TCPClientInterface
+    enabled = Yes
+    target_host = {backbone_host}
+    target_port = {backbone_port}
+"""
+
 
 _DEFAULTS = {
     "reticulum_config_dir": "data/reticulum/rns_config",
+    "rnode_enabled": True,
     "rnode_serial_port": "",
     "rnode_frequency_hz": 869_463_000,
     "rnode_bandwidth_hz": 125_000,
     "rnode_tx_power": 20,
     "rnode_spreading_factor": 8,
     "rnode_coding_rate": 5,
+    "backbone_enabled": True,
     "backbone_host": "node.reticulumnet.nl",
     "backbone_port": 4242,
 }
@@ -112,7 +116,14 @@ def main() -> int:
     config_dir.mkdir(parents=True, exist_ok=True)
 
     rnode_block = ""
-    if rc["rnode_serial_port"]:
+    if not rc["rnode_enabled"]:
+        print("plugins.reticulum.rnode_enabled is false -- writing a config with no RNode interface.")
+    elif not rc["rnode_serial_port"]:
+        print(
+            "plugins.reticulum.rnode_serial_port is not set -- writing a config "
+            "with no RNode interface."
+        )
+    else:
         rnode_block = _RNODE_TEMPLATE.format(
             rnode_serial_port=rc["rnode_serial_port"],
             rnode_frequency_hz=rc["rnode_frequency_hz"],
@@ -121,16 +132,19 @@ def main() -> int:
             rnode_spreading_factor=rc["rnode_spreading_factor"],
             rnode_coding_rate=rc["rnode_coding_rate"],
         )
+
+    backbone_block = ""
+    if not rc["backbone_enabled"]:
+        print("plugins.reticulum.backbone_enabled is false -- writing a config with no TCP backbone interface.")
     else:
-        print(
-            "plugins.reticulum.rnode_serial_port is not set -- writing a config "
-            "with no RNode interface (TCP backbone only)."
+        backbone_block = _BACKBONE_TEMPLATE.format(
+            backbone_host=rc["backbone_host"],
+            backbone_port=rc["backbone_port"],
         )
 
     content = _TEMPLATE.format(
         rnode_block=rnode_block,
-        backbone_host=rc["backbone_host"],
-        backbone_port=rc["backbone_port"],
+        backbone_block=backbone_block,
     )
 
     config_path = config_dir / "config"

@@ -24,13 +24,16 @@ plugins:
   reticulum:
     enabled: true
     display_name: "Meshpoint"
-    # RNode radio + TCP backbone (also editable from the page's Settings tab):
-    rnode_serial_port: ""            # by-id/by-path; blank = TCP backbone only
+    # RNode radio + TCP backbone (also editable from the page's Settings tab).
+    # Independent on/off switches -- at least one must stay enabled:
+    rnode_enabled: true
+    rnode_serial_port: ""            # by-id/by-path; blank = no RNode either way
     rnode_frequency_hz: 869463000
     rnode_bandwidth_hz: 125000
     rnode_tx_power: 20
     rnode_spreading_factor: 8
     rnode_coding_rate: 5
+    backbone_enabled: true
     backbone_host: node.reticulumnet.nl
     backbone_port: 4242
     # storage paths — defaults shown; only set to override:

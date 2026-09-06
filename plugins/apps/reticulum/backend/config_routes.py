@@ -23,7 +23,7 @@ edits made here don't reach rnsd yet. Repointed in the Phase 5 cutover.
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from src.api.audit import AuditLogWriter
 from src.api.audit.dependencies import get_audit_writer
@@ -50,12 +50,14 @@ class ReticulumUpdate(BaseModel):
     node_name: str = ""
     node_pages_dir: str = "data/reticulum/pages"
     node_announce_interval_s: int = Field(21600, ge=600, le=604800)
+    rnode_enabled: bool = True
     rnode_serial_port: str = ""
     rnode_frequency_hz: int = Field(..., ge=100_000_000, le=1_000_000_000)
     rnode_bandwidth_hz: int = 125_000
     rnode_tx_power: int = Field(20, ge=0, le=22)
     rnode_spreading_factor: int = Field(8, ge=5, le=12)
     rnode_coding_rate: int = Field(5, ge=5, le=8)
+    backbone_enabled: bool = True
     backbone_host: str = "node.reticulumnet.nl"
     backbone_port: int = Field(4242, ge=1, le=65535)
 
@@ -74,6 +76,15 @@ class ReticulumUpdate(BaseModel):
         if not stripped:
             raise ValueError("must not be empty")
         return stripped
+
+    @model_validator(mode="after")
+    def _at_least_one_interface(self) -> "ReticulumUpdate":
+        if not self.rnode_enabled and not self.backbone_enabled:
+            raise ValueError(
+                "At least one of RNode radio or TCP backbone must stay enabled "
+                "-- disable the whole plugin from Settings -> Plugins instead"
+            )
+        return self
 
 
 @router.get("/reticulum")
@@ -96,12 +107,14 @@ async def update_reticulum(
         "node_name": req.node_name.strip(),
         "node_pages_dir": req.node_pages_dir.strip() or "data/reticulum/pages",
         "node_announce_interval_s": req.node_announce_interval_s,
+        "rnode_enabled": req.rnode_enabled,
         "rnode_serial_port": req.rnode_serial_port.strip(),
         "rnode_frequency_hz": req.rnode_frequency_hz,
         "rnode_bandwidth_hz": req.rnode_bandwidth_hz,
         "rnode_tx_power": req.rnode_tx_power,
         "rnode_spreading_factor": req.rnode_spreading_factor,
         "rnode_coding_rate": req.rnode_coding_rate,
+        "backbone_enabled": req.backbone_enabled,
         "backbone_host": req.backbone_host,
         "backbone_port": req.backbone_port,
     }
