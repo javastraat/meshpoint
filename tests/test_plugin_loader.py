@@ -438,8 +438,9 @@ class TestShippedReticulumPlugin(unittest.TestCase):
         )
         self.assertIn("reticulum", [p.manifest.name for p in loaded])
         prefixes = {getattr(s.router, "prefix", "") for s in route_registry.registered()}
-        self.assertIn("/api/reticulum", prefixes)   # peers/messages/send/announce
-        self.assertIn("/api/config", prefixes)      # /api/config/reticulum settings
+        self.assertIn("/api/reticulum", prefixes)        # peers/messages/send/announce
+        self.assertIn("/api/config", prefixes)           # /api/config/reticulum settings
+        self.assertIn("/api/reticulum/nomad", prefixes)  # NomadNet browsing
         self.assertEqual(
             [s.name for s in service_registry.plugin_specs()], ["reticulum"],
         )

@@ -14,7 +14,7 @@ implementation now. `enabled: false` by default like every shipped plugin.
 |---|---|
 | `service` | `LxmfService` — RNS/LXMF client attach, started right after the packet pipeline is up (`src.api.service_registry`), stopped on shutdown |
 | `routes` | `/api/reticulum/{status,peers,messages,send,announce}` + `GET`/`PUT /api/config/reticulum` + `POST /api/config/reticulum/restart-rnsd` |
-| `sidebar` | the **Reticulum** page under Networks — Peers / Messages / Send / Settings tabs |
+| `sidebar` | the **Reticulum** page under Networks — Peers / Messages / Send / Browse / Settings tabs |
 | `topbar` | the compact status pill (own address · peer count), self-polling `/api/reticulum/status` |
 
 ## Enable it
@@ -69,11 +69,26 @@ backend/
   peer_repo.py                 reticulum_peers access (table schema stays in core)
   routes.py                    /api/reticulum/*
   config_routes.py             /api/config/reticulum (Settings tab)
+  nomad.py                     NomadNet page fetch over RNS Links
+  nomad_routes.py              /api/reticulum/nomad/{nodes,page}
   tests/
 frontend/
   reticulum_panel.js           the page (registerSidebarPage)
   reticulum_settings_tab.js    the Settings tab
+  reticulum_nomad.js           the Browse (NomadNet) tab
+  reticulum_micron.js          Micron markup -> DOM (window.MicronParser)
   reticulum_topbar_chip.js     the pill (registerTopbarChip)
+  reticulum.css                Browse-tab layout
 ```
+
+## NomadNet browsing (the "Browse" tab)
+
+`nomadnetwork.node` is a Reticulum aspect the plugin already tracks in its
+peer roster. The Browse tab fetches those nodes' Micron pages over standard
+RNS `Link`/`Request` primitives (`backend/nomad.py`) and renders them
+(`reticulum_micron.js`, ported from reticulum-meshchat's `MicronParser.js`,
+MIT). It lives here rather than in a separate plugin because it needs the
+same live `RNS` attach `LxmfService` provides — a second plugin would mean
+a second client attach + a cross-plugin seam to share the handle.
 
 Full write-up: [docs/PLUGINS.md](../../../docs/PLUGINS.md).

@@ -1,0 +1,64 @@
+/* Reticulum plugin -- the "Browse" (NomadNet) tab. Everything else on the
+ * page reuses core's shared lw-*/stat-card/mt-badge/cfg-* classes. */
+
+.rt-nomad__bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.rt-nomad__nodes { flex: 0 1 220px; }
+.rt-nomad__addr {
+    flex: 1 1 320px;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 13px;
+}
+
+.rt-nomad__bar .terminal-button { flex: 0 0 auto; }
+
+.rt-nomad__page {
+    border: 1px solid var(--border, #333);
+    border-radius: 6px;
+    padding: 14px 16px;
+    min-height: 220px;
+    max-height: 60vh;
+    overflow: auto;
+    background: var(--bg-elevated, #1a1a1a);
+    /* Micron pages are written for a monospace BBS terminal. */
+    font-family: var(--font-mono, ui-monospace, "SF Mono", Menlo, monospace);
+    font-size: 13px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.rt-nomad__page a {
+    color: var(--accent, #4ea1ff);
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+.rt-nomad__page hr {
+    border: 0;
+    border-top: 1px solid var(--border, #444);
+    margin: 6px 0;
+}
+
+.rt-nomad__page input[type="text"],
+.rt-nomad__page input[type="password"] {
+    background: var(--bg, #111);
+    color: inherit;
+    border: 1px solid var(--border, #444);
+    border-radius: 3px;
+    padding: 1px 4px;
+    font: inherit;
+}
+
+.rt-nomad__page label {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-right: 10px;
+}

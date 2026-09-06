@@ -13,9 +13,14 @@ the ``"service"`` seam (``src.api.service_registry``). ``build()`` runs
 once the pipeline is up (so ``context.pipeline.database`` is safe);
 ``wire()`` binds the routes module against the built service.
 
+Also hosts **NomadNet browsing** (``backend/nomad*.py`` -- fetching
+Micron pages from ``nomadnetwork.node`` peers over RNS Links): it needs
+the exact same live ``RNS`` attach ``LxmfService`` provides, so it's the
+same plugin rather than a second one with a second client.
+
 Imports are deferred into ``register()`` so ``backend.state`` /
-``backend.lxmf_service`` / ``backend.peer_repo`` can be imported for their
-own tests without pulling in FastAPI.
+``backend.lxmf_service`` / ``backend.peer_repo`` / ``backend.nomad`` can
+be imported for their own tests without pulling in FastAPI.
 
 Extracted from core -- ``src/reticulum/`` and the core reticulum routes
 are gone; this is the whole implementation. See
@@ -28,7 +33,7 @@ from __future__ import annotations
 def register(reg) -> None:
     from src.storage.message_repository import MessageRepository
 
-    from . import config_routes, routes, state
+    from . import config_routes, nomad_routes, routes, state
     from .lxmf_service import LxmfService
     from .peer_repo import ReticulumPeerRepository
 
@@ -36,6 +41,7 @@ def register(reg) -> None:
 
     reg.add_router(routes.router)
     reg.add_router(config_routes.router)
+    reg.add_router(nomad_routes.router)
 
     def build(context):
         service = LxmfService(
@@ -51,5 +57,6 @@ def register(reg) -> None:
 
     def wire(service, context):
         routes.init_routes(service, MessageRepository(context.pipeline.database))
+        nomad_routes.init_routes(service)
 
     reg.add_service("reticulum", build, wire)

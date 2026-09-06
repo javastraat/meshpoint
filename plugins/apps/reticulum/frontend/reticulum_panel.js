@@ -51,9 +51,10 @@ class ReticulumPanel {
         let stored = null;
         try { stored = localStorage.getItem(RT_TAB_STORE_KEY); } catch (_) {}
         this._tab = (stored === 'messages'
-            || ((stored === 'send' || stored === 'settings') && this._isAdmin))
+            || ((stored === 'send' || stored === 'settings' || stored === 'browse') && this._isAdmin))
             ? stored : 'peers';
         this._settingsTab = null;
+        this._nomadTab = null;
         this._onWsPeer = this._onWsPeer.bind(this);
         this._onWsMessage = this._onWsMessage.bind(this);
     }
@@ -104,6 +105,8 @@ class ReticulumPanel {
                                     data-rt-tab="messages">Messages</button>
                             <button class="lw-tab" type="button" role="tab"
                                     data-rt-tab="send" ${this._isAdmin ? '' : 'hidden'}>Send</button>
+                            <button class="lw-tab" type="button" role="tab"
+                                    data-rt-tab="browse" ${this._isAdmin ? '' : 'hidden'}>Browse</button>
                             <button class="lw-tab" type="button" role="tab"
                                     data-rt-tab="settings" ${this._isAdmin ? '' : 'hidden'}>Settings</button>
                         </div>
@@ -162,6 +165,9 @@ class ReticulumPanel {
                     <div data-rt-view="settings" hidden>
                         <div class="panel__body" data-rt-settings-body></div>
                     </div>
+                    <div data-rt-view="browse" hidden>
+                        <div class="panel__body" data-rt-nomad-body></div>
+                    </div>
                     <div data-rt-view="send" hidden>
                         <div class="panel__body">
                             <form class="cfg-form" id="rt-send-form" style="max-width:480px">
@@ -195,6 +201,9 @@ class ReticulumPanel {
 
         if (window.ReticulumSettingsTab) {
             this._settingsTab = new window.ReticulumSettingsTab(this._q('[data-rt-settings-body]'));
+        }
+        if (window.ReticulumNomadTab) {
+            this._nomadTab = new window.ReticulumNomadTab(this._q('[data-rt-nomad-body]'));
         }
 
         this._q('#rt-refresh-btn')?.addEventListener('click', () => this._load());
@@ -241,6 +250,7 @@ class ReticulumPanel {
             window.concentratorWS.on('reticulum_message', this._onWsMessage);
         }
         if (this._settingsTab) this._settingsTab.show();
+        if (this._nomadTab) this._nomadTab.show();
     }
 
     hide() {
@@ -250,6 +260,13 @@ class ReticulumPanel {
         // the same bound callback on the next show() just means a brief
         // doubled-up refresh, not a real leak (both handlers just reload).
         if (this._settingsTab) this._settingsTab.hide();
+        if (this._nomadTab) this._nomadTab.hide();
+    }
+
+    /** Open the Browse tab pointed at a specific node (Peers-row "Browse" button). */
+    browseNode(destinationHash) {
+        this._setTab('browse');
+        if (this._nomadTab) this._nomadTab.openNode(destinationHash);
     }
 
     _onWsPeer() { this._loadPeers(); }
@@ -258,7 +275,7 @@ class ReticulumPanel {
     _q(sel) { return this._root ? this._root.querySelector(sel) : null; }
 
     _setTab(tab) {
-        if ((tab === 'send' || tab === 'settings') && !this._isAdmin) return;
+        if ((tab === 'send' || tab === 'settings' || tab === 'browse') && !this._isAdmin) return;
         if (tab === this._tab) return;
         this._tab = tab;
         try { localStorage.setItem(RT_TAB_STORE_KEY, tab); } catch (_) {}
@@ -379,10 +396,18 @@ class ReticulumPanel {
                 <td class="lw-time">${this._fmtTime(p.last_seen)}</td>
                 <td class="mt-name">${this._esc(p.display_name || '--')}</td>
                 <td class="lw-id">${this._esc(p.destination_hash)}</td>
-                <td>${this._fmtAspect(p.aspect)}</td>
+                <td>${this._fmtAspect(p.aspect)}${
+                    p.aspect === 'nomadnetwork.node' && this._isAdmin
+                        ? ` <button type="button" class="lw-link-btn" data-rt-browse="${this._esc(p.destination_hash)}">Browse</button>`
+                        : ''
+                }</td>
                 <td class="lw-time">${this._fmtTime(p.first_seen)}</td>
             </tr>
         `).join('');
+
+        tbody.querySelectorAll('[data-rt-browse]').forEach((btn) => {
+            btn.addEventListener('click', () => this.browseNode(btn.dataset.rtBrowse));
+        });
     }
 
     async _markRead(nodeId) {
