@@ -192,6 +192,13 @@ class ReticulumNomadTab {
                 if (eq !== -1) varData[`var_${pair.slice(0, eq)}`] = pair.slice(eq + 1);
             }
         }
+        // an external http(s) link opens a normal browser tab instead of
+        // being parsed as a <hash>:/page/... Reticulum address
+        if (/^https?:\/\//i.test(addrPart)) {
+            window.open(addrPart, '_blank', 'noopener');
+            return;
+        }
+
         const { hash, path } = this._splitAddr(addrPart, currentHash);
         if (!hash) { this._status('error', 'Link has no node — nothing to open'); return; }
 

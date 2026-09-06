@@ -7,9 +7,9 @@ hash -- exactly how a NomadNet user with a hosted node appears.
 
 Opt-in (``plugins.reticulum.node_enabled``, off by default). Serves:
   * ``/page/index.mu``  -- generated: a branding/landing page (node name,
-    an ASCII SenseCap M1, a short "what is Meshpoint" blurb) linking to
-    ``info.mu``. An operator ``index.mu`` in ``node_pages_dir`` overrides
-    it entirely.
+    a blue MESHPOINT wordmark, a short "what is Meshpoint" blurb) linking
+    to ``info.mu``. An operator ``index.mu`` in ``node_pages_dir``
+    overrides it entirely.
   * ``/page/info.mu``   -- generated, **always served** regardless of an
     operator's ``index.mu`` -- a same-named file dropped in
     ``node_pages_dir`` is ignored, so any custom ``index.mu`` can safely
@@ -50,17 +50,6 @@ def _esc(s: str) -> str:
     return str(s).replace("\\", "\\\\").replace("`", "\\`")
 
 
-_ASCII_M1 = [
-    "        o",
-    "        |",
-    "    ____|____",
-    "   /         \\",
-    "  |  SenseCap |",
-    "  |     M1    |",
-    "  |___________|",
-]
-
-
 class NomadNode:
     def __init__(
         self,
@@ -69,12 +58,14 @@ class NomadNode:
         pages_dir: str,
         announce_interval_s: int,
         stats_provider: Optional[Callable[[], Awaitable[dict]]] = None,
+        hardware_description: str = "",
     ):
         self._identity = identity
         self._name = name
         self._pages_dir = Path(pages_dir)
         self._announce_interval_s = max(600, int(announce_interval_s))
         self._stats_provider = stats_provider
+        self._hardware_description = hardware_description
 
         self._destination = None
         self._announce_task: Optional[asyncio.Task] = None
@@ -236,13 +227,14 @@ class NomadNode:
         the always-on stats page. An operator's own ``index.mu`` in
         ``node_pages_dir`` replaces this entirely (see ``sample-pages/``)."""
         self._requests_served += 1
+        on_hardware = f" on {_esc(self._hardware_description)}" if self._hardware_description else ""
         lines = [
             "`c`F0a0`!" + _esc(self._name) + "`!`f`a",
             "`ca Meshpoint node`a",
             "-",
-            "`c" + "\n".join(_ASCII_M1) + "`a",
+            "`c`F38f`!MESHPOINT`!`f`a",
             "",
-            "This node runs `!Meshpoint`! on a SenseCap M1 -- it captures and",
+            "This node runs `!Meshpoint`!" + on_hardware + " -- it captures and",
             "relays Meshtastic, MeshCore, LoRaWAN, POCSAG/DAPNET and Reticulum",
             "traffic, and hosts this NomadNet page on the `!same identity`! as",
             "its LXMF address, announcing itself as `!nomadnetwork.node`!.",

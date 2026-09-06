@@ -102,7 +102,7 @@ NomadNet client works. `backend/nomad_node.py` announces on an interval,
 answers `Link`/`Request` with:
 
 - `/page/index.mu` — generated: a branding/landing page (node name, an
-  ASCII SenseCap M1, a short "what is Meshpoint" blurb) linking to
+  blue MESHPOINT wordmark, a short "what is Meshpoint" blurb) linking to
   `info.mu`. An operator `index.mu` in `node_pages_dir` overrides it
   entirely.
 - `/page/info.mu` — generated, **always served** regardless of your

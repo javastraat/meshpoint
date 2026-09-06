@@ -24,6 +24,7 @@ class TestMicronEscape(unittest.TestCase):
 
 class TestNomadNode(unittest.TestCase):
     def _node(self, **kw):
+        kw.setdefault("hardware_description", "a SenseCap M1")
         return NomadNode(
             identity=object(), name="PD2EMC Meshpoint",
             pages_dir="/tmp/does-not-exist/pages", announce_interval_s=21600, **kw,
@@ -55,10 +56,16 @@ class TestNomadNode(unittest.TestCase):
         self.assertIsInstance(out, bytes)
         text = out.decode("utf-8")
         self.assertIn("PD2EMC Meshpoint", text)
+        self.assertIn("MESHPOINT", text)
         self.assertIn("SenseCap", text)
         self.assertIn("nomadnetwork.node", text)
         self.assertIn(":/page/info.mu", text)
         self.assertEqual(n._requests_served, 1)
+
+    def test_serve_index_without_hardware_description(self) -> None:
+        n = self._node(hardware_description="")
+        text = n._serve_index("/page/index.mu", None, 1, 1, None, 0).decode("utf-8")
+        self.assertIn("runs `!Meshpoint`! -- it captures", text)
 
     def test_serve_info_returns_micron_bytes(self) -> None:
         n = self._node()

@@ -141,6 +141,7 @@ class LxmfService:
         ws_manager: "WebSocketManager",
         node_cfg: Optional[dict] = None,
         node_stats_provider=None,
+        hardware_description: str = "",
     ):
         self._display_name = display_name
         self._reticulum_config_dir = Path(reticulum_config_dir)
@@ -151,6 +152,7 @@ class LxmfService:
         self._ws_manager = ws_manager
         self._node_cfg = node_cfg or {"enabled": False}
         self._node_stats_provider = node_stats_provider
+        self._hardware_description = hardware_description
         self._node = None
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._router = None
@@ -238,6 +240,7 @@ class LxmfService:
                 pages_dir=self._node_cfg.get("pages_dir", "data/reticulum/pages"),
                 announce_interval_s=self._node_cfg.get("announce_interval_s", 21600),
                 stats_provider=self._node_stats_provider,
+                hardware_description=self._hardware_description,
             )
             await self._node.start()
 

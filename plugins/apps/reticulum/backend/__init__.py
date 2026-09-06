@@ -75,6 +75,7 @@ def register(reg) -> None:
             ws_manager=context.ws_manager,
             node_cfg=state.node_config(),
             node_stats_provider=node_stats,
+            hardware_description=context.config.device.hardware_description,
         )
 
     def wire(service, context):

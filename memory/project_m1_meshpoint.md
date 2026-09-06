@@ -11599,6 +11599,57 @@ Implemented in `plugins/apps/reticulum/backend/nomad_node.py`:
   index/info split; new CHANGELOG bullet under v0.8.1 (81 bullets,
   `ChangelogParser` re-verified clean).
 - **Not yet committed** (user's standing instruction this session: don't
-  commit without being asked) and not live-tested on the Pi -- next step
-  when deployed is confirming a real NomadNet client renders the ASCII art
-  and both pages correctly over an actual RNS Link.
+  commit without being asked).
+
+**Same session, immediately after: live-tested on a real device (RAK V2,
+`ti-meshpoint`) and the ASCII art broke.** Screenshot from the dashboard's
+own Browse tab showed the SenseCap M1 box scattered into fragments (the
+"o"/pipe/box pieces drifted right of the text instead of forming a box).
+Root cause: Micron's `` `c ``/`` `a `` centre-align toggle centers *each
+line independently* within the client's render width, so a multi-line
+ASCII shape can't stay aligned across lines the way it can in a plain
+monospace terminal. Fixed by replacing `_ASCII_M1` entirely with a single
+bold blue "MESHPOINT" wordmark line (`` `F38f `` -- Micron's 3-hex-digit
+foreground colour, each digit doubled like CSS shorthand, so `38f` ->
+`#3388ff`, the closest clean match to the dashboard's own
+`--accent-blue: #3b82f6`) -- a single line can't misalign with itself.
+`_ASCII_M1` constant removed from `nomad_node.py` entirely.
+
+**User also caught two real accuracy/functionality bugs from the same
+screenshot:**
+1. The blurb hardcoded "on a SenseCap M1" — wrong for a RAK V2 (or any
+   other supported carrier board). Threaded `device.hardware_description`
+   from `AppConfig` all the way through: `backend/__init__.py`'s
+   `build(context)` now passes `context.config.device.hardware_description`
+   to `LxmfService(...)`, which passes it to `NomadNode(...)`
+   (`hardware_description` param on both, default `""`); the blurb line
+   is now `"This node runs Meshpoint" + (" on {desc}" if set else "")`.
+2. The GitHub link on the page didn't open from the Reticulum page's own
+   **Browse** tab (user suspected a Micron scheme issue, suggesting
+   `nomadnetwork://...` -- traced and confirmed that's not a real thing:
+   `nomadnetwork://` is purely `reticulum_micron.js`'s own display-only
+   href prefix, stripped again before any click handling runs). Real bug:
+   `reticulum_nomad.js`'s `_followLink` always parsed the link target as
+   a `<hash>:/page/...` Reticulum address with no `http(s)://` special
+   case, unlike reticulum-meshchat's own parser this was ported from
+   (`onNodePageUrlClick` in `NomadNetworkPage.vue`, which `window.open()`s
+   `http(s)://` targets directly) -- so any external link surfaced "Link
+   has no node — nothing to open" instead of opening a tab. Fixed with the
+   same `http(s)://` prefix check, `window.open(addrPart, '_blank',
+   'noopener')`. The Micron markup itself (`` `[label`https://...] ``)
+   was already correct and needed no change.
+
+Tests: `test_serve_index_returns_branding_page` updated for the wordmark
+(`assertIn("MESHPOINT", text)`); new
+`test_serve_index_without_hardware_description` covers the no-hardware
+fallback wording; `_node()` test helper now defaults
+`hardware_description="a SenseCap M1"`. 11 tests green (1 skip, same
+RNS-installed-on-Mac reason as before). `node --check` clean on
+`reticulum_nomad.js`. `ChangelogParser` re-verified clean, still 81
+bullets (extended the same bullet rather than adding new ones, since it's
+all fixes to the feature just shipped in this same uncommitted change-set).
+
+**Still not committed, still not live-verified after this second round of
+fixes** -- next step when deployed is re-confirming the wordmark renders
+correctly (not just "doesn't fragment") and the GitHub link opens from
+both the dashboard's own Browse tab and a real external NomadNet client.
