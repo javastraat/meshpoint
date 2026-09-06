@@ -73,17 +73,33 @@ def live() -> list[tuple[str, Any]]:
 async def start_all(context: ServiceContext) -> None:
     """Build, wire and ``start()`` every registered service, in registration
     order. A ``build`` returning ``None`` is skipped. Meant to run once per
-    app lifecycle, with ``reset()`` between test runs."""
+    app lifecycle, with ``reset()`` between test runs.
+
+    A service whose ``build``/``wire``/``start`` raises is logged and
+    skipped -- one plugin service failing must never abort meshpoint
+    startup, the same isolation guarantee the plugin loader gives
+    ``register()``. (Real case: the reticulum plugin's ``RNS.Reticulum()``
+    hitting "Address already in use" when it starts a beat before rnsd
+    finishes coming up -- a transient it recovers from on the next
+    restart, not a reason to crash-loop the whole dashboard.) A service
+    that got as far as ``start()`` before raising is still tracked for
+    ``stop_all()``, since it may hold resources."""
     _live.clear()
     for spec in _plugin_specs:
-        service = spec.build(context)
-        if service is None:
-            logger.info("plugin service %s opted out of startup", spec.name)
-            continue
-        if spec.wire is not None:
-            spec.wire(service, context)
-        await service.start()
-        _live.append((spec.name, service))
+        try:
+            service = spec.build(context)
+            if service is None:
+                logger.info("plugin service %s opted out of startup", spec.name)
+                continue
+            if spec.wire is not None:
+                spec.wire(service, context)
+            _live.append((spec.name, service))
+            await service.start()
+        except Exception:  # noqa: BLE001 - one service must not abort startup
+            logger.exception(
+                "plugin service %s failed to start -- skipping it, the rest "
+                "of meshpoint starts normally", spec.name,
+            )
 
 
 async def stop_all() -> None:

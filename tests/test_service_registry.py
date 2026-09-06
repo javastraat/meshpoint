@@ -87,6 +87,31 @@ class TestServiceRegistry(unittest.TestCase):
         asyncio.run(service_registry.start_all(_ctx()))
         self.assertEqual([name for name, _ in service_registry.live()], ["keep"])
 
+    def test_a_service_raising_on_start_does_not_abort_the_rest(self) -> None:
+        class _Boom(_FakeService):
+            async def start(self):
+                raise OSError(98, "Address already in use")
+
+        service_registry.register_service(ServiceSpec("boom", lambda c: _Boom("boom")))
+        service_registry.register_service(
+            ServiceSpec("ok", lambda c: _FakeService("ok")),
+        )
+        # must not raise
+        asyncio.run(service_registry.start_all(_ctx()))
+        live = dict(service_registry.live())
+        self.assertTrue(live["ok"].started)  # the healthy one still came up
+
+    def test_a_build_raising_does_not_abort_the_rest(self) -> None:
+        def _bad_build(_c):
+            raise RuntimeError("bad config")
+
+        service_registry.register_service(ServiceSpec("bad", _bad_build))
+        service_registry.register_service(
+            ServiceSpec("ok", lambda c: _FakeService("ok")),
+        )
+        asyncio.run(service_registry.start_all(_ctx()))
+        self.assertEqual([n for n, _ in service_registry.live()], ["ok"])
+
     def test_start_all_is_idempotent_per_call(self) -> None:
         service_registry.register_service(
             ServiceSpec("x", lambda c: _FakeService("x")),

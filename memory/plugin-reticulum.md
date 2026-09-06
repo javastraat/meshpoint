@@ -335,6 +335,13 @@ lorawan.css`'s `[data-section="reticulum"]` + `topbar.css`'s `.topbar-reticulum`
 dropped a `_reticulum_service` reset line. `TestShippedReticulumPlugin` stays
 `@skipUnless(_HAS_FASTAPI)`. 135 passed / 12 skipped on the Mac subset.
 
+**Hardening (same commit), motivated by the Pi flip:** `service_registry.start_all`
+now wraps each service's `build`/`wire`/`start` in try/except -- a failure is
+logged + skipped, meshpoint starts normally. The Pi flip hit `RNS.Reticulum()`
+→ `[Errno 98] Address already in use` when meshpoint started a beat before rnsd
+finished; the exception propagated through the lifespan and crash-looped
+(`Meshpoint started` x3) until rnsd was up. Now it degrades gracefully. +2 tests.
+
 ---
 
 ## Migration diff for the Pi (Phase 4 flip)
