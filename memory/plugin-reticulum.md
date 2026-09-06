@@ -17,7 +17,7 @@ Update this block as phases land. `[ ]` todo, `[~]` in progress, `[x]` done.
 - [x] **Phase 0** — `add_service` core seam ✅ (commit pending). `write_rnsd_config.py` repoint + `_run_systemctl` lift **deferred** — see notes below.
 - [x] **Phase 1** — plugin backend scaffold ✅ (commit pending). `service` + `routes` only; `config_routes.py` + `_run_systemctl` lift **moved to Phase 2** (coupled to the settings tab + the rnsd-config question).
 - [x] **Phase 2** — plugin frontend. **2a** (commit): sidebar page + **topbar pill**, `sidebar`+`topbar` in `provides`. **2b** (commit): Settings tab (`reticulum_settings_tab.js`) + `backend/config_routes.py` (`GET`/`PUT /api/config/reticulum` → `plugins.reticulum.*` via `state.set_config`/`_persist`, `POST .../restart-rnsd`) + `_run_systemctl` lifted → `src/api/systemctl.py`.
-- [ ] **Phase 3** — Messages page routes reticulum sends to `/api/reticulum/send`
+- [x] **Phase 3** — Messages page routes reticulum sends to `/api/reticulum/send` (commit). `messaging.js._onSendMessage` early-returns to a new `_sendReticulumMessage()` for `protocol==='reticulum'`. Core `messages.py` branch LEFT in place as a fallback (deleted Phase 4). Works live now — core already serves `/api/reticulum/send`.
 - [ ] **Phase 4** — live-verify on the Pi (atomic config flip — see note), screenshots
 - [ ] **Phase 5** — delete core reticulum service/routes/config/frontend. **Includes** repointing `scripts/write_rnsd_config.py` off `config.reticulum` → `config.plugins["reticulum"]` (can't do it earlier — would break the live Pi's rnsd, which reads the old path until the atomic Phase 4 flip).
 - [ ] **Phase 6** — docs (CHANGELOG v0.8.1, PLUGINS.md, CONFIGURATION.md, README, API-ENDPOINTS, plugin README)
@@ -279,12 +279,20 @@ Verified: manifest parses (3 scripts), `node --check` all 3 JS, py compile,
 | `frontend/reticulum_settings_tab.js` | `frontend/js/configuration/reticulum_config_card.js` | Settings tab on the plugin's own page; core `Configuration → Reticulum` nav+card deleted Phase 5 |
 | `frontend/reticulum_panel.css` | extract if needed | |
 
-### Phase 3 — chat send path (option 1)
+### Phase 3 — chat send path (option 1) — ✅ DONE
 
-- `frontend/js/messaging_chat.js` / `messaging_contacts.js`: `protocol === 'reticulum'`
-  thread → POST `/api/reticulum/send` instead of `/api/messages/send`.
-- Conversation list/history unchanged.
-- Core `messages.py` branch left in place (dead once frontend switches); deleted Phase 5.
+- `frontend/js/messaging.js`: `_onSendMessage()` early-returns to new
+  `_sendReticulumMessage(text, convo)` when `convo.protocol === 'reticulum'` —
+  POSTs `{destination_hash: convo.node_id, text}` to `/api/reticulum/send`
+  (returns `{id,status}` / `{detail}`), same optimistic-bubble + status flow.
+  `messaging_chat.js` / `messaging_contacts.js` needed no change (badges only).
+- Conversation list/history unchanged (shared `messages` table).
+- Core `messages.py` `protocol=='reticulum'` branch + `_reticulum_service`
+  global LEFT in place as a fallback; `tests/test_messages_reticulum_send.py`
+  too — both deleted at Phase 4.
+- **Live now:** core already serves `/api/reticulum/send` (its
+  `reticulum_routes.init_routes` runs whenever `config.reticulum.enabled`), so
+  the reroute works immediately and keeps working after the plugin takes over.
 
 ### Phase 4 — live-verify on the Pi (gate before any deletion)
 

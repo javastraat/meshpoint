@@ -130,6 +130,16 @@ class MessagingPanel {
     }
 
     async _onSendMessage(text, convo) {
+        // Reticulum has a completely separate send path (LXMF over rnsd,
+        // not a Meshtastic/MeshCore radio TX). It has its own dedicated
+        // endpoint -- POST there directly rather than through
+        // /api/messages/send's generic dispatch. (Core's messages.py
+        // still special-cases protocol=='reticulum' too, as a fallback,
+        // until the Reticulum-to-plugin cutover removes it.)
+        if ((convo.protocol || '').toLowerCase() === 'reticulum') {
+            return this._sendReticulumMessage(text, convo);
+        }
+
         const isBroadcast = convo.is_broadcast || (convo.node_id || '').startsWith('broadcast:');
         const destination = isBroadcast ? 'broadcast' : convo.node_id;
 
@@ -193,6 +203,46 @@ class MessagingPanel {
             }
         } catch (e) {
             console.error('Send failed:', e);
+            this._chat.updateMessageStatus(tempMsg.id, 'network error', '');
+        }
+    }
+
+    /** Reticulum reply -- POST /api/reticulum/send ({destination_hash, text}),
+     * which returns {id, status} on success or {detail} on error. Same
+     * optimistic-bubble + status flow as the generic path above. */
+    async _sendReticulumMessage(text, convo) {
+        const tempMsg = this._chat.addOptimisticMessage(text, 'reticulum');
+        try {
+            const res = await fetch('/api/reticulum/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ destination_hash: convo.node_id, text }),
+            });
+            const result = await res.json().catch(() => ({}));
+
+            if (!res.ok) {
+                const reason = result.detail || `HTTP ${res.status}`;
+                if (res.status === 403) {
+                    this._chat.removeMessage(tempMsg.id);
+                    this._showToast(`Not sent: ${reason}`);
+                } else {
+                    this._chat.updateMessageStatus(tempMsg.id, `failed: ${reason}`, '');
+                }
+                return;
+            }
+
+            this._chat.updateMessageStatus(tempMsg.id, 'sent', String(result.id ?? ''));
+            this._contacts.addOrUpdateConversation({
+                node_id: convo.node_id,
+                node_name: convo.node_name,
+                protocol: 'reticulum',
+                text: text,
+                direction: 'sent',
+                timestamp: new Date().toISOString(),
+            });
+        } catch (e) {
+            console.error('Reticulum send failed:', e);
             this._chat.updateMessageStatus(tempMsg.id, 'network error', '');
         }
     }
