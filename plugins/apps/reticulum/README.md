@@ -108,6 +108,13 @@ answers `Link`/`Request` with:
   default) — an `index.mu` there overrides the generated one
 - `files/**` under that dir, served at `/file/<relpath>`
 
+`sample-pages/index.mu` is a copy-me starter page with a Micron cheat-sheet
+in its header. On the Pi the pages dir is
+`/opt/meshpoint/data/reticulum/pages/` (relative to the service's
+`WorkingDirectory`); it isn't auto-created, and handlers are registered once
+at startup so new/changed `.mu` files need a `systemctl restart meshpoint`.
+Toggling `node_enabled` needs a restart too.
+
 ```yaml
 plugins:
   reticulum:

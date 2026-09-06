@@ -161,7 +161,9 @@ class ReticulumSettingsTab {
                                 <span class="cfg-field__hint">
                                     Drop <code>.mu</code> files here for extra pages; files under
                                     a <code>files/</code> subdir are served at <code>/file/…</code>.
-                                    A built-in index page shows live Meshpoint stats.
+                                    A built-in index page shows live Meshpoint stats; an
+                                    <code>index.mu</code> here replaces it — see
+                                    <code>plugins/apps/reticulum/sample-pages/index.mu</code>.
                                     Changes need a restart.
                                 </span>
                             </label>

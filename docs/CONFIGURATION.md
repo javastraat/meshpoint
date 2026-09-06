@@ -242,8 +242,20 @@ plugins:
 Registers a `nomadnetwork.node` destination on the *same identity* as your
 LXMF address, announces it, and serves a built-in `/page/index.mu` (live
 Meshpoint stats + an about blurb), a `/page/nodes.mu` (other nodes you've
-heard), and any `.mu` file in `node_pages_dir`. Changes need a meshpoint
-restart.
+heard), and any `.mu` file in `node_pages_dir`. A file named `index.mu` there
+*replaces* the built-in one — `plugins/apps/reticulum/sample-pages/index.mu`
+is a copy-me starter with a Micron cheat-sheet in its header:
+
+```bash
+mkdir -p /opt/meshpoint/data/reticulum/pages
+cp /opt/meshpoint/plugins/apps/reticulum/sample-pages/index.mu \
+   /opt/meshpoint/data/reticulum/pages/index.mu
+sudo systemctl restart meshpoint
+```
+
+The pages dir isn't auto-created, and request handlers are registered once
+at startup, so adding/changing `.mu` files — and toggling `node_enabled` —
+needs a meshpoint restart.
 
 **Why it's opt-in**: meshpoint's `RNS.Reticulum()` call attaches to a
 locally-running `rnsd` shared instance as a *client*, never opening a radio
