@@ -11528,9 +11528,33 @@ sidebar icon glyph. `_BUILTIN_ROUTERS` 51 -> 49. CHANGELOG has the
 ⚠️ breaking-config entry; CONFIGURATION.md got a stub redirect note (full
 rewrite = Phase 6). 89 passed on the Mac subset.
 
-**Next:** the atomic Pi flip -- user edits `local.yaml` (`reticulum:` ->
-`plugins.reticulum:` + `enabled: true`, migration diff in
-`memory/plugin-reticulum.md`), `restart meshpoint` + `restart rnsd`,
-verify page (4th Settings tab) / pill / send / settings / rnsd restart.
-Then Phase 6 = full docs (CONFIGURATION.md §, README, PLUGINS.md
-"nine seams", API-ENDPOINTS.md).
+**The atomic Pi flip did happen** (this note just never got updated after --
+confirmed 2026-09-06 by inspecting a real device's `local.yaml`, which has
+`plugins.reticulum.enabled: true` plus the full migrated key set
+`rnode_*`/`reticulum_config_dir`/`identity_path`/`lxmf_storage_dir`/
+`node_enabled`/etc., no top-level `reticulum:` key left). Everything from
+Phase 6 onward (docs) and substantial further plugin feature work --
+NomadNet node hosting, browsing, file downloads, the plugin owning its own
+`rnsd` setup, the sample `index.mu` -- shipped and iterated on top of the
+live flip across the following sessions (see the `reticulum plugin --`
+commits after this point). Treat the plugin as the sole, live, enabled
+Reticulum implementation on deployed devices going forward; core has no
+Reticulum code left at all.
+
+**2026-09-06, later session: GitHub CI failure fixed.**
+`test_nomad_node.py::test_start_is_a_no_op_without_rns` failed on CI --
+CI has the real `rns` package installed (unlike the dev Mac's stub-only
+setup for *other* deps, `rns` itself turns out to be installed there too),
+so the test's `if RNS is None` runtime guard never fired and `NomadNode.start()`
+ran `RNS.Destination(object(), ...)` for real, crashing on `identity.hexhash`
+missing from the plain `object()` stand-in identity. Fixed by matching the
+sibling not-available-path tests' own established convention
+(`test_lxmf_service.py::TestLxmfServiceWithoutRns`, `test_nomad.py::TestNomadWithoutRns`):
+`@unittest.skipIf(nomad_node.RNS is not None, ...)` on the test method
+instead of relying on env-dependent runtime behavior. Verified locally --
+reproduces the same skip Mac-side (rns is installed there too, confirming
+this was never Mac-vs-CI, just an unguarded test). `docs/CHANGELOG.md`
+v0.8.1 NomadNet-hosting bullet extended in place (not a new bullet, matching
+this repo's own precedent of folding a same-feature CI test-skip fix into
+the feature's existing bullet); `ChangelogParser.parse_file()` re-verified
+clean, 80 bullets under v0.8.1.

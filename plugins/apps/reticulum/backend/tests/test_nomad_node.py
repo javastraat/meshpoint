@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import unittest
 
+from plugins.apps.reticulum.backend import nomad_node as nomad_node_module
 from plugins.apps.reticulum.backend.nomad_node import NomadNode, _esc
 
 
@@ -32,6 +33,10 @@ class TestNomadNode(unittest.TestCase):
         n = NomadNode(identity=object(), name="x", pages_dir="/tmp/x", announce_interval_s=1)
         self.assertGreaterEqual(n._announce_interval_s, 600)
 
+    @unittest.skipIf(
+        nomad_node_module.RNS is not None,
+        "rns installed -- this covers only the not-available path",
+    )
     def test_start_is_a_no_op_without_rns(self) -> None:
         n = self._node()
         asyncio.run(n.start())  # must not raise
