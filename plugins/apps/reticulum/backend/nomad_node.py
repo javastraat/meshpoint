@@ -169,6 +169,13 @@ class NomadNode:
 
     # --- announce ------------------------------------------------------
 
+    def announce(self) -> None:
+        """Re-send the ``nomadnetwork.node`` announce on demand (the
+        Reticulum page's Announce button), so a browsing client learns
+        our node hash without waiting for the next automatic one."""
+        if self._destination is not None:
+            self._announce()
+
     def _announce(self) -> None:
         try:
             self._destination.announce(app_data=self._name.encode("utf-8"))

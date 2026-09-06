@@ -64,6 +64,11 @@ class TestNomadNode(unittest.TestCase):
         self.assertIn("libstalin.so", text)
         self.assertIn("abcd:/page/index.mu", text)
 
+    def test_announce_is_a_no_op_before_start(self) -> None:
+        n = self._node()
+        n.announce()  # _destination is None -> must not raise
+        self.assertIsNone(n._last_announce)
+
     def test_serve_nodes_empty(self) -> None:
         n = self._node()
         text = n._serve_nodes("/page/nodes.mu", None, 1, 1, None, 0).decode("utf-8")

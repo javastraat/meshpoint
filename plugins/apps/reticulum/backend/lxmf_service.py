@@ -394,3 +394,7 @@ class LxmfService:
         if self._source is None:
             raise RuntimeError("Reticulum service is not running")
         self._source.announce()
+        if self._node is not None:
+            # one identity, two aspects -- announce the node hash too so
+            # "Announce" refreshes both "message me" and "browse me".
+            self._node.announce()
