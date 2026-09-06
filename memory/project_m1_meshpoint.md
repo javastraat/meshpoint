@@ -11454,9 +11454,14 @@ can't ride the packet pipeline for its start/stop lifecycle the way
   `"service"` in `KNOWN_PROVIDES` (backend-only, no frontend script req).
 - `server.py`: `start_all()` right after `capture_source_registry.wire_all()`
   + `message_repo`; `stop_all()` after `listener_registry.stop_all()`.
-- Tests: new `test_service_registry.py` (8), +2 facade, +1 manifest.
-  103 passed / 2 skipped / 1 pre-existing env failure (dapnet loader test
-  needs fastapi, absent on Mac -- fails identically on clean stash).
+- Tests: new `test_service_registry.py` (8), +2 facade, +1 manifest,
+  +`TestShippedHelloServicePlugin` (3) in `test_plugin_loader.py`.
+  All green / 1 pre-existing env failure (dapnet loader test needs
+  fastapi, absent on Mac -- fails identically on clean stash).
+- New reference plugin `plugins/apps/hello-service/` (`provides =
+  ["service"]`, locked, disabled by default) -- a `HelloService` that
+  logs on start/stop. Minimal worked example + Pi verification probe
+  (`journalctl -u meshpoint | grep hello_service`).
 - CHANGELOG "Internal:" bullet under v0.8.1.
 - Deferred: `_run_systemctl` lift -> Phase 1; `write_rnsd_config.py`
   repoint -> Phase 5 (repointing now breaks the live Pi's rnsd).

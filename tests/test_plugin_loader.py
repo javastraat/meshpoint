@@ -16,7 +16,13 @@ import textwrap
 import unittest
 from pathlib import Path
 
-from src.api import capture_source_registry, listener_registry, protocol_registry, route_registry
+from src.api import (
+    capture_source_registry,
+    listener_registry,
+    protocol_registry,
+    route_registry,
+    service_registry,
+)
 from src.plugins.loader import load_plugins
 
 _MANIFEST = """\
@@ -354,6 +360,56 @@ class TestShippedDapnetPlugin(unittest.TestCase):
             self._community / "nonexistent-builtin", self._community, {},
         )
         self.assertNotIn("dapnet", [p.manifest.name for p in loaded])
+
+
+class TestShippedHelloServicePlugin(unittest.TestCase):
+    """The real plugins/apps/hello-service/ folder loads and registers a
+    lifespan-managed background service -- the reference for the "service"
+    seam, and (its register() imports nothing heavy) the one shipped
+    service plugin that exercises the whole path on the Mac."""
+
+    def setUp(self) -> None:
+        service_registry.reset()
+        self._community = Path(__file__).resolve().parents[1] / "plugins" / "apps"
+
+    def tearDown(self) -> None:
+        for name in [m for m in list(sys.modules) if m.startswith("meshpoint_plugin_")]:
+            del sys.modules[name]
+        service_registry.reset()
+
+    def test_hello_service_registers_a_service_when_enabled(self) -> None:
+        loaded = load_plugins(
+            self._community / "nonexistent-builtin",
+            self._community,
+            {"hello-service": {"enabled": True}},
+        )
+        self.assertIn("hello-service", [p.manifest.name for p in loaded])
+        self.assertEqual(
+            [s.name for s in service_registry.plugin_specs()], ["hello-service"],
+        )
+
+    def test_hello_service_builds_starts_and_stops(self) -> None:
+        import asyncio
+
+        load_plugins(
+            self._community / "nonexistent-builtin",
+            self._community,
+            {"hello-service": {"enabled": True}},
+        )
+        ctx = service_registry.ServiceContext(
+            pipeline=object(), ws_manager=object(), config=object(),
+        )
+        asyncio.run(service_registry.start_all(ctx))
+        self.assertEqual([n for n, _ in service_registry.live()], ["hello-service"])
+        asyncio.run(service_registry.stop_all())
+        self.assertEqual(service_registry.live(), [])
+
+    def test_hello_service_skipped_when_not_enabled(self) -> None:
+        loaded = load_plugins(
+            self._community / "nonexistent-builtin", self._community, {},
+        )
+        self.assertNotIn("hello-service", [p.manifest.name for p in loaded])
+        self.assertEqual(service_registry.plugin_specs(), [])
 
 
 if __name__ == "__main__":  # pragma: no cover

@@ -1,0 +1,19 @@
+name = "hello-service"
+version = "0.1.0"
+meshpoint_api = 1
+provides = ["service"]     # this plugin only registers a lifespan-managed
+                            # background service via reg.add_service() -- an
+                            # object with async start()/stop(), started right
+                            # after the packet pipeline is up and stopped on
+                            # shutdown. No routes, no frontend, nothing in the
+                            # UI: it's the minimal reference for the "service"
+                            # seam, and it logs on start/stop so it doubles as
+                            # a way to confirm the wiring fires on a real
+                            # device. See docs/PLUGINS.md and
+                            # src/api/service_registry.py.
+locked = true  # shipped with this fork -- not user-installed, can't be deleted
+
+[meta]
+description = "Minimal example plugin: a no-op background service that logs when it starts and stops. Reference for the service seam -- see docs/PLUGINS.md."
+homepage = "https://github.com/KMX415/meshpoint"
+author = "Einstein PD2EMC"

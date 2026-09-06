@@ -121,6 +121,8 @@ Shipped as `feat: "service" plugin capability ...`. What actually landed:
 | `tests/test_service_registry.py` | **new**, 8 tests (asyncio.run style, mirrors `test_listener_registry.py`) |
 | `tests/test_plugin_registry_facade.py` | +2 (`add_service` delegates / rejected) |
 | `tests/test_plugin_manifest.py` | +1 (`service` is a known provides value, no frontend script needed) |
+| `plugins/apps/hello-service/` | **new** reference plugin — `provides = ["service"]`, `locked = true`, a `HelloService` that logs on start/stop (no heavy imports, loads on the Mac). Doubles as the Pi verification probe (`journalctl -u meshpoint \| grep hello_service`) and the Phase 6 doc example. |
+| `tests/test_plugin_loader.py` | +`TestShippedHelloServicePlugin` (3 tests: registers when enabled, builds/starts/stops, skipped when disabled) |
 | `docs/CHANGELOG.md` | "Internal:" bullet under `### v0.8.1` |
 
 Verified: `python3.11 -m pytest tests/test_service_registry.py tests/test_plugin_registry_facade.py
