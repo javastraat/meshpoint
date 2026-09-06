@@ -1,0 +1,32 @@
+[Unit]
+Description=Reticulum Network Stack Daemon (rnsd)
+Documentation=https://github.com/javastraat/meshpoint
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=meshpoint
+Group=meshpoint
+WorkingDirectory=/opt/meshpoint
+# Regenerates rnsd's own config file from local.yaml's
+# plugins.reticulum: section every start -- see write_rnsd_config.py's
+# own docstring for why this must run before rnsd itself, and why it
+# writes into the exact same directory meshpoint's own LxmfService
+# uses (shared-instance RPC auth is per-configdir, confirmed live).
+# Installed by plugins/apps/reticulum/setup.sh.
+ExecStartPre=/opt/meshpoint/venv/bin/python3 /opt/meshpoint/plugins/apps/reticulum/write_rnsd_config.py
+ExecStart=/opt/meshpoint/venv/bin/rnsd --config /opt/meshpoint/data/reticulum/rns_config -s
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=rnsd
+
+# Hardening
+NoNewPrivileges=false
+ProtectSystem=false
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
