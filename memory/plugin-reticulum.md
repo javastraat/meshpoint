@@ -16,7 +16,7 @@ Update this block as phases land. `[ ]` todo, `[~]` in progress, `[x]` done.
 
 - [x] **Phase 0** — `add_service` core seam ✅ (commit pending). `write_rnsd_config.py` repoint + `_run_systemctl` lift **deferred** — see notes below.
 - [x] **Phase 1** — plugin backend scaffold ✅ (commit pending). `service` + `routes` only; `config_routes.py` + `_run_systemctl` lift **moved to Phase 2** (coupled to the settings tab + the rnsd-config question).
-- [~] **Phase 2** — plugin frontend. **2a done** (commit pending): sidebar page + **topbar pill**, `sidebar`+`topbar` added to `provides`. **2b todo**: settings tab + move `config_routes.py` in (`/api/config/reticulum/*` → `plugins.reticulum.*` writes like dapnet's `state._persist()`) + lift `_run_systemctl` → `src/api/systemctl.py`.
+- [x] **Phase 2** — plugin frontend. **2a** (commit): sidebar page + **topbar pill**, `sidebar`+`topbar` in `provides`. **2b** (commit): Settings tab (`reticulum_settings_tab.js`) + `backend/config_routes.py` (`GET`/`PUT /api/config/reticulum` → `plugins.reticulum.*` via `state.set_config`/`_persist`, `POST .../restart-rnsd`) + `_run_systemctl` lifted → `src/api/systemctl.py`.
 - [ ] **Phase 3** — Messages page routes reticulum sends to `/api/reticulum/send`
 - [ ] **Phase 4** — live-verify on the Pi (atomic config flip — see note), screenshots
 - [ ] **Phase 5** — delete core reticulum service/routes/config/frontend. **Includes** repointing `scripts/write_rnsd_config.py` off `config.reticulum` → `config.plugins["reticulum"]` (can't do it earlier — would break the live Pi's rnsd, which reads the old path until the atomic Phase 4 flip).
@@ -221,6 +221,43 @@ the frontend cutover is atomic with the Phase 4 flip.
 
 Verified: manifest parses (`provides` + `frontend_scripts` + `[sidebar]`), `node --check` both JS
 files, 77 passed / 6 skipped.
+
+### Phase 2b — Settings tab + config_routes + systemctl lift — ✅ DONE
+
+- `src/api/systemctl.py` (**new**) — `run_systemctl(*args)` lifted from
+  `rnode_firmware_routes.py`, which now does `from src.api.systemctl import
+  run_systemctl as _run_systemctl` (keeps the old private name working for its
+  own uses AND for core's `reticulum_config_routes.py`, which imports it from
+  there until Phase 5).
+- `plugins/apps/reticulum/backend/config_routes.py` (**new**, from
+  `src/api/routes/reticulum_config_routes.py`):
+  - `GET /api/config/reticulum` → `state.to_dict()` (new — the settings tab
+    needs its own load; core's card read the full `/api/config`)
+  - `PUT /api/config/reticulum` — pydantic `ReticulumUpdate` (bandwidth
+    whitelist kept), **no `enabled` field** (Settings→Plugins owns it),
+    → `state.set_config()` → `state._persist()` → `plugins.reticulum.*`
+  - `POST /api/config/reticulum/restart-rnsd` → `run_systemctl("restart","rnsd")`
+- `backend/state.py` +`set_config()` / `_current_saved_config()` / `_persist()`
+  (mirror dapnet's `state.py`; `_ALLOWED_UPDATE_KEYS` excludes `enabled`).
+- `backend/__init__.py` +`reg.add_router(config_routes.router)`.
+- `frontend/reticulum_settings_tab.js` (**new**, from `reticulum_config_card.js`)
+  — plain-`fetch` tab class (`show`/`hide`/`_mount`/`_load`), own `_request`/
+  `_toast` (dapnet pattern), port picker from `/api/config/serial-ports` +
+  usage map from `/api/config`, `window.confirmModal` for the rnsd restart.
+  No `enabled` checkbox.
+- `frontend/reticulum_panel.js` — 4th tab "Settings" (admin-only), instantiates
+  `window.ReticulumSettingsTab` in `mount()`, forwards `show()`/`hide()`.
+- `plugin.toml` — settings-tab script added to `[frontend].scripts`.
+- Tests: `test_systemctl.py` (**new**, 2), `test_state.py` +4 (set_config /
+  persist-merge), loader test asserts `/api/config` prefix registered too.
+
+**Route shadowing during coexistence** (same as Phase 1): core's
+`reticulum_config_routes` (in `_BUILTIN_ROUTERS`) wins `PUT /api/config/reticulum`
++ the restart route over the plugin's. Moot — the settings tab is dormant until
+Phase 4, and core's routes are deleted at the cutover, so the plugin's win then.
+
+Verified: manifest parses (3 scripts), `node --check` all 3 JS, py compile,
+89 passed / 6 skipped, ruff clean.
 
 ### Phase 2 — plugin frontend (coexists)
 

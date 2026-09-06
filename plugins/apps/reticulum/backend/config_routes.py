@@ -1,0 +1,121 @@
+"""Reticulum RNode/backbone settings -- the plugin's own Settings tab.
+
+Moved from ``src/api/routes/reticulum_config_routes.py``. Two shape changes
+for the plugin:
+
+* Reads/writes ``plugins.reticulum.*`` (via ``backend/state.py``) instead
+  of the core ``AppConfig.reticulum`` dataclass + ``save_section_to_yaml``.
+* No ``enabled`` field -- Settings -> Plugins' own toggle is the sole
+  on/off switch now, same as every other shipped plugin.
+
+Unchanged: a save here only updates ``local.yaml`` -- the RNode/backbone
+fields are only ever read by ``scripts/write_rnsd_config.py``, which runs
+as ``rnsd``'s own ``ExecStartPre``, so applying those needs an rnsd
+restart too. ``restart_rnsd()`` gives the Settings tab a direct way to
+trigger that, reusing the narrowly-scoped ``sudo systemctl ... rnsd``
+helper (now ``src.api.systemctl``).
+
+NOTE (until the reticulum-to-plugin cutover): ``scripts/write_rnsd_config.py``
+still reads the core ``reticulum:`` section, not ``plugins.reticulum``, so
+edits made here don't reach rnsd yet. Repointed in the Phase 5 cutover.
+"""
+
+from __future__ import annotations
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field, field_validator
+
+from src.api.audit import AuditLogWriter
+from src.api.audit.dependencies import get_audit_writer
+from src.api.auth.dependencies import require_admin
+from src.api.auth.jwt_session import SessionClaims
+from src.api.systemctl import run_systemctl
+
+from . import state
+
+router = APIRouter(prefix="/api/config", tags=["config", "reticulum"])
+
+# SX127x/SX126x (every RNode board) only accept these LoRa bandwidths --
+# anything else silently fails to key up, so reject early rather than let a
+# typo reach rnsd only to be discovered on the next restart.
+_VALID_BANDWIDTHS_HZ = frozenset(
+    {7800, 10400, 15600, 20800, 31250, 41700, 62500, 125000, 250000, 500000}
+)
+
+
+class ReticulumUpdate(BaseModel):
+    display_name: str = "Meshpoint"
+    rnode_serial_port: str = ""
+    rnode_frequency_hz: int = Field(..., ge=100_000_000, le=1_000_000_000)
+    rnode_bandwidth_hz: int = 125_000
+    rnode_tx_power: int = Field(20, ge=0, le=22)
+    rnode_spreading_factor: int = Field(8, ge=5, le=12)
+    rnode_coding_rate: int = Field(5, ge=5, le=8)
+    backbone_host: str = "node.reticulumnet.nl"
+    backbone_port: int = Field(4242, ge=1, le=65535)
+
+    @field_validator("rnode_bandwidth_hz")
+    @classmethod
+    def _check_bandwidth(cls, value: int) -> int:
+        if value not in _VALID_BANDWIDTHS_HZ:
+            allowed = ", ".join(str(v) for v in sorted(_VALID_BANDWIDTHS_HZ))
+            raise ValueError(f"rnode_bandwidth_hz must be one of: {allowed}")
+        return value
+
+    @field_validator("display_name", "backbone_host")
+    @classmethod
+    def _non_empty(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("must not be empty")
+        return stripped
+
+
+@router.get("/reticulum")
+async def get_reticulum(_claims: SessionClaims = Depends(require_admin)):
+    """Current ``plugins.reticulum.*`` values for the Settings tab to load.
+    ``enabled`` is deliberately not here -- Settings -> Plugins owns it."""
+    return state.to_dict()
+
+
+@router.put("/reticulum")
+async def update_reticulum(
+    req: ReticulumUpdate,
+    claims: SessionClaims = Depends(require_admin),
+    audit: AuditLogWriter = Depends(get_audit_writer),
+):
+    updates = {
+        "display_name": req.display_name,
+        "rnode_serial_port": req.rnode_serial_port.strip(),
+        "rnode_frequency_hz": req.rnode_frequency_hz,
+        "rnode_bandwidth_hz": req.rnode_bandwidth_hz,
+        "rnode_tx_power": req.rnode_tx_power,
+        "rnode_spreading_factor": req.rnode_spreading_factor,
+        "rnode_coding_rate": req.rnode_coding_rate,
+        "backbone_host": req.backbone_host,
+        "backbone_port": req.backbone_port,
+    }
+    with audit.timed_action(
+        user=claims.subject,
+        action="config.reticulum_update",
+        params={k: v for k, v in updates.items() if k != "rnode_serial_port"},
+    ):
+        try:
+            state.set_config(updates)
+        except PermissionError as exc:
+            raise HTTPException(403, str(exc)) from exc
+    return {"saved": True, "restart_required": True}
+
+
+@router.post("/reticulum/restart-rnsd")
+async def restart_rnsd(_claims: SessionClaims = Depends(require_admin)):
+    """Restart the opt-in ``rnsd`` systemd unit so it re-runs
+    ``write_rnsd_config.py`` and reconnects with the saved RNode/backbone
+    settings. Errors clearly if rnsd isn't installed as a service."""
+    rc, out = await run_systemctl("restart", "rnsd")
+    if rc != 0:
+        raise HTTPException(
+            502,
+            f"systemctl restart rnsd failed (exit {rc}): {out or 'no output'}",
+        )
+    return {"success": True, "output": out}

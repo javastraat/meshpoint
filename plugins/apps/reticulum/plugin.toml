@@ -6,19 +6,18 @@ provides = ["service", "routes", "sidebar", "topbar"]
                                     #            client attach), started right
                                     #            after the pipeline is up,
                                     #            stopped on shutdown
-                                    #   routes   /api/reticulum/* (status,
-                                    #            peers, messages, send, announce)
+                                    #   routes   /api/reticulum/* (status, peers,
+                                    #            messages, send, announce) +
+                                    #            /api/config/reticulum (settings)
                                     #   sidebar  the Reticulum page (Peers /
-                                    #            Messages / Send tabs)
+                                    #            Messages / Send / Settings tabs)
                                     #   topbar   the compact status pill
-                                    # RNode/backbone settings (config_routes +
-                                    # a Settings tab) land in Phase 2b. See
-                                    # memory/plugin-reticulum.md.
 locked = true  # shipped with this fork -- not user-installed, can't be deleted
 
 [frontend]
 scripts = [
     "frontend/reticulum_panel.js",
+    "frontend/reticulum_settings_tab.js",
     "frontend/reticulum_topbar_chip.js",
 ]
 

@@ -6,6 +6,7 @@ Pure Python -- backend.state has no FastAPI / RNS import.
 from __future__ import annotations
 
 import unittest
+from unittest import mock
 
 from plugins.apps.reticulum.backend import state
 
@@ -52,6 +53,53 @@ class TestReticulumState(unittest.TestCase):
     def test_rnode_serial_port_empty_string_is_taken_verbatim(self) -> None:
         state.init({"rnode_serial_port": ""})
         self.assertEqual(state.to_dict()["rnode_serial_port"], "")
+
+
+class TestReticulumStateWrites(unittest.TestCase):
+    def setUp(self) -> None:
+        state.init({})
+        self._persist = mock.patch.object(state, "_persist")
+        self._persist.start()
+
+    def tearDown(self) -> None:
+        self._persist.stop()
+        state.init({})
+
+    def test_set_config_merges_and_persists(self) -> None:
+        state.set_config({"display_name": "PD2EMC", "backbone_port": 4243})
+        self.assertEqual(state.display_name(), "PD2EMC")
+        self.assertEqual(state.to_dict()["backbone_port"], 4243)
+        state._persist.assert_called_once()
+
+    def test_set_config_ignores_unknown_keys(self) -> None:
+        state.set_config({"display_name": "X", "enabled": True, "bogus": 1})
+        d = state.to_dict()
+        self.assertEqual(d["display_name"], "X")
+        self.assertNotIn("enabled", d)  # enabled is the Settings->Plugins toggle
+        self.assertNotIn("bogus", d)
+
+
+class TestReticulumStatePersistMerge(unittest.TestCase):
+    """_persist() must preserve fields it doesn't manage (like "enabled")
+    even though to_dict() never includes them -- save_section_to_yaml does
+    a shallow per-section dict.update()."""
+
+    def tearDown(self) -> None:
+        state.init({})
+
+    def test_persist_merges_over_current_saved_config(self) -> None:
+        state.init({"display_name": "Merged"})
+        with mock.patch.object(
+            state, "_current_saved_config",
+            return_value={"enabled": True, "extra": "kept"},
+        ), mock.patch("src.config.save_section_to_yaml") as mock_save:
+            state._persist()
+        mock_save.assert_called_once()
+        (section, values), _ = mock_save.call_args
+        self.assertEqual(section, "plugins")
+        self.assertTrue(values["reticulum"]["enabled"])
+        self.assertEqual(values["reticulum"]["extra"], "kept")
+        self.assertEqual(values["reticulum"]["display_name"], "Merged")
 
 
 if __name__ == "__main__":  # pragma: no cover

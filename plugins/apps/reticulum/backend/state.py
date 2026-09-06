@@ -85,3 +85,54 @@ def lxmf_storage_dir() -> str:
 
 def to_dict() -> dict[str, Any]:
     return dict(_config)
+
+
+# --- settings-tab writes ----------------------------------------------------
+
+_ALLOWED_UPDATE_KEYS = frozenset(_DEFAULTS)  # never "enabled" -- that's the
+# Settings -> Plugins toggle, same as every other plugin.
+
+
+def set_config(updates: dict) -> None:
+    """Merge settings-tab values (already validated by config_routes.py's
+    pydantic model) into state and persist to ``plugins.reticulum``. A
+    ``DapnetSerialSource``-style live effect isn't possible here -- the
+    LxmfService reads these once at construction -- so, like every other
+    plugin's config change, this takes effect on the next restart (and,
+    for the RNode/backbone fields, an rnsd restart too)."""
+    global _config
+    merged = dict(_config)
+    for key, value in updates.items():
+        if key in _ALLOWED_UPDATE_KEYS:
+            merged[key] = value
+    _config = merged
+    _persist()
+
+
+def _current_saved_config() -> dict:
+    """Read ``plugins.reticulum``'s CURRENT on-disk shape (not this
+    module's load-time snapshot) so a settings save never clobbers a
+    same-session Settings -> Plugins enable/disable toggle -- same
+    reasoning as the DAPNET plugin's own state._current_saved_config()."""
+    import yaml
+
+    from src.config import _get_local_yaml_path  # noqa: SLF001 -- see docstring
+
+    path = _get_local_yaml_path()
+    if not path.exists():
+        return {}
+    with open(path) as fh:
+        data = yaml.safe_load(fh) or {}
+    section = data.get("plugins")
+    if not isinstance(section, dict):
+        return {}
+    current = section.get("reticulum")
+    return dict(current) if isinstance(current, dict) else {}
+
+
+def _persist() -> None:
+    from src.config import save_section_to_yaml
+
+    current = _current_saved_config()
+    current.update(to_dict())
+    save_section_to_yaml("plugins", {"reticulum": current})

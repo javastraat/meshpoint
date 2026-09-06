@@ -437,10 +437,9 @@ class TestShippedReticulumPlugin(unittest.TestCase):
             {"reticulum": {"enabled": True}},
         )
         self.assertIn("reticulum", [p.manifest.name for p in loaded])
-        self.assertTrue(
-            any(getattr(s.router, "prefix", "") == "/api/reticulum"
-                for s in route_registry.registered())
-        )
+        prefixes = {getattr(s.router, "prefix", "") for s in route_registry.registered()}
+        self.assertIn("/api/reticulum", prefixes)   # peers/messages/send/announce
+        self.assertIn("/api/config", prefixes)      # /api/config/reticulum settings
         self.assertEqual(
             [s.name for s in service_registry.plugin_specs()], ["reticulum"],
         )

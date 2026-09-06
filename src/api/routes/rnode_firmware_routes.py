@@ -55,6 +55,10 @@ from src.api.audit import AuditLogWriter
 from src.api.audit.dependencies import get_audit_writer
 from src.api.auth.dependencies import require_admin
 from src.api.auth.jwt_session import SessionClaims
+# Re-exported under the old private name for this module's own uses and for
+# src/api/routes/reticulum_config_routes.py, which imports it from here
+# until that file goes away in the reticulum-to-plugin cutover.
+from src.api.systemctl import run_systemctl as _run_systemctl
 from src.config import AppConfig
 
 logger = logging.getLogger(__name__)
@@ -353,20 +357,6 @@ async def _stream_eeprom_wipe(port: str) -> AsyncIterator[bytes]:
     })
 
 
-async def _run_systemctl(*args: str) -> tuple[int, str]:
-    """Runs ``sudo systemctl <args>``, returning (returncode, combined
-    output). Scoped to exactly the three ``rnsd`` subcommands granted
-    in config/sudoers-meshpoint -- see that file's own comment for why
-    this exists (rnsd holds the RNode's serial port open continuously,
-    conflicting with rnodeconf needing exclusive access to flash)."""
-    process = await asyncio.create_subprocess_exec(
-        "sudo", "systemctl", *args,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.STDOUT,
-    )
-    output = await process.stdout.read() if process.stdout else b""
-    returncode = await process.wait()
-    return returncode, output.decode("utf-8", errors="replace").strip()
 
 
 def _rnsd_owns_port(port_aliases: set) -> bool:

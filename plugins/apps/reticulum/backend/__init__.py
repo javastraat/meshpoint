@@ -28,13 +28,14 @@ from __future__ import annotations
 def register(reg) -> None:
     from src.storage.message_repository import MessageRepository
 
-    from . import routes, state
+    from . import config_routes, routes, state
     from .lxmf_service import LxmfService
     from .peer_repo import ReticulumPeerRepository
 
     state.init(reg.config)
 
     reg.add_router(routes.router)
+    reg.add_router(config_routes.router)
 
     def build(context):
         service = LxmfService(

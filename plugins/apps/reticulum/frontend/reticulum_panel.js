@@ -50,8 +50,10 @@ class ReticulumPanel {
         this._isAdmin = window.meshpointIdentity?.role !== 'viewer';
         let stored = null;
         try { stored = localStorage.getItem(RT_TAB_STORE_KEY); } catch (_) {}
-        this._tab = (stored === 'messages' || (stored === 'send' && this._isAdmin))
+        this._tab = (stored === 'messages'
+            || ((stored === 'send' || stored === 'settings') && this._isAdmin))
             ? stored : 'peers';
+        this._settingsTab = null;
         this._onWsPeer = this._onWsPeer.bind(this);
         this._onWsMessage = this._onWsMessage.bind(this);
     }
@@ -102,6 +104,8 @@ class ReticulumPanel {
                                     data-rt-tab="messages">Messages</button>
                             <button class="lw-tab" type="button" role="tab"
                                     data-rt-tab="send" ${this._isAdmin ? '' : 'hidden'}>Send</button>
+                            <button class="lw-tab" type="button" role="tab"
+                                    data-rt-tab="settings" ${this._isAdmin ? '' : 'hidden'}>Settings</button>
                         </div>
                     </div>
                     <div data-rt-view="peers">
@@ -155,6 +159,9 @@ class ReticulumPanel {
                             </p>
                         </div>
                     </div>
+                    <div data-rt-view="settings" hidden>
+                        <div class="panel__body" data-rt-settings-body></div>
+                    </div>
                     <div data-rt-view="send" hidden>
                         <div class="panel__body">
                             <form class="cfg-form" id="rt-send-form" style="max-width:480px">
@@ -185,6 +192,10 @@ class ReticulumPanel {
                 </div>
             </section>
         `;
+
+        if (window.ReticulumSettingsTab) {
+            this._settingsTab = new window.ReticulumSettingsTab(this._q('[data-rt-settings-body]'));
+        }
 
         this._q('#rt-refresh-btn')?.addEventListener('click', () => this._load());
         this._q('#rt-announce-btn')?.addEventListener('click', () => this._handleAnnounce());
@@ -229,6 +240,7 @@ class ReticulumPanel {
             window.concentratorWS.on('reticulum_peer', this._onWsPeer);
             window.concentratorWS.on('reticulum_message', this._onWsMessage);
         }
+        if (this._settingsTab) this._settingsTab.show();
     }
 
     hide() {
@@ -237,6 +249,7 @@ class ReticulumPanel {
         // ConcentratorWebSocket has no unsubscribe primitive -- re-adding
         // the same bound callback on the next show() just means a brief
         // doubled-up refresh, not a real leak (both handlers just reload).
+        if (this._settingsTab) this._settingsTab.hide();
     }
 
     _onWsPeer() { this._loadPeers(); }
@@ -245,6 +258,7 @@ class ReticulumPanel {
     _q(sel) { return this._root ? this._root.querySelector(sel) : null; }
 
     _setTab(tab) {
+        if ((tab === 'send' || tab === 'settings') && !this._isAdmin) return;
         if (tab === this._tab) return;
         this._tab = tab;
         try { localStorage.setItem(RT_TAB_STORE_KEY, tab); } catch (_) {}
