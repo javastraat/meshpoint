@@ -212,13 +212,20 @@ plugins:
 > key" warning until you move it). Same LXMF address/identity (paths default
 > the same), same peer roster (the `reticulum_peers` table is untouched).
 
-The RNode radio + TCP backbone fields (and `display_name`) are also editable
-from the **Settings** tab on the Reticulum page — `rnode_serial_port` is a
-dropdown drawing from the same USB-device enumeration every companion's port
-picker uses. Saving there only updates `local.yaml`; the RNode/backbone fields
-also need `rnsd` to restart (see below), which the tab's **Restart rnsd**
-button does directly. There is no "enabled" checkbox on the tab — Settings →
+The RNode radio + TCP backbone fields (and `display_name`, and the NomadNet
+`nomad_timeout_s`) are also editable from the **Settings** tab on the
+Reticulum page — `rnode_serial_port` is a dropdown drawing from the same
+USB-device enumeration every companion's port picker uses. Saving there only
+updates `local.yaml` (`nomad_timeout_s` applies immediately; the RNode/
+backbone fields also need `rnsd` to restart — the tab's **Restart rnsd**
+button does that). There is no "enabled" checkbox on the tab — Settings →
 Plugins' own toggle is the single on/off switch.
+
+The **Browse** tab is a minimal NomadNet browser — it fetches
+`nomadnetwork.node` peers' Micron pages over RNS Links.
+`plugins.reticulum.nomad_timeout_s` (default 20) is the link/path budget in
+seconds; bump it for multi-hop LoRa-only nodes, which are much slower than
+the TCP backbone.
 
 **Why it's opt-in**: meshpoint's `RNS.Reticulum()` call attaches to a
 locally-running `rnsd` shared instance as a *client*, never opening a radio

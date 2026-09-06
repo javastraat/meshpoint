@@ -173,8 +173,11 @@ Provided by the **Reticulum** plugin (`plugins/apps/reticulum/`, `plugins.reticu
 | GET | `/api/reticulum/messages/{destination_hash}` | Viewer | One conversation's message history (from the shared `messages` table) |
 | POST | `/api/reticulum/send` | Admin | Send a direct LXMF message (`destination_hash`, `text`) — the Messages page posts here for `protocol='reticulum'` conversations |
 | POST | `/api/reticulum/announce` | Admin | Re-send meshpoint's own LXMF delivery announce on demand |
-| GET | `/api/config/reticulum` | Admin | Current `plugins.reticulum.*` — display name + RNode radio + TCP backbone (the page's Settings tab loads this) |
-| PUT | `/api/config/reticulum` | Admin | Save display name / RNode / backbone settings (needs a restart, and `rnsd` restart for RNode/backbone) |
+| GET | `/api/reticulum/nomad/nodes` | Viewer | `nomadnetwork.node` peers in the roster (the Browse tab's node list) |
+| POST | `/api/reticulum/nomad/page` | Admin | Fetch one NomadNet page over an RNS Link (`destination_hash`, `path`, optional `field_data`) → `{ok, content}` (Micron markup) or `{ok: false, error}` |
+| POST | `/api/reticulum/nomad/file` | Admin | Fetch a `/file/...` path → the raw bytes as an attachment, or a 502 |
+| GET | `/api/config/reticulum` | Admin | Current `plugins.reticulum.*` — display name + NomadNet timeout + RNode radio + TCP backbone (the page's Settings tab loads this) |
+| PUT | `/api/config/reticulum` | Admin | Save display name / NomadNet timeout / RNode / backbone settings (the timeout applies immediately; the rest need a restart, and `rnsd` restart for RNode/backbone) |
 | POST | `/api/config/reticulum/restart-rnsd` | Admin | Restart the `rnsd` systemd unit so it re-reads its generated config |
 
 ## Messages (chat)

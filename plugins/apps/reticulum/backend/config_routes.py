@@ -45,6 +45,7 @@ _VALID_BANDWIDTHS_HZ = frozenset(
 
 class ReticulumUpdate(BaseModel):
     display_name: str = "Meshpoint"
+    nomad_timeout_s: int = Field(20, ge=5, le=120)
     rnode_serial_port: str = ""
     rnode_frequency_hz: int = Field(..., ge=100_000_000, le=1_000_000_000)
     rnode_bandwidth_hz: int = 125_000
@@ -86,6 +87,7 @@ async def update_reticulum(
 ):
     updates = {
         "display_name": req.display_name,
+        "nomad_timeout_s": req.nomad_timeout_s,
         "rnode_serial_port": req.rnode_serial_port.strip(),
         "rnode_frequency_hz": req.rnode_frequency_hz,
         "rnode_bandwidth_hz": req.rnode_bandwidth_hz,
@@ -104,6 +106,10 @@ async def update_reticulum(
             state.set_config(updates)
         except PermissionError as exc:
             raise HTTPException(403, str(exc)) from exc
+
+    # nomad_timeout_s takes effect immediately -- the rest need a restart.
+    from . import nomad
+    nomad.set_timeouts(req.nomad_timeout_s)
     return {"saved": True, "restart_required": True}
 
 

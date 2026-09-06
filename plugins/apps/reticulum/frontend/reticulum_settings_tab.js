@@ -57,6 +57,12 @@ class ReticulumSettingsTab {
                                    placeholder="Meshpoint" data-rt-display-name>
                             <span class="cfg-field__hint">Shown to peers over LXMF announces.</span>
                         </label>
+                        <label class="cfg-field cfg-field--narrow">
+                            <span class="cfg-field__label">NomadNet timeout (s)</span>
+                            <input class="cfg-field__input" type="number" min="5" max="120" step="1"
+                                   data-rt-nomad-timeout>
+                            <span class="cfg-field__hint">Browse tab: link/path budget. Bump for multi-hop LoRa nodes. Takes effect immediately.</span>
+                        </label>
                         <fieldset class="cfg-fieldset">
                             <legend class="cfg-fieldset__legend">RNode radio</legend>
                             <label class="cfg-field">
@@ -146,6 +152,7 @@ class ReticulumSettingsTab {
 
         this._form = this._q('[data-rt-form]');
         this._displayName = this._q('[data-rt-display-name]');
+        this._nomadTimeout = this._q('[data-rt-nomad-timeout]');
         this._serialPort = this._q('[data-rt-serial-port]');
         this._frequency = this._q('[data-rt-frequency]');
         this._frequencyMhz = this._q('[data-rt-frequency-mhz]');
@@ -179,6 +186,7 @@ class ReticulumSettingsTab {
 
     _render(rt) {
         if (this._displayName) this._displayName.value = rt.display_name || 'Meshpoint';
+        if (this._nomadTimeout) this._nomadTimeout.value = rt.nomad_timeout_s ?? 20;
         if (this._frequency) {
             this._frequency.value = rt.rnode_frequency_hz ?? 869463000;
             this._renderFrequencyHint();
@@ -279,6 +287,7 @@ class ReticulumSettingsTab {
         event.preventDefault();
         const payload = {
             display_name: this._displayName.value.trim() || 'Meshpoint',
+            nomad_timeout_s: Number(this._nomadTimeout.value) || 20,
             rnode_serial_port: this._serialPort.value,
             rnode_frequency_hz: Number(this._frequency.value),
             rnode_bandwidth_hz: Number(this._bandwidth.value),

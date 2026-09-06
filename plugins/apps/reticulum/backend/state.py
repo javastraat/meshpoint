@@ -55,6 +55,9 @@ _DEFAULTS: dict[str, Any] = {
     "rnode_coding_rate": 5,
     "backbone_host": "node.reticulumnet.nl",
     "backbone_port": 4242,
+    # NomadNet "Browse" tab: path/link timeout budget in seconds (request
+    # gets 1.5x). 20 suits a TCP backbone; bump for multi-hop LoRa nodes.
+    "nomad_timeout_s": 20,
 }
 
 _config: dict[str, Any] = dict(_DEFAULTS)

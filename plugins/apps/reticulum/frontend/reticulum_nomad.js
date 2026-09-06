@@ -195,6 +195,12 @@ class ReticulumNomadTab {
         const { hash, path } = this._splitAddr(addrPart, currentHash);
         if (!hash) { this._status('error', 'Link has no node — nothing to open'); return; }
 
+        // a /file/... link downloads instead of rendering
+        if (path.startsWith('/file/')) {
+            this._downloadFile(hash, path);
+            return;
+        }
+
         // gather form fields this link asks to submit
         const fieldData = { ...varData };
         const spec = a.dataset.nomadFields;
@@ -208,6 +214,38 @@ class ReticulumNomadTab {
             });
         }
         this._go(hash, path, Object.keys(fieldData).length ? fieldData : null);
+    }
+
+    async _downloadFile(hash, path) {
+        this._status('pending', `Downloading ${path.split('/').pop()}…`);
+        try {
+            const r = await fetch('/api/reticulum/nomad/file', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ destination_hash: hash, path }),
+            });
+            if (!r.ok) {
+                const err = await r.json().catch(() => ({}));
+                this._status('error', err.detail || `Download failed (HTTP ${r.status})`);
+                return;
+            }
+            const blob = await r.blob();
+            const cd = r.headers.get('Content-Disposition') || '';
+            const m = cd.match(/filename="?([^"]+)"?/);
+            const name = m ? m[1] : (path.split('/').pop() || 'downloaded_file');
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = name;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+            this._status('success', `Downloaded ${name}`);
+        } catch (e) {
+            this._status('error', `Download error: ${e.message}`);
+        }
     }
 
     _syncNav() {

@@ -45,5 +45,40 @@ class TestNomadResultShape(unittest.TestCase):
         self.assertIsNone(r.error)
 
 
+class TestNomadTimeouts(unittest.TestCase):
+    def tearDown(self) -> None:
+        nomad.set_timeouts(None)
+
+    def test_none_restores_defaults(self) -> None:
+        nomad.set_timeouts(None)
+        self.assertEqual(nomad._path_lookup_timeout_s, 20)
+        self.assertEqual(nomad._request_timeout_s, 30)
+
+    def test_scales_from_one_knob(self) -> None:
+        nomad.set_timeouts(40)
+        self.assertEqual(nomad._link_timeout_s, 40)
+        self.assertEqual(nomad._request_timeout_s, 60)  # 1.5x
+
+    def test_floor(self) -> None:
+        nomad.set_timeouts(1)
+        self.assertGreaterEqual(nomad._link_timeout_s, 5)
+
+
+class TestExtractFile(unittest.TestCase):
+    def test_bytes_plus_name_metadata_list(self) -> None:
+        name, data = nomad._extract_file([b"payload", {"name": b"/x/report.pdf"}], None)
+        self.assertEqual(name, "report.pdf")
+        self.assertEqual(data, b"payload")
+
+    def test_bare_bytes(self) -> None:
+        name, data = nomad._extract_file(b"raw", None)
+        self.assertEqual(data, b"raw")
+        self.assertEqual(name, "downloaded_file")
+
+    def test_unsupported_shape_raises(self) -> None:
+        with self.assertRaises(ValueError):
+            nomad._extract_file(42, None)
+
+
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()
