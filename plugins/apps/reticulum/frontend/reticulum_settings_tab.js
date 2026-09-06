@@ -45,7 +45,8 @@ class ReticulumSettingsTab {
                         <p class="cfg-card__hint">
                             Native Reticulum/LXMF messaging, sharing an RNode over USB with
                             the opt-in <code>rnsd</code> service. Requires <code>rnsd</code>
-                            to be installed (Settings → System, or <code>install.sh</code>) --
+                            to be installed (Settings → Plugins, or
+                            <code>sudo meshpoint plugin setup reticulum</code>) --
                             this tab only edits its config. Enable/disable the whole plugin
                             from Settings → Plugins.
                         </p>
