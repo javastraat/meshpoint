@@ -248,7 +248,16 @@ plugins:
     node_name: ""                          # blank = use display_name
     node_pages_dir: "data/reticulum/pages"  # your .mu files; files/ -> /file/...
     node_announce_interval_s: 21600         # 6h
+    node_spaceapi_url: ""                   # optional: a hackerspace SpaceAPI feed
 ```
+
+`node_spaceapi_url` (optional, also on the Settings tab) points at a
+[SpaceAPI](https://spaceapi.io) endpoint (`directory.spaceapi.io` lists
+them). When set, the node fetches it every 5 min and serves a generated
+**`/page/spacestate.mu`** (open/closed + address + IRC/e-mail), and any of
+your own `.mu` pages can use a **`{spacestate}`** token that's replaced at
+serve time with a colour-coded `OPEN` / `CLOSED` / `unknown`. Blank = none
+of that exists.
 
 Registers a `nomadnetwork.node` destination on the *same identity* as your
 LXMF address, announces it, and serves a built-in `/page/index.mu` (a

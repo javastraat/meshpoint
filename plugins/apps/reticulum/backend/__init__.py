@@ -112,6 +112,7 @@ def register(reg) -> None:
             node_stats_provider=node_stats,
             hardware_description=context.config.device.hardware_description,
             project_url=project_url,
+            spaceapi_url=state.node_config()["spaceapi_url"],
         )
 
     def wire(service, context):

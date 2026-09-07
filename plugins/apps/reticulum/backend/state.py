@@ -73,6 +73,10 @@ _DEFAULTS: dict[str, Any] = {
     "node_name": "",                       # blank = use display_name
     "node_pages_dir": "data/reticulum/pages",
     "node_announce_interval_s": 21600,     # 6h
+    # Optional: a hackerspace SpaceAPI URL. When set, the node also serves
+    # /page/spacestate.mu (is-the-space-open + address/contacts, fetched +
+    # cached). Blank = that page isn't registered.
+    "node_spaceapi_url": "",
 }
 
 _config: dict[str, Any] = dict(_DEFAULTS)
@@ -118,6 +122,7 @@ def node_config() -> dict[str, Any]:
         "name": str(_config["node_name"]).strip() or display_name(),
         "pages_dir": str(_config["node_pages_dir"]),
         "announce_interval_s": int(_config["node_announce_interval_s"] or 21600),
+        "spaceapi_url": str(_config.get("node_spaceapi_url") or "").strip(),
     }
 
 

@@ -686,3 +686,40 @@ Real TechInc facts from web search (wiki.techinc.nl is behind Anubis): Louwesweg
 association, network@techinc.nl. `[EDIT]` markers everywhere for adaptation.
 Micron notes baked into the README (`c per-line centring, 3-hex `F, no backticks
 in art). CHANGELOG + plugin README updated.
+
+---
+
+## 2026-09-07 — SpaceAPI "is the space open" for hosted nodes (uncommitted)
+
+User wanted live hackerspace status on the BBS. Wiki (wiki.techinc.nl/Events)
+is behind Anubis -> no scraping. SpaceAPI works: TechInc =
+`https://techinc.nl/space/spacestate.json` (v0.13, state.open + top-level
+open, no events feed). Built (Settings-tab visibility, user picked option 1):
+- **`backend/spaceapi.py`** (new): `fetch(url) -> dict|None` via urllib (8s,
+  256KB cap). Normalises 0.13/13/14/15 (`state.open` vs top-level `open`,
+  `state.lastchange` vs top). De-obfuscates `a AT b DOT c`. Returns
+  `{space, open(bool|None), message, lastchange, address, url, irc, email, ml}`.
+- **`state.py`**: `node_spaceapi_url: ""` in _DEFAULTS + `node_config()["spaceapi_url"]`.
+- **`nomad_node.py`**: `NomadNode(spaceapi_url=)`, `_spaceapi` last-good cache +
+  `_spaceapi_task`/`_spaceapi_loop` (300s, `asyncio.to_thread(spaceapi.fetch)`),
+  `_spaceapi_word()` -> `` `F0a0`!OPEN`!`f `` / `` `Fd44`!CLOSED`!`f `` /
+  `` `F888unknown`f ``. `_serve_spacestate` generated page (registered only
+  when url set, excluded from operator .mu loop like info/nodes). `_make_file_server`
+  does a `{spacestate}` -> word substitution on operator .mu pages (not /file/,
+  only when url set). `_page_count` +1. `_fmt_ago()` helper.
+- Threaded: `__init__` -> `LxmfService(spaceapi_url=)` -> `NomadNode`.
+- **`config_routes.py`**: `node_spaceapi_url` field + `_spaceapi_url_ok` validator
+  (blank or http(s)) + write dict.
+- **`reticulum_settings_tab.js`**: "SpaceAPI URL (optional)" input in node-hosting
+  fieldset, `data-rt-node-spaceapi`, wired render/_onSubmit.
+- Tests: `test_spaceapi.py` (6), `test_nomad_node.py` +4 (serve + token +
+  gating). 72 reticulum backend pass.
+- Docs: CHANGELOG (92), plugin README + CONFIGURATION.md node blocks.
+- BBS: `index.mu` gets "The space is right now: {spacestate}" + menu item
+  "Space status" -> :/page/spacestate.mu; sample-bbs README widget section.
+- NOTE the `{spacestate}` token is substituted only when the NODE serves the
+  page -- the dashboard Pages-tab preview shows the raw token.
+
+Events/agenda deferred: needs an iCal feed. TechInc Meetup one works
+(`meetup.com/Technologia-Incognita/events/ical/`) but is just the recurring
+Wednesday social. Same generated-page + config-URL pattern would apply.

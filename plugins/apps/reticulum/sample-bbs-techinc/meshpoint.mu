@@ -1,7 +1,3 @@
-#!c=1
-# TechInc Mesh BBS -- About Meshpoint (meshpoint.mu)
-# Generic -- nothing to [EDIT] here unless you want to.
-
 `F38f`!TechInc Mesh BBS`!`f  `F888//`f  `!About Meshpoint`!
 ========================================================
 
@@ -18,9 +14,28 @@ script, then it just sits there and listens.
 
 `F888Meshtastic `f: node roster, positions on a map, telemetry,
              DM + channel messaging
-`F888MeshCore   `f: node roster, messaging, live radio view
+`F888MeshCore   `f: node roster, positions on a map, telemetry,
+             DM + channel messaging
 `F888LoRaWAN    `f: uplink frames, decrypted with your own keys,
              device roster
+
+>Talk back
+
+It is not just a sniffer. From the dashboard you can:
+
+`F888Chat     `f: send on Meshtastic channels + DMs, and message
+             MeshCore nodes
+`F888Relay    `f: repeat/forward traffic through a USB companion
+`F888MQTT     `f: bridge Meshtastic traffic to/from a broker
+`F888Meshradar `f: optionally push to meshradar.io for pooled,
+             multi-site mesh intelligence
+
+>Reticulum / LXMF
+
+`*Meshpoint`* attaches to a local `*rnsd`* as a client: an LXMF
+inbox, a peer roster built from announces, a NomadNet browser,
+and when node hosting is on this very BBS. All on one
+identity: browse it and message it on the same hash.
 
 >RTL-SDR -- one $30 dongle, a lot of bands
 
@@ -41,20 +56,28 @@ Only one RTL-SDR mode runs at a time -- they share the dongle.
 
 A spectrum sweep across the RTL-SDR's range -- a quick "what is
 loud right now" view, and a noise-floor trace on the dashboard.
+Thru LoRa concentrator or a attached companion.
 
->Reticulum / LXMF
+>Flash companions
 
-`*Meshpoint`* attaches to a local `*rnsd`* as a client: an LXMF
-inbox, a peer roster built from announces, a NomadNet browser,
-and when node hosting is on this very BBS. All on one
-identity: browse it and message it on the same hash.
+Plug an ESP32 board into the Pi's USB and flash it from the
+dashboard -- no laptop, no cables to a workstation:
+
+`F888Meshtastic `f: latest release, straight onto a stick
+`F888MeshCore   `f: same, for MeshCore companions
+`F888RNode      `f: RNode firmware for a Reticulum radio
+`F888Companions `f: the POCSAG pager, Reticulum-node and
+             RF-environment helper sketches
+
+It reads the board's current version over serial and checks it
+against the newest release on GitHub before you flash.
 
 >The dashboard
 
-Per-protocol pages, a live map, packet stats + traffic graphs,
-a real terminal, firmware flashing for Meshtastic / MeshCore /
-RNode / pager companions, and a plugin system (every radio mode
-above is a plugin you enable per node).
+Per-protocol pages, a live map, a mesh topology graph, a
+MeshCore repeater view, packet stats + traffic graphs, a real
+terminal, and a plugin system -- every radio mode above is a
+plugin you enable per node.
 
 >Open source
 
@@ -63,7 +86,6 @@ developed in the open on GitHub, and installs on Raspberry Pi
 OS from a single script. Run it, study it, fork it -- if you
 run a changed version that others use, share those changes back.
 
-`F888Licence`f: AGPL-3.0
 `F888Source `f: `[github.com/KMX415/meshpoint`https://github.com/KMX415/meshpoint]
 `F888Stats  `f: `[this node's live numbers`:/page/info.mu]
 

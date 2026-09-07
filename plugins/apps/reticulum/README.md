@@ -185,7 +185,17 @@ plugins:
     node_name: ""                        # blank = display_name
     node_pages_dir: data/reticulum/pages
     node_announce_interval_s: 21600       # 6h; min 600
+    node_spaceapi_url: ""                 # optional hackerspace SpaceAPI feed
 ```
+
+`node_spaceapi_url` (optional, also on the Settings tab): a
+[SpaceAPI](https://spaceapi.io) endpoint. Set it and the node fetches it
+every 5 min (cached), serves a generated `/page/spacestate.mu`
+(open/closed + address + contacts), and replaces a `{spacestate}` token in
+any of your own `.mu` pages with a colour-coded `OPEN` / `CLOSED` /
+`unknown` word. Find your space's URL at `directory.spaceapi.io`. The
+`{spacestate}` substitution only happens when the node serves the page —
+the dashboard preview shows the raw token.
 
 `GET /api/reticulum/status` reports the live `node` block
 (`hosting`, `name`, `pages`, `requests_served`, `last_announce_s_ago`).

@@ -40,6 +40,8 @@ import time
 from pathlib import Path
 from typing import Awaitable, Callable, Optional
 
+from . import spaceapi
+
 logger = logging.getLogger(__name__)
 
 try:
@@ -48,6 +50,12 @@ except ImportError:
     RNS = None
 
 _STATS_REFRESH_S = 60  # info.mu shows CPU temp / load / 24h counts -- keep it fresh
+_SPACEAPI_REFRESH_S = 300  # is-the-space-open doesn't move fast; be polite
+
+# Token an operator can drop into any of their own .mu pages -- replaced at
+# serve time with a colour-coded OPEN / CLOSED / unknown word (only when a
+# SpaceAPI URL is configured). See _make_file_server / _spaceapi_word.
+_SPACESTATE_TOKEN = b"{spacestate}"
 
 # figlet "standard" MESHPOINT, 53 cols, no backticks. Emitted raw (never
 # through _esc -- Micron renders "\" literally, and _esc would double it).
@@ -68,6 +76,15 @@ def _esc(s: str) -> str:
     return str(s).replace("\\", "\\\\").replace("`", "\\`")
 
 
+def _fmt_ago(seconds: int) -> str:
+    seconds = max(0, seconds)
+    if seconds < 3600:
+        return f"{seconds // 60}m"
+    if seconds < 86400:
+        return f"{seconds // 3600}h"
+    return f"{seconds // 86400}d"
+
+
 class NomadNode:
     def __init__(
         self,
@@ -78,6 +95,7 @@ class NomadNode:
         stats_provider: Optional[Callable[[], Awaitable[dict]]] = None,
         hardware_description: str = "",
         project_url: str = "https://github.com/KMX415/meshpoint",
+        spaceapi_url: str = "",
     ):
         self._identity = identity
         self._name = name
@@ -86,11 +104,14 @@ class NomadNode:
         self._stats_provider = stats_provider
         self._hardware_description = hardware_description
         self._project_url = project_url
+        self._spaceapi_url = spaceapi_url
 
         self._destination = None
         self._announce_task: Optional[asyncio.Task] = None
         self._stats_task: Optional[asyncio.Task] = None
+        self._spaceapi_task: Optional[asyncio.Task] = None
         self._stats: dict = {}
+        self._spaceapi: dict = {}  # last good SpaceAPI fetch, {} until one lands
         self._last_announce: Optional[float] = None
         self._requests_served = 0
 
@@ -112,6 +133,12 @@ class NomadNode:
             await self._refresh_stats()
             self._stats_task = asyncio.get_running_loop().create_task(self._stats_loop())
 
+        if self._spaceapi_url:
+            await self._refresh_spaceapi()
+            self._spaceapi_task = asyncio.get_running_loop().create_task(
+                self._spaceapi_loop()
+            )
+
         self._announce()
         self._announce_task = asyncio.get_running_loop().create_task(self._announce_loop())
         logger.info(
@@ -120,10 +147,10 @@ class NomadNode:
         )
 
     async def stop(self) -> None:
-        for task in (self._announce_task, self._stats_task):
+        for task in (self._announce_task, self._stats_task, self._spaceapi_task):
             if task:
                 task.cancel()
-        self._announce_task = self._stats_task = None
+        self._announce_task = self._stats_task = self._spaceapi_task = None
         self._destination = None
 
     def status(self) -> dict:
@@ -169,10 +196,16 @@ class NomadNode:
             response_generator=self._serve_nodes,
             allow=RNS.Destination.ALLOW_ALL,
         )
+        if self._spaceapi_url:
+            d.register_request_handler(
+                "/page/spacestate.mu",
+                response_generator=self._serve_spacestate,
+                allow=RNS.Destination.ALLOW_ALL,
+            )
 
         if pages.is_dir():
             for p in sorted(pages.glob("*.mu")):
-                if p.name in ("index.mu", "nodes.mu", "info.mu"):
+                if p.name in ("index.mu", "nodes.mu", "info.mu", "spacestate.mu"):
                     continue
                 d.register_request_handler(
                     f"/page/{p.name}",
@@ -206,10 +239,12 @@ class NomadNode:
 
     def _page_count(self) -> int:
         n = 3  # index (generated or overridden) + info + nodes (both fixed generated)
+        if self._spaceapi_url:
+            n += 1  # /page/spacestate.mu
         if self._pages_dir.is_dir():
             n += sum(
                 1 for p in self._pages_dir.glob("*.mu")
-                if p.name not in ("index.mu", "nodes.mu", "info.mu")
+                if p.name not in ("index.mu", "nodes.mu", "info.mu", "spacestate.mu")
             )
         return n
 
@@ -245,15 +280,47 @@ class NomadNode:
         except Exception:  # noqa: BLE001
             logger.debug("NomadNet node stats refresh failed", exc_info=True)
 
+    async def _spaceapi_loop(self) -> None:
+        while True:
+            await asyncio.sleep(_SPACEAPI_REFRESH_S)
+            await self._refresh_spaceapi()
+
+    async def _refresh_spaceapi(self) -> None:
+        try:
+            # spaceapi.fetch is a blocking urllib call -- off the event loop.
+            result = await asyncio.to_thread(spaceapi.fetch, self._spaceapi_url)
+            if result:  # keep the last good one on a failed / partial fetch
+                self._spaceapi = result
+        except Exception:  # noqa: BLE001
+            logger.debug("SpaceAPI refresh failed", exc_info=True)
+
+    def _spaceapi_word(self) -> str:
+        """Colour-coded OPEN / CLOSED / unknown, as a Micron fragment."""
+        state = (self._spaceapi or {}).get("open")
+        if state is True:
+            return "`F0a0`!OPEN`!`f"
+        if state is False:
+            return "`Fd44`!CLOSED`!`f"
+        return "`F888unknown`f"
+
     # --- request handlers (called on RNS's thread; return bytes) --------
 
     def _make_file_server(self, path: Path, is_file: bool = False):
         def _serve(request_path, data, request_id, link_id, remote_identity, requested_at):
             self._requests_served += 1
             try:
-                return path.read_bytes()
+                body = path.read_bytes()
             except OSError:
                 return b"`!Not found`!"
+            # Light template pass on .mu pages: {spacestate} -> live word.
+            if (
+                not is_file and self._spaceapi_url
+                and _SPACESTATE_TOKEN in body
+            ):
+                body = body.replace(
+                    _SPACESTATE_TOKEN, self._spaceapi_word().encode("utf-8"),
+                )
+            return body
         return _serve
 
     def _serve_index(self, request_path, data, request_id, link_id, remote_identity, requested_at):
@@ -380,6 +447,48 @@ class NomadNode:
             "MeshCore, LoRaWAN, POCSAG/DAPNET, Reticulum).",
             f"`[{_esc(self._project_label())}`{self._project_url}]",
         ]
+        return ("\n".join(lines)).encode("utf-8")
+
+    def _serve_spacestate(self, request_path, data, request_id, link_id, remote_identity, requested_at):
+        """Hackerspace status from the configured SpaceAPI endpoint -- only
+        registered when ``node_spaceapi_url`` is set. Served from the
+        cached last-good fetch (``_spaceapi_loop`` refreshes it)."""
+        self._requests_served += 1
+        s = self._spaceapi or {}
+        name = _esc(s.get("space") or "This space")
+
+        def row(label, value):
+            return f"{label:<10}: {value}"
+
+        lines = [
+            "`c`F0a0`!" + name + "`!`f`a",
+            "`ca space status`a",
+            "-",
+            "Status    : " + self._spaceapi_word(),
+        ]
+        if s.get("message"):
+            lines.append(row("Note", _esc(s["message"])))
+        if s.get("lastchange"):
+            ago = int(time.time()) - int(s["lastchange"])
+            lines.append(row("Changed", _fmt_ago(ago) + " ago"))
+        if s.get("address"):
+            lines.append(row("Where", _esc(s["address"])))
+        contact = [
+            ("Web", s.get("url"), True),
+            ("IRC", s.get("irc"), False),
+            ("E-mail", s.get("email"), False),
+            ("List", s.get("ml"), False),
+        ]
+        contact_rows = [
+            row(lbl, f"`[{_esc(val)}`{val}]" if is_url and val.startswith("http") else _esc(val))
+            for lbl, val, is_url in contact if val
+        ]
+        if contact_rows:
+            lines += ["", ">Contact", *contact_rows]
+        if not s:
+            lines.append("")
+            lines.append("(status not fetched yet -- try again shortly)")
+        lines += ["", "`[Home`:/page/index.mu]"]
         return ("\n".join(lines)).encode("utf-8")
 
     def _serve_nodes(self, request_path, data, request_id, link_id, remote_identity, requested_at):

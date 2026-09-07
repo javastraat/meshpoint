@@ -50,6 +50,7 @@ class ReticulumUpdate(BaseModel):
     node_name: str = ""
     node_pages_dir: str = "data/reticulum/pages"
     node_announce_interval_s: int = Field(21600, ge=600, le=604800)
+    node_spaceapi_url: str = ""
     rnode_enabled: bool = True
     rnode_serial_port: str = ""
     rnode_frequency_hz: int = Field(..., ge=100_000_000, le=1_000_000_000)
@@ -75,6 +76,14 @@ class ReticulumUpdate(BaseModel):
         stripped = value.strip()
         if not stripped:
             raise ValueError("must not be empty")
+        return stripped
+
+    @field_validator("node_spaceapi_url")
+    @classmethod
+    def _spaceapi_url_ok(cls, value: str) -> str:
+        stripped = value.strip()
+        if stripped and not stripped.startswith(("http://", "https://")):
+            raise ValueError("node_spaceapi_url must be an http(s) URL or blank")
         return stripped
 
     @model_validator(mode="after")
@@ -107,6 +116,7 @@ async def update_reticulum(
         "node_name": req.node_name.strip(),
         "node_pages_dir": req.node_pages_dir.strip() or "data/reticulum/pages",
         "node_announce_interval_s": req.node_announce_interval_s,
+        "node_spaceapi_url": req.node_spaceapi_url.strip(),
         "rnode_enabled": req.rnode_enabled,
         "rnode_serial_port": req.rnode_serial_port.strip(),
         "rnode_frequency_hz": req.rnode_frequency_hz,

@@ -140,6 +140,47 @@ class TestNomadNode(unittest.TestCase):
         text = self._node()._serve_info("/page/info.mu", None, 1, 1, None, 0).decode("utf-8")
         self.assertIn("https://github.com/KMX415/meshpoint", text)
 
+    def test_serve_spacestate_renders_from_cache(self) -> None:
+        n = self._node(spaceapi_url="https://x/spaceapi.json")
+        n._spaceapi = {
+            "space": "Technologia Incognita", "open": False,
+            "lastchange": 1, "address": "Louwesweg 1",
+            "url": "https://www.techinc.nl", "irc": "#techinc @ OFTC",
+        }
+        text = n._serve_spacestate("/page/spacestate.mu", None, 1, 1, None, 0).decode()
+        self.assertIn("Technologia Incognita", text)
+        self.assertIn("CLOSED", text)
+        self.assertIn("Louwesweg 1", text)
+        self.assertIn("`[https://www.techinc.nl`https://www.techinc.nl]", text)
+
+    def test_serve_spacestate_before_first_fetch(self) -> None:
+        n = self._node(spaceapi_url="https://x")
+        text = n._serve_spacestate("/page/spacestate.mu", None, 1, 1, None, 0).decode()
+        self.assertIn("unknown", text)
+        self.assertIn("not fetched yet", text)
+
+    def test_spacestate_token_substituted_in_operator_pages(self) -> None:
+        import tempfile
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as d:
+            page = Path(d) / "about.mu"
+            page.write_text("TechInc is {spacestate} right now\n")
+            n = self._node(spaceapi_url="https://x")
+            n._spaceapi = {"open": True}
+            body = n._make_file_server(page)("/page/about.mu", None, 1, 1, None, 0)
+            self.assertIn("`F0a0`!OPEN`!`f", body.decode())
+            self.assertNotIn("{spacestate}", body.decode())
+
+    def test_spacestate_token_left_alone_when_no_url(self) -> None:
+        import tempfile
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as d:
+            page = Path(d) / "about.mu"
+            page.write_text("status: {spacestate}\n")
+            n = self._node()  # no spaceapi_url
+            body = n._make_file_server(page)("/page/about.mu", None, 1, 1, None, 0)
+            self.assertIn("{spacestate}", body.decode())
+
     def test_serve_nodes_lists_recent(self) -> None:
         n = self._node()
         n._stats = {"recent_nodes": [
