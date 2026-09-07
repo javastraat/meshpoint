@@ -12,16 +12,16 @@
 `F38f`!TechInc Mesh BBS`!`f  `F888//`f  `!Bulletins`!
 ========================================================
 
-`F888Last updated: 2025-09-07`f                          [EDIT]
+`F888Last updated: 2025-09-07`f
 
 -
->2025-09-07  -  Node is live                            [EDIT]
+>2025-09-07  -  Node is live
 
 The TechInc Meshpoint node is up on Reticulum and hosting this
 board. Say hi over LXMF. More pages coming.
 
 -
->2025-09-03  -  Wednesday social                        [EDIT]
+>2025-09-03  -  Wednesday social
 
 Open evening as usual, 19:30 till late. Bring a project, or just
 come look. Mesh corner is by the radio bench.

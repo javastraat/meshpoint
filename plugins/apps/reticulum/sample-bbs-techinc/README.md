@@ -13,7 +13,7 @@ LXMF to the node's address*.
 |---|---|---|
 | `index.mu` | `/page/index.mu` | Splash + main menu (replaces the generated landing page) |
 | `techinc.mu` | `/page/techinc.mu` | About the hackerspace — address, open evening, membership |
-| `meshpoint.mu` | `/page/meshpoint.mu` | About Meshpoint — what it is, the protocols, the dashboard (generic, no `[EDIT]`) |
+| `meshpoint.mu` | `/page/meshpoint.mu` | About Meshpoint — what it is, the protocols, the dashboard (generic, reusable as-is) |
 | `mesh.mu` | `/page/mesh.mu` | What the node relays, frequencies, how to reach it, how to get your own node |
 | `bulletins.mu` | `/page/bulletins.mu` | Message-of-the-day board — add dated entries at the top |
 | `links.mu` | `/page/links.mu` | Other NomadNet nodes + Reticulum resources |
@@ -48,14 +48,14 @@ sudo systemctl restart meshpoint     # a restart registers the new files
 
 ## Before you ship it
 
-Search the files for `[EDIT]` and fix:
+The address and contact details are the real TechInc ones. If you're
+adapting this for another space, or before the first announce, still check:
 
-- the space address / grid locator (`index.mu`, `techinc.mu`)
-- the open-evening day/time (`techinc.mu`)
-- the e-mail / chat channel (`techinc.mu`)
-- the frequencies + preset in `mesh.mu` — match your node's real config
-- the SysOp callsign everywhere
-- date the bulletins
+- `index.mu` / `techinc.mu` — space name, address, contact block
+- `mesh.mu` — the frequencies + preset must match this node's real config
+- the SysOp callsign in `index.mu`
+- the bulletin dates in `bulletins.mu`
+- your `node_spaceapi_url` (Settings tab) so `{spacestate}` resolves
 
 To turn a node name in `links.mu` into a real link you need that node's
 32-hex destination hash: `` `[Name`<hash>:/page/index.mu] ``.

@@ -3,12 +3,12 @@
 #
 # A NomadNet node link is:  `[Their Board`<32-hex-hash>:/page/index.mu]
 # Find a node's hash in the Browse tab's picker (or its announce), paste
-# it in, done. [EDIT] the list for nodes you actually like.
+# it in, done. Keep the list to nodes you actually like.
 
 `F38f`!TechInc Mesh BBS`!`f  `F888//`f  `!Other nodes & links`!
 ========================================================
 
->Nodes worth a visit                                    [EDIT]
+>Nodes worth a visit
 
 `[Reticulum Netherlands`4c16d2fb33d98f7fb44b8fa7947ea325:/page/index.mu]
 `[RNS Berlin Community`cca2bf8ed88ebdf19e90cdee35bfe95a:/page/index.mu]

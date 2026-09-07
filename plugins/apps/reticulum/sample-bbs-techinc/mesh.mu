@@ -1,6 +1,6 @@
 #!c=1
 # TechInc Mesh BBS -- Get on the mesh (mesh.mu)
-# [EDIT] the frequencies / presets to match this node's actual config.
+# Frequencies / presets below match this node's config -- keep them in sync.
 
 `F38f`!TechInc Mesh BBS`!`f  `F888//`f  `!Get on the mesh`!
 ========================================================
@@ -13,7 +13,7 @@ an RNode, captures and relays several mesh protocols at once, and
 hosts this NomadNet page on the `!same identity`! as its LXMF
 address.
 
->Frequencies                                         [EDIT]
+>Frequencies
 
 `F888Meshtastic  `f: 869.525 MHz   preset LongFast
 `F888MeshCore    `f: 869.618 MHz
