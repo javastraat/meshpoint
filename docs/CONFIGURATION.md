@@ -252,7 +252,7 @@ plugins:
 
 Registers a `nomadnetwork.node` destination on the *same identity* as your
 LXMF address, announces it, and serves a built-in `/page/index.mu` (a
-branding/landing page — name, a blue MESHPOINT wordmark, an about blurb — linking
+branding/landing page — a blue figlet MESHPOINT banner, name, an about blurb — linking
 to `info.mu`), a `/page/info.mu` (live stats — **always served**, even if
 you replace `index.mu`: version/uptime, a **Host** block — board, CPU
 temp, load, memory, free disk — and a **Mesh activity** block with

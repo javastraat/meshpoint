@@ -6,10 +6,10 @@ both "message me" (LXMF) and "browse me" (``nomadnetwork.node``) on one
 hash -- exactly how a NomadNet user with a hosted node appears.
 
 Opt-in (``plugins.reticulum.node_enabled``, off by default). Serves:
-  * ``/page/index.mu``  -- generated: a branding/landing page (node name,
-    a blue MESHPOINT wordmark, a short "what is Meshpoint" blurb) linking
-    to ``info.mu``. An operator ``index.mu`` in ``node_pages_dir``
-    overrides it entirely.
+  * ``/page/index.mu``  -- generated: a branding/landing page (a blue
+    figlet ``MESHPOINT`` banner, node name, a short "what is Meshpoint"
+    blurb) linking to ``info.mu``. An operator ``index.mu`` in
+    ``node_pages_dir`` overrides it entirely.
   * ``/page/info.mu``   -- generated, **always served** regardless of an
     operator's ``index.mu`` -- a same-named file dropped in
     ``node_pages_dir`` is ignored, so any custom ``index.mu`` can safely
@@ -48,6 +48,19 @@ except ImportError:
     RNS = None
 
 _STATS_REFRESH_S = 60  # info.mu shows CPU temp / load / 24h counts -- keep it fresh
+
+# figlet "standard" MESHPOINT, 53 cols, no backticks. Emitted raw (never
+# through _esc -- Micron renders "\" literally, and _esc would double it).
+# LEFT-ALIGNED on purpose: Micron's `c centres each line independently, so
+# a `c'd multi-line block fragments (this is why the old one-line wordmark
+# existed). `F38f == #3388ff, the dashboard's accent blue.
+_MESHPOINT_BANNER = (
+    r" __  __ _____ ____  _   _ ____   ___ ___ _   _ _____",
+    r"|  \/  | ____/ ___|| | | |  _ \ / _ \_ _| \ | |_   _|",
+    r"| |\/| |  _| \___ \| |_| | |_) | | | | ||  \| | | |",
+    r"| |  | | |___ ___) |  _  |  __/| |_| | || |\  | | |",
+    r"|_|  |_|_____|____/|_| |_|_|    \___/___|_| \_| |_|",
+)
 
 
 def _esc(s: str) -> str:
@@ -250,10 +263,12 @@ class NomadNode:
         self._requests_served += 1
         on_hardware = f" on {_esc(self._hardware_description)}" if self._hardware_description else ""
         lines = [
-            "`c`F0a0`!" + _esc(self._name) + "`!`f`a",
-            "`ca Meshpoint node`a",
+            "`F38f",
+            *_MESHPOINT_BANNER,
+            "`f",
+            "`F0a0`!" + _esc(self._name) + "`!`f",
+            "a Meshpoint node",
             "-",
-            "`c`F38f`!MESHPOINT`!`f`a",
             "",
             "This node runs `!Meshpoint`!" + on_hardware + " -- it captures and",
             "relays Meshtastic, MeshCore, LoRaWAN, POCSAG/DAPNET and Reticulum",

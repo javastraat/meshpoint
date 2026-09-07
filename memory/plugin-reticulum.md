@@ -646,3 +646,12 @@ current-node shortcuts errored ("must be <hash>:/page/path.mu"). Fixed:
 (flex 3 1 280px + min-width:0; search/select now `flex: 1 1` too) so the
 whole address is editable. User said NO to an "info" quick button --
 removed it, edit-the-path is the workflow.
+
+**Node-picker width fix (same batch, LIVE-VERIFIED).** One node name ~140
+chars ("ToReticuLoki – ...") blew the native <select> popup to full-screen
+(CSS can't size a native popup -> only the option text drives it).
+`_renderNodeOptions` `cap(s)` truncates the visible label to 46 chars + '…',
+full name kept in the option `title` + still filters. CSS: `.rt-nomad__nodes`
+`flex: 0 1 260px; max-width: 300px`. User confirmed dropdown now sane width
+("much better") + the `:/page/x.mu` address-bar fix worked to check a
+friend's info.mu. Browse batch (addr bar + dropdown cap) done, uncommitted.

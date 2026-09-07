@@ -62,11 +62,14 @@ class TestNomadNode(unittest.TestCase):
         self.assertIsInstance(out, bytes)
         text = out.decode("utf-8")
         self.assertIn("PD2EMC Meshpoint", text)
-        self.assertIn("MESHPOINT", text)
         self.assertIn("SenseCap", text)
         self.assertIn("nomadnetwork.node", text)
         self.assertIn(":/page/info.mu", text)
         self.assertEqual(n._requests_served, 1)
+        # the figlet MESHPOINT banner, left-aligned (never `c'd) and raw
+        for row in nomad_node_module._MESHPOINT_BANNER:
+            self.assertIn(row, text)
+        self.assertNotIn("`c" + nomad_node_module._MESHPOINT_BANNER[0], text)
 
     def test_serve_index_without_hardware_description(self) -> None:
         n = self._node(hardware_description="")

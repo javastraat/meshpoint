@@ -129,9 +129,9 @@ on the **same identity** as its LXMF address — one hash is both "message me"
 NomadNet client works. `backend/nomad_node.py` announces on an interval,
 answers `Link`/`Request` with:
 
-- `/page/index.mu` — generated: a branding/landing page (node name, an
-  blue MESHPOINT wordmark, a short "what is Meshpoint" blurb) linking to
-  `info.mu`. An operator `index.mu` in `node_pages_dir` overrides it
+- `/page/index.mu` — generated: a branding/landing page (a blue figlet
+  MESHPOINT banner, node name, a short "what is Meshpoint" blurb) linking
+  to `info.mu`. An operator `index.mu` in `node_pages_dir` overrides it
   entirely.
 - `/page/info.mu` — generated, **always served** regardless of your
   `index.mu` (a same-named file you drop in `node_pages_dir` is ignored):
