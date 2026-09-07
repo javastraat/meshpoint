@@ -66,10 +66,22 @@ class TestNomadNode(unittest.TestCase):
         self.assertIn("nomadnetwork.node", text)
         self.assertIn(":/page/info.mu", text)
         self.assertEqual(n._requests_served, 1)
+        self.assertIn("`F888Node`f", text)          # labelled name row
+        self.assertNotIn("a Meshpoint node", text)   # subtitle dropped
         # the figlet MESHPOINT banner, left-aligned (never `c'd) and raw
         for row in nomad_node_module._MESHPOINT_BANNER:
             self.assertIn(row, text)
         self.assertNotIn("`c" + nomad_node_module._MESHPOINT_BANNER[0], text)
+
+    def test_serve_index_shows_the_node_address_once_hosting(self) -> None:
+        n = self._node()
+        self.assertNotIn("`F888Address`f", n._serve_index("/page/index.mu", None, 1, 1, None, 0).decode())
+
+        class _Dest:
+            hash = bytes.fromhex("00112233445566778899aabbccddeeff")
+        n._destination = _Dest()
+        text = n._serve_index("/page/index.mu", None, 1, 1, None, 0).decode()
+        self.assertIn("`F888Address`f : 00112233445566778899aabbccddeeff", text)
 
     def test_serve_index_without_hardware_description(self) -> None:
         n = self._node(hardware_description="")

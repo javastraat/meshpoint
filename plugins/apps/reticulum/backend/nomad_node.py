@@ -266,8 +266,15 @@ class NomadNode:
             "`F38f",
             *_MESHPOINT_BANNER,
             "`f",
-            "`F0a0`!" + _esc(self._name) + "`!`f",
-            "a Meshpoint node",
+            "`F888Node`f    : `F0a0`!" + _esc(self._name) + "`!`f",
+        ]
+        addr = self._address_hex()
+        if addr:
+            # the nomadnetwork.node hash -- what a visitor pastes as
+            # "<hash>:/page/x.mu" to reach us; LXMF delivery is a separate
+            # aspect hash on the same identity.
+            lines.append("`F888Address`f : " + addr)
+        lines += [
             "-",
             "",
             "This node runs `!Meshpoint`!" + on_hardware + " -- it captures and",
@@ -275,8 +282,15 @@ class NomadNode:
             "traffic, and hosts this NomadNet page on the `!same identity`! as",
             "its LXMF address, announcing itself as `!nomadnetwork.node`!.",
             "",
-            "You can browse this node here and message it over LXMF on the",
-            "same hash.",
+        ]
+        if addr:
+            lines += [
+                "The Address above is for browsing; LXMF messaging uses a",
+                "separate hash on the same identity.",
+                "",
+            ]
+        lines += [
+            "You can browse this node here and message it over LXMF.",
             "",
             ">Links",
             "`[Host, mesh & Reticulum stats`:/page/info.mu]",
@@ -286,6 +300,14 @@ class NomadNode:
 
     def _project_label(self) -> str:
         return self._project_url.split("://", 1)[-1].rstrip("/")
+
+    def _address_hex(self) -> str:
+        """This node's ``nomadnetwork.node`` destination hash as lowercase
+        hex, or ``""`` before the destination exists (tests, pre-start)."""
+        try:
+            return self._destination.hash.hex()
+        except (AttributeError, TypeError):
+            return ""
 
     def _serve_info(self, request_path, data, request_id, link_id, remote_identity, requested_at):
         """Fixed stats page -- always generated, never overridable by an

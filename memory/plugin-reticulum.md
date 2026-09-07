@@ -655,3 +655,16 @@ full name kept in the option `title` + still filters. CSS: `.rt-nomad__nodes`
 `flex: 0 1 260px; max-width: 300px`. User confirmed dropdown now sane width
 ("much better") + the `:/page/x.mu` address-bar fix worked to check a
 friend's info.mu. Browse batch (addr bar + dropdown cap) done, uncommitted.
+
+**Figlet banner in generated index.mu — LIVE-VERIFIED.** `_MESHPOINT_BANNER`
+(figlet "standard", 53 cols, raw tuple of raw-strings, no `_esc`) replaces the
+`c'd one-liner in `_serve_index`; left-aligned, green node name directly under.
+Browsed PD2EMC's default page from ti-meshpoint (screenshot) — renders clean.
+Only affects nodes WITHOUT a custom index.mu. Uncommitted.
+
+**index.mu header polish (uncommitted):** `Node    : <name>` (grey label +
+green bold name) and `Address : <hash>` (nomadnetwork.node destination hex
+via `_address_hex()` -> `self._destination.hash.hex()`, gated so tests /
+pre-start skip it). Dropped "a Meshpoint node" subtitle. Blurb's stale
+"message it over LXMF on the same hash" -> notes LXMF is a separate aspect
+hash on the same identity (only when the Address line shows).
