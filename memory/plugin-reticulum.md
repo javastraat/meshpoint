@@ -590,10 +590,15 @@ User: the nomadnetwork.node list is huge. Added to `reticulum_nomad.js`:
   `rf` = `rnode_enabled AND rnode_serial_port.strip()` (blank port = RF off,
   the established implicit switch). `frequency_hz` only when `rf`.
 - `reticulum_topbar_chip.js` `_applyStatus`: freq slot shows
-  `{(frequency_hz/1e6).toFixed(3)} MHz` when rf, `TCP` when backbone-only,
-  `--` otherwise; falls back to `{peer_count} peers` if `status.radio`
+  `{(frequency_hz/1e6).toFixed(3)} MHz` when rf, peers when backbone-only,
+  `--` otherwise; falls back to peers if `status.radio`
   missing (old backend). Peer count -> chip `.title` hover
   ("Reticulum · N peers heard"). Matches Meshtastic/MeshCore/Pager chips.
 - Tests: `test_status_route.py` (3, fastapi-gated). Docs: CHANGELOG (90),
   README topbar row. Clean separation from the info.mu batch (only shared
   file would be routes.py, which info.mu didn't touch).
+
+**Topbar pill refinement (user):** backbone-only shows PEER COUNT in the
+freq slot (not "TCP" -- peers is the meaningful number for a node with no
+radio). Logic: `rf && frequency_hz` -> "{MHz}", else -> "{N} peers".
+Hover title: "Reticulum · {RNode radio|TCP backbone} · {N} peers heard".

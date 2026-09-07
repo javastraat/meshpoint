@@ -14,9 +14,10 @@
  * language as the built-in chips. Hidden until the service reports it's
  * available (rns/lxmf installed); lamp online/offline tracks `running`.
  *
- * The "freq" slot shows the RNode frequency when RF is configured
- * (matching the Meshtastic/MeshCore/Pager chips), "TCP" for a
- * backbone-only setup; the peer count moved to the chip's hover title.
+ * The "freq" slot shows the RNode frequency when an RNode is connected
+ * (matching the Meshtastic/MeshCore/Pager chips); a backbone-only node has
+ * no frequency, so it shows the peer count there instead. The hover title
+ * always carries the peer count + which interface is up.
  */
 class ReticulumTopbarChip {
     constructor() {
@@ -82,23 +83,23 @@ class ReticulumTopbarChip {
         callEl.textContent = status.running
             ? this._shortAddress(status.own_address)
             : 'starting…';
-        // "freq" slot: match the other radio chips -- the RNode frequency
-        // when RF is configured, else "TCP" for a backbone-only setup.
-        // Peer count moves to the hover title so it's not lost.
+        // "freq" slot: the RNode frequency when an RNode is connected
+        // (matches the Meshtastic/MeshCore/Pager chips), otherwise the peer
+        // count -- the meaningful number for a backbone-only node.
+        const r = status.radio || {};
+        const peers = status.peer_count ?? 0;
+        const peersLabel = `${peers} peer${peers === 1 ? '' : 's'}`;
         if (!status.running) {
             freqEl.textContent = '--';
-        } else if (status.radio) {
-            const r = status.radio;
-            freqEl.textContent = (r.rf && r.frequency_hz)
-                ? `${(r.frequency_hz / 1e6).toFixed(3)} MHz`
-                : (r.backbone ? 'TCP' : '--');
+        } else if (r.rf && r.frequency_hz) {
+            freqEl.textContent = `${(r.frequency_hz / 1e6).toFixed(3)} MHz`;
         } else {
-            freqEl.textContent = `${status.peer_count ?? 0} peers`;  // old backend
+            freqEl.textContent = peersLabel;
         }
         const root = this._group.querySelector('.topbar-reticulum');
         if (root) {
-            const peers = status.peer_count ?? 0;
-            root.title = `Reticulum · ${peers} peer${peers === 1 ? '' : 's'} heard`;
+            const via = r.rf ? 'RNode radio' : (r.backbone ? 'TCP backbone' : '');
+            root.title = `Reticulum${via ? ` · ${via}` : ''} · ${peersLabel} heard`;
         }
     }
 
