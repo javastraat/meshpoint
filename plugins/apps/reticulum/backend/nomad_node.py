@@ -170,6 +170,20 @@ class NomadNode:
                             allow=RNS.Destination.ALLOW_ALL,
                         )
 
+    def reload_pages(self) -> None:
+        """Re-scan ``node_pages_dir`` and (re-)register a request handler
+        per ``.mu`` file -- so a page created or edited through the
+        dashboard's Pages tab is served without a plugin restart.
+
+        Editing an *existing* file's content is already live (each request
+        re-``read_bytes()``s -- see ``_make_file_server``); this is what a
+        *new* file needs. A *deleted* file's handler stays registered and
+        just starts returning "Not found" (RNS has no clean unregister) --
+        harmless, and a real restart clears it.
+        """
+        if self._destination is not None:
+            self._register_handlers()
+
     def _page_count(self) -> int:
         n = 3  # index (generated or overridden) + info + nodes (both fixed generated)
         if self._pages_dir.is_dir():

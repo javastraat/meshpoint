@@ -256,6 +256,16 @@ class LxmfService:
     def node_status(self) -> Optional[dict]:
         return self._node.status() if self._node is not None else None
 
+    def reload_node_pages(self) -> bool:
+        """Re-register the hosted node's ``.mu`` request handlers (Pages
+        tab, after a create/delete). Returns ``False`` when no node is
+        running -- the file was still written, it just won't be served
+        until the node starts."""
+        if self._node is not None:
+            self._node.reload_pages()
+            return True
+        return False
+
     def _on_announce(
         self, aspect: str, destination_hash: bytes, app_data: Optional[bytes],
     ) -> None:

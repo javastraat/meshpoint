@@ -467,3 +467,45 @@ checks minus the installing. Settings → Plugins shows "⚠ Setup needed" /
 button (`POST /api/plugins/reticulum/check`). If check.sh ever needs to test
 something new, keep it sudo-free — the loader runs it as the `meshpoint`
 service account at boot.
+
+---
+
+## 2026-09-07 — "Pages" tab: in-dashboard .mu editor for hosted nodes
+
+User asked for a way to edit `index.mu` etc. without SSH. Built as a 6th
+tab on the Reticulum page (NOT a hook plugin — the page has no
+registerPageHook and the editor is inseparable from node hosting).
+
+- **`backend/node_pages.py`** (new, FastAPI-free): `validate_name`
+  (`^[a-z0-9][a-z0-9._-]{0,62}\.mu$`, no `..`, `RESERVED_NAMES =
+  {info.mu, nodes.mu}`), `list_pages` (index.mu first, always listed),
+  `read_page`/`write_page` (128 KB cap, `chmod 0o644` — never +x)/
+  `delete_page`, `sample_index()` (reads `sample-pages/index.mu`).
+- **`NomadNode.reload_pages()`** — re-runs `_register_handlers()`. Editing
+  existing file content was ALREADY live (`_make_file_server` does
+  `read_bytes()` per request); only *new* files need this. Deleted files
+  leave a stale handler returning "Not found" (RNS has no unregister) —
+  harmless, restart clears it.
+- **`LxmfService.reload_node_pages() -> bool`** — calls it if node running.
+- **`nomad_routes.py`**: `GET /pages`, `GET /sample-page`,
+  `GET/PUT/DELETE /pages/{name}` (all admin). PUT returns
+  `{saved, page, served}` (`served` = node was reloaded).
+- **`reticulum_node_pages_tab.js`** (new, `window.ReticulumNodePagesTab`):
+  file list + New/Delete, textarea, live preview via
+  `new window.MicronParser(true).parseToHtml()` (same as Browse tab, into
+  `.rt-nomad__page`), Load-sample button. Added to `plugin.toml` scripts.
+- **`reticulum_panel.js`**: `data-rt-tab="pages"` button (hidden until
+  `_syncPagesTab()` sees `/status`.node), view div, lazy tab instance,
+  `_activateSubTab`/`hide`/`_setTab` guards, restores from localStorage
+  optimistically then bounces if not hosting.
+- **`reticulum.css`**: `.rt-pages*` two-column layout (list + editor/preview
+  grid, stacks <900px).
+- Tests: `test_node_pages.py` (17, pure), `test_nomad_routes.py` (6,
+  fastapi-gated → skip on Mac), `test_nomad_node.py` +1 (reload no-op).
+  54 reticulum backend tests pass / 6 skip on Mac. ruff clean.
+- Docs: CHANGELOG v0.8.1 (+1 → 87), plugin README + CONFIGURATION.md node
+  sections.
+- **NOT committed, NOT Pi-tested.** Pi test: enable node_enabled, open
+  Pages tab, edit index.mu, Save, browse `<hash>:/page/index.mu` from the
+  Browse tab → should show the edit with no restart. Create a new
+  `about.mu`, link to it from index.mu, confirm it serves.

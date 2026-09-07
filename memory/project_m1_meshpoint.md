@@ -11940,3 +11940,9 @@ a real from-source acars install via the Run setup button (acarsdec+libacars
 build — good long-output streaming test). CAVEAT: acars is a hook plugin on
 rtlsdr; the build runs fine but "Enable it" post-setup will 400 until rtlsdr
 is enabled.
+
+**Same session — final verification: user ran a REAL from-source install via
+the Run setup modal on the RAK V2 (ACARS: acarsdec + libacars, git clone +
+cmake + make -j, several minutes). Streamed correctly, completed, verdict
+flipped to ✓. "Re-check all deps" button also confirmed working. Phase 1 +
+phase 2 + all check.sh + Re-check-all are now fully live-verified.**

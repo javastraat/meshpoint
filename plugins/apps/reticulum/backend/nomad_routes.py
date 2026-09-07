@@ -1,9 +1,13 @@
-"""NomadNet browsing endpoints -- the Reticulum page's "Browse" tab.
+"""NomadNet browsing + page-editing endpoints for the Reticulum page.
 
 `/api/reticulum/nomad/nodes` lists the `nomadnetwork.node` peers already
 in the roster (announces the plugin's LxmfService heard); `/page` fetches
 one page's Micron markup over a Link; `/file` fetches a `/file/...` path
-as an attachment. See `backend/nomad.py`.
+as an attachment (see `backend/nomad.py`).
+
+`/api/reticulum/nomad/pages*` is the other direction -- read/write the
+local `.mu` files a hosted node serves, backing the page's "Pages" tab
+(see `backend/node_pages.py`).
 """
 
 from __future__ import annotations
@@ -17,7 +21,7 @@ from pydantic import BaseModel, Field
 from src.api.auth.dependencies import require_admin
 from src.api.auth.jwt_session import SessionClaims
 
-from . import nomad, state
+from . import node_pages, nomad, state
 from .lxmf_service import LxmfService
 
 router = APIRouter(prefix="/api/reticulum/nomad", tags=["reticulum"])
@@ -99,3 +103,71 @@ async def nomad_file(
         media_type=ctype,
         headers={"Content-Disposition": f'attachment; filename="{name}"'},
     )
+
+
+# --- Pages tab: edit the .mu files this node serves ----------------------
+
+def _pages_dir() -> str:
+    return state.node_config()["pages_dir"]
+
+
+def _reload_node() -> bool:
+    """Ask the running node (if any) to re-register its .mu handlers."""
+    return bool(_service and _service.reload_node_pages())
+
+
+class PageWrite(BaseModel):
+    content: str = Field(..., max_length=node_pages.MAX_PAGE_BYTES * 2)
+
+
+@router.get("/pages")
+async def list_node_pages(_claims: SessionClaims = Depends(require_admin)):
+    """Every editable `*.mu` file in `node_pages_dir` (index.mu first).
+    `node` reports whether a node is actually hosting right now -- edits
+    still save when it isn't, they just won't be served until it starts."""
+    return {
+        "pages": node_pages.list_pages(_pages_dir()),
+        "pages_dir": _pages_dir(),
+        "node_hosting": bool(_service and _service.node_status()),
+    }
+
+
+@router.get("/sample-page")
+async def node_sample_page(_claims: SessionClaims = Depends(require_admin)):
+    """The bundled `sample-pages/index.mu` -- the 'Load sample' button."""
+    return {"content": node_pages.sample_index()}
+
+
+@router.get("/pages/{name}")
+async def read_node_page(
+    name: str, _claims: SessionClaims = Depends(require_admin),
+):
+    try:
+        node_pages.validate_name(name)
+    except node_pages.PageError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return {"name": name, "content": node_pages.read_page(_pages_dir(), name)}
+
+
+@router.put("/pages/{name}")
+async def write_node_page(
+    name: str, req: PageWrite,
+    _claims: SessionClaims = Depends(require_admin),
+):
+    try:
+        meta = node_pages.write_page(_pages_dir(), name, req.content)
+    except node_pages.PageError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return {"saved": True, "page": meta, "served": _reload_node()}
+
+
+@router.delete("/pages/{name}")
+async def delete_node_page(
+    name: str, _claims: SessionClaims = Depends(require_admin),
+):
+    try:
+        node_pages.delete_page(_pages_dir(), name)
+    except node_pages.PageError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    _reload_node()
+    return {"deleted": True, "name": name}

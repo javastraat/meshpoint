@@ -50,6 +50,12 @@ class TestNomadNode(unittest.TestCase):
         self.assertEqual(st["name"], "PD2EMC Meshpoint")
         self.assertIn("requests_served", st)
 
+    def test_reload_pages_is_a_no_op_when_not_hosting(self) -> None:
+        n = self._node()
+        self.assertIsNone(n._destination)
+        n.reload_pages()  # must not raise (Pages tab calls this after every save)
+        self.assertIsNone(n._destination)
+
     def test_serve_index_returns_branding_page(self) -> None:
         n = self._node()
         out = n._serve_index("/page/index.mu", None, 1, 1, None, 0)

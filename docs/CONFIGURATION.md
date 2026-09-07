@@ -268,9 +268,16 @@ cp /opt/meshpoint/plugins/apps/reticulum/sample-pages/index.mu \
 sudo systemctl restart meshpoint
 ```
 
-The pages dir isn't auto-created, and request handlers are registered once
-at startup, so adding/changing `.mu` files — and toggling `node_enabled` —
-needs a meshpoint restart.
+…or, once hosting is on, just use the **Pages** tab that appears on the
+Reticulum page (admin only): edit `index.mu` and any other `.mu` file in a
+raw-Micron editor with a live preview, Save, and it's served immediately —
+no SSH, no restart. It refuses `info.mu`/`nodes.mu` (generated) and always
+writes non-executable files, so executable "dynamic pages" stay an SSH job.
+
+The pages dir isn't auto-created by hand-editing (the Pages tab creates it
+on first save). Editing a `.mu` file's contents on disk is picked up per
+request, but *adding* one via SSH still needs a restart; toggling
+`node_enabled` always does.
 
 **Why it's opt-in**: meshpoint's `RNS.Reticulum()` call attaches to a
 locally-running `rnsd` shared instance as a *client*, never opening a radio

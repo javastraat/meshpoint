@@ -134,12 +134,25 @@ answers `Link`/`Request` with:
   by default)
 - `files/**` under that dir, served at `/file/<relpath>`
 
+### Editing pages — the "Pages" tab
+
+While a node is hosting, the Reticulum page grows a **Pages** tab (admin
+only): a list of the `.mu` files in `node_pages_dir`, a raw-Micron editor,
+and a live preview rendered by the same parser the Browse tab uses. Save
+(`PUT /api/reticulum/nomad/pages/{name}`) writes the file and re-registers
+the node's request handlers, so a new or edited page is served
+immediately — no restart. `info.mu` / `nodes.mu` are refused (they're
+generated); pages are always written non-executable, so "dynamic pages"
+(executable `.mu` scripts) still need SSH, on purpose. A **Load sample**
+button drops in `sample-pages/index.mu`.
+
 `sample-pages/index.mu` is a copy-me starter page with a Micron cheat-sheet
 in its header. On the Pi the pages dir is
 `/opt/meshpoint/data/reticulum/pages/` (relative to the service's
-`WorkingDirectory`); it isn't auto-created, and handlers are registered once
-at startup so new/changed `.mu` files need a `systemctl restart meshpoint`.
-Toggling `node_enabled` needs a restart too.
+`WorkingDirectory`) and isn't auto-created — the Pages tab creates it on
+first save. Editing a `.mu` file **on disk** (SSH) is picked up per
+request; *adding* one that way still needs a restart (or a save from the
+Pages tab, which re-scans). Toggling `node_enabled` needs a restart.
 
 ```yaml
 plugins:
@@ -152,5 +165,7 @@ plugins:
 
 `GET /api/reticulum/status` reports the live `node` block
 (`hosting`, `name`, `pages`, `requests_served`, `last_announce_s_ago`).
+`GET/PUT/DELETE /api/reticulum/nomad/pages[/{name}]` (+ `GET
+/api/reticulum/nomad/sample-page`) back the Pages tab.
 
 Full write-up: [docs/PLUGINS.md](../../../docs/PLUGINS.md).

@@ -27,6 +27,7 @@ scripts = [
     "frontend/reticulum_panel.js",
     "frontend/reticulum_settings_tab.js",
     "frontend/reticulum_nomad.js",
+    "frontend/reticulum_node_pages_tab.js",
     "frontend/reticulum_topbar_chip.js",
 ]
 styles = ["frontend/reticulum.css"]

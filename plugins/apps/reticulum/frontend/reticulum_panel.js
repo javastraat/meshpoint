@@ -50,11 +50,14 @@ class ReticulumPanel {
         this._isAdmin = window.meshpointIdentity?.role !== 'viewer';
         let stored = null;
         try { stored = localStorage.getItem(RT_TAB_STORE_KEY); } catch (_) {}
+        // 'pages' restores optimistically -- _syncPagesTab() bounces it
+        // back to 'peers' on the first /status if no node is hosting.
         this._tab = (stored === 'messages'
-            || ((stored === 'send' || stored === 'settings' || stored === 'browse') && this._isAdmin))
+            || (['send', 'settings', 'browse', 'pages'].includes(stored) && this._isAdmin))
             ? stored : 'peers';
         this._settingsTab = null;
         this._nomadTab = null;
+        this._nodePagesTab = null;
         this._onWsPeer = this._onWsPeer.bind(this);
         this._onWsMessage = this._onWsMessage.bind(this);
     }
@@ -109,6 +112,8 @@ class ReticulumPanel {
                                     data-rt-tab="browse" ${this._isAdmin ? '' : 'hidden'}>Browse</button>
                             <button class="lw-tab" type="button" role="tab"
                                     data-rt-tab="settings" ${this._isAdmin ? '' : 'hidden'}>Settings</button>
+                            <button class="lw-tab" type="button" role="tab"
+                                    data-rt-tab="pages" hidden>Pages</button>
                         </div>
                     </div>
                     <div data-rt-view="peers">
@@ -165,6 +170,9 @@ class ReticulumPanel {
                     <div data-rt-view="settings" hidden>
                         <div class="panel__body" data-rt-settings-body></div>
                     </div>
+                    <div data-rt-view="pages" hidden>
+                        <div class="panel__body" data-rt-nodepages-body></div>
+                    </div>
                     <div data-rt-view="browse" hidden>
                         <div class="panel__body" data-rt-nomad-body></div>
                     </div>
@@ -204,6 +212,9 @@ class ReticulumPanel {
         }
         if (window.ReticulumNomadTab) {
             this._nomadTab = new window.ReticulumNomadTab(this._q('[data-rt-nomad-body]'));
+        }
+        if (window.ReticulumNodePagesTab) {
+            this._nodePagesTab = new window.ReticulumNodePagesTab(this._q('[data-rt-nodepages-body]'));
         }
 
         this._q('#rt-refresh-btn')?.addEventListener('click', () => this._load());
@@ -260,6 +271,7 @@ class ReticulumPanel {
         // doubled-up refresh, not a real leak (both handlers just reload).
         if (this._settingsTab) this._settingsTab.hide();
         if (this._nomadTab) this._nomadTab.hide();
+        if (this._nodePagesTab) this._nodePagesTab.hide();
     }
 
     /** Load only the sub-tab that's actually visible -- the Settings and
@@ -269,6 +281,7 @@ class ReticulumPanel {
     _activateSubTab() {
         if (this._tab === 'settings' && this._settingsTab) this._settingsTab.show();
         else if (this._tab === 'browse' && this._nomadTab) this._nomadTab.show();
+        else if (this._tab === 'pages' && this._nodePagesTab) this._nodePagesTab.show();
     }
 
     /** Open the Browse tab pointed at a specific node (Peers-row "Browse" button). */
@@ -283,7 +296,8 @@ class ReticulumPanel {
     _q(sel) { return this._root ? this._root.querySelector(sel) : null; }
 
     _setTab(tab) {
-        if ((tab === 'send' || tab === 'settings' || tab === 'browse') && !this._isAdmin) return;
+        if ((tab === 'send' || tab === 'settings' || tab === 'browse' || tab === 'pages') && !this._isAdmin) return;
+        if (tab === 'pages' && !this._nodeHosting) return;
         if (tab === this._tab) return;
         this._tab = tab;
         try { localStorage.setItem(RT_TAB_STORE_KEY, tab); } catch (_) {}
@@ -315,7 +329,18 @@ class ReticulumPanel {
             this._setText('rt-stat-status', s.running ? 'Running' : (s.available ? 'Stopped' : 'Unavailable'));
             const addrEl = this._q('#rt-own-address');
             if (addrEl) addrEl.textContent = s.own_address ? `You: ${s.own_address}` : '';
+            this._syncPagesTab(this._isAdmin && !!s.node);
         } catch (_) {}
+    }
+
+    /** The Pages tab only makes sense while a NomadNet node is actually
+     * hosting (`/status`.node != null). Show/hide its button accordingly,
+     * and bounce off it if the node just stopped. */
+    _syncPagesTab(hosting) {
+        this._nodeHosting = hosting;
+        const btn = this._root?.querySelector('[data-rt-tab="pages"]');
+        if (btn) btn.hidden = !hosting;
+        if (!hosting && this._tab === 'pages') this._setTab('peers');
     }
 
     async _loadPeers() {
