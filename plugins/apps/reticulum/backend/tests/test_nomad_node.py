@@ -86,7 +86,7 @@ class TestNomadNode(unittest.TestCase):
     def test_serve_index_without_hardware_description(self) -> None:
         n = self._node(hardware_description="")
         text = n._serve_index("/page/index.mu", None, 1, 1, None, 0).decode("utf-8")
-        self.assertIn("runs `!Meshpoint`! -- it captures", text)
+        self.assertIn("runs `!Meshpoint`!. It captures", text)
 
     def test_serve_info_returns_micron_bytes(self) -> None:
         n = self._node()

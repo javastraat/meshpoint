@@ -309,7 +309,10 @@ class ReticulumNodePagesTab {
             this._setStatus('error', 'Open a page or start a new one first.');
             return;
         }
-        if (this._srcEl.value.trim() && !window.confirm('Replace the editor contents with the sample page?')) {
+        if (this._srcEl.value.trim() && !(await this._confirm({
+            label: 'Load sample?',
+            description: 'Replace the current editor contents with the sample page?',
+        }))) {
             return;
         }
         try {
@@ -360,7 +363,12 @@ class ReticulumNodePagesTab {
     async _delete() {
         const name = this._current?.name;
         if (!name || this._current.isNew) return;
-        if (!window.confirm(`Delete ${name} from the node's pages folder?`)) return;
+        const ok = await this._confirm({
+            label: 'Delete page?',
+            description: `Remove "${name}" from the node's pages folder on the device. `
+                + `If the node is hosting, it stops serving that page.`,
+        });
+        if (!ok) return;
         try {
             const r = await fetch(`/api/reticulum/nomad/pages/${encodeURIComponent(name)}`, {
                 method: 'DELETE', credentials: 'same-origin',
@@ -527,7 +535,18 @@ class ReticulumNodePagesTab {
 
     async _confirmDiscard() {
         if (!this._dirty) return true;
-        return window.confirm('Discard unsaved changes to this page?');
+        return this._confirm({
+            label: 'Discard changes?',
+            description: 'This page has unsaved edits — discard them?',
+        });
+    }
+
+    /** Styled dashboard confirm modal, falling back to window.confirm. */
+    _confirm(opts) {
+        if (typeof window.confirmModal === 'function') return window.confirmModal(opts);
+        return Promise.resolve(window.confirm(
+            [opts.label, opts.description].filter(Boolean).join('\n\n'),
+        ));
     }
 
     _setStatus(kind, msg) {

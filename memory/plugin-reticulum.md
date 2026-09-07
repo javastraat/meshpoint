@@ -668,3 +668,10 @@ via `_address_hex()` -> `self._destination.hash.hex()`, gated so tests /
 pre-start skip it). Dropped "a Meshpoint node" subtitle. Blurb's stale
 "message it over LXMF on the same hash" -> notes LXMF is a separate aspect
 hash on the same identity (only when the Address line shows).
+
+**Pages-tab confirms use the styled modal (uncommitted).** Delete /
+discard-changes / load-sample were raw `window.confirm`. New `_confirm(opts)`
+helper on `ReticulumNodePagesTab` -> `window.confirmModal({label,description})`
+(the dashboard's DangerousModal, loaded globally via index.html), native
+fallback. (User also hand-edited the index.mu blurb "-- it captures" ->
+". It captures"; test assertion updated to match.)
