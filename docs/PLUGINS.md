@@ -808,8 +808,14 @@ The script itself must run as the unprivileged `meshpoint` service account —
 **no `sudo`**.
 Checking a file under `/etc/systemd/system` or `systemctl is-enabled <unit>`
 both work without root; installing anything does not (that's `setup.sh`'s
-job). Reticulum's `check.sh` is the reference: `venv/bin/python3 -c "import
-LXMF"` plus an installed, enabled `rnsd.service`.
+job). Every shipped plugin has one to copy from — the from-source builds
+(`acars`, `adsb`, `radio`, the `multimon-ng` trio) just do `command -v
+<binary>`; `rtlsdr` also greps its DVB-T blacklist file; `reticulum` does
+`venv/bin/python3 -c "import LXMF"` plus an installed, enabled
+`rnsd.service`; `dapnet` (no build step of its own) checks `pyserial`
+imports and exits 0 with an `arduino-cli` note rather than nagging.
+`tests/test_plugin_manifest.py` fails if a plugin ships a `setup.sh`
+without a matching `check.sh`.
 
 ## Testing
 

@@ -11867,3 +11867,49 @@ Pi-tested.**
 modal → on exit 0 the ⚠ should flip and Enable/Restart buttons appear.
 Also test the failure path (e.g. break network so pip fails) and the
 "another setup already running" guard.
+
+**PHASE 2 LIVE-VERIFIED on the SenseCap M1** (screenshots): "Run setup" on
+the Reticulum row → DangerousModal confirm ("sudo bash setup.sh (reticulum)")
+→ setup modal streamed real output: `$ sudo bash
+/opt/meshpoint/plugins/apps/reticulum/setup.sh` (absolute — .resolve() works,
+sudoers matched, no hang), "lxmf already installed -- skipping", rnsd.service
+copied + symlinked + enabled, "Done." → green "setup.sh finished. Enable the
+plugin and restart to load it." + Enable it / Restart service / Close buttons
+(shown => post-run re-probe returned deps_ok != false, i.e. check.sh passed).
+Background row refreshes on Close (by design). NOTE: lxmf was already
+installed on the SenseCap so the `pip install lxmf` streaming path is still
+unexercised (low risk). RAK V2 already has rnsd so no button there unless
+`systemctl disable rnsd` first. All 3 phase-1/2 commits pushed
+(60d83290/117d808a/ce78127d).
+
+---
+
+**Same session — `check.sh` for the other 9 setup.sh plugins. Built, NOT
+committed.** Following reticulum, added `[deps] check = "check.sh"` +
+`check.sh` to: acars, adsb, dab, dapnet, p2000, pagers, pocsag, radio,
+rtl433, rtlsdr. Each mirrors its setup.sh's own idempotency check:
+- `command -v <binary>` for the from-source / apt ones: acarsdec (acars),
+  dump1090 (adsb), welle-cli (dab), multimon-ng (p2000/pagers/pocsag),
+  rtl_433 (rtl433).
+- **rtlsdr**: `rtl_sdr` on PATH **+** the DVB-T blacklist file present with
+  `blacklist dvb_usb_rtl28xxu` (matches setup.sh's two checks).
+- **radio**: `redsea` (its setup's job) + also reports `rtl_fm`/`ffmpeg`
+  (from rtlsdr plugin / base pkgs) since radio can't stream without them;
+  message says which setup to run for each.
+- **dapnet**: no build step of its own — checks `venv/bin/python3 -c
+  "import serial"` (pyserial, transitive via meshtastic/meshcore) and
+  **exits 0**, with an arduino-cli present/absent note (firmware card only).
+  So dapnet shows ✓, not a nag.
+All `chmod +x`, `bash -n` clean, run cleanly on the Mac (report
+"not installed" / exit 1 as expected off-device; rtl433+partial others
+pass via homebrew binaries).
+- Tests: new `TestShippedPluginManifests` in test_plugin_manifest.py —
+  every shipped manifest parses + declared setup/check files exist, AND
+  every plugin with `[deps] setup` also has `[deps] check` (fails CI on a
+  future setup.sh without a check.sh). 115 passed / 6 skipped / 25 subtests.
+- Docs: CHANGELOG v0.8.1 (+1 bullet → 85), PLUGINS.md "check.sh reference"
+  para updated to list them all.
+
+Pi note: `meshpoint plugin check` (no arg) now re-probes every enabled
+plugin with a check; on the RAK/SenseCap only reticulum is enabled so
+output is unchanged, but enabling e.g. rtlsdr would light up its verdict.

@@ -451,5 +451,49 @@ class TestDiscoverPlugins(unittest.TestCase):
                          [("acars", "builtin"), ("extra", "community")])
 
 
+class TestShippedPluginManifests(unittest.TestCase):
+    """Every plugin folder that actually ships in this repo has a manifest
+    that parses, and every ``[deps]`` script it names really exists (a
+    typo'd ``check =`` key or a renamed script would be caught here rather
+    than only at boot on the device)."""
+
+    def setUp(self) -> None:
+        self._community = Path(__file__).resolve().parents[1] / "plugins" / "apps"
+        self._builtin = Path(__file__).resolve().parents[1] / "src" / "plugins" / "apps"
+
+    def _dirs(self):
+        for base in (self._builtin, self._community):
+            if base.is_dir():
+                for d in sorted(base.iterdir()):
+                    if (d / "plugin.toml").is_file():
+                        yield d
+
+    def test_every_shipped_manifest_parses(self) -> None:
+        found = list(self._dirs())
+        self.assertTrue(found, "no shipped plugin folders discovered")
+        for d in found:
+            with self.subTest(plugin=d.name):
+                m = parse_manifest(d)
+                if m.setup is not None:
+                    self.assertTrue(m.setup_path.is_file())
+                if m.check is not None:
+                    self.assertTrue(m.check_path.is_file())
+                    self.assertGreater(m.check_path.stat().st_size, 0)
+
+    def test_every_plugin_with_setup_also_ships_a_check(self) -> None:
+        # Not enforced by the parser -- but the whole point of the deps
+        # check is that Settings -> Plugins can tell the truth for every
+        # plugin that needs a setup step, so a new setup.sh without a
+        # check.sh should be a deliberate, noticed choice.
+        for d in self._dirs():
+            m = parse_manifest(d)
+            if m.setup is not None:
+                with self.subTest(plugin=d.name):
+                    self.assertIsNotNone(
+                        m.check,
+                        f"{d.name} declares [deps] setup but no [deps] check",
+                    )
+
+
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()

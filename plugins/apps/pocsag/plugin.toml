@@ -6,6 +6,7 @@ locked = true  # shipped with this fork -- not user-installed, can't be deleted
 
 [deps]
 setup = "setup.sh"
+check = "check.sh"
 
 [frontend]
 scripts = ["frontend/pocsag_panel.js"]

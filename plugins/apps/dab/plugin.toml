@@ -7,6 +7,7 @@ locked = true  # shipped with this fork -- not user-installed, can't be deleted
 [deps]
 apt = ["welle.io"]
 setup = "setup.sh"
+check = "check.sh"
 
 [frontend]
 scripts = ["frontend/dab_panel.js", "frontend/dab_config_panel.js"]

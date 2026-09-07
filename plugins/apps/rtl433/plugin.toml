@@ -7,6 +7,7 @@ locked = true  # shipped with this fork -- not user-installed, can't be deleted
 [deps]
 apt = ["rtl-433"]
 setup = "setup.sh"
+check = "check.sh"
 
 [frontend]
 scripts = ["frontend/rtl433_panel.js"]

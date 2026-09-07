@@ -6,6 +6,7 @@ locked = true  # shipped with this fork -- not user-installed, can't be deleted
 
 [deps]
 setup = "setup.sh"
+check = "check.sh"
 
 [frontend]
 scripts = ["frontend/adsb_panel.js", "frontend/adsb_map_modal.js", "frontend/adsb_flight_modal.js"]

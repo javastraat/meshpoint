@@ -26,6 +26,7 @@ locked = true  # shipped with this fork -- not user-installed, can't be deleted
 setup = "setup.sh"    # builds librtlsdr from source + blacklists the
                        # kernel DVB-T stack -- the one shared, hardware-
                        # level dependency every RTL-SDR plugin needs
+check = "check.sh"    # probes rtl_sdr on PATH + the DVB-T blacklist file
 
 [frontend]
 scripts = ["frontend/rtlsdr_panel.js"]
