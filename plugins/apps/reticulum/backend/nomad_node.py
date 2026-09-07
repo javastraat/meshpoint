@@ -277,7 +277,7 @@ class NomadNode:
         lines += [
             "-",
             "",
-            "This node runs `!Meshpoint`!" + on_hardware + " -- it captures and",
+            "This node runs `!Meshpoint`!" + on_hardware + ". It captures and",
             "relays Meshtastic, MeshCore, LoRaWAN, POCSAG/DAPNET and Reticulum",
             "traffic, and hosts this NomadNet page on the `!same identity`! as",
             "its LXMF address, announcing itself as `!nomadnetwork.node`!.",
