@@ -1297,8 +1297,10 @@ If a plugin declares a `[deps] check` script, the loader runs it (unprivileged)
 at boot and the page shows a live verdict on that plugin's row — **"⚠ Setup
 needed"** with the reason, or **"✓ Dependencies installed"** — instead of the
 always-on "Requires: … run setup" hint. A **Re-check** button
-(`POST /api/plugins/{id}/check`) re-runs the probe, so once you've run the
-setup step on the device the warning clears without a service restart. A
+(`POST /api/plugins/{id}/check`, or `meshpoint plugin check [<id>]` from the
+CLI) re-runs the probe, so once you've run the setup step on the device the
+warning clears without a service restart. `meshpoint plugin list` shows the
+same verdict but only as a boot-time snapshot — `check` re-runs it live. A
 plugin with no `check` script keeps the old static hint.
 
 A `hook` plugin (`[hook] host = "..."` above) can't be enabled ahead of its

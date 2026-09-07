@@ -37,7 +37,63 @@ def run_plugin_list() -> None:
         return
     for p in plugins:
         _print_plugin_row(p)
+    if any(p.get("has_deps_check") for p in plugins):
+        print(
+            f"  {_DIM}dep state is the boot-time snapshot -- "
+            f"'meshpoint plugin check' re-runs the probes live.{_RESET}"
+        )
     print()
+
+
+def run_plugin_check(plugin_id: str | None = None) -> int:
+    """Re-run one plugin's (or every checkable plugin's) ``[deps] check``
+    probe *inside the running service* and print the fresh verdict.
+
+    This is the authoritative check: the probe runs server-side as the
+    ``meshpoint`` service account -- exactly the context the loader uses at
+    boot -- so it doesn't matter which shell (SSH, web Terminal) invokes
+    the CLI. ``meshpoint plugin list`` by contrast only echoes the
+    boot-time snapshot, which goes stale if deps change on the device
+    afterwards.
+    """
+    client = CliApiClient()
+    plugins = _fetch_plugins(client)  # also establishes the admin session
+    if plugins is None:
+        return 1
+
+    if plugin_id is not None:
+        targets = [plugin_id]
+    else:
+        targets = [p["id"] for p in plugins if p.get("has_deps_check")]
+        if not targets:
+            print("\n  No plugin declares a [deps] check script.\n")
+            return 0
+
+    print()
+    exit_code = 0
+    for pid in targets:
+        try:
+            body = client.post(f"/api/plugins/{pid}/check")
+        except AuthRequired:
+            print("  Re-check needs a dashboard admin login.\n")
+            return 1
+        except (ServiceDown, ApiError) as exc:
+            print(f"  {pid:<20} {_YELLOW}re-check failed: {exc}{_RESET}")
+            exit_code = 1
+            continue
+        p = body.get("plugin", {})
+        deps_ok = p.get("deps_ok")
+        if deps_ok is True:
+            print(f"  {pid:<20} {_GREEN}dependencies installed{_RESET}")
+        elif deps_ok is False:
+            first = (p.get("deps_detail") or "").splitlines()
+            print(f"  {pid:<20} {_YELLOW}setup needed{_RESET}"
+                  + (f" -- {first[0]}" if first else ""))
+            exit_code = 1
+        else:
+            print(f"  {pid:<20} {_DIM}no verdict{_RESET}")
+    print()
+    return exit_code
 
 
 def _fetch_plugins(client: CliApiClient) -> list | None:

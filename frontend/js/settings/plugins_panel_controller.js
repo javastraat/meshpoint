@@ -306,19 +306,24 @@ class PluginsPanelController {
             : '';
         // A plugin with a [deps] check script (has_deps_check) gets a live
         // verdict from the loader instead of the always-on static hint:
-        // deps_ok === false -> "setup needed" + why + a Re-check button (so
-        // running setup on the device can clear it without a restart);
-        // === true -> a quiet "installed" line; null (no check / not loaded)
-        // -> the same static hint as before.
+        // deps_ok === false -> "setup needed" + why; === true -> a quiet
+        // "installed" line; null (no check / not loaded) -> the static hint.
+        // Either verdict carries a Re-check button -- the boot-time verdict
+        // goes stale if rnsd/a package is changed on the device afterwards,
+        // so re-running the probe is the way to refresh it without a restart.
+        const recheckBtnHtml = plugin.has_deps_check
+            ? ` <button type="button" class="plugin-row__recheck" data-recheck>Re-check</button>`
+            : '';
         let depsNote = '';
         if (plugin.deps_ok === false) {
             const why = (plugin.deps_detail || '').split('\n').filter(Boolean)[0]
                 || 'dependencies missing';
             depsNote = `<p class="plugin-row__deps plugin-row__deps--bad" title="${this._escape(plugin.deps_detail || '')}">`
-                + `⚠ Setup needed — ${this._escape(why)}${runHint}`
-                + ` <button type="button" class="plugin-row__recheck" data-recheck>Re-check</button></p>`;
+                + `⚠ Setup needed — ${this._escape(why)}${runHint}${recheckBtnHtml}</p>`;
         } else if (plugin.deps_ok === true) {
-            depsNote = `<p class="plugin-row__deps plugin-row__deps--ok">✓ Dependencies installed</p>`;
+            depsNote = `<p class="plugin-row__deps plugin-row__deps--ok">✓ Dependencies installed${recheckBtnHtml}</p>`;
+        } else if (plugin.has_deps_check) {
+            depsNote = `<p class="plugin-row__deps">Dependency state unknown${recheckBtnHtml}</p>`;
         } else if (staticHint) {
             depsNote = `<p class="plugin-row__deps">${staticHint}</p>`;
         }

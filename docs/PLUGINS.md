@@ -789,9 +789,15 @@ Plugins shows the verdict on that plugin's row — **"⚠ Setup needed"** with
 your message, or **"✓ Dependencies installed"** — instead of the always-on
 "Requires: … run setup" hint. A **Re-check** button re-runs it
 (`POST /api/plugins/{id}/check`) so running setup on the device clears the
-warning without a restart.
+warning without a restart. `meshpoint plugin check [<id>]` does the same from
+the CLI — and unlike `meshpoint plugin list` (which just echoes the boot-time
+snapshot), it re-runs the probe live. Both run it **inside the service
+process**, as the `meshpoint` service account — the exact context the loader
+uses at boot — so it doesn't matter which shell (SSH, the dashboard's web
+Terminal) you call the CLI from.
 
-It must run as the unprivileged `meshpoint` service account — **no `sudo`**.
+The script itself must run as the unprivileged `meshpoint` service account —
+**no `sudo`**.
 Checking a file under `/etc/systemd/system` or `systemctl is-enabled <unit>`
 both work without root; installing anything does not (that's `setup.sh`'s
 job). Reticulum's `check.sh` is the reference: `venv/bin/python3 -c "import
@@ -840,9 +846,11 @@ An operator doesn't need to touch YAML by hand for the common cases:
   verdict (for a plugin with a `[deps] check` script) or the setup-script
   hint, a **Re-check** button, and (for a community, non-`locked` plugin) a
   Delete button that removes `plugins/apps/<id>/` outright.
-- `meshpoint plugin list` / `sudo meshpoint plugin setup <id>` — the CLI
-  equivalents, usable from SSH or the dashboard's own web Terminal (it's a
-  real shell on the device).
+- `meshpoint plugin list` / `meshpoint plugin check [<id>]` /
+  `sudo meshpoint plugin setup <id>` — the CLI equivalents, usable from SSH
+  or the dashboard's own web Terminal (it's a real shell on the device).
+  `check` re-runs the `[deps]` probes live (the `list` verdict is a
+  boot-time snapshot).
 
 Both are read from `discover_plugins()` fresh each time, so nothing needs
 telling about a new plugin beyond it existing on disk with a valid

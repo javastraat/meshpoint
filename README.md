@@ -403,6 +403,7 @@ meshpoint report         # full operational report (asks for admin login; sudo s
 meshpoint restart        # restart the service
 meshpoint meshcore-radio # configure MeshCore companion radio frequency
 meshpoint plugin list    # list discovered app plugins and their enabled/loaded state
+meshpoint plugin check [<id>]  # re-run [deps] check probes live (list shows a boot-time snapshot)
 meshpoint plugin setup <id>  # show + confirm + run a plugin's apt deps and setup.sh
 sudo meshpoint setup     # re-run config wizard
 sudo meshpoint reset-password  # recover forgotten admin password

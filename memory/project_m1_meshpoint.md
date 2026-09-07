@@ -11775,3 +11775,38 @@ work): on the real device, `POST /api/plugins/reticulum/check` (or just a
 restart) should report `deps_ok: true` when lxmf + rnsd.service are in place,
 and the Settings → Plugins row should show "✓ Dependencies installed". Break it
 (e.g. `systemctl disable rnsd`) and confirm the ⚠ + Re-check button behave.
+
+**Same session, follow-up after Pi live-test.** User confirmed on the real
+RAK V2: `bash check.sh` → exit 0 "installed", `meshpoint plugin list` shows
+"deps: installed", dashboard Settings → Plugins row shows "✓ Dependencies
+installed". User then noticed the gap: after `systemctl disable rnsd`,
+`meshpoint plugin list` *still* said installed — because both `list` and
+`GET /api/plugins` serve the boot-time snapshot; the check only re-runs at
+boot or via `POST /api/plugins/{id}/check`. User also raised that the SSH
+`pi`-shell `bash check.sh` isn't the same context the loader uses (the
+`meshpoint` service account). Fixed both:
+- **`meshpoint plugin check [<id>]`** (new CLI subcommand, `run_plugin_check`
+  in `plugin_command.py`, wired in `main.py`). POSTs `/api/plugins/{id}/check`
+  (all `has_deps_check` plugins if no id) — so the probe runs *inside the
+  service process as the service user*, authoritative regardless of which
+  shell calls it. Exit 1 if any plugin reports `deps_ok: false`.
+  `CliApiClient` gained `post()` (refactored shared `_request()`, `get()`
+  unchanged; HTTPError body `detail` now surfaced in `ApiError`).
+- `run_plugin_list` now prints a dim footer when any plugin has a check:
+  "dep state is the boot-time snapshot -- 'meshpoint plugin check' re-runs
+  the probes live."
+- **Panel Re-check button now shows on BOTH verdicts** (was failure-only) —
+  `has_deps_check` gates it, not `deps_ok === false` — since the ✓ verdict
+  also goes stale on a live `rnsd` change. New `has_deps_check && deps_ok
+  == null` branch renders "Dependency state unknown" + button.
+- Tests: `TestRunPluginCheck` (5 cases) in test_plugin_command.py. Mac
+  subset still green (113 passed / 6 skipped incl. the new ones), ruff +
+  `node --check` clean.
+- Docs: CHANGELOG bullet extended (still 83 — same bullet), PLUGINS.md +
+  CONFIGURATION.md + README CLI table + reticulum README all mention
+  `meshpoint plugin check` and the snapshot-vs-live distinction.
+
+**Still not committed. Pi re-test of the break path now possible via:**
+`meshpoint plugin check reticulum` after `systemctl disable rnsd` should
+report "setup needed -- rnsd.service is installed but not enabled" and
+exit 1; dashboard row should flip to ⚠ after clicking Re-check.

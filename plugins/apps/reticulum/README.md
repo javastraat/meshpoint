@@ -27,9 +27,11 @@ sudo meshpoint plugin setup reticulum
 
 Until that's done, Settings → Plugins shows **"⚠ Setup needed"** on the
 Reticulum row — `check.sh` probes for `lxmf` in the venv plus an installed,
-enabled `rnsd.service`, and the loader re-runs it at every boot (a **Re-check**
-button on the row re-runs it on demand). The plugin still loads and serves its
-pages without setup; it just can't attach to Reticulum.
+enabled `rnsd.service`. The loader re-runs it at every boot; the row's
+**Re-check** button (or `meshpoint plugin check reticulum`) re-runs it on
+demand, so a live change to `rnsd` shows up without restarting meshpoint. The
+plugin still loads and serves its pages without setup; it just can't attach to
+Reticulum.
 
 ```yaml
 plugins:

@@ -67,12 +67,18 @@ def cmd_version(_args: argparse.Namespace) -> None:
 
 
 def cmd_plugin(args: argparse.Namespace) -> None:
-    from src.cli.plugin_command import run_plugin_list, run_plugin_setup
+    from src.cli.plugin_command import (
+        run_plugin_check,
+        run_plugin_list,
+        run_plugin_setup,
+    )
 
     if args.plugin_command == "list":
         run_plugin_list()
     elif args.plugin_command == "setup":
         sys.exit(run_plugin_setup(args.id, skip_confirm=args.yes))
+    elif args.plugin_command == "check":
+        sys.exit(run_plugin_check(args.id))
     else:
         args.plugin_parser.print_help()
         sys.exit(1)
@@ -113,7 +119,9 @@ def main() -> None:
 
     sub.add_parser("version", help="Print version information")
 
-    plugin_parser = sub.add_parser("plugin", help="Manage app plugins (list, install deps)")
+    plugin_parser = sub.add_parser(
+        "plugin", help="Manage app plugins (list, check deps, install deps)",
+    )
     plugin_sub = plugin_parser.add_subparsers(dest="plugin_command")
     plugin_sub.add_parser("list", help="List discovered app plugins and their state")
     plugin_setup = plugin_sub.add_parser(
@@ -124,6 +132,16 @@ def main() -> None:
     )
     plugin_setup.add_argument(
         "-y", "--yes", action="store_true", help="Skip the confirmation prompt",
+    )
+    plugin_check = plugin_sub.add_parser(
+        "check",
+        help="Re-run plugins' [deps] check probes now (refreshes the stale "
+             "boot-time verdict shown by 'list')",
+    )
+    plugin_check.add_argument(
+        "id", nargs="?",
+        help="Plugin id to re-check; omit to re-check every plugin that has a "
+             "[deps] check script",
     )
     plugin_parser.set_defaults(plugin_parser=plugin_parser)
 

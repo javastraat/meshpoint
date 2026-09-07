@@ -8,7 +8,12 @@ from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from src.cli.plugin_command import _confirm, _print_plugin_row, run_plugin_setup
+from src.cli.plugin_command import (
+    _confirm,
+    _print_plugin_row,
+    run_plugin_check,
+    run_plugin_setup,
+)
 from src.plugins.manifest import PluginManifest
 
 
@@ -156,6 +161,65 @@ class TestRunPluginSetup(unittest.TestCase):
             mock_run.return_value = MagicMock(returncode=7)
             code = run_plugin_setup("acars", skip_confirm=True)
         self.assertEqual(code, 7)
+
+
+class TestRunPluginCheck(unittest.TestCase):
+    def _run(self, plugin_id, *, plugins, post_result) -> tuple[int, str]:
+        client = MagicMock()
+        buf = io.StringIO()
+        with patch("src.cli.plugin_command.CliApiClient", return_value=client), \
+             patch("src.cli.plugin_command._fetch_plugins", return_value=plugins):
+            client.post.side_effect = post_result
+            with redirect_stdout(buf):
+                code = run_plugin_check(plugin_id)
+        return code, buf.getvalue()
+
+    def test_single_plugin_pass(self) -> None:
+        code, out = self._run(
+            "reticulum", plugins=[{"id": "reticulum", "has_deps_check": True}],
+            post_result=[{"plugin": {"deps_ok": True}}],
+        )
+        self.assertEqual(code, 0)
+        self.assertIn("dependencies installed", out)
+
+    def test_single_plugin_fail_sets_exit_1_and_shows_reason(self) -> None:
+        code, out = self._run(
+            "reticulum", plugins=[{"id": "reticulum", "has_deps_check": True}],
+            post_result=[{"plugin": {"deps_ok": False,
+                                     "deps_detail": "rnsd.service not enabled\nrun setup"}}],
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("setup needed", out)
+        self.assertIn("rnsd.service not enabled", out)
+
+    def test_no_id_rechecks_only_plugins_with_a_check(self) -> None:
+        code, out = self._run(
+            None,
+            plugins=[
+                {"id": "reticulum", "has_deps_check": True},
+                {"id": "acars", "has_deps_check": False},
+            ],
+            post_result=[{"plugin": {"deps_ok": True}}],
+        )
+        self.assertEqual(code, 0)
+        self.assertIn("reticulum", out)
+        self.assertNotIn("acars", out)
+
+    def test_no_checkable_plugins_is_a_clean_noop(self) -> None:
+        code, out = self._run(
+            None, plugins=[{"id": "acars", "has_deps_check": False}],
+            post_result=[],
+        )
+        self.assertEqual(code, 0)
+        self.assertIn("No plugin declares", out)
+
+    def test_service_down_returns_1(self) -> None:
+        client = MagicMock()
+        with patch("src.cli.plugin_command.CliApiClient", return_value=client), \
+             patch("src.cli.plugin_command._fetch_plugins", return_value=None):
+            with redirect_stdout(io.StringIO()):
+                code = run_plugin_check("reticulum")
+        self.assertEqual(code, 1)
 
 
 if __name__ == "__main__":  # pragma: no cover

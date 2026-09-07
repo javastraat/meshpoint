@@ -43,19 +43,36 @@ class CliApiClient:
         )
 
     def get(self, path: str) -> dict | list:
+        return self._request("GET", path)
+
+    def post(self, path: str, body: dict | None = None) -> dict | list:
+        return self._request("POST", path, body)
+
+    def _request(
+        self, method: str, path: str, body: dict | None = None
+    ) -> dict | list:
         headers = (
             {"Authorization": f"Bearer {self._bearer}"} if self._bearer else {}
         )
+        data = None
+        if body is not None:
+            data = json.dumps(body).encode()
+            headers["Content-Type"] = "application/json"
         try:
             request = urllib.request.Request(
-                f"{self._base}{path}", headers=headers
+                f"{self._base}{path}", headers=headers, data=data, method=method
             )
             with self._opener.open(request, timeout=self._timeout) as resp:
                 return json.loads(resp.read().decode())
         except urllib.error.HTTPError as exc:
             if exc.code in (401, 403):
                 raise AuthRequired(path) from exc
-            raise ApiError(f"{path}: HTTP {exc.code}") from exc
+            detail = ""
+            try:
+                detail = json.loads(exc.read().decode()).get("detail", "")
+            except Exception:
+                pass
+            raise ApiError(f"{path}: HTTP {exc.code}{f' -- {detail}' if detail else ''}") from exc
         except urllib.error.URLError as exc:
             raise ServiceDown(str(exc.reason)) from exc
 
