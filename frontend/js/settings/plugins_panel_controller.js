@@ -55,11 +55,15 @@ class PluginsPanelController {
         // Close can't dismiss it mid-run (setup.sh is minutes long).
         this._setupModal = null;
         this._setupRunning = false;
+        this.recheckAllBtn = rootEl.querySelector('[data-recheck-all]');
     }
 
     bind() {
         if (this.restartBtn) {
             this.restartBtn.addEventListener('click', () => this._restartService());
+        }
+        if (this.recheckAllBtn) {
+            this.recheckAllBtn.addEventListener('click', () => this._recheckAll());
         }
         if (this.searchEl) {
             this.searchEl.addEventListener('input', () => {
@@ -137,6 +141,40 @@ class PluginsPanelController {
         if (!this.restartStatusEl) return;
         this.restartStatusEl.dataset.kind = kind;
         this.restartStatusEl.textContent = message;
+    }
+
+    /** Re-run every plugin's [deps] check probe in one shot (server-side,
+     * concurrent) and re-render, so an admin can see what's missing across
+     * all plugins without clicking each row's Re-check. */
+    async _recheckAll() {
+        if (!this.recheckAllBtn) return;
+        this.recheckAllBtn.disabled = true;
+        const label = this.recheckAllBtn.textContent;
+        this.recheckAllBtn.textContent = 'Re-checking…';
+        this._setRestartStatus('pending', 'Re-checking every plugin’s dependencies…');
+        try {
+            const response = await fetch('/api/plugins/check-all', {
+                method: 'POST', credentials: 'same-origin',
+            });
+            if (!response.ok) {
+                this._setRestartStatus('error', response.status === 403
+                    ? 'Admin role required.'
+                    : `Re-check failed (HTTP ${response.status}).`);
+                return;
+            }
+            const body = await response.json();
+            this._plugins = body.plugins || this._plugins;
+            this._render();
+            const bad = this._plugins.filter((p) => p.deps_ok === false).map((p) => p.id);
+            this._setRestartStatus(bad.length ? 'error' : 'success', bad.length
+                ? `Setup needed: ${bad.join(', ')}.`
+                : `All ${body.checked} checked plugins have their dependencies installed.`);
+        } catch (_e) {
+            this._setRestartStatus('error', 'Network error re-checking dependencies.');
+        } finally {
+            this.recheckAllBtn.disabled = false;
+            this.recheckAllBtn.textContent = label;
+        }
     }
 
     async refresh() {

@@ -11913,3 +11913,30 @@ pass via homebrew binaries).
 Pi note: `meshpoint plugin check` (no arg) now re-probes every enabled
 plugin with a check; on the RAK/SenseCap only reticulum is enabled so
 output is unchanged, but enabling e.g. rtlsdr would light up its verdict.
+
+---
+
+**Same session — "Re-check all deps" page-level button. Built, NOT committed.**
+User: clicking each row's Re-check one at a time to see what's missing is
+tedious. Added:
+- **`POST /api/plugins/check-all`** (admin, audited `config.plugin_deps_check`
+  with `plugin_id: "*"`): `discover_plugins` → filter `check is not None` →
+  `asyncio.gather(*(asyncio.to_thread(run_deps_check, m) ...))` → write all
+  `_deps_overrides` → return `{checked: N, plugins: [_describe...]}` (full
+  list, GET shape). Route is unambiguous (no `POST /{plugin_id}`).
+- **index.html**: `<button data-recheck-all>Re-check all deps</button>` between
+  the search box and Restart service (`.terminal-button`, no new CSS).
+- **plugins_panel_controller.js**: `this.recheckAllBtn` + `_recheckAll()` —
+  POSTs, swaps `this._plugins`, `_render()`, summarises in the restart-status
+  line ("Setup needed: acars, …" / "All N checked plugins …").
+- Test: `test_check_all_reruns_every_declared_probe` in TestPluginDepsCheck
+  (2 checkable + 1 without → checked==2, verdicts persist to GET).
+- Docs: CHANGELOG (+1 → 86), CONFIGURATION.md, module docstring.
+
+**Live status (screenshots)**: all check.sh deployed on RAK V2 — rtlsdr/adsb/
+dab/p2000/pagers/pocsag show "✓ Dependencies installed", acars shows
+"⚠ Setup needed — acarsdec is not installed" + Run setup/Re-check. User plans
+a real from-source acars install via the Run setup button (acarsdec+libacars
+build — good long-output streaming test). CAVEAT: acars is a hook plugin on
+rtlsdr; the build runs fine but "Enable it" post-setup will 400 until rtlsdr
+is enabled.

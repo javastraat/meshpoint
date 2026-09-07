@@ -485,6 +485,32 @@ class TestPluginDepsCheck(_PluginRoutesTestBase):
         resp = self._client().post("/api/plugins/nope/check")
         self.assertEqual(resp.status_code, 404)
 
+    def test_check_all_reruns_every_declared_probe(self) -> None:
+        _make_plugin_dir(
+            self.community, "aaa",
+            check_script='#!/usr/bin/env bash\necho ok\nexit 0\n',
+        )
+        _make_plugin_dir(
+            self.community, "bbb",
+            check_script='#!/usr/bin/env bash\necho "libx missing"\nexit 1\n',
+        )
+        _make_plugin_dir(self.community, "ccc")  # no check
+        config = MagicMock()
+        config.plugins = {}
+        self._init(config)
+
+        resp = self._client().post("/api/plugins/check-all")
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+        self.assertEqual(body["checked"], 2)
+        by_id = {p["id"]: p for p in body["plugins"]}
+        self.assertIs(by_id["aaa"]["deps_ok"], True)
+        self.assertIs(by_id["bbb"]["deps_ok"], False)
+        self.assertIsNone(by_id["ccc"]["deps_ok"])
+        # Verdicts persist for a subsequent GET.
+        again = {p["id"]: p for p in self._client().get("/api/plugins").json()["plugins"]}
+        self.assertIs(again["bbb"]["deps_ok"], False)
+
 
 class _FakeStream:
     def __init__(self, lines):

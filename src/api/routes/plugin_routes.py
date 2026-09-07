@@ -22,8 +22,9 @@ so the UI can grey out a not-yet-enableable toggle before anyone touches it.
 
 A plugin that declares ``[deps] check`` gets an unprivileged "are its deps
 installed?" probe, run at boot by the loader and re-runnable on demand via
-``POST /api/plugins/{id}/check`` -- ``GET`` reports the verdict as
-``deps_ok`` / ``deps_detail``. ``POST /api/plugins/{id}/setup/stream`` runs
+``POST /api/plugins/{id}/check`` (one plugin) or ``POST /api/plugins/check-all``
+(every declared probe, concurrently -- the page-level "Re-check all deps"
+button) -- ``GET`` reports the verdict as ``deps_ok`` / ``deps_detail``. ``POST /api/plugins/{id}/setup/stream`` runs
 the plugin's ``[deps] setup`` script (``sudo bash setup.sh``, same sudoers
 grant + audit as ``meshpoint plugin setup``) and streams its output back as
 NDJSON so an admin can install a plugin's system dependencies from the page
@@ -346,6 +347,48 @@ async def recheck_plugin_deps(
     loaded_names = {p.manifest.name for p in _loaded_plugins}
     route_map = _route_map(discover_plugins(_builtin_dir, _community_dir))
     return {"checked": True, "plugin": _describe(manifest, loaded_names, route_map)}
+
+
+@router.post("/check-all")
+async def recheck_all_plugin_deps(
+    _claims: SessionClaims = Depends(require_admin),
+    audit: AuditLogWriter = Depends(get_audit_writer),
+):
+    """Re-run *every* discovered plugin's ``[deps] check`` probe concurrently
+    and record the results -- the page-level "Re-check all deps" button, so
+    an admin doesn't have to click each row's Re-check one at a time.
+    Returns the full plugin list, same shape as ``GET``."""
+    if _config is None:
+        raise HTTPException(503, "Config not loaded")
+
+    manifests = discover_plugins(_builtin_dir, _community_dir)
+    checkable = [m for m in manifests if m.check is not None]
+
+    with audit.timed_action(
+        user=_claims.subject,
+        action="config.plugin_deps_check",
+        params={"plugin_id": "*", "count": len(checkable)},
+    ):
+        results = await asyncio.gather(
+            *(asyncio.to_thread(run_deps_check, m) for m in checkable)
+        )
+    for manifest, (deps_ok, detail) in zip(checkable, results):
+        _deps_overrides[manifest.name] = (deps_ok, detail)
+    logger.info(
+        "re-checked %d plugin dependency probes: %s",
+        len(checkable),
+        ", ".join(
+            f"{m.name}={'ok' if r[0] else 'setup-needed'}"
+            for m, r in zip(checkable, results)
+        ) or "none",
+    )
+
+    loaded_names = {p.manifest.name for p in _loaded_plugins}
+    route_map = _route_map(manifests)
+    return {
+        "checked": len(checkable),
+        "plugins": [_describe(m, loaded_names, route_map) for m in manifests],
+    }
 
 
 async def _stream_plugin_setup(

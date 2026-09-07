@@ -1299,7 +1299,9 @@ needed"** with the reason, or **"✓ Dependencies installed"** — instead of th
 always-on "Requires: … run setup" hint. A **Re-check** button
 (`POST /api/plugins/{id}/check`, or `meshpoint plugin check [<id>]` from the
 CLI) re-runs the probe, so once you've run the setup step on the device the
-warning clears without a service restart. `meshpoint plugin list` shows the
+warning clears without a service restart. A page-level **Re-check all deps**
+button (next to Restart service) re-runs every plugin's probe at once
+(`POST /api/plugins/check-all`). `meshpoint plugin list` shows the
 same verdict but only as a boot-time snapshot — `check` re-runs it live. A
 plugin with no `check` script keeps the old static hint.
 
