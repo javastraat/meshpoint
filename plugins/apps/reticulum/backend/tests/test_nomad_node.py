@@ -83,6 +83,47 @@ class TestNomadNode(unittest.TestCase):
         self.assertIn("11270", text)
         self.assertIn(":/page/index.mu", text)
         self.assertEqual(n._requests_served, 1)
+        # No host/mesh keys -> those sections are simply absent.
+        self.assertNotIn(">Host", text)
+        self.assertNotIn(">Mesh activity", text)
+
+    def test_serve_info_host_and_mesh_sections(self) -> None:
+        n = self._node()
+        n._stats = {
+            "version": "0.8.1",
+            "host": {
+                "pi_model": "Raspberry Pi 4 Model B", "cpu_temp_c": 47.2,
+                "load_1m": 0.31, "mem_used_mb": 900, "mem_total_mb": 3800,
+                "disk_free_gb": 21.4, "disk_total_gb": 29.0,
+            },
+            "mesh": {
+                "packets_total": 1234567, "packets_24h": 8912,
+                "by_protocol": {"meshtastic": 900000, "meshcore": 300000, "lorawan": 34567},
+            },
+        }
+        text = n._serve_info("/page/info.mu", None, 1, 1, None, 0).decode("utf-8")
+        self.assertIn(">Host", text)
+        self.assertIn("Raspberry Pi 4 Model B", text)
+        self.assertIn("47.2 C", text)
+        self.assertIn("900 / 3800 MB", text)
+        self.assertIn(">Mesh activity", text)
+        self.assertIn("1,234,567", text)     # thousands-separated
+        self.assertIn("meshtastic", text)
+        # per-protocol is ordered by count desc
+        self.assertLess(text.index("meshtastic"), text.index("lorawan"))
+        # deliberately nothing node-level
+        self.assertNotIn("source_id", text)
+
+    def test_serve_info_and_index_use_the_project_url(self) -> None:
+        n = self._node(project_url="https://github.com/someforker/meshpoint")
+        for handler in (n._serve_index, n._serve_info):
+            text = handler("/page/x.mu", None, 1, 1, None, 0).decode("utf-8")
+            self.assertIn("https://github.com/someforker/meshpoint", text)
+            self.assertIn("github.com/someforker/meshpoint]", text)  # link label
+
+    def test_project_url_defaults_to_kmx415(self) -> None:
+        text = self._node()._serve_info("/page/info.mu", None, 1, 1, None, 0).decode("utf-8")
+        self.assertIn("https://github.com/KMX415/meshpoint", text)
 
     def test_serve_nodes_lists_recent(self) -> None:
         n = self._node()

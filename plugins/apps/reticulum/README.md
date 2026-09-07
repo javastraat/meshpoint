@@ -131,10 +131,16 @@ answers `Link`/`Request` with:
   `info.mu`. An operator `index.mu` in `node_pages_dir` overrides it
   entirely.
 - `/page/info.mu` — generated, **always served** regardless of your
-  `index.mu` (a same-named file you drop in `node_pages_dir` is ignored)
-  — version, uptime, Reticulum peer count, NomadNet node count,
-  conversation count, plus an about blurb. Safe to link to from your own
-  `index.mu`.
+  `index.mu` (a same-named file you drop in `node_pages_dir` is ignored):
+  version / uptime / hardware / Reticulum peer + NomadNet node +
+  conversation counts, a **`>Host`** block (board model, CPU temp, 1-min
+  load, memory, free disk — all non-sensitive), and a **`>Mesh activity`**
+  block (total + 24 h packet counts and a per-protocol split —
+  **aggregate only, nothing node-level**, since the page is public on the
+  Reticulum network). Refreshed every 60 s. The "Meshpoint on GitHub"
+  link is derived from this checkout's `git` origin
+  (`src.remote.repo_source`, falls back to `KMX415/meshpoint`). Safe to
+  link to from your own `index.mu`.
 - `/page/nodes.mu` — the recent `nomadnetwork.node` peers as Micron links
 - any other `*.mu` file you drop in `node_pages_dir` (`data/reticulum/pages/`
   by default)

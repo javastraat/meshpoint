@@ -548,3 +548,39 @@ User: the nomadnetwork.node list is huge. Added to `reticulum_nomad.js`:
 - No backend change (list endpoint already returns name+hash; favs client-side).
 - Docs: CHANGELOG (+1 -> 88), plugin README Browse section.
 - No JS tests (plugin frontend has none); `node --check` clean.
+
+---
+
+## 2026-09-07 — info.mu: Host + Mesh sections, git-derived GitHub URL (uncommitted)
+
+- **`backend/host_stats.py`** (new, FastAPI-free): `read_host()` -> `{pi_model,
+  cpu_temp_c, load_1m, mem_used_mb, mem_total_mb, disk_free_gb, disk_total_gb}`,
+  every value None-safe. Plain `/proc/device-tree/model`, `/sys/class/thermal`,
+  `os.getloadavg`, `/proc/meminfo`, `shutil.disk_usage` -- NO psutil. On the Mac:
+  load+disk work, rest None.
+- **`__init__.py` `node_stats()`**: adds `hardware` (from
+  `context.config.device.hardware_description`), `conversations`
+  (`MessageRepository.get_conversations()` filtered to protocol=='reticulum'),
+  `host` (host_stats), `mesh` ({packets_total, packets_24h, by_protocol} from
+  `context.pipeline.packet_repo.get_count / get_count_since / get_protocol_distribution`).
+  Mesh + conversation queries wrapped try/except -> info.mu degrades, never 500s.
+- **git-derived URL**: `from src.remote.repo_source import resolve_owner_repo`
+  (ALREADY EXISTS -- reads `.git/config` origin, no git subprocess, falls back
+  to `KMX415/meshpoint`). `project_url = f"https://github.com/{resolve_owner_repo()}"`
+  threaded __init__ -> LxmfService(project_url=) -> NomadNode(project_url=).
+  Replaces hardcoded `javastraat/meshpoint` in `_serve_index` + `_serve_info`.
+  `_project_label()` strips scheme for the link label.
+- **`_serve_info`**: `row(label,value)` helper (`f"{label:<22}: {value}"`),
+  `>Host` block (only rows present), `>Mesh activity` block (packets + per-proto
+  sorted desc, thousands-separated, 2-space indent -- Micron preserves leading
+  spaces). AGGREGATE ONLY, no node-level data (page is public on the mesh).
+- **`_STATS_REFRESH_S` 300 -> 60**.
+- **`sample-pages/index.mu`**: header comment + Links label updated to say
+  info.mu shows host/mesh + git-follows-origin. (User already added the figlet
+  MESHPOINT banner to the sample.)
+- Tests: `test_host_stats.py` (4, pure + mock OSError path), `test_nomad_node.py`
+  +4 (host/mesh sections, forker project_url, KMX415 default). 61 reticulum
+  backend pass / 6 skip. ruff + changelog(89) clean.
+- **NOT committed, NOT Pi-tested.** Pi: browse `<hash>:/page/info.mu` -> should
+  show real board/temp/load/disk + packet counts; GitHub link = whatever the
+  device's `git remote get-url origin` resolves to (KMX415 if tracking upstream).

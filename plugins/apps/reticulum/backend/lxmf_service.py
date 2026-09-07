@@ -142,6 +142,7 @@ class LxmfService:
         node_cfg: Optional[dict] = None,
         node_stats_provider=None,
         hardware_description: str = "",
+        project_url: str = "https://github.com/KMX415/meshpoint",
     ):
         self._display_name = display_name
         self._reticulum_config_dir = Path(reticulum_config_dir)
@@ -153,6 +154,7 @@ class LxmfService:
         self._node_cfg = node_cfg or {"enabled": False}
         self._node_stats_provider = node_stats_provider
         self._hardware_description = hardware_description
+        self._project_url = project_url
         self._node = None
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._router = None
@@ -241,6 +243,7 @@ class LxmfService:
                 announce_interval_s=self._node_cfg.get("announce_interval_s", 21600),
                 stats_provider=self._node_stats_provider,
                 hardware_description=self._hardware_description,
+                project_url=self._project_url,
             )
             await self._node.start()
 

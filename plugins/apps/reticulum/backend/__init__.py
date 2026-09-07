@@ -32,16 +32,21 @@ are gone; this is the whole implementation. See
 
 from __future__ import annotations
 
+import logging
 import time as _time
+from datetime import datetime, timedelta, timezone
+
+logger = logging.getLogger(__name__)
 
 _wired_at: float | None = None
 
 
 def register(reg) -> None:
+    from src.remote.repo_source import resolve_owner_repo
     from src.storage.message_repository import MessageRepository
     from src.version import __version__
 
-    from . import config_routes, nomad_routes, routes, state
+    from . import config_routes, host_stats, nomad_routes, routes, state
     from .lxmf_service import LxmfService
     from .peer_repo import ReticulumPeerRepository
 
@@ -51,8 +56,34 @@ def register(reg) -> None:
     reg.add_router(config_routes.router)
     reg.add_router(nomad_routes.router)
 
+    project_url = f"https://github.com/{resolve_owner_repo()}"
+
     def build(context):
         peer_repo = ReticulumPeerRepository(context.pipeline.database)
+
+        async def _mesh_stats() -> dict:
+            """Aggregate packet counts for /page/info.mu -- totals + a
+            per-protocol split, nothing node-level (that page is served to
+            anyone on the Reticulum network)."""
+            try:
+                pr = context.pipeline.packet_repo
+                since = datetime.now(timezone.utc) - timedelta(hours=24)
+                return {
+                    "packets_total": await pr.get_count(),
+                    "packets_24h": await pr.get_count_since(since),
+                    "by_protocol": await pr.get_protocol_distribution(),
+                }
+            except Exception:  # noqa: BLE001 -- info.mu degrades, never 500s
+                logger.debug("mesh stats unavailable", exc_info=True)
+                return {}
+
+        async def _conversation_count() -> int | None:
+            try:
+                mr = MessageRepository(context.pipeline.database)
+                convs = await mr.get_conversations()
+                return sum(1 for c in convs if c.protocol == "reticulum")
+            except Exception:  # noqa: BLE001
+                return None
 
         async def node_stats() -> dict:
             up = int(_time.time() - _wired_at) if _wired_at else 0
@@ -60,9 +91,13 @@ def register(reg) -> None:
             return {
                 "version": __version__,
                 "uptime": _fmt_uptime(up),
+                "hardware": context.config.device.hardware_description,
                 "reticulum_peers": await peer_repo.count(),
                 "nomad_nodes": await peer_repo.count("nomadnetwork.node"),
+                "conversations": await _conversation_count(),
                 "recent_nodes": [p.to_dict() for p in nodes],
+                "host": host_stats.read_host(),
+                "mesh": await _mesh_stats(),
             }
 
         return LxmfService(
@@ -76,6 +111,7 @@ def register(reg) -> None:
             node_cfg=state.node_config(),
             node_stats_provider=node_stats,
             hardware_description=context.config.device.hardware_description,
+            project_url=project_url,
         )
 
     def wire(service, context):

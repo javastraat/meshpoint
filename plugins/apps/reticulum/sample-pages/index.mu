@@ -12,9 +12,12 @@
 #     sudo systemctl restart meshpoint
 #
 # A file at <node_pages_dir>/index.mu REPLACES the built-in landing page.
-# The built-in live-stats page keeps working either way at /page/info.mu -
-# it's always served, even with a custom index.mu in place, so link to it
-# for uptime / peer counts (see the Links section below).
+# The built-in stats page at /page/info.mu is always served, even with a
+# custom index.mu in place -- version/uptime, a Host block (board, CPU
+# temp, load, memory, free disk) and a Mesh activity block (aggregate
+# packet counts + a per-protocol split). Link to it from your own page
+# (see the Links section below); its GitHub link follows this install's
+# own git origin.
 #
 # Extra .mu files in the same dir are served at /page/<name>.mu
 # Files under a files/ subdir are served at /file/<relpath>
@@ -33,7 +36,15 @@
 #   `<name`Default>     input field (for forms)
 # ---------------------------------------------------------------------------
 
-`c`F0a0`!My Meshpoint`!`f
+`F38f
+ __  __ _____ ____  _   _ ____   ___ ___ _   _ _____
+|  \/  | ____/ ___|| | | |  _ \ / _ \_ _| \ | |_   _|
+| |\/| |  _| \___ \| |_| | |_) | | | | ||  \| | | |
+| |  | | |___ ___) |  _  |  __/| |_| | || |\  | | |
+|_|  |_|_____|____/|_| |_|_|    \___/___|_| \_| |_|
+`f
+-
+
 `cA multi-protocol LoRa mesh gateway
 `a
 -
@@ -46,7 +57,7 @@ You can browse this node here `!and`! message it over LXMF on the same hash.
 
 >Links
 
-`[Live stats & nodes heard`:/page/info.mu]
+`[Host, mesh & Reticulum stats`:/page/info.mu]
 `[Nodes this Meshpoint has heard`:/page/nodes.mu]
 `[Meshpoint on GitHub`https://github.com/KMX415/meshpoint]
 

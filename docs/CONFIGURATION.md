@@ -253,9 +253,13 @@ plugins:
 Registers a `nomadnetwork.node` destination on the *same identity* as your
 LXMF address, announces it, and serves a built-in `/page/index.mu` (a
 branding/landing page — name, a blue MESHPOINT wordmark, an about blurb — linking
-to `info.mu`), a `/page/info.mu` (live Meshpoint stats — **always served**,
-even if you replace `index.mu`), a `/page/nodes.mu` (other nodes you've
-heard), and any other `.mu` file in `node_pages_dir`. A file named
+to `info.mu`), a `/page/info.mu` (live stats — **always served**, even if
+you replace `index.mu`: version/uptime, a **Host** block — board, CPU
+temp, load, memory, free disk — and a **Mesh activity** block with
+aggregate + per-protocol packet counts, *nothing node-level* since the
+page is public; its GitHub link follows this install's `git` origin), a
+`/page/nodes.mu` (other nodes you've heard), and any other `.mu` file in
+`node_pages_dir`. A file named
 `index.mu` there *replaces* the built-in landing page (`info.mu` stays
 fixed either way, so your own `index.mu` can safely link to
 `:/page/info.mu`) — `plugins/apps/reticulum/sample-pages/index.mu`

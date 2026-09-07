@@ -13,7 +13,12 @@ Opt-in (``plugins.reticulum.node_enabled``, off by default). Serves:
   * ``/page/info.mu``   -- generated, **always served** regardless of an
     operator's ``index.mu`` -- a same-named file dropped in
     ``node_pages_dir`` is ignored, so any custom ``index.mu`` can safely
-    link to ``:/page/info.mu`` for live Meshpoint stats + an "about" blurb.
+    link to ``:/page/info.mu``. Shows version/uptime/peer counts, a
+    ``>Host`` block (board, CPU temp, load, memory, free disk -- all
+    non-sensitive) and a ``>Mesh activity`` block (aggregate packet counts
+    + a per-protocol split -- deliberately **nothing node-level**, the page
+    is public on the Reticulum network). The GitHub link is derived from
+    this checkout's ``git`` origin (``src.remote.repo_source``).
   * ``/page/nodes.mu``  -- generated: the other ``nomadnetwork.node``
     peers this Meshpoint has heard.
   * ``/page/<name>.mu`` -- any other ``.mu`` file the operator drops in
@@ -42,7 +47,7 @@ try:
 except ImportError:
     RNS = None
 
-_STATS_REFRESH_S = 300  # the node index page is rarely hit; don't poll hard
+_STATS_REFRESH_S = 60  # info.mu shows CPU temp / load / 24h counts -- keep it fresh
 
 
 def _esc(s: str) -> str:
@@ -59,6 +64,7 @@ class NomadNode:
         announce_interval_s: int,
         stats_provider: Optional[Callable[[], Awaitable[dict]]] = None,
         hardware_description: str = "",
+        project_url: str = "https://github.com/KMX415/meshpoint",
     ):
         self._identity = identity
         self._name = name
@@ -66,6 +72,7 @@ class NomadNode:
         self._announce_interval_s = max(600, int(announce_interval_s))
         self._stats_provider = stats_provider
         self._hardware_description = hardware_description
+        self._project_url = project_url
 
         self._destination = None
         self._announce_task: Optional[asyncio.Task] = None
@@ -257,10 +264,13 @@ class NomadNode:
             "same hash.",
             "",
             ">Links",
-            "`[Live stats & nodes heard`:/page/info.mu]",
-            "`[Meshpoint on GitHub`https://github.com/javastraat/meshpoint]",
+            "`[Host, mesh & Reticulum stats`:/page/info.mu]",
+            f"`[Meshpoint on GitHub`{self._project_url}]",
         ]
         return ("\n".join(lines)).encode("utf-8")
+
+    def _project_label(self) -> str:
+        return self._project_url.split("://", 1)[-1].rstrip("/")
 
     def _serve_info(self, request_path, data, request_id, link_id, remote_identity, requested_at):
         """Fixed stats page -- always generated, never overridable by an
@@ -269,6 +279,12 @@ class NomadNode:
         link to ``:/page/info.mu`` and always get live numbers."""
         self._requests_served += 1
         s = self._stats
+        host = s.get("host") or {}
+        mesh = s.get("mesh") or {}
+
+        def row(label, value):
+            return f"{label:<22}: {value}"
+
         lines = [
             "`c`F0a0`!" + _esc(self._name) + "`!`f`a",
             "`ca Meshpoint node`a",
@@ -276,15 +292,46 @@ class NomadNode:
             ">Meshpoint",
         ]
         if s.get("version"):
-            lines.append("Version              : " + _esc(s["version"]))
+            lines.append(row("Version", _esc(s["version"])))
         if s.get("uptime"):
-            lines.append("Uptime               : " + _esc(s["uptime"]))
+            lines.append(row("Uptime", _esc(s["uptime"])))
+        if s.get("hardware"):
+            lines.append(row("Hardware", _esc(s["hardware"])))
         if s.get("reticulum_peers") is not None:
-            lines.append("Reticulum peers heard : " + str(s["reticulum_peers"]))
+            lines.append(row("Reticulum peers heard", s["reticulum_peers"]))
         if s.get("nomad_nodes") is not None:
-            lines.append("NomadNet nodes heard  : " + str(s["nomad_nodes"]))
+            lines.append(row("NomadNet nodes heard", s["nomad_nodes"]))
         if s.get("conversations") is not None:
-            lines.append("LXMF conversations    : " + str(s["conversations"]))
+            lines.append(row("LXMF conversations", s["conversations"]))
+
+        # Host health -- non-sensitive (temp / load / free space), best-effort.
+        host_rows = []
+        if host.get("pi_model"):
+            host_rows.append(row("Board", _esc(host["pi_model"])))
+        if host.get("cpu_temp_c") is not None:
+            host_rows.append(row("CPU temp", f"{host['cpu_temp_c']} C"))
+        if host.get("load_1m") is not None:
+            host_rows.append(row("Load (1m)", host["load_1m"]))
+        if host.get("mem_total_mb"):
+            host_rows.append(row("Memory", f"{host['mem_used_mb']} / {host['mem_total_mb']} MB"))
+        if host.get("disk_total_gb"):
+            host_rows.append(row("Disk free", f"{host['disk_free_gb']} / {host['disk_total_gb']} GB"))
+        if host_rows:
+            lines += ["", ">Host", *host_rows]
+
+        # Mesh activity -- aggregate counts only, deliberately nothing
+        # node-level (this page is public on the Reticulum network).
+        if mesh:
+            lines += ["", ">Mesh activity"]
+            if mesh.get("packets_total") is not None:
+                lines.append(row("Packets seen", f"{mesh['packets_total']:,}"))
+            if mesh.get("packets_24h") is not None:
+                lines.append(row("  last 24h", f"{mesh['packets_24h']:,}"))
+            for proto, cnt in sorted(
+                (mesh.get("by_protocol") or {}).items(), key=lambda kv: -kv[1],
+            ):
+                lines.append(row(f"  {_esc(proto)}", f"{cnt:,}"))
+
         lines += [
             "",
             ">Pages",
@@ -294,7 +341,7 @@ class NomadNode:
             ">About Meshpoint",
             "A multi-protocol LoRa mesh gateway + dashboard (Meshtastic,",
             "MeshCore, LoRaWAN, POCSAG/DAPNET, Reticulum).",
-            "`[github.com/javastraat/meshpoint`https://github.com/javastraat/meshpoint]",
+            f"`[{_esc(self._project_label())}`{self._project_url}]",
         ]
         return ("\n".join(lines)).encode("utf-8")
 
