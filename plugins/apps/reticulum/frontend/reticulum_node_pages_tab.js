@@ -3,10 +3,12 @@
  * files a hosted NomadNet node serves (`plugins.reticulum.node_pages_dir`).
  *
  * Only shown when node hosting is on. Left: the file list (`index.mu`
- * first) + New. Right: a textarea of raw Micron with a live preview
- * rendered by the same `window.MicronParser` the Browse tab uses. Save
- * PUTs `/api/reticulum/nomad/pages/{name}`; the backend re-registers the
- * node's request handlers so a new page is served without a restart.
+ * first) + New. Right: a small Micron formatting toolbar (bold/underline/
+ * italic/colour/headings/centre/divider/link -- selection-aware where it
+ * makes sense), a textarea of raw Micron, and a live preview rendered by
+ * the same `window.MicronParser` the Browse tab uses. Save PUTs
+ * `/api/reticulum/nomad/pages/{name}`; the backend re-registers the node's
+ * request handlers so a new page is served without a restart.
  *
  * Plain fetch()-driven, same shape as reticulum_settings_tab.js.
  */
@@ -56,6 +58,23 @@ class ReticulumNodePagesTab {
                         </div>
                     </div>
                     <p class="cfg-status" data-pg-status aria-live="polite"></p>
+                    <div class="rt-pages__toolbar" data-pg-toolbar role="toolbar" aria-label="Micron formatting">
+                        <button type="button" data-mu="bold" title="Bold (\`!)"><b>B</b></button>
+                        <button type="button" data-mu="underline" title="Underline (\`_)"><u>U</u></button>
+                        <button type="button" data-mu="italic" title="Italic (\`*)"><i>I</i></button>
+                        <label class="rt-pages__tb-color" title="Text colour (\`F)">
+                            <span>A</span>
+                            <input type="color" data-mu-color value="#3388ff" aria-label="Text colour">
+                        </label>
+                        <span class="rt-pages__tb-sep"></span>
+                        <button type="button" data-mu="h1" title="Heading (&gt;)">H1</button>
+                        <button type="button" data-mu="h2" title="Sub-heading (&gt;&gt;)">H2</button>
+                        <button type="button" data-mu="center" title="Centre (\`c … \`a)">↔</button>
+                        <button type="button" data-mu="divider" title="Divider (-)">─</button>
+                        <span class="rt-pages__tb-sep"></span>
+                        <button type="button" data-mu="link" title="Link (\`[label\`url])">🔗</button>
+                        <button type="button" data-mu="reset" title="Reset formatting (\`\`)">⌫</button>
+                    </div>
                     <div class="rt-pages__split">
                         <textarea class="rt-pages__src" data-pg-src spellcheck="false"
                                   placeholder="Pick a page on the left, or New, to start editing."
@@ -76,6 +95,8 @@ class ReticulumNodePagesTab {
         this._saveBtn = this._q('[data-pg-save]');
         this._deleteBtn = this._q('[data-pg-delete]');
         this._sampleBtn = this._q('[data-pg-sample]');
+        this._toolbarEl = this._q('[data-pg-toolbar]');
+        this._setToolbarEnabled(false);
 
         this._q('[data-pg-new]').addEventListener('click', () => this._newPage());
         this._saveBtn.addEventListener('click', () => this._save());
@@ -88,6 +109,14 @@ class ReticulumNodePagesTab {
         });
         this._nameEl.addEventListener('input', () => {
             this._saveBtn.disabled = !this._nameEl.value.trim();
+        });
+
+        this._q('[data-pg-toolbar]').addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-mu]');
+            if (btn) this._insertMarkup(btn.dataset.mu);
+        });
+        this._q('[data-mu-color]').addEventListener('change', (e) => {
+            this._insertMarkup('color', e.target.value);
         });
     }
 
@@ -140,6 +169,7 @@ class ReticulumNodePagesTab {
             this._nameEl.hidden = true;
             this._nameStaticEl.textContent = name;
             this._srcEl.disabled = false;
+            this._setToolbarEnabled(true);
             this._srcEl.value = body.content || '';
             this._deleteBtn.hidden = false;
             this._saveBtn.disabled = true;
@@ -159,6 +189,7 @@ class ReticulumNodePagesTab {
         this._nameEl.value = '';
         this._nameStaticEl.textContent = '';
         this._srcEl.disabled = false;
+        this._setToolbarEnabled(true);
         this._srcEl.value = '';
         this._deleteBtn.hidden = true;
         this._saveBtn.disabled = true;
@@ -238,6 +269,7 @@ class ReticulumNodePagesTab {
             this._current = null;
             this._srcEl.value = '';
             this._srcEl.disabled = true;
+            this._setToolbarEnabled(false);
             this._deleteBtn.hidden = true;
             this._nameStaticEl.textContent = '';
             this._saveBtn.disabled = true;
@@ -247,6 +279,84 @@ class ReticulumNodePagesTab {
         } catch (_e) {
             this._setStatus('error', 'Network error deleting page.');
         }
+    }
+
+    // --- formatting toolbar (Micron codes at the cursor / around selection) ---
+
+    _setToolbarEnabled(on) {
+        if (!this._toolbarEl) return;
+        this._toolbarEl.classList.toggle('rt-pages__toolbar--off', !on);
+        this._toolbarEl.querySelectorAll('button, input').forEach((el) => {
+            el.disabled = !on;
+        });
+    }
+
+    _insertMarkup(kind, colorHex) {
+        const ta = this._srcEl;
+        if (ta.disabled) return;
+        const start = ta.selectionStart;
+        const end = ta.selectionEnd;
+        const val = ta.value;
+        const sel = val.slice(start, end);
+        let out = null;      // replacement text for [start,end)
+        let caret = null;    // where to put the cursor after
+
+        const wrap = (open, close) => {
+            out = open + sel + close;
+            caret = sel ? start + out.length : start + open.length;
+        };
+        const linePrefix = (prefix) => {
+            const ls = val.lastIndexOf('\n', start - 1) + 1;
+            ta.value = val.slice(0, ls) + prefix + ' ' + val.slice(ls);
+            caret = start + prefix.length + 1;
+        };
+
+        switch (kind) {
+        case 'bold': wrap('`!', '`!'); break;
+        case 'underline': wrap('`_', '`_'); break;
+        case 'italic': wrap('`*', '`*'); break;
+        case 'reset': wrap('``', '``'); break;
+        case 'center': wrap('`c', '`a'); break;
+        case 'color': wrap('`F' + this._to3hex(colorHex), '`f'); break;
+        case 'h1': linePrefix('>'); break;
+        case 'h2': linePrefix('>>'); break;
+        case 'divider': {
+            const onOwnLine = start === 0 || val[start - 1] === '\n';
+            out = (onOwnLine ? '' : '\n') + '-\n';
+            caret = start + out.length;
+            break;
+        }
+        case 'link': {
+            const label = window.prompt('Link text:', sel || '');
+            if (label == null) return;
+            const url = window.prompt(
+                'Link target (https://…  or  :/page/name.mu for this node):', 'https://',
+            );
+            if (url == null) return;
+            out = '`[' + label + '`' + url + ']';
+            caret = start + out.length;
+            break;
+        }
+        default: return;
+        }
+
+        if (out !== null) {
+            ta.value = val.slice(0, start) + out + val.slice(end);
+        }
+        ta.focus();
+        if (caret != null) ta.setSelectionRange(caret, caret);
+        this._dirty = true;
+        this._saveBtn.disabled = !!(this._current?.isNew && !this._nameEl.value.trim());
+        this._renderPreview();
+    }
+
+    /** #rrggbb -> Micron's 3-hex-digit form (each channel 0..f). */
+    _to3hex(hex) {
+        const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex || '');
+        if (!m) return '888';
+        return m.slice(1)
+            .map((c) => Math.round((parseInt(c, 16) / 255) * 15).toString(16))
+            .join('');
     }
 
     _schedulePreview() {

@@ -149,8 +149,10 @@ answers `Link`/`Request` with:
 ### Editing pages — the "Pages" tab
 
 While a node is hosting, the Reticulum page grows a **Pages** tab (admin
-only): a list of the `.mu` files in `node_pages_dir`, a raw-Micron editor,
-and a live preview rendered by the same parser the Browse tab uses. Save
+only): a list of the `.mu` files in `node_pages_dir`, a raw-Micron editor
+with a small formatting toolbar (bold/underline/italic/colour/headings/
+centre/divider/link — wraps the selection where that makes sense), and a
+live preview rendered by the same parser the Browse tab uses. Save
 (`PUT /api/reticulum/nomad/pages/{name}`) writes the file and re-registers
 the node's request handlers, so a new or edited page is served
 immediately — no restart. `info.mu` / `nodes.mu` are refused (they're

@@ -602,3 +602,16 @@ User: the nomadnetwork.node list is huge. Added to `reticulum_nomad.js`:
 freq slot (not "TCP" -- peers is the meaningful number for a node with no
 radio). Logic: `rf && frequency_hz` -> "{MHz}", else -> "{N} peers".
 Hover title: "Reticulum · {RNode radio|TCP backbone} · {N} peers heard".
+
+**Pages-tab formatting toolbar (uncommitted).** Inspired by fr33n0w/
+micron-composer (NC-OSL licensed -> ideas only, no code borrowed; our
+MicronParser is already the reticulum-meshchat MIT port). Added to
+`reticulum_node_pages_tab.js`: `.rt-pages__toolbar` row above the split,
+buttons `data-mu=bold|underline|italic|reset|center|color|h1|h2|divider|
+link`. `_insertMarkup(kind, colorHex)`: `wrap(open,close)` is
+selection-aware (`` `!sel`! ``, `` `Fxxx sel`f ``, `` `c sel `a ``);
+`linePrefix` for h1/h2; divider self-newlines; link uses two
+`window.prompt`s. `_to3hex('#rrggbb')` -> Micron 3-hex.
+`_setToolbarEnabled(on)` toggles with `_srcEl.disabled` (open/new/delete).
+Native `<input type=color>` default `#3388ff`. CSS `.rt-pages__toolbar*`.
+No backend/endpoint. CHANGELOG 91, README + file docstring updated.
