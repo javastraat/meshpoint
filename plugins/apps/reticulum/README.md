@@ -111,6 +111,12 @@ MIT). It lives here rather than in a separate plugin because it needs the
 same live `RNS` attach `LxmfService` provides — a second plugin would mean
 a second client attach + a cross-plugin seam to share the handle.
 
+The node picker filters live (the `/nodes` endpoint caps at 300 of the
+network's many `nomadnetwork.node` announces) and the **☆** button keeps a
+per-browser favourites list in `localStorage` — favourites get their own
+optgroup at the top of the picker and stay selectable after they age off
+the recent list.
+
 ## Hosting a NomadNet node (opt-in)
 
 Off by default. Flip `plugins.reticulum.node_enabled: true` (or the toggle on

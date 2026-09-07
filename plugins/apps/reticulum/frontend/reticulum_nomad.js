@@ -9,7 +9,14 @@
  *
  * Admin-only (like Send/Settings) -- POST /api/reticulum/nomad/page
  * requires admin, and browsing establishes real RNS Links.
+ *
+ * The node picker filters live (the network carries 1000+ nomadnetwork.node
+ * announces, capped at 300 server-side) and keeps a per-browser favourites
+ * list in localStorage -- favourites show in their own optgroup at the top
+ * and stay reachable even after they age off the recent list.
  */
+
+const RT_NOMAD_FAV_KEY = 'meshpoint.rtNomadFavourites';
 
 class ReticulumNomadTab {
     constructor(el) {
@@ -20,6 +27,8 @@ class ReticulumNomadTab {
         this._historyIdx = -1;
         this._parser = null;
         this._loading = false;
+        this._filter = '';
+        this._currentHash = '';
     }
 
     show() {
@@ -42,9 +51,14 @@ class ReticulumNomadTab {
         this._el.innerHTML = `
             <div class="rt-nomad">
                 <div class="rt-nomad__bar">
+                    <input type="search" class="cfg-field__input rt-nomad__search" data-nomad-search
+                           placeholder="Filter nodes…" autocomplete="off" spellcheck="false"
+                           aria-label="Filter NomadNet nodes">
                     <select class="cfg-field__input rt-nomad__nodes" data-nomad-nodes>
                         <option value="">— pick a node —</option>
                     </select>
+                    <button class="terminal-button rt-nomad__fav" type="button" data-nomad-fav
+                            title="Favourite the current node" disabled>&#9734;</button>
                     <input type="text" class="cfg-field__input rt-nomad__addr" data-nomad-addr
                            placeholder="&lt;destination hash&gt;:/page/index.mu" autocomplete="off" spellcheck="false">
                     <button class="terminal-button" type="button" data-nomad-go>Go</button>
@@ -64,10 +78,17 @@ class ReticulumNomadTab {
         this._addrEl = this._q('[data-nomad-addr]');
         this._statusEl = this._q('[data-nomad-status]');
         this._pageEl = this._q('[data-nomad-page]');
+        this._searchEl = this._q('[data-nomad-search]');
+        this._favBtn = this._q('[data-nomad-fav]');
 
         this._nodesEl.addEventListener('change', () => {
             if (this._nodesEl.value) this._go(this._nodesEl.value, '/page/index.mu');
         });
+        this._searchEl.addEventListener('input', () => {
+            this._filter = this._searchEl.value.trim().toLowerCase();
+            this._renderNodeOptions();
+        });
+        this._favBtn.addEventListener('click', () => this._toggleFavourite());
         this._q('[data-nomad-go]').addEventListener('click', () => this._goFromAddr());
         this._addrEl.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') { e.preventDefault(); this._goFromAddr(); }
@@ -96,13 +117,82 @@ class ReticulumNomadTab {
             if (!r.ok) return;
             this._nodes = await r.json();
         } catch (_) { return; }
-        const current = this._nodesEl.value;
-        this._nodesEl.innerHTML = '<option value="">— pick a node —</option>'
-            + this._nodes.map((n) => `
-                <option value="${this._esc(n.destination_hash)}">
-                    ${this._esc(n.display_name || n.destination_hash)}
-                </option>`).join('');
+        this._renderNodeOptions();
+    }
+
+    /** Rebuild the <select>: a "★ Favourites" optgroup (merged in even when
+     * a favourite has aged off the recent list), then "Recent nodes", both
+     * filtered by the search box. */
+    _renderNodeOptions() {
+        if (!this._nodesEl) return;
+        const favs = this._favourites();
+        const favHashes = new Set(favs.map((f) => f.hash));
+        const q = this._filter;
+        const match = (name, hash) => !q
+            || (name || '').toLowerCase().includes(q)
+            || (hash || '').toLowerCase().includes(q);
+
+        const opt = (hash, name, star) => `<option value="${this._esc(hash)}">`
+            + `${star ? '★ ' : ''}${this._esc(name || hash)}</option>`;
+
+        const recent = this._nodes
+            .filter((n) => match(n.display_name, n.destination_hash))
+            .map((n) => opt(n.destination_hash, n.display_name, favHashes.has(n.destination_hash)));
+
+        const favOpts = favs
+            .filter((f) => match(f.name, f.hash))
+            .map((f) => opt(f.hash, f.name, true));
+
+        const current = this._nodesEl.value || this._currentHash;
+        let html = '<option value="">— pick a node —</option>';
+        if (favOpts.length) html += `<optgroup label="★ Favourites">${favOpts.join('')}</optgroup>`;
+        html += `<optgroup label="Recent nodes">${recent.join('')
+            || '<option value="" disabled>no match</option>'}</optgroup>`;
+        this._nodesEl.innerHTML = html;
         if (current) this._nodesEl.value = current;
+        this._syncFavBtn();
+    }
+
+    // --- favourites (per-browser, localStorage) ------------------------
+
+    _favourites() {
+        try {
+            const v = JSON.parse(localStorage.getItem(RT_NOMAD_FAV_KEY) || '[]');
+            return Array.isArray(v) ? v.filter((f) => f && f.hash) : [];
+        } catch (_) { return []; }
+    }
+
+    _saveFavourites(list) {
+        try { localStorage.setItem(RT_NOMAD_FAV_KEY, JSON.stringify(list)); } catch (_) {}
+    }
+
+    _isFavourite(hash) {
+        return this._favourites().some((f) => f.hash === hash);
+    }
+
+    _toggleFavourite() {
+        const hash = this._currentHash;
+        if (!hash) return;
+        const list = this._favourites();
+        const idx = list.findIndex((f) => f.hash === hash);
+        if (idx >= 0) {
+            list.splice(idx, 1);
+        } else {
+            const known = this._nodes.find((n) => n.destination_hash === hash);
+            list.push({ hash, name: (known && known.display_name) || `${hash.slice(0, 12)}…` });
+        }
+        this._saveFavourites(list);
+        this._renderNodeOptions();
+    }
+
+    _syncFavBtn() {
+        if (!this._favBtn) return;
+        const on = !!this._currentHash && this._isFavourite(this._currentHash);
+        this._favBtn.disabled = !this._currentHash;
+        this._favBtn.innerHTML = on ? '&#9733;' : '&#9734;';  // ★ / ☆
+        this._favBtn.classList.toggle('rt-nomad__fav--on', on);
+        this._favBtn.title = !this._currentHash ? 'Open a node to favourite it'
+            : (on ? 'Remove from favourites' : 'Add to favourites');
     }
 
     _goFromAddr() {
@@ -156,6 +246,9 @@ class ReticulumNomadTab {
             }
             this._render(data.content || '');
             this._status('success', `${hash.slice(0, 8)}… ${path}`);
+            this._currentHash = hash;
+            if (this._nodesEl) this._nodesEl.value = hash;
+            this._syncFavBtn();
             if (pushHistory) {
                 this._history = this._history.slice(0, this._historyIdx + 1);
                 this._history.push({ hash, path, field_data: fieldData || null });

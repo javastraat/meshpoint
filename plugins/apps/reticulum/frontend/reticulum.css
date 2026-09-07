@@ -9,14 +9,23 @@
     margin-bottom: 8px;
 }
 
-.rt-nomad__nodes { flex: 0 1 220px; }
+.rt-nomad__search { flex: 0 1 170px; }
+.rt-nomad__nodes { flex: 0 1 240px; }
 .rt-nomad__addr {
-    flex: 1 1 320px;
+    flex: 1 1 300px;
     font-family: var(--font-mono, ui-monospace, monospace);
     font-size: 13px;
 }
 
 .rt-nomad__bar .terminal-button { flex: 0 0 auto; }
+
+.rt-nomad__fav {
+    font-size: 15px;
+    line-height: 1;
+    padding-inline: 9px;
+}
+.rt-nomad__fav--on { color: var(--accent-amber, #f5b942); border-color: currentColor; }
+.rt-nomad__fav:disabled { opacity: 0.4; }
 
 .rt-nomad__page {
     border: 1px solid var(--border, #333);

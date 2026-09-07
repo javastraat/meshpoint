@@ -530,3 +530,21 @@ explicit `background: var(--bg-elevated, #1a1a1a)` + `color: #d7dae0` +
 matching the preview pane in every theme. (`--bg-elevated` has no light
 value either but the fg is now explicit so it's fine.) User confirmed the
 sample Contact-block fix renders correctly ("operator : YOURCALL").
+
+**Browse tab: node picker filter + favourites (uncommitted, same session).**
+User: the nomadnetwork.node list is huge. Added to `reticulum_nomad.js`:
+- `<input type=search data-nomad-search>` -> `this._filter` -> `_renderNodeOptions()`
+  (matches display_name OR hash, case-insensitive).
+- `_renderNodeOptions()` rebuilds the `<select>` with `<optgroup label="★ Favourites">`
+  then `<optgroup label="Recent nodes">`, filtered; favourites merged in even
+  if aged off the 300-cap `/nodes` response ("no match" disabled option when
+  the recent list filters to empty).
+- Favourites in `localStorage` key `meshpoint.rtNomadFavourites` = `[{hash,name}]`.
+  `_favourites/_saveFavourites/_isFavourite/_toggleFavourite/_syncFavBtn`.
+- `☆`/`★` button (`data-nomad-fav`, `.rt-nomad__fav`) toggles the *currently
+  open* node (`this._currentHash`, set in `_fetch` success); disabled until a
+  node is open. `.rt-nomad__fav--on` = amber star.
+- CSS: `.rt-nomad__search` flex 0 1 170px, narrowed addr to 300, fav button.
+- No backend change (list endpoint already returns name+hash; favs client-side).
+- Docs: CHANGELOG (+1 -> 88), plugin README Browse section.
+- No JS tests (plugin frontend has none); `node --check` clean.
