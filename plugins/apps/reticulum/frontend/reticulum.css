@@ -319,3 +319,177 @@
     margin: 0;
     overflow: auto;
 }
+
+/* ---- Peer drawer + Announce modal (reticulum_detail_panels.js) ----
+ * Own small right-side-drawer/center-modal chrome rather than reusing
+ * core's node_drawer.css/packet_detail_modal.css classes -- keeps this
+ * plugin removable without touching core, at the cost of a little
+ * duplicated positioning/animation CSS. Same var(--*) tokens core uses. */
+
+.rt-drawer-backdrop {
+    position: fixed;
+    inset: 0;
+    background: var(--scrim, rgba(0, 0, 0, 0.5));
+    z-index: 1999;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+.rt-drawer-backdrop--visible { opacity: 1; }
+
+.rt-drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 360px;
+    max-width: 100%;
+    height: 100vh;
+    background: var(--bg-secondary);
+    border-left: 1px solid var(--border);
+    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.4);
+    z-index: 2000;
+    transform: translateX(100%);
+    transition: transform 0.25s ease;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.rt-drawer--open { transform: translateX(0); }
+
+.rt-drawer__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-card);
+    flex-shrink: 0;
+}
+.rt-drawer__title {
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.rt-drawer__close {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.4rem;
+    cursor: pointer;
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+.rt-drawer__close:hover { background: var(--overlay-med); color: var(--text-primary); }
+
+.rt-drawer__body { flex: 1; overflow-y: auto; padding: 0.75rem 1rem; }
+
+.rt-drawer__row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.3rem 0;
+    font-size: 0.75rem;
+    border-bottom: 1px solid var(--border);
+}
+.rt-drawer__row span:first-child { color: var(--text-muted); }
+.rt-drawer__row--block { flex-direction: column; align-items: stretch; }
+
+.rt-mono { font-family: var(--font-mono, ui-monospace, monospace); color: var(--text-primary); word-break: break-all; text-align: right; }
+
+.rt-drawer__browse { width: 100%; margin: 0.75rem 0; }
+
+.rt-drawer__section-title {
+    margin-top: 1rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--accent-cyan);
+}
+
+.rt-drawer__announces { display: flex; flex-direction: column; margin-top: 0.4rem; }
+
+.rt-drawer__announce-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.35rem 0.2rem;
+    background: none;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-secondary);
+    font-size: 0.7rem;
+    cursor: pointer;
+    text-align: left;
+}
+.rt-drawer__announce-row:hover { background: var(--overlay-med); }
+
+@media (max-width: 480px) {
+    .rt-drawer { width: 100%; }
+}
+
+.rt-amodal-overlay {
+    position: fixed;
+    inset: 0;
+    background: var(--scrim, rgba(0, 0, 0, 0.5));
+    z-index: 2100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.rt-amodal {
+    width: 420px;
+    max-width: 100%;
+    max-height: 85vh;
+    overflow-y: auto;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+.rt-amodal__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.9rem 1.1rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-card);
+}
+.rt-amodal__title { margin: 0; font-size: 1rem; color: var(--text-primary); }
+.rt-amodal__meta { font-size: 0.7rem; color: var(--text-muted); margin-top: 0.15rem; }
+.rt-amodal__close {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.4rem;
+    cursor: pointer;
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+}
+.rt-amodal__close:hover { background: var(--overlay-med); color: var(--text-primary); }
+
+.rt-amodal__body { padding: 0.9rem 1.1rem; }
+
+.rt-amodal__appdata {
+    margin: 0.35rem 0 0;
+    padding: 0.5rem;
+    background: var(--bg-elevated, #1a1a1a);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.7rem;
+    color: #d7dae0;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.rt-amodal__view-peer { width: 100%; margin-top: 0.9rem; }

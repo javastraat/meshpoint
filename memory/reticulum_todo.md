@@ -5,7 +5,7 @@ See `memory/plugin-reticulum.md` for implementation detail (dated sections,
 one per feature) and `memory/project_m1_meshpoint.md` for wider session
 context.
 
-Last updated 2026-09-07.
+Last updated 2026-09-07 (added click-to-detail on Peers/Activity, same day).
 
 ---
 
@@ -28,6 +28,11 @@ checked on the Pi.
 
 - **Activity tab**: open Reticulum → Activity, confirm announces stream in
   (and `call.audio` rows appear if any Sideband/MeshChat users are around).
+- **Peer drawer / Announce popup (new 2026-09-07, not opened in a real
+  browser yet)**: click a Peers row → right-side drawer should slide in;
+  click an Activity row → center popup should appear with the announce's
+  hex `app_data` if present. Check both light and dark theme, and that
+  "View peer" / "Browse this node" actually cross-navigate correctly.
 - **Propagation node — NEEDS TESTING** (UI is confirmed on the device, the
   relay itself is not):
   1. Settings → Propagation node → tick "Act as an LXMF propagation node" →
@@ -59,6 +64,7 @@ checked on the Pi.
 | Activity | Raw announce feed | Activity tab: 200-entry ring buffer, live over `reticulum_announce` WS; incl. `call.audio` (stream-only); `nomadnetwork.node` rows get a Browse button |
 | Notifications | ntfy / webhook on inbound DM | `notify_url` config; fire-and-forget POST (`backend/notify.py`) |
 | Propagation node | LXMF store-and-forward relay | `propagation_enabled` + `propagation_storage_limit_mb`; own `lxmf.propagation` hash, re-announced 6 h; status line on Settings tab; `propagation` block on `GET /api/reticulum/status` |
+| Peers/Activity | Click-to-detail | Peers row → right-side drawer (hash, aspect, first/last seen, recent announces from that peer); Activity row → detail popup (full time, hash, aspect, raw `app_data` hex, "View peer" link). Own components (`reticulum_detail_panels.js`), not core's NodeDrawer/PacketDetailModal — those are shaped for RF packets, announces are much thinner |
 | Browsing | NomadNet node browser | Browse tab: live filter, ☆ favourites, `:/page/x.mu` shortcuts |
 | Hosting | Our own `nomadnetwork.node` | one hash = "message me" + "browse me" |
 | Hosting | Generated `index` / `info` / `nodes` pages | `info.mu` = live version/uptime/host/mesh-activity stats |

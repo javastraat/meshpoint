@@ -63,6 +63,8 @@ class ReticulumPanel {
         this._settingsTab = null;
         this._nomadTab = null;
         this._nodePagesTab = null;
+        this._peerDrawer = null;
+        this._announceModal = null;
         this._onWsPeer = this._onWsPeer.bind(this);
         this._onWsMessage = this._onWsMessage.bind(this);
         this._onWsAnnounce = this._onWsAnnounce.bind(this);
@@ -253,6 +255,12 @@ class ReticulumPanel {
         if (window.ReticulumNodePagesTab) {
             this._nodePagesTab = new window.ReticulumNodePagesTab(this._q('[data-rt-nodepages-body]'));
         }
+        if (window.ReticulumPeerDrawer) {
+            this._peerDrawer = new window.ReticulumPeerDrawer();
+        }
+        if (window.ReticulumAnnounceModal) {
+            this._announceModal = new window.ReticulumAnnounceModal();
+        }
 
         this._q('#rt-refresh-btn')?.addEventListener('click', () => this._load());
         this._q('#rt-announce-btn')?.addEventListener('click', () => this._handleAnnounce());
@@ -264,6 +272,28 @@ class ReticulumPanel {
             messageTbody.addEventListener('click', (e) => {
                 const tr = e.target.closest('tr[data-node-id]');
                 if (tr) this._markRead(tr.dataset.nodeId);
+            });
+        }
+        const peerTbody = this._q('#rt-peer-tbody');
+        if (peerTbody) {
+            peerTbody.addEventListener('click', (e) => {
+                if (e.target.closest('[data-rt-browse]')) return;
+                const tr = e.target.closest('tr[data-rt-peer-hash]');
+                if (!tr) return;
+                const peer = this._peers.find((p) => p.destination_hash === tr.dataset.rtPeerHash);
+                if (peer) this._openPeerDrawer(peer);
+            });
+        }
+        const announceTbody = this._q('#rt-announce-tbody');
+        if (announceTbody) {
+            announceTbody.addEventListener('click', (e) => {
+                if (e.target.closest('[data-rt-browse]')) return;
+                const tr = e.target.closest('tr[data-rt-ts]');
+                if (!tr) return;
+                const entry = this._announces.find(
+                    (a) => a.ts === tr.dataset.rtTs && a.destination_hash === tr.dataset.rtHash
+                );
+                if (entry) this._openAnnounceModal(entry);
             });
         }
         this._q('#rt-send-form')?.addEventListener('submit', (e) => this._handleSend(e));
@@ -327,6 +357,29 @@ class ReticulumPanel {
     browseNode(destinationHash) {
         this._setTab('browse');
         if (this._nomadTab) this._nomadTab.openNode(destinationHash);
+    }
+
+    /** Peers-row click -> right-side drawer (reticulum_detail_panels.js).
+     * Recent-activity list is filtered client-side from the Activity ring
+     * buffer already in memory -- no extra fetch, same shape as the
+     * Browse tab's other client-side filters. */
+    _openPeerDrawer(peer) {
+        if (!this._peerDrawer) return;
+        const recent = this._announces.filter((a) => a.destination_hash === peer.destination_hash);
+        this._peerDrawer.open(peer, recent, {
+            onBrowse: peer.aspect === 'nomadnetwork.node' ? (hash) => this.browseNode(hash) : undefined,
+            onViewAnnounce: (entry) => this._openAnnounceModal(entry),
+        });
+    }
+
+    /** Activity-row click -> center modal (reticulum_detail_panels.js). */
+    _openAnnounceModal(entry) {
+        if (!this._announceModal) return;
+        const peer = this._peers.find((p) => p.destination_hash === entry.destination_hash);
+        this._announceModal.show(entry, {
+            knownPeer: !!peer,
+            onViewPeer: () => { if (peer) this._openPeerDrawer(peer); },
+        });
     }
 
     _onWsPeer() { this._loadPeers(); }
@@ -476,7 +529,7 @@ class ReticulumPanel {
         }
 
         tbody.innerHTML = visible.map((p) => `
-            <tr>
+            <tr class="lw-pkt-row" data-rt-peer-hash="${this._esc(p.destination_hash)}" title="Click for details">
                 <td class="lw-time">${this._fmtTime(p.last_seen)}</td>
                 <td class="mt-name">${this._esc(p.display_name || '--')}</td>
                 <td class="lw-id">${this._esc(p.destination_hash)}</td>
@@ -557,7 +610,7 @@ class ReticulumPanel {
         }
         if (empty) empty.style.display = 'none';
         tbody.innerHTML = this._announces.slice(0, RT_ANNOUNCE_LIMIT).map((a) => `
-            <tr>
+            <tr class="lw-pkt-row" data-rt-ts="${this._esc(a.ts)}" data-rt-hash="${this._esc(a.destination_hash)}" title="Click for details">
                 <td class="lw-time">${this._fmtTime(a.ts)}</td>
                 <td class="mt-name">${this._esc(a.display_name || '--')}</td>
                 <td class="lw-id">${this._esc(a.destination_hash)}</td>

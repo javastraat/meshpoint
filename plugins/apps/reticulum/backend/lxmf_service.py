@@ -399,19 +399,26 @@ class LxmfService:
                 except Exception:
                     display_name = ""
         dest_hex = RNS.hexrep(destination_hash, delimit=False)
+        # Kept alongside display_name for the Activity tab's detail popup --
+        # display_name is already a lossy decode (utf-8 for NomadNet nodes,
+        # LXMF's own parser otherwise), the raw hex is the actual bytes an
+        # operator would want when display_name comes back empty/garbled.
+        app_data_hex = bytes(app_data).hex() if app_data else None
         if self._loop is not None:
             asyncio.run_coroutine_threadsafe(
-                self._handle_announce(dest_hex, display_name, aspect), self._loop,
+                self._handle_announce(dest_hex, display_name, aspect, app_data_hex), self._loop,
             )
 
     async def _handle_announce(
         self, destination_hash: str, display_name: str, aspect: str,
+        app_data_hex: Optional[str] = None,
     ) -> None:
         entry = {
             "ts": datetime.now(timezone.utc).isoformat(),
             "destination_hash": destination_hash,
             "display_name": display_name,
             "aspect": aspect,
+            "app_data_hex": app_data_hex,
         }
         self._announce_log.append(entry)
         await self._ws_manager.broadcast("reticulum_announce", entry)

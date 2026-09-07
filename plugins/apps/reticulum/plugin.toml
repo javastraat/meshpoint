@@ -24,6 +24,7 @@ check = "check.sh"   # unprivileged probe: lxmf in venv + rnsd.service installed
 [frontend]
 scripts = [
     "frontend/reticulum_micron.js",
+    "frontend/reticulum_detail_panels.js",
     "frontend/reticulum_panel.js",
     "frontend/reticulum_settings_tab.js",
     "frontend/reticulum_nomad.js",

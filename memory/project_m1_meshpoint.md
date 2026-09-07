@@ -11946,3 +11946,65 @@ the Run setup modal on the RAK V2 (ACARS: acarsdec + libacars, git clone +
 cmake + make -j, several minutes). Streamed correctly, completed, verdict
 flipped to ✓. "Re-check all deps" button also confirmed working. Phase 1 +
 phase 2 + all check.sh + Re-check-all are now fully live-verified.**
+
+## Reticulum plugin: click-to-detail on Peers + Activity (2026-09-07)
+
+User asked (after reviewing the Activity/Peers tabs added earlier the same
+day, see `memory/plugin-reticulum.md`): should clicking a Peers row open a
+detail panel on the right, and clicking an Activity row open a packet-
+content popup, "same as a meshcore contact/meshtastic node and recent
+packets"? Confirmed yes, then asked specifically "should all be in the
+plugin" -- i.e. don't extend core's shared components, keep it plugin-
+owned. Investigated first (subagent): Meshtastic and MeshCore already
+share one core `NodeDrawer` (`frontend/js/node_drawer.js`, `window.
+nodeDrawer`) for the row-click drawer, backed by `/api/packets/by-source/
+{id}` for "recent packets"; a separate shared `PacketDetailModal`
+(`frontend/js/packet_detail_modal.js`) does the single-packet popup,
+already extensible per-protocol via `registerProtocolFormat()`
+(`js/protocol_format_registry.js`) -- DAPNET uses that seam.
+
+**Decision: built Reticulum's own components instead of extending either
+core one.** Reasoning given to the user: `NodeDrawer` is shaped around
+Meshtastic/MeshCore node fields (hardware, telemetry, position) and
+`PacketDetailModal` around a captured RF packet (RF/Mesh/Payload/Capture
+layers) -- a Reticulum announce is `{ts, destination_hash, display_name,
+aspect, app_data_hex}`, nothing like either shape. Forcing it through
+either would mean a core file growing a reticulum-shaped branch instead
+of the plugin staying self-contained -- same principle as the DAPNET/
+RTL-SDR core→plugin extractions and this file's own curated-sidebar-icon
+note (2026-09-05, above) about plugins never reaching into core's shared
+surfaces.
+
+**Built:**
+- `plugins/apps/reticulum/frontend/reticulum_detail_panels.js` (new) --
+  `ReticulumPeerDrawer` (right-side slide-in: destination hash, aspect,
+  first/last seen, a "Browse this node" button for `nomadnetwork.node`
+  peers, and a "Recent activity" list filtered client-side from the
+  Activity ring buffer already in memory -- no new fetch) and
+  `ReticulumAnnounceModal` (center popup: full timestamp, destination
+  hash, aspect, the announce's raw `app_data` in hex when present, a
+  "View peer" button that closes the popup and opens the drawer if the
+  announcer is a known roster entry).
+- `plugins/apps/reticulum/frontend/reticulum.css` -- own `.rt-drawer*`/
+  `.rt-amodal*` rules, deliberately not reusing `node_drawer.css`/
+  `packet_detail_modal.css` classes (same self-contained reasoning),
+  same `var(--*)` design tokens core uses so it still matches the theme.
+- `reticulum_panel.js` -- row-click delegation on `#rt-peer-tbody` /
+  `#rt-announce-tbody` (guarded so clicking the existing "Browse" button
+  doesn't also fire the row-open), `_openPeerDrawer()` / `_openAnnounceModal()`.
+- `lxmf_service.py` -- `_on_announce`/`_handle_announce` now also capture
+  raw `app_data` as hex (`app_data_hex`, optional 4th param, backward
+  compatible) alongside the already-decoded `display_name` -- the popup's
+  only source of "packet content" since announces carry nothing else.
+  Existing announce-shape tests didn't need changes (they check specific
+  keys, not full-dict equality).
+- `plugin.toml` -- registered the new script.
+
+**Verification**: `python3.11 -m pytest plugins/apps/reticulum/` — 114
+passed, same pre-existing 7 failures as before the change (route tests
+need `aiosqlite`, Mac has none — confirmed identical failure set via
+`git stash` on a clean checkout, matches `memory/reticulum_todo.md`'s
+Mac-testing note). `ChangelogParser.parse_file` re-verified clean. CHANGELOG bullet
+added under `### v0.8.1` (matches `src/version.py`). Not opened in a
+real browser yet — added to `memory/reticulum_todo.md`'s Pi-verification
+list (drawer/popup visuals, light+dark theme, cross-navigation).
