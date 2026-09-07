@@ -15,7 +15,7 @@ implementation now. `enabled: false` by default like every shipped plugin.
 | `service` | `LxmfService` — RNS/LXMF client attach, started right after the packet pipeline is up (`src.api.service_registry`), stopped on shutdown |
 | `routes` | `/api/reticulum/{status,peers,messages,send,announce}` + `/api/reticulum/nomad/{nodes,page,file}` + `GET`/`PUT /api/config/reticulum` + `POST /api/config/reticulum/restart-rnsd` |
 | `sidebar` | the **Reticulum** page under Networks — Peers / Messages / Send / Browse / Settings tabs |
-| `topbar` | the compact status pill (own address · peer count), self-polling `/api/reticulum/status` |
+| `topbar` | the compact status pill (own address · RNode frequency, or `TCP` for a backbone-only setup; peer count in the hover title), self-polling `/api/reticulum/status` |
 
 ## Enable it
 

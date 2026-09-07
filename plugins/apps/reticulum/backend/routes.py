@@ -20,6 +20,7 @@ from src.api.auth.dependencies import require_admin
 from src.api.auth.jwt_session import SessionClaims
 from src.storage.message_repository import MessageRepository
 
+from . import state
 from .lxmf_service import LxmfService
 
 router = APIRouter(prefix="/api/reticulum", tags=["reticulum"])
@@ -45,6 +46,10 @@ async def reticulum_status():
     if _service is None:
         return {"enabled": False, "running": False}
     peer_count = await _service.peer_count() if _service.own_address else 0
+    cfg = state.to_dict()
+    rf_on = bool(cfg.get("rnode_enabled")) and bool(
+        str(cfg.get("rnode_serial_port") or "").strip()
+    )
     return {
         "enabled": True,
         "running": _service.own_address is not None,
@@ -52,6 +57,13 @@ async def reticulum_status():
         "own_address": _service.own_address,
         "peer_count": peer_count,
         "node": _service.node_status(),   # None unless hosting a NomadNet node
+        "radio": {
+            # what the topbar chip shows in its "freq" slot: the RNode
+            # frequency when RF is configured, else the TCP backbone.
+            "rf": rf_on,
+            "frequency_hz": cfg.get("rnode_frequency_hz") if rf_on else None,
+            "backbone": bool(cfg.get("backbone_enabled")),
+        },
     }
 
 

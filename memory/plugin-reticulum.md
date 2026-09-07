@@ -584,3 +584,16 @@ User: the nomadnetwork.node list is huge. Added to `reticulum_nomad.js`:
 - **NOT committed, NOT Pi-tested.** Pi: browse `<hash>:/page/info.mu` -> should
   show real board/temp/load/disk + packet counts; GitHub link = whatever the
   device's `git remote get-url origin` resolves to (KMX415 if tracking upstream).
+
+**Topbar pill: freq instead of peer count (uncommitted, user request).**
+- `routes.py` GET /status: new `radio` block = `{rf, frequency_hz, backbone}`.
+  `rf` = `rnode_enabled AND rnode_serial_port.strip()` (blank port = RF off,
+  the established implicit switch). `frequency_hz` only when `rf`.
+- `reticulum_topbar_chip.js` `_applyStatus`: freq slot shows
+  `{(frequency_hz/1e6).toFixed(3)} MHz` when rf, `TCP` when backbone-only,
+  `--` otherwise; falls back to `{peer_count} peers` if `status.radio`
+  missing (old backend). Peer count -> chip `.title` hover
+  ("Reticulum · N peers heard"). Matches Meshtastic/MeshCore/Pager chips.
+- Tests: `test_status_route.py` (3, fastapi-gated). Docs: CHANGELOG (90),
+  README topbar row. Clean separation from the info.mu batch (only shared
+  file would be routes.py, which info.mu didn't touch).

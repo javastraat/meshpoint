@@ -13,6 +13,10 @@
  * (still core, untouched) -- same brand/lamp/call/sep/freq visual
  * language as the built-in chips. Hidden until the service reports it's
  * available (rns/lxmf installed); lamp online/offline tracks `running`.
+ *
+ * The "freq" slot shows the RNode frequency when RF is configured
+ * (matching the Meshtastic/MeshCore/Pager chips), "TCP" for a
+ * backbone-only setup; the peer count moved to the chip's hover title.
  */
 class ReticulumTopbarChip {
     constructor() {
@@ -78,9 +82,24 @@ class ReticulumTopbarChip {
         callEl.textContent = status.running
             ? this._shortAddress(status.own_address)
             : 'starting…';
-        freqEl.textContent = status.running
-            ? `${status.peer_count ?? 0} peers`
-            : '--';
+        // "freq" slot: match the other radio chips -- the RNode frequency
+        // when RF is configured, else "TCP" for a backbone-only setup.
+        // Peer count moves to the hover title so it's not lost.
+        if (!status.running) {
+            freqEl.textContent = '--';
+        } else if (status.radio) {
+            const r = status.radio;
+            freqEl.textContent = (r.rf && r.frequency_hz)
+                ? `${(r.frequency_hz / 1e6).toFixed(3)} MHz`
+                : (r.backbone ? 'TCP' : '--');
+        } else {
+            freqEl.textContent = `${status.peer_count ?? 0} peers`;  // old backend
+        }
+        const root = this._group.querySelector('.topbar-reticulum');
+        if (root) {
+            const peers = status.peer_count ?? 0;
+            root.title = `Reticulum · ${peers} peer${peers === 1 ? '' : 's'} heard`;
+        }
     }
 
     _shortAddress(addr) {
