@@ -13,6 +13,7 @@ LXMF to the node's address*.
 |---|---|---|
 | `index.mu` | `/page/index.mu` | Splash + main menu (replaces the generated landing page) |
 | `techinc.mu` | `/page/techinc.mu` | About the hackerspace — address, open evening, membership |
+| `meshpoint.mu` | `/page/meshpoint.mu` | About Meshpoint — what it is, the protocols, the dashboard (generic, no `[EDIT]`) |
 | `mesh.mu` | `/page/mesh.mu` | What the node relays, frequencies, how to reach it, how to get your own node |
 | `bulletins.mu` | `/page/bulletins.mu` | Message-of-the-day board — add dated entries at the top |
 | `links.mu` | `/page/links.mu` | Other NomadNet nodes + Reticulum resources |

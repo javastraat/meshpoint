@@ -29,11 +29,12 @@ LXMF address -- browse here, message us on the same hash.
 >Main Menu
 
 `[1  -  About TechInc`:/page/techinc.mu]
-`[2  -  Get on the mesh`:/page/mesh.mu]
-`[3  -  Bulletins / news`:/page/bulletins.mu]
-`[4  -  Other nodes & links`:/page/links.mu]
-`[5  -  Live node stats`:/page/info.mu]
-`[6  -  NomadNet nodes we have heard`:/page/nodes.mu]
+`[2  -  About Meshpoint`:/page/meshpoint.mu]
+`[3  -  Get on the mesh`:/page/mesh.mu]
+`[4  -  Bulletins / news`:/page/bulletins.mu]
+`[5  -  Other nodes & links`:/page/links.mu]
+`[6  -  Live node stats`:/page/info.mu]
+`[7  -  NomadNet nodes we have heard`:/page/nodes.mu]
 
 -
 `F888SysOp `f: `!PD2EMC`! (Einstein)

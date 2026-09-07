@@ -37,4 +37,4 @@ to become a member, ask someone at the space or mail the board.
 `F888Chat   `f: #techinc on hackint (IRC), bridged to Matrix   [EDIT]
 
 -
-`[<< Main menu`:/page/index.mu]     `[The mesh >>`:/page/mesh.mu]
+`[<< Main menu`:/page/index.mu]     `[About Meshpoint >>`:/page/meshpoint.mu]
