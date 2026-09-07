@@ -509,3 +509,15 @@ registerPageHook and the editor is inseparable from node hosting).
   Pages tab, edit index.mu, Save, browse `<hash>:/page/index.mu` from the
   Browse tab → should show the edit with no restart. Create a new
   `about.mu`, link to it from index.mu, confirm it serves.
+
+**LIVE on the SenseCap + browsed from ti-meshpoint (screenshots)**: Pages tab
+edits index.mu with working live preview, Save serves it immediately, and
+`359a563e...:/page/index.mu` renders correctly when browsed from another
+Reticulum node. Feature confirmed end to end.
+FOUND + FIXED a bug in `sample-pages/index.mu`: the Contact block used
+`` `Foperator`` etc. -- `` `F`` consumes the next 3 chars as a hex colour, so
+"ope"/"loc"/"not" became a bad colour and the labels rendered "rator :" /
+"ation :" / "es :". Now `` `F888operator`f : ...`` (valid grey). Header note
+updated to point at the Pages tab / Load sample; hardware line ->
+"<your hardware>". Anyone who used the old sample must re-Load-sample + Save
+(or hand-fix those 3 lines). Still uncommitted.

@@ -2,8 +2,10 @@
 # ---------------------------------------------------------------------------
 # Sample NomadNet node page for the Meshpoint reticulum plugin.
 #
-# Copy this file to your node's pages directory and restart Meshpoint:
+# Easiest: on the Reticulum page's "Pages" tab, click "Load sample", edit,
+# and Save -- it's served straight away, no restart.
 #
+# Or by hand:
 #     mkdir -p /opt/meshpoint/data/reticulum/pages
 #     cp plugins/apps/reticulum/sample-pages/index.mu \
 #        /opt/meshpoint/data/reticulum/pages/index.mu
@@ -16,7 +18,8 @@
 #
 # Extra .mu files in the same dir are served at /page/<name>.mu
 # Files under a files/ subdir are served at /file/<relpath>
-# Handlers are registered once at startup, so new files need a restart.
+# Editing a file's contents is picked up live; a brand-new file needs a
+# Save from the Pages tab (it re-scans) or a restart.
 #
 # Micron quick reference:
 #   `F0a0 ... `f   foreground colour (3 hex) ... revert
@@ -35,7 +38,7 @@
 `a
 -
 
-Welcome. This node runs `*Meshpoint`* on a SenseCap M1 - it captures and
+Welcome. This node runs `*Meshpoint`* on <your hardware> - it captures and
 relays Meshtastic, MeshCore, LoRaWAN, POCSAG/DAPNET and Reticulum traffic,
 and hosts this NomadNet page on the `!same identity`! as its LXMF address.
 
@@ -49,9 +52,9 @@ You can browse this node here `!and`! message it over LXMF on the same hash.
 
 >Contact
 
-`Foperator  : `f`!YOURCALL`!
-`Flocation  : `fyour town, grid QTHLOC
-`Fnotes     : `freply to this address over LXMF
+`F888operator`f : `!YOURCALL`!
+`F888location`f : your town, grid QTHLOC
+`F888notes`f    : reply to this address over LXMF
 
 -
 `cEdit me: plugins/apps/reticulum/sample-pages/index.mu`a
