@@ -135,8 +135,16 @@ class ReticulumNomadTab {
             || (name || '').toLowerCase().includes(q)
             || (hash || '').toLowerCase().includes(q);
 
-        const opt = (hash, name, star) => `<option value="${this._esc(hash)}">`
-            + `${star ? '★ ' : ''}${this._esc(name || hash)}</option>`;
+        // The native <select> popup sizes itself to the widest option, and
+        // CSS can't touch it -- one node with a 140-char name blows the
+        // whole dropdown wide. Cap the visible label; the full name still
+        // matches the filter box and rides in the option's title.
+        const cap = (s) => (s.length > 46 ? s.slice(0, 45).trimEnd() + '…' : s);
+        const opt = (hash, name, star) => {
+            const full = name || hash;
+            return `<option value="${this._esc(hash)}" title="${this._esc(full)}">`
+                + `${star ? '★ ' : ''}${this._esc(cap(full))}</option>`;
+        };
 
         const recent = this._nodes
             .filter((n) => match(n.display_name, n.destination_hash))

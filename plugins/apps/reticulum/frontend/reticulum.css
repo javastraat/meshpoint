@@ -10,7 +10,12 @@
 }
 
 .rt-nomad__search { flex: 1 1 130px; min-width: 0; }
-.rt-nomad__nodes { flex: 1 1 180px; min-width: 0; }
+.rt-nomad__nodes {
+    flex: 0 1 260px;
+    min-width: 0;
+    max-width: 300px;
+    text-overflow: ellipsis;   /* collapsed state; the popup is capped in JS */
+}
 .rt-nomad__addr {
     flex: 3 1 280px;
     min-width: 0;
