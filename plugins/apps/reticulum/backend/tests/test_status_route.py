@@ -31,6 +31,7 @@ class TestStatusRadioBlock(unittest.TestCase):
         class _FakeService:
             available = True
             own_address = "<abc123>"
+            propagation = None
 
             async def peer_count(self):
                 return 42
@@ -38,7 +39,11 @@ class TestStatusRadioBlock(unittest.TestCase):
             def node_status(self):
                 return None
 
-        routes.init_routes(_FakeService(), object())
+            def propagation_status(self):
+                return self.propagation
+
+        self._svc = _FakeService()
+        routes.init_routes(self._svc, object())
         app = FastAPI()
         app.include_router(routes.router)
         self.client = TestClient(app)
@@ -68,6 +73,15 @@ class TestStatusRadioBlock(unittest.TestCase):
     def test_backbone_flag_passes_through(self) -> None:
         state.init({"rnode_serial_port": "", "backbone_enabled": True})
         self.assertTrue(self._radio()["backbone"])
+
+    def test_propagation_block_is_none_by_default(self) -> None:
+        self.assertIsNone(self.client.get("/api/reticulum/status").json()["propagation"])
+
+    def test_propagation_block_passes_through_when_enabled(self) -> None:
+        self._svc.propagation = {"enabled": True, "address": "<pn>", "messages_held": 3}
+        p = self.client.get("/api/reticulum/status").json()["propagation"]
+        self.assertEqual(p["messages_held"], 3)
+        self.assertEqual(p["address"], "<pn>")
 
 
 if __name__ == "__main__":  # pragma: no cover

@@ -813,3 +813,45 @@ sorted DTSTART desc, limit=100. Built to mirror SpaceAPI exactly:
   `time.monotonic()` can be < `_SPACEAPI_TTL_S` (120), so `age` wasn't "stale".
   Now `time.monotonic() - 10_000`. (The events equivalent uses `0.0` but its
   guard is `if self._events_fetched_at and ...` so 0.0 is safely falsy.)
+
+---
+
+## 2026-09-07 — LXMF propagation node (backlog item, server side, uncommitted)
+
+The box can now ALSO be a store-and-forward relay. THREE aspects on one
+identity, all concurrent: `lxmf.delivery` (inbox), `nomadnetwork.node`
+(pages, if `node_enabled`), `lxmf.propagation` (relay, if
+`propagation_enabled`). Propagation dest is a SEPARATE hash.
+- **`state.py`**: `propagation_enabled` (False), `propagation_storage_limit_mb`
+  (250) in `_DEFAULTS`; `propagation_config()` accessor.
+- **`config_routes.py`**: `propagation_enabled` bool, `propagation_storage_limit_mb`
+  `Field(250, ge=0, le=100_000)` + write dict.
+- **`lxmf_service.py`**: `propagation_cfg` ctor param. `_PROPAGATION_ANNOUNCE_INTERVAL_S=21600`.
+  `start()` -> `_start_propagation()` after `_source.announce()`, before node.
+  `_start_propagation`: best-effort `router.set_message_storage_limit(megabytes=)`
+  in its OWN try/except (not in every LXMF version, kw name has changed --
+  must not block enabling); then `router.enable_propagation()` (fatal fail ->
+  log + return); `_announce_propagation()` (`router.announce_propagation_node()`);
+  `_pn_task = loop.create_task(_propagation_announce_loop())` (6h re-announce).
+  `stop()` cancels `_pn_task`. `announce()` also re-announces PN if `_pn_task`.
+  `propagation_address` prop -> `RNS.prettyhexrep(router.propagation_destination.hash)`
+  (None-safe). `propagation_status()` -> None unless enabled+router, else
+  `{enabled, address, storage_limit_mb, messages_held}` (held from
+  `len(getattr(router,"propagation_entries",{}))`, best-effort).
+- **`routes.py`**: `/status` gains `"propagation": _service.propagation_status()`.
+- **`__init__.py`**: `propagation_cfg=state.propagation_config()`.
+- **`reticulum_settings_tab.js`**: "Propagation node" fieldset (toggle
+  `data-rt-prop-enabled` + `data-rt-prop-storage` MB + `data-rt-prop-status`
+  line) between TCP-backbone and NomadNet-node fieldsets. `_loadPropagationStatus()`
+  reads `/status`.propagation.
+- API refs from reticulum-meshchat `meshchat.py` (LXMF is the same lib):
+  `enable/disable_propagation()`, `announce_propagation_node()`,
+  `propagation_destination.hexhash`, client side (NOT done): `set_outbound_propagation_node`,
+  `request_messages_from_propagation_node`, `propagation_transfer_state/progress`.
+- Tests: `test_state.py` +2, `test_lxmf_service.py` +5 (`_FakeRouter`),
+  `test_status_route.py` +2. 108 reticulum tests.
+- NOT done (client side): syncing FROM a preferred propagation node, transfer
+  progress UI, PN peering. -> backlog "Propagation node polish".
+- Pi verification needed: enable, restart, check Settings status line shows a
+  PN address; from another node/Sideband set this hash as propagation node and
+  send to an offline 3rd party, then bring them online and sync.

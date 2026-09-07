@@ -63,6 +63,7 @@ _ROSTER_ASPECTS = ("lxmf.delivery", "lxmf.propagation", "nomadnetwork.node")
 # roster with every Sideband/MeshChat user on the public network.
 _ANNOUNCE_ASPECTS = (*_ROSTER_ASPECTS, "call.audio")
 _ANNOUNCE_LOG_MAX = 200  # in-memory ring buffer behind GET /api/reticulum/announces
+_PROPAGATION_ANNOUNCE_INTERVAL_S = 21600  # 6h -- re-announce the lxmf.propagation dest
 
 # Total wait budget for a cold-cache path request in send_message():
 # 5 x 1s = 5s. Long enough for a same-network shared-instance response
@@ -158,6 +159,7 @@ class LxmfService:
         spaceapi_url: str = "",
         events_ical_url: str = "",
         notify_url: str = "",
+        propagation_cfg: Optional[dict] = None,
     ):
         self._display_name = display_name
         self._reticulum_config_dir = Path(reticulum_config_dir)
@@ -173,6 +175,7 @@ class LxmfService:
         self._spaceapi_url = spaceapi_url
         self._events_ical_url = events_ical_url
         self._notify_url = notify_url
+        self._propagation_cfg = propagation_cfg or {"enabled": False}
         self._node = None
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._router = None
@@ -180,6 +183,7 @@ class LxmfService:
         self._identity = None
         self._announce_log: deque = deque(maxlen=_ANNOUNCE_LOG_MAX)
         self._bg_tasks: set = set()
+        self._pn_task: Optional[asyncio.Task] = None
 
     def _spawn(self, coro) -> None:
         """Fire-and-forget a coroutine, holding a strong ref so it isn't
@@ -261,6 +265,9 @@ class LxmfService:
             "Reticulum LXMF service started -- address %s", self.own_address
         )
 
+        if self._propagation_cfg.get("enabled"):
+            self._start_propagation()
+
         if self._node_cfg.get("enabled"):
             from .nomad_node import NomadNode
             self._node = NomadNode(
@@ -279,6 +286,9 @@ class LxmfService:
     async def stop(self) -> None:
         # Neither RNS nor LXMF expose a clean per-client detach -- process
         # exit is how meshchat.py itself relies on state being flushed too.
+        if self._pn_task is not None:
+            self._pn_task.cancel()
+            self._pn_task = None
         if self._node is not None:
             await self._node.stop()
             self._node = None
@@ -287,6 +297,77 @@ class LxmfService:
 
     def node_status(self) -> Optional[dict]:
         return self._node.status() if self._node is not None else None
+
+    # --- LXMF propagation node ------------------------------------------------
+
+    @property
+    def propagation_address(self) -> Optional[str]:
+        """The ``lxmf.propagation`` destination hash (a *different* hash from
+        the delivery/browse one -- this is what a client points at to sync)."""
+        try:
+            return RNS.prettyhexrep(self._router.propagation_destination.hash)
+        except Exception:  # noqa: BLE001 -- RNS missing / not enabled yet
+            return None
+
+    def _start_propagation(self) -> None:
+        """Turn this node into an LXMF store-and-forward relay. LXMF's own
+        ``LXMRouter`` does the work; we just enable it, cap its on-disk store,
+        and re-announce the propagation destination on an interval (same shape
+        as reticulum-meshchat's local propagation node)."""
+        limit_mb = int(self._propagation_cfg.get("storage_limit_mb") or 0)
+        if limit_mb > 0:
+            # Not in every LXMF version, and the kw name has changed across
+            # releases -- best-effort, never let it block enabling propagation.
+            try:
+                self._router.set_message_storage_limit(megabytes=limit_mb)
+            except Exception:  # noqa: BLE001
+                logger.debug(
+                    "LXMF: set_message_storage_limit unavailable -- store uncapped",
+                    exc_info=True,
+                )
+        try:
+            self._router.enable_propagation()
+        except Exception:  # noqa: BLE001
+            logger.exception("LXMF: could not enable the propagation node")
+            return
+        self._announce_propagation()
+        logger.info(
+            "LXMF propagation node enabled -- address %s (store limit %s MB)",
+            self.propagation_address or "?",
+            self._propagation_cfg.get("storage_limit_mb") or "unlimited",
+        )
+        if self._loop is not None:
+            self._pn_task = self._loop.create_task(self._propagation_announce_loop())
+
+    def _announce_propagation(self) -> None:
+        try:
+            self._router.announce_propagation_node()
+        except Exception:  # noqa: BLE001
+            logger.debug("LXMF: propagation-node announce failed", exc_info=True)
+
+    async def _propagation_announce_loop(self) -> None:
+        while True:
+            await asyncio.sleep(_PROPAGATION_ANNOUNCE_INTERVAL_S)
+            self._announce_propagation()
+
+    def propagation_status(self) -> Optional[dict]:
+        """``None`` unless the propagation node is enabled -- feeds
+        GET /api/reticulum/status and the Settings tab."""
+        if not self._propagation_cfg.get("enabled") or self._router is None:
+            return None
+        held = None
+        try:
+            entries = getattr(self._router, "propagation_entries", None)
+            if entries is not None:
+                held = len(entries)
+        except Exception:  # noqa: BLE001
+            pass
+        return {
+            "enabled": True,
+            "address": self.propagation_address,
+            "storage_limit_mb": int(self._propagation_cfg.get("storage_limit_mb") or 0),
+            "messages_held": held,
+        }
 
     def reload_node_pages(self) -> bool:
         """Re-register the hosted node's ``.mu`` request handlers (Pages
@@ -472,3 +553,5 @@ class LxmfService:
             # one identity, two aspects -- announce the node hash too so
             # "Announce" refreshes both "message me" and "browse me".
             self._node.announce()
+        if self._pn_task is not None:
+            self._announce_propagation()

@@ -205,6 +205,8 @@ plugins:
     backbone_host: "node.reticulumnet.nl"
     backbone_port: 4242
     notify_url: ""                              # optional: ntfy topic / webhook, POSTed on an inbound LXMF DM
+    propagation_enabled: false                  # run an LXMF store-and-forward relay (added role, not a replacement)
+    propagation_storage_limit_mb: 250           # cap the on-disk propagation store (0 = LXMF default)
     # storage paths — defaults shown; only set to override:
     # reticulum_config_dir: "data/reticulum/rns_config"
     # identity_path: "data/reticulum/identity"
@@ -243,6 +245,16 @@ it's empty after a restart. The **Peers** tab is the deduped roster.
 direct message fires a one-line `POST` there (message text as body, sender
 as `Title` header). This sends the message text to that service — self-host
 ntfy or use a private webhook if that's a concern. Blank = off.
+
+`plugins.reticulum.propagation_enabled` (also on the Settings tab): run an
+**LXMF propagation node** — a store-and-forward relay so peers who were
+offline can sync their messages from this box later. It's an *added* role,
+not a replacement: `lxmf.delivery` (message me), `nomadnetwork.node` (browse
+me) and `lxmf.propagation` (relay) all run at once on one identity, the
+propagation service on its own separate hash. `propagation_storage_limit_mb`
+(default 250) caps the on-disk store — `0` uses LXMF's own default. Restart
+to apply. The Settings tab shows a live status line (address, messages
+held); `GET /api/reticulum/status` carries the same in a `propagation` block.
 
 The **Browse** tab is a minimal NomadNet browser — it fetches
 `nomadnetwork.node` peers' Micron pages over RNS Links.

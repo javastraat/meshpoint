@@ -134,6 +134,33 @@ it doesn't pad the roster with every Sideband/MeshChat user on the public
 network. `nomadnetwork.node` rows carry the same **Browse** button the
 Peers tab has (admin only).
 
+## Propagation node (opt-in)
+
+Set **Settings → Propagation node → "Act as an LXMF propagation node"**
+(`plugins.reticulum.propagation_enabled`) and the box runs a
+store-and-forward relay: an LXMF message for a peer who's offline is held
+here until their client next syncs from this node — the classic reason to
+run an always-on Reticulum box.
+
+It's an *added* role, nothing is replaced. The same identity now answers on
+three aspects at once:
+
+| Aspect | Role |
+|---|---|
+| `lxmf.delivery` | "message me" — the inbox (always on) |
+| `nomadnetwork.node` | "browse me" — the hosted pages (`node_enabled`) |
+| `lxmf.propagation` | "relay for others" — this feature |
+
+`lxmf.propagation` is a **different hash** from the delivery/browse one — a
+separate service other people point their clients at. `LXMF`'s own
+`LXMRouter` does the relaying; the plugin calls `enable_propagation()`,
+re-announces the propagation destination every 6 h (and on the **Announce**
+button), and caps the on-disk store with **`propagation_storage_limit_mb`**
+(default 250; `0` = LXMF's own default — don't leave it uncapped on a small
+SD card). `GET /api/reticulum/status` reports a `propagation` block
+(address, limit, messages held); the Settings tab shows it as a live line.
+Takes effect on restart.
+
 ## Message notifications (opt-in)
 
 Set **Settings → Message notifications → ntfy / webhook URL**

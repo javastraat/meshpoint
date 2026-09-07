@@ -57,6 +57,7 @@ async def reticulum_status():
         "own_address": _service.own_address,
         "peer_count": peer_count,
         "node": _service.node_status(),   # None unless hosting a NomadNet node
+        "propagation": _service.propagation_status(),  # None unless enabled
         "radio": {
             # what the topbar chip shows in its "freq" slot: the RNode
             # frequency when RF is configured, else the TCP backbone.

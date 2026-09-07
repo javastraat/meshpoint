@@ -52,6 +52,11 @@ _DEFAULTS: dict[str, Any] = {
     # Optional: an ntfy topic / webhook URL. When set, an inbound LXMF direct
     # message fires a one-line POST there (fire-and-forget). Blank = off.
     "notify_url": "",
+    # LXMF propagation node: run a store-and-forward relay so peers who were
+    # offline can sync their messages from this box later. Off by default.
+    # storage_limit_mb caps the on-disk propagation store (0 = LXMF default).
+    "propagation_enabled": False,
+    "propagation_storage_limit_mb": 250,
     # RF and backbone are independent interfaces rnsd can run at once or
     # separately -- at least one must stay on (enforced by config_routes.py's
     # ReticulumUpdate validator), same as NomadNet needs one of them to
@@ -123,6 +128,14 @@ def lxmf_storage_dir() -> str:
 
 def notify_url() -> str:
     return str(_config.get("notify_url") or "").strip()
+
+
+def propagation_config() -> dict[str, Any]:
+    """LXMF propagation-node settings, resolved."""
+    return {
+        "enabled": bool(_config.get("propagation_enabled")),
+        "storage_limit_mb": max(0, int(_config.get("propagation_storage_limit_mb") or 0)),
+    }
 
 
 def node_config() -> dict[str, Any]:

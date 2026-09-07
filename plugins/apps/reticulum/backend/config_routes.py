@@ -53,6 +53,8 @@ class ReticulumUpdate(BaseModel):
     node_spaceapi_url: str = ""
     node_events_ical_url: str = ""
     notify_url: str = ""
+    propagation_enabled: bool = False
+    propagation_storage_limit_mb: int = Field(250, ge=0, le=100_000)
     rnode_enabled: bool = True
     rnode_serial_port: str = ""
     rnode_frequency_hz: int = Field(..., ge=100_000_000, le=1_000_000_000)
@@ -121,6 +123,8 @@ async def update_reticulum(
         "node_spaceapi_url": req.node_spaceapi_url.strip(),
         "node_events_ical_url": req.node_events_ical_url.strip(),
         "notify_url": req.notify_url.strip(),
+        "propagation_enabled": req.propagation_enabled,
+        "propagation_storage_limit_mb": req.propagation_storage_limit_mb,
         "rnode_enabled": req.rnode_enabled,
         "rnode_serial_port": req.rnode_serial_port.strip(),
         "rnode_frequency_hz": req.rnode_frequency_hz,

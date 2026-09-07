@@ -145,6 +145,68 @@ class TestAnnounceLog(unittest.TestCase):
         self.assertEqual(log[0]["display_name"], str(lxmf_service._ANNOUNCE_LOG_MAX + 24))
 
 
+class _FakeRouter:
+    def __init__(self):
+        self.calls = []
+        self.propagation_entries = {"a": 1, "b": 2}
+
+        class _Dest:
+            hash = b"\x01" * 16
+
+        self.propagation_destination = _Dest()
+
+    def set_message_storage_limit(self, **kw):
+        self.calls.append(("limit", kw))
+
+    def enable_propagation(self):
+        self.calls.append(("enable",))
+
+    def announce_propagation_node(self):
+        self.calls.append(("announce",))
+
+
+class TestPropagationNode(unittest.TestCase):
+    def test_start_enables_caps_store_and_announces(self) -> None:
+        svc = _make_service(propagation_cfg={"enabled": True, "storage_limit_mb": 500})
+        svc._router = _FakeRouter()
+        svc._loop = None  # skip the periodic re-announce task
+        svc._start_propagation()
+        self.assertEqual([c[0] for c in svc._router.calls], ["limit", "enable", "announce"])
+        self.assertEqual(svc._router.calls[0][1], {"megabytes": 500})
+
+    def test_start_skips_limit_when_zero(self) -> None:
+        svc = _make_service(propagation_cfg={"enabled": True, "storage_limit_mb": 0})
+        svc._router = _FakeRouter()
+        svc._loop = None
+        svc._start_propagation()
+        self.assertEqual([c[0] for c in svc._router.calls], ["enable", "announce"])
+
+    def test_status_none_when_disabled(self) -> None:
+        svc = _make_service()
+        svc._router = _FakeRouter()
+        self.assertIsNone(svc.propagation_status())
+
+    def test_status_reports_held_count_and_limit(self) -> None:
+        svc = _make_service(propagation_cfg={"enabled": True, "storage_limit_mb": 250})
+        svc._router = _FakeRouter()
+        st = svc.propagation_status()
+        self.assertTrue(st["enabled"])
+        self.assertEqual(st["messages_held"], 2)
+        self.assertEqual(st["storage_limit_mb"], 250)
+
+    def test_enable_failure_is_swallowed(self) -> None:
+        svc = _make_service(propagation_cfg={"enabled": True})
+
+        class _Boom:
+            def enable_propagation(self):
+                raise RuntimeError("nope")
+
+        svc._router = _Boom()
+        svc._loop = None
+        svc._start_propagation()  # must not raise
+        self.assertIsNone(svc._pn_task)
+
+
 class TestInboundNotify(unittest.TestCase):
     def test_notify_inbound_posts_preview_and_sender(self) -> None:
         svc = _make_service(notify_url="https://ntfy.sh/topic")

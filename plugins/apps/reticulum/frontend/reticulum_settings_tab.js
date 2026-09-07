@@ -138,6 +138,28 @@ class ReticulumSettingsTab {
                             </div>
                         </fieldset>
                         <fieldset class="cfg-fieldset">
+                            <legend class="cfg-fieldset__legend">Propagation node</legend>
+                            <p class="cfg-field__hint" data-rt-prop-status>
+                                Run an LXMF store-and-forward relay: messages for a peer
+                                who's offline get held here until their client next syncs
+                                from this node. The natural job for an always-on box. Off
+                                by default; takes effect after a restart.
+                            </p>
+                            <label class="cfg-field cfg-field--toggle">
+                                <input type="checkbox" data-rt-prop-enabled>
+                                <span class="cfg-field__label">Act as an LXMF propagation node</span>
+                            </label>
+                            <label class="cfg-field cfg-field--narrow">
+                                <span class="cfg-field__label">Store limit (MB)</span>
+                                <input class="cfg-field__input" type="number"
+                                       min="0" max="100000" step="10" data-rt-prop-storage>
+                                <span class="cfg-field__hint">
+                                    Cap for the on-disk message store. 0 = LXMF's own
+                                    default (don't leave it uncapped on a small SD card).
+                                </span>
+                            </label>
+                        </fieldset>
+                        <fieldset class="cfg-fieldset">
                             <legend class="cfg-fieldset__legend">NomadNet node</legend>
                             <p class="cfg-field__hint" data-rt-node-status>
                                 Host a NomadNet node — serve Micron pages over Reticulum,
@@ -255,6 +277,9 @@ class ReticulumSettingsTab {
         this._backboneEnabled = this._q('[data-rt-backbone-enabled]');
         this._backboneHost = this._q('[data-rt-backbone-host]');
         this._backbonePort = this._q('[data-rt-backbone-port]');
+        this._propEnabled = this._q('[data-rt-prop-enabled]');
+        this._propStorage = this._q('[data-rt-prop-storage]');
+        this._propStatusEl = this._q('[data-rt-prop-status]');
         this._nodeEnabled = this._q('[data-rt-node-enabled]');
         this._nodeName = this._q('[data-rt-node-name]');
         this._nodeInterval = this._q('[data-rt-node-interval]');
@@ -312,6 +337,24 @@ class ReticulumSettingsTab {
         if (this._backboneEnabled) this._backboneEnabled.checked = rt.backbone_enabled !== false;
         if (this._backboneHost) this._backboneHost.value = rt.backbone_host || 'node.reticulumnet.nl';
         if (this._backbonePort) this._backbonePort.value = rt.backbone_port ?? 4242;
+        if (this._propEnabled) this._propEnabled.checked = !!rt.propagation_enabled;
+        if (this._propStorage) this._propStorage.value = rt.propagation_storage_limit_mb ?? 250;
+        this._loadPropagationStatus();
+    }
+
+    async _loadPropagationStatus() {
+        if (!this._propStatusEl) return;
+        let p = null;
+        try {
+            const r = await fetch('/api/reticulum/status', { credentials: 'same-origin' });
+            if (r.ok) p = (await r.json()).propagation;
+        } catch (_) { return; }
+        if (!p || !p.enabled) return;
+        const held = p.messages_held == null ? '' : `, ${p.messages_held} message(s) held`;
+        const cap = p.storage_limit_mb ? `${p.storage_limit_mb} MB store` : 'store uncapped';
+        this._propStatusEl.textContent =
+            `Relaying now — address ${p.address || '(pending)'}, ${cap}${held}. `
+            + 'Point a client at this address to sync from it.';
     }
 
     async _loadNodeStatus() {
@@ -438,6 +481,8 @@ class ReticulumSettingsTab {
             node_spaceapi_url: (this._nodeSpaceapi?.value || '').trim(),
             node_events_ical_url: (this._nodeEvents?.value || '').trim(),
             notify_url: (this._notifyUrl?.value || '').trim(),
+            propagation_enabled: !!this._propEnabled?.checked,
+            propagation_storage_limit_mb: Number(this._propStorage?.value) || 0,
             rnode_enabled: rnodeEnabled,
             rnode_serial_port: this._serialPort.value,
             rnode_frequency_hz: Number(this._frequency.value),

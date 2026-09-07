@@ -115,6 +115,7 @@ def register(reg) -> None:
             spaceapi_url=state.node_config()["spaceapi_url"],
             events_ical_url=state.node_config()["events_ical_url"],
             notify_url=state.notify_url(),
+            propagation_cfg=state.propagation_config(),
         )
 
     def wire(service, context):

@@ -83,6 +83,24 @@ class TestReticulumState(unittest.TestCase):
         self.assertEqual(nc["name"], "PD2EMC BBS")
         self.assertEqual(nc["announce_interval_s"], 3600)
 
+    def test_propagation_config_defaults_off(self) -> None:
+        state.init({})
+        pc = state.propagation_config()
+        self.assertFalse(pc["enabled"])
+        self.assertEqual(pc["storage_limit_mb"], 250)
+        self.assertEqual(state.notify_url(), "")
+
+    def test_propagation_config_explicit(self) -> None:
+        state.init({
+            "propagation_enabled": True,
+            "propagation_storage_limit_mb": 1000,
+            "notify_url": "  https://ntfy.sh/x  ",
+        })
+        pc = state.propagation_config()
+        self.assertTrue(pc["enabled"])
+        self.assertEqual(pc["storage_limit_mb"], 1000)
+        self.assertEqual(state.notify_url(), "https://ntfy.sh/x")  # stripped
+
 
 class TestReticulumStateWrites(unittest.TestCase):
     def setUp(self) -> None:
