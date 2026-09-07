@@ -7,7 +7,11 @@
  * table (same shape as Settings > Themes' "Installed themes" list) with a
  * toggle switch, and persists flips through ``PUT /api/plugins/{id}``.
  * Enabling/disabling only takes effect on the next restart -- the panel says
- * so inline rather than pretending the change is live. A `deletable` plugin
+ * so inline rather than pretending the change is live. A plugin that declares
+ * a `[deps] check` script shows a live verdict from the loader (⚠ setup needed
+ * with the reason, or ✓ installed) instead of the always-on "Requires:" hint,
+ * with a Re-check button (``POST /api/plugins/{id}/check``) so running setup on
+ * the device clears the warning without a restart. A `deletable` plugin
  * (community tier, not `locked`) also gets a Delete button that removes its
  * folder via ``DELETE /api/plugins/{id}`` -- same confirm-to-delete modal as
  * Settings > Themes' "Installed themes" list. A page-level "Restart service"
@@ -294,9 +298,30 @@ class PluginsPanelController {
         // non-empty -- otherwise the hint silently vanishes for exactly the
         // plugins that most need one run before enabling.
         const aptDeps = plugin.apt_deps || [];
-        const depsNote = (aptDeps.length || plugin.setup_script)
-            ? `<p class="plugin-row__deps">Requires: ${aptDeps.length ? `<code>${this._escape(aptDeps.join(', '))}</code>` : 'a build step'}${plugin.setup_script ? ` — run <code>sudo meshpoint plugin setup ${this._escape(plugin.id)}</code> on the device` : ''}</p>`
+        const runHint = plugin.setup_script
+            ? ` — run <code>sudo meshpoint plugin setup ${this._escape(plugin.id)}</code> on the device`
             : '';
+        const staticHint = (aptDeps.length || plugin.setup_script)
+            ? `Requires: ${aptDeps.length ? `<code>${this._escape(aptDeps.join(', '))}</code>` : 'a build step'}${runHint}`
+            : '';
+        // A plugin with a [deps] check script (has_deps_check) gets a live
+        // verdict from the loader instead of the always-on static hint:
+        // deps_ok === false -> "setup needed" + why + a Re-check button (so
+        // running setup on the device can clear it without a restart);
+        // === true -> a quiet "installed" line; null (no check / not loaded)
+        // -> the same static hint as before.
+        let depsNote = '';
+        if (plugin.deps_ok === false) {
+            const why = (plugin.deps_detail || '').split('\n').filter(Boolean)[0]
+                || 'dependencies missing';
+            depsNote = `<p class="plugin-row__deps plugin-row__deps--bad" title="${this._escape(plugin.deps_detail || '')}">`
+                + `⚠ Setup needed — ${this._escape(why)}${runHint}`
+                + ` <button type="button" class="plugin-row__recheck" data-recheck>Re-check</button></p>`;
+        } else if (plugin.deps_ok === true) {
+            depsNote = `<p class="plugin-row__deps plugin-row__deps--ok">✓ Dependencies installed</p>`;
+        } else if (staticHint) {
+            depsNote = `<p class="plugin-row__deps">${staticHint}</p>`;
+        }
         // A "hook" plugin (dependency != null) has nowhere to render
         // without its host enabled -- shown here regardless of current
         // state, and the toggle itself is disabled below when the host
@@ -341,6 +366,10 @@ class PluginsPanelController {
         const delBtn = row.querySelector('[data-delete]');
         if (delBtn) {
             delBtn.addEventListener('click', () => this._deletePlugin(plugin, delBtn, resultEl));
+        }
+        const recheckBtn = row.querySelector('[data-recheck]');
+        if (recheckBtn) {
+            recheckBtn.addEventListener('click', () => this._recheckDeps(plugin, recheckBtn, resultEl));
         }
         // Wired on the name+chevron wrapper, not the whole row or the
         // whole first cell -- the version/byline span right below it
@@ -403,6 +432,43 @@ class PluginsPanelController {
             resultEl.textContent = 'Network error.';
         } finally {
             toggle.disabled = false;
+        }
+    }
+
+    async _recheckDeps(plugin, button, resultEl) {
+        button.disabled = true;
+        resultEl.dataset.kind = 'pending';
+        resultEl.textContent = 'Re-checking dependencies…';
+        try {
+            const response = await fetch(
+                `/api/plugins/${encodeURIComponent(plugin.id)}/check`,
+                { method: 'POST', credentials: 'same-origin' },
+            );
+            const body = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                resultEl.dataset.kind = 'error';
+                resultEl.textContent = response.status === 403
+                    ? 'Admin role required.'
+                    : (body.detail || `Failed (HTTP ${response.status}).`);
+                button.disabled = false;
+                return;
+            }
+            const ok = body.plugin && body.plugin.deps_ok === true;
+            // refresh() re-renders every row from the new /api/plugins state,
+            // so the ⚠/✓ line updates itself -- this message just narrates
+            // the outcome in the row's result slot.
+            this._pendingMessage = {
+                id: plugin.id,
+                kind: ok ? 'success' : 'error',
+                text: ok
+                    ? 'Dependencies OK.'
+                    : 'Still missing dependencies — run setup on the device.',
+            };
+            await this.refresh();
+        } catch (_e) {
+            resultEl.dataset.kind = 'error';
+            resultEl.textContent = 'Network error.';
+            button.disabled = false;
         }
     }
 

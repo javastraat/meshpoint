@@ -41,7 +41,7 @@ def _build_app() -> FastAPI:
 
 def _make_plugin_dir(
     apps: Path, name: str, *, version: str = "1.0.0", description: str = "",
-    locked: bool = False,
+    locked: bool = False, check_script: str | None = None,
 ) -> Path:
     d = apps / name
     d.mkdir(parents=True)
@@ -49,6 +49,9 @@ def _make_plugin_dir(
         name=name, version=version, description=description,
         locked_line="locked = true" if locked else "",
     ))
+    if check_script is not None:
+        toml += '\n[deps]\ncheck = "check.sh"\n'
+        (d / "check.sh").write_text(textwrap.dedent(check_script), encoding="utf-8")
     (d / "plugin.toml").write_text(toml, encoding="utf-8")
     (d / "backend").mkdir()
     (d / "backend" / "__init__.py").write_text(
@@ -406,6 +409,80 @@ class TestDeletePlugin(_PluginRoutesTestBase):
         ):
             resp = self._client().delete("/api/plugins/acars")
         self.assertEqual(resp.status_code, 403)
+
+
+class TestPluginDepsCheck(_PluginRoutesTestBase):
+    """The [deps] check verdict surfaced on GET, and the on-demand
+    POST /api/plugins/{id}/check re-run."""
+
+    def _client(self) -> TestClient:
+        return TestClient(_build_app())
+
+    def test_get_surfaces_boot_time_deps_status(self) -> None:
+        _make_plugin_dir(
+            self.community, "acars",
+            check_script='#!/usr/bin/env bash\necho "libfoo missing"\nexit 1\n',
+        )
+        config = MagicMock()
+        config.plugins = {"acars": {"enabled": True}}
+        manifest = parse_manifest(self.community / "acars", source="community")
+        loaded = [LoadedPlugin(manifest, MagicMock(), deps_ok=False,
+                               deps_detail="libfoo missing")]
+        self._init(config, loaded=loaded)
+
+        body = self._client().get("/api/plugins").json()
+        acars = body["plugins"][0]
+        self.assertTrue(acars["has_deps_check"])
+        self.assertIs(acars["deps_ok"], False)
+        self.assertEqual(acars["deps_detail"], "libfoo missing")
+
+    def test_get_deps_ok_none_when_no_check_declared(self) -> None:
+        _make_plugin_dir(self.community, "acars")
+        config = MagicMock()
+        config.plugins = {"acars": {"enabled": True}}
+        manifest = parse_manifest(self.community / "acars", source="community")
+        self._init(config, loaded=[LoadedPlugin(manifest, MagicMock())])
+
+        acars = self._client().get("/api/plugins").json()["plugins"][0]
+        self.assertFalse(acars["has_deps_check"])
+        self.assertIsNone(acars["deps_ok"])
+
+    def test_recheck_reruns_script_and_records_fresh_result(self) -> None:
+        _make_plugin_dir(
+            self.community, "acars",
+            check_script='#!/usr/bin/env bash\necho ok\nexit 0\n',
+        )
+        config = MagicMock()
+        config.plugins = {"acars": {"enabled": True}}
+        manifest = parse_manifest(self.community / "acars", source="community")
+        # Boot-time snapshot said deps were missing; the re-run now passes.
+        loaded = [LoadedPlugin(manifest, MagicMock(), deps_ok=False,
+                               deps_detail="was missing")]
+        self._init(config, loaded=loaded)
+        client = self._client()
+
+        resp = client.post("/api/plugins/acars/check")
+        self.assertEqual(resp.status_code, 200)
+        self.assertIs(resp.json()["plugin"]["deps_ok"], True)
+
+        # The fresher verdict now also shows on a plain GET.
+        acars = client.get("/api/plugins").json()["plugins"][0]
+        self.assertIs(acars["deps_ok"], True)
+
+    def test_recheck_on_plugin_without_check_is_400(self) -> None:
+        _make_plugin_dir(self.community, "acars")
+        config = MagicMock()
+        config.plugins = {}
+        self._init(config)
+        resp = self._client().post("/api/plugins/acars/check")
+        self.assertEqual(resp.status_code, 400)
+
+    def test_recheck_unknown_plugin_is_404(self) -> None:
+        config = MagicMock()
+        config.plugins = {}
+        self._init(config)
+        resp = self._client().post("/api/plugins/nope/check")
+        self.assertEqual(resp.status_code, 404)
 
 
 if __name__ == "__main__":  # pragma: no cover

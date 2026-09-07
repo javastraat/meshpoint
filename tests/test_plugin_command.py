@@ -15,7 +15,7 @@ from src.plugins.manifest import PluginManifest
 def _manifest(**overrides) -> PluginManifest:
     base = dict(
         name="acars", version="1.0.0", api_version=1,
-        provides=("listener",), apt=(), setup=None,
+        provides=("listener",), apt=(), setup=None, check=None,
         description="", homepage="", author="",
         frontend_scripts=(), frontend_styles=(),
         path=Path("/fake/acars"), source="community", locked=False,
@@ -78,6 +78,17 @@ class TestPrintPluginRow(unittest.TestCase):
     def test_no_apt_deps_no_hint(self) -> None:
         out = self._render(apt_deps=[])
         self.assertNotIn("deps:", out)
+
+    def test_deps_check_failing_shows_setup_needed_and_reason(self) -> None:
+        out = self._render(deps_ok=False, deps_detail="lxmf is not installed\nrun setup")
+        self.assertIn("setup needed", out)
+        self.assertIn("lxmf is not installed", out)
+        self.assertIn("meshpoint plugin setup acars", out)
+
+    def test_deps_check_passing_shows_installed(self) -> None:
+        out = self._render(deps_ok=True, setup_script="setup.sh")
+        self.assertIn("deps: installed", out)
+        self.assertNotIn("meshpoint plugin setup", out)
 
 
 class TestRunPluginSetup(unittest.TestCase):

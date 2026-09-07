@@ -86,7 +86,17 @@ def _print_plugin_row(p: dict) -> None:
     # non-empty -- same bug/fix as plugins_panel_controller.js's web
     # equivalent of this row.
     apt_deps = p.get("apt_deps") or []
-    if apt_deps or p.get("setup_script"):
+    deps_ok = p.get("deps_ok")
+    if deps_ok is False:
+        why = (p.get("deps_detail") or "").splitlines()
+        print(
+            f"      {_YELLOW}deps: setup needed"
+            f"{f' -- {why[0]}' if why else ''} "
+            f"-- run: meshpoint plugin setup {p['id']}{_RESET}"
+        )
+    elif deps_ok is True:
+        print(f"      {_DIM}deps: installed{_RESET}")
+    elif apt_deps or p.get("setup_script"):
         deps_label = ', '.join(apt_deps) if apt_deps else "a build step"
         print(
             f"      {_DIM}deps: {deps_label} "

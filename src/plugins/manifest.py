@@ -29,6 +29,11 @@ Manifest shape::
     [deps]                         # optional
     apt = ["cmake", "pkg-config"]
     setup = "setup.sh"             # relative to the plugin dir, must exist
+    check = "check.sh"             # optional, relative to the plugin dir, must
+                                    # exist. Run unprivileged at boot (and on
+                                    # demand from Settings -> Plugins): exit 0 =
+                                    # deps satisfied, non-zero = setup needed,
+                                    # stdout/stderr = the reason shown to the admin.
 
     [frontend]                     # required when "panel", "sidebar", "hook" or "topbar" in provides
     scripts = ["frontend/acars_panel.js"]   # rel paths, must exist
@@ -148,6 +153,9 @@ class PluginManifest:
     provides: tuple[str, ...]
     apt: tuple[str, ...]
     setup: str | None  # relative path within `path`, verified to exist
+    check: str | None  # relative path within `path`, verified to exist -- an
+                       # unprivileged "are my deps installed?" probe (exit 0 =
+                       # yes). None = no probe declared; caller assumes ok.
     description: str
     homepage: str
     author: str
@@ -168,6 +176,10 @@ class PluginManifest:
     @property
     def setup_path(self) -> Path | None:
         return self.path / self.setup if self.setup else None
+
+    @property
+    def check_path(self) -> Path | None:
+        return self.path / self.check if self.check else None
 
     @property
     def is_builtin(self) -> bool:
@@ -279,6 +291,14 @@ def parse_manifest(
             raise PluginManifestError(
                 "deps", f"'deps.setup' ({setup!r}) does not exist in the plugin.",
             )
+    check = deps.get("check")
+    if check is not None:
+        if not isinstance(check, str) or not check.strip():
+            raise PluginManifestError("deps", "'deps.check' must be a path string.")
+        if not (plugin_dir / check).is_file():
+            raise PluginManifestError(
+                "deps", f"'deps.check' ({check!r}) does not exist in the plugin.",
+            )
 
     meta = data.get("meta", {})
     if not isinstance(meta, dict):
@@ -309,6 +329,7 @@ def parse_manifest(
         provides=tuple(provides),
         apt=tuple(apt),
         setup=setup,
+        check=check,
         description=_str_field(meta, "description", "meta"),
         homepage=_str_field(meta, "homepage", "meta"),
         author=_str_field(meta, "author", "meta"),

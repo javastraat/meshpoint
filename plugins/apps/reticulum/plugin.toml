@@ -17,6 +17,9 @@ locked = true  # shipped with this fork -- not user-installed, can't be deleted
 
 [deps]
 setup = "setup.sh"   # pip install lxmf + install/enable the rnsd systemd unit
+check = "check.sh"   # unprivileged probe: lxmf in venv + rnsd.service installed
+                     # and enabled. Settings -> Plugins shows "setup needed" when
+                     # this fails instead of the always-on install hint.
 
 [frontend]
 scripts = [

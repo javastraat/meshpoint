@@ -22,6 +22,7 @@ def _manifest(*provides: str) -> PluginManifest:
         provides=tuple(provides),
         apt=(),
         setup=None,
+        check=None,
         description="",
         homepage="",
         author="",

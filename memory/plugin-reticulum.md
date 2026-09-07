@@ -452,3 +452,18 @@ experience:
 4. `feat: main Messages page routes reticulum sends to the plugin's /api/reticulum/send`
 5. `refactor: delete core reticulum service/routes/config/frontend now that the plugin is live-verified`
 6. docs / changelog / memory
+
+---
+
+## 2026-09-07 — plugin `[deps] check` (not extraction work, but reticulum-owned)
+
+Reticulum ships the first `[deps] check = "check.sh"` script (new optional
+manifest key, see `memory/project_m1_meshpoint.md` for the whole feature).
+`plugins/apps/reticulum/check.sh` — unprivileged probe, exit 0 = deps in
+place: `venv/bin/python3 -c "import LXMF"` + `/etc/systemd/system/rnsd.service`
+exists + `systemctl is-enabled rnsd`. Mirror of `setup.sh`'s own idempotency
+checks minus the installing. Settings → Plugins shows "⚠ Setup needed" /
+"✓ Dependencies installed" on the Reticulum row from this, with a Re-check
+button (`POST /api/plugins/reticulum/check`). If check.sh ever needs to test
+something new, keep it sudo-free — the loader runs it as the `meshpoint`
+service account at boot.

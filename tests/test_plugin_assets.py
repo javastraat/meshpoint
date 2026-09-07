@@ -22,7 +22,7 @@ def _m(name: str, *, provides=("panel",), scripts=("frontend/p.js",),
        styles=(), sidebar=None) -> PluginManifest:
     return PluginManifest(
         name=name, version="1", api_version=1, provides=tuple(provides),
-        apt=(), setup=None, description="", homepage="", author="",
+        apt=(), setup=None, check=None, description="", homepage="", author="",
         frontend_scripts=tuple(scripts), frontend_styles=tuple(styles),
         path=Path("/x") / name, sidebar=sidebar,
     )
@@ -124,7 +124,7 @@ class TestResolvePluginAsset(unittest.TestCase):
         (self.root / "acars" / "plugin.toml").write_text("x", encoding="utf-8")
         self.m = PluginManifest(
             name="acars", version="1", api_version=1, provides=("panel",),
-            apt=(), setup=None, description="", homepage="", author="",
+            apt=(), setup=None, check=None, description="", homepage="", author="",
             frontend_scripts=("frontend/p.js",), frontend_styles=(),
             path=self.root / "acars",
         )

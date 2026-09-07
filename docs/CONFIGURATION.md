@@ -284,7 +284,10 @@ restart it once `rnsd` is up.
 **Set it up with `sudo meshpoint plugin setup reticulum`** (or `sudo bash
 /opt/meshpoint/plugins/apps/reticulum/setup.sh`) — that `pip install`s `lxmf`
 into the venv and installs + enables the `rnsd` systemd unit
-(`plugins/apps/reticulum/rnsd.service`). `rns` (the Reticulum stack, the `rnsd`
+(`plugins/apps/reticulum/rnsd.service`). Until that's done, Settings → Plugins
+shows **"⚠ Setup needed"** on the Reticulum row (its `check.sh` probes for
+`lxmf` in the venv plus an installed, enabled `rnsd.service`); the plugin still
+loads and serves its pages, it just can't attach to Reticulum. `rns` (the Reticulum stack, the `rnsd`
 binary, and `rnodeconf` for the RNode flasher) stays a core dependency;
 `lxmf` is Reticulum-messaging-only, so it's part of this step.
 
@@ -1252,6 +1255,8 @@ locked = true                             # optional, default false. Community-t
 [deps]                                    # optional
 apt = ["cmake", "libcjson-dev"]
 setup = "setup.sh"
+check = "check.sh"                         # optional: unprivileged "deps installed?"
+                                           # probe. exit 0 = ok, non-zero = setup needed
 
 [frontend]                                # required when "sidebar" or "hook" in provides
 scripts = ["frontend/acars_panel.js"]     # served from /plugins/apps/acars/...
@@ -1287,6 +1292,14 @@ by hand — `GET /api/plugins` / `PUT /api/plugins/{id}`. Since plugins load
 once at startup, the toggle only changes what a restart will load; the page
 shows both the saved setting and whether the plugin is actually loaded right
 now, and flags "restart required" when they disagree.
+
+If a plugin declares a `[deps] check` script, the loader runs it (unprivileged)
+at boot and the page shows a live verdict on that plugin's row — **"⚠ Setup
+needed"** with the reason, or **"✓ Dependencies installed"** — instead of the
+always-on "Requires: … run setup" hint. A **Re-check** button
+(`POST /api/plugins/{id}/check`) re-runs the probe, so once you've run the
+setup step on the device the warning clears without a service restart. A
+plugin with no `check` script keeps the old static hint.
 
 A `hook` plugin (`[hook] host = "..."` above) can't be enabled ahead of its
 host — ACARS above hooks into `rtlsdr`, so enabling `plugins.acars.enabled`

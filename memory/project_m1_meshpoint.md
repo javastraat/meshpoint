@@ -11708,3 +11708,70 @@ Implementation:
   deployed is confirming a real `rnsd` restart with each combo actually
   connects/doesn't connect the expected interface (not just that the
   generated config file looks right).
+
+---
+
+**2026-09-07 session: plugin `[deps] check` — phase 1 of "show setup state on
+Settings → Plugins".** User's idea (discussed first, per norm): at boot, probe
+whether an enabled plugin's system deps are actually installed; if not, show a
+"setup needed" message on that plugin's row instead of the current unconditional
+"Requires: … run `meshpoint plugin setup`" nag. Phase 2 (a button that runs
+setup in-browser with streamed output) is deferred to its own change-set —
+noted as feasible because the firmware flashers already have the NDJSON
+`asyncio.create_subprocess_exec` + `StreamingResponse` pattern and the
+`sudo bash setup.sh` sudoers grant already exists.
+
+Phase 1 shipped (NOT committed yet — user commits incrementally):
+- **`src/plugins/manifest.py`**: optional `[deps] check = "check.sh"` key,
+  validated-to-exist like `setup`; `PluginManifest.check` + `.check_path`.
+  Field has no default so 4 test helpers that construct `PluginManifest(...)`
+  directly gained `check=None` (test_plugin_assets ×2, _registry_facade,
+  _command).
+- **`src/plugins/loader.py`**: `run_deps_check(manifest) -> (bool|None, str)`
+  runs `bash check.sh` unprivileged, 15s timeout (`DEPS_CHECK_TIMEOUT_S`),
+  exit 0 = ok / non-zero|timeout|OSError = False, stdout+stderr (trimmed 2KB)
+  = detail. `_attach_deps_status()` runs all declared checks concurrently
+  (ThreadPoolExecutor, max 4) after the load loop and folds the result onto
+  each `LoadedPlugin` via `dataclasses.replace` (new frozen fields
+  `deps_ok: bool|None = None`, `deps_detail: str = ""`). **Advisory only** —
+  a failing check never unloads the plugin (Reticulum degrades gracefully via
+  its guarded `import LXMF`).
+- **`src/api/routes/plugin_routes.py`**: `_describe()` gains `has_deps_check` /
+  `deps_ok` / `deps_detail` (via `_deps_status()`, which reads a session-local
+  `_deps_overrides` dict first, then the boot snapshot). New
+  `POST /api/plugins/{id}/check` (admin, audited `config.plugin_deps_check`)
+  re-runs the probe and records the result in `_deps_overrides` so the warning
+  clears without a full restart. 400 if the plugin declares no check.
+- **`frontend/js/settings/plugins_panel_controller.js`**: row shows
+  `deps_ok === false` → "⚠ Setup needed — {first line of detail}" + run hint +
+  **Re-check** button; `=== true` → "✓ Dependencies installed"; `null` → the
+  old static hint unchanged. `_recheckDeps()` POSTs then `refresh()`s.
+  `settings.css`: `.plugin-row__deps--ok/--bad`, `.plugin-row__recheck`.
+- **`src/cli/plugin_command.py`**: `_print_plugin_row` shows the same verdict
+  (yellow "deps: setup needed — {reason}" / dim "deps: installed").
+- **`plugins/apps/reticulum/check.sh`** (new, +x, first shipped check): probes
+  `venv/bin/python3 -c "import LXMF"` + `/etc/systemd/system/rnsd.service`
+  exists + `systemctl is-enabled rnsd`. No sudo. `plugin.toml` gains
+  `check = "check.sh"`.
+- Tests: test_plugin_manifest (parse + absent-file → "deps"), test_plugin_loader
+  (3: pass→True, fail→False+still-loaded, none→None), test_plugin_routes
+  (5: GET surfaces verdict, none when no check, recheck reruns+records, 400 no
+  check, 404 unknown), test_plugin_command (2). Mac subset (manifest/loader/
+  assets/facade/command) green: 108 passed / 6 skipped. `ruff check src tests
+  plugins` clean. `node --check` clean. **test_plugin_routes.py NOT runnable on
+  the Mac (no fastapi)** — logic exercised via direct `run_deps_check()` calls
+  against the real reticulum + adsb manifests; needs CI/Pi to confirm the route
+  tests.
+- Docs: CHANGELOG v0.8.1 (+1 bullet, 83 total, parse re-verified),
+  PLUGINS.md (layout + toml example + field table + new "Letting the dashboard
+  show 'setup needed'" subsection + Managing section), CONFIGURATION.md
+  (toml example + Settings→Plugins prose + Reticulum "Set it up with" para),
+  README.md ("What's Different" Settings→Plugins bullet),
+  plugins/apps/reticulum/README.md ("Enable it" now leads with setup + the
+  ⚠ warning).
+
+**Pi verification still needed** (both this and the prior rnode/backbone combo
+work): on the real device, `POST /api/plugins/reticulum/check` (or just a
+restart) should report `deps_ok: true` when lxmf + rnsd.service are in place,
+and the Settings → Plugins row should show "✓ Dependencies installed". Break it
+(e.g. `systemctl disable rnsd`) and confirm the ⚠ + Re-check button behave.

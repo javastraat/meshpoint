@@ -60,6 +60,8 @@ class TestParseManifest(unittest.TestCase):
         self.assertEqual(m.provides, ("listener", "routes"))
         self.assertEqual(m.apt, ())
         self.assertIsNone(m.setup)
+        self.assertIsNone(m.check)
+        self.assertIsNone(m.check_path)
         self.assertEqual(m.description, "")
         self.assertEqual(m.homepage, "")
         self.assertEqual(m.author, "")
@@ -84,17 +86,22 @@ class TestParseManifest(unittest.TestCase):
 [deps]
 apt = ["cmake", "pkg-config"]
 setup = "setup.sh"
+check = "check.sh"
 
 [meta]
 description = "ACARS decoding"
 homepage = "https://example.org"
 author = "Einstein"
 """
-        d = _write_plugin(self.root, "acars", toml, extra_files=("setup.sh",))
+        d = _write_plugin(
+            self.root, "acars", toml, extra_files=("setup.sh", "check.sh"),
+        )
         m = parse_manifest(d)
         self.assertEqual(m.apt, ("cmake", "pkg-config"))
         self.assertEqual(m.setup, "setup.sh")
         self.assertEqual(m.setup_path, d / "setup.sh")
+        self.assertEqual(m.check, "check.sh")
+        self.assertEqual(m.check_path, d / "check.sh")
         self.assertEqual(m.description, "ACARS decoding")
         self.assertEqual(m.author, "Einstein")
 
@@ -240,6 +247,10 @@ styles = ["frontend/panel.css"]
 
     def test_setup_file_absent(self) -> None:
         toml = _VALID + '\n[deps]\nsetup = "setup.sh"\n'
+        self.assertEqual(self._code("acars", toml), "deps")
+
+    def test_check_file_absent(self) -> None:
+        toml = _VALID + '\n[deps]\ncheck = "check.sh"\n'
         self.assertEqual(self._code("acars", toml), "deps")
 
     def test_meta_not_string(self) -> None:

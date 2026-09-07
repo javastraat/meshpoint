@@ -71,6 +71,7 @@ case what you want to build needs one.
 plugins/apps/<your-id>/
     plugin.toml              # the manifest -- required
     setup.sh                 # optional: installs system deps (apt + build)
+    check.sh                 # optional: "are deps installed?" probe (exit 0 = yes)
     README.md                # recommended: install/config/layout, like this
     backend/
         __init__.py          # required: register(reg) entry point
@@ -113,6 +114,7 @@ locked = false                            # optional, default false -- see below
 [deps]                                    # optional
 apt = ["cmake", "pkg-config"]
 setup = "setup.sh"                        # relative path, must exist
+check = "check.sh"                        # optional, relative path, must exist
 
 [frontend]                                # required when "panel", "sidebar" or "hook" in provides
 scripts = ["frontend/acars_panel.js"]     # relative paths, must exist
@@ -143,6 +145,7 @@ author = "Your Name"
 | `provides` | yes | Non-empty subset of `listener`, `routes`, `panel`, `sidebar`, `hook`, `capture`, `protocol`, `topbar`, `service`. Calling a `PluginRegistry` method for a capability you didn't declare raises at register time — see [The `register(reg)` entry point](#the-registerreg-entry-point). |
 | `locked` | no, default `false` | Only meaningful for **community** plugins. `true` marks a shipped/bundled community plugin (git-tracked, not a real user drop-in) so Settings → Plugins refuses to offer a Delete button for it — the same protection `plugins/themes/*/theme.json`'s `"locked": true` already gives the bundled theme pack. ACARS sets this. If you're writing a plugin someone else will `git clone` into their own `plugins/apps/`, leave it `false` (default) so they can delete it if they want to. |
 | `[deps].apt` / `.setup` | no | System packages + a build script. **Never installed automatically** — the operator runs it themselves (`sudo bash plugins/apps/<id>/setup.sh` or `sudo meshpoint plugin setup <id>`, which just wraps the same script after showing what it does). |
+| `[deps].check` | no | Path to an **unprivileged** "are my deps installed?" probe. Exit `0` = satisfied, non-zero = setup needed (stdout/stderr is shown to the admin as the reason). Run at boot by the loader and on demand from Settings → Plugins (`POST /api/plugins/{id}/check`). Must not use `sudo` — the service account has to be able to answer it. See [System dependencies](#system-dependencies). |
 | `[frontend].scripts` / `.styles` | scripts required iff `panel`, `sidebar`, `hook` or `topbar` in `provides` | Served at `/plugins/apps/<id>/<path>` — **only** the exact files listed here, from either tier, nothing else in the folder is reachable (`src/plugins/assets.py:resolve_plugin_asset`). |
 | `[sidebar].route` / `.label` / `.category` | required iff `sidebar` in `provides` | See [Adding a top-level sidebar page](#adding-a-top-level-sidebar-page-sidebar) below. `category` must be one of `KNOWN_SIDEBAR_CATEGORIES` in `src/plugins/manifest.py`. |
 | `[sidebar].icon` | no, default `"plug"` | One of `KNOWN_SIDEBAR_ICONS` (`src/plugins/manifest.py`) — a curated key, not raw SVG. See [Adding a top-level sidebar page](#adding-a-top-level-sidebar-page-sidebar). |
@@ -776,6 +779,24 @@ Make your script idempotent — `setup.sh` should check whether it already
 did its job (ACARS checks `shutil.which`-equivalent for `acarsdec` on
 `PATH`) and exit cleanly instead of reinstalling every time it's re-run.
 
+### Letting the dashboard show "setup needed"
+
+Optionally add a `check.sh` and point `[deps] check` at it. It's a probe,
+not an installer: exit `0` when every dependency is in place, non-zero
+otherwise, and print what's missing to stdout. The loader runs it
+(unprivileged, ~15s cap) for each enabled plugin at boot, and Settings →
+Plugins shows the verdict on that plugin's row — **"⚠ Setup needed"** with
+your message, or **"✓ Dependencies installed"** — instead of the always-on
+"Requires: … run setup" hint. A **Re-check** button re-runs it
+(`POST /api/plugins/{id}/check`) so running setup on the device clears the
+warning without a restart.
+
+It must run as the unprivileged `meshpoint` service account — **no `sudo`**.
+Checking a file under `/etc/systemd/system` or `systemctl is-enabled <unit>`
+both work without root; installing anything does not (that's `setup.sh`'s
+job). Reticulum's `check.sh` is the reference: `venv/bin/python3 -c "import
+LXMF"` plus an installed, enabled `rnsd.service`.
+
 ## Testing
 
 Keep your listener/decode logic importable without FastAPI, so it unit-tests
@@ -815,9 +836,10 @@ your plugin's tests are part of the same run, so `plugins/apps/<id>/`,
 An operator doesn't need to touch YAML by hand for the common cases:
 
 - **Settings → Plugins** in the dashboard lists every discovered plugin,
-  toggles `plugins.<id>.enabled`, shows apt-deps + the setup-script hint,
-  and (for a community, non-`locked` plugin) offers a Delete button that
-  removes `plugins/apps/<id>/` outright.
+  toggles `plugins.<id>.enabled`, shows apt-deps + a live dependency
+  verdict (for a plugin with a `[deps] check` script) or the setup-script
+  hint, a **Re-check** button, and (for a community, non-`locked` plugin) a
+  Delete button that removes `plugins/apps/<id>/` outright.
 - `meshpoint plugin list` / `sudo meshpoint plugin setup <id>` — the CLI
   equivalents, usable from SSH or the dashboard's own web Terminal (it's a
   real shell on the device).

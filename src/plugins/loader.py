@@ -16,8 +16,10 @@ from __future__ import annotations
 
 import importlib.util
 import logging
+import subprocess
 import sys
-from dataclasses import dataclass
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, replace
 from pathlib import Path
 from types import ModuleType
 
@@ -31,10 +33,82 @@ from src.plugins.registry import PluginRegistry
 logger = logging.getLogger(__name__)
 
 
+# Cap for a single plugin's [deps] check script -- a probe that hasn't
+# answered by now is treated as "deps not satisfied" rather than holding
+# up boot.
+DEPS_CHECK_TIMEOUT_S = 15
+
+
 @dataclass(frozen=True)
 class LoadedPlugin:
     manifest: PluginManifest
     module: ModuleType
+    # Result of the plugin's optional [deps] check = "check.sh" probe.
+    # None  -> no probe declared (or not run yet); caller assumes ok.
+    # True  -> probe exited 0, deps satisfied.
+    # False -> probe exited non-zero / timed out / errored; setup needed.
+    deps_ok: bool | None = None
+    deps_detail: str = ""  # probe stdout+stderr, trimmed -- the "why" for the admin
+
+
+def run_deps_check(manifest: PluginManifest) -> tuple[bool | None, str]:
+    """Run a plugin's ``[deps] check`` script unprivileged and classify the
+    result. Returns ``(deps_ok, detail)``: ``None`` when the plugin declares
+    no check, otherwise ``True``/``False`` with the script's combined
+    stdout+stderr (trimmed) as the human-readable reason.
+
+    Shared by :func:`load_plugins` (at boot) and the Settings -> Plugins
+    ``POST /api/plugins/{id}/check`` route (on demand, after the operator
+    has run setup). Never uses ``sudo`` -- a check must be answerable by the
+    unprivileged service account.
+    """
+    if not manifest.check_path:
+        return None, ""
+    try:
+        proc = subprocess.run(
+            ["bash", str(manifest.check_path)],
+            capture_output=True, text=True,
+            timeout=DEPS_CHECK_TIMEOUT_S, check=False,
+        )
+    except subprocess.TimeoutExpired:
+        return False, f"dependency check timed out after {DEPS_CHECK_TIMEOUT_S}s"
+    except OSError as exc:
+        return False, f"could not run dependency check: {exc}"
+    detail = (proc.stdout + proc.stderr).strip()
+    if len(detail) > 2000:
+        detail = "…" + detail[-2000:]
+    return proc.returncode == 0, detail
+
+
+def _attach_deps_status(loaded: list[LoadedPlugin]) -> list[LoadedPlugin]:
+    """Run every loaded plugin's ``[deps] check`` concurrently and fold the
+    result onto its :class:`LoadedPlugin`. Advisory only -- a failing check
+    never unloads a plugin, it just lights up the warning on Settings ->
+    Plugins."""
+    checkable = [lp for lp in loaded if lp.manifest.check]
+    if not checkable:
+        return loaded
+    with ThreadPoolExecutor(max_workers=min(4, len(checkable))) as pool:
+        results = dict(
+            zip(
+                (lp.manifest.name for lp in checkable),
+                pool.map(lambda lp: run_deps_check(lp.manifest), checkable),
+            )
+        )
+    out: list[LoadedPlugin] = []
+    for lp in loaded:
+        res = results.get(lp.manifest.name)
+        if res is None:
+            out.append(lp)
+            continue
+        deps_ok, detail = res
+        if deps_ok is False:
+            logger.warning(
+                "plugin %s: dependency check failed -- setup needed%s",
+                lp.manifest.name, f" ({detail.splitlines()[0]})" if detail else "",
+            )
+        out.append(replace(lp, deps_ok=deps_ok, deps_detail=detail))
+    return out
 
 
 def _import_backend(manifest: PluginManifest) -> ModuleType:
@@ -119,4 +193,4 @@ def load_plugins(
             len(loaded), len(manifests),
             ", ".join(m.name for m in manifests),
         )
-    return loaded
+    return _attach_deps_status(loaded)

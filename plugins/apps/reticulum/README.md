@@ -19,6 +19,18 @@ implementation now. `enabled: false` by default like every shipped plugin.
 
 ## Enable it
 
+First run the setup step (`pip install lxmf` + install/enable `rnsd.service`):
+
+```sh
+sudo meshpoint plugin setup reticulum
+```
+
+Until that's done, Settings → Plugins shows **"⚠ Setup needed"** on the
+Reticulum row — `check.sh` probes for `lxmf` in the venv plus an installed,
+enabled `rnsd.service`, and the loader re-runs it at every boot (a **Re-check**
+button on the row re-runs it on demand). The plugin still loads and serves its
+pages without setup; it just can't attach to Reticulum.
+
 ```yaml
 plugins:
   reticulum:

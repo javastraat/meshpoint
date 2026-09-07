@@ -1337,6 +1337,23 @@ select.update-field__input option:checked {
     margin-top: 3px;
 }
 
+.plugin-row__deps--ok { color: var(--accent-green); }
+.plugin-row__deps--bad { color: var(--accent-red); }
+
+.plugin-row__recheck {
+    background: none;
+    border: 1px solid currentColor;
+    color: inherit;
+    border-radius: 6px;
+    padding: 1px 8px;
+    font-size: 0.7rem;
+    cursor: pointer;
+    vertical-align: middle;
+}
+
+.plugin-row__recheck:hover { background: var(--overlay-weak); }
+.plugin-row__recheck:disabled { opacity: 0.5; cursor: default; }
+
 .plugin-row__dep {
     color: var(--text-muted);
     font-size: 0.75rem;

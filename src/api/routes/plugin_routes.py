@@ -43,7 +43,7 @@ from src.api.audit.dependencies import get_audit_writer
 from src.api.auth.dependencies import require_admin
 from src.api.auth.jwt_session import SessionClaims
 from src.config import AppConfig, remove_subsection_key, save_section_to_yaml
-from src.plugins.loader import LoadedPlugin, is_plugin_enabled
+from src.plugins.loader import LoadedPlugin, is_plugin_enabled, run_deps_check
 from src.plugins.manifest import SOURCE_COMMUNITY, PluginManifest, discover_plugins
 
 logger = logging.getLogger(__name__)
@@ -54,6 +54,11 @@ _config: AppConfig | None = None
 _builtin_dir: Path | None = None
 _community_dir: Path | None = None
 _loaded_plugins: list[LoadedPlugin] = []
+# Fresher [deps]-check results than the boot-time snapshot on _loaded_plugins,
+# keyed by plugin id -- written by POST /api/plugins/{id}/check so an admin who
+# just ran setup on the device can clear the "setup needed" warning without a
+# full service restart. Lost on restart (boot re-runs every check); that's fine.
+_deps_overrides: dict[str, tuple[bool | None, str]] = {}
 
 
 def init_routes(
@@ -75,12 +80,26 @@ def reset_routes() -> None:
     _builtin_dir = None
     _community_dir = None
     _loaded_plugins = []
+    _deps_overrides.clear()
 
 
 def _is_enabled(manifest: PluginManifest) -> bool:
     conf = _config.plugins.get(manifest.name)
     conf = conf if isinstance(conf, dict) else {}
     return is_plugin_enabled(manifest, conf)
+
+
+def _deps_status(plugin_id: str) -> tuple[bool | None, str]:
+    """This plugin's dependency-check verdict: an on-demand re-check result
+    if one has been recorded this session, otherwise the boot-time snapshot
+    from the loader. ``(None, "")`` when the plugin declares no check or
+    isn't loaded."""
+    if plugin_id in _deps_overrides:
+        return _deps_overrides[plugin_id]
+    for lp in _loaded_plugins:
+        if lp.manifest.name == plugin_id:
+            return lp.deps_ok, lp.deps_detail
+    return None, ""
 
 
 def _route_map(manifests: list[PluginManifest]) -> dict[str, PluginManifest]:
@@ -107,6 +126,7 @@ def _describe(
 ) -> dict:
     enabled = _is_enabled(manifest)
     loaded = manifest.name in loaded_names
+    deps_ok, deps_detail = _deps_status(manifest.name)
     host = _host_manifest(manifest, route_map)
     dependency = None
     if manifest.hook is not None:
@@ -125,6 +145,12 @@ def _describe(
         "author": manifest.author,
         "apt_deps": list(manifest.apt),
         "setup_script": manifest.setup,
+        "has_deps_check": manifest.check is not None,
+        # None  = no check declared / plugin not loaded -> UI falls back to the
+        #         static "Requires: … run setup" hint.
+        # True  = deps satisfied.  False = setup needed (deps_detail says why).
+        "deps_ok": deps_ok,
+        "deps_detail": deps_detail,
         "enabled": enabled,
         "loaded": loaded,
         "restart_required": enabled != loaded,
@@ -262,6 +288,38 @@ async def update_plugin(
         "plugin": _describe(manifest, loaded_names, route_map),
         "also_disabled": also_disabled,
     }
+
+
+@router.post("/{plugin_id}/check")
+async def recheck_plugin_deps(
+    plugin_id: str,
+    _claims: SessionClaims = Depends(require_admin),
+    audit: AuditLogWriter = Depends(get_audit_writer),
+):
+    """Re-run a plugin's ``[deps] check`` script now and record the result,
+    so an admin who just ran setup on the device can clear the "setup
+    needed" warning without restarting the service. The script runs
+    unprivileged, same as at boot. 400 if the plugin declares no check."""
+    if _config is None:
+        raise HTTPException(503, "Config not loaded")
+
+    manifest = _find_manifest(plugin_id)
+    if manifest.check is None:
+        raise HTTPException(400, f"{plugin_id!r} declares no [deps] check script.")
+
+    with audit.timed_action(
+        user=_claims.subject,
+        action="config.plugin_deps_check",
+        params={"plugin_id": plugin_id},
+    ):
+        deps_ok, detail = run_deps_check(manifest)
+
+    _deps_overrides[plugin_id] = (deps_ok, detail)
+    logger.info("plugin %s dependency re-check: deps_ok=%s", plugin_id, deps_ok)
+
+    loaded_names = {p.manifest.name for p in _loaded_plugins}
+    route_map = _route_map(discover_plugins(_builtin_dir, _community_dir))
+    return {"checked": True, "plugin": _describe(manifest, loaded_names, route_map)}
 
 
 @router.delete("/{plugin_id}")

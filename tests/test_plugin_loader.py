@@ -35,12 +35,17 @@ provides = {provides}
 
 def _make_plugin(apps: Path, name: str, backend_init: str, *,
                  provides: str = '["routes", "listener"]',
-                 extra: dict[str, str] | None = None) -> None:
+                 extra: dict[str, str] | None = None,
+                 check_script: str | None = None) -> None:
     d = apps / name / "backend"
     d.mkdir(parents=True)
-    (apps / name / "plugin.toml").write_text(
-        _MANIFEST.format(name=name, provides=provides), encoding="utf-8",
-    )
+    manifest = _MANIFEST.format(name=name, provides=provides)
+    if check_script is not None:
+        manifest += '\n[deps]\ncheck = "check.sh"\n'
+        (apps / name / "check.sh").write_text(
+            textwrap.dedent(check_script), encoding="utf-8",
+        )
+    (apps / name / "plugin.toml").write_text(manifest, encoding="utf-8")
     (d / "__init__.py").write_text(textwrap.dedent(backend_init), encoding="utf-8")
     for fname, body in (extra or {}).items():
         (d / fname).write_text(textwrap.dedent(body), encoding="utf-8")
@@ -115,6 +120,45 @@ class TestLoadPlugins(unittest.TestCase):
 
         self.assertEqual([p.manifest.name for p in loaded], ["zzz-good"])
         self.assertEqual(len(route_registry.registered()), 1)
+
+    def test_deps_check_pass_marks_deps_ok_true(self) -> None:
+        _make_plugin(self.apps, "acars", """
+            def register(reg):
+                reg.add_router(object())
+        """, provides='["routes"]',
+            check_script='#!/usr/bin/env bash\necho "all good"\nexit 0\n')
+
+        loaded = self._load({"acars": {"enabled": True}})
+
+        self.assertEqual(len(loaded), 1)
+        self.assertIs(loaded[0].deps_ok, True)
+        self.assertEqual(loaded[0].deps_detail, "all good")
+
+    def test_deps_check_fail_marks_deps_ok_false_with_detail(self) -> None:
+        _make_plugin(self.apps, "acars", """
+            def register(reg):
+                reg.add_router(object())
+        """, provides='["routes"]',
+            check_script='#!/usr/bin/env bash\necho "libfoo missing"\nexit 1\n')
+
+        with self.assertLogs("src.plugins.loader", level=logging.WARNING):
+            loaded = self._load({"acars": {"enabled": True}})
+
+        # A failing check never unloads the plugin -- advisory only.
+        self.assertEqual(len(loaded), 1)
+        self.assertIs(loaded[0].deps_ok, False)
+        self.assertIn("libfoo missing", loaded[0].deps_detail)
+
+    def test_no_deps_check_leaves_deps_ok_none(self) -> None:
+        _make_plugin(self.apps, "acars", """
+            def register(reg):
+                reg.add_router(object())
+        """, provides='["routes"]')
+
+        loaded = self._load({"acars": {"enabled": True}})
+
+        self.assertIsNone(loaded[0].deps_ok)
+        self.assertEqual(loaded[0].deps_detail, "")
 
     def test_builtin_plugin_loads_without_config(self) -> None:
         _make_plugin(self.builtin, "acars", """
