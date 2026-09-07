@@ -11810,3 +11810,60 @@ boot or via `POST /api/plugins/{id}/check`. User also raised that the SSH
 `meshpoint plugin check reticulum` after `systemctl disable rnsd` should
 report "setup needed -- rnsd.service is installed but not enabled" and
 exit 1; dashboard row should flip to ⚠ after clicking Re-check.
+
+**LIVE-VERIFIED on the real RAK V2, same session** (screenshot + terminal):
+- `sudo systemctl disable rnsd; meshpoint plugin check reticulum`
+  → "reticulum   setup needed -- rnsd.service is installed but not enabled"
+- `sudo systemctl enable rnsd; meshpoint plugin check reticulum`
+  → "reticulum   dependencies installed"
+- Dashboard Settings → Plugins row (rnsd disabled): shows
+  "⚠ Setup needed — rnsd.service is installed but not enabled — run
+  sudo meshpoint plugin setup reticulum on the device [Re-check]", and the
+  Re-check click surfaces "Still missing dependencies — run setup on the
+  device." in the row's action slot. End-to-end confirmed. Follow-up batch
+  ready to commit.
+
+---
+
+**Same session — Phase 2: in-browser setup runner. Built, NOT committed, NOT
+Pi-tested.**
+- **`src/api/routes/plugin_routes.py`**: `POST /api/plugins/{id}/setup/stream`
+  (admin, audited `config.plugin_setup`). `_stream_plugin_setup()` takes
+  `_setup_lock` (module `asyncio.Lock` — one setup at a time; pre-checks
+  `.locked()` for a friendly "already running" message), wraps
+  `audit.timed_action`, delegates to `_drive_setup(cmd, manifest)` which
+  `asyncio.create_subprocess_exec("sudo","bash",str(setup_path.resolve()))`
+  — `.resolve()` is load-bearing, `_community_dir` from server.py is
+  CWD-relative and sudoers only matches the absolute `/opt/meshpoint/...`
+  pattern. Pumps stdout+stderr → NDJSON `{type:line|started|result}`, same
+  wire shape as the firmware flashers. 30-min cap (`_SETUP_TIMEOUT_S`),
+  kills on timeout. On exit re-runs `run_deps_check` + writes
+  `_deps_overrides` so the row self-clears; `deps_ok` rides back in the
+  result. `StreamingResponse(media_type="application/x-ndjson")`. 400 if no
+  setup script, 404 unknown. **No sudoers change** — the
+  `/bin/bash /opt/meshpoint/{plugins,src/plugins}/apps/*/setup.sh` grants
+  already exist from `meshpoint plugin setup`.
+- **`plugins_panel_controller.js`**: "Run setup" button on `deps_ok === false
+  && setup_script` rows. `_runSetup()` → `confirmModal` (DangerousModal) →
+  lazily-built `.plugin-setup-modal` (own DOM, appended to body) with a
+  scrolling `<pre>`, streamed via `window.UpdateStreamClient.postNdjson`
+  (already loaded on index.html before this script). `_setupRunning` guard
+  blocks backdrop/Close mid-run. On success: "Enable it"
+  (`PUT /api/plugins/{id}`) + "Restart service" (calls existing
+  `_restartService()`) buttons; on close, `refresh()`.
+- **`settings.css`**: `.plugin-row__runsetup` (shares `.plugin-row__recheck`
+  styling) + `.plugin-setup-modal*` (uses `--scrim`/`--bg-inset`/
+  `--border-subtle`/`--font-mono` tokens, `z-index:1000`).
+- Tests: `TestPluginSetupStream` (5) in test_plugin_routes.py — `_FakeProc`/
+  `_FakeStream` + `AsyncMock` patch on `create_subprocess_exec`, asserts
+  started→lines→result, failure rc, deps re-probe+override, 400/404. **Not
+  runnable on the Mac (no fastapi)** — CI/Pi only.
+- Docs: CHANGELOG v0.8.1 (+1 bullet → 84, parse re-verified), PLUGINS.md
+  (System-deps section + Managing section), CONFIGURATION.md, README
+  "What's Different", reticulum README ("Run setup" as an option).
+
+**Pi test plan for phase 2**: with rnsd disabled/lxmf uninstalled, click
+"Run setup" on the Reticulum row → watch `setup.sh` output stream in the
+modal → on exit 0 the ⚠ should flip and Enable/Restart buttons appear.
+Also test the failure path (e.g. break network so pip fails) and the
+"another setup already running" guard.

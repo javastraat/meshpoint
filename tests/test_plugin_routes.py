@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import json
 import tempfile
 import textwrap
 import unittest
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -482,6 +483,122 @@ class TestPluginDepsCheck(_PluginRoutesTestBase):
         config.plugins = {}
         self._init(config)
         resp = self._client().post("/api/plugins/nope/check")
+        self.assertEqual(resp.status_code, 404)
+
+
+class _FakeStream:
+    def __init__(self, lines):
+        self._lines = list(lines)
+
+    async def readline(self):
+        if self._lines:
+            return (self._lines.pop(0) + "\n").encode()
+        return b""
+
+
+class _FakeProc:
+    def __init__(self, returncode, stdout=(), stderr=()):
+        self.stdout = _FakeStream(stdout)
+        self.stderr = _FakeStream(stderr)
+        self._rc = returncode
+
+    async def wait(self):
+        return self._rc
+
+    def kill(self):  # pragma: no cover - only hit on the timeout path
+        pass
+
+
+def _ndjson_events(raw: bytes) -> list[dict]:
+    return [json.loads(ln) for ln in raw.decode().splitlines() if ln.strip()]
+
+
+class TestPluginSetupStream(_PluginRoutesTestBase):
+    def _client(self) -> TestClient:
+        return TestClient(_build_app())
+
+    def _make_setup_plugin(self, name="acars", *, check_script=None) -> None:
+        d = _make_plugin_dir(self.community, name, check_script=check_script)
+        (d / "setup.sh").write_text("#!/bin/sh\ntrue\n", encoding="utf-8")
+        toml = (d / "plugin.toml").read_text()
+        if "[deps]" in toml:
+            toml = toml.replace("[deps]\n", '[deps]\nsetup = "setup.sh"\n')
+        else:
+            toml += '\n[deps]\nsetup = "setup.sh"\n'
+        (d / "plugin.toml").write_text(toml, encoding="utf-8")
+
+    def test_stream_emits_lines_then_result_on_success(self) -> None:
+        self._make_setup_plugin()
+        config = MagicMock()
+        config.plugins = {}
+        self._init(config)
+
+        fake = _FakeProc(0, stdout=["installing foo", "done"])
+        with patch(
+            "src.api.routes.plugin_routes.asyncio.create_subprocess_exec",
+            new=AsyncMock(return_value=fake),
+        ):
+            resp = self._client().post("/api/plugins/acars/setup/stream")
+        self.assertEqual(resp.status_code, 200)
+        events = _ndjson_events(resp.content)
+        self.assertEqual(events[0]["type"], "started")
+        self.assertEqual(
+            [e["text"] for e in events if e["type"] == "line"],
+            ["installing foo", "done"],
+        )
+        result = events[-1]
+        self.assertEqual(result["type"], "result")
+        self.assertTrue(result["result"]["success"])
+        self.assertEqual(result["result"]["returncode"], 0)
+
+    def test_stream_reports_failure_returncode(self) -> None:
+        self._make_setup_plugin()
+        config = MagicMock()
+        config.plugins = {}
+        self._init(config)
+
+        fake = _FakeProc(3, stderr=["E: could not install"])
+        with patch(
+            "src.api.routes.plugin_routes.asyncio.create_subprocess_exec",
+            new=AsyncMock(return_value=fake),
+        ):
+            resp = self._client().post("/api/plugins/acars/setup/stream")
+        events = _ndjson_events(resp.content)
+        self.assertFalse(events[-1]["result"]["success"])
+        self.assertEqual(events[-1]["result"]["returncode"], 3)
+
+    def test_stream_reprobes_deps_and_records_override(self) -> None:
+        self._make_setup_plugin(
+            check_script='#!/usr/bin/env bash\necho ok\nexit 0\n',
+        )
+        config = MagicMock()
+        config.plugins = {}
+        self._init(config)
+
+        fake = _FakeProc(0, stdout=["done"])
+        with patch(
+            "src.api.routes.plugin_routes.asyncio.create_subprocess_exec",
+            new=AsyncMock(return_value=fake),
+        ):
+            resp = self._client().post("/api/plugins/acars/setup/stream")
+        self.assertIs(_ndjson_events(resp.content)[-1]["result"]["deps_ok"], True)
+        # The fresh verdict is now visible on a plain GET too.
+        acars = self._client().get("/api/plugins").json()["plugins"][0]
+        self.assertIs(acars["deps_ok"], True)
+
+    def test_plugin_without_setup_script_is_400(self) -> None:
+        _make_plugin_dir(self.community, "acars")
+        config = MagicMock()
+        config.plugins = {}
+        self._init(config)
+        resp = self._client().post("/api/plugins/acars/setup/stream")
+        self.assertEqual(resp.status_code, 400)
+
+    def test_unknown_plugin_is_404(self) -> None:
+        config = MagicMock()
+        config.plugins = {}
+        self._init(config)
+        resp = self._client().post("/api/plugins/nope/setup/stream")
         self.assertEqual(resp.status_code, 404)
 
 

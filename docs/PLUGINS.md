@@ -775,6 +775,14 @@ unknown cwd. `sudo bash plugins/apps/<id>/setup.sh` (relative, even from
 `/opt/meshpoint`) still works, just prompts for a password.
 `meshpoint plugin setup` always passes the resolved absolute path.
 
+A plugin that also declares `[deps] check` (next section) gets a **Run
+setup** button on its Settings → Plugins row when the check says setup is
+needed: it runs that same `sudo bash setup.sh` server-side and streams the
+output into a modal (`POST /api/plugins/{id}/setup/stream`, admin-only,
+audited as `config.plugin_setup`), then re-probes `check` and offers Enable
++ Restart on success. Same script, same sudoers grant — just no SSH needed.
+Only one setup runs at a time; there's a 30-minute cap.
+
 Make your script idempotent — `setup.sh` should check whether it already
 did its job (ACARS checks `shutil.which`-equivalent for `acarsdec` on
 `PATH`) and exit cleanly instead of reinstalling every time it's re-run.
@@ -844,8 +852,10 @@ An operator doesn't need to touch YAML by hand for the common cases:
 - **Settings → Plugins** in the dashboard lists every discovered plugin,
   toggles `plugins.<id>.enabled`, shows apt-deps + a live dependency
   verdict (for a plugin with a `[deps] check` script) or the setup-script
-  hint, a **Re-check** button, and (for a community, non-`locked` plugin) a
-  Delete button that removes `plugins/apps/<id>/` outright.
+  hint, a **Re-check** button, a **Run setup** button that streams
+  `setup.sh` output into a modal when setup is needed, and (for a
+  community, non-`locked` plugin) a Delete button that removes
+  `plugins/apps/<id>/` outright.
 - `meshpoint plugin list` / `meshpoint plugin check [<id>]` /
   `sudo meshpoint plugin setup <id>` — the CLI equivalents, usable from SSH
   or the dashboard's own web Terminal (it's a real shell on the device).

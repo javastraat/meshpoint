@@ -1303,6 +1303,12 @@ warning clears without a service restart. `meshpoint plugin list` shows the
 same verdict but only as a boot-time snapshot — `check` re-runs it live. A
 plugin with no `check` script keeps the old static hint.
 
+When setup is needed, a **Run setup** button on the row runs the plugin's
+`setup.sh` on the device (`sudo bash …/setup.sh`, admin-only, audited) and
+streams its output into a modal — the same install `sudo meshpoint plugin
+setup <id>` does, no SSH required. On success it re-checks the deps and
+offers **Enable it** + **Restart service** inline.
+
 A `hook` plugin (`[hook] host = "..."` above) can't be enabled ahead of its
 host — ACARS above hooks into `rtlsdr`, so enabling `plugins.acars.enabled`
 while `plugins.rtlsdr.enabled` is off (or unset) is rejected, both from the

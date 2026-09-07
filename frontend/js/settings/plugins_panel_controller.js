@@ -11,7 +11,10 @@
  * a `[deps] check` script shows a live verdict from the loader (⚠ setup needed
  * with the reason, or ✓ installed) instead of the always-on "Requires:" hint,
  * with a Re-check button (``POST /api/plugins/{id}/check``) so running setup on
- * the device clears the warning without a restart. A `deletable` plugin
+ * the device clears the warning without a restart. When a setup is genuinely
+ * needed, a **Run setup** button streams ``sudo bash setup.sh``
+ * (``POST /api/plugins/{id}/setup/stream``, NDJSON via ``UpdateStreamClient``)
+ * into a modal, then offers Enable + Restart once it succeeds. A `deletable` plugin
  * (community tier, not `locked`) also gets a Delete button that removes its
  * folder via ``DELETE /api/plugins/{id}`` -- same confirm-to-delete modal as
  * Settings > Themes' "Installed themes" list. A page-level "Restart service"
@@ -48,6 +51,10 @@ class PluginsPanelController {
         // admin just expanded a moment ago.
         this._seenGroupRoots = new Set();
         this._modal = null;
+        // Lazily-built "Run setup" output modal + a guard so its backdrop /
+        // Close can't dismiss it mid-run (setup.sh is minutes long).
+        this._setupModal = null;
+        this._setupRunning = false;
     }
 
     bind() {
@@ -314,12 +321,18 @@ class PluginsPanelController {
         const recheckBtnHtml = plugin.has_deps_check
             ? ` <button type="button" class="plugin-row__recheck" data-recheck>Re-check</button>`
             : '';
+        // "Run setup" streams `sudo bash setup.sh` output into a modal --
+        // offered only where a live verdict says it's actually needed, so a
+        // healthy row (or one with no check) doesn't invite a re-run.
+        const runSetupBtnHtml = (plugin.deps_ok === false && plugin.setup_script)
+            ? ` <button type="button" class="plugin-row__runsetup" data-run-setup>Run setup</button>`
+            : '';
         let depsNote = '';
         if (plugin.deps_ok === false) {
             const why = (plugin.deps_detail || '').split('\n').filter(Boolean)[0]
                 || 'dependencies missing';
             depsNote = `<p class="plugin-row__deps plugin-row__deps--bad" title="${this._escape(plugin.deps_detail || '')}">`
-                + `⚠ Setup needed — ${this._escape(why)}${runHint}${recheckBtnHtml}</p>`;
+                + `⚠ Setup needed — ${this._escape(why)}${runSetupBtnHtml}${recheckBtnHtml}</p>`;
         } else if (plugin.deps_ok === true) {
             depsNote = `<p class="plugin-row__deps plugin-row__deps--ok">✓ Dependencies installed${recheckBtnHtml}</p>`;
         } else if (plugin.has_deps_check) {
@@ -375,6 +388,10 @@ class PluginsPanelController {
         const recheckBtn = row.querySelector('[data-recheck]');
         if (recheckBtn) {
             recheckBtn.addEventListener('click', () => this._recheckDeps(plugin, recheckBtn, resultEl));
+        }
+        const runSetupBtn = row.querySelector('[data-run-setup]');
+        if (runSetupBtn) {
+            runSetupBtn.addEventListener('click', () => this._runSetup(plugin));
         }
         // Wired on the name+chevron wrapper, not the whole row or the
         // whole first cell -- the version/byline span right below it
@@ -475,6 +492,151 @@ class PluginsPanelController {
             resultEl.textContent = 'Network error.';
             button.disabled = false;
         }
+    }
+
+    // ── Run setup (stream sudo bash setup.sh into a modal) ───────────────
+
+    _ensureSetupModal() {
+        if (this._setupModal) return this._setupModal;
+        const root = document.createElement('div');
+        root.className = 'plugin-setup-modal';
+        root.setAttribute('aria-hidden', 'true');
+        root.innerHTML = `
+            <div class="plugin-setup-modal__backdrop" data-ps-backdrop></div>
+            <div class="plugin-setup-modal__sheet" role="dialog" aria-modal="true">
+                <h3 class="plugin-setup-modal__title" data-ps-title>Run setup</h3>
+                <p class="plugin-setup-modal__status" data-ps-status aria-live="polite"></p>
+                <pre class="plugin-setup-modal__output" data-ps-output></pre>
+                <div class="plugin-setup-modal__actions" data-ps-actions>
+                    <button type="button" class="plugin-setup-modal__btn" data-ps-enable hidden>Enable it</button>
+                    <button type="button" class="plugin-setup-modal__btn" data-ps-restart hidden>Restart service</button>
+                    <button type="button" class="plugin-setup-modal__btn plugin-setup-modal__btn--ghost" data-ps-close>Close</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(root);
+        root.querySelector('[data-ps-backdrop]').addEventListener('click', () => {
+            if (!this._setupRunning) this._closeSetupModal();
+        });
+        root.querySelector('[data-ps-close]').addEventListener('click', () => {
+            if (!this._setupRunning) this._closeSetupModal();
+        });
+        this._setupModal = {
+            root,
+            title: root.querySelector('[data-ps-title]'),
+            status: root.querySelector('[data-ps-status]'),
+            output: root.querySelector('[data-ps-output]'),
+            enableBtn: root.querySelector('[data-ps-enable]'),
+            restartBtn: root.querySelector('[data-ps-restart]'),
+            closeBtn: root.querySelector('[data-ps-close]'),
+        };
+        return this._setupModal;
+    }
+
+    _closeSetupModal() {
+        if (!this._setupModal) return;
+        this._setupModal.root.setAttribute('aria-hidden', 'true');
+        this._setupModal.root.classList.remove('plugin-setup-modal--open');
+        // The dep verdict / enabled state may have changed while it was open.
+        this.refresh();
+    }
+
+    async _runSetup(plugin) {
+        const ok = await this._confirm(
+            `Run "${plugin.id}"'s setup.sh on the device now? This executes ` +
+            `sudo bash plugins/apps/${plugin.id}/setup.sh — the same thing ` +
+            `\`sudo meshpoint plugin setup ${plugin.id}\` does — installing apt ` +
+            `packages and/or building from source. Can take several minutes.`,
+            { label: 'Run plugin setup?', command: `sudo bash setup.sh (${plugin.id})` },
+        );
+        if (!ok) return;
+
+        const m = this._ensureSetupModal();
+        m.title.textContent = `Setup — ${plugin.id}`;
+        m.status.dataset.kind = 'pending';
+        m.status.textContent = 'Running setup.sh…';
+        m.output.textContent = '';
+        m.enableBtn.hidden = true;
+        m.restartBtn.hidden = true;
+        m.closeBtn.disabled = true;
+        m.root.setAttribute('aria-hidden', 'false');
+        m.root.classList.add('plugin-setup-modal--open');
+        this._setupRunning = true;
+
+        const append = (text) => {
+            const atBottom = m.output.scrollTop + m.output.clientHeight >= m.output.scrollHeight - 4;
+            m.output.textContent += (m.output.textContent ? '\n' : '') + text;
+            if (atBottom) m.output.scrollTop = m.output.scrollHeight;
+        };
+
+        let result = null;
+        try {
+            result = await window.UpdateStreamClient.postNdjson(
+                `/api/plugins/${encodeURIComponent(plugin.id)}/setup/stream`,
+                {},
+                (event) => {
+                    if (event.type === 'started' && Array.isArray(event.cmd)) {
+                        append(`$ ${event.cmd.join(' ')}`);
+                    } else if (event.type === 'line') {
+                        append(event.text);
+                    }
+                },
+            );
+        } catch (err) {
+            this._setupRunning = false;
+            m.closeBtn.disabled = false;
+            m.status.dataset.kind = 'error';
+            m.status.textContent = err && err.status === 403
+                ? 'Admin role required.'
+                : `Request failed: ${(err && err.message) || err}`;
+            return;
+        }
+
+        this._setupRunning = false;
+        m.closeBtn.disabled = false;
+        const success = !!(result && result.success);
+        m.status.dataset.kind = success ? 'success' : 'error';
+        if (success) {
+            m.status.textContent = result.deps_ok === false
+                ? 'setup.sh finished, but the dependency check still fails — see output above.'
+                : 'setup.sh finished. Enable the plugin and restart to load it.';
+            if (result.deps_ok !== false) {
+                m.enableBtn.hidden = plugin.enabled;
+                m.restartBtn.hidden = false;
+            }
+        } else {
+            m.status.textContent = `setup.sh exited with code ${result ? result.returncode : '?'} — see output above.`;
+        }
+
+        m.enableBtn.onclick = async () => {
+            m.enableBtn.disabled = true;
+            try {
+                const r = await fetch(`/api/plugins/${encodeURIComponent(plugin.id)}`, {
+                    method: 'PUT',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ enabled: true }),
+                });
+                if (!r.ok) {
+                    const b = await r.json().catch(() => ({}));
+                    m.status.dataset.kind = 'error';
+                    m.status.textContent = b.detail || `Enable failed (HTTP ${r.status}).`;
+                    m.enableBtn.disabled = false;
+                    return;
+                }
+                m.status.dataset.kind = 'success';
+                m.status.textContent = 'Enabled. Restart the service to load it.';
+                m.enableBtn.hidden = true;
+            } catch (_e) {
+                m.status.dataset.kind = 'error';
+                m.status.textContent = 'Enable failed (network error).';
+                m.enableBtn.disabled = false;
+            }
+        };
+        m.restartBtn.onclick = () => {
+            this._closeSetupModal();
+            this._restartService();
+        };
     }
 
     async _deletePlugin(plugin, button, resultEl) {

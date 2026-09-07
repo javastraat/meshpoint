@@ -19,7 +19,9 @@ implementation now. `enabled: false` by default like every shipped plugin.
 
 ## Enable it
 
-First run the setup step (`pip install lxmf` + install/enable `rnsd.service`):
+First run the setup step (`pip install lxmf` + install/enable `rnsd.service`) —
+either the **Run setup** button on the Settings → Plugins row (streams the
+output in a modal), or from a shell:
 
 ```sh
 sudo meshpoint plugin setup reticulum

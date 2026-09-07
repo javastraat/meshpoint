@@ -20,6 +20,16 @@ reported back as ``also_disabled`` so it's never a silent side effect.
 ``GET`` surfaces the same relationship per plugin as a ``dependency`` field
 so the UI can grey out a not-yet-enableable toggle before anyone touches it.
 
+A plugin that declares ``[deps] check`` gets an unprivileged "are its deps
+installed?" probe, run at boot by the loader and re-runnable on demand via
+``POST /api/plugins/{id}/check`` -- ``GET`` reports the verdict as
+``deps_ok`` / ``deps_detail``. ``POST /api/plugins/{id}/setup/stream`` runs
+the plugin's ``[deps] setup`` script (``sudo bash setup.sh``, same sudoers
+grant + audit as ``meshpoint plugin setup``) and streams its output back as
+NDJSON so an admin can install a plugin's system dependencies from the page
+without SSHing in; it re-probes ``check`` afterwards so the row clears
+itself.
+
 An admin can also delete a community plugin's folder outright (an
 "uninstall") -- refused for built-ins and for a ``locked`` community plugin
 (a shipped/bundled one, like ACARS, that ``git`` tracks; deleting it
@@ -30,12 +40,16 @@ plugin themes.
 
 from __future__ import annotations
 
+import asyncio
 import getpass
+import json
 import logging
 import shutil
+from collections.abc import AsyncIterator
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from src.api.audit import AuditLogWriter
@@ -55,10 +69,22 @@ _builtin_dir: Path | None = None
 _community_dir: Path | None = None
 _loaded_plugins: list[LoadedPlugin] = []
 # Fresher [deps]-check results than the boot-time snapshot on _loaded_plugins,
-# keyed by plugin id -- written by POST /api/plugins/{id}/check so an admin who
-# just ran setup on the device can clear the "setup needed" warning without a
-# full service restart. Lost on restart (boot re-runs every check); that's fine.
+# keyed by plugin id -- written by POST /api/plugins/{id}/check (and the setup
+# stream) so an admin who just ran setup on the device can clear the "setup
+# needed" warning without a full service restart. Lost on restart (boot re-runs
+# every check); that's fine.
 _deps_overrides: dict[str, tuple[bool | None, str]] = {}
+
+# Only one setup.sh at a time -- setup scripts are apt/pip/build steps that
+# already serialise on the dpkg lock; two in parallel just deadlock noisily.
+_setup_lock = asyncio.Lock()
+
+# setup.sh is apt-get + pip + from-source builds -- minutes, not seconds.
+_SETUP_TIMEOUT_S = 1800
+
+
+def _ndjson(payload: dict) -> bytes:
+    return (json.dumps(payload, separators=(",", ":")) + "\n").encode("utf-8")
 
 
 def init_routes(
@@ -320,6 +346,147 @@ async def recheck_plugin_deps(
     loaded_names = {p.manifest.name for p in _loaded_plugins}
     route_map = _route_map(discover_plugins(_builtin_dir, _community_dir))
     return {"checked": True, "plugin": _describe(manifest, loaded_names, route_map)}
+
+
+async def _stream_plugin_setup(
+    manifest: PluginManifest, audit: AuditLogWriter, user: str,
+) -> AsyncIterator[bytes]:
+    """Run ``sudo bash <plugin>/setup.sh`` and stream its stdout+stderr as
+    NDJSON lines (``{"type":"line","stream":...,"text":...}``), then a final
+    ``{"type":"result","result":{...}}``. Same wire shape the firmware
+    flashers use (``UpdateStreamClient.postNdjson`` on the client).
+
+    The absolute path matters: ``config/sudoers-meshpoint`` grants NOPASSWD
+    only for ``/bin/bash /opt/meshpoint/.../setup.sh`` as an absolute
+    pattern -- a relative argv (``config.dashboard.plugins_dir`` is
+    CWD-relative by convention) would silently fall back to a password
+    prompt and hang. Mirrors ``src.cli.plugin_command``'s own ``.resolve()``.
+    """
+    setup_path = manifest.setup_path
+    if setup_path is None:  # pragma: no cover - guarded by the caller
+        yield _ndjson({"type": "result", "result": {"returncode": -1, "success": False}})
+        return
+    cmd = ["sudo", "bash", str(setup_path.resolve())]
+
+    if _setup_lock.locked():
+        yield _ndjson({
+            "type": "line", "stream": "stderr",
+            "text": "Another plugin setup is already running -- try again once it finishes.",
+        })
+        yield _ndjson({"type": "result", "result": {"returncode": -1, "success": False}})
+        return
+
+    await _setup_lock.acquire()
+    try:
+        with audit.timed_action(
+            user=user, action="config.plugin_setup",
+            params={"plugin_id": manifest.name, "cmd": cmd},
+        ) as ctx:
+            async for chunk, result in _drive_setup(cmd, manifest):
+                if result is not None:
+                    ctx.set_result("success" if result.get("success") else "error")
+                yield chunk
+    finally:
+        _setup_lock.release()
+
+
+async def _drive_setup(cmd: list[str], manifest: PluginManifest):
+    """Spawn ``cmd``, yield ``(ndjson_bytes, result_dict_or_None)`` for every
+    line and the final result. Split out of :func:`_stream_plugin_setup` only
+    to keep the lock/audit wrapper readable."""
+    yield _ndjson({"type": "started", "cmd": cmd}), None
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+    except OSError as exc:
+        res = {"returncode": -1, "success": False}
+        yield _ndjson({"type": "line", "stream": "stderr", "text": str(exc)}), None
+        yield _ndjson({"type": "result", "result": res}), res
+        return
+
+    queue: asyncio.Queue = asyncio.Queue()
+
+    async def pump(stream, name: str) -> None:
+        if stream is not None:
+            while True:
+                line = await stream.readline()
+                if not line:
+                    break
+                await queue.put(
+                    (name, line.decode("utf-8", errors="replace").rstrip("\n")),
+                )
+        await queue.put(None)
+
+    tasks = [
+        asyncio.create_task(pump(proc.stdout, "stdout")),
+        asyncio.create_task(pump(proc.stderr, "stderr")),
+    ]
+    pending = len(tasks)
+    try:
+        while pending:
+            item = await asyncio.wait_for(queue.get(), timeout=_SETUP_TIMEOUT_S)
+            if item is None:
+                pending -= 1
+                continue
+            name, text = item
+            yield _ndjson({"type": "line", "stream": name, "text": text}), None
+        returncode = await asyncio.wait_for(proc.wait(), timeout=30)
+    except asyncio.TimeoutError:
+        proc.kill()
+        for t in tasks:
+            t.cancel()
+        res = {"returncode": -1, "success": False}
+        yield _ndjson({
+            "type": "line", "stream": "stderr",
+            "text": f"setup.sh timed out after {_SETUP_TIMEOUT_S // 60} min -- killed.",
+        }), None
+        yield _ndjson({"type": "result", "result": res}), res
+        return
+
+    for t in tasks:
+        await t
+
+    # Re-probe deps so the row updates without a restart (same as
+    # POST /{id}/check), and hand the verdict back in the result.
+    deps_ok: bool | None = None
+    if manifest.check is not None:
+        deps_ok, detail = run_deps_check(manifest)
+        _deps_overrides[manifest.name] = (deps_ok, detail)
+
+    res = {"returncode": returncode, "success": returncode == 0, "deps_ok": deps_ok}
+    logger.info(
+        "plugin %s setup finished rc=%s deps_ok=%s", manifest.name, returncode, deps_ok,
+    )
+    yield _ndjson({"type": "result", "result": res}), res
+
+
+@router.post("/{plugin_id}/setup/stream")
+async def run_plugin_setup_stream(
+    plugin_id: str,
+    claims: SessionClaims = Depends(require_admin),
+    audit: AuditLogWriter = Depends(get_audit_writer),
+) -> StreamingResponse:
+    """Run the plugin's ``[deps] setup`` script on the device (``sudo bash
+    setup.sh``) and stream its output back live, so an admin can install a
+    plugin's system dependencies from Settings -> Plugins without SSHing in.
+    Same thing ``meshpoint plugin setup <id>`` does from the CLI, same
+    sudoers grant, admin-only and audited. 400 if the plugin has no setup
+    script."""
+    if _config is None:
+        raise HTTPException(503, "Config not loaded")
+
+    manifest = _find_manifest(plugin_id)
+    if manifest.setup is None:
+        raise HTTPException(400, f"{plugin_id!r} has no [deps] setup script to run.")
+
+    return StreamingResponse(
+        _stream_plugin_setup(manifest, audit, claims.subject),
+        media_type="application/x-ndjson",
+        headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
+    )
 
 
 @router.delete("/{plugin_id}")
