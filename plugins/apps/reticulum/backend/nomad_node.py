@@ -50,7 +50,7 @@ except ImportError:
     RNS = None
 
 _STATS_REFRESH_S = 60  # info.mu shows CPU temp / load / 24h counts -- keep it fresh
-_SPACEAPI_REFRESH_S = 300  # is-the-space-open doesn't move fast; be polite
+_SPACEAPI_TTL_S = 120  # serve the cached status within this; refresh lazily when older
 
 # Token an operator can drop into any of their own .mu pages -- replaced at
 # serve time with a colour-coded OPEN / CLOSED / unknown word (only when a
@@ -107,11 +107,13 @@ class NomadNode:
         self._spaceapi_url = spaceapi_url
 
         self._destination = None
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._announce_task: Optional[asyncio.Task] = None
         self._stats_task: Optional[asyncio.Task] = None
-        self._spaceapi_task: Optional[asyncio.Task] = None
         self._stats: dict = {}
         self._spaceapi: dict = {}  # last good SpaceAPI fetch, {} until one lands
+        self._spaceapi_fetched_at = 0.0  # monotonic; 0 = never
+        self._spaceapi_refreshing = False
         self._last_announce: Optional[float] = None
         self._requests_served = 0
 
@@ -127,6 +129,7 @@ class NomadNode:
             "nomadnetwork", "node",
         )
         self._destination.set_link_established_callback(self._on_link)
+        self._loop = asyncio.get_running_loop()
         self._register_handlers()
 
         if self._stats_provider is not None:
@@ -134,10 +137,10 @@ class NomadNode:
             self._stats_task = asyncio.get_running_loop().create_task(self._stats_loop())
 
         if self._spaceapi_url:
+            # One priming fetch so the first visitor sees a real status; after
+            # that it's refreshed lazily, only when a page that needs it is
+            # actually requested (see _spaceapi_maybe_refresh) -- no timer.
             await self._refresh_spaceapi()
-            self._spaceapi_task = asyncio.get_running_loop().create_task(
-                self._spaceapi_loop()
-            )
 
         self._announce()
         self._announce_task = asyncio.get_running_loop().create_task(self._announce_loop())
@@ -147,11 +150,12 @@ class NomadNode:
         )
 
     async def stop(self) -> None:
-        for task in (self._announce_task, self._stats_task, self._spaceapi_task):
+        for task in (self._announce_task, self._stats_task):
             if task:
                 task.cancel()
-        self._announce_task = self._stats_task = self._spaceapi_task = None
+        self._announce_task = self._stats_task = None
         self._destination = None
+        self._loop = None
 
     def status(self) -> dict:
         return {
@@ -280,10 +284,21 @@ class NomadNode:
         except Exception:  # noqa: BLE001
             logger.debug("NomadNet node stats refresh failed", exc_info=True)
 
-    async def _spaceapi_loop(self) -> None:
-        while True:
-            await asyncio.sleep(_SPACEAPI_REFRESH_S)
-            await self._refresh_spaceapi()
+    def _spaceapi_maybe_refresh(self) -> None:
+        """Called from an RNS request thread. If the cached SpaceAPI status is
+        missing or older than ``_SPACEAPI_TTL_S``, kick a background refresh on
+        the event loop and return immediately -- the request in hand is always
+        served from cache, never blocked on the HTTP fetch. If nobody browses a
+        page that needs the status, we never poll the endpoint at all."""
+        if not self._spaceapi_url or self._spaceapi_refreshing or self._loop is None:
+            return
+        age = time.monotonic() - self._spaceapi_fetched_at
+        if self._spaceapi and age < _SPACEAPI_TTL_S:
+            return
+        self._spaceapi_refreshing = True
+        self._loop.call_soon_threadsafe(
+            lambda: self._loop.create_task(self._refresh_spaceapi())
+        )
 
     async def _refresh_spaceapi(self) -> None:
         try:
@@ -293,6 +308,11 @@ class NomadNode:
                 self._spaceapi = result
         except Exception:  # noqa: BLE001
             logger.debug("SpaceAPI refresh failed", exc_info=True)
+        finally:
+            # Stamp even on failure so a flapping endpoint isn't hammered every
+            # request -- we retry no sooner than one TTL from now.
+            self._spaceapi_fetched_at = time.monotonic()
+            self._spaceapi_refreshing = False
 
     def _spaceapi_word(self) -> str:
         """Colour-coded OPEN / CLOSED / unknown, as a Micron fragment."""
@@ -317,6 +337,7 @@ class NomadNode:
                 not is_file and self._spaceapi_url
                 and _SPACESTATE_TOKEN in body
             ):
+                self._spaceapi_maybe_refresh()
                 body = body.replace(
                     _SPACESTATE_TOKEN, self._spaceapi_word().encode("utf-8"),
                 )
@@ -451,9 +472,12 @@ class NomadNode:
 
     def _serve_spacestate(self, request_path, data, request_id, link_id, remote_identity, requested_at):
         """Hackerspace status from the configured SpaceAPI endpoint -- only
-        registered when ``node_spaceapi_url`` is set. Served from the
-        cached last-good fetch (``_spaceapi_loop`` refreshes it)."""
+        registered when ``node_spaceapi_url`` is set. Served from the cached
+        last-good fetch; viewing this page is what triggers a lazy refresh
+        (``_spaceapi_maybe_refresh``), so a stale value here self-heals on the
+        next load."""
         self._requests_served += 1
+        self._spaceapi_maybe_refresh()
         s = self._spaceapi or {}
         name = _esc(s.get("space") or "This space")
 

@@ -171,6 +171,43 @@ class TestNomadNode(unittest.TestCase):
             self.assertIn("`F0a0`!OPEN`!`f", body.decode())
             self.assertNotIn("{spacestate}", body.decode())
 
+    def test_spacestate_lazy_refresh_scheduled_when_stale(self) -> None:
+        n = self._node(spaceapi_url="https://x")
+        n._spaceapi = {"open": True}          # have a value...
+        n._spaceapi_fetched_at = 0.0          # ...but it's ancient -> stale
+
+        scheduled: list = []
+
+        class _FakeLoop:
+            def call_soon_threadsafe(self, fn, *a):
+                scheduled.append(fn)
+
+            def create_task(self, coro):
+                coro.close()
+
+        n._loop = _FakeLoop()
+        n._serve_spacestate("/page/spacestate.mu", None, 1, 1, None, 0)
+        self.assertEqual(len(scheduled), 1)          # a refresh was kicked
+        self.assertTrue(n._spaceapi_refreshing)      # and de-duped until it lands
+
+        scheduled.clear()
+        n._serve_spacestate("/page/spacestate.mu", None, 1, 1, None, 0)
+        self.assertEqual(scheduled, [])              # second hit doesn't stack
+
+    def test_spacestate_no_refresh_when_cache_fresh(self) -> None:
+        import time as _t
+
+        n = self._node(spaceapi_url="https://x")
+        n._spaceapi = {"open": True}
+        n._spaceapi_fetched_at = _t.monotonic()      # just fetched
+
+        class _BoomLoop:
+            def call_soon_threadsafe(self, *a):
+                raise AssertionError("should not schedule a refresh")
+
+        n._loop = _BoomLoop()
+        n._serve_spacestate("/page/spacestate.mu", None, 1, 1, None, 0)
+
     def test_spacestate_token_left_alone_when_no_url(self) -> None:
         import tempfile
         from pathlib import Path

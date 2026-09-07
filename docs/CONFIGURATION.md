@@ -253,11 +253,13 @@ plugins:
 
 `node_spaceapi_url` (optional, also on the Settings tab) points at a
 [SpaceAPI](https://spaceapi.io) endpoint (`directory.spaceapi.io` lists
-them). When set, the node fetches it every 5 min and serves a generated
-**`/page/spacestate.mu`** (open/closed + address + IRC/e-mail), and any of
-your own `.mu` pages can use a **`{spacestate}`** token that's replaced at
-serve time with a colour-coded `OPEN` / `CLOSED` / `unknown`. Blank = none
-of that exists.
+them). When set, the node serves a generated **`/page/spacestate.mu`**
+(open/closed + address + IRC/e-mail), and any of your own `.mu` pages can
+use a **`{spacestate}`** token that's replaced at serve time with a
+colour-coded `OPEN` / `CLOSED` / `unknown`. The status is fetched once at
+startup, then lazily — only when a page that needs it is requested, cached
+2 min — so an unbrowsed node never polls the endpoint. Blank = none of
+that exists.
 
 Registers a `nomadnetwork.node` destination on the *same identity* as your
 LXMF address, announces it, and serves a built-in `/page/index.mu` (a

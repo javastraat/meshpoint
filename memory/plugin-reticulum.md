@@ -700,8 +700,16 @@ open, no events feed). Built (Settings-tab visibility, user picked option 1):
   `state.lastchange` vs top). De-obfuscates `a AT b DOT c`. Returns
   `{space, open(bool|None), message, lastchange, address, url, irc, email, ml}`.
 - **`state.py`**: `node_spaceapi_url: ""` in _DEFAULTS + `node_config()["spaceapi_url"]`.
-- **`nomad_node.py`**: `NomadNode(spaceapi_url=)`, `_spaceapi` last-good cache +
-  `_spaceapi_task`/`_spaceapi_loop` (300s, `asyncio.to_thread(spaceapi.fetch)`),
+- **`nomad_node.py`**: `NomadNode(spaceapi_url=)`, `_spaceapi` last-good cache.
+  **LAZY refresh (no timer)** — one priming `_refresh_spaceapi()` in `start()`,
+  then `_spaceapi_maybe_refresh()` called from the RNS request thread by
+  `_serve_spacestate` + the `{spacestate}` path in `_make_file_server`: if cache
+  empty or older than `_SPACEAPI_TTL_S` (120s) and not already `_spaceapi_refreshing`,
+  `self._loop.call_soon_threadsafe(... create_task(_refresh_spaceapi()))` and
+  serve cache immediately (never blocks the response on the 8s urllib call).
+  `_refresh_spaceapi` stamps `_spaceapi_fetched_at` in `finally` even on failure
+  (flap backoff). `self._loop` set in `start()`, cleared in `stop()`. An unbrowsed
+  node never hits the endpoint.
   `_spaceapi_word()` -> `` `F0a0`!OPEN`!`f `` / `` `Fd44`!CLOSED`!`f `` /
   `` `F888unknown`f ``. `_serve_spacestate` generated page (registered only
   when url set, excluded from operator .mu loop like info/nodes). `_make_file_server`
@@ -712,8 +720,9 @@ open, no events feed). Built (Settings-tab visibility, user picked option 1):
   (blank or http(s)) + write dict.
 - **`reticulum_settings_tab.js`**: "SpaceAPI URL (optional)" input in node-hosting
   fieldset, `data-rt-node-spaceapi`, wired render/_onSubmit.
-- Tests: `test_spaceapi.py` (6), `test_nomad_node.py` +4 (serve + token +
-  gating). 72 reticulum backend pass.
+- Tests: `test_spaceapi.py` (6), `test_nomad_node.py` +6 (serve + token +
+  gating + lazy-refresh scheduled-when-stale / not-when-fresh). 74 reticulum
+  backend pass.
 - Docs: CHANGELOG (92), plugin README + CONFIGURATION.md node blocks.
 - BBS: `index.mu` gets "The space is right now: {spacestate}" + menu item
   "Space status" -> :/page/spacestate.mu; sample-bbs README widget section.

@@ -189,13 +189,15 @@ plugins:
 ```
 
 `node_spaceapi_url` (optional, also on the Settings tab): a
-[SpaceAPI](https://spaceapi.io) endpoint. Set it and the node fetches it
-every 5 min (cached), serves a generated `/page/spacestate.mu`
-(open/closed + address + contacts), and replaces a `{spacestate}` token in
-any of your own `.mu` pages with a colour-coded `OPEN` / `CLOSED` /
-`unknown` word. Find your space's URL at `directory.spaceapi.io`. The
-`{spacestate}` substitution only happens when the node serves the page —
-the dashboard preview shows the raw token.
+[SpaceAPI](https://spaceapi.io) endpoint. Set it and the node serves a
+generated `/page/spacestate.mu` (open/closed + address + contacts) and
+replaces a `{spacestate}` token in any of your own `.mu` pages with a
+colour-coded `OPEN` / `CLOSED` / `unknown` word. The status is fetched
+once at startup and then **only when someone actually loads a page that
+needs it** — never on a timer — and cached for 2 min, so an idle node
+never touches the endpoint. Find your space's URL at
+`directory.spaceapi.io`. The `{spacestate}` substitution only happens when
+the node serves the page — the dashboard preview shows the raw token.
 
 `GET /api/reticulum/status` reports the live `node` block
 (`hosting`, `name`, `pages`, `requests_served`, `last_announce_s_ago`).
