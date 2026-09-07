@@ -797,10 +797,12 @@ sorted DTSTART desc, limit=100. Built to mirror SpaceAPI exactly:
   field, added to `_feed_url_ok` validator, write dict. **`__init__.py`**:
   `notify_url=state.notify_url()`.
 - **`reticulum_panel.js`**: new "Activity" tab (`data-rt-tab="announces"`, no
-  admin gate). `_announces` array, `_loadAnnounces`/`_renderAnnounces`,
-  `_onWsAnnounce(entry)` unshift+cap 200 + re-render if active. `_load()` also
-  refreshes announces when that tab is active. Tab restore allows 'announces'.
-  `RT_ASPECT_BADGES['call.audio']='mt-badge--routing'`.
+  admin gate), between Peers and Messages. `_announces` array,
+  `_loadAnnounces`/`_renderAnnounces`, `_onWsAnnounce(entry)` unshift+cap 200 +
+  re-render if active. `_load()` also refreshes announces when that tab is
+  active. Tab restore allows 'announces'.
+  `RT_ASPECT_BADGES['call.audio']='mt-badge--routing'`. `nomadnetwork.node`
+  rows get the same `data-rt-browse` -> `browseNode()` button as `_renderPeers`.
 - **`reticulum_settings_tab.js`**: new "Message notifications" fieldset,
   `data-rt-notify-url`, wired render/_onSubmit.
 - Tests: `test_notify.py` (6), `test_lxmf_service.py` +7 (TestAnnounceLog x4,

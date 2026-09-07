@@ -111,9 +111,9 @@ class ReticulumPanel {
                             <button class="lw-tab" type="button" role="tab"
                                     data-rt-tab="peers">Peers</button>
                             <button class="lw-tab" type="button" role="tab"
-                                    data-rt-tab="messages">Messages</button>
-                            <button class="lw-tab" type="button" role="tab"
                                     data-rt-tab="announces">Activity</button>
+                            <button class="lw-tab" type="button" role="tab"
+                                    data-rt-tab="messages">Messages</button>
                             <button class="lw-tab" type="button" role="tab"
                                     data-rt-tab="send" ${this._isAdmin ? '' : 'hidden'}>Send</button>
                             <button class="lw-tab" type="button" role="tab"
@@ -561,9 +561,17 @@ class ReticulumPanel {
                 <td class="lw-time">${this._fmtTime(a.ts)}</td>
                 <td class="mt-name">${this._esc(a.display_name || '--')}</td>
                 <td class="lw-id">${this._esc(a.destination_hash)}</td>
-                <td>${this._fmtAspect(a.aspect)}</td>
+                <td>${this._fmtAspect(a.aspect)}${
+                    a.aspect === 'nomadnetwork.node' && this._isAdmin
+                        ? ` <button type="button" class="lw-link-btn" data-rt-browse="${this._esc(a.destination_hash)}">Browse</button>`
+                        : ''
+                }</td>
             </tr>
         `).join('');
+
+        tbody.querySelectorAll('[data-rt-browse]').forEach((btn) => {
+            btn.addEventListener('click', () => this.browseNode(btn.dataset.rtBrowse));
+        });
     }
 
     async _handleAnnounce() {

@@ -131,7 +131,8 @@ in-memory ring buffer (200 entries, `GET /api/reticulum/announces`), fed
 live over the `reticulum_announce` WebSocket event, and gone on restart.
 The **Peers** tab is the deduped roster; `call.audio` is Activity-only so
 it doesn't pad the roster with every Sideband/MeshChat user on the public
-network.
+network. `nomadnetwork.node` rows carry the same **Browse** button the
+Peers tab has (admin only).
 
 ## Message notifications (opt-in)
 
