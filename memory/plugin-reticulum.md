@@ -675,3 +675,14 @@ helper on `ReticulumNodePagesTab` -> `window.confirmModal({label,description})`
 (the dashboard's DangerousModal, loaded globally via index.html), native
 fallback. (User also hand-edited the index.mu blurb "-- it captures" ->
 ". It captures"; test assertion updated to match.)
+
+**sample-bbs-techinc/ (uncommitted).** User wants a real deployable NomadNet
+"BBS" for the TechInc node. New folder `plugins/apps/reticulum/sample-bbs-techinc/`:
+index.mu (figlet splash + numbered main menu), techinc.mu, mesh.mu,
+bulletins.mu, links.mu (all cross-linked `:/page/x.mu`), + README.md deploy
+guide. All 5 pass the MicronParser via a DOM-shim (/tmp/micron_test.js pattern).
+Real TechInc facts from web search (wiki.techinc.nl is behind Anubis): Louwesweg 1
+1066 EA Amsterdam / ACTA building, Wednesday 19:30 open evening, member-funded
+association, network@techinc.nl. `[EDIT]` markers everywhere for adaptation.
+Micron notes baked into the README (`c per-line centring, 3-hex `F, no backticks
+in art). CHANGELOG + plugin README updated.

@@ -168,7 +168,10 @@ generated); pages are always written non-executable, so "dynamic pages"
 button drops in `sample-pages/index.mu`.
 
 `sample-pages/index.mu` is a copy-me starter page with a Micron cheat-sheet
-in its header. On the Pi the pages dir is
+in its header. `sample-bbs-techinc/` is a fuller worked example — a small
+read-only "BBS" (splash + `techinc.mu` / `mesh.mu` / `bulletins.mu` /
+`links.mu`, all cross-linked), TechInc-flavoured with `[EDIT]` markers;
+see its own README to deploy + adapt. On the Pi the pages dir is
 `/opt/meshpoint/data/reticulum/pages/` (relative to the service's
 `WorkingDirectory`) and isn't auto-created — the Pages tab creates it on
 first save. Editing a `.mu` file **on disk** (SSH) is picked up per
