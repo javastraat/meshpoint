@@ -150,9 +150,13 @@ answers `Link`/`Request` with:
 
 While a node is hosting, the Reticulum page grows a **Pages** tab (admin
 only): a list of the `.mu` files in `node_pages_dir`, a raw-Micron editor
-with a small formatting toolbar (bold/underline/italic/colour/headings/
-centre/divider/link — wraps the selection where that makes sense), and a
-live preview rendered by the same parser the Browse tab uses. Save
+with a formatting toolbar (bold/underline/italic, fg + bg colour, H1–H3,
+left/centre/right align, divider, link, emoji, a box-drawing/symbols
+palette, and text-field / checkbox / radio — inserts at the cursor or
+wraps the selection), and a live preview
+rendered by the same parser the Browse tab uses. (The field widgets
+render but only submit to an *executable* NomadNet page, so a form on
+your own node's page is display-only unless it POSTs elsewhere.) Save
 (`PUT /api/reticulum/nomad/pages/{name}`) writes the file and re-registers
 the node's request handlers, so a new or edited page is served
 immediately — no restart. `info.mu` / `nodes.mu` are refused (they're

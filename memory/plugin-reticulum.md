@@ -615,3 +615,15 @@ selection-aware (`` `!sel`! ``, `` `Fxxx sel`f ``, `` `c sel `a ``);
 `_setToolbarEnabled(on)` toggles with `_srcEl.disabled` (open/new/delete).
 Native `<input type=color>` default `#3388ff`. CSS `.rt-pages__toolbar*`.
 No backend/endpoint. CHANGELOG 91, README + file docstring updated.
+
+**Toolbar parity pass (uncommitted).** Compared to fr33n0w/micron-composer,
+added: H3, bg colour swatch (`data-mu-color="bg"` -> `` `Bxxx`b ``), left/
+right align (`` `l ``/`` `r `` wrapping `` `a ``), Field (`` `<name`> ``),
+Checkbox (`` `<?|slug|1`Label> ``), Radio (`` `<^|choice|slug`Label> ``),
+emoji picker + ASCII/box-drawing palette (both `_buildCharMenu(sel, chars)`
+dropdowns, one open at a time, close-on-outside-click). `_insertText(str)`
+for plain-char insert. NOT copied: "Magic" = micron-composer's experimental
+AI page-beautify (needs an LLM call -> doesn't fit an offline edge device).
+Field/checkbox/radio widgets render but only submit to an *executable*
+NomadNet page -- noted in docstring/README/CHANGELOG since our node serves
+plain files.

@@ -3,12 +3,20 @@
  * files a hosted NomadNet node serves (`plugins.reticulum.node_pages_dir`).
  *
  * Only shown when node hosting is on. Left: the file list (`index.mu`
- * first) + New. Right: a small Micron formatting toolbar (bold/underline/
- * italic/colour/headings/centre/divider/link -- selection-aware where it
- * makes sense), a textarea of raw Micron, and a live preview rendered by
- * the same `window.MicronParser` the Browse tab uses. Save PUTs
- * `/api/reticulum/nomad/pages/{name}`; the backend re-registers the node's
- * request handlers so a new page is served without a restart.
+ * first) + New. Right: a Micron formatting toolbar, a textarea of raw
+ * Micron, and a live preview rendered by the same `window.MicronParser`
+ * the Browse tab uses. Save PUTs `/api/reticulum/nomad/pages/{name}`; the
+ * backend re-registers the node's request handlers so a new page is served
+ * without a restart.
+ *
+ * Toolbar: bold/underline/italic, fg + bg colour (native picker ->
+ * nearest 3-hex), H1/H2/H3, left/centre/right align, divider, link,
+ * an emoji picker, a box-drawing/symbols palette, and the
+ * interactive-field trio (text field / checkbox / radio).
+ * Each inserts the Micron code at the cursor or wraps the selection.
+ * Note the field/checkbox/radio widgets render but only *submit* to an
+ * executable NomadNet page -- this node serves plain files, so a form on
+ * your own page is display-only unless it POSTs to another node.
  *
  * Plain fetch()-driven, same shape as reticulum_settings_tab.js.
  */
@@ -64,15 +72,34 @@ class ReticulumNodePagesTab {
                         <button type="button" data-mu="italic" title="Italic (\`*)"><i>I</i></button>
                         <label class="rt-pages__tb-color" title="Text colour (\`F)">
                             <span>A</span>
-                            <input type="color" data-mu-color value="#3388ff" aria-label="Text colour">
+                            <input type="color" data-mu-color="fg" value="#3388ff" aria-label="Text colour">
+                        </label>
+                        <label class="rt-pages__tb-color" title="Background colour (\`B)">
+                            <span>▚</span>
+                            <input type="color" data-mu-color="bg" value="#222222" aria-label="Background colour">
                         </label>
                         <span class="rt-pages__tb-sep"></span>
                         <button type="button" data-mu="h1" title="Heading (&gt;)">H1</button>
                         <button type="button" data-mu="h2" title="Sub-heading (&gt;&gt;)">H2</button>
+                        <button type="button" data-mu="h3" title="Sub-sub-heading (&gt;&gt;&gt;)">H3</button>
+                        <button type="button" data-mu="left" title="Left align (\`l)">◀</button>
                         <button type="button" data-mu="center" title="Centre (\`c … \`a)">↔</button>
+                        <button type="button" data-mu="right" title="Right align (\`r)">▶</button>
                         <button type="button" data-mu="divider" title="Divider (-)">─</button>
                         <span class="rt-pages__tb-sep"></span>
                         <button type="button" data-mu="link" title="Link (\`[label\`url])">🔗</button>
+                        <button type="button" data-mu="field" title="Text input field">Field</button>
+                        <button type="button" data-mu="checkbox" title="Checkbox">☑</button>
+                        <button type="button" data-mu="radio" title="Radio button">◉</button>
+                        <span class="rt-pages__tb-emoji">
+                            <button type="button" data-mu-emoji-toggle title="Insert emoji">😀</button>
+                            <div class="rt-pages__tb-emoji-menu" data-mu-emoji-menu hidden></div>
+                        </span>
+                        <span class="rt-pages__tb-emoji">
+                            <button type="button" data-mu-ascii-toggle title="Box-drawing &amp; symbols">▛</button>
+                            <div class="rt-pages__tb-emoji-menu rt-pages__tb-ascii-menu" data-mu-ascii-menu hidden></div>
+                        </span>
+                        <span class="rt-pages__tb-sep"></span>
                         <button type="button" data-mu="reset" title="Reset formatting (\`\`)">⌫</button>
                     </div>
                     <div class="rt-pages__split">
@@ -115,8 +142,49 @@ class ReticulumNodePagesTab {
             const btn = e.target.closest('[data-mu]');
             if (btn) this._insertMarkup(btn.dataset.mu);
         });
-        this._q('[data-mu-color]').addEventListener('change', (e) => {
-            this._insertMarkup('color', e.target.value);
+        this._el.querySelectorAll('[data-mu-color]').forEach((inp) => {
+            inp.addEventListener('change', (e) => {
+                this._insertMarkup(e.target.dataset.muColor === 'bg' ? 'bgcolor' : 'color', e.target.value);
+            });
+        });
+        this._buildCharMenu('[data-mu-emoji-menu]', [
+            '📡', '📻', '🛰️', '🌐', '🔗', '⚡', '📶', '🔋', '🖥️', '💾',
+            '📍', '🗺️', '🧭', '⭐', '✅', '❌', '⚠️', 'ℹ️', '➡️', '⬅️',
+            '🔒', '🔓', '🐧', '🍓', '🤝', '👋', '🎛️', '🔧', '📊', '🕒',
+        ]);
+        this._buildCharMenu('[data-mu-ascii-menu]', [
+            '─', '│', '┌', '┐', '└', '┘', '├', '┤', '┬', '┴', '┼',
+            '═', '║', '╔', '╗', '╚', '╝', '╠', '╣', '╦', '╩', '╬',
+            '█', '▓', '▒', '░', '▀', '▄', '▌', '▐', '■', '□',
+            '→', '←', '↑', '↓', '↔', '»', '«', '•', '·', '°',
+        ]);
+        this._el.querySelectorAll('[data-mu-emoji-toggle], [data-mu-ascii-toggle]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const menu = btn.parentElement.querySelector('.rt-pages__tb-emoji-menu');
+                const wasHidden = menu.hidden;
+                this._el.querySelectorAll('.rt-pages__tb-emoji-menu').forEach((m) => { m.hidden = true; });
+                menu.hidden = !wasHidden;
+            });
+        });
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.rt-pages__tb-emoji')) {
+                this._el.querySelectorAll('.rt-pages__tb-emoji-menu').forEach((m) => { m.hidden = true; });
+            }
+        });
+    }
+
+    _buildCharMenu(sel, chars) {
+        const menu = this._q(sel);
+        if (!menu) return;
+        chars.forEach((ch) => {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.textContent = ch;
+            b.addEventListener('click', () => {
+                menu.hidden = true;
+                this._insertText(ch);
+            });
+            menu.appendChild(b);
         });
     }
 
@@ -311,15 +379,21 @@ class ReticulumNodePagesTab {
             caret = start + prefix.length + 1;
         };
 
+        const slug = (s) => (s || 'name').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'name';
+
         switch (kind) {
         case 'bold': wrap('`!', '`!'); break;
         case 'underline': wrap('`_', '`_'); break;
         case 'italic': wrap('`*', '`*'); break;
         case 'reset': wrap('``', '``'); break;
+        case 'left': wrap('`l', '`a'); break;
         case 'center': wrap('`c', '`a'); break;
+        case 'right': wrap('`r', '`a'); break;
         case 'color': wrap('`F' + this._to3hex(colorHex), '`f'); break;
+        case 'bgcolor': wrap('`B' + this._to3hex(colorHex), '`b'); break;
         case 'h1': linePrefix('>'); break;
         case 'h2': linePrefix('>>'); break;
+        case 'h3': linePrefix('>>>'); break;
         case 'divider': {
             const onOwnLine = start === 0 || val[start - 1] === '\n';
             out = (onOwnLine ? '' : '\n') + '-\n';
@@ -337,6 +411,27 @@ class ReticulumNodePagesTab {
             caret = start + out.length;
             break;
         }
+        case 'field': {
+            const name = window.prompt('Field name (submitted as var_<name>):', 'message');
+            if (name == null) return;
+            out = '`<' + slug(name) + '`>';
+            caret = start + out.length;
+            break;
+        }
+        case 'checkbox': {
+            const label = window.prompt('Checkbox label:', sel || 'I agree');
+            if (label == null) return;
+            out = '`<?|' + slug(label) + '|1`' + label + '>';
+            caret = start + out.length;
+            break;
+        }
+        case 'radio': {
+            const label = window.prompt("Radio option label (group 'choice'):", sel || 'Option A');
+            if (label == null) return;
+            out = '`<^|choice|' + slug(label) + '`' + label + '>';
+            caret = start + out.length;
+            break;
+        }
         default: return;
         }
 
@@ -345,6 +440,19 @@ class ReticulumNodePagesTab {
         }
         ta.focus();
         if (caret != null) ta.setSelectionRange(caret, caret);
+        this._dirty = true;
+        this._saveBtn.disabled = !!(this._current?.isNew && !this._nameEl.value.trim());
+        this._renderPreview();
+    }
+
+    /** Drop plain text at the cursor (emoji picker). */
+    _insertText(str) {
+        const ta = this._srcEl;
+        if (ta.disabled) return;
+        const { selectionStart: s, selectionEnd: e, value: v } = ta;
+        ta.value = v.slice(0, s) + str + v.slice(e);
+        ta.focus();
+        ta.setSelectionRange(s + str.length, s + str.length);
         this._dirty = true;
         this._saveBtn.disabled = !!(this._current?.isNew && !this._nameEl.value.trim());
         this._renderPreview();
