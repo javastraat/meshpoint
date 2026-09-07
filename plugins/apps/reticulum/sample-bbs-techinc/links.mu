@@ -1,24 +1,23 @@
 #!c=1
 # TechInc Mesh BBS -- Other nodes & links (links.mu)
 #
-# NomadNet node links need the target's destination hash:
-#   `[Their Board`<32-hex-hash>:/page/index.mu]
-# Paste hashes you actually have. Names without a link are ones to
-# search for in your own node picker.
+# A NomadNet node link is:  `[Their Board`<32-hex-hash>:/page/index.mu]
+# Find a node's hash in the Browse tab's picker (or its announce), paste
+# it in, done. [EDIT] the list for nodes you actually like.
 
 `F38f`!TechInc Mesh BBS`!`f  `F888//`f  `!Other nodes & links`!
 ========================================================
 
 >Nodes worth a visit                                    [EDIT]
 
-Search these in the Browse tab's node filter, then add the hash
-to turn them into links:
+`[Reticulum Netherlands`4c16d2fb33d98f7fb44b8fa7947ea325:/page/index.mu]
+`[RNS Berlin Community`cca2bf8ed88ebdf19e90cdee35bfe95a:/page/index.mu]
+`[Reticulum Community Wiki`72a2d9c12215802605779f4366d48335:/page/index.mu]
+`[RNS.recipes Forum`9ce92808be498e9e05590ff27cbfdfe4:/page/index.mu]
 
-  Reticulum Netherlands
-  RNS Berlin Community
+Also out there -- find the hash in your node picker to link them:
+
   Rhein-Main RNS
-  Reticulum Community Wiki
-  RNS.recipes Forum
   Notes from the Mesh
 
 >Reticulum resources

@@ -17,8 +17,8 @@ address.
 
 `F888Meshtastic  `f: 869.525 MHz   preset LongFast
 `F888MeshCore    `f: 869.618 MHz
-`F888POCSAG/pager `f: 869.4625 MHz  (DAPNET / P2000 monitoring)
 `F888Reticulum   `f: 869.463 MHz   (RNode, plus a TCP backbone)
+#`F888POCSAG/pager `f: 869.4625 MHz  (DAPNET / P2000 monitoring)
 
 >Reach this node
 

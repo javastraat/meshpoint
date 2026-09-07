@@ -9,8 +9,8 @@
 
 `*Meshpoint`* is an edge radio + mesh gateway with a web
 dashboard. It runs on a Raspberry Pi, listens on real hardware
--- an 868 MHz LoRa concentrator, an RNode, and a cheap RTL-SDR
-dongle -- decodes what it hears, stores it, and serves it up
+an 868 MHz LoRa concentrator, an RNode, and a cheap RTL-SDR
+dongle and decodes what it hears, stores it, and serves it up
 locally. No cloud, no account, no phone-home. One install
 script, then it just sits there and listens.
 
@@ -44,9 +44,9 @@ loud right now" view, and a noise-floor trace on the dashboard.
 
 >Reticulum / LXMF
 
-`*Meshpoint`* attaches to a local `rnsd` as a client: an LXMF
+`*Meshpoint`* attaches to a local `*rnsd`* as a client: an LXMF
 inbox, a peer roster built from announces, a NomadNet browser,
-and -- when node hosting is on -- this very BBS. All on one
+and when node hosting is on this very BBS. All on one
 identity: browse it and message it on the same hash.
 
 >The dashboard
@@ -58,8 +58,12 @@ above is a plugin you enable per node).
 
 >Open source
 
-`*Meshpoint`* is a fork, developed in the open, Raspberry Pi OS.
+`!Meshpoint`! is free software under the `!GNU AGPL v3`!,
+developed in the open on GitHub, and installs on Raspberry Pi
+OS from a single script. Run it, study it, fork it -- if you
+run a changed version that others use, share those changes back.
 
+`F888Licence`f: AGPL-3.0
 `F888Source `f: `[github.com/KMX415/meshpoint`https://github.com/KMX415/meshpoint]
 `F888Stats  `f: `[this node's live numbers`:/page/info.mu]
 
