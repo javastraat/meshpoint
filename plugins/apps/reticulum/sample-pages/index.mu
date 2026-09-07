@@ -48,7 +48,7 @@ You can browse this node here `!and`! message it over LXMF on the same hash.
 
 `[Live stats & nodes heard`:/page/info.mu]
 `[Nodes this Meshpoint has heard`:/page/nodes.mu]
-`[Meshpoint on GitHub`https://github.com/javastraat/meshpoint]
+`[Meshpoint on GitHub`https://github.com/KMX415/meshpoint]
 
 >Contact
 

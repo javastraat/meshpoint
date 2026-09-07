@@ -158,8 +158,12 @@
     width: 100%;
     min-height: 340px;
     resize: vertical;
-    background: var(--bg, #111);
-    color: inherit;
+    /* Matches the preview pane -- both are "terminal" surfaces. Colours are
+       explicit on purpose: --bg-elevated has no light-theme value, and a
+       bare `color: inherit` renders dark-on-dark (invisible) in light mode. */
+    background: var(--bg-elevated, #1a1a1a);
+    color: #d7dae0;
+    caret-color: #d7dae0;
     border: 1px solid var(--border, #333);
     border-radius: 6px;
     padding: 10px 12px;
@@ -167,6 +171,8 @@
     font-size: 13px;
     line-height: 1.5;
 }
+
+.rt-pages__src::placeholder { color: #7a7f8a; }
 
 .rt-pages__preview {
     min-height: 340px;

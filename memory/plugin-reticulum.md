@@ -521,3 +521,12 @@ FOUND + FIXED a bug in `sample-pages/index.mu`: the Contact block used
 updated to point at the Pages tab / Load sample; hardware line ->
 "<your hardware>". Anyone who used the old sample must re-Load-sample + Save
 (or hand-fix those 3 lines). Still uncommitted.
+
+**Light-mode fix (same uncommitted batch)**: `.rt-pages__src` textarea was
+`background: var(--bg, #111)` (--bg undefined -> always #111 dark) +
+`color: inherit` -> dark-on-dark, invisible editor text in light mode. Now
+explicit `background: var(--bg-elevated, #1a1a1a)` + `color: #d7dae0` +
+`caret-color` + `::placeholder` -- editor is a dark "terminal" surface
+matching the preview pane in every theme. (`--bg-elevated` has no light
+value either but the fg is now explicit so it's fine.) User confirmed the
+sample Contact-block fix renders correctly ("operator : YOURCALL").
