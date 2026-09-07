@@ -11,8 +11,8 @@
  *
  * Toolbar: bold/underline/italic, fg + bg colour (native picker ->
  * nearest 3-hex), H1/H2/H3, left/centre/right align, divider, link,
- * an emoji picker, a box-drawing/symbols palette, and the
- * interactive-field trio (text field / checkbox / radio).
+ * an emoji picker, a box-drawing/symbols palette, the interactive-field
+ * trio (text field / checkbox / radio), and a ? cheat-sheet popover.
  * Each inserts the Micron code at the cursor or wraps the selection.
  * Note the field/checkbox/radio widgets render but only *submit* to an
  * executable NomadNet page -- this node serves plain files, so a form on
@@ -101,6 +101,10 @@ class ReticulumNodePagesTab {
                         </span>
                         <span class="rt-pages__tb-sep"></span>
                         <button type="button" data-mu="reset" title="Reset formatting (\`\`)">⌫</button>
+                        <span class="rt-pages__tb-emoji">
+                            <button type="button" data-pg-help-toggle title="Micron cheat-sheet">?</button>
+                            <div class="rt-pages__help" data-pg-help hidden>${this._helpHtml()}</div>
+                        </span>
                     </div>
                     <div class="rt-pages__split">
                         <textarea class="rt-pages__src" data-pg-src spellcheck="false"
@@ -166,11 +170,43 @@ class ReticulumNodePagesTab {
                 menu.hidden = !wasHidden;
             });
         });
+        this._q('[data-pg-help-toggle]').addEventListener('click', () => {
+            const p = this._q('[data-pg-help]');
+            p.hidden = !p.hidden;
+        });
         document.addEventListener('click', (e) => {
             if (!e.target.closest('.rt-pages__tb-emoji')) {
                 this._el.querySelectorAll('.rt-pages__tb-emoji-menu').forEach((m) => { m.hidden = true; });
+                const help = this._q('[data-pg-help]');
+                if (help) help.hidden = true;
             }
         });
+        this._el.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                this._el.querySelectorAll('.rt-pages__tb-emoji-menu, [data-pg-help]')
+                    .forEach((m) => { m.hidden = true; });
+            }
+        });
+    }
+
+    _helpHtml() {
+        const rows = [
+            ['`! `_ `*', 'bold / underline / italic — toggle, repeat to close'],
+            ['`Fxxx … `f', 'text colour (3 hex, e.g. `F38f) … revert'],
+            ['`Bxxx … `b', 'background colour … revert'],
+            ['``', 'reset every format at once'],
+            ['`c `l `r `a', 'centre / left / right align … `a reverts'],
+            ['&gt; &gt;&gt; &gt;&gt;&gt;', 'H1 / H2 / H3 (rest of the line)'],
+            ['-', 'divider — on its own line'],
+            ['`[label`url]', 'link — `url can be https://… or :/page/x.mu (this node)'],
+            ['`&lt;name`&gt;', 'text field · `&lt;?|n|1`Lbl&gt; checkbox · `&lt;^|g|v`Lbl&gt; radio'],
+        ];
+        const note = 'Keep lines under ~130 chars for phone / MeshChat clients. '
+            + '<b>Centre aligns each line on its own</b> — multi-line ASCII art must '
+            + 'be left-aligned or it fragments.';
+        return '<h4>Micron quick reference</h4><dl>'
+            + rows.map(([c, d]) => `<dt><code>${c}</code></dt><dd>${d}</dd>`).join('')
+            + `</dl><p class="rt-pages__help-note">${note}</p>`;
     }
 
     _buildCharMenu(sel, chars) {
@@ -354,7 +390,8 @@ class ReticulumNodePagesTab {
     _setToolbarEnabled(on) {
         if (!this._toolbarEl) return;
         this._toolbarEl.classList.toggle('rt-pages__toolbar--off', !on);
-        this._toolbarEl.querySelectorAll('button, input').forEach((el) => {
+        // the cheat-sheet (?) stays usable even with no page open
+        this._toolbarEl.querySelectorAll('button:not([data-pg-help-toggle]), input').forEach((el) => {
             el.disabled = !on;
         });
     }

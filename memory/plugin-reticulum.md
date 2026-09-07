@@ -627,3 +627,12 @@ AI page-beautify (needs an LLM call -> doesn't fit an offline edge device).
 Field/checkbox/radio widgets render but only submit to an *executable*
 NomadNet page -- noted in docstring/README/CHANGELOG since our node serves
 plain files.
+
+**+ ? cheat-sheet popover (same batch).** Toolbar `?` button -> `.rt-pages__help`
+popover (anchored right, `min(380px,90vw)`), a `<dl>` of Micron codes built by
+`_helpHtml()`, closes on outside-click / Escape. Stays enabled with no page
+open (`_setToolbarEnabled` excludes `[data-pg-help-toggle]`). Emoji + ASCII +
+help are all "one open at a time". The note line spells out the
+"centre aligns each line on its own -> multi-line ASCII must be left-aligned"
+gotcha from earlier this session.
+Micron-composer parity now: everything except "Magic" (AI beautify).
