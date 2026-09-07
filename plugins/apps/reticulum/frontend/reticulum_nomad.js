@@ -60,7 +60,8 @@ class ReticulumNomadTab {
                     <button class="terminal-button rt-nomad__fav" type="button" data-nomad-fav
                             title="Favourite the current node" disabled>&#9734;</button>
                     <input type="text" class="cfg-field__input rt-nomad__addr" data-nomad-addr
-                           placeholder="&lt;destination hash&gt;:/page/index.mu" autocomplete="off" spellcheck="false">
+                           placeholder="&lt;hash&gt;:/page/x.mu  —  or  :/page/info.mu on the current node"
+                           autocomplete="off" spellcheck="false">
                     <button class="terminal-button" type="button" data-nomad-go>Go</button>
                     <button class="terminal-button" type="button" data-nomad-back title="Back" disabled>&larr;</button>
                     <button class="terminal-button" type="button" data-nomad-fwd title="Forward" disabled>&rarr;</button>
@@ -68,8 +69,10 @@ class ReticulumNomadTab {
                 </div>
                 <p class="cfg-status" data-nomad-status aria-live="polite"></p>
                 <div class="rt-nomad__page" data-nomad-page>
-                    <p class="lw-empty">Pick a NomadNet node above, or type a
-                    <code>&lt;hash&gt;:/page/index.mu</code> address, to start browsing.</p>
+                    <p class="lw-empty">Pick a NomadNet node above, or type an address
+                    (<code>&lt;hash&gt;:/page/x.mu</code>). Once you're on a node, the bar
+                    holds its full address — edit the path (e.g. <code>:/page/info.mu</code>)
+                    and press Go.</p>
                 </div>
             </div>
         `;
@@ -198,8 +201,13 @@ class ReticulumNomadTab {
     _goFromAddr() {
         const raw = (this._addrEl.value || '').trim();
         if (!raw) return;
-        const { hash, path } = this._splitAddr(raw);
-        if (!hash) { this._status('error', 'Address must be <hash>:/page/path.mu'); return; }
+        // ":/page/x.mu" and "/page/x.mu" resolve against the node we're on --
+        // so you can edit just the path in the pre-filled address bar.
+        const { hash, path } = this._splitAddr(raw, this._currentHash);
+        if (!hash) {
+            this._status('error', 'Type <hash>:/page/x.mu — or :/page/x.mu once you\'re on a node');
+            return;
+        }
         this._go(hash, path);
     }
 

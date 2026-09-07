@@ -636,3 +636,13 @@ help are all "one open at a time". The note line spells out the
 "centre aligns each line on its own -> multi-line ASCII must be left-aligned"
 gotcha from earlier this session.
 Micron-composer parity now: everything except "Magic" (AI beautify).
+
+**Browse address bar (uncommitted).** User: want to reach info.mu on a node
+even when unlinked. Turned out the address bar ALREADY pre-fills
+`<hash>:/page/index.mu` (from `_fetch`), but `_goFromAddr` never passed
+`this._currentHash` to `_splitAddr`, so the `:/page/x.mu` / `/page/x.mu`
+current-node shortcuts errored ("must be <hash>:/page/path.mu"). Fixed:
+`_splitAddr(raw, this._currentHash)`. Also widened `.rt-nomad__addr`
+(flex 3 1 280px + min-width:0; search/select now `flex: 1 1` too) so the
+whole address is editable. User said NO to an "info" quick button --
+removed it, edit-the-path is the workflow.

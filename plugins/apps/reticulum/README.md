@@ -115,7 +115,10 @@ The node picker filters live (the `/nodes` endpoint caps at 300 of the
 network's many `nomadnetwork.node` announces) and the **☆** button keeps a
 per-browser favourites list in `localStorage` — favourites get their own
 optgroup at the top of the picker and stay selectable after they age off
-the recent list.
+the recent list. The address bar pre-fills with the current node's full
+`<hash>:/page/…` address and accepts `:/page/x.mu` / `/page/x.mu`
+shortcuts against it — edit the path and Go to reach a page nothing links
+to (e.g. `:/page/info.mu`).
 
 ## Hosting a NomadNet node (opt-in)
 
