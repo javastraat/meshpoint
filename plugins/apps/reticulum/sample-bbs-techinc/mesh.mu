@@ -1,7 +1,3 @@
-#!c=1
-# TechInc Mesh BBS -- Get on the mesh (mesh.mu)
-# Frequencies / presets below match this node's config -- keep them in sync.
-
 `F38f`!TechInc Mesh BBS`!`f  `F888//`f  `!Get on the mesh`!
 ========================================================
 
@@ -38,4 +34,4 @@ Reticulum -- no accounts, no servers.
 `F888Sideband  `f: `[unsigned.io/sideband`https://unsigned.io/sideband]
 
 -
-`[<< Main menu`:/page/index.mu]     `[Upcoming events >>`:/page/events.mu]
+`[<< Main menu`:/page/index.mu]     `[Other nodes & links >>`:/page/links.mu]

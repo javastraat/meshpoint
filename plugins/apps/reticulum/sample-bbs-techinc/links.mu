@@ -1,10 +1,3 @@
-#!c=1
-# TechInc Mesh BBS -- Other nodes & links (links.mu)
-#
-# A NomadNet node link is:  `[Their Board`<32-hex-hash>:/page/index.mu]
-# Find a node's hash in the Browse tab's picker (or its announce), paste
-# it in, done. Keep the list to nodes you actually like.
-
 `F38f`!TechInc Mesh BBS`!`f  `F888//`f  `!Other nodes & links`!
 ========================================================
 

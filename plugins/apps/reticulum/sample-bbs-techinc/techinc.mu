@@ -1,6 +1,3 @@
-#!c=1
-# TechInc Mesh BBS -- About TechInc (techinc.mu)
-
 `F38f`!TechInc Mesh BBS`!`f  `F888//`f  `!About TechInc`!
 ========================================================
 
