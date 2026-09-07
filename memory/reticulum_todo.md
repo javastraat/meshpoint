@@ -33,6 +33,11 @@ checked on the Pi.
   click an Activity row → center popup should appear with the announce's
   hex `app_data` if present. Check both light and dark theme, and that
   "View peer" / "Browse this node" actually cross-navigate correctly.
+- **sample-bbs-techinc nav links (fixed 2026-09-07, not walked in a real
+  NomadNet client)**: browse the hosted node in Sideband/NomadNet/
+  MeshChat, click "Next" through every page, confirm no dead links and
+  that the `spacestate.mu`/`events.mu` cross-link only appears when both
+  `node_spaceapi_url` and `node_events_ical_url` are actually set.
 - **Propagation node — NEEDS TESTING** (UI is confirmed on the device, the
   relay itself is not):
   1. Settings → Propagation node → tick "Act as an LXMF propagation node" →
@@ -71,6 +76,7 @@ checked on the Pi.
 | Hosting | Operator `.mu` pages + `files/` | Pages tab: editor, formatting toolbar, Micron cheat-sheet, live preview |
 | Hosting | `/page/spacestate.mu` + `{spacestate}` token | SpaceAPI feed, lazy fetch (once at boot, then on view) |
 | Hosting | `/page/events.mu` | iCalendar feed, lazy fetch |
+| Hosting | Generated-page cross-links | `info.mu`↔`nodes.mu` always; `spacestate.mu`↔`events.mu` only when the other is configured. Never link into an operator's own custom pages — shared code, most installs won't have e.g. `meshpoint.mu` |
 | Ops | Dep check / setup / `meshpoint plugin check` | boot probe + on-demand + Run-setup modal |
 | Samples | `sample-pages/`, `sample-bbs-techinc/` | TechInc BBS carries real address + "Contact us" (IRC/Matrix/email/phone) |
 | Core (not this plugin) | RNode firmware flasher, Heltec-V4 node card | Configuration → Firmware |

@@ -560,7 +560,15 @@ class NomadNode:
         if not s:
             lines.append("")
             lines.append("(status not fetched yet -- try again shortly)")
-        lines += ["", "`[Home`:/page/index.mu]"]
+        # Cross-link to the sibling generated page only when it's actually
+        # registered (node_events_ical_url set) -- never a hardcoded jump
+        # into an operator's own custom pages (e.g. sample-bbs-techinc's
+        # meshpoint.mu), since this handler is shared by every hosted node
+        # and most won't have a page by that name.
+        nav = "`[Home`:/page/index.mu]"
+        if self._events_ical_url:
+            nav += "     `[Upcoming events >>`:/page/events.mu]"
+        lines += ["", nav]
         return ("\n".join(lines)).encode("utf-8")
 
     def _serve_events(self, request_path, data, request_id, link_id, remote_identity, requested_at):
@@ -589,7 +597,11 @@ class NomadNode:
             lines.append(
                 f"`[{summary}`{url}]" if url.startswith("http") else summary
             )
-        lines += ["", "`[Home`:/page/index.mu]"]
+        # Same sibling-only cross-link as _serve_spacestate, mirrored.
+        nav = "`[Home`:/page/index.mu]"
+        if self._spaceapi_url:
+            nav += "     `[Space status >>`:/page/spacestate.mu]"
+        lines += ["", nav]
         return ("\n".join(lines)).encode("utf-8")
 
     def _serve_nodes(self, request_path, data, request_id, link_id, remote_identity, requested_at):
@@ -605,4 +617,8 @@ class NomadNode:
             label = _esc(n.get("display_name") or n.get("destination_hash", ""))
             dh = n.get("destination_hash", "")
             lines.append(f"`[{label}`{dh}:/page/index.mu]")
+        # info.mu already links here; close the loop back the other way.
+        # Both always generated/registered unconditionally, so no config
+        # gate needed (unlike the spacestate/events cross-links above).
+        lines += ["", "`[Home`:/page/index.mu]     `[Live node stats >>`:/page/info.mu]"]
         return ("\n".join(lines)).encode("utf-8")
