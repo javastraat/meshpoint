@@ -75,6 +75,15 @@ async def reticulum_peers():
     return [p.to_dict() for p in peers]
 
 
+@router.get("/announces")
+async def reticulum_announces():
+    """Recent announces heard (newest first) -- the Activity tab. In-memory
+    ring buffer, so it starts empty on each restart."""
+    if _service is None:
+        raise HTTPException(503, "Reticulum companion is disabled")
+    return _service.announce_log()
+
+
 @router.get("/messages/{destination_hash}")
 async def reticulum_conversation(destination_hash: str, limit: int = 50):
     if _message_repo is None:

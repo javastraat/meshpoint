@@ -201,6 +201,23 @@ class ReticulumSettingsTab {
                                 </span>
                             </label>
                         </fieldset>
+                        <fieldset class="cfg-fieldset">
+                            <legend class="cfg-fieldset__legend">Message notifications</legend>
+                            <label class="cfg-field">
+                                <span class="cfg-field__label">ntfy / webhook URL (optional)</span>
+                                <input class="cfg-field__input" type="text"
+                                       placeholder="https://ntfy.sh/your-topic" data-rt-notify-url>
+                                <span class="cfg-field__hint">
+                                    When an LXMF direct message arrives, POST its text here
+                                    with the sender as the <code>Title</code> header — an
+                                    <a href="https://ntfy.sh" target="_blank" rel="noopener">ntfy</a>
+                                    topic or any webhook that takes a plain-text body. This
+                                    sends the message text to that third-party service; use a
+                                    self-hosted ntfy or private webhook if that matters.
+                                    Restart to apply.
+                                </span>
+                            </label>
+                        </fieldset>
                         <div class="cfg-card__actions">
                             <button class="terminal-button terminal-button--primary" type="submit">
                                 Save Reticulum
@@ -244,6 +261,7 @@ class ReticulumSettingsTab {
         this._nodePages = this._q('[data-rt-node-pages]');
         this._nodeSpaceapi = this._q('[data-rt-node-spaceapi]');
         this._nodeEvents = this._q('[data-rt-node-events]');
+        this._notifyUrl = this._q('[data-rt-notify-url]');
         this._nodeStatusEl = this._q('[data-rt-node-status]');
         this._statusEl = this._q('[data-rt-status]');
         this._rnsdStatusEl = this._q('[data-rt-rnsd-status]');
@@ -280,6 +298,7 @@ class ReticulumSettingsTab {
         if (this._nodePages) this._nodePages.value = rt.node_pages_dir || 'data/reticulum/pages';
         if (this._nodeSpaceapi) this._nodeSpaceapi.value = rt.node_spaceapi_url || '';
         if (this._nodeEvents) this._nodeEvents.value = rt.node_events_ical_url || '';
+        if (this._notifyUrl) this._notifyUrl.value = rt.notify_url || '';
         this._loadNodeStatus();
         if (this._rnodeEnabled) this._rnodeEnabled.checked = rt.rnode_enabled !== false;
         if (this._frequency) {
@@ -418,6 +437,7 @@ class ReticulumSettingsTab {
             node_announce_interval_s: Number(this._nodeInterval.value) || 21600,
             node_spaceapi_url: (this._nodeSpaceapi?.value || '').trim(),
             node_events_ical_url: (this._nodeEvents?.value || '').trim(),
+            notify_url: (this._notifyUrl?.value || '').trim(),
             rnode_enabled: rnodeEnabled,
             rnode_serial_port: this._serialPort.value,
             rnode_frequency_hz: Number(this._frequency.value),

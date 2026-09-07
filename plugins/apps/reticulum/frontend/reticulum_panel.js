@@ -35,7 +35,11 @@ const RT_ASPECT_BADGES = {
     'lxmf.delivery': 'mt-badge--text',
     'lxmf.propagation': 'mt-badge--routing',
     'nomadnetwork.node': 'mt-badge--nodeinfo',
+    'call.audio': 'mt-badge--routing',
 };
+
+// Rows kept in the Activity table's DOM (backend ring buffer is 200).
+const RT_ANNOUNCE_LIMIT = 200;
 
 class ReticulumPanel {
     constructor() {
@@ -43,6 +47,7 @@ class ReticulumPanel {
         this._refreshTimer = null;
         this._peers = [];
         this._peersShowAll = false;
+        this._announces = [];
         this._sendPeerSearchQuery = '';
         // Fails open like every other panel's own guard (no identity/role
         // info at all means show it) -- the real security boundary is
@@ -52,7 +57,7 @@ class ReticulumPanel {
         try { stored = localStorage.getItem(RT_TAB_STORE_KEY); } catch (_) {}
         // 'pages' restores optimistically -- _syncPagesTab() bounces it
         // back to 'peers' on the first /status if no node is hosting.
-        this._tab = (stored === 'messages'
+        this._tab = (['messages', 'announces'].includes(stored)
             || (['send', 'settings', 'browse', 'pages'].includes(stored) && this._isAdmin))
             ? stored : 'peers';
         this._settingsTab = null;
@@ -60,6 +65,7 @@ class ReticulumPanel {
         this._nodePagesTab = null;
         this._onWsPeer = this._onWsPeer.bind(this);
         this._onWsMessage = this._onWsMessage.bind(this);
+        this._onWsAnnounce = this._onWsAnnounce.bind(this);
     }
 
     mount(rootEl) {
@@ -106,6 +112,8 @@ class ReticulumPanel {
                                     data-rt-tab="peers">Peers</button>
                             <button class="lw-tab" type="button" role="tab"
                                     data-rt-tab="messages">Messages</button>
+                            <button class="lw-tab" type="button" role="tab"
+                                    data-rt-tab="announces">Activity</button>
                             <button class="lw-tab" type="button" role="tab"
                                     data-rt-tab="send" ${this._isAdmin ? '' : 'hidden'}>Send</button>
                             <button class="lw-tab" type="button" role="tab"
@@ -164,6 +172,35 @@ class ReticulumPanel {
                             </table>
                             <p class="lw-empty" id="rt-message-empty" style="display:none">
                                 No Reticulum messages yet.
+                            </p>
+                        </div>
+                    </div>
+                    <div data-rt-view="announces" hidden>
+                        <div class="panel__body lw-table-wrap">
+                            <p class="lw-panel__limit">
+                                Announces heard since the service last started — the raw
+                                feed (repeats and all), newest first. The deduped roster
+                                is the Peers tab.
+                            </p>
+                            <table class="lw-table lw-table--rt-announces">
+                                <colgroup>
+                                    <col class="col-time">
+                                    <col class="col-name">
+                                    <col class="col-id">
+                                    <col class="col-type">
+                                </colgroup>
+                                <thead>
+                                    <tr>
+                                        <th>Time</th>
+                                        <th>Display name</th>
+                                        <th>Destination</th>
+                                        <th>Aspect</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="rt-announce-tbody"></tbody>
+                            </table>
+                            <p class="lw-empty" id="rt-announce-empty" style="display:none">
+                                No announces heard yet.
                             </p>
                         </div>
                     </div>
@@ -259,6 +296,7 @@ class ReticulumPanel {
         if (window.concentratorWS) {
             window.concentratorWS.on('reticulum_peer', this._onWsPeer);
             window.concentratorWS.on('reticulum_message', this._onWsMessage);
+            window.concentratorWS.on('reticulum_announce', this._onWsAnnounce);
         }
         this._activateSubTab();
     }
@@ -282,6 +320,7 @@ class ReticulumPanel {
         if (this._tab === 'settings' && this._settingsTab) this._settingsTab.show();
         else if (this._tab === 'browse' && this._nomadTab) this._nomadTab.show();
         else if (this._tab === 'pages' && this._nodePagesTab) this._nodePagesTab.show();
+        else if (this._tab === 'announces') this._loadAnnounces();
     }
 
     /** Open the Browse tab pointed at a specific node (Peers-row "Browse" button). */
@@ -292,6 +331,15 @@ class ReticulumPanel {
 
     _onWsPeer() { this._loadPeers(); }
     _onWsMessage() { this._loadMessages(); }
+
+    _onWsAnnounce(entry) {
+        if (!entry || !entry.ts) return;
+        this._announces.unshift(entry);
+        if (this._announces.length > RT_ANNOUNCE_LIMIT) {
+            this._announces.length = RT_ANNOUNCE_LIMIT;
+        }
+        if (this._tab === 'announces') this._renderAnnounces();
+    }
 
     _q(sel) { return this._root ? this._root.querySelector(sel) : null; }
 
@@ -318,7 +366,9 @@ class ReticulumPanel {
     }
 
     async _load() {
-        await Promise.all([this._loadStatus(), this._loadPeers(), this._loadMessages()]);
+        const jobs = [this._loadStatus(), this._loadPeers(), this._loadMessages()];
+        if (this._tab === 'announces') jobs.push(this._loadAnnounces());
+        await Promise.all(jobs);
     }
 
     async _loadStatus() {
@@ -483,6 +533,35 @@ class ReticulumPanel {
                 <td class="mt-name">${this._esc(c.node_name || c.node_id)}</td>
                 <td>${this._esc(c.last_message || '')}</td>
                 <td class="lw-num">${c.unread_count ? c.unread_count : ''}</td>
+            </tr>
+        `).join('');
+    }
+
+    async _loadAnnounces() {
+        try {
+            const r = await fetch('/api/reticulum/announces', { credentials: 'same-origin' });
+            if (!r.ok) return;
+            this._announces = await r.json();
+            this._renderAnnounces();
+        } catch (_) {}
+    }
+
+    _renderAnnounces() {
+        const tbody = this._q('#rt-announce-tbody');
+        const empty = this._q('#rt-announce-empty');
+        if (!tbody) return;
+        if (!this._announces.length) {
+            tbody.innerHTML = '';
+            if (empty) empty.style.display = '';
+            return;
+        }
+        if (empty) empty.style.display = 'none';
+        tbody.innerHTML = this._announces.slice(0, RT_ANNOUNCE_LIMIT).map((a) => `
+            <tr>
+                <td class="lw-time">${this._fmtTime(a.ts)}</td>
+                <td class="mt-name">${this._esc(a.display_name || '--')}</td>
+                <td class="lw-id">${this._esc(a.destination_hash)}</td>
+                <td>${this._fmtAspect(a.aspect)}</td>
             </tr>
         `).join('');
     }

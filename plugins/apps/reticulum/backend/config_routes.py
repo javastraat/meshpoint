@@ -52,6 +52,7 @@ class ReticulumUpdate(BaseModel):
     node_announce_interval_s: int = Field(21600, ge=600, le=604800)
     node_spaceapi_url: str = ""
     node_events_ical_url: str = ""
+    notify_url: str = ""
     rnode_enabled: bool = True
     rnode_serial_port: str = ""
     rnode_frequency_hz: int = Field(..., ge=100_000_000, le=1_000_000_000)
@@ -79,7 +80,7 @@ class ReticulumUpdate(BaseModel):
             raise ValueError("must not be empty")
         return stripped
 
-    @field_validator("node_spaceapi_url", "node_events_ical_url")
+    @field_validator("node_spaceapi_url", "node_events_ical_url", "notify_url")
     @classmethod
     def _feed_url_ok(cls, value: str) -> str:
         stripped = value.strip()
@@ -119,6 +120,7 @@ async def update_reticulum(
         "node_announce_interval_s": req.node_announce_interval_s,
         "node_spaceapi_url": req.node_spaceapi_url.strip(),
         "node_events_ical_url": req.node_events_ical_url.strip(),
+        "notify_url": req.notify_url.strip(),
         "rnode_enabled": req.rnode_enabled,
         "rnode_serial_port": req.rnode_serial_port.strip(),
         "rnode_frequency_hz": req.rnode_frequency_hz,

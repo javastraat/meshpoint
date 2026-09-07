@@ -768,3 +768,46 @@ sorted DTSTART desc, limit=100. Built to mirror SpaceAPI exactly:
 - KNOWN NIT: feed is dense with the weekly "Social YYYY-MM-DD"; they crowd
   out real events in the 12-item window. No dedup done (fragile) -- revisit
   if user asks.
+
+---
+
+## 2026-09-07 — Activity tab + DM notifications (backlog items 11 & 12, uncommitted)
+
+- **`backend/notify.py`** (new): `post(url, *, title, body) -> bool`. urllib
+  POST, 8s, body capped 3072B, `Title` header sanitised to ASCII/printable
+  (ntfy titles must be latin-1 single-line). Returns True on 2xx, never raises.
+  ntfy-style: message text = body, sender = Title. Works for any plain-text
+  webhook.
+- **`lxmf_service.py`**:
+  - `_ROSTER_ASPECTS` = the old 3; `_ANNOUNCE_ASPECTS` = `(*_ROSTER, "call.audio")`.
+    `call.audio` is registered for the stream but NOT written to `reticulum_peers`
+    (would pad the roster with every Sideband/MeshChat user).
+  - `_announce_log` = `deque(maxlen=_ANNOUNCE_LOG_MAX=200)`. `_handle_announce`
+    now: build `entry {ts,destination_hash,display_name,aspect}`, append, always
+    `broadcast("reticulum_announce", entry)`; then if roster aspect →
+    `record_announce` + `broadcast("reticulum_peer", ...)` (unchanged shape).
+    `announce_log()` returns `list(reversed(...))` (newest first).
+  - `notify_url` ctor param + `self._notify_url`. `_handle_inbound_message`:
+    after the non-duplicate ws broadcast, `if self._notify_url: self._spawn(self._notify_inbound(name or source_hex[:16], text))`.
+    `_notify_inbound` truncates to 240 (`...`), `asyncio.to_thread(notify.post)`,
+    swallows errors. `_spawn` = fire-and-forget with a `self._bg_tasks` strong-ref set.
+- **`routes.py`**: `GET /api/reticulum/announces` -> `_service.announce_log()` (503 if no service).
+- **`state.py`**: `notify_url` in `_DEFAULTS` + `notify_url()` accessor (top-level,
+  not node_config -- the inbox is always on). **`config_routes.py`**: `notify_url`
+  field, added to `_feed_url_ok` validator, write dict. **`__init__.py`**:
+  `notify_url=state.notify_url()`.
+- **`reticulum_panel.js`**: new "Activity" tab (`data-rt-tab="announces"`, no
+  admin gate). `_announces` array, `_loadAnnounces`/`_renderAnnounces`,
+  `_onWsAnnounce(entry)` unshift+cap 200 + re-render if active. `_load()` also
+  refreshes announces when that tab is active. Tab restore allows 'announces'.
+  `RT_ASPECT_BADGES['call.audio']='mt-badge--routing'`.
+- **`reticulum_settings_tab.js`**: new "Message notifications" fieldset,
+  `data-rt-notify-url`, wired render/_onSubmit.
+- Tests: `test_notify.py` (6), `test_lxmf_service.py` +7 (TestAnnounceLog x4,
+  TestInboundNotify x3 with `_FakePeerRepo`/`_FakeWs`), `test_announces_route.py` (2).
+  101 reticulum tests pass.
+- **CI FIX (same session)**: `test_spacestate_lazy_refresh_scheduled_when_stale`
+  set `_spaceapi_fetched_at = 0.0` -- on a freshly-booted CI runner
+  `time.monotonic()` can be < `_SPACEAPI_TTL_S` (120), so `age` wasn't "stale".
+  Now `time.monotonic() - 10_000`. (The events equivalent uses `0.0` but its
+  guard is `if self._events_fetched_at and ...` so 0.0 is safely falsy.)

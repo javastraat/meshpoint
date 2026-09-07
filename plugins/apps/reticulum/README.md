@@ -13,8 +13,8 @@ implementation now. `enabled: false` by default like every shipped plugin.
 | Seam | What |
 |---|---|
 | `service` | `LxmfService` — RNS/LXMF client attach, started right after the packet pipeline is up (`src.api.service_registry`), stopped on shutdown |
-| `routes` | `/api/reticulum/{status,peers,messages,send,announce}` + `/api/reticulum/nomad/{nodes,page,file}` + `GET`/`PUT /api/config/reticulum` + `POST /api/config/reticulum/restart-rnsd` |
-| `sidebar` | the **Reticulum** page under Networks — Peers / Messages / Send / Browse / Settings tabs |
+| `routes` | `/api/reticulum/{status,peers,announces,messages,send,announce}` + `/api/reticulum/nomad/{nodes,page,file}` + `GET`/`PUT /api/config/reticulum` + `POST /api/config/reticulum/restart-rnsd` |
+| `sidebar` | the **Reticulum** page under Networks — Peers / Messages / Activity / Send / Browse / Settings tabs |
 | `topbar` | the compact status pill (own address · RNode frequency when an RNode is connected, else the peer count for a backbone-only node; hover title has the peer count + active interface), self-polling `/api/reticulum/status` |
 
 ## Enable it
@@ -121,6 +121,29 @@ the recent list. The address bar pre-fills with the current node's full
 `<hash>:/page/…` address and accepts `:/page/x.mu` / `/page/x.mu`
 shortcuts against it — edit the path and Go to reach a page nothing links
 to (e.g. `:/page/info.mu`).
+
+## Activity tab
+
+The **Activity** tab is the raw announce feed — every `lxmf.delivery`,
+`lxmf.propagation`, `nomadnetwork.node` and `call.audio` announce the
+service has heard since it started, newest first, repeats and all. It's an
+in-memory ring buffer (200 entries, `GET /api/reticulum/announces`), fed
+live over the `reticulum_announce` WebSocket event, and gone on restart.
+The **Peers** tab is the deduped roster; `call.audio` is Activity-only so
+it doesn't pad the roster with every Sideband/MeshChat user on the public
+network.
+
+## Message notifications (opt-in)
+
+Set **Settings → Message notifications → ntfy / webhook URL**
+(`plugins.reticulum.notify_url`) and every inbound LXMF direct message
+fires a one-line `POST` there — the message text as the body, the sender as
+an ntfy-style `Title` header. Works with an [ntfy](https://ntfy.sh) topic
+or any webhook that accepts a plain-text body. Fire-and-forget off the
+event loop (`backend/notify.py`, stdlib `urllib`), 8 s timeout, failures
+are logged and ignored. Note it hands the message text to that third party
+— use a self-hosted ntfy or a private endpoint if that matters. Blank =
+off.
 
 ## Hosting a NomadNet node (opt-in)
 

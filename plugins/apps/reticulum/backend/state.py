@@ -49,6 +49,9 @@ _DEFAULTS: dict[str, Any] = {
     "reticulum_config_dir": "data/reticulum/rns_config",
     "identity_path": "data/reticulum/identity",
     "lxmf_storage_dir": "data/reticulum/lxmf",
+    # Optional: an ntfy topic / webhook URL. When set, an inbound LXMF direct
+    # message fires a one-line POST there (fire-and-forget). Blank = off.
+    "notify_url": "",
     # RF and backbone are independent interfaces rnsd can run at once or
     # separately -- at least one must stay on (enforced by config_routes.py's
     # ReticulumUpdate validator), same as NomadNet needs one of them to
@@ -116,6 +119,10 @@ def identity_path() -> str:
 
 def lxmf_storage_dir() -> str:
     return str(_config["lxmf_storage_dir"])
+
+
+def notify_url() -> str:
+    return str(_config.get("notify_url") or "").strip()
 
 
 def node_config() -> dict[str, Any]:

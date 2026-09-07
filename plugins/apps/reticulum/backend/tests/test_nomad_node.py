@@ -172,9 +172,11 @@ class TestNomadNode(unittest.TestCase):
             self.assertNotIn("{spacestate}", body.decode())
 
     def test_spacestate_lazy_refresh_scheduled_when_stale(self) -> None:
+        import time as _t
+
         n = self._node(spaceapi_url="https://x")
-        n._spaceapi = {"open": True}          # have a value...
-        n._spaceapi_fetched_at = 0.0          # ...but it's ancient -> stale
+        n._spaceapi = {"open": True}                  # have a value...
+        n._spaceapi_fetched_at = _t.monotonic() - 10_000  # ...but it's stale
 
         scheduled: list = []
 

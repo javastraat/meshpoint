@@ -32,8 +32,12 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+from collections import deque
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
+
+from . import notify
 
 if TYPE_CHECKING:
     from src.api.websocket_manager import WebSocketManager
@@ -50,7 +54,15 @@ except ImportError:  # not installed -- e.g. Mac dev environment
     RNS = None
     LXMF = None
 
-_ANNOUNCE_ASPECTS = ("lxmf.delivery", "lxmf.propagation", "nomadnetwork.node")
+# Aspects that build the peer roster (a "who can I reach / what nodes exist"
+# list). Kept deliberately narrow -- see _ROSTER_ASPECTS vs the wider set the
+# Activity stream listens on.
+_ROSTER_ASPECTS = ("lxmf.delivery", "lxmf.propagation", "nomadnetwork.node")
+# Everything the Activity stream shows. `call.audio` is stream-only: an audio
+# call announce means someone's reachable for voice, but it shouldn't pad the
+# roster with every Sideband/MeshChat user on the public network.
+_ANNOUNCE_ASPECTS = (*_ROSTER_ASPECTS, "call.audio")
+_ANNOUNCE_LOG_MAX = 200  # in-memory ring buffer behind GET /api/reticulum/announces
 
 # Total wait budget for a cold-cache path request in send_message():
 # 5 x 1s = 5s. Long enough for a same-network shared-instance response
@@ -145,6 +157,7 @@ class LxmfService:
         project_url: str = "https://github.com/KMX415/meshpoint",
         spaceapi_url: str = "",
         events_ical_url: str = "",
+        notify_url: str = "",
     ):
         self._display_name = display_name
         self._reticulum_config_dir = Path(reticulum_config_dir)
@@ -159,11 +172,21 @@ class LxmfService:
         self._project_url = project_url
         self._spaceapi_url = spaceapi_url
         self._events_ical_url = events_ical_url
+        self._notify_url = notify_url
         self._node = None
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._router = None
         self._source = None
         self._identity = None
+        self._announce_log: deque = deque(maxlen=_ANNOUNCE_LOG_MAX)
+        self._bg_tasks: set = set()
+
+    def _spawn(self, coro) -> None:
+        """Fire-and-forget a coroutine, holding a strong ref so it isn't
+        GC'd mid-flight, and swallowing its result/exception."""
+        task = asyncio.ensure_future(coro)
+        self._bg_tasks.add(task)
+        task.add_done_callback(self._bg_tasks.discard)
 
     @property
     def available(self) -> bool:
@@ -303,15 +326,32 @@ class LxmfService:
     async def _handle_announce(
         self, destination_hash: str, display_name: str, aspect: str,
     ) -> None:
-        await self._peer_repo.record_announce(destination_hash, display_name, aspect)
-        await self._ws_manager.broadcast(
-            "reticulum_peer",
-            {
-                "destination_hash": destination_hash,
-                "display_name": display_name,
-                "aspect": aspect,
-            },
-        )
+        entry = {
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "destination_hash": destination_hash,
+            "display_name": display_name,
+            "aspect": aspect,
+        }
+        self._announce_log.append(entry)
+        await self._ws_manager.broadcast("reticulum_announce", entry)
+
+        if aspect in _ROSTER_ASPECTS:
+            await self._peer_repo.record_announce(
+                destination_hash, display_name, aspect,
+            )
+            await self._ws_manager.broadcast(
+                "reticulum_peer",
+                {
+                    "destination_hash": destination_hash,
+                    "display_name": display_name,
+                    "aspect": aspect,
+                },
+            )
+
+    def announce_log(self) -> list[dict]:
+        """The recent announce ring buffer, newest first -- backs
+        GET /api/reticulum/announces and the Activity tab."""
+        return list(reversed(self._announce_log))
 
     def _on_lxmf_message(self, message) -> None:
         if self._loop is not None:
@@ -343,6 +383,18 @@ class LxmfService:
                 "node_id": source_hex, "node_name": name,
             },
         )
+        if self._notify_url:
+            self._spawn(self._notify_inbound(name or source_hex[:16], text))
+
+    async def _notify_inbound(self, sender: str, text: str) -> None:
+        preview = text if len(text) <= 240 else text[:237] + "..."
+        try:
+            await asyncio.to_thread(
+                notify.post, self._notify_url,
+                title=f"LXMF from {sender}", body=preview,
+            )
+        except Exception:  # noqa: BLE001 -- notification is best-effort
+            logger.debug("inbound-message notification failed", exc_info=True)
 
     async def send_message(self, destination_hash_hex: str, text: str) -> int:
         """Sends a direct LXMF message. Raises ValueError if the

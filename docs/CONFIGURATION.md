@@ -204,6 +204,7 @@ plugins:
     backbone_enabled: true
     backbone_host: "node.reticulumnet.nl"
     backbone_port: 4242
+    notify_url: ""                              # optional: ntfy topic / webhook, POSTed on an inbound LXMF DM
     # storage paths — defaults shown; only set to override:
     # reticulum_config_dir: "data/reticulum/rns_config"
     # identity_path: "data/reticulum/identity"
@@ -231,6 +232,17 @@ turned off independently (e.g. LoRa-only with no internet backbone, or
 backbone-only with no RNode attached). The save is rejected if you try to
 turn both off — use Settings → Plugins to disable Reticulum entirely
 instead of leaving it running with no interfaces.
+
+The **Activity** tab is the raw announce feed (every `lxmf.delivery` /
+`lxmf.propagation` / `nomadnetwork.node` / `call.audio` announce heard since
+the service started, newest first) — a 200-entry in-memory ring buffer, so
+it's empty after a restart. The **Peers** tab is the deduped roster.
+
+`plugins.reticulum.notify_url` (optional, also on the Settings tab): an
+[ntfy](https://ntfy.sh) topic or webhook URL. When set, an inbound LXMF
+direct message fires a one-line `POST` there (message text as body, sender
+as `Title` header). This sends the message text to that service — self-host
+ntfy or use a private webhook if that's a concern. Blank = off.
 
 The **Browse** tab is a minimal NomadNet browser — it fetches
 `nomadnetwork.node` peers' Micron pages over RNS Links.
