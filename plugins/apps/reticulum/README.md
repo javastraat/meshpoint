@@ -91,6 +91,8 @@ backend/
   nomad.py                     NomadNet page fetch over RNS Links
   nomad_routes.py              /api/reticulum/nomad/{nodes,page,file}
   nomad_node.py                host our own nomadnetwork.node destination
+  spaceapi.py                  SpaceAPI fetch/normalise (-> /page/spacestate.mu)
+  ical.py                      iCalendar fetch/parse (-> /page/events.mu)
   tests/
 frontend/
   reticulum_panel.js           the page (registerSidebarPage)
@@ -145,6 +147,8 @@ answers `Link`/`Request` with:
   (`src.remote.repo_source`, falls back to `KMX415/meshpoint`). Safe to
   link to from your own `index.mu`.
 - `/page/nodes.mu` — the recent `nomadnetwork.node` peers as Micron links
+- `/page/spacestate.mu` — generated, only when `node_spaceapi_url` is set
+- `/page/events.mu` — generated, only when `node_events_ical_url` is set
 - any other `*.mu` file you drop in `node_pages_dir` (`data/reticulum/pages/`
   by default)
 - `files/**` under that dir, served at `/file/<relpath>`
@@ -162,16 +166,16 @@ render but only submit to an *executable* NomadNet page, so a form on
 your own node's page is display-only unless it POSTs elsewhere.) Save
 (`PUT /api/reticulum/nomad/pages/{name}`) writes the file and re-registers
 the node's request handlers, so a new or edited page is served
-immediately — no restart. `info.mu` / `nodes.mu` are refused (they're
-generated); pages are always written non-executable, so "dynamic pages"
-(executable `.mu` scripts) still need SSH, on purpose. A **Load sample**
-button drops in `sample-pages/index.mu`.
+immediately — no restart. `info.mu` / `nodes.mu` / `spacestate.mu` /
+`events.mu` are refused (they're generated); pages are always written
+non-executable, so "dynamic pages" (executable `.mu` scripts) still need
+SSH, on purpose. A **Load sample** button drops in `sample-pages/index.mu`.
 
 `sample-pages/index.mu` is a copy-me starter page with a Micron cheat-sheet
 in its header. `sample-bbs-techinc/` is a fuller worked example — a small
 read-only "BBS" (splash + `techinc.mu` / `meshpoint.mu` / `mesh.mu` /
-`bulletins.mu` / `links.mu`, all cross-linked), TechInc-flavoured with
-`[EDIT]` markers; see its own README to deploy + adapt. On the Pi the pages dir is
+`links.mu`, all cross-linked, plus generated `spacestate.mu` / `events.mu`),
+carrying real TechInc details; see its own README to deploy + adapt. On the Pi the pages dir is
 `/opt/meshpoint/data/reticulum/pages/` (relative to the service's
 `WorkingDirectory`) and isn't auto-created — the Pages tab creates it on
 first save. Editing a `.mu` file **on disk** (SSH) is picked up per
@@ -186,18 +190,28 @@ plugins:
     node_pages_dir: data/reticulum/pages
     node_announce_interval_s: 21600       # 6h; min 600
     node_spaceapi_url: ""                 # optional hackerspace SpaceAPI feed
+    node_events_ical_url: ""              # optional .ics calendar feed
 ```
 
 `node_spaceapi_url` (optional, also on the Settings tab): a
 [SpaceAPI](https://spaceapi.io) endpoint. Set it and the node serves a
 generated `/page/spacestate.mu` (open/closed + address + contacts) and
 replaces a `{spacestate}` token in any of your own `.mu` pages with a
-colour-coded `OPEN` / `CLOSED` / `unknown` word. The status is fetched
-once at startup and then **only when someone actually loads a page that
-needs it** — never on a timer — and cached for 2 min, so an idle node
-never touches the endpoint. Find your space's URL at
+colour-coded `OPEN` / `CLOSED` / `unknown` word. Find your space's URL at
 `directory.spaceapi.io`. The `{spacestate}` substitution only happens when
 the node serves the page — the dashboard preview shows the raw token.
+
+`node_events_ical_url` (optional, also on the Settings tab): any
+iCalendar (`.ics`) feed — a wiki's event export, a shared Google/Nextcloud
+calendar. Set it and the node serves a generated `/page/events.mu` — the
+next dozen upcoming events (`VEVENT` `SUMMARY` + start time + link),
+past ones dropped, soonest first. `backend/ical.py` parses it with the
+stdlib only (line unfolding, floating / `Z` times, all-day dates).
+
+Both feeds follow the same rule: fetched **once at startup, then only when
+someone actually loads the page** — never on a timer (`spacestate.mu`
+cached 2 min, `events.mu` 15 min), so an idle node never touches either
+endpoint. A fetch failure keeps the last good copy and shows a small note.
 
 `GET /api/reticulum/status` reports the live `node` block
 (`hosting`, `name`, `pages`, `requests_served`, `last_announce_s_ago`).

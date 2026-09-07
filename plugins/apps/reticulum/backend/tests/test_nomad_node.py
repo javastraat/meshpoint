@@ -218,6 +218,61 @@ class TestNomadNode(unittest.TestCase):
             body = n._make_file_server(page)("/page/about.mu", None, 1, 1, None, 0)
             self.assertIn("{spacestate}", body.decode())
 
+    def test_serve_events_renders_from_cache(self) -> None:
+        import datetime as _dt
+
+        n = self._node(events_ical_url="https://x/cal.ics")
+        n._events_fetched_at = 1.0  # pretend we fetched
+        n._events = [
+            {"summary": "Social 2026-09-09", "all_day": False,
+             "start": _dt.datetime(2026, 9, 9, 19, 0), "end": None,
+             "url": "https://wiki.techinc.nl/Social_2026-09-09"},
+            {"summary": "ALV", "all_day": True,
+             "start": _dt.date(2026, 9, 20), "end": None, "url": ""},
+        ]
+        text = n._serve_events("/page/events.mu", None, 1, 1, None, 0).decode()
+        self.assertIn("Upcoming events", text)
+        self.assertIn("Wed 9 Sep  19:00", text)
+        self.assertIn("`[Social 2026-09-09`https://wiki.techinc.nl/Social_2026-09-09]", text)
+        self.assertIn("Sun 20 Sep", text)
+        self.assertNotIn("nothing scheduled", text)
+
+    def test_serve_events_before_first_fetch(self) -> None:
+        n = self._node(events_ical_url="https://x")
+        text = n._serve_events("/page/events.mu", None, 1, 1, None, 0).decode()
+        self.assertIn("not fetched yet", text)
+
+    def test_serve_events_empty_after_fetch(self) -> None:
+        n = self._node(events_ical_url="https://x")
+        n._events_fetched_at = 1.0
+        n._events = []
+        text = n._serve_events("/page/events.mu", None, 1, 1, None, 0).decode()
+        self.assertIn("nothing scheduled", text)
+
+    def test_events_page_counted_and_gated(self) -> None:
+        self.assertEqual(self._node()._page_count(), 3)
+        self.assertEqual(self._node(events_ical_url="https://x")._page_count(), 4)
+        both = self._node(events_ical_url="https://x", spaceapi_url="https://y")
+        self.assertEqual(both._page_count(), 5)
+
+    def test_events_lazy_refresh_scheduled_when_stale(self) -> None:
+        n = self._node(events_ical_url="https://x")
+        n._events_fetched_at = 0.0  # never fetched -> stale
+
+        scheduled: list = []
+
+        class _FakeLoop:
+            def call_soon_threadsafe(self, fn, *a):
+                scheduled.append(fn)
+
+            def create_task(self, coro):
+                coro.close()
+
+        n._loop = _FakeLoop()
+        n._serve_events("/page/events.mu", None, 1, 1, None, 0)
+        self.assertEqual(len(scheduled), 1)
+        self.assertTrue(n._events_refreshing)
+
     def test_serve_nodes_lists_recent(self) -> None:
         n = self._node()
         n._stats = {"recent_nodes": [

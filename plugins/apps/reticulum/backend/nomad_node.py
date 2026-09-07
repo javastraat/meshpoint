@@ -21,6 +21,9 @@ Opt-in (``plugins.reticulum.node_enabled``, off by default). Serves:
     this checkout's ``git`` origin (``src.remote.repo_source``).
   * ``/page/nodes.mu``  -- generated: the other ``nomadnetwork.node``
     peers this Meshpoint has heard.
+  * ``/page/spacestate.mu`` / ``/page/events.mu`` -- generated, and only
+    registered when ``node_spaceapi_url`` / ``node_events_ical_url`` is set
+    (hackerspace open/closed status, upcoming calendar events).
   * ``/page/<name>.mu`` -- any other ``.mu`` file the operator drops in
     ``node_pages_dir``.
   * ``/file/<path>``    -- any file under ``node_pages_dir/files/``.
@@ -40,7 +43,7 @@ import time
 from pathlib import Path
 from typing import Awaitable, Callable, Optional
 
-from . import spaceapi
+from . import ical, spaceapi
 
 logger = logging.getLogger(__name__)
 
@@ -51,11 +54,16 @@ except ImportError:
 
 _STATS_REFRESH_S = 60  # info.mu shows CPU temp / load / 24h counts -- keep it fresh
 _SPACEAPI_TTL_S = 120  # serve the cached status within this; refresh lazily when older
+_EVENTS_TTL_S = 900  # events.mu -- agenda barely moves; 15 min cache, still lazy
 
 # Token an operator can drop into any of their own .mu pages -- replaced at
 # serve time with a colour-coded OPEN / CLOSED / unknown word (only when a
 # SpaceAPI URL is configured). See _make_file_server / _spaceapi_word.
 _SPACESTATE_TOKEN = b"{spacestate}"
+
+# .mu names the node generates itself -- an operator file with one of these
+# names is ignored (never registered, not counted as a page).
+_GENERATED_PAGES = frozenset({"index.mu", "info.mu", "nodes.mu", "spacestate.mu", "events.mu"})
 
 # figlet "standard" MESHPOINT, 53 cols, no backticks. Emitted raw (never
 # through _esc -- Micron renders "\" literally, and _esc would double it).
@@ -96,6 +104,7 @@ class NomadNode:
         hardware_description: str = "",
         project_url: str = "https://github.com/KMX415/meshpoint",
         spaceapi_url: str = "",
+        events_ical_url: str = "",
     ):
         self._identity = identity
         self._name = name
@@ -105,6 +114,7 @@ class NomadNode:
         self._hardware_description = hardware_description
         self._project_url = project_url
         self._spaceapi_url = spaceapi_url
+        self._events_ical_url = events_ical_url
 
         self._destination = None
         self._loop: Optional[asyncio.AbstractEventLoop] = None
@@ -114,6 +124,9 @@ class NomadNode:
         self._spaceapi: dict = {}  # last good SpaceAPI fetch, {} until one lands
         self._spaceapi_fetched_at = 0.0  # monotonic; 0 = never
         self._spaceapi_refreshing = False
+        self._events: list = []  # last good iCal fetch (may legitimately be [])
+        self._events_fetched_at = 0.0  # monotonic; 0 = never
+        self._events_refreshing = False
         self._last_announce: Optional[float] = None
         self._requests_served = 0
 
@@ -141,6 +154,8 @@ class NomadNode:
             # that it's refreshed lazily, only when a page that needs it is
             # actually requested (see _spaceapi_maybe_refresh) -- no timer.
             await self._refresh_spaceapi()
+        if self._events_ical_url:
+            await self._refresh_events()  # prime; then lazy, same as spacestate
 
         self._announce()
         self._announce_task = asyncio.get_running_loop().create_task(self._announce_loop())
@@ -206,10 +221,16 @@ class NomadNode:
                 response_generator=self._serve_spacestate,
                 allow=RNS.Destination.ALLOW_ALL,
             )
+        if self._events_ical_url:
+            d.register_request_handler(
+                "/page/events.mu",
+                response_generator=self._serve_events,
+                allow=RNS.Destination.ALLOW_ALL,
+            )
 
         if pages.is_dir():
             for p in sorted(pages.glob("*.mu")):
-                if p.name in ("index.mu", "nodes.mu", "info.mu", "spacestate.mu"):
+                if p.name in _GENERATED_PAGES:
                     continue
                 d.register_request_handler(
                     f"/page/{p.name}",
@@ -245,10 +266,12 @@ class NomadNode:
         n = 3  # index (generated or overridden) + info + nodes (both fixed generated)
         if self._spaceapi_url:
             n += 1  # /page/spacestate.mu
+        if self._events_ical_url:
+            n += 1  # /page/events.mu
         if self._pages_dir.is_dir():
             n += sum(
                 1 for p in self._pages_dir.glob("*.mu")
-                if p.name not in ("index.mu", "nodes.mu", "info.mu", "spacestate.mu")
+                if p.name not in _GENERATED_PAGES
             )
         return n
 
@@ -313,6 +336,31 @@ class NomadNode:
             # request -- we retry no sooner than one TTL from now.
             self._spaceapi_fetched_at = time.monotonic()
             self._spaceapi_refreshing = False
+
+    def _events_maybe_refresh(self) -> None:
+        """Lazy refresh, same contract as ``_spaceapi_maybe_refresh``: called
+        from an RNS request thread, kicks a background fetch when the cached
+        agenda is missing/stale and returns at once -- never blocks the page."""
+        if not self._events_ical_url or self._events_refreshing or self._loop is None:
+            return
+        age = time.monotonic() - self._events_fetched_at
+        if self._events_fetched_at and age < _EVENTS_TTL_S:
+            return
+        self._events_refreshing = True
+        self._loop.call_soon_threadsafe(
+            lambda: self._loop.create_task(self._refresh_events())
+        )
+
+    async def _refresh_events(self) -> None:
+        try:
+            result = await asyncio.to_thread(ical.fetch, self._events_ical_url)
+            if result is not None:  # [] is a valid "nothing scheduled"
+                self._events = result
+        except Exception:  # noqa: BLE001
+            logger.debug("iCal refresh failed", exc_info=True)
+        finally:
+            self._events_fetched_at = time.monotonic()
+            self._events_refreshing = False
 
     def _spaceapi_word(self) -> str:
         """Colour-coded OPEN / CLOSED / unknown, as a Micron fragment."""
@@ -512,6 +560,35 @@ class NomadNode:
         if not s:
             lines.append("")
             lines.append("(status not fetched yet -- try again shortly)")
+        lines += ["", "`[Home`:/page/index.mu]"]
+        return ("\n".join(lines)).encode("utf-8")
+
+    def _serve_events(self, request_path, data, request_id, link_id, remote_identity, requested_at):
+        """Upcoming events from the configured iCal feed -- only registered
+        when ``node_events_ical_url`` is set. Served from the cached last-good
+        fetch; viewing the page is what triggers a lazy refresh, so a stale
+        agenda self-heals on the next load."""
+        self._requests_served += 1
+        fetched = self._events_fetched_at > 0
+        self._events_maybe_refresh()
+        lines = [
+            "`c`F0a0`!Upcoming events`!`f`a",
+            "`c" + _esc(self._name) + "`a",
+            "-",
+        ]
+        if not self._events:
+            lines.append(
+                "(nothing scheduled)" if fetched
+                else "(not fetched yet -- try again shortly)"
+            )
+        for ev in self._events:
+            summary = _esc(ev.get("summary") or "") or "(untitled)"
+            url = ev.get("url") or ""
+            lines.append("")
+            lines.append("`F888" + _esc(ical.format_when(ev)) + "`f")
+            lines.append(
+                f"`[{summary}`{url}]" if url.startswith("http") else summary
+            )
         lines += ["", "`[Home`:/page/index.mu]"]
         return ("\n".join(lines)).encode("utf-8")
 

@@ -38,4 +38,4 @@ Reticulum -- no accounts, no servers.
 `F888Sideband  `f: `[unsigned.io/sideband`https://unsigned.io/sideband]
 
 -
-`[<< Main menu`:/page/index.mu]     `[Bulletins >>`:/page/bulletins.mu]
+`[<< Main menu`:/page/index.mu]     `[Upcoming events >>`:/page/events.mu]

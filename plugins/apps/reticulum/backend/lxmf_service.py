@@ -144,6 +144,7 @@ class LxmfService:
         hardware_description: str = "",
         project_url: str = "https://github.com/KMX415/meshpoint",
         spaceapi_url: str = "",
+        events_ical_url: str = "",
     ):
         self._display_name = display_name
         self._reticulum_config_dir = Path(reticulum_config_dir)
@@ -157,6 +158,7 @@ class LxmfService:
         self._hardware_description = hardware_description
         self._project_url = project_url
         self._spaceapi_url = spaceapi_url
+        self._events_ical_url = events_ical_url
         self._node = None
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._router = None
@@ -247,6 +249,7 @@ class LxmfService:
                 hardware_description=self._hardware_description,
                 project_url=self._project_url,
                 spaceapi_url=self._spaceapi_url,
+                events_ical_url=self._events_ical_url,
             )
             await self._node.start()
 

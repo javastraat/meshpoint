@@ -19,7 +19,7 @@ The space is right now: {spacestate}
 `[1  -  About TechInc`:/page/techinc.mu]
 `[2  -  About Meshpoint`:/page/meshpoint.mu]
 `[3  -  Get on the mesh`:/page/mesh.mu]
-`[4  -  Bulletins / news`:/page/bulletins.mu]
+`[4  -  Upcoming events`:/page/events.mu]
 `[5  -  Other nodes & links`:/page/links.mu]
 `[6  -  Space status (open / closed)`:/page/spacestate.mu]
 `[7  -  Live node stats`:/page/info.mu]

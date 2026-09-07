@@ -113,6 +113,7 @@ def register(reg) -> None:
             hardware_description=context.config.device.hardware_description,
             project_url=project_url,
             spaceapi_url=state.node_config()["spaceapi_url"],
+            events_ical_url=state.node_config()["events_ical_url"],
         )
 
     def wire(service, context):

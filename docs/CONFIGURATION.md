@@ -249,6 +249,7 @@ plugins:
     node_pages_dir: "data/reticulum/pages"  # your .mu files; files/ -> /file/...
     node_announce_interval_s: 21600         # 6h
     node_spaceapi_url: ""                   # optional: a hackerspace SpaceAPI feed
+    node_events_ical_url: ""                # optional: an iCalendar (.ics) feed
 ```
 
 `node_spaceapi_url` (optional, also on the Settings tab) points at a
@@ -256,10 +257,17 @@ plugins:
 them). When set, the node serves a generated **`/page/spacestate.mu`**
 (open/closed + address + IRC/e-mail), and any of your own `.mu` pages can
 use a **`{spacestate}`** token that's replaced at serve time with a
-colour-coded `OPEN` / `CLOSED` / `unknown`. The status is fetched once at
-startup, then lazily — only when a page that needs it is requested, cached
-2 min — so an unbrowsed node never polls the endpoint. Blank = none of
-that exists.
+colour-coded `OPEN` / `CLOSED` / `unknown`.
+
+`node_events_ical_url` (optional, also on the Settings tab) points at any
+iCalendar (`.ics`) feed. When set, the node serves a generated
+**`/page/events.mu`** — the next dozen upcoming events from the feed
+(summary + start time + link), soonest first.
+
+Both feeds are fetched once at startup, then lazily — only when a page
+that needs them is requested (`spacestate.mu` cached 2 min, `events.mu`
+15 min) — so an unbrowsed node never polls either endpoint. Blank = the
+page isn't registered.
 
 Registers a `nomadnetwork.node` destination on the *same identity* as your
 LXMF address, announces it, and serves a built-in `/page/index.mu` (a

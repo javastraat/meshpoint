@@ -729,6 +729,42 @@ open, no events feed). Built (Settings-tab visibility, user picked option 1):
 - NOTE the `{spacestate}` token is substituted only when the NODE serves the
   page -- the dashboard Pages-tab preview shows the raw token.
 
-Events/agenda deferred: needs an iCal feed. TechInc Meetup one works
-(`meetup.com/Technologia-Incognita/events/ical/`) but is just the recurring
-Wednesday social. Same generated-page + config-URL pattern would apply.
+SpaceAPI lazy-refresh + BBS [EDIT]-marker removal + techinc.mu "Contact us"
+block: committed 2026-09-07 (aeb6e72e / prior).
+
+---
+
+## 2026-09-07 — Events / iCal agenda for hosted nodes (uncommitted)
+
+User found `https://wiki.techinc.nl/TechInc.ical` (SMW iCalendar export; 302
+-> Special:Ask, urllib follows it). Floating times, no TZID/DESCRIPTION/RRULE,
+sorted DTSTART desc, limit=100. Built to mirror SpaceAPI exactly:
+- **`backend/ical.py`** (new): `fetch(url, *, now=None) -> list[dict]|None`.
+  urllib 8s / 512KB. `_unfold` (RFC5545 space-continuation), `_vevents`,
+  `_parse_vevent` (needs DTSTART+SUMMARY), `_parse_dt` (YYYYMMDD date-only /
+  `VALUE=DATE`; `...THHMMSS[Z]` -> naive, `Z` converted UTC->local via
+  `.astimezone()`), `_untext` (`\, \; \n \\`). Drops past events (end or
+  start < now), sorts soonest-first, caps `_MAX_EVENTS=12`. `[]` = valid
+  "nothing scheduled" (only fetch/decode failure -> None). `format_when(ev)`
+  -> `Wed 9 Sep  19:00` / `Sun 20 Sep` (all-day).
+- **`nomad_node.py`**: `NomadNode(events_ical_url=)`, `_events` list +
+  `_events_fetched_at` + `_events_refreshing`. `_events_maybe_refresh()` /
+  `_refresh_events()` = copy of the spaceapi lazy pattern, `_EVENTS_TTL_S=900`.
+  `start()` primes. `_serve_events` generated page (registered + `_page_count`
+  +1 only when url set). NB uses `_events_fetched_at>0` for the "fetched?"
+  check, not `self._events` (empty list is legit). New module-level
+  `_GENERATED_PAGES` frozenset (index/info/nodes/spacestate/events) replaces
+  the two inline name tuples in `_register_handlers` + `_page_count`.
+- **`state.py`** `node_events_ical_url` + `node_config()["events_ical_url"]`.
+  **`config_routes.py`**: field + validator renamed `_spaceapi_url_ok` ->
+  `_feed_url_ok` (now covers both url keys) + write dict.
+  **`lxmf_service.py`** / **`__init__.py`**: threaded through.
+  **`reticulum_settings_tab.js`**: "Events iCal URL (optional)" input
+  `data-rt-node-events` after the spaceapi one; wired render/_onSubmit.
+- **BBS**: `git rm sample-bbs-techinc/bulletins.mu`; `index.mu` menu item 4
+  -> "Upcoming events" `:/page/events.mu`; `mesh.mu` footer -> "Upcoming
+  events >>". README "Live bits" section rewritten for both URLs.
+- Tests: `test_ical.py` (9), `test_nomad_node.py` +5. 88 reticulum backend.
+- KNOWN NIT: feed is dense with the weekly "Social YYYY-MM-DD"; they crowd
+  out real events in the 12-item window. No dedup done (fragile) -- revisit
+  if user asks.

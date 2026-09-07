@@ -189,6 +189,17 @@ class ReticulumSettingsTab {
                                     Find yours at <code>directory.spaceapi.io</code>. Restart to apply.
                                 </span>
                             </label>
+                            <label class="cfg-field">
+                                <span class="cfg-field__label">Events iCal URL (optional)</span>
+                                <input class="cfg-field__input" type="text"
+                                       placeholder="https://your-wiki/Events.ics" data-rt-node-events>
+                                <span class="cfg-field__hint">
+                                    An <code>.ics</code> calendar feed. Set it and the node also
+                                    serves <code>/page/events.mu</code> — the next dozen upcoming
+                                    events, fetched on demand (once at boot, then only when the
+                                    page is viewed). Restart to apply.
+                                </span>
+                            </label>
                         </fieldset>
                         <div class="cfg-card__actions">
                             <button class="terminal-button terminal-button--primary" type="submit">
@@ -232,6 +243,7 @@ class ReticulumSettingsTab {
         this._nodeInterval = this._q('[data-rt-node-interval]');
         this._nodePages = this._q('[data-rt-node-pages]');
         this._nodeSpaceapi = this._q('[data-rt-node-spaceapi]');
+        this._nodeEvents = this._q('[data-rt-node-events]');
         this._nodeStatusEl = this._q('[data-rt-node-status]');
         this._statusEl = this._q('[data-rt-status]');
         this._rnsdStatusEl = this._q('[data-rt-rnsd-status]');
@@ -267,6 +279,7 @@ class ReticulumSettingsTab {
         if (this._nodeInterval) this._nodeInterval.value = rt.node_announce_interval_s ?? 21600;
         if (this._nodePages) this._nodePages.value = rt.node_pages_dir || 'data/reticulum/pages';
         if (this._nodeSpaceapi) this._nodeSpaceapi.value = rt.node_spaceapi_url || '';
+        if (this._nodeEvents) this._nodeEvents.value = rt.node_events_ical_url || '';
         this._loadNodeStatus();
         if (this._rnodeEnabled) this._rnodeEnabled.checked = rt.rnode_enabled !== false;
         if (this._frequency) {
@@ -404,6 +417,7 @@ class ReticulumSettingsTab {
             node_pages_dir: this._nodePages.value.trim() || 'data/reticulum/pages',
             node_announce_interval_s: Number(this._nodeInterval.value) || 21600,
             node_spaceapi_url: (this._nodeSpaceapi?.value || '').trim(),
+            node_events_ical_url: (this._nodeEvents?.value || '').trim(),
             rnode_enabled: rnodeEnabled,
             rnode_serial_port: this._serialPort.value,
             rnode_frequency_hz: Number(this._frequency.value),
