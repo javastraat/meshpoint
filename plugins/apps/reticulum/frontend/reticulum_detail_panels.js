@@ -60,6 +60,17 @@ function _rtSignalQuality(rssi) {
     return 'Poor';
 }
 
+// RNS interface names are full descriptors, e.g.
+// "TCPInterface[ReticulumNet Internet/node.reticulumnet.nl:4242]" --
+// much longer than anything Meshtastic/MeshCore's own rows ever show
+// (hardware names, dBm numbers), so unlike those it needs its own
+// shortening rather than just reusing the plain-text row helper: shows
+// the interface class name only, full descriptor as a hover title.
+function _rtShortInterfaceName(name) {
+    const short = name.split('[')[0].trim() || name;
+    return `<span title="${_rtEsc(name)}">${_rtEsc(short)}</span>`;
+}
+
 // Identical to node_drawer.js's own _hashColor -- same avatar-color
 // scheme for the same visual language.
 function _rtHashColor(str) {
@@ -68,6 +79,36 @@ function _rtHashColor(str) {
         hash = str.charCodeAt(i) + ((hash << 5) - hash);
     }
     return `hsl(${Math.abs(hash) % 360}, 55%, 45%)`;
+}
+
+// Same localStorage key + {hash, name} shape as reticulum_nomad.js's own
+// Browse-tab favourites (RT_NOMAD_FAV_KEY) -- duplicated on purpose
+// (same small-duplication convention as _RT_ASPECT_BADGES above) so a
+// node favourited from either the Peers drawer or the Browse tab shows
+// up in both: one shared list, not two. Scoped to nomadnetwork.node
+// peers only -- that's the only aspect the Browse picker actually does
+// anything useful with; favouriting an lxmf.delivery/propagation peer
+// here would just add a dead entry to that picker.
+const _RT_FAV_KEY = 'meshpoint.rtNomadFavourites';
+
+function _rtFavourites() {
+    try {
+        const v = JSON.parse(localStorage.getItem(_RT_FAV_KEY) || '[]');
+        return Array.isArray(v) ? v.filter((f) => f && f.hash) : [];
+    } catch (_) { return []; }
+}
+
+function _rtIsFavourite(hash) {
+    return _rtFavourites().some((f) => f.hash === hash);
+}
+
+function _rtToggleFavourite(hash, name) {
+    const list = _rtFavourites();
+    const idx = list.findIndex((f) => f.hash === hash);
+    if (idx >= 0) list.splice(idx, 1);
+    else list.push({ hash, name: name || `${hash.slice(0, 12)}…` });
+    try { localStorage.setItem(_RT_FAV_KEY, JSON.stringify(list)); } catch (_) {}
+    return idx < 0;  // true if it's now favourited
 }
 
 /** One collapsible `.nd-section` (node_drawer.css), populated with
@@ -149,6 +190,8 @@ class ReticulumPeerDrawer {
         const name = _rtEsc(peer.display_name || peer.destination_hash);
         const shortLabel = _rtEsc((peer.destination_hash || '').slice(0, 2)).toUpperCase();
         const color = _rtHashColor(peer.destination_hash || '');
+        const canFavourite = peer.aspect === 'nomadnetwork.node';
+        const isFav = canFavourite && _rtIsFavourite(peer.destination_hash);
 
         drawer.innerHTML = `
             <div class="nd-header">
@@ -159,6 +202,12 @@ class ReticulumPeerDrawer {
                         <div class="nd-header__id">${_rtEsc(peer.destination_hash)}</div>
                     </div>
                 </div>
+                ${canFavourite ? `
+                    <button class="nd-header__favorite${isFav ? ' nd-header__favorite--on' : ''}"
+                            data-favorite-toggle
+                            aria-pressed="${isFav ? 'true' : 'false'}"
+                            title="${isFav ? 'Remove from favourites' : 'Add to favourites'}">${isFav ? '★' : '☆'}</button>
+                ` : ''}
                 <button class="nd-close" title="Close">&times;</button>
             </div>
             <div class="nd-body">
@@ -166,6 +215,16 @@ class ReticulumPeerDrawer {
             </div>
         `;
         drawer.querySelector('.nd-close').addEventListener('click', () => this.close());
+        const favBtn = drawer.querySelector('[data-favorite-toggle]');
+        if (favBtn) {
+            favBtn.addEventListener('click', () => {
+                const nowOn = _rtToggleFavourite(peer.destination_hash, peer.display_name);
+                favBtn.classList.toggle('nd-header__favorite--on', nowOn);
+                favBtn.setAttribute('aria-pressed', nowOn ? 'true' : 'false');
+                favBtn.title = nowOn ? 'Remove from favourites' : 'Add to favourites';
+                favBtn.innerHTML = nowOn ? '★' : '☆';
+            });
+        }
 
         document.body.appendChild(backdrop);
         document.body.appendChild(drawer);
@@ -204,17 +263,31 @@ class ReticulumPeerDrawer {
 
         body.innerHTML = '';
 
-        if (peer.aspect === 'nomadnetwork.node' && typeof opts.onBrowse === 'function') {
+        const canSend = peer.aspect === 'lxmf.delivery' && typeof opts.onSendMessage === 'function';
+        const canBrowse = peer.aspect === 'nomadnetwork.node' && typeof opts.onBrowse === 'function';
+        if (canSend || canBrowse) {
             const actions = document.createElement('div');
             actions.className = 'nd-actions';
-            const browseBtn = document.createElement('button');
-            browseBtn.className = 'nd-action-btn nd-action-btn--primary';
-            browseBtn.textContent = 'Browse this node';
-            browseBtn.addEventListener('click', () => {
-                this.close();
-                opts.onBrowse(peer.destination_hash);
-            });
-            actions.appendChild(browseBtn);
+            if (canSend) {
+                const sendBtn = document.createElement('button');
+                sendBtn.className = 'nd-action-btn nd-action-btn--primary';
+                sendBtn.textContent = 'Send Message';
+                sendBtn.addEventListener('click', () => {
+                    this.close();
+                    opts.onSendMessage(peer.destination_hash);
+                });
+                actions.appendChild(sendBtn);
+            }
+            if (canBrowse) {
+                const browseBtn = document.createElement('button');
+                browseBtn.className = 'nd-action-btn nd-action-btn--primary';
+                browseBtn.textContent = 'Browse this node';
+                browseBtn.addEventListener('click', () => {
+                    this.close();
+                    opts.onBrowse(peer.destination_hash);
+                });
+                actions.appendChild(browseBtn);
+            }
             body.appendChild(actions);
         }
 
@@ -234,7 +307,7 @@ class ReticulumPeerDrawer {
             body.appendChild(_rtSection('Routing', [
                 { label: 'Hops', value: _rtEsc(link.hops != null ? String(link.hops) : 'unknown') },
                 { label: 'Path known', value: _rtEsc(link.has_path ? 'Yes' : 'No') },
-                { label: 'Next hop interface', value: link.next_hop_interface ? _rtEsc(link.next_hop_interface) : null },
+                { label: 'Next hop interface', value: link.next_hop_interface ? _rtShortInterfaceName(link.next_hop_interface) : null },
                 { label: 'Identity resolved', value: _rtEsc(link.identity_resolved ? 'Yes' : 'No') },
                 { label: 'Announces this session', value: link.announces_this_session ? _rtEsc(String(link.announces_this_session)) : null },
             ], true));

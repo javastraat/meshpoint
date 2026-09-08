@@ -12604,3 +12604,75 @@ it. **Not yet opened in a real browser** -- the live-verification
 screenshots above are from the *first* (`rt-pdm-*`) version; this exact-
 class-reuse rebuild needs its own look on the device before calling it
 done, added to `memory/reticulum_todo.md`'s Pi-verification list.
+
+## Same session, live-verified the exact-reuse rebuild, then found 3 real gaps by direct comparison
+
+User confirmed the exact-class-reuse announce popup side by side with
+Meshtastic's Packet detail and asked "these are the same?" -- yes, and
+the one visible difference (a focus-ring box around the close button in
+one screenshot, absent in the other) was correctly identified as just a
+focus-vs-already-scrolled-and-blurred timing artifact (both modals call
+`.focus()` on their close button identically at open time), not a real
+style gap.
+
+Then did the same comparison for the peer drawer against Meshtastic's
+node drawer and asked again -- this time there *were* three real,
+non-cosmetic differences, all called out honestly rather than claiming
+false parity:
+1. No action-buttons row for `lxmf.delivery` peers (Meshtastic has
+   Send Message + View on Map; Reticulum only ever had a Browse button,
+   and only for `nomadnetwork.node`).
+2. No favourite star (Meshtastic nodes can be starred via
+   `MeshpointNodeFavorites`; Reticulum peers had no equivalent).
+3. The "Next hop interface" value (a full RNS descriptor like
+   `TCPInterface[ReticulumNet Internet/node.reticulumnet.nl:4242]`) wrapped
+   across two lines -- much longer than anything Meshtastic's own rows
+   ever have to show.
+
+User said yes to fixing #1 and #3, and for #2 pointed out "we already
+have [favourites] in the browser for reticulum maybe combine them" --
+referring to `reticulum_nomad.js`'s existing Browse-tab favourites
+(`RT_NOMAD_FAV_KEY = 'meshpoint.rtNomadFavourites'`, `{hash, name}`
+objects in `localStorage`). Investigated that file directly rather than
+assume the shape, then **deliberately reused the exact same key and
+object shape** in `reticulum_detail_panels.js` (small duplicated
+functions -- `_rtFavourites`/`_rtIsFavourite`/`_rtToggleFavourite`, same
+convention as `_RT_ASPECT_BADGES` already duplicated in that file) so a
+node favourited from either the Peers drawer or the Browse tab shows up
+in both -- one shared list via shared storage, not two competing ones,
+without needing a new cross-file module for ~15 lines of logic. Scoped
+the star to `nomadnetwork.node` peers only (confirmed
+`_renderNodeOptions()` in `reticulum_nomad.js` doesn't filter by aspect,
+so favouriting a non-browsable peer would've added a dead entry to that
+picker).
+
+**Built**:
+- `ReticulumPeerDrawer` header gained a `nd-header__favorite` star
+  (identical class to Meshtastic's own, same ★/☆ glyphs, same
+  `--on` toggle class) for `nomadnetwork.node` peers only.
+- Actions row (`nd-actions`) now conditionally includes **Send
+  Message** (`lxmf.delivery`, admin-gated to match the Send tab itself
+  being admin-only) alongside/instead of **Browse this node**
+  (`nomadnetwork.node`) -- both `nd-action-btn--primary`, matching
+  Meshtastic's own two-button row shape.
+- `reticulum_panel.js` gained `composeMessageTo(destinationHash)`:
+  clears any active Send-tab peer-search filter (so the target option
+  can't be hidden), switches to the Send tab, sets the peer `<select>`
+  value, focuses the message text field. Wired as the drawer's
+  `onSendMessage` callback.
+- New `_rtShortInterfaceName()`: splits an RNS interface descriptor on
+  `[`, shows just the class name (e.g. `TCPInterface`), puts the full
+  original string in a `title` attribute for hover detail -- no core
+  CSS touched, this is a data-presentation fix in the plugin's own JS.
+
+**Verification**: `node --check` clean on both edited JS files, full
+backend suite unaffected (169 passed, same 9 pre-existing failures --
+this was a frontend-only change, no backend touched). CHANGELOG: new
+bullet after the exact-class-reuse one (a distinct follow-up, not an
+edit-in-place, since it's genuinely new functionality, not a style
+correction to the same feature). **None of these three additions have
+been opened in a browser yet** -- added to `memory/reticulum_todo.md`'s
+Pi-verification list (confirm Send Message pre-fills and focuses
+correctly, confirm cross-navigation between drawer-starred and
+Browse-tab-starred nodes actually shares state, confirm the interface
+name shortens with a working tooltip).

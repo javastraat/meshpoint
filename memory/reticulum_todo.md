@@ -63,7 +63,27 @@ checked on the Pi.
   both light/dark theme again, confirm the live Routing/Signal fetch
   populates, confirm a TCP-only peer shows no Signal section at all, and
   that section-collapse/expand + "View peer"/"Browse this node" still
-  work.
+  work. **LIVE-VERIFIED the exact-reuse version too** — user confirmed
+  side-by-side with Meshtastic's Packet detail that the announce popup
+  is genuinely identical (the one visible difference, a focus-ring box
+  around the close button in one screenshot but not the other, was just
+  a focus-vs-blurred-state artifact, not a style gap). Then compared the
+  peer drawer against Meshtastic's node drawer and found three **real**
+  (non-cosmetic) gaps, all fixed same day: added a **Send Message**
+  button (admin-only, `lxmf.delivery` peers) that jumps to the Send tab
+  pre-filled with that peer; added a **favourite star** for
+  `nomadnetwork.node` peers, sharing the exact same `localStorage` list
+  (`meshpoint.rtNomadFavourites`) the Browse tab's own favourites
+  already use — a node starred from either place shows starred in both;
+  and shortened the "Next hop interface" row (a long RNS descriptor like
+  `TCPInterface[ReticulumNet Internet/node.reticulumnet.nl:4242]`,
+  wrapped across two lines before) to just the interface class name with
+  the full string as a hover tooltip. **These three additions
+  themselves haven't been opened in a browser yet** — check the Send
+  Message button actually pre-fills and focuses the Send tab, that
+  starring a node from the drawer shows up in the Browse tab's
+  Favourites optgroup and vice versa, and that the interface name looks
+  right (short text + working tooltip).
 - **sample-bbs-techinc nav links (fixed 2026-09-07, not walked in a real
   NomadNet client)**: browse the hosted node in Sideband/NomadNet/
   MeshChat, click "Next" through every page, confirm no dead links and
@@ -120,7 +140,7 @@ checked on the Pi.
 | Activity | Raw announce feed | Activity tab: 200-entry ring buffer, live over `reticulum_announce` WS; incl. `call.audio` (stream-only); `nomadnetwork.node` rows get a Browse button |
 | Notifications | ntfy / webhook on inbound DM | `notify_url` config; fire-and-forget POST (`backend/notify.py`) |
 | Propagation node | LXMF store-and-forward relay | `propagation_enabled` + `propagation_storage_limit_mb`; own `lxmf.propagation` hash, re-announced 6 h; status line on Settings tab; `propagation` block on `GET /api/reticulum/status` |
-| Peers/Activity | Click-to-detail | Peers row → right-side drawer (identity, live routing via `GET /peers/{hash}/link`: hops/path/next-hop/identity-resolved/announce-count, signal from most recent announce, recent activity); Activity row → detail popup (routing, signal if heard via RNode, payload/app_data hex, "View peer"). Own JS/data (`reticulum_detail_panels.js`) but literally emits core's own `node_drawer.css`/`packet_detail_modal.css` class names (`nd-drawer`/`nd-section`/`nd-row`, `pdm-overlay`/`pdm-layer`/`pdm-row`) for pixel-identical styling — same reuse-not-duplicate pattern as `lw-*`/`mt-badge`/`terminal-button` elsewhere in this plugin |
+| Peers/Activity | Click-to-detail | Peers row → right-side drawer (identity, live routing via `GET /peers/{hash}/link`: hops/path/next-hop/identity-resolved/announce-count, signal from most recent announce, recent activity, a Send Message button for `lxmf.delivery` peers, a favourite star for `nomadnetwork.node` peers sharing the Browse tab's own favourites list); Activity row → detail popup (routing, signal if heard via RNode, payload/app_data hex, "View peer"). Own JS/data (`reticulum_detail_panels.js`) but literally emits core's own `node_drawer.css`/`packet_detail_modal.css` class names (`nd-drawer`/`nd-section`/`nd-row`, `pdm-overlay`/`pdm-layer`/`pdm-row`) for pixel-identical styling — same reuse-not-duplicate pattern as `lw-*`/`mt-badge`/`terminal-button` elsewhere in this plugin |
 | Browsing | NomadNet node browser | Browse tab: live filter, ☆ favourites, `:/page/x.mu` shortcuts |
 | Hosting | Our own `nomadnetwork.node` | one hash = "message me" + "browse me" |
 | Hosting | Generated `index` / `info` / `nodes` pages | `info.mu` = live version/uptime/host/mesh-activity stats |

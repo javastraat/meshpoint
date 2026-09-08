@@ -359,6 +359,22 @@ class ReticulumPanel {
         if (this._nomadTab) this._nomadTab.openNode(destinationHash);
     }
 
+    /** Open the Send tab pre-filled with a specific peer (Peers-drawer
+     * "Send Message" button) -- clears any active search filter first so
+     * the target option is guaranteed visible/selectable. */
+    composeMessageTo(destinationHash) {
+        this._sendPeerSearchQuery = '';
+        const searchEl = this._q('#rt-send-peer-search');
+        if (searchEl) searchEl.value = '';
+        const clearBtn = this._q('#rt-send-peer-search-clear');
+        if (clearBtn) clearBtn.hidden = true;
+        this._renderSendPeers();
+        this._setTab('send');
+        const select = this._q('#rt-send-peer');
+        if (select) select.value = destinationHash;
+        this._q('#rt-send-text')?.focus();
+    }
+
     /** Peers-row click -> right-side drawer (reticulum_detail_panels.js).
      * Recent-activity list is filtered client-side from the Activity ring
      * buffer already in memory -- no extra fetch, same shape as the
@@ -368,6 +384,8 @@ class ReticulumPanel {
         const recent = this._announces.filter((a) => a.destination_hash === peer.destination_hash);
         this._peerDrawer.open(peer, recent, {
             onBrowse: peer.aspect === 'nomadnetwork.node' ? (hash) => this.browseNode(hash) : undefined,
+            onSendMessage: (peer.aspect === 'lxmf.delivery' && this._isAdmin)
+                ? (hash) => this.composeMessageTo(hash) : undefined,
             onViewAnnounce: (entry) => this._openAnnounceModal(entry),
         });
     }
