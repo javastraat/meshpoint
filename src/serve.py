@@ -54,6 +54,31 @@ def _bind_address() -> tuple[str, int]:
         return FALLBACK_HOST, FALLBACK_PORT
 
 
+def _tls_files() -> tuple[str, str] | None:
+    """(keyfile, certfile) if ``dashboard.tls_enabled`` and the cert is
+    ready, else ``None`` (plain HTTP). Cert generation/regeneration
+    failures fall back to HTTP rather than crash-loop the service --
+    same reasoning as ``_bind_address``'s own fallback: this dashboard
+    is also the tool an operator would use to fix whatever's wrong."""
+    try:
+        from src.config import load_config
+
+        dashboard = load_config().dashboard
+        if not dashboard.tls_enabled:
+            return None
+
+        from src.tls_cert import ensure_cert
+
+        ensure_cert(dashboard.tls_cert_path, dashboard.tls_key_path)
+        return dashboard.tls_key_path, dashboard.tls_cert_path
+    except Exception:
+        logger.exception(
+            "dashboard.tls_enabled is set but the TLS cert could not be "
+            "prepared; falling back to plain HTTP",
+        )
+        return None
+
+
 def main() -> None:
     import uvicorn
 
@@ -71,7 +96,17 @@ def main() -> None:
             FALLBACK_PORT,
         )
         host, port = FALLBACK_HOST, FALLBACK_PORT
-    uvicorn.run("src.api.server:create_app", factory=True, host=host, port=port)
+
+    tls = _tls_files()
+    ssl_kwargs = {}
+    if tls is not None:
+        keyfile, certfile = tls
+        ssl_kwargs = {"ssl_keyfile": keyfile, "ssl_certfile": certfile}
+        logger.info("HTTPS enabled -- serving with self-signed cert %s", certfile)
+
+    uvicorn.run(
+        "src.api.server:create_app", factory=True, host=host, port=port, **ssl_kwargs,
+    )
 
 
 if __name__ == "__main__":

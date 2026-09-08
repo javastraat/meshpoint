@@ -1071,11 +1071,18 @@ dashboard:
   static_dir: "frontend"
   plugins_dir: "plugins"     # extra/community themes: <plugins_dir>/themes/<id>/
   theme: "dark"              # default theme for browsers that haven't picked one
+  tls_enabled: false          # serve HTTPS with a self-signed cert meshpoint manages itself
+  tls_cert_path: "data/tls/cert.pem"
+  tls_key_path: "data/tls/key.pem"
 ```
 
 Access at `http://<pi-ip>:8080`. Bind to `127.0.0.1` to restrict to local access only.
 
 Changes to `host`/`port`/`static_dir`/`plugins_dir` take effect on service restart. If the configured address can't be used (config typo, port already taken, privileged port), the server logs the problem and falls back to `0.0.0.0:8080` so the dashboard stays reachable.
+
+**`tls_enabled`** (config-file only, no Settings-tab toggle yet — same as `host`/`port`): serve HTTPS instead of plain HTTP. Off by default; without it, the dashboard — **including the login form** — is plaintext HTTP, readable by anything on the same network segment. There's no real DNS name to get a CA-signed cert against for a LAN device, so meshpoint generates and manages its own self-signed cert (`src/tls_cert.py`, using the `cryptography` package already bundled — no `openssl` install needed). Every address the dashboard might actually be reached at goes into the cert: every IP `hostname -I` reports (LAN, Tailscale/VPN, anything live), plus the machine's hostname and its `.local` mDNS name, plus `127.0.0.1`/`localhost`. The cert is (re)generated automatically at startup whenever that address set has drifted from what's already baked in — a DHCP lease renewal, connecting/disconnecting a VPN, or a hostname change all trigger a fresh cert next restart, so it never goes stale relative to what you're actually connecting to. `tls_cert_path`/`tls_key_path` default under `data/` (survives a backup/restore of `data/`, not committed to git); the private key is written `0600`. If cert generation fails for any reason, the dashboard falls back to plain HTTP rather than crash-loop — same "never lock the operator out of the tool that could fix the config" reasoning as a bad `host`/`port`.
+
+Since there's no real CA, every browser shows the expected "this certificate is self-signed" warning the first time it visits each address — that's inherent to a LAN device with no public DNS name, not a bug. Restart to apply after flipping `tls_enabled`, and note that once it's on, `http://` URLs to this dashboard stop working (the same port now speaks TLS only) — update bookmarks/QR codes to `https://`.
 
 **`theme`** — the default dashboard theme, one of the installed theme ids. Built-ins ship in `frontend/themes/` (`dark`, `light`, `high-contrast`, `sunlight`); the bundled extras in `plugins/themes/` are `solarized-dark`, `nord`, `gruvbox-dark`, `amber-mono`, `green-crt`, `dracula`, `catppuccin-mocha`, `rose-pine`, `everforest-dark`, `one-dark`, `kanagawa`, `github-dark`, `ayu-mirage`, `colorblind-safe`. It's what a browser shows when nobody has picked a theme via the topbar toggle; a per-browser choice made there overrides it locally. Editable at **Settings → Themes → Default theme** (admin only) or with `PUT /api/config/dashboard/theme` — applies live, no restart.
 

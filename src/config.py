@@ -375,6 +375,15 @@ class DashboardConfig:
     # plugins/themes/). Browsers that have never picked a theme use this;
     # a per-browser choice made in the theme toggle overrides it locally.
     theme: str = "dark"
+    # Serve HTTPS instead of plain HTTP. Off by default (existing installs
+    # keep working unchanged). The cert is a self-signed one meshpoint
+    # generates and regenerates itself (src/tls_cert.py) -- there's no
+    # real DNS name for a LAN device to get a CA-signed cert against, and
+    # bootstrapping one is out of scope for a local dashboard's threat
+    # model. Restart required to apply.
+    tls_enabled: bool = False
+    tls_cert_path: str = "data/tls/cert.pem"
+    tls_key_path: str = "data/tls/key.pem"
 
 
 @dataclass

@@ -12322,3 +12322,69 @@ root-vs-non-root once authenticated).
    check after every CHANGELOG edit paid off here). Restored the header
    in a follow-up edit, reverified 31 sections and exactly one
    `v0.8.0` header via grep.
+
+## TODO (2026-09-08, user is drafting their own security-recommendations doc, invited help) -- security hardening backlog
+
+Item 1 built same day (detail below); 2-4 not started -- user's own
+stated priority order:
+
+1. **HTTPS/TLS option -- BUILT 2026-09-08, not yet live-tested on the
+   Pi.** New `dashboard.tls_enabled`/`tls_cert_path`/`tls_key_path`
+   (`src/config.py`, config-file only, no Settings-tab toggle yet -- same
+   as `host`/`port`). New `src/tls_cert.py` generates a self-signed cert
+   with the already-bundled `cryptography` package (no new dependency).
+   User asked specifically for the SAN list to cover **every** reachable
+   address, not just the primary LAN IP -- their test box has 2 IPs (LAN
+   + Tailscale) and is also reachable via `sensecap.local` over wifi -- so
+   it bakes in every IP `hostname -I` reports (same approach
+   `log_format.py`'s `_local_ip()` already used for the startup banner,
+   just keeping all of them instead of the first), the hostname + 
+   `<hostname>.local`, and `127.0.0.1`/`localhost`. Auto-regenerates at
+   every startup if that address set has drifted from what's already
+   baked into the on-disk cert. Wired into `serve.py` via `_tls_files()`,
+   falling back to plain HTTP on any generation failure (same
+   never-crash-loop-the-fix-it-tool reasoning `_bind_address()` already
+   uses). Real bug caught by smoke-testing on the Mac before writing
+   tests: `socket.gethostname()` already returns `name.local` on macOS
+   (just the short name on Raspberry Pi OS) -- first version doubled it
+   into `name.local.local`; fixed by normalizing to the short form
+   first. 16 new tests (`test_tls_cert.py` x12, new `test_serve.py` x4 --
+   `serve.py` had zero prior coverage). CONFIGURATION.md + CHANGELOG
+   updated. **Next step**: set `tls_enabled: true` on the real device,
+   restart, confirm HTTPS actually works over the LAN IP, the Tailscale
+   IP, and `sensecap.local` -- and confirm the only warning shown is the
+   expected self-signed one, not also a hostname-mismatch warning.
+2. **Move things off root onto the `meshpoint` user (or similar)** --
+   "in longer term... to limit attack surface," specifically the
+   self-update chain's `pip install` currently running as root via
+   `config/sudoers-meshpoint`'s `NOPASSWD` grant. Explicitly longer-term,
+   not urgent.
+3. **Web terminal -> plugin** -- moving the built-in Ops → Terminal
+   feature (currently core, admin-gated but root-equivalent via sudoers)
+   into an opt-in plugin, same shape as every other powerful/risky
+   capability in this app. "A good move prob, makes attack surface much
+   less via web" -- but "the root thing needs some thought," not
+   scoped/greenlit as a concrete build.
+4. **USB companion udev rules are too permissive** -- currently a mode
+   where every user on the box has full access to the serial devices;
+   should be `0660` with a `dialout`-or-`meshpoint` group instead. Raised
+   as an observation, not yet prioritized against the three above.
+
+Root cause of items 1-3 surfaced from the user asking "can we get root
+from the built-in webterminal" -- confirmed yes, trivially, via
+`config/sudoers-meshpoint`'s `NOPASSWD` grants for `pip install *` and
+`plugins/apps/*/setup.sh`. Read as an intentional tradeoff already
+documented in that file's own comments (the terminal's real security
+boundary is `require_admin` auth, not root-vs-non-root once
+authenticated) rather than an oversight -- but the user wants to shrink
+that surface anyway, hence this list.
+
+Full detail + reasoning also saved as a standing memory
+(`meshpoint-security-hardening-roadmap`, auto-memory system) so it's
+recalled automatically in future sessions regardless of whether this
+project file gets reread start-to-finish.
+
+**Separately, same session, already fixed** (not part of this backlog,
+a real vulnerability the user found and I patched immediately): the
+backup/restore tar-symlink issue -- see the dated entry directly above
+this one for full detail.
