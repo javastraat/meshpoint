@@ -384,6 +384,12 @@ class DashboardConfig:
     tls_enabled: bool = False
     tls_cert_path: str = "data/tls/cert.pem"
     tls_key_path: str = "data/tls/key.pem"
+    # uvicorn can't serve plain HTTP and HTTPS on the same socket, so
+    # once tls_enabled is on, `port` above becomes a plain-HTTP listener
+    # that does nothing but 308-redirect to this port -- the real
+    # dashboard moves here. Bookmarks/QR codes to :port stop working as
+    # a dashboard URL and instead just bounce to :tls_port.
+    tls_port: int = 8443
 
 
 @dataclass

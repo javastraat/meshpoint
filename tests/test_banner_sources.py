@@ -117,6 +117,22 @@ class BannerSourceLinesTest(unittest.TestCase):
         self.assertIn("Dashboard", out)
         self.assertIn("https://", out)
 
+    def test_dashboard_line_shows_tls_port_not_plain_port_when_enabled(self) -> None:
+        # dashboard.port becomes the redirect-only listener once TLS is
+        # on (src/serve.py) -- the banner must point at tls_port, the
+        # port the real dashboard is actually reachable on.
+        cfg = _eu868_config()
+        cfg.dashboard.tls_enabled = True
+        cfg.dashboard.port = 8080
+        cfg.dashboard.tls_port = 8443
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            print_banner(cfg)
+        out = buf.getvalue()
+        dashboard_line = next(line for line in out.splitlines() if "Dashboard" in line)
+        self.assertIn(":8443", dashboard_line)
+        self.assertNotIn(":8080", dashboard_line)
+
 
 if __name__ == "__main__":
     unittest.main()

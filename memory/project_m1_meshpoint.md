@@ -12365,6 +12365,38 @@ stated priority order:
    against all three addresses (LAN IP / Tailscale IP / `sensecap.local`)
    to confirm only the expected self-signed warning shows, not also a
    hostname-mismatch one -- the log only confirms the server side.
+
+   **Follow-up, BUILT same day**: user asked for old `http://host:8080`
+   bookmarks to redirect to HTTPS on refresh once TLS is on. Real
+   constraint explained first (one socket can't speak both HTTP and
+   HTTPS -- needs a second listener, not a sniff-and-branch trick); used
+   `AskUserQuestion` to settle the port split after a garbled reply --
+   user picked **8443** for HTTPS, `8080` stays as redirect-only. New
+   `dashboard.tls_port` (default 8443). `serve.py`'s `main()` now runs
+   two `uvicorn.Server`s concurrently via `asyncio.gather()` when TLS is
+   on: the real app on `tls_port`, and a new tiny ASGI app
+   (`_make_https_redirect_app()`) on `port` that 308s every request to
+   the same host+path on `tls_port` -- reads the target host from the
+   request's own Host header so it works for whichever of the box's
+   several addresses someone actually used, matching `tls_cert.py`'s
+   multi-address SAN design. `tls_port` gets its own bind-check,
+   disabling TLS for that run (not crash-looping) if it can't bind.
+   Banner updated to show `tls_port` when TLS is on. 9 new/updated
+   tests in `test_serve.py`, 1 more in `test_banner_sources.py`. Hand-
+   verified by actually starting both uvicorn servers via
+   `asyncio.gather` in a throwaway script and confirming a real HTTP
+   client followed the 308 to the correct target. CONFIGURATION.md +
+   CHANGELOG updated (same bullet, extended). **Not yet live-tested on
+   the device.**
+
+   Also: user asked whether all this is in `config/default.yaml` too --
+   turned out they'd already added `tls_enabled`/`tls_cert_path`/
+   `tls_key_path` there themselves in their first TLS commit; only
+   `tls_port` was missing, added it. They then tidied it further
+   themselves right after (commented out the two path keys as inline
+   docs, kept `tls_enabled`/`tls_port` live) -- confirmed config still
+   resolves identically either way since the Python dataclass defaults
+   cover the commented-out keys.
 2. **Move things off root onto the `meshpoint` user (or similar)** --
    "in longer term... to limit attack surface," specifically the
    self-update chain's `pip install` currently running as root via

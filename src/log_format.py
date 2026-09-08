@@ -429,8 +429,10 @@ def print_banner(config: AppConfig, sources=None) -> None:
         info_lines.append(("Upstream", upstream.url))
     else:
         info_lines.append(("Upstream", f"{DIM}disabled{RESET}"))
-    scheme = "https" if dashboard.tls_enabled else "http"
-    info_lines.append(("Dashboard", f"{scheme}://{_local_ip()}:{dashboard.port}"))
+    if dashboard.tls_enabled:
+        info_lines.append(("Dashboard", f"https://{_local_ip()}:{dashboard.tls_port}"))
+    else:
+        info_lines.append(("Dashboard", f"http://{_local_ip()}:{dashboard.port}"))
 
     for label, value in info_lines:
         print(f"   {DIM}{label:<12}{RESET} {value}")

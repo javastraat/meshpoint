@@ -119,8 +119,11 @@ dashboard:                # web dashboard / API server
   # Editable from Settings -> Themes.
   theme: "dark"
   tls_enabled: false
-  tls_cert_path: "data/tls/cert.pem"
-  tls_key_path: "data/tls/key.pem"
+  # tls_cert_path: "data/tls/cert.pem"
+  # tls_key_path: "data/tls/key.pem"
+  # Once tls_enabled is on, `port` above becomes a plain-HTTP listener
+  # that only 308-redirects to this port -- the real dashboard moves here.
+  tls_port: 8443
 
 metrics:                  # Prometheus-compatible /metrics scrape endpoint
   enabled: false
