@@ -12151,3 +12151,67 @@ to `memory/reticulum_todo.md`'s Pi-verification list (enable both
 checkboxes, restart, DM `ping`/`help`/`stats`/etc. from Sideband/
 MeshChat, confirm a plain conversational DM gets no reply, confirm the
 save form rejects `talkback_enabled` without `node_enabled`).
+
+## Same session, immediately after — live test found (and fixed) a real bug: Reticulum messages didn't live-update the Messages page
+
+User actually ran the live test within minutes -- a real two-node exchange
+(their `rakv2-meshpoint` DMing `ti-meshpoint`'s bot with `stats`/`help`/
+`spacestate`/`events`). Screenshots showed the reply *content* was 100%
+correct on every command, but: "i send message dont get a reply (its
+send) after a page reload i see the reply, also no message notification.
+like it doesnt refresh on incoming rt message." A second round of 4
+screenshots (one of each node, before/after reload) showed the same
+symptom on **both** sides -- the sender not seeing an arriving reply live,
+*and* the bot's own hosting node not seeing its own outgoing reply appear
+in its own open thread live either.
+
+Delegated root-cause investigation to a subagent (given the file paths/
+line numbers involved and the size of the two-page trace) rather than
+guessing: the core cross-protocol **Messages** page (`frontend/js/
+messaging.js`) only live-updates on a generic `message_received` /
+`message_updated` / `message_sent` WS event, shared by every protocol.
+Meshtastic/MeshCore's inbound path (`src/api/server.py:1817`) broadcasts
+`message_received` with `{text, node_id, node_name, protocol, direction,
+packet_id, source_id, destination_id}`. Reticulum's `_handle_inbound_
+message` (`lxmf_service.py`) only ever broadcast a **plugin-private**
+`reticulum_message` event -- consumed solely by `reticulum_panel.js`'s
+own tab, never registered with by the core Messages page at all. Not a
+payload-shape bug, not a timing bug: the core page simply never
+subscribed to the event Reticulum was firing. This is a pre-existing gap
+in *every* Reticulum DM, not something the talkback bot introduced --
+talkback just being the first thing that made someone actually watch a
+live two-way exchange closely enough to notice.
+
+**Fixed** (`plugins/apps/reticulum/backend/lxmf_service.py`):
+- `_handle_inbound_message` now also broadcasts `message_received` in the
+  core's exact shape (`protocol: "reticulum"`, `packet_id`, `source_id`,
+  `destination_id` included) alongside the existing `reticulum_message` --
+  fixes the receiving side (a user chatting with any Reticulum contact,
+  not just the bot).
+- `send_message()` now also broadcasts `message_sent` -- confirmed via
+  `grep -rn "message_sent" src/` that **no protocol currently fires this
+  event at all**, anywhere in the app, so this was genuinely dead
+  listener code in `messaging.js` since it was written; adding it here
+  carries zero regression risk to Meshtastic/MeshCore's existing
+  human-composed Send flow (that flow already renders optimistically
+  from the HTTP response, never waits on this event). Explicitly did
+  **not** touch `messaging.js`'s `message_sent` handler itself to also
+  append into an open thread -- it only ever updates the sidebar/contacts
+  list today, and making it also append would risk double-rendering a
+  normal human-typed sent message for every protocol, a regression I
+  can't verify without a live browser. Documented as a known remaining
+  gap: the bot's *own* hosting node still won't see its own auto-reply
+  appear as a bubble in an already-open thread (sidebar preview will
+  update now; the thread render still needs a reload) -- narrower and
+  much rarer than the fixed case (an ordinary user watching for a reply).
+
+**Verification**: added `TestInboundMessageBroadcast` (mocks `lxmf_
+service.RNS` and a fake `message` object, asserts both event names fire
+with the core-correct payload shape) plus a `_FakeMessageRepo` test
+helper. Full suite: 155 passed (was 154), same 7 pre-existing aiosqlite-
+gated failures. `ast.parse` clean. CHANGELOG: separate bullet under
+`### v0.8.1` right after the talkback one (a fix, not the same feature).
+**Not yet re-verified live** -- this whole fix was diagnosed and written
+from screenshots, never watched working on the actual device. Top item
+in `memory/reticulum_todo.md`'s Pi-verification list now: redo the same
+two-node DM exchange and confirm replies appear without a reload.

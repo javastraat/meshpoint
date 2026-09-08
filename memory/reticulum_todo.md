@@ -38,14 +38,22 @@ checked on the Pi.
   MeshChat, click "Next" through every page, confirm no dead links and
   that the `spacestate.mu`/`events.mu` cross-link only appears when both
   `node_spaceapi_url` and `node_events_ical_url` are actually set.
-- **Talk-back bot (new 2026-09-08, zero live testing)**: enable "Host a
-  NomadNet node" + "Talk-back bot" on the Settings tab, restart, then from
-  another LXMF client (Sideband/MeshChat) DM the node's `lxmf.delivery`
-  address `ping` (expect `pong`), `help`, `stats`, `nodes`, and — if
-  `node_spaceapi_url`/`node_events_ical_url` are set — `spacestate`/
-  `events`. Also worth confirming: a plain conversational DM (not a
-  command) gets no auto-reply, and the save form actually rejects
-  `talkback_enabled` with `node_enabled` off.
+- **Talk-back bot — LIVE-TESTED 2026-09-08, content confirmed correct**:
+  ran a real two-node exchange (rakv2-meshpoint ↔ ti-meshpoint), all of
+  `help`/`stats`/`spacestate`/`events` replied with correct real data
+  (screenshots). One bug found and fixed same day (see below) — a reply
+  didn't appear until a manual reload. Still not confirmed live:
+  `ping`/`nodes`, the "plain DM gets no reply" case, and that the save
+  form rejects `talkback_enabled` with `node_enabled` off.
+- **Fixed 2026-09-08: Reticulum messages (including talkback replies)
+  didn't live-update the Messages page.** Root cause: the core Messages
+  page only listens for a `message_received` WS event; `lxmf_service.py`
+  was only firing its own plugin-private `reticulum_message` event. Now
+  fires both. `send_message()` also now fires `message_sent` (previously
+  nothing did, anywhere). **Not yet re-verified live** — the diagnosis and
+  fix were made from screenshots, not by watching it work on the device.
+  Re-test the same two-node DM exchange and confirm replies now appear
+  without a reload on both sides.
 - **Propagation node — NEEDS TESTING** (UI is confirmed on the device, the
   relay itself is not):
   1. Settings → Propagation node → tick "Act as an LXMF propagation node" →
@@ -139,8 +147,11 @@ plugins:
 ## Done (this backlog's completed items)
 
 - **2026-09-08** — LXMF talk-back bot (`help`/`ping`/`stats`/`spacestate`/
-  `events`/`nodes` over DM, requires `node_enabled`). Not yet live-tested
-  against a real RNS stack -- see Pi-verification list above.
+  `events`/`nodes` over DM, requires `node_enabled`). Live-tested same day,
+  reply content confirmed correct; found + fixed a live-update bug in the
+  same session (Reticulum messages weren't reaching the core Messages
+  page's WS listener) — see Pi-verification list above for what's still
+  unconfirmed.
 - **2026-09-07** — Activity tab, DM notifications, LXMF propagation node
   (server side), click-to-detail on Peers/Activity, sample-bbs-techinc nav
   fixes + generated-page cross-links. Details: `memory/plugin-reticulum.md`

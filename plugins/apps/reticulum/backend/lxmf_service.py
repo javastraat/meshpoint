@@ -485,6 +485,23 @@ class LxmfService:
                 "node_id": source_hex, "node_name": name,
             },
         )
+        # Also fire the core cross-protocol event (src/api/server.py's own
+        # Meshtastic/MeshCore inbound path broadcasts this) so the shared
+        # Messages page live-updates an open Reticulum thread the same way
+        # it already does for every other protocol -- "reticulum_message"
+        # above is plugin-private, only reticulum_panel.js listens for it.
+        # Confirmed live 2026-09-08: without this, a reply only appeared
+        # after a manual page reload.
+        own_hex = RNS.hexrep(self._source.hash, delimit=False) if self._source else ""
+        await self._ws_manager.broadcast(
+            "message_received",
+            {
+                "text": text, "node_id": source_hex, "node_name": name,
+                "protocol": "reticulum", "direction": "received",
+                "packet_id": packet_id, "source_id": source_hex,
+                "destination_id": own_hex,
+            },
+        )
         if self._notify_url:
             self._spawn(self._notify_inbound(name or source_hex[:16], text))
         if self._talkback_enabled and self._node is not None:
@@ -582,6 +599,22 @@ class LxmfService:
         row_id = await self._message_repo.save_sent(
             text=text, node_id=destination_hash_hex, node_name=name,
             protocol="reticulum",
+        )
+        # No core protocol actually fires this today (messaging.js's own
+        # 'message_sent' listener only ever touches the sidebar/contacts
+        # list, never the open thread -- so this is safe to add: it can't
+        # double-render anything). Added so a *second* session watching
+        # this same conversation (e.g. the admin dashboard of the node
+        # that just auto-replied via the talkback bot) sees its sidebar
+        # preview update without a reload -- the session that actually
+        # called this (a human's Send tab) already renders optimistically
+        # from the HTTP response, same as every other protocol.
+        await self._ws_manager.broadcast(
+            "message_sent",
+            {
+                "text": text, "node_id": destination_hash_hex, "node_name": name,
+                "protocol": "reticulum", "direction": "sent",
+            },
         )
         return row_id
 

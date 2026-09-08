@@ -49,6 +49,16 @@ class _FakeWs:
         self.events.append((event_type, data))
 
 
+class _FakeMessageRepo:
+    def __init__(self):
+        self._next_id = 1
+
+    async def save_received(self, *, text, node_id, node_name, protocol, packet_id):
+        row_id = self._next_id
+        self._next_id += 1
+        return row_id, False
+
+
 @unittest.skipIf(
     lxmf_service.RNS is not None,
     "rns/lxmf installed -- this covers only the not-available path",
@@ -251,6 +261,34 @@ class _FakeNode:
 
     def events_snapshot(self):
         return list(self._events)
+
+
+class TestInboundMessageBroadcast(unittest.TestCase):
+    """Confirmed live 2026-09-08: the core cross-protocol Messages page
+    only listens for 'message_received' -- 'reticulum_message' is
+    plugin-private (reticulum_panel.js's own listener), so without also
+    firing the core event an inbound Reticulum message (including a
+    talkback reply) never live-updates an open thread there, only after
+    a manual page reload."""
+
+    def test_fires_both_the_plugin_and_core_events(self) -> None:
+        svc = _make_service(
+            peer_repo=_FakePeerRepo(), message_repo=_FakeMessageRepo(), ws_manager=_FakeWs(),
+        )
+        message = mock.Mock(source_hash=b"\xaa" * 16, content=b"hello", hash=b"\xbb" * 8)
+        with mock.patch.object(lxmf_service, "RNS") as mock_rns:
+            mock_rns.hexrep.return_value = "aa" * 16
+            asyncio.run(svc._handle_inbound_message(message))
+
+        kinds = [e[0] for e in svc._ws_manager.events]
+        self.assertIn("reticulum_message", kinds)
+        self.assertIn("message_received", kinds)
+
+        core_payload = next(d for k, d in svc._ws_manager.events if k == "message_received")
+        self.assertEqual(core_payload["protocol"], "reticulum")
+        self.assertEqual(core_payload["direction"], "received")
+        self.assertEqual(core_payload["text"], "hello")
+        self.assertEqual(core_payload["node_id"], "aa" * 16)
 
 
 class TestTalkback(unittest.TestCase):
