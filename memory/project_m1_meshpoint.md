@@ -12536,6 +12536,71 @@ original click-to-detail one) + `memory/reticulum_todo.md` updated.
 RSSI-history mini-chart across a peer's repeated RNode-heard announces
 -- flagged as real extra frontend work for a follow-up, not backend
 work, since all the underlying data (rssi per announce entry) is
-already captured now. **Not yet opened in a real browser at all** --
-this entire redesign is unverified live; top item to check next on the
-Peers/Activity Pi-verification list.
+already captured now.
+
+## Same session, immediately after — live-verified, then pushed further: "why can't we have them 100% the same"
+
+User shared two live screenshots minutes later: the redesigned announce
+popup (Routing + Payload sections, real data) and the peer drawer
+(live-resolved Routing section -- Hops: 4, Path known: Yes, Next hop
+interface `TCPInterface[...]`, Identity resolved: Yes, Announces this
+session: 1) -- confirming the whole backend + first-pass frontend
+redesign actually works on the real device.
+
+Then asked directly: "why can't we have them 100% the same looking as
+in meshcore or meshtastic drawer and popup?" -- a fair challenge to the
+first pass, which had used hand-copied `rt-pdm-*` CSS (rules manually
+transcribed from `packet_detail_modal.css`'s values) rather than the
+actual core classes. Recognized this was a real, fixable gap, not an
+architectural constraint: `.pdm-layer`/`.pdm-row`/`.nd-drawer`/
+`.nd-section`/`.nd-row` are just layout/color rules with zero
+protocol-specific JS behavior baked into the CSS itself -- both
+stylesheets already load globally on every page (confirmed back in the
+very first click-to-detail investigation this session), so emitting
+those literal class names from the plugin's own markup gives true
+pixel-identical styling, not an approximation, for free -- exactly the
+same "reuse global core CSS classes, don't duplicate them" pattern this
+plugin already follows for `lw-*`/`mt-badge`/`terminal-button`/`cfg-*`.
+The original 2026-09-07 reasoning for building something separate was
+never "don't reuse core CSS" -- it was "don't teach `NodeDrawer`/
+`PacketDetailModal`'s own *JS classes* a Reticulum-shaped branch" (their
+`_fetchDetail`/`_buildInfoSection`/etc. are hardcoded to Meshtastic/
+MeshCore field names and endpoints). Reusing their CSS classes on the
+plugin's own separately-instantiated DOM elements satisfies both: no
+core JS touched, no core file edited, and now genuinely identical
+visuals too.
+
+**Rebuilt `reticulum_detail_panels.js` a second time**: peer drawer now
+builds `nd-drawer`/`nd-header`/`nd-avatar`/`nd-header__info`/`nd-close`/
+`nd-body` chrome, `nd-actions`/`nd-action-btn` for the Browse button,
+and a new `_rtSection()` helper reproducing `NodeDrawer._buildSection`'s
+exact collapsible behavior (click header, toggle `nd-section__content`
+display, flip the `▼`/`▶` arrow) over `nd-section`/`nd-row` rows. Avatar
+color uses `_rtHashColor()`, a verbatim copy of `node_drawer.js`'s own
+`_hashColor` (same hash function, same `hsl(...)` output). Announce
+popup now builds `pdm-overlay`/`pdm-modal`/`pdm-layer`/`pdm-row`/
+`pdm-expand`/`pdm-payload-text` directly, mirroring
+`packet_detail_modal.js`'s own `_buildLayer`/`_row`/`_expandableBlock`
+method shapes closely enough that a future core change to that modal's
+markup would be easy to notice and re-mirror. Gutted `reticulum.css`'s
+entire drawer/modal block (removed ~170 lines of `rt-drawer-backdrop`/
+`rt-drawer__*`/`rt-amodal*`/`rt-pdm-*` rules -- extracted the file's
+head via `sed`, hand-verified the cut point with a `diff`, replaced the
+tail with a ~20-line block) down to exactly two plugin-specific rules
+that couldn't be core reuse: `.rt-activity-row` (a `<button>` needs its
+own browser-default-chrome reset that no core class provides) and
+`.rt-amodal__view-peer` (spacing for an action button popup_detail_modal
+has no equivalent of, since it doesn't have plugin-injected buttons).
+
+**Verification**: full plugin suite unaffected (169 passed, same 9
+pre-existing failures -- this was a frontend-only change), `node --check`
+clean, CSS brace-balance checked, grepped both `reticulum_detail_panels.js`
+and every other plugin frontend file for leftover `rt-drawer`/`rt-pdm`/
+`rt-amodal` references (only the one legitimate `rt-amodal__view-peer`
+remains). CHANGELOG bullet updated in place (same `### v0.8.1` entry,
+description of the CSS approach corrected) rather than a new bullet,
+since this supersedes the first pass's approach rather than adding to
+it. **Not yet opened in a real browser** -- the live-verification
+screenshots above are from the *first* (`rt-pdm-*`) version; this exact-
+class-reuse rebuild needs its own look on the device before calling it
+done, added to `memory/reticulum_todo.md`'s Pi-verification list.

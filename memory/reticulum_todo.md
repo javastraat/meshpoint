@@ -41,14 +41,29 @@ checked on the Pi.
   resolved/announce-count via new `GET /peers/{hash}/link`), a Signal
   section when the peer's most recent announce carried RSSI/SNR (RNode-
   heard only), then Recent activity; click an Activity row → popup shows
-  Routing/Signal/Payload the same way. Own `rt-pdm-*` CSS classes mirror
-  `packet_detail_modal.css`'s look without touching that core file.
-  **Nothing here has been opened in a browser yet** — check both light
-  and dark theme, confirm the live Routing/Signal fetch actually
-  populates (not stuck on "Loading routing info…"), confirm a peer heard
-  only over the TCP backbone correctly shows no Signal section at all
-  (not a blank one), and that "View peer"/"Browse this node" still
-  cross-navigate correctly.
+  Routing/Signal/Payload the same way. **LIVE-VERIFIED same day** — user
+  shared screenshots of both working on the device: the announce popup
+  showing Routing + Payload, the peer drawer showing a live-resolved
+  Routing section (Hops: 4, Path known: Yes, Next hop interface
+  `TCPInterface[...]`, Identity resolved: Yes, Announces this session).
+  **Then asked "why can't we have them 100% the same looking as in
+  meshcore or meshtastic"** -- correctly pushed back on the first pass
+  using hand-copied `rt-pdm-*` CSS that only *approximated*
+  `packet_detail_modal.css`. Rebuilt to literally emit core's own class
+  names (`nd-drawer`/`nd-header`/`nd-section`/`nd-row` for the peer
+  drawer, `pdm-overlay`/`pdm-modal`/`pdm-layer`/`pdm-row` for the
+  announce popup) instead of duplicating them -- both stylesheets
+  already load globally, same reasoning as this plugin already reusing
+  `lw-*`/`mt-badge`/`terminal-button`/`cfg-*`, so this is genuinely
+  pixel-identical now, not a lookalike. Peer drawer sections are also
+  now collapsible (matching NodeDrawer's own arrow-toggle behavior),
+  and the avatar circle uses the exact same hash-to-HSL-color function.
+  **Not yet re-verified live with this second (exact-reuse) version** --
+  the screenshots above are from the *first* (`rt-pdm-*`) version; check
+  both light/dark theme again, confirm the live Routing/Signal fetch
+  populates, confirm a TCP-only peer shows no Signal section at all, and
+  that section-collapse/expand + "View peer"/"Browse this node" still
+  work.
 - **sample-bbs-techinc nav links (fixed 2026-09-07, not walked in a real
   NomadNet client)**: browse the hosted node in Sideband/NomadNet/
   MeshChat, click "Next" through every page, confirm no dead links and
@@ -105,7 +120,7 @@ checked on the Pi.
 | Activity | Raw announce feed | Activity tab: 200-entry ring buffer, live over `reticulum_announce` WS; incl. `call.audio` (stream-only); `nomadnetwork.node` rows get a Browse button |
 | Notifications | ntfy / webhook on inbound DM | `notify_url` config; fire-and-forget POST (`backend/notify.py`) |
 | Propagation node | LXMF store-and-forward relay | `propagation_enabled` + `propagation_storage_limit_mb`; own `lxmf.propagation` hash, re-announced 6 h; status line on Settings tab; `propagation` block on `GET /api/reticulum/status` |
-| Peers/Activity | Click-to-detail | Peers row → right-side drawer (identity, live routing via `GET /peers/{hash}/link`: hops/path/next-hop/identity-resolved/announce-count, signal from most recent announce, recent activity); Activity row → detail popup (routing, signal if heard via RNode, payload/app_data hex, "View peer"). Own components (`reticulum_detail_panels.js`), restyled 2026-09-08 to match core `packet_detail_modal.css`'s layered-section look (own `rt-pdm-*` classes) now that real RSSI/SNR/hop data makes that genuinely fit, not just cosmetic |
+| Peers/Activity | Click-to-detail | Peers row → right-side drawer (identity, live routing via `GET /peers/{hash}/link`: hops/path/next-hop/identity-resolved/announce-count, signal from most recent announce, recent activity); Activity row → detail popup (routing, signal if heard via RNode, payload/app_data hex, "View peer"). Own JS/data (`reticulum_detail_panels.js`) but literally emits core's own `node_drawer.css`/`packet_detail_modal.css` class names (`nd-drawer`/`nd-section`/`nd-row`, `pdm-overlay`/`pdm-layer`/`pdm-row`) for pixel-identical styling — same reuse-not-duplicate pattern as `lw-*`/`mt-badge`/`terminal-button` elsewhere in this plugin |
 | Browsing | NomadNet node browser | Browse tab: live filter, ☆ favourites, `:/page/x.mu` shortcuts |
 | Hosting | Our own `nomadnetwork.node` | one hash = "message me" + "browse me" |
 | Hosting | Generated `index` / `info` / `nodes` pages | `info.mu` = live version/uptime/host/mesh-activity stats |
