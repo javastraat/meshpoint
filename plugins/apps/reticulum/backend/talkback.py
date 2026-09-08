@@ -12,11 +12,17 @@ snapshot accessors (``stats_snapshot()`` / ``spaceapi_snapshot()`` /
 ``events_snapshot()``, which trigger the same lazy refresh viewing the
 corresponding page would) and calls ``build_reply()`` with the result.
 
-Loop-safety note: every reply here is prose that does not start with one of
-the recognized command words (see ``_COMMANDS``), so a reply from this bot
-can never itself be parsed as a new command -- two Meshpoint nodes with
-talkback on can't ping-pong each other indefinitely. ``lxmf_service.py``
-still applies a small per-sender cooldown as defence in depth.
+Commands require a leading ``.`` (``.help``, ``.ping``, ...) -- a bare
+"ping" or "stats" is common enough as an ordinary word that a human typing
+it conversationally shouldn't get an unexpected auto-reply instead of their
+actual correspondent. The ``.`` prefix is the same convention IRC/Slack/
+Discord bots use for exactly this reason.
+
+Loop-safety note: every reply here is prose that doesn't start with ``.``
+at all, so a reply from this bot can never itself be parsed as a new
+command -- two Meshpoint nodes with talkback on can't ping-pong each other
+indefinitely. ``lxmf_service.py`` still applies a small per-sender cooldown
+as defence in depth.
 """
 
 from __future__ import annotations
@@ -25,21 +31,30 @@ from typing import Optional
 
 from . import ical
 
-# Order here is also the order `help` lists them in.
+_COMMAND_PREFIX = "."
+
+# Order here is also the order `.help` lists them in.
 _COMMANDS = ("help", "ping", "stats", "spacestate", "events", "nodes")
+
+
+def _display(command: str) -> str:
+    return _COMMAND_PREFIX + command
+
 
 _MAX_EVENTS_IN_REPLY = 5
 _MAX_NODES_IN_REPLY = 15
 
 
 def parse_command(text: str) -> Optional[str]:
-    """The first whitespace-delimited word, lowercased, if (and only if)
-    it's one of the recognized commands -- anything else is treated as an
-    ordinary DM, not a bot query, and gets no reply at all."""
+    """The first whitespace-delimited word, lowercased and with the leading
+    ``.`` stripped, if (and only if) it starts with ``.`` and the remainder
+    is one of the recognized commands -- anything else (including a bare
+    "help"/"ping" with no dot) is treated as an ordinary DM, not a bot
+    query, and gets no reply at all."""
     stripped = (text or "").strip()
-    if not stripped:
+    if not stripped or not stripped.startswith(_COMMAND_PREFIX):
         return None
-    word = stripped.split(None, 1)[0].lower()
+    word = stripped.split(None, 1)[0].lower()[len(_COMMAND_PREFIX):]
     return word if word in _COMMANDS else None
 
 
@@ -86,7 +101,7 @@ def _reply_help(spaceapi_configured: bool, events_configured: bool) -> str:
     if events_configured:
         cmds.append("events")
     cmds.append("nodes")
-    return "Commands: " + ", ".join(cmds)
+    return "Commands: " + ", ".join(_display(c) for c in cmds)
 
 
 def _reply_stats(node_name: str, stats: dict) -> str:

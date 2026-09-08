@@ -9,16 +9,26 @@ from plugins.apps.reticulum.backend import talkback
 
 
 class TestParseCommand(unittest.TestCase):
-    def test_recognizes_each_command_case_insensitively(self) -> None:
+    def test_recognizes_each_dotted_command_case_insensitively(self) -> None:
         for cmd in ("help", "ping", "stats", "spacestate", "events", "nodes"):
             with self.subTest(cmd=cmd):
-                self.assertEqual(talkback.parse_command(cmd.upper()), cmd)
+                self.assertEqual(talkback.parse_command("." + cmd.upper()), cmd)
+
+    def test_bare_word_without_dot_is_not_a_command(self) -> None:
+        # The whole point of the dot prefix: a human typing a plain word
+        # that happens to match a command name must not trigger a reply.
+        for cmd in ("help", "ping", "stats", "spacestate", "events", "nodes"):
+            with self.subTest(cmd=cmd):
+                self.assertIsNone(talkback.parse_command(cmd))
 
     def test_only_first_word_matters(self) -> None:
-        self.assertEqual(talkback.parse_command("ping me back please"), "ping")
+        self.assertEqual(talkback.parse_command(".ping me back please"), "ping")
 
     def test_strips_surrounding_whitespace(self) -> None:
-        self.assertEqual(talkback.parse_command("  stats  "), "stats")
+        self.assertEqual(talkback.parse_command("  .stats  "), "stats")
+
+    def test_unrecognized_dotted_word_returns_none(self) -> None:
+        self.assertIsNone(talkback.parse_command(".banana"))
 
     def test_unrecognized_text_returns_none(self) -> None:
         self.assertIsNone(talkback.parse_command("hey, are you around?"))
@@ -26,6 +36,9 @@ class TestParseCommand(unittest.TestCase):
     def test_empty_and_blank_return_none(self) -> None:
         self.assertIsNone(talkback.parse_command(""))
         self.assertIsNone(talkback.parse_command("   "))
+
+    def test_lone_dot_returns_none(self) -> None:
+        self.assertIsNone(talkback.parse_command("."))
 
 
 class TestBuildReply(unittest.TestCase):
@@ -43,6 +56,11 @@ class TestBuildReply(unittest.TestCase):
 
     def test_ping_is_pong(self) -> None:
         self.assertEqual(self._reply("ping"), "pong")
+
+    def test_help_lists_commands_with_a_dot_prefix(self) -> None:
+        reply = self._reply("help")
+        self.assertIn(".stats", reply)
+        self.assertIn(".ping", reply)
 
     def test_help_omits_unconfigured_commands(self) -> None:
         reply = self._reply("help")

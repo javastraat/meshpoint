@@ -295,10 +295,11 @@ that needs them is requested (`spacestate.mu` cached 2 min, `events.mu`
 page isn't registered.
 
 `talkback_enabled` (also on the Settings tab): auto-reply to an inbound
-LXMF DM whose first word is `help`, `ping`, `stats`, `spacestate`, `events`
-or `nodes` with the same plain-text data those pages show (`spacestate`/
-`events` reply "not configured" if their URL above is blank). **Requires
-`node_enabled`** — the save is rejected otherwise, since every command
+LXMF DM whose first word is `.help`, `.ping`, `.stats`, `.spacestate`,
+`.events` or `.nodes` (the leading dot is required — a bare `ping` typed
+conversationally is left alone) with the same plain-text data those pages
+show (`.spacestate`/`.events` reply "not configured" if their URL above is
+blank). **Requires `node_enabled`** — the save is rejected otherwise, since every command
 answers from data only a hosted node caches. Anything else in a DM is
 left alone (not a bot query). Restart to apply.
 

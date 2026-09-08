@@ -12215,3 +12215,47 @@ gated failures. `ast.parse` clean. CHANGELOG: separate bullet under
 from screenshots, never watched working on the actual device. Top item
 in `memory/reticulum_todo.md`'s Pi-verification list now: redo the same
 two-node DM exchange and confirm replies appear without a reload.
+
+**Live-verified minutes later**: user re-ran `.ping`→`pong` and `stats`
+(pre-dot-prefix build) between the same two nodes -- both appeared live
+in the open thread, no reload. Confirms the fix.
+
+## Same session, one more round — talkback commands switched to require a leading dot
+
+User's idea: "can you make it that it needs .help .stats etc a . so a
+user typing help won't work but .help works... is that an idea?" --
+correctly spotted that a bare word ("ping", "stats") is common enough in
+ordinary conversation that it could trigger an unwanted bot reply instead
+of reaching the actual human on the other end. Agreed it's a good idea
+(the standard IRC/Slack/Discord bot-command convention exists for exactly
+this reason) and built it directly rather than treating it as an
+exploratory question, since the ask was already concrete ("can you make
+it...").
+
+**Changed**: `talkback.py`'s `parse_command()` now requires the first
+word to start with `.` and strips it before matching against `_COMMANDS`
+-- a bare `help`/`ping`/etc. with no dot now returns `None` (ordinary DM,
+no reply). `_reply_help()` lists commands with the dot shown
+(`.help, .ping, .stats, ...`). `build_reply()`'s dispatch is unchanged
+(still keyed on the bare word internally) -- only the parsing/display
+layer grew the dot. Loop-safety reasoning got strictly stronger, not
+weaker: replies already never started with a command word, and now also
+never start with `.` at all, so the invariant holds by an even wider
+margin.
+
+**Updated everywhere the old bare-word commands were mentioned**:
+Settings tab hint text, `docs/CONFIGURATION.md`, the CHANGELOG bullet
+(edited in place, not a new bullet -- both talkback commits were already
+made when this landed, but it's the same unreleased-version entry, not a
+shipped one), and `memory/reticulum_todo.md` (Have table, config-key
+comment, Done section, Pi-verification note flagging that the earlier
+live test used the old bare-word form and the `.`-prefixed version
+itself hasn't been tried on the device yet).
+
+**Tests**: updated all bare-word command literals in `test_talkback.py`
+and `TestTalkback` in `test_lxmf_service.py` to the dotted form, added
+`test_bare_word_without_dot_is_not_a_command` (all 6 commands) and a
+matching hook-level `test_bare_word_without_dot_gets_no_reply`, plus a
+`.help` dot-prefix-in-output check and a lone-`.`-returns-`None` edge
+case. Full suite: 160 passed (was 155), same 7 pre-existing aiosqlite-
+gated failures.

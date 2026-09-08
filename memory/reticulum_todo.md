@@ -5,7 +5,7 @@ See `memory/plugin-reticulum.md` for implementation detail (dated sections,
 one per feature) and `memory/project_m1_meshpoint.md` for wider session
 context.
 
-Last updated 2026-09-08 (talk-back bot built).
+Last updated 2026-09-08 (talk-back bot built + switched to dot-prefixed commands).
 
 ---
 
@@ -38,22 +38,27 @@ checked on the Pi.
   MeshChat, click "Next" through every page, confirm no dead links and
   that the `spacestate.mu`/`events.mu` cross-link only appears when both
   `node_spaceapi_url` and `node_events_ical_url` are actually set.
-- **Talk-back bot — LIVE-TESTED 2026-09-08, content confirmed correct**:
-  ran a real two-node exchange (rakv2-meshpoint ↔ ti-meshpoint), all of
-  `help`/`stats`/`spacestate`/`events` replied with correct real data
-  (screenshots). One bug found and fixed same day (see below) — a reply
-  didn't appear until a manual reload. Still not confirmed live:
-  `ping`/`nodes`, the "plain DM gets no reply" case, and that the save
-  form rejects `talkback_enabled` with `node_enabled` off.
-- **Fixed 2026-09-08: Reticulum messages (including talkback replies)
-  didn't live-update the Messages page.** Root cause: the core Messages
-  page only listens for a `message_received` WS event; `lxmf_service.py`
-  was only firing its own plugin-private `reticulum_message` event. Now
-  fires both. `send_message()` also now fires `message_sent` (previously
-  nothing did, anywhere). **Not yet re-verified live** — the diagnosis and
-  fix were made from screenshots, not by watching it work on the device.
-  Re-test the same two-node DM exchange and confirm replies now appear
-  without a reload on both sides.
+- **Talk-back bot — LIVE-TESTED 2026-09-08, fully working**: ran a real
+  two-node exchange (rakv2-meshpoint ↔ ti-meshpoint). `help`/`stats`/
+  `spacestate`/`events`/`ping` all replied with correct real data, and
+  after the live-update fix below, replies appear instantly with no
+  reload needed. **Same day, commands were switched to require a leading
+  `.`** (`.help`/`.ping`/etc., a bare word no longer triggers a reply —
+  user's idea, avoids an ordinary conversational "ping" or "stats"
+  getting an unwanted bot reply instead of reaching the human on the
+  other end) — the live test above predates this change and used the old
+  bare-word form; **not yet re-verified with the `.` prefix on a real
+  device**. Also still not confirmed: `.nodes`, the "plain DM gets no
+  reply" case, and that the save form rejects `talkback_enabled` with
+  `node_enabled` off — minor, low-risk remainder.
+- **Fixed + LIVE-VERIFIED 2026-09-08: Reticulum messages (including
+  talkback replies) didn't live-update the Messages page.** Root cause:
+  the core Messages page only listens for a `message_received` WS event;
+  `lxmf_service.py` was only firing its own plugin-private
+  `reticulum_message` event. Now fires both. `send_message()` also now
+  fires `message_sent` (previously nothing did, anywhere). Confirmed
+  working: `ping`→`pong` and `stats` both appeared live in the open
+  thread with no reload.
 - **Propagation node — NEEDS TESTING** (UI is confirmed on the device, the
   relay itself is not):
   1. Settings → Propagation node → tick "Act as an LXMF propagation node" →
@@ -93,7 +98,7 @@ checked on the Pi.
 | Hosting | `/page/spacestate.mu` + `{spacestate}` token | SpaceAPI feed, lazy fetch (once at boot, then on view) |
 | Hosting | `/page/events.mu` | iCalendar feed, lazy fetch |
 | Hosting | Generated-page cross-links | `info.mu`↔`nodes.mu` always; `spacestate.mu`↔`events.mu` only when the other is configured. Never link into an operator's own custom pages — shared code, most installs won't have e.g. `meshpoint.mu` |
-| Hosting | Talk-back bot | `talkback_enabled` (requires `node_enabled`); DM `help`/`ping`/`stats`/`spacestate`/`events`/`nodes` for a plain-text reply built from the same cached data the `.mu` pages read. Pure functions in `backend/talkback.py`; loop-safe by construction (replies never start with a command word) + a per-sender cooldown |
+| Hosting | Talk-back bot | `talkback_enabled` (requires `node_enabled`); DM `.help`/`.ping`/`.stats`/`.spacestate`/`.events`/`.nodes` (dot required — a bare word doesn't trigger it) for a plain-text reply built from the same cached data the `.mu` pages read. Pure functions in `backend/talkback.py`; loop-safe by construction (replies never start with `.`) + a per-sender cooldown |
 | Ops | Dep check / setup / `meshpoint plugin check` | boot probe + on-demand + Run-setup modal |
 | Samples | `sample-pages/`, `sample-bbs-techinc/` | TechInc BBS carries real address + "Contact us" (IRC/Matrix/email/phone) |
 | Core (not this plugin) | RNode firmware flasher, Heltec-V4 node card | Configuration → Firmware |
@@ -146,9 +151,11 @@ plugins:
 
 ## Done (this backlog's completed items)
 
-- **2026-09-08** — LXMF talk-back bot (`help`/`ping`/`stats`/`spacestate`/
-  `events`/`nodes` over DM, requires `node_enabled`). Live-tested same day,
-  reply content confirmed correct; found + fixed a live-update bug in the
+- **2026-09-08** — LXMF talk-back bot (`.help`/`.ping`/`.stats`/
+  `.spacestate`/`.events`/`.nodes` over DM, requires `node_enabled`;
+  dot prefix required, added same day so a bare conversational word
+  can't trigger it). Live-tested same day (pre-dot-prefix), reply
+  content confirmed correct; found + fixed a live-update bug in the
   same session (Reticulum messages weren't reaching the core Messages
   page's WS listener) — see Pi-verification list above for what's still
   unconfirmed.

@@ -227,10 +227,11 @@ class ReticulumSettingsTab {
                                 <span class="cfg-field__label">Talk-back bot</span>
                             </label>
                             <p class="cfg-field__hint">
-                                Auto-reply to a DM containing <code>help</code>, <code>ping</code>,
-                                <code>stats</code>, <code>spacestate</code>, <code>events</code> or
-                                <code>nodes</code> with the same data those pages show. Requires
-                                "Host a NomadNet node" above. Restart to apply.
+                                Auto-reply to a DM starting with <code>.help</code>, <code>.ping</code>,
+                                <code>.stats</code>, <code>.spacestate</code>, <code>.events</code> or
+                                <code>.nodes</code> with the same data those pages show — the leading
+                                dot means an ordinary message that happens to say "ping" never
+                                triggers a reply. Requires "Host a NomadNet node" above. Restart to apply.
                             </p>
                         </fieldset>
                         <fieldset class="cfg-fieldset">

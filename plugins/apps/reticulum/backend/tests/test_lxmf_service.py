@@ -321,7 +321,7 @@ class TestTalkback(unittest.TestCase):
             sent.append((dest, text))
         svc._send_talkback_reply = fake_send
 
-        self._run_and_flush(lambda: svc._maybe_talkback("aa" * 16, "ping"))
+        self._run_and_flush(lambda: svc._maybe_talkback("aa" * 16, ".ping"))
         self.assertEqual(sent, [("aa" * 16, "pong")])
 
     def test_unrecognized_text_gets_no_reply(self) -> None:
@@ -330,6 +330,16 @@ class TestTalkback(unittest.TestCase):
         svc._send_talkback_reply = lambda d, t: sent.append((d, t))
 
         self._run_and_flush(lambda: svc._maybe_talkback("aa" * 16, "just chatting"))
+        self.assertEqual(sent, [])
+
+    def test_bare_word_without_dot_gets_no_reply(self) -> None:
+        # The dot prefix exists so a human typing a plain "ping"/"stats"
+        # doesn't get an unexpected bot reply instead of their correspondent.
+        svc = self._svc()
+        sent = []
+        svc._send_talkback_reply = lambda d, t: sent.append((d, t))
+
+        self._run_and_flush(lambda: svc._maybe_talkback("aa" * 16, "ping"))
         self.assertEqual(sent, [])
 
     def test_disabled_service_never_calls_maybe_talkback(self) -> None:
@@ -348,8 +358,8 @@ class TestTalkback(unittest.TestCase):
         svc._send_talkback_reply = fake_send
 
         async def runner():
-            svc._maybe_talkback("aa" * 16, "ping")
-            svc._maybe_talkback("aa" * 16, "ping")
+            svc._maybe_talkback("aa" * 16, ".ping")
+            svc._maybe_talkback("aa" * 16, ".ping")
             await asyncio.sleep(0)
         asyncio.run(runner())
         self.assertEqual(len(sent), 1)
@@ -362,7 +372,7 @@ class TestTalkback(unittest.TestCase):
         with mock.patch.object(lxmf_service, "RNS") as mock_rns:
             mock_rns.hexrep.return_value = own_hex
             svc._source = mock.Mock(hash=b"\xaa" * 16)
-            self._run_and_flush(lambda: svc._maybe_talkback(own_hex, "ping"))
+            self._run_and_flush(lambda: svc._maybe_talkback(own_hex, ".ping"))
         self.assertEqual(sent, [])
 
     def test_stats_reply_uses_node_snapshot(self) -> None:
@@ -373,7 +383,7 @@ class TestTalkback(unittest.TestCase):
             sent.append((dest, text))
         svc._send_talkback_reply = fake_send
 
-        self._run_and_flush(lambda: svc._maybe_talkback("bb" * 16, "stats"))
+        self._run_and_flush(lambda: svc._maybe_talkback("bb" * 16, ".stats"))
         self.assertEqual(len(sent), 1)
         self.assertIn("TechInc Node", sent[0][1])
         self.assertIn("0.8.1", sent[0][1])
@@ -386,7 +396,7 @@ class TestTalkback(unittest.TestCase):
             sent.append((dest, text))
         svc._send_talkback_reply = fake_send
 
-        self._run_and_flush(lambda: svc._maybe_talkback("cc" * 16, "spacestate"))
+        self._run_and_flush(lambda: svc._maybe_talkback("cc" * 16, ".spacestate"))
         self.assertEqual(len(sent), 1)
         self.assertIn("isn't configured", sent[0][1])
 
