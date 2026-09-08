@@ -155,6 +155,159 @@ class TestAnnounceLog(unittest.TestCase):
         self.assertEqual(log[0]["display_name"], str(lxmf_service._ANNOUNCE_LOG_MAX + 24))
 
 
+class TestAnnounceSignalCapture(unittest.TestCase):
+    """_on_announce resolves RSSI/SNR/quality for the announce packet
+    hash RNS hands it (see peer_link_info's docstring for why this only
+    ever comes from an interface that reports signal, e.g. RNode/LoRa,
+    never a TCP backbone peer)."""
+
+    def _svc(self):
+        return _make_service(peer_repo=_FakePeerRepo(), ws_manager=_FakeWs())
+
+    def test_captures_signal_when_reticulum_instance_available(self) -> None:
+        svc = self._svc()
+        svc._reticulum = mock.Mock()
+        svc._reticulum.get_packet_rssi.return_value = -72.0
+        svc._reticulum.get_packet_snr.return_value = 8.5
+        svc._reticulum.get_packet_q.return_value = 91
+        dest_bytes = b"\xaa" * 16
+        packet_hash = b"\x01\x02\x03\x04"
+
+        async def runner():
+            svc._loop = asyncio.get_running_loop()
+            with mock.patch.object(lxmf_service, "RNS") as mock_rns:
+                mock_rns.hexrep.side_effect = lambda b, delimit=None: b.hex()
+                svc._on_announce("lxmf.delivery", dest_bytes, None, packet_hash)
+            await asyncio.sleep(0)
+        asyncio.run(runner())
+
+        log = svc.announce_log()
+        self.assertEqual(len(log), 1)
+        self.assertEqual(log[0]["rssi"], -72.0)
+        self.assertEqual(log[0]["snr"], 8.5)
+        self.assertEqual(log[0]["quality"], 91)
+        self.assertEqual(log[0]["packet_hash"], packet_hash.hex())
+        svc._reticulum.get_packet_rssi.assert_called_once_with(packet_hash)
+
+    def test_no_signal_fields_without_a_packet_hash(self) -> None:
+        # A TCP-backbone-only setup, or an announce RNS didn't attach a
+        # hash to -- must not crash, just report no signal.
+        svc = self._svc()
+        svc._reticulum = mock.Mock()
+
+        async def runner():
+            svc._loop = asyncio.get_running_loop()
+            with mock.patch.object(lxmf_service, "RNS") as mock_rns:
+                mock_rns.hexrep.side_effect = lambda b, delimit=None: b.hex()
+                svc._on_announce("lxmf.delivery", b"\xbb" * 16, None, None)
+            await asyncio.sleep(0)
+        asyncio.run(runner())
+
+        log = svc.announce_log()
+        self.assertIsNone(log[0]["rssi"])
+        self.assertIsNone(log[0]["packet_hash"])
+        svc._reticulum.get_packet_rssi.assert_not_called()
+
+    def test_signal_lookup_failure_is_swallowed(self) -> None:
+        svc = self._svc()
+        svc._reticulum = mock.Mock()
+        svc._reticulum.get_packet_rssi.side_effect = RuntimeError("rpc down")
+
+        async def runner():
+            svc._loop = asyncio.get_running_loop()
+            with mock.patch.object(lxmf_service, "RNS") as mock_rns:
+                mock_rns.hexrep.side_effect = lambda b, delimit=None: b.hex()
+                svc._on_announce("lxmf.delivery", b"\xcc" * 16, None, b"\x01")
+            await asyncio.sleep(0)
+        asyncio.run(runner())  # must not raise
+
+        log = svc.announce_log()
+        self.assertIsNone(log[0]["rssi"])
+
+
+class TestPeerLinkInfo(unittest.TestCase):
+    """peer_link_info() is tested directly with RNS mocked at module
+    level (real RNS.Transport is a static-method API on the actual
+    Transport class, unlike LXMF's own instance-based router)."""
+
+    def _svc(self):
+        return _make_service(peer_repo=_FakePeerRepo(), ws_manager=_FakeWs())
+
+    def test_no_rns_returns_all_empty(self) -> None:
+        svc = self._svc()
+        with mock.patch.object(lxmf_service, "RNS", None):
+            info = svc.peer_link_info("aa" * 16)
+        self.assertEqual(info["hops"], None)
+        self.assertFalse(info["has_path"])
+        self.assertFalse(info["identity_resolved"])
+        self.assertEqual(info["announces_this_session"], 0)
+
+    def test_invalid_hex_returns_empty_without_raising(self) -> None:
+        svc = self._svc()
+        info = svc.peer_link_info("not-hex")
+        self.assertFalse(info["has_path"])
+
+    def test_reports_hops_and_path_and_identity(self) -> None:
+        svc = self._svc()
+        dest_hex = "aa" * 16
+        with mock.patch.object(lxmf_service, "RNS") as mock_rns:
+            mock_rns.Transport.has_path.return_value = True
+            mock_rns.Transport.hops_to.return_value = 3
+            mock_rns.Transport.PATHFINDER_M = 128
+            mock_rns.Identity.recall.return_value = object()  # "known" identity
+            svc._reticulum = mock.Mock()
+            svc._reticulum.get_next_hop_if_name.return_value = "RNodeInterface"
+            info = svc.peer_link_info(dest_hex)
+        self.assertEqual(info["hops"], 3)
+        self.assertTrue(info["has_path"])
+        self.assertEqual(info["next_hop_interface"], "RNodeInterface")
+        self.assertTrue(info["identity_resolved"])
+
+    def test_unknown_hops_reported_as_none(self) -> None:
+        svc = self._svc()
+        with mock.patch.object(lxmf_service, "RNS") as mock_rns:
+            mock_rns.Transport.has_path.return_value = False
+            mock_rns.Transport.hops_to.return_value = 128
+            mock_rns.Transport.PATHFINDER_M = 128
+            mock_rns.Identity.recall.return_value = None
+            info = svc.peer_link_info("bb" * 16)
+        self.assertIsNone(info["hops"])
+        self.assertFalse(info["has_path"])
+        self.assertFalse(info["identity_resolved"])
+
+    def test_counts_announces_and_returns_most_recent_signal(self) -> None:
+        svc = self._svc()
+        dest_hex = "cc" * 16
+        asyncio.run(svc._handle_announce(dest_hex, "Bob", "lxmf.delivery", None, "old-hash", -100.0, 2.0, 30))
+        asyncio.run(svc._handle_announce(dest_hex, "Bob", "lxmf.delivery", None, "new-hash", -60.0, 9.0, 95))
+        with mock.patch.object(lxmf_service, "RNS") as mock_rns:
+            mock_rns.Transport.has_path.return_value = False
+            mock_rns.Transport.hops_to.return_value = 128
+            mock_rns.Transport.PATHFINDER_M = 128
+            mock_rns.Identity.recall.return_value = None
+            info = svc.peer_link_info(dest_hex)
+        self.assertEqual(info["announces_this_session"], 2)
+        self.assertEqual(info["rssi"], -60.0)  # the most recent one, not the first
+
+    def test_most_recent_with_no_signal_is_not_shadowed_by_an_older_signal(self) -> None:
+        # Regression guard: the "most recent match" tracking must not use
+        # "signal_at is None" as its own found-latest flag, since the most
+        # recent announce can legitimately have no signal (heard over TCP)
+        # while an older one from the same peer did have signal (RNode).
+        svc = self._svc()
+        dest_hex = "dd" * 16
+        asyncio.run(svc._handle_announce(dest_hex, "Bob", "lxmf.delivery", None, "rnode-hash", -60.0, 9.0, 95))
+        asyncio.run(svc._handle_announce(dest_hex, "Bob", "lxmf.delivery"))  # newer, no signal (e.g. TCP)
+        with mock.patch.object(lxmf_service, "RNS") as mock_rns:
+            mock_rns.Transport.has_path.return_value = False
+            mock_rns.Transport.hops_to.return_value = 128
+            mock_rns.Transport.PATHFINDER_M = 128
+            mock_rns.Identity.recall.return_value = None
+            info = svc.peer_link_info(dest_hex)
+        self.assertIsNone(info["rssi"])  # the newest entry's (lack of) signal wins
+        self.assertEqual(info["announces_this_session"], 2)
+
+
 class _FakeRouter:
     def __init__(self):
         self.calls = []

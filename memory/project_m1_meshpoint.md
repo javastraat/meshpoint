@@ -12431,3 +12431,111 @@ project file gets reread start-to-finish.
 a real vulnerability the user found and I patched immediately): the
 backup/restore tar-symlink issue -- see the dated entry directly above
 this one for full detail.
+
+## Same session, back to Reticulum — Peers drawer/Activity popup redesign: real signal + routing data, matching core's visual style (2026-09-08)
+
+User was walking the Pi-verification list (Activity tab confirmed live,
+all 6 talkback commands confirmed live) then hit the Peer drawer/
+Announce popup item and compared two screenshots: the Reticulum Peers
+drawer (built 2026-09-07, simple: destination/aspect/first-seen/last-
+seen/recent-activity) against MeshCore's own contact drawer (metrics
+chart, signal quality, collapsible sections). Said "we like gui design
+of the contacts better more info etc." Asked via `AskUserQuestion`
+whether that meant visual polish only or adding genuinely new data
+fields -- user picked **"add more real data fields."**
+
+**Investigated RNS's actual API surface** (this Mac has `RNS` installed
+under python3.14's site-packages even though the project's own
+python3.11 test env doesn't -- read the real source directly rather than
+guess) and cross-checked call shapes against
+`/Users/einstein/Software/reticulum-meshchat/meshchat.py` (the existing
+LXMF-API reference). Confirmed real, non-fake data genuinely exists:
+- `RNS.Transport.hops_to(dest)` / `has_path(dest)` -- current path-table
+  state (hop count, `PATHFINDER_M`=128 sentinel for "unknown").
+- `self._reticulum.get_next_hop_if_name(dest)` -- which local interface
+  (RNode vs TCP backbone) would carry traffic to them.
+- `self._reticulum.get_packet_rssi/snr/q(packet_hash)` -- **only
+  resolvable if the announce handler's `received_announce()` accepts a
+  4th `announce_packet_hash` param**, confirmed by reading
+  `RNS/Transport.py` directly: it uses `inspect.signature(...).parameters`
+  length (3/4/5) to decide what to pass a registered handler. Our
+  `_AnnounceHandler.received_announce` already declared the 4-arg form
+  (added defensively at some earlier point) but was silently discarding
+  the packet hash instead of forwarding it -- the plumbing existed,
+  wasn't used.
+- `RNS.Identity.recall(dest)` -- whether we hold their public key
+  (distinct from `has_path`: a path is the route, identity is the
+  encryption key -- either can be known without the other).
+
+Second follow-up mid-implementation: "what more can we show do we show
+all we have/can show" -- answered with the fuller list above before
+finishing the backend (identity-resolved, announce-count-this-session,
+a text quality label, and flagged a real RSSI-history chart as a bigger
+follow-up, not done this pass).
+
+Then, unprompted, the user shared a *third* comparison screenshot: core's
+Meshtastic `PacketDetailModal` (the RF/Mesh/Payload/Capture layered
+popup) next to Reticulum's flat announce popup, asking for "the same
+design throughout the inline popup of the activities." This actually
+resolved a tension from the original 2026-09-07 build (which deliberately
+avoided PacketDetailModal's visual language because Reticulum announces
+had no RF-shaped data to justify it) -- now that real RSSI/SNR/hops
+exist, the same layered look genuinely fits instead of being forced.
+
+**Built**:
+- `lxmf_service.py` -- `self._reticulum` now stored (was a local var in
+  `start()`); `_AnnounceHandler`/`_on_announce`/`_handle_announce` now
+  thread `announce_packet_hash` all the way through, resolving RSSI/SNR/
+  quality synchronously on RNS's own announce-handling thread (a local
+  IPC round-trip when attached to the shared `rnsd` instance, same
+  reasoning as every other synchronous RNS call already in this file --
+  never on the asyncio loop). New `peer_link_info(destination_hash_hex)`
+  -- deliberately per-peer, on-demand only (never batched into the big
+  `/peers` list: the public network's path table can run into the
+  thousands, so `hops_to()` for every row on every 15s poll would be a
+  real cost). New `GET /api/reticulum/peers/{hash}/link` route.
+- **Bug caught and fixed while writing `peer_link_info`'s "most recent
+  announce" scan**: the first draft used `if signal_at is None:` as its
+  own "found the latest match yet" flag -- wrong, because the *most
+  recent* announce can legitimately have no signal (heard over TCP)
+  while an *older* one from the same peer did (heard over RNode) --
+  that bug would've silently shown stale RNode signal data as if it
+  were current. Fixed with an explicit `found_latest` flag; added a
+  named regression test for exactly this case
+  (`test_most_recent_with_no_signal_is_not_shadowed_by_an_older_signal`).
+- `reticulum_detail_panels.js` -- full rewrite. New `_rtLayer()`/
+  `_rtExpandableRow()` helpers producing the same HTML shape as core's
+  `packet_detail_modal.js` (`_buildLayer`/`_row`/`_expandableBlock`),
+  under `rt-pdm-*` class names (own CSS in `reticulum.css`, mirrors
+  `packet_detail_modal.css`'s `.pdm-layer`/`.pdm-row` shapes without
+  touching that file). Peer drawer: Identity (unchanged) + a live-fetched
+  Routing section (hops/path/next-hop/identity-resolved/announce-count)
+  + a Signal section (only rendered when the peer's latest announce
+  actually carried it) + Recent activity (now shows an inline dBm badge
+  per row when available). Announce popup: Routing + Signal (own layer,
+  only if present) + Payload (display name + expandable app_data hex).
+  Fetch races handled with an incrementing `_openToken` (drawer
+  reopened/closed before the `/link` fetch resolves -> stale response
+  discarded). Quality label reuses `node_drawer.js`'s exact RSSI
+  thresholds (`_signalQuality`: >-80 Excellent, >=-100 Good, >=-115
+  Fair, else Poor) rather than RNS's own separate 0-100 `quality` score
+  -- same physical unit (dBm) as Meshtastic/MeshCore, so the same
+  thresholds are the correct match, not an arbitrary choice.
+
+**Tests**: `TestAnnounceSignalCapture` (3, incl. the RPC-failure-
+swallowed case) + `TestPeerLinkInfo` (6, incl. the regression case
+above) in `test_lxmf_service.py`; extended `test_announces_route.py`'s
+fake service + added 2 route tests for `/peers/{hash}/link`. Full
+plugin suite: 169 passed (was 160), same 9 pre-existing aiosqlite-gated
+route-test failures (2 more than before, same class of failure, both on
+the new route -- confirmed by the identical `ModuleNotFoundError:
+aiosqlite` chain). CHANGELOG (`### v0.8.1`, new bullet after the
+original click-to-detail one) + `memory/reticulum_todo.md` updated.
+
+**Not done this pass** (explicitly deferred, not forgotten): an
+RSSI-history mini-chart across a peer's repeated RNode-heard announces
+-- flagged as real extra frontend work for a follow-up, not backend
+work, since all the underlying data (rssi per announce entry) is
+already captured now. **Not yet opened in a real browser at all** --
+this entire redesign is unverified live; top item to check next on the
+Peers/Activity Pi-verification list.

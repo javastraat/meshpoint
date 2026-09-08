@@ -26,31 +26,46 @@ checked on the Pi.
 
 ### Pi verification still owed
 
-- **Activity tab**: open Reticulum → Activity, confirm announces stream in
-  (and `call.audio` rows appear if any Sideband/MeshChat users are around).
-- **Peer drawer / Announce popup (new 2026-09-07, not opened in a real
-  browser yet)**: click a Peers row → right-side drawer should slide in;
-  click an Activity row → center popup should appear with the announce's
-  hex `app_data` if present. Check both light and dark theme, and that
-  "View peer" / "Browse this node" actually cross-navigate correctly.
+- **Activity tab — LIVE-VERIFIED 2026-09-08**: user shared a live capture,
+  announces streaming in fast (public Reticulum network), all three
+  aspects present (`lxmf.delivery`, `lxmf.propagation`,
+  `nomadnetwork.node` with working Browse buttons) plus a `call.audio`
+  row (Philster) confirming the stream-only voice-peer path too.
+- **Peer drawer / Announce popup — REDESIGNED 2026-09-08, not opened in a
+  real browser since the redesign**: user compared the original simple
+  version against MeshCore's richer contact drawer ("we like gui design
+  of the contacts better more info etc") and asked for real routing/
+  signal data plus the same layered-section visual style as Meshtastic's
+  packet-detail popup. Rebuilt: click a Peers row → drawer now shows
+  Identity, a live-fetched Routing section (hops/path/next-hop/identity-
+  resolved/announce-count via new `GET /peers/{hash}/link`), a Signal
+  section when the peer's most recent announce carried RSSI/SNR (RNode-
+  heard only), then Recent activity; click an Activity row → popup shows
+  Routing/Signal/Payload the same way. Own `rt-pdm-*` CSS classes mirror
+  `packet_detail_modal.css`'s look without touching that core file.
+  **Nothing here has been opened in a browser yet** — check both light
+  and dark theme, confirm the live Routing/Signal fetch actually
+  populates (not stuck on "Loading routing info…"), confirm a peer heard
+  only over the TCP backbone correctly shows no Signal section at all
+  (not a blank one), and that "View peer"/"Browse this node" still
+  cross-navigate correctly.
 - **sample-bbs-techinc nav links (fixed 2026-09-07, not walked in a real
   NomadNet client)**: browse the hosted node in Sideband/NomadNet/
   MeshChat, click "Next" through every page, confirm no dead links and
   that the `spacestate.mu`/`events.mu` cross-link only appears when both
   `node_spaceapi_url` and `node_events_ical_url` are actually set.
-- **Talk-back bot — LIVE-TESTED 2026-09-08, fully working, including the
-  `.` prefix**: ran a real two-node exchange (rakv2-meshpoint ↔
-  ti-meshpoint). `help`/`stats`/`spacestate`/`events`/`ping` all replied
-  with correct real data (pre-dot-prefix build), live-update confirmed
-  (no reload needed). After switching commands to require a leading `.`
-  (user's idea — a bare "ping"/"stats" typed conversationally shouldn't
-  trigger a reply), re-verified on the same device post-restart:
-  `.ping` → `pong`, live in the open thread. Still not explicitly
-  confirmed: `.help`/`.stats`/`.spacestate`/`.events`/`.nodes` with the
-  new dot syntax specifically (only `.ping` shown so far, but same code
-  path as the pre-dot test), the "bare word gets no reply" case, and that
-  the save form rejects `talkback_enabled` with `node_enabled` off —
-  minor, low-risk remainder.
+- **Talk-back bot — FULLY LIVE-VERIFIED 2026-09-08, all 6 commands.**
+  Ran a real two-node exchange (rakv2-meshpoint ↔ ti-meshpoint), pre- and
+  post-dot-prefix. All six commands confirmed correct with the final
+  `.`-prefixed syntax: `.help` lists all six correctly, `.ping`→`pong`,
+  `.stats` shows live version/uptime/peer counts, `.spacestate` shows
+  real SpaceAPI status (TechInc: CLOSED, address), `.events` lists real
+  upcoming events with correct truncation ("...and 7 more"), `.nodes`
+  lists real heard NomadNet nodes with correct truncation ("...and 85
+  more"). Live-update (no reload) confirmed throughout. Only remaining
+  untested edge cases: a bare word (no dot) actually getting no reply,
+  and the save form rejecting `talkback_enabled` with `node_enabled`
+  off — both low-risk, covered by unit tests already.
 - **Fixed + LIVE-VERIFIED 2026-09-08: Reticulum messages (including
   talkback replies) didn't live-update the Messages page.** Root cause:
   the core Messages page only listens for a `message_received` WS event;
@@ -90,7 +105,7 @@ checked on the Pi.
 | Activity | Raw announce feed | Activity tab: 200-entry ring buffer, live over `reticulum_announce` WS; incl. `call.audio` (stream-only); `nomadnetwork.node` rows get a Browse button |
 | Notifications | ntfy / webhook on inbound DM | `notify_url` config; fire-and-forget POST (`backend/notify.py`) |
 | Propagation node | LXMF store-and-forward relay | `propagation_enabled` + `propagation_storage_limit_mb`; own `lxmf.propagation` hash, re-announced 6 h; status line on Settings tab; `propagation` block on `GET /api/reticulum/status` |
-| Peers/Activity | Click-to-detail | Peers row → right-side drawer (hash, aspect, first/last seen, recent announces from that peer); Activity row → detail popup (full time, hash, aspect, raw `app_data` hex, "View peer" link). Own components (`reticulum_detail_panels.js`), not core's NodeDrawer/PacketDetailModal — those are shaped for RF packets, announces are much thinner |
+| Peers/Activity | Click-to-detail | Peers row → right-side drawer (identity, live routing via `GET /peers/{hash}/link`: hops/path/next-hop/identity-resolved/announce-count, signal from most recent announce, recent activity); Activity row → detail popup (routing, signal if heard via RNode, payload/app_data hex, "View peer"). Own components (`reticulum_detail_panels.js`), restyled 2026-09-08 to match core `packet_detail_modal.css`'s layered-section look (own `rt-pdm-*` classes) now that real RSSI/SNR/hop data makes that genuinely fit, not just cosmetic |
 | Browsing | NomadNet node browser | Browse tab: live filter, ☆ favourites, `:/page/x.mu` shortcuts |
 | Hosting | Our own `nomadnetwork.node` | one hash = "message me" + "browse me" |
 | Hosting | Generated `index` / `info` / `nodes` pages | `info.mu` = live version/uptime/host/mesh-activity stats |

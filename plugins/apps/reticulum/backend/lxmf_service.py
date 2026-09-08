@@ -140,7 +140,7 @@ class _AnnounceHandler:
         self, destination_hash, announced_identity, app_data,
         announce_packet_hash=None,
     ) -> None:
-        self._on_announce(self.aspect_filter, destination_hash, app_data)
+        self._on_announce(self.aspect_filter, destination_hash, app_data, announce_packet_hash)
 
 
 class LxmfService:
@@ -195,6 +195,7 @@ class LxmfService:
         self._router = None
         self._source = None
         self._identity = None
+        self._reticulum = None
         self._announce_log: deque = deque(maxlen=_ANNOUNCE_LOG_MAX)
         self._bg_tasks: set = set()
         self._pn_task: Optional[asyncio.Task] = None
@@ -247,6 +248,7 @@ class LxmfService:
         # init earlier in this same lifespan -- acceptable to block on
         # briefly here.
         reticulum = RNS.Reticulum(configdir=str(self._reticulum_config_dir))
+        self._reticulum = reticulum
         _install_rns_log_bridge()
         logger.info(
             "Reticulum instance ready (config dir: %s)", reticulum.configdir
@@ -395,6 +397,7 @@ class LxmfService:
 
     def _on_announce(
         self, aspect: str, destination_hash: bytes, app_data: Optional[bytes],
+        announce_packet_hash: Optional[bytes] = None,
     ) -> None:
         display_name = ""
         if app_data:
@@ -418,14 +421,38 @@ class LxmfService:
         # LXMF's own parser otherwise), the raw hex is the actual bytes an
         # operator would want when display_name comes back empty/garbled.
         app_data_hex = bytes(app_data).hex() if app_data else None
+        # RSSI/SNR/quality are only meaningful for announces heard over an
+        # interface that reports signal quality (RNode/LoRa does; a TCP
+        # backbone peer won't) -- resolved here, synchronously, on RNS's
+        # own announce-handling thread (same as reticulum-meshchat's own
+        # db_upsert_announce): self._reticulum.get_packet_rssi() is a
+        # local IPC round-trip to the shared rnsd instance when attached
+        # as a client, not something that belongs on the asyncio loop.
+        rssi = snr = quality = None
+        packet_hash_hex = None
+        if announce_packet_hash is not None:
+            packet_hash_hex = announce_packet_hash.hex()
+            if self._reticulum is not None:
+                try:
+                    rssi = self._reticulum.get_packet_rssi(announce_packet_hash)
+                    snr = self._reticulum.get_packet_snr(announce_packet_hash)
+                    quality = self._reticulum.get_packet_q(announce_packet_hash)
+                except Exception:
+                    logger.debug("could not resolve signal for announce", exc_info=True)
         if self._loop is not None:
             asyncio.run_coroutine_threadsafe(
-                self._handle_announce(dest_hex, display_name, aspect, app_data_hex), self._loop,
+                self._handle_announce(
+                    dest_hex, display_name, aspect, app_data_hex,
+                    packet_hash_hex, rssi, snr, quality,
+                ),
+                self._loop,
             )
 
     async def _handle_announce(
         self, destination_hash: str, display_name: str, aspect: str,
-        app_data_hex: Optional[str] = None,
+        app_data_hex: Optional[str] = None, packet_hash_hex: Optional[str] = None,
+        rssi: Optional[float] = None, snr: Optional[float] = None,
+        quality: Optional[int] = None,
     ) -> None:
         entry = {
             "ts": datetime.now(timezone.utc).isoformat(),
@@ -433,6 +460,10 @@ class LxmfService:
             "display_name": display_name,
             "aspect": aspect,
             "app_data_hex": app_data_hex,
+            "packet_hash": packet_hash_hex,
+            "rssi": rssi,
+            "snr": snr,
+            "quality": quality,
         }
         self._announce_log.append(entry)
         await self._ws_manager.broadcast("reticulum_announce", entry)
@@ -623,6 +654,83 @@ class LxmfService:
 
     async def peer_count(self) -> int:
         return await self._peer_repo.count()
+
+    def peer_link_info(self, destination_hash_hex: str) -> dict:
+        """Live routing + last-known-signal info for one peer, computed
+        on demand (never for the whole roster at once -- ``hops_to``
+        walks RNS's path table, and that roster can run into the
+        thousands on the public network, so this is a per-peer detail
+        lookup, not something the /peers list carries for every row).
+
+        ``hops``/``has_path``/``next_hop_interface`` reflect the path
+        table *right now* -- RNS.Transport.hops_to()'s own docs call an
+        unknown path ``PATHFINDER_M`` (its max-hops sentinel), turned
+        into ``None`` here. ``rssi``/``snr``/``quality`` come from this
+        peer's most recent announce in the in-memory Activity ring
+        buffer (same source the Activity tab reads), so they're only
+        present when that peer has announced since this service last
+        restarted, and only non-``None`` when that particular announce
+        arrived over a signal-reporting interface (RNode/LoRa does; a
+        TCP backbone peer never will -- that's a fact about the network
+        path, not a bug here)."""
+        empty = {
+            "hops": None, "has_path": False, "next_hop_interface": None,
+            "identity_resolved": False, "announces_this_session": 0,
+            "rssi": None, "snr": None, "quality": None, "signal_at": None,
+        }
+        try:
+            dest_bytes = bytes.fromhex(destination_hash_hex)
+        except ValueError:
+            return empty
+        if RNS is None:
+            return empty
+
+        has_path = bool(RNS.Transport.has_path(dest_bytes))
+        hops = None
+        next_hop_interface = None
+        raw_hops = RNS.Transport.hops_to(dest_bytes)
+        if raw_hops != RNS.Transport.PATHFINDER_M:
+            hops = raw_hops
+        if has_path and self._reticulum is not None:
+            try:
+                next_hop_interface = self._reticulum.get_next_hop_if_name(dest_bytes)
+            except Exception:
+                logger.debug("could not resolve next-hop interface", exc_info=True)
+
+        # Distinct from has_path: a path is the *route*, an identity is the
+        # public key needed to actually encrypt something for them. Either
+        # can be known without the other -- e.g. a fresh path response
+        # hasn't necessarily carried their identity yet.
+        try:
+            identity_resolved = RNS.Identity.recall(dest_bytes) is not None
+        except Exception:
+            identity_resolved = False
+
+        rssi = snr = quality = signal_at = None
+        announces_this_session = 0
+        found_latest = False
+        for entry in reversed(self._announce_log):  # newest-appended-last, so reversed = newest first
+            if entry.get("destination_hash") != destination_hash_hex:
+                continue
+            announces_this_session += 1
+            if not found_latest:
+                rssi = entry.get("rssi")
+                snr = entry.get("snr")
+                quality = entry.get("quality")
+                signal_at = entry.get("ts")
+                found_latest = True
+
+        return {
+            "hops": hops,
+            "has_path": has_path,
+            "next_hop_interface": next_hop_interface,
+            "identity_resolved": identity_resolved,
+            "announces_this_session": announces_this_session,
+            "rssi": rssi,
+            "snr": snr,
+            "quality": quality,
+            "signal_at": signal_at,
+        }
 
     def announce(self) -> None:
         """Re-sends meshpoint's own delivery announce on demand -- lets

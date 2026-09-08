@@ -85,6 +85,18 @@ async def reticulum_announces():
     return _service.announce_log()
 
 
+@router.get("/peers/{destination_hash}/link")
+async def reticulum_peer_link(destination_hash: str):
+    """Live routing + last-known-signal info for one peer -- the Peers
+    drawer's detail fetch. Deliberately per-peer, not part of GET /peers:
+    hops_to()/has_path() walk RNS's path table, which the public network
+    can grow into the thousands of entries, so this can't run for every
+    row on every roster poll."""
+    if _service is None:
+        raise HTTPException(503, "Reticulum companion is disabled")
+    return _service.peer_link_info(destination_hash)
+
+
 @router.get("/messages/{destination_hash}")
 async def reticulum_conversation(destination_hash: str, limit: int = 50):
     if _message_repo is None:

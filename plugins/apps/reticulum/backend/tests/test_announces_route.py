@@ -1,4 +1,5 @@
-"""GET /api/reticulum/announces -- the Activity tab's backing route.
+"""GET /api/reticulum/announces (Activity tab) and GET /api/reticulum/
+peers/{destination_hash}/link (Peers drawer's live routing/signal detail).
 
 FastAPI-gated (CI / Pi only), same `_HAS_FASTAPI` pattern the other route
 tests use.
@@ -33,6 +34,13 @@ class TestAnnouncesRoute(unittest.TestCase):
                      "display_name": "Bob", "aspect": "lxmf.delivery"},
                 ]
 
+            def peer_link_info(self, destination_hash):
+                return {
+                    "hops": 3, "has_path": True, "next_hop_interface": "RNodeInterface",
+                    "identity_resolved": True, "announces_this_session": 2,
+                    "rssi": -72.0, "snr": 8.5, "quality": 91, "signal_at": "2026-09-07T12:00:00+00:00",
+                }
+
         routes.init_routes(_FakeService(), object())
         app = FastAPI()
         app.include_router(routes.router)
@@ -52,6 +60,22 @@ class TestAnnouncesRoute(unittest.TestCase):
     def test_503_when_service_absent(self) -> None:
         self._routes.reset_routes()
         r = self.client.get("/api/reticulum/announces")
+        self.assertEqual(r.status_code, 503)
+
+    def test_peer_link_returns_service_data(self) -> None:
+        r = self.client.get("/api/reticulum/peers/" + "aa" * 16 + "/link")
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertEqual(body["hops"], 3)
+        self.assertTrue(body["has_path"])
+        self.assertEqual(body["next_hop_interface"], "RNodeInterface")
+        self.assertTrue(body["identity_resolved"])
+        self.assertEqual(body["announces_this_session"], 2)
+        self.assertEqual(body["rssi"], -72.0)
+
+    def test_peer_link_503_when_service_absent(self) -> None:
+        self._routes.reset_routes()
+        r = self.client.get("/api/reticulum/peers/" + "aa" * 16 + "/link")
         self.assertEqual(r.status_code, 503)
 
 

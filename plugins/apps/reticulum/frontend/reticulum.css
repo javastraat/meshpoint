@@ -386,21 +386,9 @@
 
 .rt-drawer__body { flex: 1; overflow-y: auto; padding: 0.75rem 1rem; }
 
-.rt-drawer__row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.3rem 0;
-    font-size: 0.75rem;
-    border-bottom: 1px solid var(--border);
-}
-.rt-drawer__row span:first-child { color: var(--text-muted); }
-.rt-drawer__row--block { flex-direction: column; align-items: stretch; }
-
-.rt-mono { font-family: var(--font-mono, ui-monospace, monospace); color: var(--text-primary); word-break: break-all; text-align: right; }
-
 .rt-drawer__browse { width: 100%; margin: 0.75rem 0; }
+
+.rt-pdm-loading { font-size: 0.7rem; color: var(--text-muted); font-style: italic; padding: 0.5rem 0; }
 
 .rt-drawer__section-title {
     margin-top: 1rem;
@@ -479,17 +467,84 @@
 
 .rt-amodal__body { padding: 0.9rem 1.1rem; }
 
-.rt-amodal__appdata {
-    margin: 0.35rem 0 0;
-    padding: 0.5rem;
-    background: var(--bg-elevated, #1a1a1a);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    font-family: var(--font-mono, ui-monospace, monospace);
-    font-size: 0.7rem;
-    color: #d7dae0;
-    white-space: pre-wrap;
-    word-break: break-all;
+.rt-amodal__view-peer { width: 100%; margin-top: 0.9rem; }
+
+/* ---- Layered sections (rt-pdm-*), matching core's own
+ * packet_detail_modal.css (.pdm-layer/.pdm-row) class-for-class in
+ * shape so the Peers drawer + Activity popup read as the same visual
+ * system as the Meshtastic/MeshCore packet-detail modal -- without
+ * importing or editing that core file. Genuinely fits now (not just a
+ * cosmetic match): announces carry real per-packet RSSI/SNR when heard
+ * over RNode, and peers carry real live hop/path/identity data, the
+ * same kind of RF + routing breakdown that modal already shows for
+ * every other protocol. */
+
+.rt-pdm-layer {
+    display: grid;
+    grid-template-columns: 7.5rem 1fr;
+    gap: 0.35rem 0.75rem;
+    padding: 0.65rem 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.78rem;
+}
+.rt-pdm-layer:last-child { border-bottom: none; }
+
+.rt-pdm-layer__label {
+    font-weight: 600;
+    color: var(--accent-cyan);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding-top: 0.1rem;
 }
 
-.rt-amodal__view-peer { width: 100%; margin-top: 0.9rem; }
+.rt-pdm-layer__rows {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 0;
+}
+
+.rt-pdm-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.5rem;
+    line-height: 1.45;
+}
+.rt-pdm-row--block { flex-direction: column; }
+
+.rt-pdm-row__key { color: var(--text-muted); flex-shrink: 0; }
+
+.rt-pdm-row__val {
+    color: var(--text-primary);
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.74rem;
+    word-break: break-word;
+}
+.rt-pdm-row__val--good { color: var(--accent-green, #2fae5e); }
+.rt-pdm-row__val--mono { font-family: var(--font-mono, ui-monospace, monospace); }
+
+.rt-pdm-payload-text {
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.74rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--text-primary);
+    margin: 0.2rem 0 0;
+}
+
+.rt-pdm-expand {
+    margin-top: 0.35rem;
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--accent-cyan);
+    font-size: 0.68rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 6px;
+    cursor: pointer;
+}
+.rt-pdm-expand:hover { background: var(--overlay-med); }
+
+@media (max-width: 520px) {
+    .rt-pdm-layer { grid-template-columns: 1fr; gap: 0.35rem; }
+}
