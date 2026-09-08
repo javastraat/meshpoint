@@ -118,6 +118,9 @@ dashboard:                # web dashboard / API server
   # A per-browser choice in the theme toggle overrides this locally.
   # Editable from Settings -> Themes.
   theme: "dark"
+  tls_enabled: false
+  tls_cert_path: "data/tls/cert.pem"
+  tls_key_path: "data/tls/key.pem"
 
 metrics:                  # Prometheus-compatible /metrics scrape endpoint
   enabled: false

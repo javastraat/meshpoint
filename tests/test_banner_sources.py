@@ -93,6 +93,30 @@ class BannerSourceLinesTest(unittest.TestCase):
         self.assertIn("Frequency", out)
         self.assertIn("Source", out)
 
+    def test_dashboard_line_is_http_when_tls_disabled(self) -> None:
+        cfg = _eu868_config()
+        cfg.dashboard.tls_enabled = False
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            print_banner(cfg)
+        self.assertIn("Dashboard", buf.getvalue())
+        self.assertIn("http://", buf.getvalue())
+        self.assertNotIn("https://", buf.getvalue())
+
+    def test_dashboard_line_is_https_when_tls_enabled(self) -> None:
+        # Confirmed live 2026-09-08: with dashboard.tls_enabled on, uvicorn
+        # itself logs "Running on https://..." but this banner line still
+        # said "http://" -- it hardcoded the scheme instead of reading
+        # dashboard.tls_enabled.
+        cfg = _eu868_config()
+        cfg.dashboard.tls_enabled = True
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            print_banner(cfg)
+        out = buf.getvalue()
+        self.assertIn("Dashboard", out)
+        self.assertIn("https://", out)
+
 
 if __name__ == "__main__":
     unittest.main()

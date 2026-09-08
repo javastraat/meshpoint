@@ -12350,10 +12350,21 @@ stated priority order:
    into `name.local.local`; fixed by normalizing to the short form
    first. 16 new tests (`test_tls_cert.py` x12, new `test_serve.py` x4 --
    `serve.py` had zero prior coverage). CONFIGURATION.md + CHANGELOG
-   updated. **Next step**: set `tls_enabled: true` on the real device,
-   restart, confirm HTTPS actually works over the LAN IP, the Tailscale
-   IP, and `sensecap.local` -- and confirm the only warning shown is the
-   expected self-signed one, not also a hostname-mismatch warning.
+   updated.
+
+   **LIVE-VERIFIED same day**: user set `tls_enabled: true` on
+   ti-meshpoint and restarted -- full boot log pasted back showed
+   `Uvicorn running on https://0.0.0.0:8080` and every other subsystem
+   (Reticulum, MeshCore, concentrator, upstream) starting clean. Found a
+   real cosmetic bug in that log: the startup banner's `Dashboard` line
+   still printed `http://10.209.23.119:8080` -- `log_format.py:432`
+   hardcoded the scheme instead of reading `dashboard.tls_enabled`,
+   even though uvicorn's own line right above it correctly said
+   `https://`. Fixed (one-line conditional) + 2 new tests in
+   `test_banner_sources.py`. Still open: an actual browser round-trip
+   against all three addresses (LAN IP / Tailscale IP / `sensecap.local`)
+   to confirm only the expected self-signed warning shows, not also a
+   hostname-mismatch one -- the log only confirms the server side.
 2. **Move things off root onto the `meshpoint` user (or similar)** --
    "in longer term... to limit attack surface," specifically the
    self-update chain's `pip install` currently running as root via
