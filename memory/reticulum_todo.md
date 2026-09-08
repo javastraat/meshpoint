@@ -38,19 +38,19 @@ checked on the Pi.
   MeshChat, click "Next" through every page, confirm no dead links and
   that the `spacestate.mu`/`events.mu` cross-link only appears when both
   `node_spaceapi_url` and `node_events_ical_url` are actually set.
-- **Talk-back bot — LIVE-TESTED 2026-09-08, fully working**: ran a real
-  two-node exchange (rakv2-meshpoint ↔ ti-meshpoint). `help`/`stats`/
-  `spacestate`/`events`/`ping` all replied with correct real data, and
-  after the live-update fix below, replies appear instantly with no
-  reload needed. **Same day, commands were switched to require a leading
-  `.`** (`.help`/`.ping`/etc., a bare word no longer triggers a reply —
-  user's idea, avoids an ordinary conversational "ping" or "stats"
-  getting an unwanted bot reply instead of reaching the human on the
-  other end) — the live test above predates this change and used the old
-  bare-word form; **not yet re-verified with the `.` prefix on a real
-  device**. Also still not confirmed: `.nodes`, the "plain DM gets no
-  reply" case, and that the save form rejects `talkback_enabled` with
-  `node_enabled` off — minor, low-risk remainder.
+- **Talk-back bot — LIVE-TESTED 2026-09-08, fully working, including the
+  `.` prefix**: ran a real two-node exchange (rakv2-meshpoint ↔
+  ti-meshpoint). `help`/`stats`/`spacestate`/`events`/`ping` all replied
+  with correct real data (pre-dot-prefix build), live-update confirmed
+  (no reload needed). After switching commands to require a leading `.`
+  (user's idea — a bare "ping"/"stats" typed conversationally shouldn't
+  trigger a reply), re-verified on the same device post-restart:
+  `.ping` → `pong`, live in the open thread. Still not explicitly
+  confirmed: `.help`/`.stats`/`.spacestate`/`.events`/`.nodes` with the
+  new dot syntax specifically (only `.ping` shown so far, but same code
+  path as the pre-dot test), the "bare word gets no reply" case, and that
+  the save form rejects `talkback_enabled` with `node_enabled` off —
+  minor, low-risk remainder.
 - **Fixed + LIVE-VERIFIED 2026-09-08: Reticulum messages (including
   talkback replies) didn't live-update the Messages page.** Root cause:
   the core Messages page only listens for a `message_received` WS event;

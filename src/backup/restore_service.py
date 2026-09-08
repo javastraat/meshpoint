@@ -72,6 +72,7 @@ class BackupRestoreService:
         try:
             with tarfile.open(archive_path, "r:gz") as tar:
                 members = tar.getmembers()
+                self._reject_non_regular_members(members)
                 bundle_prefix = self._resolve_bundle_prefix(members)
                 manifest_member = self._find_member(
                     members,
@@ -199,6 +200,32 @@ class BackupRestoreService:
             )
         if not manifest.device_id:
             raise RestoreValidationError("manifest missing device_id")
+
+    @staticmethod
+    def _reject_non_regular_members(members: list[tarfile.TarInfo]) -> None:
+        """A backup archive should contain nothing but plain files and
+        directories. tar happily stores symlinks, hardlinks, and device/
+        FIFO nodes too -- and the member-type check below this point
+        (``if not member.isfile(): continue``) treats every one of those
+        as harmless and silently skips it, right past the path/manifest
+        checks the rest of this method does. That skip is only safe
+        because nothing here ever extracts to disk (only ``extractfile()``
+        for hashing) -- but ``restore_finish.sh`` (run as root via
+        ``launch_restore``) does a real ``tar -xzf`` of this exact archive
+        once validation passes. A symlink member (e.g. ``data/x`` ->
+        ``/etc/cron.d``) combined with a "regular" file member at
+        ``data/x/payload`` is the classic tar symlink attack: tar
+        extracts the link first, then writes the "regular" file straight
+        through it to an arbitrary path -- as root. Reject the whole
+        archive outright the moment any such member is found, rather
+        than skip it and let a later stage extract it anyway."""
+        for member in members:
+            if member.isdir() or member.isfile():
+                continue
+            raise RestoreValidationError(
+                f"archive contains a non-regular-file member ({member.name}): "
+                "symlinks, hardlinks, and device/FIFO entries are not allowed"
+            )
 
     @staticmethod
     def _resolve_bundle_prefix(members: list[tarfile.TarInfo]) -> str:

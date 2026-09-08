@@ -106,6 +106,72 @@ class TestBackupRestoreValidate(unittest.TestCase):
         with self.assertRaises(RestoreValidationError):
             self.service.validate_archive_bytes(payload)
 
+    def test_rejects_symlink_member(self) -> None:
+        # The classic tar symlink attack: a symlink member pointing
+        # outside the restore tree, extracted as root by
+        # restore_finish.sh -- validate_archive_path must reject the
+        # whole archive rather than silently skip the non-regular member
+        # (member.isfile() is False for a symlink, so a bare "skip if
+        # not isfile()" lets it sail through path/manifest checks
+        # untouched).
+        manifest = self._valid_manifest()
+        buffer = io.BytesIO()
+        bundle = "meshpoint-backup-test0001-20260611T120000Z"
+        with tarfile.open(fileobj=buffer, mode="w:gz") as tar:
+            manifest_bytes = manifest.to_json().encode("utf-8")
+            info = tarfile.TarInfo(name=f"{bundle}/manifest.json")
+            info.size = len(manifest_bytes)
+            tar.addfile(info, io.BytesIO(manifest_bytes))
+            local_bytes = b"device:\n  device_id: abc\n"
+            info = tarfile.TarInfo(name=f"{bundle}/config/local.yaml")
+            info.size = len(local_bytes)
+            tar.addfile(info, io.BytesIO(local_bytes))
+            link = tarfile.TarInfo(name=f"{bundle}/data/evil")
+            link.type = tarfile.SYMTYPE
+            link.linkname = "/etc/cron.d"
+            tar.addfile(link)
+        with self.assertRaises(RestoreValidationError):
+            self.service.validate_archive_bytes(buffer.getvalue())
+
+    def test_rejects_hardlink_member(self) -> None:
+        manifest = self._valid_manifest()
+        buffer = io.BytesIO()
+        bundle = "meshpoint-backup-test0001-20260611T120000Z"
+        with tarfile.open(fileobj=buffer, mode="w:gz") as tar:
+            manifest_bytes = manifest.to_json().encode("utf-8")
+            info = tarfile.TarInfo(name=f"{bundle}/manifest.json")
+            info.size = len(manifest_bytes)
+            tar.addfile(info, io.BytesIO(manifest_bytes))
+            local_bytes = b"device:\n  device_id: abc\n"
+            info = tarfile.TarInfo(name=f"{bundle}/config/local.yaml")
+            info.size = len(local_bytes)
+            tar.addfile(info, io.BytesIO(local_bytes))
+            link = tarfile.TarInfo(name=f"{bundle}/data/evil")
+            link.type = tarfile.LNKTYPE
+            link.linkname = f"{bundle}/config/local.yaml"
+            tar.addfile(link)
+        with self.assertRaises(RestoreValidationError):
+            self.service.validate_archive_bytes(buffer.getvalue())
+
+    def test_rejects_fifo_member(self) -> None:
+        manifest = self._valid_manifest()
+        buffer = io.BytesIO()
+        bundle = "meshpoint-backup-test0001-20260611T120000Z"
+        with tarfile.open(fileobj=buffer, mode="w:gz") as tar:
+            manifest_bytes = manifest.to_json().encode("utf-8")
+            info = tarfile.TarInfo(name=f"{bundle}/manifest.json")
+            info.size = len(manifest_bytes)
+            tar.addfile(info, io.BytesIO(manifest_bytes))
+            local_bytes = b"device:\n  device_id: abc\n"
+            info = tarfile.TarInfo(name=f"{bundle}/config/local.yaml")
+            info.size = len(local_bytes)
+            tar.addfile(info, io.BytesIO(local_bytes))
+            fifo = tarfile.TarInfo(name=f"{bundle}/data/pipe")
+            fifo.type = tarfile.FIFOTYPE
+            tar.addfile(fifo)
+        with self.assertRaises(RestoreValidationError):
+            self.service.validate_archive_bytes(buffer.getvalue())
+
 
 if __name__ == "__main__":
     unittest.main()

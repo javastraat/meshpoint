@@ -12259,3 +12259,66 @@ matching hook-level `test_bare_word_without_dot_gets_no_reply`, plus a
 `.help` dot-prefix-in-output check and a lone-`.`-returns-`None` edge
 case. Full suite: 160 passed (was 155), same 7 pre-existing aiosqlite-
 gated failures.
+
+## Same session — two real security findings from the user, one fixed, one noted (2026-09-08)
+
+Prompted by the "can we get root from the built-in webterminal" question
+(answered factually: yes, trivially, via `config/sudoers-meshpoint`'s
+`NOPASSWD` grants for `pip install *` and `plugins/apps/*/setup.sh` —
+confirmed this is a deliberate tradeoff, not an oversight, per
+`command_catalog.py`'s own docstring ("the operator is admin and the
+shell is full") and the sudoers file's comment that the plugin-setup
+grant "doesn't raise the bar beyond what enabling a plugin at all
+already means" — the real boundary is `require_admin` auth, not
+root-vs-non-root once authenticated).
+
+**User's two follow-ups**:
+1. **Noted, not built**: "would definitely consider making the terminal
+   a plugin" — since it's a root-equivalent admin surface, moving it out
+   of core into an explicitly opt-in plugin (like every other
+   powerful/risky capability in this app) is a reasonable direction. Not
+   scoped or built this session, just recorded here as a real idea for
+   later.
+2. **Built + tested**: a genuine vulnerability in backup/restore, which
+   the user diagnosed themselves precisely (down to naming the exact
+   function and the exact `TarInfo` type checks needed) —
+   `src/backup/restore_service.py`'s `validate_archive_path()` only
+   applied its path/manifest allowlist checks to members where
+   `.isfile()` was true, silently `continue`-ing past symlinks,
+   hardlinks, and device/FIFO members instead of rejecting them. That
+   validation function is the *only* gate before `restore_finish.sh`
+   (run as root via `sudo` from `launch_restore()`) does a real
+   `tar -xzf "${ARCHIVE_PATH}" -C "${EXTRACT_DIR}"` (confirmed by
+   reading the script directly, line 82) — so a crafted archive with a
+   symlink member (`data/x` → `/etc/cron.d`) followed by a "regular"
+   member at `data/x/payload` is the classic tar symlink attack:
+   restore extracts the link, then writes the payload straight through
+   it to an arbitrary root-owned path. Confirmed the upload route
+   (`backup_routes.py:185`) always calls validation before
+   `save_validated_upload`/`launch_restore`, so fixing this one function
+   fully closes the gap for the real upload-restore flow.
+
+   **Fix**: new `_reject_non_regular_members()` static method, called
+   first thing inside `validate_archive_path`'s `tarfile.open` block --
+   raises `RestoreValidationError` on any member that's neither
+   `isdir()` nor `isfile()` (covers `issym()`/`islnk()`/`ischr()`/
+   `isblk()`/`isfifo()` in one check), rejecting the whole archive
+   outright rather than skipping the dangerous member and letting a
+   later stage extract it anyway -- exactly the fix shape the user
+   suggested unprompted.
+
+   **Tests**: 3 new cases in `tests/test_backup_restore_validate.py`
+   (symlink, hardlink, FIFO members, each alongside an otherwise-valid
+   manifest+archive) -- all raise as expected (4 existing + 3 new = 7 in
+   that file). Full backup suite across all four test_backup_*.py files:
+   13 passed, zero regressions.
+
+   **CHANGELOG mistake caught and fixed same session**: the first Edit
+   to insert this bullet accidentally deleted the adjacent
+   `### v0.8.0 (August 2026)` section header entirely (the `old_string`/
+   `new_string` boundary swallowed it) -- `ChangelogParser.parse_file`
+   silently returned 30 sections instead of the expected 31 rather than
+   erroring, which is how it was caught (habit of re-running the parser
+   check after every CHANGELOG edit paid off here). Restored the header
+   in a follow-up edit, reverified 31 sections and exactly one
+   `v0.8.0` header via grep.
