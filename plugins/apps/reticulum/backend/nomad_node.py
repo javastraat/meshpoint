@@ -172,6 +172,10 @@ class NomadNode:
         self._destination = None
         self._loop = None
 
+    @property
+    def name(self) -> str:
+        return self._name
+
     def status(self) -> dict:
         return {
             "hosting": self._destination is not None,
@@ -183,6 +187,34 @@ class NomadNode:
                 else int(time.monotonic() - self._last_announce)
             ),
         }
+
+    # --- plain-text snapshots (talkback.py; anything wanting this data
+    # without going through Micron-formatted .mu output) --------------------
+
+    @property
+    def spaceapi_configured(self) -> bool:
+        return bool(self._spaceapi_url)
+
+    @property
+    def events_configured(self) -> bool:
+        return bool(self._events_ical_url)
+
+    def stats_snapshot(self) -> dict:
+        """The same dict ``_serve_info``/``_serve_nodes`` read from --
+        already plain data, no Micron formatting to strip."""
+        return dict(self._stats or {})
+
+    def spaceapi_snapshot(self) -> dict:
+        """Triggers the same lazy refresh viewing ``spacestate.mu`` would,
+        then returns the cached SpaceAPI dict."""
+        self._spaceapi_maybe_refresh()
+        return dict(self._spaceapi or {})
+
+    def events_snapshot(self) -> list:
+        """Triggers the same lazy refresh viewing ``events.mu`` would, then
+        returns the cached event list."""
+        self._events_maybe_refresh()
+        return list(self._events)
 
     # --- RNS wiring -------------------------------------------------------
 

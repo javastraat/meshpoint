@@ -89,6 +89,12 @@ _DEFAULTS: dict[str, Any] = {
     # /page/events.mu (upcoming events, fetched + cached, same lazy refresh as
     # spacestate). Blank = that page isn't registered.
     "node_events_ical_url": "",
+    # Optional: auto-reply to inbound LXMF DMs matching a known command
+    # (help/ping/stats/spacestate/events/nodes) with the same data the
+    # hosted node's own .mu pages show. Requires node_enabled -- enforced by
+    # config_routes.py's validator, since every command answers from data
+    # only a hosted node caches.
+    "talkback_enabled": False,
 }
 
 _config: dict[str, Any] = dict(_DEFAULTS)
@@ -148,6 +154,7 @@ def node_config() -> dict[str, Any]:
         "announce_interval_s": int(_config["node_announce_interval_s"] or 21600),
         "spaceapi_url": str(_config.get("node_spaceapi_url") or "").strip(),
         "events_ical_url": str(_config.get("node_events_ical_url") or "").strip(),
+        "talkback_enabled": bool(_config.get("talkback_enabled")),
     }
 
 

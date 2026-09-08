@@ -230,5 +230,128 @@ class TestInboundNotify(unittest.TestCase):
             asyncio.run(svc._notify_inbound("Bob", "hi"))  # must not raise
 
 
+class _FakeNode:
+    """Stand-in for NomadNode's public snapshot surface (nomad_node.py) --
+    talkback only ever reads through these, never a real hosted node."""
+
+    def __init__(self, name="TestNode", spaceapi_configured=False,
+                 events_configured=False, stats=None, spaceapi=None, events=None):
+        self.name = name
+        self.spaceapi_configured = spaceapi_configured
+        self.events_configured = events_configured
+        self._stats = stats if stats is not None else {}
+        self._spaceapi = spaceapi if spaceapi is not None else {}
+        self._events = events if events is not None else []
+
+    def stats_snapshot(self):
+        return dict(self._stats)
+
+    def spaceapi_snapshot(self):
+        return dict(self._spaceapi)
+
+    def events_snapshot(self):
+        return list(self._events)
+
+
+class TestTalkback(unittest.TestCase):
+    """``_maybe_talkback`` is tested directly with plain source_hex/text
+    strings, the same way ``_handle_announce`` is tested separately from
+    ``_on_announce`` -- ``_handle_inbound_message`` itself needs a real RNS
+    ``message`` object and stays integration-level (see this file's module
+    docstring)."""
+
+    def _svc(self, **node_kw) -> LxmfService:
+        svc = _make_service(talkback_enabled=True)
+        svc._node = _FakeNode(**node_kw)
+        return svc
+
+    @staticmethod
+    def _run_and_flush(fn) -> None:
+        """Runs a sync call that spawns a fire-and-forget task (_spawn ->
+        asyncio.ensure_future) and yields once so that task actually runs
+        to completion before the test asserts on it."""
+        async def runner():
+            fn()
+            await asyncio.sleep(0)
+        asyncio.run(runner())
+
+    def test_ping_gets_a_reply(self) -> None:
+        svc = self._svc()
+        sent = []
+
+        async def fake_send(dest, text):
+            sent.append((dest, text))
+        svc._send_talkback_reply = fake_send
+
+        self._run_and_flush(lambda: svc._maybe_talkback("aa" * 16, "ping"))
+        self.assertEqual(sent, [("aa" * 16, "pong")])
+
+    def test_unrecognized_text_gets_no_reply(self) -> None:
+        svc = self._svc()
+        sent = []
+        svc._send_talkback_reply = lambda d, t: sent.append((d, t))
+
+        self._run_and_flush(lambda: svc._maybe_talkback("aa" * 16, "just chatting"))
+        self.assertEqual(sent, [])
+
+    def test_disabled_service_never_calls_maybe_talkback(self) -> None:
+        # _handle_inbound_message gates on self._talkback_enabled before
+        # calling _maybe_talkback -- verify the flag itself is off by
+        # default so a plain _make_service() never wires this up.
+        svc = _make_service()
+        self.assertFalse(svc._talkback_enabled)
+
+    def test_cooldown_suppresses_a_second_reply(self) -> None:
+        svc = self._svc()
+        sent = []
+
+        async def fake_send(dest, text):
+            sent.append((dest, text))
+        svc._send_talkback_reply = fake_send
+
+        async def runner():
+            svc._maybe_talkback("aa" * 16, "ping")
+            svc._maybe_talkback("aa" * 16, "ping")
+            await asyncio.sleep(0)
+        asyncio.run(runner())
+        self.assertEqual(len(sent), 1)
+
+    def test_never_replies_to_its_own_address(self) -> None:
+        svc = self._svc()
+        sent = []
+        svc._send_talkback_reply = lambda d, t: sent.append((d, t))
+        own_hex = "aa" * 16
+        with mock.patch.object(lxmf_service, "RNS") as mock_rns:
+            mock_rns.hexrep.return_value = own_hex
+            svc._source = mock.Mock(hash=b"\xaa" * 16)
+            self._run_and_flush(lambda: svc._maybe_talkback(own_hex, "ping"))
+        self.assertEqual(sent, [])
+
+    def test_stats_reply_uses_node_snapshot(self) -> None:
+        svc = self._svc(name="TechInc Node", stats={"version": "0.8.1"})
+        sent = []
+
+        async def fake_send(dest, text):
+            sent.append((dest, text))
+        svc._send_talkback_reply = fake_send
+
+        self._run_and_flush(lambda: svc._maybe_talkback("bb" * 16, "stats"))
+        self.assertEqual(len(sent), 1)
+        self.assertIn("TechInc Node", sent[0][1])
+        self.assertIn("0.8.1", sent[0][1])
+
+    def test_spacestate_reply_only_fetched_when_configured(self) -> None:
+        svc = self._svc(spaceapi_configured=False)
+        sent = []
+
+        async def fake_send(dest, text):
+            sent.append((dest, text))
+        svc._send_talkback_reply = fake_send
+
+        self._run_and_flush(lambda: svc._maybe_talkback("cc" * 16, "spacestate"))
+        self.assertEqual(len(sent), 1)
+        self.assertIn("isn't configured", sent[0][1])
+
+
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()

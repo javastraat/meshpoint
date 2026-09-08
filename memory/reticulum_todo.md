@@ -5,7 +5,7 @@ See `memory/plugin-reticulum.md` for implementation detail (dated sections,
 one per feature) and `memory/project_m1_meshpoint.md` for wider session
 context.
 
-Last updated 2026-09-07 (added click-to-detail on Peers/Activity, same day).
+Last updated 2026-09-08 (talk-back bot built).
 
 ---
 
@@ -38,6 +38,14 @@ checked on the Pi.
   MeshChat, click "Next" through every page, confirm no dead links and
   that the `spacestate.mu`/`events.mu` cross-link only appears when both
   `node_spaceapi_url` and `node_events_ical_url` are actually set.
+- **Talk-back bot (new 2026-09-08, zero live testing)**: enable "Host a
+  NomadNet node" + "Talk-back bot" on the Settings tab, restart, then from
+  another LXMF client (Sideband/MeshChat) DM the node's `lxmf.delivery`
+  address `ping` (expect `pong`), `help`, `stats`, `nodes`, and — if
+  `node_spaceapi_url`/`node_events_ical_url` are set — `spacestate`/
+  `events`. Also worth confirming: a plain conversational DM (not a
+  command) gets no auto-reply, and the save form actually rejects
+  `talkback_enabled` with `node_enabled` off.
 - **Propagation node — NEEDS TESTING** (UI is confirmed on the device, the
   relay itself is not):
   1. Settings → Propagation node → tick "Act as an LXMF propagation node" →
@@ -77,6 +85,7 @@ checked on the Pi.
 | Hosting | `/page/spacestate.mu` + `{spacestate}` token | SpaceAPI feed, lazy fetch (once at boot, then on view) |
 | Hosting | `/page/events.mu` | iCalendar feed, lazy fetch |
 | Hosting | Generated-page cross-links | `info.mu`↔`nodes.mu` always; `spacestate.mu`↔`events.mu` only when the other is configured. Never link into an operator's own custom pages — shared code, most installs won't have e.g. `meshpoint.mu` |
+| Hosting | Talk-back bot | `talkback_enabled` (requires `node_enabled`); DM `help`/`ping`/`stats`/`spacestate`/`events`/`nodes` for a plain-text reply built from the same cached data the `.mu` pages read. Pure functions in `backend/talkback.py`; loop-safe by construction (replies never start with a command word) + a per-sender cooldown |
 | Ops | Dep check / setup / `meshpoint plugin check` | boot probe + on-demand + Run-setup modal |
 | Samples | `sample-pages/`, `sample-bbs-techinc/` | TechInc BBS carries real address + "Contact us" (IRC/Matrix/email/phone) |
 | Core (not this plugin) | RNode firmware flasher, Heltec-V4 node card | Configuration → Firmware |
@@ -108,6 +117,7 @@ plugins:
     node_announce_interval_s: 21600
     node_spaceapi_url: ""                # → /page/spacestate.mu + {spacestate}
     node_events_ical_url: ""             # → /page/events.mu
+    talkback_enabled: false              # DM bot; requires node_enabled
 ```
 
 ---
@@ -116,7 +126,6 @@ plugins:
 
 | Prio | Feature | What it is | Effort / risk |
 |---|---|---|---|
-| **High** | **LXMF talk-back bot** | Node auto-replies to DMs with commands: `help` / `stats` / `spacestate` / `events` / `nodes` / `ping`. Reuses the stat + SpaceAPI + iCal caches the node already keeps. Rate-limit + don't answer other bots / our own address. | Low–Med — one hook in `_handle_inbound_message`; new `backend/talkback.py` of pure functions; `talkback_enabled` config |
 | Med | **Attachments in Send** | images / small files over `LXMF.FIELD_IMAGE` / `FIELD_FILE_ATTACHMENTS` | Send side is easy (set `lxm.fields` before `handle_outbound`). Inbound is the blocker: shared `messages` table (`src/storage/message_repository.py`) has no attachment columns and core's conversation UI can't render them — needs a design decision (disk store + flag vs a JSON column on the shared table) |
 | Med | **Propagation node polish** | client side: sync *from* a preferred propagation node, show transfer progress; PN peering | Med — LXMF client API: `set_outbound_propagation_node`, `request_messages_from_propagation_node`, `propagation_transfer_state/progress/last_result` (all used in reticulum-meshchat `meshchat.py`) |
 | Med | **Telemetry publish** (Sideband-style) | push Pi telemetry (CPU temp, load, GPS, sensors) as LXMF telemetry fields to a collector | Medium — reuse `backend/host_stats.py` |
@@ -129,17 +138,20 @@ plugins:
 
 ## Done (this backlog's completed items)
 
+- **2026-09-08** — LXMF talk-back bot (`help`/`ping`/`stats`/`spacestate`/
+  `events`/`nodes` over DM, requires `node_enabled`). Not yet live-tested
+  against a real RNS stack -- see Pi-verification list above.
 - **2026-09-07** — Activity tab, DM notifications, LXMF propagation node
-  (server side). Details: `memory/plugin-reticulum.md` dated sections.
+  (server side), click-to-detail on Peers/Activity, sample-bbs-techinc nav
+  fixes + generated-page cross-links. Details: `memory/plugin-reticulum.md`
+  dated sections.
 - Earlier in the same session — SpaceAPI `/page/spacestate.mu` + `{spacestate}`
   token (later switched to lazy fetch), iCal `/page/events.mu`, the
   `sample-bbs-techinc/` page set, plugin dep-check / setup flow.
 
 ## Suggested order from here
 
-1. **Talk-back bot** — cheap, high "actually useful", makes `spacestate` /
-   `events` reachable over DM not just via the browsable pages.
-2. Then whatever the user's interested in. Telemetry is a coherent pair
+1. Whatever the user's interested in next. Telemetry is a coherent pair
    (publish + collector). Audio is a separate project. Attachments need the
    `messages`-table decision first.
 

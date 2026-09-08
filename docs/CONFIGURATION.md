@@ -274,6 +274,7 @@ plugins:
     node_announce_interval_s: 21600         # 6h
     node_spaceapi_url: ""                   # optional: a hackerspace SpaceAPI feed
     node_events_ical_url: ""                # optional: an iCalendar (.ics) feed
+    talkback_enabled: false                 # auto-reply to DM commands (requires node_enabled)
 ```
 
 `node_spaceapi_url` (optional, also on the Settings tab) points at a
@@ -292,6 +293,14 @@ Both feeds are fetched once at startup, then lazily — only when a page
 that needs them is requested (`spacestate.mu` cached 2 min, `events.mu`
 15 min) — so an unbrowsed node never polls either endpoint. Blank = the
 page isn't registered.
+
+`talkback_enabled` (also on the Settings tab): auto-reply to an inbound
+LXMF DM whose first word is `help`, `ping`, `stats`, `spacestate`, `events`
+or `nodes` with the same plain-text data those pages show (`spacestate`/
+`events` reply "not configured" if their URL above is blank). **Requires
+`node_enabled`** — the save is rejected otherwise, since every command
+answers from data only a hosted node caches. Anything else in a DM is
+left alone (not a bot query). Restart to apply.
 
 Registers a `nomadnetwork.node` destination on the *same identity* as your
 LXMF address, announces it, and serves a built-in `/page/index.mu` (a

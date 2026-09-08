@@ -52,6 +52,7 @@ class ReticulumUpdate(BaseModel):
     node_announce_interval_s: int = Field(21600, ge=600, le=604800)
     node_spaceapi_url: str = ""
     node_events_ical_url: str = ""
+    talkback_enabled: bool = False
     notify_url: str = ""
     propagation_enabled: bool = False
     propagation_storage_limit_mb: int = Field(250, ge=0, le=100_000)
@@ -99,6 +100,15 @@ class ReticulumUpdate(BaseModel):
             )
         return self
 
+    @model_validator(mode="after")
+    def _talkback_needs_node(self) -> "ReticulumUpdate":
+        if self.talkback_enabled and not self.node_enabled:
+            raise ValueError(
+                "The talk-back bot answers from data the hosted NomadNet "
+                "node caches -- enable \"Host a NomadNet node\" first"
+            )
+        return self
+
 
 @router.get("/reticulum")
 async def get_reticulum(_claims: SessionClaims = Depends(require_admin)):
@@ -122,6 +132,7 @@ async def update_reticulum(
         "node_announce_interval_s": req.node_announce_interval_s,
         "node_spaceapi_url": req.node_spaceapi_url.strip(),
         "node_events_ical_url": req.node_events_ical_url.strip(),
+        "talkback_enabled": req.talkback_enabled,
         "notify_url": req.notify_url.strip(),
         "propagation_enabled": req.propagation_enabled,
         "propagation_storage_limit_mb": req.propagation_storage_limit_mb,

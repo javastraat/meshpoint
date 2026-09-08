@@ -32,12 +32,13 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+import time
 from collections import deque
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
-from . import notify
+from . import notify, talkback
 
 if TYPE_CHECKING:
     from src.api.websocket_manager import WebSocketManager
@@ -72,6 +73,12 @@ _PROPAGATION_ANNOUNCE_INTERVAL_S = 21600  # 6h -- re-announce the lxmf.propagati
 # request indefinitely for a genuinely offline/unknown peer.
 _PATH_REQUEST_RETRIES = 5
 _PATH_REQUEST_POLL_INTERVAL_S = 1.0
+
+# Talkback (backend/talkback.py) is inherently loop-safe (its replies never
+# start with a recognized command word, see that module's docstring), but a
+# per-sender cooldown is cheap defence in depth against any bug that would
+# let a reply re-trigger a reply.
+_TALKBACK_COOLDOWN_S = 5.0
 
 
 # --- RNS/LXMF log bridge ------------------------------------------------------
@@ -160,6 +167,7 @@ class LxmfService:
         events_ical_url: str = "",
         notify_url: str = "",
         propagation_cfg: Optional[dict] = None,
+        talkback_enabled: bool = False,
     ):
         self._display_name = display_name
         self._reticulum_config_dir = Path(reticulum_config_dir)
@@ -176,6 +184,12 @@ class LxmfService:
         self._events_ical_url = events_ical_url
         self._notify_url = notify_url
         self._propagation_cfg = propagation_cfg or {"enabled": False}
+        # Requires node hosting: every command answers from data a hosted
+        # node already caches (see talkback.py's module docstring) -- this
+        # flag alone does nothing unless node_cfg["enabled"] is also true
+        # (enforced by config_routes.py's validator, not re-checked here).
+        self._talkback_enabled = talkback_enabled
+        self._talkback_last_reply: dict[str, float] = {}
         self._node = None
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._router = None
@@ -473,6 +487,37 @@ class LxmfService:
         )
         if self._notify_url:
             self._spawn(self._notify_inbound(name or source_hex[:16], text))
+        if self._talkback_enabled and self._node is not None:
+            self._maybe_talkback(source_hex, text)
+
+    def _maybe_talkback(self, source_hex: str, text: str) -> None:
+        command = talkback.parse_command(text)
+        if command is None:
+            return
+        own_hex = RNS.hexrep(self._source.hash, delimit=False) if self._source else None
+        if source_hex == own_hex:
+            return  # never reply to ourselves (e.g. a self-test DM)
+        last = self._talkback_last_reply.get(source_hex, 0.0)
+        now = time.monotonic()
+        if now - last < _TALKBACK_COOLDOWN_S:
+            return
+        self._talkback_last_reply[source_hex] = now
+        reply = talkback.build_reply(
+            command,
+            node_name=self._node.name,
+            stats=self._node.stats_snapshot(),
+            spaceapi_configured=self._node.spaceapi_configured,
+            spaceapi=self._node.spaceapi_snapshot() if self._node.spaceapi_configured else {},
+            events_configured=self._node.events_configured,
+            events=self._node.events_snapshot() if self._node.events_configured else [],
+        )
+        self._spawn(self._send_talkback_reply(source_hex, reply))
+
+    async def _send_talkback_reply(self, destination_hash_hex: str, text: str) -> None:
+        try:
+            await self.send_message(destination_hash_hex, text)
+        except Exception:  # noqa: BLE001 -- best-effort, same as notify
+            logger.debug("talkback reply failed", exc_info=True)
 
     async def _notify_inbound(self, sender: str, text: str) -> None:
         preview = text if len(text) <= 240 else text[:237] + "..."

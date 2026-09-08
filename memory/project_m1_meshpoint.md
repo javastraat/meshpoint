@@ -12067,3 +12067,87 @@ addition, one combined bullet). Not opened in a real NomadNet client --
 worth adding to the Pi-verification list next time that's being done
 anyway (walk the menu, confirm no dead links, confirm the two config-
 gated links actually disappear when spaceapi/ical aren't configured).
+
+## New session (2026-09-08) — Reticulum LXMF talk-back bot, top of the backlog
+
+User asked what was on the Reticulum todo, then specifically about the
+talk-back bot (top of "Could build" in `memory/reticulum_todo.md`).
+Scoped it first: commands (`help`/`ping`/`stats`/`spacestate`/`events`/
+`nodes`), hook point (`lxmf_service.py`'s `_handle_inbound_message`, same
+place `notify_url` already fires), loop-safety concern (a reply bot can
+in principle spam/ping-pong). Flagged one real design question before
+building: should the bot require `node_enabled`, since every command's
+data (`stats`/`spacestate`/`events`/`nodes`) is literally what the hosted
+node's `.mu` pages already show and reusing those caches beats a second
+fetch path. **User: "what do you advise?"** -- advised requiring
+`node_enabled` (avoid a second data path that can drift from the pages);
+user agreed ("sure do it").
+
+**Built, end to end:**
+- `plugins/apps/reticulum/backend/talkback.py` (new) -- pure functions,
+  no RNS/LXMF/asyncio imports. `parse_command()` matches the first word
+  case-insensitively against the 6 commands, else `None` (an ordinary DM
+  gets no reply). `build_reply()` dispatches to per-command formatters.
+  **Loop-safety invariant baked into every reply**: none starts with a
+  recognized command word, so a reply can never itself be re-parsed as a
+  new command -- two Meshpoint nodes with this on can't ping-pong forever.
+  Documented explicitly in the module docstring so it isn't accidentally
+  broken by a future edit.
+- `nomad_node.py` -- added `stats_snapshot()` / `spaceapi_snapshot()` /
+  `events_snapshot()` (plain dicts/lists, the same cached data `_serve_info`
+  etc. read, `spaceapi`/`events` triggering the same lazy-refresh a page
+  view would) and `spaceapi_configured`/`events_configured`/`name`
+  properties -- all public, so `lxmf_service.py` never reaches into
+  NomadNode's `_`-prefixed internals (the same "public accessor, not
+  private-attribute reach-in" call made for the click-to-detail work
+  yesterday).
+- `lxmf_service.py` -- `talkback_enabled` constructor param, a
+  `_maybe_talkback(source_hex, text)` method called from
+  `_handle_inbound_message` (mirrors `_handle_announce` being separately
+  testable from `_on_announce` -- `_maybe_talkback` takes plain strings,
+  no RNS message object needed, so it's fully unit-testable on the Mac).
+  Guards: never replies to its own address (`RNS.hexrep` compare against
+  `self._source.hash`), a `_TALKBACK_COOLDOWN_S = 5.0` per-sender cooldown
+  dict as defence-in-depth on top of the loop-safety invariant above.
+- Config plumbing end to end, same shape as `notify_url`/`propagation_enabled`
+  before it: `state.py` default + `node_config()["talkback_enabled"]`,
+  `config_routes.py` field + a new `_talkback_needs_node` model validator
+  (rejects `talkback_enabled=True` with `node_enabled=False`, same pattern
+  as the existing `_at_least_one_interface` validator), `backend/__init__.py`
+  wiring, a Settings-tab checkbox in the NomadNet-node fieldset with a
+  matching client-side pre-check (immediate error, not just a 422 round
+  trip) mirroring the RNode/backbone "at least one" check already there.
+
+**Tests added** (all passing, all on the Mac with no `rns`/`lxmf`/`fastapi`-
+DB stack needed): `test_talkback.py` (21 tests, pure function coverage
+incl. an explicit "help reply can't itself be parsed as a command" test),
+`TestTalkback` in `test_lxmf_service.py` (8 tests -- ping/unrecognized/
+cooldown/self-guard/stats/spacestate-not-configured, using a `_FakeNode`
+stand-in for NomadNode's public snapshot surface and a `_run_and_flush`
+helper that runs a sync call then `await asyncio.sleep(0)` so the
+`_spawn`'d fire-and-forget task actually completes before asserting --
+first attempt used a bare lambda as the `_send_talkback_reply` stub, which
+crashed `_spawn`'s `asyncio.ensure_future` since a lambda isn't awaitable;
+fixed by using `async def fake_send` throughout), `test_config_routes.py`
+(new file, 4 tests on the pydantic validator -- confirmed importable on
+the Mac standalone, no aiosqlite pulled in), plus small additions to
+`test_state.py` and `test_nomad_node.py` for the new config key and
+snapshot accessors.
+
+**Verification**: full `python3.11 -m pytest plugins/apps/reticulum/` --
+154 passed (up from 114), same pre-existing 7 aiosqlite-gated route-test
+failures as every prior session, confirmed unrelated. `ast.parse`/
+`node --check` clean on every touched file. `ChangelogParser.parse_file`
+re-verified. CHANGELOG bullet under `### v0.8.1`; CONFIGURATION.md and
+`memory/reticulum_todo.md` updated (talk-back bot moved from "Could
+build" to "Done", removed from "Suggested order"). README's Reticulum
+section deliberately left untouched -- it already doesn't mention the
+Activity tab or propagation node from the day before, so adding just
+talkback would be inconsistent; a full README refresh for Reticulum is
+its own separate task if the user wants it.
+
+**Not done**: zero live testing against a real RNS/LXMF stack -- added
+to `memory/reticulum_todo.md`'s Pi-verification list (enable both
+checkboxes, restart, DM `ping`/`help`/`stats`/etc. from Sideband/
+MeshChat, confirm a plain conversational DM gets no reply, confirm the
+save form rejects `talkback_enabled` without `node_enabled`).

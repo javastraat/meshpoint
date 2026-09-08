@@ -222,6 +222,16 @@ class ReticulumSettingsTab {
                                     page is viewed). Restart to apply.
                                 </span>
                             </label>
+                            <label class="cfg-field cfg-field--toggle">
+                                <input type="checkbox" data-rt-talkback-enabled>
+                                <span class="cfg-field__label">Talk-back bot</span>
+                            </label>
+                            <p class="cfg-field__hint">
+                                Auto-reply to a DM containing <code>help</code>, <code>ping</code>,
+                                <code>stats</code>, <code>spacestate</code>, <code>events</code> or
+                                <code>nodes</code> with the same data those pages show. Requires
+                                "Host a NomadNet node" above. Restart to apply.
+                            </p>
                         </fieldset>
                         <fieldset class="cfg-fieldset">
                             <legend class="cfg-fieldset__legend">Message notifications</legend>
@@ -286,6 +296,7 @@ class ReticulumSettingsTab {
         this._nodePages = this._q('[data-rt-node-pages]');
         this._nodeSpaceapi = this._q('[data-rt-node-spaceapi]');
         this._nodeEvents = this._q('[data-rt-node-events]');
+        this._talkbackEnabled = this._q('[data-rt-talkback-enabled]');
         this._notifyUrl = this._q('[data-rt-notify-url]');
         this._nodeStatusEl = this._q('[data-rt-node-status]');
         this._statusEl = this._q('[data-rt-status]');
@@ -323,6 +334,7 @@ class ReticulumSettingsTab {
         if (this._nodePages) this._nodePages.value = rt.node_pages_dir || 'data/reticulum/pages';
         if (this._nodeSpaceapi) this._nodeSpaceapi.value = rt.node_spaceapi_url || '';
         if (this._nodeEvents) this._nodeEvents.value = rt.node_events_ical_url || '';
+        if (this._talkbackEnabled) this._talkbackEnabled.checked = !!rt.talkback_enabled;
         if (this._notifyUrl) this._notifyUrl.value = rt.notify_url || '';
         this._loadNodeStatus();
         if (this._rnodeEnabled) this._rnodeEnabled.checked = rt.rnode_enabled !== false;
@@ -471,6 +483,14 @@ class ReticulumSettingsTab {
             );
             return;
         }
+        if (this._talkbackEnabled?.checked && !this._nodeEnabled.checked) {
+            this._setStatus(
+                'error',
+                'The talk-back bot answers from data the hosted NomadNet node '
+                + 'caches -- enable "Host a NomadNet node" first.',
+            );
+            return;
+        }
         const payload = {
             display_name: this._displayName.value.trim() || 'Meshpoint',
             nomad_timeout_s: Number(this._nomadTimeout.value) || 20,
@@ -480,6 +500,7 @@ class ReticulumSettingsTab {
             node_announce_interval_s: Number(this._nodeInterval.value) || 21600,
             node_spaceapi_url: (this._nodeSpaceapi?.value || '').trim(),
             node_events_ical_url: (this._nodeEvents?.value || '').trim(),
+            talkback_enabled: !!this._talkbackEnabled?.checked,
             notify_url: (this._notifyUrl?.value || '').trim(),
             propagation_enabled: !!this._propEnabled?.checked,
             propagation_storage_limit_mb: Number(this._propStorage?.value) || 0,

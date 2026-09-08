@@ -294,6 +294,82 @@ class TestNomadNode(unittest.TestCase):
         text = n._serve_nodes("/page/nodes.mu", None, 1, 1, None, 0).decode("utf-8")
         self.assertIn("none yet", text)
 
+    def test_events_and_spacestate_cross_link_only_when_both_configured(self) -> None:
+        n = self._node(spaceapi_url="https://x", events_ical_url="https://y")
+        events_text = n._serve_events("/page/events.mu", None, 1, 1, None, 0).decode()
+        self.assertIn(":/page/spacestate.mu", events_text)
+        space_text = n._serve_spacestate("/page/spacestate.mu", None, 1, 1, None, 0).decode()
+        self.assertIn(":/page/events.mu", space_text)
+
+    def test_events_has_no_spacestate_link_when_not_configured(self) -> None:
+        n = self._node(events_ical_url="https://y")  # no spaceapi_url
+        text = n._serve_events("/page/events.mu", None, 1, 1, None, 0).decode()
+        self.assertNotIn("spacestate.mu", text)
+
+    def test_serve_nodes_links_back_to_info(self) -> None:
+        n = self._node()
+        text = n._serve_nodes("/page/nodes.mu", None, 1, 1, None, 0).decode()
+        self.assertIn(":/page/info.mu", text)
+        self.assertIn(":/page/index.mu", text)
+
+
+class TestNomadNodeTalkbackSnapshots(unittest.TestCase):
+    """Public plain-text accessors added for backend/talkback.py -- a
+    second, non-Micron consumer of the same cached data the .mu pages
+    already read."""
+
+    def _node(self, **kw):
+        kw.setdefault("hardware_description", "a SenseCap M1")
+        return NomadNode(
+            identity=object(), name="PD2EMC Meshpoint",
+            pages_dir="/tmp/does-not-exist/pages", announce_interval_s=21600, **kw,
+        )
+
+    def test_name_property(self) -> None:
+        self.assertEqual(self._node().name, "PD2EMC Meshpoint")
+
+    def test_configured_flags_reflect_urls(self) -> None:
+        n = self._node()
+        self.assertFalse(n.spaceapi_configured)
+        self.assertFalse(n.events_configured)
+        n2 = self._node(spaceapi_url="https://x", events_ical_url="https://y")
+        self.assertTrue(n2.spaceapi_configured)
+        self.assertTrue(n2.events_configured)
+
+    def test_stats_snapshot_is_a_plain_copy(self) -> None:
+        n = self._node()
+        n._stats = {"version": "0.8.1"}
+        snap = n.stats_snapshot()
+        self.assertEqual(snap, {"version": "0.8.1"})
+        snap["version"] = "mutated"
+        self.assertEqual(n._stats["version"], "0.8.1")  # copy, not a live ref
+
+    def test_spaceapi_snapshot_triggers_lazy_refresh_when_stale(self) -> None:
+        import time as _t
+
+        n = self._node(spaceapi_url="https://x")
+        n._spaceapi = {"open": True}
+        n._spaceapi_fetched_at = _t.monotonic() - 10_000
+
+        scheduled: list = []
+
+        class _FakeLoop:
+            def call_soon_threadsafe(self, fn, *a):
+                scheduled.append(fn)
+
+            def create_task(self, coro):
+                coro.close()
+
+        n._loop = _FakeLoop()
+        snap = n.spaceapi_snapshot()
+        self.assertEqual(snap, {"open": True})
+        self.assertEqual(len(scheduled), 1)  # same lazy-refresh path as the .mu page
+
+    def test_events_snapshot_returns_a_plain_list(self) -> None:
+        n = self._node(events_ical_url="https://y")
+        n._events = [{"summary": "Talk"}]
+        self.assertEqual(n.events_snapshot(), [{"summary": "Talk"}])
+
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()

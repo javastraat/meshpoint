@@ -70,6 +70,7 @@ class TestReticulumState(unittest.TestCase):
         self.assertFalse(nc["enabled"])
         self.assertEqual(nc["name"], "PD2EMC Meshpoint")  # blank node_name -> display_name
         self.assertEqual(nc["pages_dir"], "data/reticulum/pages")
+        self.assertFalse(nc["talkback_enabled"])
 
     def test_node_config_uses_explicit_values(self) -> None:
         state.init({
@@ -77,11 +78,13 @@ class TestReticulumState(unittest.TestCase):
             "node_enabled": True,
             "node_name": "PD2EMC BBS",
             "node_announce_interval_s": 3600,
+            "talkback_enabled": True,
         })
         nc = state.node_config()
         self.assertTrue(nc["enabled"])
         self.assertEqual(nc["name"], "PD2EMC BBS")
         self.assertEqual(nc["announce_interval_s"], 3600)
+        self.assertTrue(nc["talkback_enabled"])
 
     def test_propagation_config_defaults_off(self) -> None:
         state.init({})
