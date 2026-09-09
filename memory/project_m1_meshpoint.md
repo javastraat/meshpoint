@@ -12740,9 +12740,71 @@ v0.8.1 present), README "What's Different" + API table row,
 API-ENDPOINTS.md (3 new rows + `/peers` note), CONFIGURATION.md
 Contacts paragraph.
 
-**Not yet opened in a browser / on the Pi.** Owed: the Contact section
-saves + the name propagates to all four surfaces (Peers/Activity/
-Messages/Send); "announced as X" appears only when the names differ;
-Remove works; the small `✓` shows for trusted; light/dark theme on the
-form inputs; `contacts.json` actually lands under
-`/opt/meshpoint/data/reticulum/`.
+**PARTIALLY LIVE-VERIFIED 2026-09-09** on ti-meshpoint (v0.8.1, HTTPS
+:8443). User saved peer `ffe6ea53…` (announced `echo@gvrd`) as "test"
+with "mark as known" ticked: drawer showed "Saved.", Peers row became
+`test ✓`, header showed `test` + `announced as echo@gvrd` sub-line. The
+save→render loop works. Still owed: Send picker / Messages list /
+Activity row + tooltip show the name; **Remove** clears it everywhere +
+drops the ✓; both themes on the form; `contacts.json` under
+`/opt/meshpoint/data/reticulum/`. **Possible issue from the
+screenshot:** the Name `<input>` looked dark-on-dark while Note
+rendered fine — likely a post-type text-selection artifact, but if
+real the `.rt-contact-form input` `#111`/`#eee` colour fallbacks need
+to be theme-aware (same latent issue the Browse tab's own inputs would
+have).
+
+## Reticulum — Propagation node polish, client side (new-build #2, 2026-09-09)
+
+User picked #2 off the list after #1. What shipped v0.8.1 was relay-only
+(be a propagation node); this is the client half — use *another* node as
+your propagation node. Design mirrors reticulum-meshchat's `meshchat.py`
+(the reference for every LXMF-client call in this plugin).
+
+**Built:**
+- Config keys `propagation_outbound_node` (an `lxmf.propagation` dest
+  hash; `config_routes.py` validates hex 8-64 even-length) +
+  `propagation_auto_sync_interval_s` (0 = manual, else ≥300; model
+  validator rejects <300 and rejects an interval with no node set).
+  `state.propagation_config()` gains both.
+- `lxmf_service.py`: `set_outbound_propagation_node()` /
+  `sync_propagation_messages()` / `cancel_propagation_sync()` /
+  `propagation_client_status()` / `_apply_outbound_propagation_node()`
+  (called in `_connect`, independent of the relay toggle) /
+  `_propagation_sync_loop()` (started when interval > 0, task cancelled
+  in `stop()`). State names built at runtime from `LXMRouter.PR_*`.
+- `routes.py`: `GET /api/reticulum/propagation` (`{local, client}`),
+  admin `POST .../propagation/sync` (400 if no node) + `/sync/cancel`;
+  `propagation_client` block added to `/status`.
+- `reticulum_settings_tab.js`: propagation fieldset gains an
+  outbound-node `<select>` (populated from `/peers` filtered to
+  `lxmf.propagation`, saved hash kept selectable), auto-sync interval,
+  a client status line; matching client-side validation.
+- `reticulum_panel.js`: "Sync inbox" button in the page header (shown
+  when an outbound node is configured + admin), `_handleSync()` POSTs
+  then polls `/propagation` every 2s for up to 60s showing transfer
+  state, reloads Messages on a terminal state.
+- `reticulum.css`: `.rt-prop-divider`.
+
+**Tests:** `test_lxmf_service.py::TestPropagationClient` ×7 (Mac-runnable,
+`_FakeRouter` extended with the outbound/sync methods + transfer attrs);
+`test_config_routes.py::TestPropagationOutboundNode` ×6 +
+`test_propagation_route.py` ×5 (FastAPI-gated, CI/Pi). Full plugin suite
+**176 passed**, 25 skipped, no regressions. `test_status_route.py`'s
+`_FakeService` needed a `propagation_client_status` stub added (the
+`/status` handler now calls it). JS `node --check` clean.
+
+**Docs:** CHANGELOG v0.8.1 (parser reverified 31 sections), README
+"What's Different", API-ENDPOINTS.md (3 rows), CONFIGURATION.md (prose +
+the yaml block's 2 new keys).
+
+**NOT done:** PN peering (relays gossiping to each other — meshchat
+doesn't either); a WS push when a *timed* auto-sync delivers new
+messages (a manual sync reloads the Messages tab; an idle page catches
+up on its normal 15s poll).
+
+**Not browser/Pi-verified.** Owed: dropdown lists heard relays + keeps
+the saved hash selected after restart; "Sync inbox" appears only with a
+node set; a real stopped→start→sync→message-lands cycle with transfer
+state cycling; auto-sync interval fires; an unreachable node shows a
+failed state, not a hang. Full checklist in `memory/reticulum_todo.md`.

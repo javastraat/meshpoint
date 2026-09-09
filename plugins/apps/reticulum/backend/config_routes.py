@@ -56,6 +56,8 @@ class ReticulumUpdate(BaseModel):
     notify_url: str = ""
     propagation_enabled: bool = False
     propagation_storage_limit_mb: int = Field(250, ge=0, le=100_000)
+    propagation_outbound_node: str = ""
+    propagation_auto_sync_interval_s: int = Field(0, ge=0, le=86_400)
     rnode_enabled: bool = True
     rnode_serial_port: str = ""
     rnode_frequency_hz: int = Field(..., ge=100_000_000, le=1_000_000_000)
@@ -91,6 +93,22 @@ class ReticulumUpdate(BaseModel):
             raise ValueError("must be an http(s) URL or blank")
         return stripped
 
+    @field_validator("propagation_outbound_node")
+    @classmethod
+    def _prop_node_hash_ok(cls, value: str) -> str:
+        stripped = value.strip().lower().replace(":", "")
+        if not stripped:
+            return ""
+        if (
+            len(stripped) < 8 or len(stripped) > 64 or len(stripped) % 2
+            or any(c not in "0123456789abcdef" for c in stripped)
+        ):
+            raise ValueError(
+                "propagation_outbound_node must be a Reticulum destination hash "
+                "(hex, e.g. the 32-char hash from a peer's Destination column) or blank"
+            )
+        return stripped
+
     @model_validator(mode="after")
     def _at_least_one_interface(self) -> "ReticulumUpdate":
         if not self.rnode_enabled and not self.backbone_enabled:
@@ -98,6 +116,17 @@ class ReticulumUpdate(BaseModel):
                 "At least one of RNode radio or TCP backbone must stay enabled "
                 "-- disable the whole plugin from Settings -> Plugins instead"
             )
+        return self
+
+    @model_validator(mode="after")
+    def _auto_sync_needs_a_node(self) -> "ReticulumUpdate":
+        if self.propagation_auto_sync_interval_s and not self.propagation_outbound_node:
+            raise ValueError(
+                "Auto-sync needs an outbound propagation node -- set one, or "
+                "leave the interval at 0 for manual sync only"
+            )
+        if 0 < self.propagation_auto_sync_interval_s < 300:
+            raise ValueError("propagation_auto_sync_interval_s must be 0 or at least 300")
         return self
 
     @model_validator(mode="after")
@@ -136,6 +165,8 @@ async def update_reticulum(
         "notify_url": req.notify_url.strip(),
         "propagation_enabled": req.propagation_enabled,
         "propagation_storage_limit_mb": req.propagation_storage_limit_mb,
+        "propagation_outbound_node": req.propagation_outbound_node,
+        "propagation_auto_sync_interval_s": req.propagation_auto_sync_interval_s,
         "rnode_enabled": req.rnode_enabled,
         "rnode_serial_port": req.rnode_serial_port.strip(),
         "rnode_frequency_hz": req.rnode_frequency_hz,

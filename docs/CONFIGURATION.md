@@ -207,6 +207,8 @@ plugins:
     notify_url: ""                              # optional: ntfy topic / webhook, POSTed on an inbound LXMF DM
     propagation_enabled: false                  # run an LXMF store-and-forward relay (added role, not a replacement)
     propagation_storage_limit_mb: 250           # cap the on-disk propagation store (0 = LXMF default)
+    propagation_outbound_node: ""               # optional: use another node's lxmf.propagation hash as your relay
+    propagation_auto_sync_interval_s: 0         # 0 = manual sync only; else re-sync every N seconds (min 300)
     # storage paths — defaults shown; only set to override:
     # reticulum_config_dir: "data/reticulum/rns_config"
     # identity_path: "data/reticulum/identity"
@@ -266,6 +268,17 @@ propagation service on its own separate hash. `propagation_storage_limit_mb`
 (default 250) caps the on-disk store — `0` uses LXMF's own default. Restart
 to apply. The Settings tab shows a live status line (address, messages
 held); `GET /api/reticulum/status` carries the same in a `propagation` block.
+
+`plugins.reticulum.propagation_outbound_node` (Settings tab → *Propagation
+node*, dropdown of `lxmf.propagation` peers): use *another* node as your
+propagation node. Messages you send to an offline peer go to that relay
+instead of failing, and a **"Sync inbox"** button on the Reticulum page
+pulls any messages parked there for you (showing live transfer state).
+This is independent of `propagation_enabled` — you can use a relay without
+running one. `propagation_auto_sync_interval_s` (default `0` = manual only;
+otherwise ≥ 300) re-syncs on a timer. Restart to apply. `GET
+/api/reticulum/propagation` reports both halves; `GET /api/reticulum/status`
+gains a `propagation_client` block.
 
 The **Browse** tab is a minimal NomadNet browser — it fetches
 `nomadnetwork.node` peers' Micron pages over RNS Links.

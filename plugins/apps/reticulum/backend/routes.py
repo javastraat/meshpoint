@@ -65,7 +65,8 @@ async def reticulum_status():
         "own_address": _service.own_address,
         "peer_count": peer_count,
         "node": _service.node_status(),   # None unless hosting a NomadNet node
-        "propagation": _service.propagation_status(),  # None unless enabled
+        "propagation": _service.propagation_status(),  # None unless running a local relay
+        "propagation_client": _service.propagation_client_status(),  # None until the router exists
         "radio": {
             # what the topbar chip shows in its "freq" slot: the RNode
             # frequency when RF is configured, else the TCP backbone.
@@ -162,6 +163,44 @@ async def reticulum_announce(_claims: SessionClaims = Depends(require_admin)):
     except RuntimeError as exc:
         raise HTTPException(503, str(exc))
     return {"status": "announced"}
+
+
+# --- LXMF propagation: client side (sync from a preferred node) ----------
+
+
+@router.get("/propagation")
+async def reticulum_propagation():
+    """Both halves of propagation: `local` (this box running a relay, or
+    None) and `client` (the outbound node + current/last sync state)."""
+    if _service is None:
+        raise HTTPException(503, "Reticulum companion is disabled")
+    return {
+        "local": _service.propagation_status(),
+        "client": _service.propagation_client_status(),
+    }
+
+
+@router.post("/propagation/sync")
+async def reticulum_propagation_sync(_claims: SessionClaims = Depends(require_admin)):
+    """Pull any messages parked for us on the configured outbound
+    propagation node. Returns as soon as the request is dispatched --
+    poll `GET /propagation` for transfer state."""
+    if _service is None:
+        raise HTTPException(503, "Reticulum companion is disabled")
+    result = _service.sync_propagation_messages()
+    if not result.get("ok"):
+        raise HTTPException(400, result.get("error") or "sync failed")
+    return {"status": "syncing"}
+
+
+@router.post("/propagation/sync/cancel")
+async def reticulum_propagation_sync_cancel(
+    _claims: SessionClaims = Depends(require_admin),
+):
+    if _service is None:
+        raise HTTPException(503, "Reticulum companion is disabled")
+    _service.cancel_propagation_sync()
+    return {"status": "cancelled"}
 
 
 # --- contacts / petnames --------------------------------------------------

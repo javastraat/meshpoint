@@ -173,6 +173,9 @@ Provided by the **Reticulum** plugin (`plugins/apps/reticulum/`, `plugins.reticu
 | GET | `/api/reticulum/messages/{destination_hash}` | Viewer | One conversation's message history (from the shared `messages` table) |
 | POST | `/api/reticulum/send` | Admin | Send a direct LXMF message (`destination_hash`, `text`) — the Messages page posts here for `protocol='reticulum'` conversations |
 | POST | `/api/reticulum/announce` | Admin | Re-send meshpoint's own LXMF delivery announce on demand |
+| GET | `/api/reticulum/propagation` | Viewer | Both halves of propagation: `local` (this box's relay, or null) and `client` (outbound node + current/last sync state) |
+| POST | `/api/reticulum/propagation/sync` | Admin | Pull messages parked for us on the configured outbound propagation node (400 if none configured); returns once dispatched — poll `GET /propagation` for state |
+| POST | `/api/reticulum/propagation/sync/cancel` | Admin | Cancel an in-flight propagation sync |
 | GET | `/api/reticulum/contacts` | Viewer | The operator's petname address book — `{hash: {petname, note, trusted, updated}}`, stored in `data/reticulum/contacts.json`, never announced |
 | PUT | `/api/reticulum/contacts/{destination_hash}` | Admin | Set a contact (`petname`, optional `note`, `trusted`); an empty `petname` removes it |
 | DELETE | `/api/reticulum/contacts/{destination_hash}` | Admin | Forget a contact |

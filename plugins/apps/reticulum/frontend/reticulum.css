@@ -400,4 +400,11 @@
     color: var(--text-muted, #777);
 }
 
+/* Settings tab: visual break before the propagation-client sub-block. */
+.rt-prop-divider {
+    border-top: 1px solid var(--border-subtle, #333);
+    padding-top: 0.6rem;
+    margin-top: 0.3rem;
+}
+
 .rt-amodal__view-peer { width: 100%; margin-top: 0.75rem; }

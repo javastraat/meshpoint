@@ -318,6 +318,11 @@ class _FakeRouter:
 
         self.propagation_destination = _Dest()
 
+        self.outbound_propagation_node = None
+        self.propagation_transfer_state = None
+        self.propagation_transfer_progress = 0.0
+        self.propagation_transfer_last_result = None
+
     def set_message_storage_limit(self, **kw):
         self.calls.append(("limit", kw))
 
@@ -326,6 +331,19 @@ class _FakeRouter:
 
     def announce_propagation_node(self):
         self.calls.append(("announce",))
+
+    def set_outbound_propagation_node(self, dest_bytes):
+        self.calls.append(("set_outbound", dest_bytes))
+        self.outbound_propagation_node = dest_bytes
+
+    def get_outbound_propagation_node(self):
+        return self.outbound_propagation_node
+
+    def cancel_propagation_node_requests(self):
+        self.calls.append(("cancel",))
+
+    def request_messages_from_propagation_node(self, identity):
+        self.calls.append(("sync", identity))
 
 
 class TestPropagationNode(unittest.TestCase):
@@ -368,6 +386,62 @@ class TestPropagationNode(unittest.TestCase):
         svc._loop = None
         svc._start_propagation()  # must not raise
         self.assertIsNone(svc._pn_task)
+
+
+class TestPropagationClient(unittest.TestCase):
+    def test_set_outbound_node_normalises_and_calls_router(self) -> None:
+        svc = _make_service()
+        svc._router = _FakeRouter()
+        ok = svc.set_outbound_propagation_node("AB:CD" + "ef" * 14)
+        self.assertTrue(ok)
+        self.assertEqual(svc._prop_outbound, "abcd" + "ef" * 14)
+        self.assertEqual(svc._router.calls[-1][0], "set_outbound")
+
+    def test_clearing_outbound_node_cancels_and_nulls(self) -> None:
+        svc = _make_service()
+        svc._router = _FakeRouter()
+        svc.set_outbound_propagation_node("ab" * 16)
+        self.assertFalse(svc.set_outbound_propagation_node(""))
+        self.assertEqual(svc._prop_outbound, "")
+        self.assertIn(("cancel",), svc._router.calls)
+        self.assertIsNone(svc._router.outbound_propagation_node)
+
+    def test_bad_hash_is_swallowed_and_clears(self) -> None:
+        svc = _make_service()
+        svc._router = _FakeRouter()
+        self.assertFalse(svc.set_outbound_propagation_node("nothex!!"))
+        self.assertEqual(svc._prop_outbound, "")
+
+    def test_sync_needs_an_outbound_node(self) -> None:
+        svc = _make_service()
+        svc._router = _FakeRouter()
+        svc._identity = object()
+        res = svc.sync_propagation_messages()
+        self.assertFalse(res["ok"])
+        self.assertIn("outbound propagation node", res["error"])
+
+    def test_sync_dispatches_the_request(self) -> None:
+        svc = _make_service()
+        svc._router = _FakeRouter()
+        svc._identity = object()
+        svc.set_outbound_propagation_node("cd" * 16)
+        res = svc.sync_propagation_messages()
+        self.assertTrue(res["ok"])
+        self.assertEqual(svc._router.calls[-1][0], "sync")
+
+    def test_client_status_shape(self) -> None:
+        svc = _make_service(propagation_cfg={"outbound_node": "ab" * 16, "auto_sync_interval_s": 600})
+        svc._router = _FakeRouter()
+        svc._router.propagation_transfer_last_result = 3
+        st = svc.propagation_client_status()
+        self.assertEqual(st["outbound_node"], "ab" * 16)
+        self.assertEqual(st["auto_sync_interval_s"], 600)
+        self.assertEqual(st["last_result"], 3)
+        self.assertEqual(st["state"], "idle")  # None -> idle
+
+    def test_client_status_none_without_router(self) -> None:
+        svc = _make_service(propagation_cfg={"outbound_node": "ab" * 16})
+        self.assertIsNone(svc.propagation_client_status())
 
 
 class TestInboundNotify(unittest.TestCase):

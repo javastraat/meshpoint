@@ -895,3 +895,55 @@ Operator-assigned names for peers. Local address book, never announced.
 - NOT done: petnames in the core cross-protocol Messages page (would need
   a core change — the plugin's own Messages tab does resolve them).
 - Pi verification: see `memory/reticulum_todo.md`.
+
+## 2026-09-09 — Propagation node polish, client side (new-build #2)
+
+Server side (be a relay) shipped v0.8.1; this is the client half (use
+someone else's relay). Mirrors reticulum-meshchat's `meshchat.py`.
+
+- Config: `propagation_outbound_node` (a `lxmf.propagation` dest hash,
+  validated hex 8-64 even-length in `config_routes.py`) +
+  `propagation_auto_sync_interval_s` (0 = manual, else ≥300 — model
+  validator rejects <300 and rejects >0 with no node). `state.py`
+  `propagation_config()` gains `outbound_node`/`auto_sync_interval_s`.
+- `lxmf_service.py`:
+  - `set_outbound_propagation_node(hash|None)` — normalises
+    (lower/strip/`:`-strip), `router.set_outbound_propagation_node(
+    bytes.fromhex(h))`; clearing cancels in-flight + nulls
+    `router.outbound_propagation_node`; bad hash → swallow + clear.
+  - `sync_propagation_messages()` → `{ok, error}`, calls
+    `router.request_messages_from_propagation_node(self._identity)`.
+  - `cancel_propagation_sync()` → `router.cancel_propagation_node_requests()`.
+  - `propagation_client_status()` → `{outbound_node, auto_sync_interval_s,
+    state, progress, last_result}` from
+    `router.propagation_transfer_state/_progress/_last_result`. `state`
+    mapped via `_prop_state_names()` (built from `LXMRouter.PR_*` at
+    runtime; `{}` when LXMF absent → "idle"/"unknown").
+  - `_apply_outbound_propagation_node()` called in `_connect` (after
+    `_start_propagation`, independent of the relay toggle); starts
+    `_propagation_sync_loop` if interval > 0. `_prop_sync_task`
+    cancelled in `stop()`.
+- `routes.py`: `GET /propagation` (`{local, client}`), admin `POST
+  /propagation/sync` (400 if no node) + `/propagation/sync/cancel`;
+  `propagation_client` added to `/status`.
+- Frontend:
+  - `reticulum_settings_tab.js`: outbound-node `<select>` populated
+    from `/peers` filtered to `lxmf.propagation` (saved hash kept
+    selectable if not re-heard), auto-sync `<number>`, client status
+    line; client-side validation mirrors the model validator.
+  - `reticulum_panel.js`: "Sync inbox" button in the header (shown when
+    `status.propagation_client.outbound_node` set + admin);
+    `_handleSync()` POSTs then polls `GET /propagation` every 2s up to
+    60s, rendering `state`, reloads Messages on a terminal state.
+    `_renderSyncControls()` shows idle state / last_result when not
+    polling.
+  - `reticulum.css`: `.rt-prop-divider`.
+- Tests: `test_lxmf_service.py::TestPropagationClient` ×7 (Mac-runnable,
+  `_FakeRouter` extended), `test_config_routes.py::TestPropagationOutboundNode`
+  ×6 + `test_propagation_route.py` ×5 (CI/Pi). Suite 176 passed.
+- NOT done: **PN peering** (relays gossiping held messages to each
+  other — `LXMRouter` has hooks, meshchat doesn't do it either); a WS
+  push when an auto-sync delivers new messages (manual sync reloads the
+  Messages tab, a timed one on an idle page goes unnoticed until the
+  15s poll).
+- Pi verification: see `memory/reticulum_todo.md`.

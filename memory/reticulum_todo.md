@@ -5,7 +5,7 @@ See `memory/plugin-reticulum.md` for implementation detail (dated sections,
 one per feature) and `memory/project_m1_meshpoint.md` for wider session
 context.
 
-Last updated 2026-09-09 (Contacts / petnames built — new-build #1).
+Last updated 2026-09-09 (new-build #1 Contacts + #2 Propagation client both built).
 
 ---
 
@@ -84,18 +84,35 @@ checked on the Pi.
   starring a node from the drawer shows up in the Browse tab's
   Favourites optgroup and vice versa, and that the interface name looks
   right (short text + working tooltip).
-- **Contacts / petnames — BUILT 2026-09-09, not opened in a browser.**
-  Peers drawer gains an editable **Contact** section (admin only): your
-  own name for a destination hash + note + "mark as known" flag, stored
-  in `data/reticulum/contacts.json`, never announced. The name wins in
-  the Peers/Activity tables, Messages list and Send picker; announced
-  name → "announced as X" sub-line/tooltip. New `GET /contacts` +
-  admin `PUT`/`DELETE /contacts/{hash}`; `/peers` + `/announces` gain
-  `petname`/`trusted`. Check: the section saves and the name shows on
-  all four surfaces; "announced as X" only when names differ; Remove
-  works; `✓` shows for trusted; form inputs OK in light/dark; the JSON
-  file lands under `/opt/meshpoint/data/reticulum/`. Detail:
-  `memory/project_m1_meshpoint.md` dated 2026-09-09.
+- **Contacts / petnames — BUILT 2026-09-09, PARTIALLY LIVE-VERIFIED
+  same day** on ti-meshpoint (v0.8.1, HTTPS :8443). User saved a peer
+  (`ffe6ea53…`, announced `echo@gvrd`) as "test" from the drawer's
+  Contact section: "Saved." status shown, Peers row updated to `test ✓`
+  (green checkmark = trusted), drawer header shows `test` + `announced
+  as echo@gvrd` sub-line. Core save→render loop confirmed. **Still to
+  check:** Send-tab picker shows the name (not the hash); Messages list
+  shows it; Activity row + tooltip; **Remove** clears it on all
+  surfaces and drops the ✓; both light/dark themes on the form; the
+  JSON file at `/opt/meshpoint/data/reticulum/contacts.json`. **One
+  possible issue from the screenshot:** the Name `<input>` looked
+  dark-on-dark (value hard to read) while the Note field rendered
+  normally — may just be a post-type selection highlight; if real, the
+  `.rt-contact-form input` colours (`#111`/`#eee` fallbacks) need to
+  follow the theme. Detail: `memory/project_m1_meshpoint.md` dated
+  2026-09-09.
+- **Propagation client — BUILT 2026-09-09, not tested end-to-end.**
+  Set `propagation_outbound_node` (Settings tab dropdown of
+  `lxmf.propagation` peers), restart. Check: the dropdown lists heard
+  relays; the saved hash stays selected after restart even if not
+  re-heard; the client status line renders. Then the real test — from
+  another node, send a DM to a third party who is **offline** with
+  *this* box's peer set as *their* propagation node... actually the
+  cleaner test: set a known public propagation node as our outbound,
+  have someone send us a DM while we're stopped, start up, hit "Sync
+  inbox", watch the transfer state cycle (requesting → link →
+  receiving → complete) and the message land in Messages. Also: auto-
+  sync interval > 0 actually re-syncs; a bad/unreachable node shows a
+  failed state not a hang; "Sync inbox" hidden when no outbound node.
 - **sample-bbs-techinc nav links (fixed 2026-09-07, not walked in a real
   NomadNet client)**: browse the hosted node in Sideband/NomadNet/
   MeshChat, click "Next" through every page, confirm no dead links and
@@ -151,7 +168,8 @@ checked on the Pi.
 | Presence | Peer roster from announces | Peers tab; topbar pill = own address + RNode frequency |
 | Activity | Raw announce feed | Activity tab: 200-entry ring buffer, live over `reticulum_announce` WS; incl. `call.audio` (stream-only); `nomadnetwork.node` rows get a Browse button |
 | Notifications | ntfy / webhook on inbound DM | `notify_url` config; fire-and-forget POST (`backend/notify.py`) |
-| Propagation node | LXMF store-and-forward relay | `propagation_enabled` + `propagation_storage_limit_mb`; own `lxmf.propagation` hash, re-announced 6 h; status line on Settings tab; `propagation` block on `GET /api/reticulum/status` |
+| Propagation node | LXMF store-and-forward relay (server) | `propagation_enabled` + `propagation_storage_limit_mb`; own `lxmf.propagation` hash, re-announced 6 h; status line on Settings tab; `propagation` block on `GET /api/reticulum/status` |
+| Propagation client | Use another node as your relay | `propagation_outbound_node` (Settings dropdown of `lxmf.propagation` peers) + `propagation_auto_sync_interval_s`; "Sync inbox" button in the Reticulum page header with live transfer state; `GET /api/reticulum/propagation` + admin `POST .../propagation/sync[/cancel]`; `propagation_client` block on `/status`. `backend/lxmf_service.py` `set_outbound_propagation_node`/`sync_propagation_messages`/`propagation_client_status`, mirrors reticulum-meshchat |
 | Peers/Activity | Click-to-detail | Peers row → right-side drawer (identity, live routing via `GET /peers/{hash}/link`: hops/path/next-hop/identity-resolved/announce-count, signal from most recent announce, recent activity, a Send Message button for `lxmf.delivery` peers, a favourite star for `nomadnetwork.node` peers sharing the Browse tab's own favourites list); Activity row → detail popup (routing, signal if heard via RNode, payload/app_data hex, "View peer"). Own JS/data (`reticulum_detail_panels.js`) but literally emits core's own `node_drawer.css`/`packet_detail_modal.css` class names (`nd-drawer`/`nd-section`/`nd-row`, `pdm-overlay`/`pdm-layer`/`pdm-row`) for pixel-identical styling — same reuse-not-duplicate pattern as `lw-*`/`mt-badge`/`terminal-button` elsewhere in this plugin |
 | Contacts | Operator petnames for peers | Peers drawer → Contact section (admin): name + note + "known" flag per destination hash, `data/reticulum/contacts.json` (`backend/contacts.py`), never announced. Name wins across Peers/Activity/Messages/Send; announced name → "announced as X". `GET /contacts` + admin `PUT`/`DELETE /contacts/{hash}`; `/peers` + `/announces` gain `petname`/`trusted` |
 | Browsing | NomadNet node browser | Browse tab: live filter, ☆ favourites, `:/page/x.mu` shortcuts |
@@ -185,8 +203,10 @@ plugins:
     backbone_port: 4242
     nomad_timeout_s: 20                  # Browse tab link/path budget
     notify_url: ""                       # ntfy / webhook, POSTed on inbound DM
-    propagation_enabled: false           # LXMF store-and-forward relay
+    propagation_enabled: false           # LXMF store-and-forward relay (server side)
     propagation_storage_limit_mb: 250    # 0 = LXMF default (don't leave uncapped on SD)
+    propagation_outbound_node: ""        # client side: use another node's lxmf.propagation hash
+    propagation_auto_sync_interval_s: 0  # 0 = manual only; else every N s (min 300)
     node_enabled: false                  # host a NomadNet node
     node_name: ""                        # blank = display_name
     node_pages_dir: data/reticulum/pages
@@ -203,7 +223,7 @@ plugins:
 | Prio | Feature | What it is | Effort / risk |
 |---|---|---|---|
 | Med | **Attachments in Send** | images / small files over `LXMF.FIELD_IMAGE` / `FIELD_FILE_ATTACHMENTS` | Send side is easy (set `lxm.fields` before `handle_outbound`). Inbound is the blocker: shared `messages` table (`src/storage/message_repository.py`) has no attachment columns and core's conversation UI can't render them — needs a design decision (disk store + flag vs a JSON column on the shared table) |
-| Med | **Propagation node polish** | client side: sync *from* a preferred propagation node, show transfer progress; PN peering | Med — LXMF client API: `set_outbound_propagation_node`, `request_messages_from_propagation_node`, `propagation_transfer_state/progress/last_result` (all used in reticulum-meshchat `meshchat.py`) |
+| ~~Med~~ | ~~**Propagation node polish**~~ | **MOSTLY BUILT 2026-09-09** (new-build #2): outbound node + "Sync inbox" + live transfer state + auto-sync. Still open: **PN peering** (propagation nodes syncing to each other) and a message-arrival WS push after a sync completes | — |
 | Med | **Telemetry publish** (Sideband-style) | push Pi telemetry (CPU temp, load, GPS, sensors) as LXMF telemetry fields to a collector | Medium — reuse `backend/host_stats.py` |
 | Med | **Telemetry collector + map** | receive peers' telemetry, plot on the dashboard's local map tiles | Med–High |
 | Low | **Audio calls** (`call.audio` / LXST) | answer / receive voice; min viable = a recorded announcement on call | High — audio I/O + codec on the Pi, its own project |
@@ -214,6 +234,22 @@ plugins:
 
 ## Done (this backlog's completed items)
 
+- **2026-09-09** — Propagation node polish, client side (new-build #2).
+  `propagation_outbound_node` + `propagation_auto_sync_interval_s` config
+  keys; `backend/lxmf_service.py` gains `set_outbound_propagation_node` /
+  `sync_propagation_messages` / `cancel_propagation_sync` /
+  `propagation_client_status` / `_propagation_sync_loop` (mirrors
+  reticulum-meshchat's calls). `GET /api/reticulum/propagation` + admin
+  `POST .../propagation/sync[/cancel]`; `propagation_client` on `/status`.
+  Settings tab: outbound-node `<select>` (lxmf.propagation peers) +
+  auto-sync interval + client status line. Panel header: "Sync inbox"
+  button (shown when an outbound node is set) with a 60s poll loop
+  rendering live transfer state. 13 new tests (7 Mac-runnable in
+  `test_lxmf_service.py::TestPropagationClient`, 6 config-model +
+  route tests CI/Pi-only). NOT done: PN peering; a WS push when a sync
+  delivers new messages (the button reloads the Messages tab on
+  completion, but an idle page won't notice a timed auto-sync). Not
+  browser/Pi-verified.
 - **2026-09-09** — Contacts / petnames (new-build #1). Editable Contact
   section in the Peers drawer, `data/reticulum/contacts.json` store
   (`backend/contacts.py`), `GET /contacts` + admin `PUT`/`DELETE`,

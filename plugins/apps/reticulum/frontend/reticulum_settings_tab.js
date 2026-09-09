@@ -158,6 +158,31 @@ class ReticulumSettingsTab {
                                     default (don't leave it uncapped on a small SD card).
                                 </span>
                             </label>
+                            <p class="cfg-field__hint rt-prop-divider">
+                                <strong>Use another node as your propagation node</strong> —
+                                route your messages to offline peers through it, and sync
+                                any messages parked there for you. Independent of the relay
+                                toggle above. Takes effect after a restart.
+                            </p>
+                            <label class="cfg-field">
+                                <span class="cfg-field__label">Outbound propagation node</span>
+                                <select class="cfg-field__input" data-rt-prop-outbound>
+                                    <option value="">-- none (don't use one) --</option>
+                                </select>
+                                <span class="cfg-field__hint" data-rt-prop-client-status>
+                                    Pick an <code>lxmf.propagation</code> peer heard on the
+                                    network, or leave as none.
+                                </span>
+                            </label>
+                            <label class="cfg-field cfg-field--narrow">
+                                <span class="cfg-field__label">Auto-sync every (s)</span>
+                                <input class="cfg-field__input" type="number"
+                                       min="0" max="86400" step="60" data-rt-prop-autosync>
+                                <span class="cfg-field__hint">
+                                    0 = manual only (use "Sync inbox" on the Reticulum page).
+                                    Otherwise re-syncs on this interval; minimum 300.
+                                </span>
+                            </label>
                         </fieldset>
                         <fieldset class="cfg-fieldset">
                             <legend class="cfg-fieldset__legend">NomadNet node</legend>
@@ -291,6 +316,9 @@ class ReticulumSettingsTab {
         this._propEnabled = this._q('[data-rt-prop-enabled]');
         this._propStorage = this._q('[data-rt-prop-storage]');
         this._propStatusEl = this._q('[data-rt-prop-status]');
+        this._propOutbound = this._q('[data-rt-prop-outbound]');
+        this._propAutoSync = this._q('[data-rt-prop-autosync]');
+        this._propClientStatusEl = this._q('[data-rt-prop-client-status]');
         this._nodeEnabled = this._q('[data-rt-node-enabled]');
         this._nodeName = this._q('[data-rt-node-name]');
         this._nodeInterval = this._q('[data-rt-node-interval]');
@@ -352,7 +380,36 @@ class ReticulumSettingsTab {
         if (this._backbonePort) this._backbonePort.value = rt.backbone_port ?? 4242;
         if (this._propEnabled) this._propEnabled.checked = !!rt.propagation_enabled;
         if (this._propStorage) this._propStorage.value = rt.propagation_storage_limit_mb ?? 250;
+        if (this._propAutoSync) this._propAutoSync.value = rt.propagation_auto_sync_interval_s ?? 0;
+        this._pendingOutbound = (rt.propagation_outbound_node || '').toLowerCase();
+        this._populateOutboundNodes();
         this._loadPropagationStatus();
+    }
+
+    /** Fill the outbound-propagation-node <select> from the roster's
+     * lxmf.propagation peers, keeping the currently-saved hash selectable
+     * even if that peer hasn't re-announced this session. */
+    async _populateOutboundNodes() {
+        const sel = this._propOutbound;
+        if (!sel) return;
+        let peers = [];
+        try {
+            const r = await fetch('/api/reticulum/peers', { credentials: 'same-origin' });
+            if (r.ok) peers = (await r.json()).filter((p) => p.aspect === 'lxmf.propagation');
+        } catch (_) {}
+        const saved = this._pendingOutbound || '';
+        const opts = ['<option value="">-- none (don\'t use one) --</option>'];
+        const seen = new Set();
+        peers.forEach((p) => {
+            seen.add(p.destination_hash);
+            const label = (p.petname || p.display_name || p.destination_hash);
+            opts.push(`<option value="${this._esc(p.destination_hash)}">${this._esc(label)} — ${this._esc(p.destination_hash.slice(0, 12))}…</option>`);
+        });
+        if (saved && !seen.has(saved)) {
+            opts.push(`<option value="${this._esc(saved)}">${this._esc(saved)} (not heard this session)</option>`);
+        }
+        sel.innerHTML = opts.join('');
+        sel.value = saved;
     }
 
     async _loadPropagationStatus() {
@@ -362,12 +419,31 @@ class ReticulumSettingsTab {
             const r = await fetch('/api/reticulum/status', { credentials: 'same-origin' });
             if (r.ok) p = (await r.json()).propagation;
         } catch (_) { return; }
-        if (!p || !p.enabled) return;
-        const held = p.messages_held == null ? '' : `, ${p.messages_held} message(s) held`;
-        const cap = p.storage_limit_mb ? `${p.storage_limit_mb} MB store` : 'store uncapped';
-        this._propStatusEl.textContent =
-            `Relaying now — address ${p.address || '(pending)'}, ${cap}${held}. `
-            + 'Point a client at this address to sync from it.';
+        if (p && p.enabled) {
+            const held = p.messages_held == null ? '' : `, ${p.messages_held} message(s) held`;
+            const cap = p.storage_limit_mb ? `${p.storage_limit_mb} MB store` : 'store uncapped';
+            this._propStatusEl.textContent =
+                `Relaying now — address ${p.address || '(pending)'}, ${cap}${held}. `
+                + 'Point a client at this address to sync from it.';
+        }
+        await this._loadPropagationClientStatus();
+    }
+
+    async _loadPropagationClientStatus() {
+        if (!this._propClientStatusEl) return;
+        let c = null;
+        try {
+            const r = await fetch('/api/reticulum/status', { credentials: 'same-origin' });
+            if (r.ok) c = (await r.json()).propagation_client;
+        } catch (_) { return; }
+        if (!c || !c.outbound_node) return;
+        const last = c.last_result == null ? '' : ` · last sync: ${c.last_result} message(s) received`;
+        const auto = c.auto_sync_interval_s > 0
+            ? ` · auto-sync every ${c.auto_sync_interval_s}s` : '';
+        const state = (c.state && c.state !== 'idle' && c.state !== 'complete')
+            ? ` · ${c.state.replace(/_/g, ' ')}` : '';
+        this._propClientStatusEl.textContent =
+            `Using ${c.outbound_node.slice(0, 12)}… as your propagation node${auto}${state}${last}.`;
     }
 
     async _loadNodeStatus() {
@@ -492,6 +568,16 @@ class ReticulumSettingsTab {
             );
             return;
         }
+        const outboundNode = (this._propOutbound?.value || '').trim();
+        const autoSync = Number(this._propAutoSync?.value) || 0;
+        if (autoSync > 0 && !outboundNode) {
+            this._setStatus('error', 'Auto-sync needs an outbound propagation node — pick one, or set the interval to 0.');
+            return;
+        }
+        if (autoSync > 0 && autoSync < 300) {
+            this._setStatus('error', 'Auto-sync interval must be 0 or at least 300 seconds.');
+            return;
+        }
         const payload = {
             display_name: this._displayName.value.trim() || 'Meshpoint',
             nomad_timeout_s: Number(this._nomadTimeout.value) || 20,
@@ -505,6 +591,8 @@ class ReticulumSettingsTab {
             notify_url: (this._notifyUrl?.value || '').trim(),
             propagation_enabled: !!this._propEnabled?.checked,
             propagation_storage_limit_mb: Number(this._propStorage?.value) || 0,
+            propagation_outbound_node: outboundNode,
+            propagation_auto_sync_interval_s: autoSync,
             rnode_enabled: rnodeEnabled,
             rnode_serial_port: this._serialPort.value,
             rnode_frequency_hz: Number(this._frequency.value),

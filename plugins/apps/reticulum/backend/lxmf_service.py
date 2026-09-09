@@ -184,6 +184,13 @@ class LxmfService:
         self._events_ical_url = events_ical_url
         self._notify_url = notify_url
         self._propagation_cfg = propagation_cfg or {"enabled": False}
+        # Client side of propagation: an outbound propagation node to route
+        # messages through (and sync a parked inbox from), plus an optional
+        # auto-sync interval (0 = manual only). Independent of whether this
+        # node also *runs* a local relay (`enabled` above).
+        self._prop_outbound = str(self._propagation_cfg.get("outbound_node") or "").strip()
+        self._prop_auto_sync_s = int(self._propagation_cfg.get("auto_sync_interval_s") or 0)
+        self._prop_sync_task: Optional[asyncio.Task] = None
         # Requires node hosting: every command answers from data a hosted
         # node already caches (see talkback.py's module docstring) -- this
         # flag alone does nothing unless node_cfg["enabled"] is also true
@@ -284,6 +291,8 @@ class LxmfService:
         if self._propagation_cfg.get("enabled"):
             self._start_propagation()
 
+        self._apply_outbound_propagation_node()
+
         if self._node_cfg.get("enabled"):
             from .nomad_node import NomadNode
             self._node = NomadNode(
@@ -305,6 +314,9 @@ class LxmfService:
         if self._pn_task is not None:
             self._pn_task.cancel()
             self._pn_task = None
+        if self._prop_sync_task is not None:
+            self._prop_sync_task.cancel()
+            self._prop_sync_task = None
         if self._node is not None:
             await self._node.stop()
             self._node = None
@@ -384,6 +396,109 @@ class LxmfService:
             "storage_limit_mb": int(self._propagation_cfg.get("storage_limit_mb") or 0),
             "messages_held": held,
         }
+
+    # --- LXMF propagation client (sync FROM a preferred node) ----------------
+
+    def _prop_state_names(self) -> dict:
+        """LXMF's ``LXMRouter.PR_*`` transfer-state constants -> short
+        strings, built once from whatever this LXMF version actually
+        defines (the set has grown across releases). Mirrors
+        reticulum-meshchat's own ``convert_propagation_node_state_to_string``."""
+        cached = getattr(self, "_prop_state_name_cache", None)
+        if cached is not None:
+            return cached
+        names: dict = {}
+        try:
+            router_cls = LXMF.LXMRouter
+            for attr in dir(router_cls):
+                if attr.startswith("PR_"):
+                    names[getattr(router_cls, attr)] = attr[3:].lower()
+        except Exception:  # noqa: BLE001
+            pass
+        self._prop_state_name_cache = names
+        return names
+
+    def _apply_outbound_propagation_node(self) -> None:
+        """On connect: point the router at the configured outbound
+        propagation node (if any) and start the auto-sync loop."""
+        if not self._prop_outbound:
+            return
+        if not self.set_outbound_propagation_node(self._prop_outbound):
+            return
+        if self._prop_auto_sync_s > 0 and self._loop is not None:
+            self._prop_sync_task = self._loop.create_task(self._propagation_sync_loop())
+
+    def set_outbound_propagation_node(self, hash_hex: Optional[str]) -> bool:
+        """Route outbound-to-offline messages through, and sync a parked
+        inbox from, this ``lxmf.propagation`` destination. ``None``/blank
+        clears it. Returns whether it's now set."""
+        h = str(hash_hex or "").strip().lower().replace(":", "")
+        if self._router is None:
+            self._prop_outbound = h
+            return bool(h)
+        try:
+            if h:
+                self._router.set_outbound_propagation_node(bytes.fromhex(h))
+                self._prop_outbound = h
+                logger.info("LXMF: outbound propagation node set to %s", h)
+                return True
+            # clear -- cancel any in-flight sync first (meshchat does the same)
+            try:
+                self._router.cancel_propagation_node_requests()
+            except Exception:  # noqa: BLE001
+                pass
+            self._router.outbound_propagation_node = None
+            self._prop_outbound = ""
+            return False
+        except Exception:  # noqa: BLE001 -- bad hash / API drift: clear, don't crash
+            logger.warning("LXMF: could not set outbound propagation node %r", h, exc_info=True)
+            self._prop_outbound = ""
+            return False
+
+    def sync_propagation_messages(self) -> dict:
+        """Ask the outbound propagation node for any messages parked for
+        us. ``{"ok": bool, "error": str|None}`` -- returns quickly, the
+        transfer runs in LXMF's own threads (poll :meth:`propagation_client_status`)."""
+        if self._router is None or self._identity is None:
+            return {"ok": False, "error": "Reticulum is not running"}
+        if not self._prop_outbound:
+            return {"ok": False, "error": "No outbound propagation node configured"}
+        try:
+            self._router.request_messages_from_propagation_node(self._identity)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("LXMF: propagation sync request failed", exc_info=True)
+            return {"ok": False, "error": str(exc) or exc.__class__.__name__}
+        return {"ok": True, "error": None}
+
+    def cancel_propagation_sync(self) -> None:
+        if self._router is None:
+            return
+        try:
+            self._router.cancel_propagation_node_requests()
+        except Exception:  # noqa: BLE001
+            logger.debug("LXMF: cancel propagation sync failed", exc_info=True)
+
+    def propagation_client_status(self) -> Optional[dict]:
+        """Outbound-node + last/current sync state. ``None`` until the
+        router exists. Feeds GET /api/reticulum/propagation and the
+        Settings tab / panel header."""
+        if self._router is None:
+            return None
+        state_raw = getattr(self._router, "propagation_transfer_state", None)
+        progress = getattr(self._router, "propagation_transfer_progress", None)
+        last_result = getattr(self._router, "propagation_transfer_last_result", None)
+        return {
+            "outbound_node": self._prop_outbound or None,
+            "auto_sync_interval_s": self._prop_auto_sync_s,
+            "state": self._prop_state_names().get(state_raw, "idle" if state_raw is None else "unknown"),
+            "progress": float(progress) if isinstance(progress, (int, float)) else None,
+            "last_result": int(last_result) if isinstance(last_result, (int, float)) else None,
+        }
+
+    async def _propagation_sync_loop(self) -> None:
+        while True:
+            await asyncio.sleep(max(300, self._prop_auto_sync_s))
+            self.sync_propagation_messages()
 
     def reload_node_pages(self) -> bool:
         """Re-register the hosted node's ``.mu`` request handlers (Pages

@@ -81,6 +81,9 @@ class ReticulumPanel {
                 <h2 class="lw-panel__title">Reticulum</h2>
                 <div class="lw-panel__actions">
                     <span class="lw-panel__limit" id="rt-own-address"></span>
+                    <span class="lw-panel__limit" id="rt-sync-status"></span>
+                    <button class="terminal-button" type="button" id="rt-sync-btn"
+                            ${this._isAdmin ? '' : 'hidden'} hidden>Sync inbox</button>
                     <button class="terminal-button" type="button" id="rt-announce-btn"
                             ${this._isAdmin ? '' : 'hidden'}>Announce now</button>
                     <button class="terminal-button" type="button" id="rt-refresh-btn">Refresh</button>
@@ -268,6 +271,7 @@ class ReticulumPanel {
 
         this._q('#rt-refresh-btn')?.addEventListener('click', () => this._load());
         this._q('#rt-announce-btn')?.addEventListener('click', () => this._handleAnnounce());
+        this._q('#rt-sync-btn')?.addEventListener('click', () => this._handleSync());
         this._root.querySelectorAll('[data-rt-tab]').forEach((btn) => {
             btn.addEventListener('click', () => this._setTab(btn.dataset.rtTab));
         });
@@ -511,7 +515,81 @@ class ReticulumPanel {
             const addrEl = this._q('#rt-own-address');
             if (addrEl) addrEl.textContent = s.own_address ? `You: ${s.own_address}` : '';
             this._syncPagesTab(this._isAdmin && !!s.node);
+            this._renderSyncControls(s.propagation_client);
         } catch (_) {}
+    }
+
+    /** Show the "Sync inbox" button + its status only when an outbound
+     * propagation node is configured (and we're admin). */
+    _renderSyncControls(client) {
+        const btn = this._q('#rt-sync-btn');
+        const statusEl = this._q('#rt-sync-status');
+        const on = this._isAdmin && client && client.outbound_node;
+        if (btn) btn.hidden = !on;
+        if (!statusEl) return;
+        if (!on) { statusEl.textContent = ''; return; }
+        // Leave a live "syncing…" line alone while a poll loop owns it.
+        if (this._syncPolling) return;
+        const st = client.state;
+        if (st && st !== 'idle' && st !== 'complete') {
+            statusEl.textContent = `Sync: ${st.replace(/_/g, ' ')}`;
+        } else if (client.last_result != null) {
+            statusEl.textContent = `Last sync: ${client.last_result} new`;
+        } else {
+            statusEl.textContent = '';
+        }
+    }
+
+    async _handleSync() {
+        const btn = this._q('#rt-sync-btn');
+        const statusEl = this._q('#rt-sync-status');
+        if (!btn) return;
+        btn.disabled = true;
+        this._syncPolling = true;
+        if (statusEl) statusEl.textContent = 'Sync: requesting…';
+        try {
+            const r = await fetch('/api/reticulum/propagation/sync', {
+                method: 'POST', credentials: 'same-origin',
+            });
+            if (!r.ok) {
+                const err = await r.json().catch(() => ({}));
+                if (statusEl) statusEl.textContent = `Sync failed: ${err.detail || r.status}`;
+                this._syncPolling = false;
+                btn.disabled = false;
+                return;
+            }
+        } catch (_) {
+            if (statusEl) statusEl.textContent = 'Sync failed.';
+            this._syncPolling = false;
+            btn.disabled = false;
+            return;
+        }
+        // Poll transfer state for up to ~60s.
+        const deadline = Date.now() + 60_000;
+        const tick = async () => {
+            let c = null;
+            try {
+                const r = await fetch('/api/reticulum/propagation', { credentials: 'same-origin' });
+                if (r.ok) c = (await r.json()).client;
+            } catch (_) {}
+            const st = c?.state || 'unknown';
+            const done = ['complete', 'idle', 'no_path', 'link_failed', 'transfer_failed',
+                'no_identity_received', 'no_access', 'failed'].includes(st);
+            if (done || Date.now() > deadline) {
+                this._syncPolling = false;
+                btn.disabled = false;
+                if (statusEl) {
+                    statusEl.textContent = (st === 'complete' || st === 'idle')
+                        ? `Last sync: ${c?.last_result ?? 0} new`
+                        : `Sync: ${st.replace(/_/g, ' ')}`;
+                }
+                this._loadMessages();
+                return;
+            }
+            if (statusEl) statusEl.textContent = `Sync: ${st.replace(/_/g, ' ')}`;
+            setTimeout(tick, 2000);
+        };
+        setTimeout(tick, 1500);
     }
 
     /** The Pages tab only makes sense while a NomadNet node is actually

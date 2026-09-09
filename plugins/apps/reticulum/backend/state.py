@@ -57,6 +57,12 @@ _DEFAULTS: dict[str, Any] = {
     # storage_limit_mb caps the on-disk propagation store (0 = LXMF default).
     "propagation_enabled": False,
     "propagation_storage_limit_mb": 250,
+    # Client side of propagation: an lxmf.propagation destination hash to
+    # route outbound-to-offline messages through and sync a parked inbox
+    # from. Blank = don't use one. auto_sync_interval_s: 0 = manual only,
+    # else re-sync every N seconds (floored at 300 by the validator).
+    "propagation_outbound_node": "",
+    "propagation_auto_sync_interval_s": 0,
     # RF and backbone are independent interfaces rnsd can run at once or
     # separately -- at least one must stay on (enforced by config_routes.py's
     # ReticulumUpdate validator), same as NomadNet needs one of them to
@@ -146,10 +152,14 @@ def notify_url() -> str:
 
 
 def propagation_config() -> dict[str, Any]:
-    """LXMF propagation-node settings, resolved."""
+    """LXMF propagation settings, resolved -- both the local relay
+    (``enabled``/``storage_limit_mb``) and the client side
+    (``outbound_node``/``auto_sync_interval_s``)."""
     return {
         "enabled": bool(_config.get("propagation_enabled")),
         "storage_limit_mb": max(0, int(_config.get("propagation_storage_limit_mb") or 0)),
+        "outbound_node": str(_config.get("propagation_outbound_node") or "").strip(),
+        "auto_sync_interval_s": max(0, int(_config.get("propagation_auto_sync_interval_s") or 0)),
     }
 
 
