@@ -918,17 +918,18 @@ A catalog at the repo root, one entry per plugin/theme:
 ```
 
 Every field but `id`/`kind`/`path` mirrors the plugin's own `plugin.toml` /
-`theme.json`. **Generate it — don't hand-write it:** run
+`theme.json`. **Generate it — don't hand-write it.** Two ways:
 
-```sh
-meshpoint plugin index /path/to/your-repo --write
-```
+- A standalone `make-meshpoint-json.py` in your repo (Python 3.11+, no
+  Meshpoint checkout needed) — the template repo ships one; it scans
+  `apps/*/plugin.toml` + `themes/*/theme.json` and writes `meshpoint.json`,
+  warning about folder/name mismatches, unknown `provides`, duplicate ids.
+- `meshpoint plugin index /path/to/your-repo --write` from a Meshpoint
+  checkout — same output, using Meshpoint's own manifest validator.
 
-in a Meshpoint checkout (it reads each `plugin.toml` via the same
-validator Meshpoint uses, so it also catches folder/name mismatches). Re-run
-it whenever you bump a version. Meshpoint re-reads and re-validates the real
-manifest on install, so the catalog is metadata only — a stale or tampered
-`meshpoint.json` can't smuggle anything in.
+Re-run whenever you bump a version. Meshpoint re-reads and re-validates the
+real manifest on install, so the catalog is metadata only — a stale or
+tampered `meshpoint.json` can't smuggle anything in.
 
 ### How an operator uses it
 
