@@ -443,6 +443,21 @@ class TestPropagationClient(unittest.TestCase):
         svc = _make_service(propagation_cfg={"outbound_node": "ab" * 16})
         self.assertIsNone(svc.propagation_client_status())
 
+    def test_watch_propagation_sync_broadcasts_the_result(self) -> None:
+        svc = _make_service(ws_manager=_FakeWs())
+        svc._router = _FakeRouter()
+        svc._router.propagation_transfer_last_result = 4
+        # state None -> "idle" (terminal) -> broadcasts on the first poll
+        asyncio.run(svc._watch_propagation_sync(timeout_s=5, initial_delay_s=0))
+        ev = [e for e in svc._ws_manager.events if e[0] == "reticulum_propagation_sync"]
+        self.assertEqual(len(ev), 1)
+        self.assertEqual(ev[0][1]["last_result"], 4)
+
+    def test_watch_propagation_sync_bails_without_a_router(self) -> None:
+        svc = _make_service(ws_manager=_FakeWs())
+        asyncio.run(svc._watch_propagation_sync(timeout_s=5, initial_delay_s=0))
+        self.assertEqual(svc._ws_manager.events, [])
+
 
 class TestTelemetryPublish(unittest.TestCase):
     def test_status_none_when_disabled(self) -> None:

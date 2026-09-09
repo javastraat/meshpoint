@@ -5,7 +5,11 @@ See `memory/plugin-reticulum.md` for implementation detail (dated sections,
 one per feature) and `memory/project_m1_meshpoint.md` for wider session
 context.
 
-Last updated 2026-09-09 (new-builds #1 Contacts, #2 Propagation client, #3 Telemetry publish + location [Pi-verified], #4 Telemetry collector+map).
+Last updated 2026-09-09. Session builds: #1 Contacts, #2 Propagation
+client, #3 Telemetry publish (+location, +multi-collector), #4 Telemetry
+collect+map, Extra interfaces, UI padding pass. **Verification status
+table below** — #3 and #4 Pi-verified; #2, extra interfaces and
+multi-collector never run on the Pi.
 
 ---
 
@@ -24,7 +28,25 @@ deployed by the user. Mac has **no `rns` / `lxmf`** — backend logic is
 tested with fakes; anything touching the live RNS/LXMF stack must be
 checked on the Pi.
 
-### Pi verification still owed
+### Verification status — 2026-09-09 session builds
+
+| Feature | Pi status |
+|---|---|
+| Contacts / petnames (#1) | 🟡 **Partial** — save + name in the Peers table + green ✓ (trusted) confirmed on rakv2. **Still to check:** Send-tab picker shows the name (not the hash); **Remove** clears it on all surfaces (Peers/Activity/Messages/Send) and drops the ✓ |
+| Propagation client (#2) | 🔴 **Untested** — never run on the Pi. Needs a real `lxmf.propagation` relay to point `propagation_outbound_node` at. Check: outbound-node dropdown lists heard relays + keeps the saved hash after restart; "Sync inbox" button appears; a stopped→start→sync cycle shows transfer state (requesting→link→receiving→complete) and a parked message lands; auto-sync interval fires; a completed sync (manual or auto) shows a "synced N messages" toast + refreshes the thread (new `reticulum_propagation_sync` WS, 2026-09-09); an unreachable node shows a failed state not a hang |
+| Telemetry publish (#3) | ✅ **Verified** — two-node ti → rakv2, frame decoded byte-exact (SID_TIME/TEMPERATURE/INFORMATION + LOCATION from the GPS pin) |
+| Telemetry collect + map (#4) | ✅ **Mostly verified** — rakv2's Telemetry tab plotted ti on the map ("techinc on the map"), so decode → store → table → map all work. **Still to check:** `reticulum_telemetry` WS live-updates the tab without a reload; a telemetry-only frame does NOT create a blank row in the Messages tab (was a latent bug — confirm it's gone) |
+| Telemetry: multiple collectors | 🔴 **Untested** — built same day. Check: 2+ addresses (one per line) each get the frame; "Send telemetry now" reports "Sent to N collectors"; a bad/unreachable address doesn't stop the others |
+| Extra interfaces (Interface manager) | 🔴 **Untested** — never added one on the Pi. Check: the row editor works (add/remove/type-switch keeps edits); a valid TCPClient shows up in `data/reticulum/rns_config/config` and rnsd starts after Restart rnsd; a deliberately broken entry (missing port) is skipped with a journal warning and **rnsd still starts**; RNode+backbone both off + one active extra is accepted |
+| Real-Sideband render | 🔴 Open — the telemetry frame's structure is verified against `sense.py` and byte-exact on the wire, but no real Sideband *app* has displayed one yet (low risk) |
+| UI padding fixes (listener/SDR panels, sub-plugin chevron) | ✅ Tester confirmed |
+
+**Quick summary:** publish + collect/map are proven. The three things
+that have never touched the Pi: **propagation client (#2)**, **extra
+interfaces**, **multi-collector**. Plus finish the Contacts checklist
+and (nice-to-have) a real-Sideband render check.
+
+### Pi verification still owed (older items)
 
 - **Activity tab — LIVE-VERIFIED 2026-09-08**: user shared a live capture,
   announces streaming in fast (public Reticulum network), all three
@@ -297,7 +319,7 @@ plugins:
 | Prio | Feature | What it is | Effort / risk |
 |---|---|---|---|
 | Med | **Attachments in Send** | images / small files over `LXMF.FIELD_IMAGE` / `FIELD_FILE_ATTACHMENTS` | Send side is easy (set `lxm.fields` before `handle_outbound`). Inbound is the blocker: shared `messages` table (`src/storage/message_repository.py`) has no attachment columns and core's conversation UI can't render them — needs a design decision (disk store + flag vs a JSON column on the shared table) |
-| ~~Med~~ | ~~**Propagation node polish**~~ | **MOSTLY BUILT 2026-09-09** (new-build #2): outbound node + "Sync inbox" + live transfer state + auto-sync. Still open: **PN peering** (propagation nodes syncing to each other) and a message-arrival WS push after a sync completes | — |
+| ~~Med~~ | ~~**Propagation node polish**~~ | **BUILT 2026-09-09** (new-build #2): outbound node + "Sync inbox" + live transfer state + auto-sync + a `reticulum_propagation_sync` WS event when any sync completes (2026-09-09). Untested on Pi. | — |
 | ~~Med~~ | ~~**Telemetry publish**~~ | **BUILT 2026-09-09** (new-build #3): time + temp + status-line frame, two-node verified. **+ SID_LOCATION added same day** — opt-in `telemetry_include_location`, coords from core's Configuration→GPS pin (`device.latitude/longitude`), no separate keys. Only follow-up left: structured processor/RAM/NVM sensors (nested `[[label,val],...]` — needs verifying against a real Sideband client; low value, INFO string already carries the numbers) | Low |
 | ~~Med~~ | ~~**Telemetry collector + map**~~ | **BUILT 2026-09-09** (new-build #4). Telemetry tab: table + own-Leaflet map (not the dashboard NodeMap — Reticulum telemetry peers aren't in the core `nodes` table; a standalone mini-map was the right call). Not Pi-tested yet. Possible follow-up: also feed into the dashboard map, but that needs core `nodes`-table integration — probably not worth it | — |
 | Low | **Audio calls** (`call.audio` / LXST) | answer / receive voice; min viable = a recorded announcement on call | High — audio I/O + codec on the Pi, its own project |
@@ -305,6 +327,26 @@ plugins:
 | ~~Low~~ | ~~**Interface manager UI**~~ | **BUILT 2026-09-09** — `extra_interfaces` (TCPClient/TCPServer/UDP), Settings-tab editor, dual validation, not Pi-tested. Chose structured over raw-textarea (bad config = rnsd won't start = all Reticulum down). Follow-up: more interface types (I2P needs i2pd; a 2nd RNode) if asked | — |
 | ~~Low~~ | ~~**Contacts / petnames**~~ | **BUILT 2026-09-09** (new-build #1) — see Done + Pi-verification list | — |
 | Low | **Paper messages / QR** | Sideband-style offline message export | Low–Med |
+
+### Future / only if there's a concrete need
+
+- **Structured telemetry sensors** (`SID_PROCESSOR` 0x13 / `SID_RAM` 0x14 /
+  `SID_NVM` 0x15) — show CPU/RAM/disk as proper gauges instead of the
+  free-text status string, so a collector could graph them. Blocked on:
+  the pack format is a nested `[[label, value], ...]` list the two
+  `sense.py` WebFetches were shaky on — needs one careful read of the
+  real Sideband source + a Sideband cross-check. Low value until someone
+  builds a telemetry-graphing collector.
+- **PN peering** — two nodes both running as `lxmf.propagation` relays
+  sync their held-message stores to each other (store redundancy).
+  `LXMRouter` has hooks but reticulum-meshchat doesn't implement it, so
+  no reference — would be felt out from LXMF source. Only matters for a
+  multi-relay setup; most run one relay. Medium effort.
+- **WS push on auto-sync delivery** — ✅ **DONE 2026-09-09**
+  (`reticulum_propagation_sync` event fires when any sync completes;
+  `_watch_propagation_sync` polls the transfer state to a terminal
+  state then broadcasts state + `last_result`; frontend shows a toast +
+  reloads Messages). Was the third small follow-up.
 
 ## Done (this backlog's completed items)
 

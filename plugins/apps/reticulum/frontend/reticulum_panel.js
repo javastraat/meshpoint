@@ -74,6 +74,7 @@ class ReticulumPanel {
         this._onWsMessage = this._onWsMessage.bind(this);
         this._onWsAnnounce = this._onWsAnnounce.bind(this);
         this._onWsTelemetry = this._onWsTelemetry.bind(this);
+        this._onWsPropagationSync = this._onWsPropagationSync.bind(this);
     }
 
     mount(rootEl) {
@@ -370,6 +371,7 @@ class ReticulumPanel {
             window.concentratorWS.on('reticulum_message', this._onWsMessage);
             window.concentratorWS.on('reticulum_announce', this._onWsAnnounce);
             window.concentratorWS.on('reticulum_telemetry', this._onWsTelemetry);
+            window.concentratorWS.on('reticulum_propagation_sync', this._onWsPropagationSync);
         }
         this._activateSubTab();
     }
@@ -468,6 +470,24 @@ class ReticulumPanel {
         this._telemetry = this._telemetry.filter((t) => t.destination_hash !== entry.destination_hash);
         this._telemetry.unshift(entry);
         if (this._tab === 'telemetry') this._renderTelemetry();
+    }
+
+    /** A propagation sync (manual or timed auto-sync) just finished. */
+    _onWsPropagationSync(info) {
+        this._syncPolling = false;
+        const btn = this._q('#rt-sync-btn');
+        if (btn) btn.disabled = false;
+        const statusEl = this._q('#rt-sync-status');
+        const n = info && info.last_result != null ? info.last_result : null;
+        if (statusEl) {
+            statusEl.textContent = (info && info.state && !['complete', 'idle'].includes(info.state))
+                ? `Sync: ${info.state.replace(/_/g, ' ')}`
+                : (n != null ? `Last sync: ${n} new` : 'Sync complete');
+        }
+        if (n) {
+            this._loadMessages();
+            this._toast(`Synced ${n} message${n === 1 ? '' : 's'} from your propagation node.`);
+        }
     }
 
     _q(sel) { return this._root ? this._root.querySelector(sel) : null; }

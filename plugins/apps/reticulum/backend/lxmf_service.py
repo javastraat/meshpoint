@@ -491,7 +491,37 @@ class LxmfService:
         except Exception as exc:  # noqa: BLE001
             logger.warning("LXMF: propagation sync request failed", exc_info=True)
             return {"ok": False, "error": str(exc) or exc.__class__.__name__}
+        # Watch the transfer to completion and broadcast the result, so an
+        # open UI updates the moment a (manual OR timed) sync finishes
+        # rather than on its own next 15 s status poll.
+        if self._loop is not None:
+            self._spawn(self._watch_propagation_sync())
         return {"ok": True, "error": None}
+
+    _PROP_SYNC_TERMINAL = frozenset({
+        "complete", "idle", "no_path", "link_failed", "transfer_failed",
+        "no_identity_received", "no_access", "failed",
+    })
+
+    async def _watch_propagation_sync(
+        self, timeout_s: int = 120, initial_delay_s: float = 3.0,
+    ) -> None:
+        # A short delay first: right after the request LXMF may still read
+        # "idle" for a moment before the transfer state machine starts.
+        await asyncio.sleep(initial_delay_s)
+        deadline = time.monotonic() + timeout_s
+        status: Optional[dict] = None
+        while True:
+            status = self.propagation_client_status()
+            if status is None:
+                return
+            if status["state"] in self._PROP_SYNC_TERMINAL or time.monotonic() >= deadline:
+                break
+            await asyncio.sleep(2)
+        await self._ws_manager.broadcast("reticulum_propagation_sync", {
+            "state": (status or {}).get("state"),
+            "last_result": (status or {}).get("last_result"),
+        })
 
     def cancel_propagation_sync(self) -> None:
         if self._router is None:

@@ -913,6 +913,20 @@ editor with type-specific fields + outage-risk warning. Chose
 structured over raw textarea (rnsd ExecStartPre crash = Reticulum
 down). Not Pi-tested. Not offered: I2P, 2nd RNode, AutoInterface.
 
+## 2026-09-09 — Propagation: WS push on sync completion
+
+`sync_propagation_messages()` now spawns `_watch_propagation_sync()`
+(bg task, guarded on `self._loop`) which — after a 3s initial delay
+(`initial_delay_s` param, 0 in tests) — polls `propagation_client_status`
+until `state` hits a terminal value (`_PROP_SYNC_TERMINAL`), then
+broadcasts `reticulum_propagation_sync` = `{state, last_result}`. Covers
+manual AND timed auto-sync. Frontend `_onWsPropagationSync` clears the
+button poll, updates `#rt-sync-status`, and if `last_result > 0`
+reloads Messages + toasts. (The synced messages themselves already
+live-updated via the normal `register_delivery_callback` →
+`_handle_inbound_message` path; this adds the "sync ran, got N" signal
+the UI was missing on a background auto-sync.) 2 tests. Suite 215.
+
 ## 2026-09-09 — Telemetry: multiple collectors
 
 `telemetry_collector` field is now a textarea — one LXMF hash per line
