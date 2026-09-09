@@ -962,9 +962,10 @@ tampered `repo.json` can't smuggle anything in.
    automatically. The source row's **Pin** button freezes it to the
    commit it points at now (📌); **Unpin** returns to the branch it was
    pinned from. Each installed plugin's row shows `from owner/repo @ ref
-   · <short-sha>`, and the Update confirmation shows `installed abc1234 →
-   incoming def5678` so you see exactly what's changing. (You can also
-   just set a tag or full SHA as the `ref` when adding the source.)
+   · <short-sha>` and an **External** badge (vs "Built-in" / "Community"),
+   and the Update confirmation shows `installed abc1234 → incoming
+   def5678` so you see exactly what's changing. (You can also just set a
+   tag or full SHA as the `ref` when adding the source.)
 
 The source list lives in `local.yaml` (`plugin_sources:`), so it survives
 restarts and self-updates.

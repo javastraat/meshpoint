@@ -1404,6 +1404,7 @@ select.update-field__input option:checked {
 
 .plugin-row__badge--builtin { color: var(--text-secondary); background: var(--overlay-weak); }
 .plugin-row__badge--community { color: var(--accent-cyan); background: var(--overlay-weak); border-color: var(--accent-cyan); }
+.plugin-row__badge--external { color: var(--accent-amber); background: var(--overlay-weak); border-color: var(--accent-amber); }
 
 .plugin-row__meta {
     color: var(--text-secondary);

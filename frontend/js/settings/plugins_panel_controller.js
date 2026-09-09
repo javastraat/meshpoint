@@ -742,8 +742,22 @@ class PluginsPanelController {
               `aria-expanded="${!hostMeta.collapsed}" title="${hostMeta.collapsed ? 'Show' : 'Hide'} ${hostMeta.memberCount} dependent plugin${hostMeta.memberCount === 1 ? '' : 's'}">` +
               `${hostMeta.collapsed ? '▸' : '▾'}</button>`
             : '';
-        const badgeMod = plugin.source === 'builtin' ? 'builtin' : 'community';
-        const badgeLabel = plugin.source === 'builtin' ? 'Built-in' : 'Community';
+        // "Built-in" = core; "Community" = shipped with the fork (ACARS,
+        // Reticulum, ...); "External" = pulled from a plugin source, i.e.
+        // third-party code the operator added -- worth its own badge so
+        // that trust boundary is visible at a glance, not buried in the
+        // provenance line.
+        let badgeMod = 'community';
+        let badgeLabel = 'Community';
+        let badgeTitle = '';
+        if (plugin.source === 'builtin') {
+            badgeMod = 'builtin'; badgeLabel = 'Built-in';
+        } else if (plugin.provenance && plugin.provenance.url) {
+            badgeMod = 'external'; badgeLabel = 'External';
+            let host = plugin.provenance.url;
+            try { host = new URL(plugin.provenance.url).hostname; } catch (_) { /* keep url */ }
+            badgeTitle = `Installed from ${host} — ${plugin.provenance.url}`;
+        }
         const provides = (plugin.provides || []).join(', ') || '-';
         // A plugin can need setup.sh with no apt packages at all (e.g. a
         // from-source build like dump1090 -- its build tools are already
@@ -831,7 +845,7 @@ class PluginsPanelController {
                 <span class="plugin-row__version">v${this._escape(plugin.version)}${byLine ? ` &middot; ${byLine}` : ''}</span>
                 ${provHtml}
             </td>
-            <td><span class="plugin-row__badge plugin-row__badge--${badgeMod}">${badgeLabel}</span></td>
+            <td><span class="plugin-row__badge plugin-row__badge--${badgeMod}"${badgeTitle ? ` title="${this._escape(badgeTitle)}"` : ''}>${badgeLabel}</span></td>
             <td class="plugin-row__meta">
                 ${this._escape(plugin.description) || 'No description provided.'}
                 <p class="plugin-row__provides">${this._escape(provides)}</p>
