@@ -509,7 +509,7 @@ class RadioPanel {
             <section class="lsn-section">
                 <div class="panel">
                     <div class="panel__header">Presets</div>
-                    <div class="panel__body">
+                    <div class="panel__body lsn-panel-body">
                         <div class="lsn-preset-bar">
                             <input type="search" id="lsn-preset-search" class="lsn-preset-search"
                                    placeholder="Search presets…" autocomplete="off">

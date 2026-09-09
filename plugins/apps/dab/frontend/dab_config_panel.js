@@ -97,7 +97,7 @@ class DabConfigPanel {
                                 Scan selected channels
                             </button>
                         </div>
-                        <button class="terminal-button" type="button" data-dabcfg-scan-toggle-output hidden>
+                        <button class="terminal-button dabcfg-scan-output-toggle" type="button" data-dabcfg-scan-toggle-output hidden>
                             Show output
                         </button>
                         <pre class="dabcfg-scan-output" data-dabcfg-scan-output hidden></pre>

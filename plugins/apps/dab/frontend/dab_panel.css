@@ -199,6 +199,12 @@
     margin-top: 10px;
 }
 
+/* Sits directly below the scan action buttons (or the advanced panel) --
+   needs its own vertical gap so it doesn't butt up against them. */
+.dabcfg-scan-output-toggle {
+    margin-top: 12px;
+}
+
 .dabcfg-scan-advanced {
     margin-top: 14px;
     padding-top: 14px;

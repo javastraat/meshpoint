@@ -204,6 +204,8 @@
     flex-wrap: wrap;
     gap: 14px;
     align-items: flex-end;
+    /* Tuner fields line up with the panel header, not the card edge. */
+    padding: 12px 0.75rem;
 }
 
 .lsn-field {
