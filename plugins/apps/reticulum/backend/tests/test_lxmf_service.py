@@ -478,28 +478,31 @@ class TestTelemetryPublish(unittest.TestCase):
         self.assertFalse(res["ok"])
         self.assertIn("not running", res["error"])
 
-    def test_inbound_telemetry_logging_ignores_a_plain_message(self) -> None:
+    def test_record_inbound_telemetry_ignores_a_plain_message(self) -> None:
         svc = _make_service()
 
         class _Msg:
             fields = {}
 
-        with self.assertNoLogs("plugins.apps.reticulum.backend.lxmf_service", "INFO"):
-            svc._log_inbound_telemetry(_Msg(), "abc")
-            svc._log_inbound_telemetry(object(), "abc")  # no .fields at all
+        self.assertFalse(svc._record_inbound_telemetry(_Msg(), "abc", ""))
+        self.assertFalse(svc._record_inbound_telemetry(object(), "abc", ""))
 
-    def test_inbound_telemetry_logging_fires_on_a_telemetry_field(self) -> None:
+    def test_record_inbound_telemetry_stores_a_decoded_frame(self) -> None:
         svc = _make_service()
 
         class _Msg:
-            # field id 2 = FIELD_TELEMETRY; value would normally be msgpack
-            # bytes -- on the Mac RNS is absent so it can't decode, but it
-            # must still log rather than raise.
-            fields = {0x02: b"\x81\x01\x0f"}
+            # an already-unpacked frame dict (RNS.vendor.umsgpack absent on
+            # the Mac -> the code passes a non-bytes value straight through)
+            fields = {0x02: {0x01: 111, 0x07: 44.0, 0x0F: "node X"}}
 
-        with self.assertLogs("plugins.apps.reticulum.backend.lxmf_service", "INFO") as cm:
-            svc._log_inbound_telemetry(_Msg(), "deadbeef")
-        self.assertTrue(any("telemetry from deadbeef" in line for line in cm.output))
+        with self.assertLogs("plugins.apps.reticulum.backend.lxmf_service", "INFO"):
+            had = svc._record_inbound_telemetry(_Msg(), "deadbeef", "X")
+        self.assertTrue(had)
+        peers = svc.telemetry_peers()
+        self.assertEqual(peers[0]["destination_hash"], "deadbeef")
+        self.assertEqual(peers[0]["temperature_c"], 44.0)
+        self.assertEqual(peers[0]["info"], "node X")
+        self.assertEqual(peers[0]["name"], "X")
 
 
 class TestInboundNotify(unittest.TestCase):

@@ -38,7 +38,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
-from . import host_stats, notify, talkback, telemetry as telemetry_builder
+from . import (
+    host_stats,
+    notify,
+    talkback,
+    telemetry as telemetry_codec,
+    telemetry_store as _telemetry_store_mod,
+)
 
 if TYPE_CHECKING:
     from src.api.websocket_manager import WebSocketManager
@@ -198,6 +204,9 @@ class LxmfService:
         self._telemetry_task: Optional[asyncio.Task] = None
         self._telemetry_last_sent_at: Optional[float] = None
         self._telemetry_last_error: Optional[str] = None
+        # Collector: telemetry received FROM other nodes (in-memory,
+        # latest-per-peer). Always on -- it's just a dict.
+        self._telemetry_store = _telemetry_store_mod.TelemetryStore()
         # Requires node hosting: every command answers from data a hosted
         # node already caches (see talkback.py's module docstring) -- this
         # flag alone does nothing unless node_cfg["enabled"] is also true
@@ -541,7 +550,7 @@ class LxmfService:
         if not self.available or self._router is None or self._source is None:
             return {"ok": False, "error": "Reticulum service is not running"}
         try:
-            frame = telemetry_builder.build_telemetry(
+            frame = telemetry_codec.build_telemetry(
                 host_stats.read_host(), self._display_name,
                 location=self._telemetry_cfg.get("location"),
             )
@@ -687,32 +696,50 @@ class LxmfService:
                 self._handle_inbound_message(message), self._loop,
             )
 
-    def _log_inbound_telemetry(self, message, source_hex: str) -> None:
+    def _record_inbound_telemetry(self, message, source_hex: str, name: str) -> bool:
         """If an inbound LXMF message carries a Sideband ``FIELD_TELEMETRY``
-        frame, msgunpack it and log the decoded ``{sensor_id: value}`` dict
-        at INFO. Purely observational -- meshpoint doesn't act on received
-        telemetry yet -- but it's how you verify the telemetry-publish
-        wire format against a real client (or a loopback to our own
-        address), and the groundwork for a telemetry collector."""
+        frame: msgunpack it, log the raw ``{sensor_id: value}`` dict at
+        INFO, and record the decoded reading in the collector store.
+        Returns ``True`` when a telemetry field was present (so the caller
+        can skip treating a telemetry-only frame as a chat message)."""
         fields = getattr(message, "fields", None)
         if not isinstance(fields, dict):
-            return
+            return False
         field_id = getattr(LXMF, "FIELD_TELEMETRY", 0x02)
         raw = fields.get(field_id)
         if raw is None:
-            return
+            return False
         try:
-            decoded = RNS.vendor.umsgpack.unpackb(raw) if isinstance(raw, (bytes, bytearray)) else raw
-            logger.info("LXMF telemetry from %s: %r", source_hex, decoded)
+            frame = (
+                RNS.vendor.umsgpack.unpackb(raw)
+                if isinstance(raw, (bytes, bytearray)) else raw
+            )
+            logger.info("LXMF telemetry from %s: %r", source_hex, frame)
+            self._telemetry_store.record(
+                source_hex, telemetry_codec.decode_telemetry(frame), name,
+            )
         except Exception:  # noqa: BLE001
             logger.info(
                 "LXMF telemetry from %s: %d bytes, could not decode", source_hex,
                 len(raw) if hasattr(raw, "__len__") else -1,
             )
+        return True
+
+    async def _broadcast_telemetry_update(self, source_hex: str) -> None:
+        entry = next(
+            (e for e in self._telemetry_store.all() if e["destination_hash"] == source_hex),
+            None,
+        )
+        if entry is not None:
+            await self._ws_manager.broadcast("reticulum_telemetry", entry)
+
+    def telemetry_peers(self) -> list[dict]:
+        """Latest telemetry received per peer -- backs
+        GET /api/reticulum/telemetry/peers."""
+        return self._telemetry_store.all()
 
     async def _handle_inbound_message(self, message) -> None:
         source_hex = RNS.hexrep(message.source_hash, delimit=False)
-        self._log_inbound_telemetry(message, source_hex)
         text = (
             message.content.decode("utf-8", errors="replace")
             if message.content else ""
@@ -722,6 +749,14 @@ class LxmfService:
         name = next(
             (p.display_name for p in peers if p.destination_hash == source_hex), "",
         )
+
+        # A telemetry frame is data, not a chat message -- record it in the
+        # collector and, if there's no actual message text alongside it,
+        # stop here (don't save a blank row / fire message events).
+        if self._record_inbound_telemetry(message, source_hex, name):
+            await self._broadcast_telemetry_update(source_hex)
+            if not text.strip():
+                return
         row_id, is_duplicate = await self._message_repo.save_received(
             text=text, node_id=source_hex, node_name=name,
             protocol="reticulum", packet_id=packet_id,

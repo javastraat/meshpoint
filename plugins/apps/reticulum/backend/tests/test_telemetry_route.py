@@ -42,6 +42,12 @@ class TestTelemetryRoute(unittest.TestCase):
                 self.sent = True
                 return {"ok": self.ok, "error": None if self.ok else "Collector path unknown"}
 
+            def telemetry_peers(self):
+                return [
+                    {"destination_hash": "aa", "name": "A", "received_at": 1.0,
+                     "temperature_c": 41.0, "info": "node A", "latitude": 52.1, "longitude": 4.9},
+                ]
+
         self.svc = _FakeService()
         routes.init_routes(self.svc, object())
 
@@ -69,6 +75,13 @@ class TestTelemetryRoute(unittest.TestCase):
         self.svc.ok = False
         r = self.client.post("/api/reticulum/telemetry/send")
         self.assertEqual(r.status_code, 400)
+
+    def test_peers_collector_list(self) -> None:
+        r = self.client.get("/api/reticulum/telemetry/peers")
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertEqual(body[0]["destination_hash"], "aa")
+        self.assertEqual(body[0]["latitude"], 52.1)
 
     def test_503_without_service(self) -> None:
         self._routes.reset_routes()

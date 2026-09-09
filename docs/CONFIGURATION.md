@@ -284,9 +284,14 @@ telemetry now" button fires one frame on demand. `GET
 (opt-in, off by default) adds this node's fixed position to the frame,
 taken from the **Configuration → GPS** pin (`device.latitude` /
 `device.longitude` — no separate keys); off means the collector never
-learns where the node is. *(v1 sends time, temperature, a status line,
-and — when opted in — location; structured processor/RAM/disk sensors
-are a later addition.)*
+learns where the node is. *(Sends time, temperature, a status line, and
+— when opted in — location; structured processor/RAM/disk sensors are a
+later addition.)*
+
+**Receiving** telemetry needs no config — the **Telemetry** tab on the
+Reticulum page shows the latest frame from every node that publishes one
+(temperature, status line, location), newest first, in-memory, and plots
+the located ones on a small map. `GET /api/reticulum/telemetry/peers`.
 
 `plugins.reticulum.propagation_outbound_node` (Settings tab → *Propagation
 node*, dropdown of `lxmf.propagation` peers): use *another* node as your

@@ -217,6 +217,15 @@ async def reticulum_telemetry():
     return _service.telemetry_status()
 
 
+@router.get("/telemetry/peers")
+async def reticulum_telemetry_peers():
+    """Latest telemetry received from other nodes (the collector) --
+    one entry per peer, newest first, in-memory so empty after a restart."""
+    if _service is None:
+        raise HTTPException(503, "Reticulum companion is disabled")
+    return _service.telemetry_peers()
+
+
 @router.post("/telemetry/send")
 async def reticulum_telemetry_send(_claims: SessionClaims = Depends(require_admin)):
     """Send one telemetry frame to the collector now."""

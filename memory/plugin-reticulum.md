@@ -898,6 +898,21 @@ Operator-assigned names for peers. Local address book, never announced.
   a core change — the plugin's own Messages tab does resolve them).
 - Pi verification: see `memory/reticulum_todo.md`.
 
+## 2026-09-09 — Telemetry collector + map (new-build #4)
+
+Receive half. `telemetry.decode_telemetry` + `_unpack_location` (inverse
+of `_pack_location`); `backend/telemetry_store.py` `TelemetryStore`
+(in-mem, latest-per-peer, 24h prune, 500 cap, created in
+`LxmfService.__init__`). `_log_inbound_telemetry` → `_record_inbound_
+telemetry` (logs + records + returns had-field); `_handle_inbound_message`
+records, fires `reticulum_telemetry` WS, and returns early for a
+telemetry-only frame (fixed a latent "blank message row per frame" bug).
+`telemetry_peers()` + `GET /api/reticulum/telemetry/peers`. Frontend:
+**Telemetry tab** (`_loadTelemetry`/`_renderTelemetry` table +
+`_renderTelemetryMap` own Leaflet map — `L` is globally loaded —
+`_onWsTelemetry` live). NOT the dashboard NodeMap (core `nodes` table
+coupling). Suite 200 passed. NOT Pi-tested.
+
 ## 2026-09-09 — Telemetry publish, v1 subset (new-build #3)
 
 Broadcast this box's host stats as a Sideband-compatible LXMF telemetry

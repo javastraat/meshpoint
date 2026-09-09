@@ -48,6 +48,7 @@ class ReticulumPanel {
         this._peers = [];
         this._peersShowAll = false;
         this._announces = [];
+        this._telemetry = [];
         // Operator petname address book -- {hash: {petname, note, trusted}}
         // from GET /api/reticulum/contacts. Petnames win over the announced
         // name everywhere a peer is shown.
@@ -61,7 +62,7 @@ class ReticulumPanel {
         try { stored = localStorage.getItem(RT_TAB_STORE_KEY); } catch (_) {}
         // 'pages' restores optimistically -- _syncPagesTab() bounces it
         // back to 'peers' on the first /status if no node is hosting.
-        this._tab = (['messages', 'announces'].includes(stored)
+        this._tab = (['messages', 'announces', 'telemetry'].includes(stored)
             || (['send', 'settings', 'browse', 'pages'].includes(stored) && this._isAdmin))
             ? stored : 'peers';
         this._settingsTab = null;
@@ -72,6 +73,7 @@ class ReticulumPanel {
         this._onWsPeer = this._onWsPeer.bind(this);
         this._onWsMessage = this._onWsMessage.bind(this);
         this._onWsAnnounce = this._onWsAnnounce.bind(this);
+        this._onWsTelemetry = this._onWsTelemetry.bind(this);
     }
 
     mount(rootEl) {
@@ -121,6 +123,8 @@ class ReticulumPanel {
                                     data-rt-tab="peers">Peers</button>
                             <button class="lw-tab" type="button" role="tab"
                                     data-rt-tab="announces">Activity</button>
+                            <button class="lw-tab" type="button" role="tab"
+                                    data-rt-tab="telemetry">Telemetry</button>
                             <button class="lw-tab" type="button" role="tab"
                                     data-rt-tab="messages">Messages</button>
                             <button class="lw-tab" type="button" role="tab"
@@ -210,6 +214,36 @@ class ReticulumPanel {
                             </table>
                             <p class="lw-empty" id="rt-announce-empty" style="display:none">
                                 No announces heard yet.
+                            </p>
+                        </div>
+                    </div>
+                    <div data-rt-view="telemetry" hidden>
+                        <div class="panel__body lw-table-wrap">
+                            <p class="lw-panel__limit">
+                                Telemetry received from other nodes (Sideband-style LXMF
+                                frames), newest first — in memory, so it's empty after a
+                                restart and fills as peers report.
+                            </p>
+                            <div id="rt-telemetry-map" class="rt-telemetry-map" hidden></div>
+                            <table class="lw-table lw-table--rt-telemetry">
+                                <colgroup>
+                                    <col class="col-time">
+                                    <col class="col-name">
+                                    <col class="col-text">
+                                    <col class="col-type">
+                                </colgroup>
+                                <thead>
+                                    <tr>
+                                        <th>Heard</th>
+                                        <th>Node</th>
+                                        <th>Status</th>
+                                        <th class="lw-r">Temp / Location</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="rt-telemetry-tbody"></tbody>
+                            </table>
+                            <p class="lw-empty" id="rt-telemetry-empty" style="display:none">
+                                No telemetry received yet.
                             </p>
                         </div>
                     </div>
@@ -335,6 +369,7 @@ class ReticulumPanel {
             window.concentratorWS.on('reticulum_peer', this._onWsPeer);
             window.concentratorWS.on('reticulum_message', this._onWsMessage);
             window.concentratorWS.on('reticulum_announce', this._onWsAnnounce);
+            window.concentratorWS.on('reticulum_telemetry', this._onWsTelemetry);
         }
         this._activateSubTab();
     }
@@ -359,6 +394,7 @@ class ReticulumPanel {
         else if (this._tab === 'browse' && this._nomadTab) this._nomadTab.show();
         else if (this._tab === 'pages' && this._nodePagesTab) this._nodePagesTab.show();
         else if (this._tab === 'announces') this._loadAnnounces();
+        else if (this._tab === 'telemetry') this._loadTelemetry();
     }
 
     /** Open the Browse tab pointed at a specific node (Peers-row "Browse" button). */
@@ -427,6 +463,13 @@ class ReticulumPanel {
         if (this._tab === 'announces') this._renderAnnounces();
     }
 
+    _onWsTelemetry(entry) {
+        if (!entry || !entry.destination_hash) return;
+        this._telemetry = this._telemetry.filter((t) => t.destination_hash !== entry.destination_hash);
+        this._telemetry.unshift(entry);
+        if (this._tab === 'telemetry') this._renderTelemetry();
+    }
+
     _q(sel) { return this._root ? this._root.querySelector(sel) : null; }
 
     _setTab(tab) {
@@ -456,6 +499,7 @@ class ReticulumPanel {
             this._loadStatus(), this._loadContacts(), this._loadPeers(), this._loadMessages(),
         ];
         if (this._tab === 'announces') jobs.push(this._loadAnnounces());
+        if (this._tab === 'telemetry') jobs.push(this._loadTelemetry());
         await Promise.all(jobs);
     }
 
@@ -795,6 +839,95 @@ class ReticulumPanel {
         tbody.querySelectorAll('[data-rt-browse]').forEach((btn) => {
             btn.addEventListener('click', () => this.browseNode(btn.dataset.rtBrowse));
         });
+    }
+
+    async _loadTelemetry() {
+        try {
+            const r = await fetch('/api/reticulum/telemetry/peers', { credentials: 'same-origin' });
+            if (!r.ok) return;
+            this._telemetry = await r.json();
+            this._renderTelemetry();
+        } catch (_) {}
+    }
+
+    _renderTelemetry() {
+        const tbody = this._q('#rt-telemetry-tbody');
+        const empty = this._q('#rt-telemetry-empty');
+        if (!tbody) return;
+        if (!this._telemetry.length) {
+            tbody.innerHTML = '';
+            if (empty) empty.style.display = '';
+            return;
+        }
+        if (empty) empty.style.display = 'none';
+        tbody.innerHTML = this._telemetry.map((t) => {
+            const hash = t.destination_hash;
+            const name = this._contacts[hash]?.petname || t.name || `${hash.slice(0, 12)}…`;
+            const heard = t.received_at ? this._fmtTime(new Date(t.received_at * 1000).toISOString()) : '--';
+            const right = [];
+            if (t.temperature_c != null) right.push(`${t.temperature_c}°C`);
+            if (t.latitude != null && t.longitude != null) {
+                right.push(`<a href="https://www.openstreetmap.org/?mlat=${t.latitude}&mlon=${t.longitude}#map=13/${t.latitude}/${t.longitude}" target="_blank" rel="noopener">${t.latitude.toFixed(4)}, ${t.longitude.toFixed(4)}</a>`);
+            }
+            return `
+            <tr class="lw-pkt-row" data-rt-tele-hash="${this._esc(hash)}" title="Click for peer details">
+                <td class="lw-time">${heard}</td>
+                <td class="mt-name">${this._esc(name)}</td>
+                <td>${this._esc(t.info || '')}</td>
+                <td class="lw-r">${right.join(' · ') || '--'}</td>
+            </tr>
+        `;
+        }).join('');
+
+        tbody.querySelectorAll('tr[data-rt-tele-hash]').forEach((tr) => {
+            tr.addEventListener('click', (e) => {
+                if (e.target.closest('a')) return;
+                const peer = this._peers.find((p) => p.destination_hash === tr.dataset.rtTeleHash);
+                if (peer) this._openPeerDrawer(peer);
+            });
+        });
+
+        this._renderTelemetryMap();
+    }
+
+    /** Lightweight Leaflet map of telemetry peers that reported a location.
+     * Leaflet (`L`) + its CSS are loaded globally by the app shell. Own
+     * markers only — not the dashboard's NodeMap (that's fed from the core
+     * nodes table, which Reticulum telemetry peers aren't in). */
+    _renderTelemetryMap() {
+        const el = this._q('#rt-telemetry-map');
+        if (!el || typeof L === 'undefined') return;
+        const located = this._telemetry.filter((t) => t.latitude != null && t.longitude != null);
+        if (!located.length) {
+            el.hidden = true;
+            return;
+        }
+        el.hidden = false;
+
+        if (!this._teleMap) {
+            this._teleMap = L.map(el, { scrollWheelZoom: false });
+            L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>',
+                maxZoom: 19,
+            }).addTo(this._teleMap);
+            this._teleMarkers = L.layerGroup().addTo(this._teleMap);
+        }
+        this._teleMarkers.clearLayers();
+        const bounds = [];
+        located.forEach((t) => {
+            const name = this._contacts[t.destination_hash]?.petname || t.name || t.destination_hash.slice(0, 12);
+            const lines = [`<strong>${this._esc(name)}</strong>`];
+            if (t.temperature_c != null) lines.push(`${t.temperature_c}°C`);
+            if (t.info) lines.push(this._esc(t.info));
+            L.marker([t.latitude, t.longitude])
+                .bindPopup(lines.join('<br>'))
+                .addTo(this._teleMarkers);
+            bounds.push([t.latitude, t.longitude]);
+        });
+        if (bounds.length === 1) this._teleMap.setView(bounds[0], 12);
+        else this._teleMap.fitBounds(bounds, { padding: [30, 30], maxZoom: 13 });
+        // Container was hidden until now — Leaflet needs a nudge to re-measure.
+        setTimeout(() => this._teleMap && this._teleMap.invalidateSize(), 60);
     }
 
     async _handleAnnounce() {

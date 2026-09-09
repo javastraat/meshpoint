@@ -405,4 +405,14 @@
     margin-top: 0.3rem;
 }
 
+/* Telemetry tab: the collector map (Leaflet, own markers). */
+.rt-telemetry-map {
+    height: 300px;
+    width: 100%;
+    border: 1px solid var(--border, #333);
+    border-radius: 6px;
+    margin-bottom: 0.75rem;
+}
+.rt-telemetry-map .leaflet-container { background: var(--bg, #111); }
+
 .rt-amodal__view-peer { width: 100%; margin-top: 0.75rem; }

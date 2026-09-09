@@ -85,6 +85,34 @@ class TestBuildTelemetry(unittest.TestCase):
         frame = telemetry.build_telemetry(_FULL_HOST, "x", location=(52.370216, 4.895168, 5.0))
         self.assertIn(SID_LOCATION, frame)
 
+    def test_decode_round_trips_build(self) -> None:
+        # build_telemetry's own dict fed straight into decode_telemetry
+        # (skips msgpack -- both sides use the same list/bytes structure).
+        frame = telemetry.build_telemetry(
+            _FULL_HOST, "ti-meshpoint", location=(52.370216, 4.895168, 5.0),
+        )
+        dec = telemetry.decode_telemetry(frame)
+        self.assertEqual(dec["temperature_c"], 61.2)
+        self.assertIn("ti-meshpoint", dec["info"])
+        self.assertAlmostEqual(dec["latitude"], 52.370216, places=5)
+        self.assertAlmostEqual(dec["longitude"], 4.895168, places=5)
+        self.assertAlmostEqual(dec["altitude"], 5.0, places=1)
+        self.assertIsInstance(dec["time"], int)
+
+    def test_decode_tolerates_junk(self) -> None:
+        self.assertEqual(telemetry.decode_telemetry(None), {})
+        self.assertEqual(telemetry.decode_telemetry("nope"), {})
+        self.assertEqual(telemetry.decode_telemetry({0x99: "unknown sid"}), {})
+        # a location field that isn't a proper list -> just skipped
+        dec = telemetry.decode_telemetry({0x01: 123, 0x02: b"bad", 0x07: 40})
+        self.assertEqual(dec["time"], 123)
+        self.assertEqual(dec["temperature_c"], 40.0)
+        self.assertNotIn("latitude", dec)
+
+    def test_decode_bytes_info(self) -> None:
+        dec = telemetry.decode_telemetry({0x0F: b"hello \xe2\x82\xac"})
+        self.assertEqual(dec["info"], "hello €")
+
     def test_location_pack_layout(self) -> None:
         loc = telemetry._pack_location(52.370216, 4.895168, 5.0)
         self.assertEqual(len(loc), 7)

@@ -1,10 +1,12 @@
-"""Build a Sideband-compatible LXMF telemetry payload from host stats.
+"""Encode / decode Sideband-compatible LXMF telemetry frames.
 
 Sideband -- and any LXMF client that reads ``FIELD_TELEMETRY`` (0x02) --
-expects a msgpacked ``dict`` of ``{ sensor_id: packed_value }``. This
-module builds that dict from ``backend/host_stats.py``'s readings; the
-caller (``lxmf_service``) msgpacks it with RNS's bundled ``umsgpack`` and
-hangs it off an outbound ``LXMessage.fields``.
+expects a msgpacked ``dict`` of ``{ sensor_id: packed_value }``.
+:func:`build_telemetry` builds that dict from ``backend/host_stats.py``'s
+readings (the caller msgpacks it and hangs it off an outbound
+``LXMessage.fields``); :func:`decode_telemetry` turns a received,
+already-msgunpacked frame back into a friendly flat dict for the
+telemetry collector (``backend/telemetry_store.py``).
 
 Deliberately a **small, safe subset** of Sideband's sensor set -- only
 the sensors whose ``pack()`` format is a single unambiguous scalar/string
@@ -91,3 +93,54 @@ def build_telemetry(
         frame[SID_TEMPERATURE] = float(temp)
     frame[SID_INFORMATION] = _info_line(host, node_name)
     return frame
+
+
+def _unpack_location(packed: list) -> dict | None:
+    """Inverse of :func:`_pack_location` -- Sideband's ``Location`` list
+    back to ``{latitude, longitude, altitude, updated}``. Tolerant of a
+    short list / bad members (returns ``None`` rather than raising)."""
+    try:
+        if not isinstance(packed, (list, tuple)) or len(packed) < 3:
+            return None
+
+        def _i(b, fmt="!i"):
+            return struct.unpack(fmt, b)[0] if isinstance(b, (bytes, bytearray)) else None
+
+        lat, lon, alt = _i(packed[0]), _i(packed[1]), _i(packed[2])
+        if lat is None or lon is None:
+            return None
+        updated = packed[6] if len(packed) > 6 and isinstance(packed[6], (int, float)) else None
+        return {
+            "latitude": round(lat / 1e6, 6),
+            "longitude": round(lon / 1e6, 6),
+            "altitude": round(alt / 1e2, 2) if alt is not None else None,
+            "updated": int(updated) if updated else None,
+        }
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def decode_telemetry(frame: dict) -> dict:
+    """A msgunpacked ``{sensor_id: value}`` frame -> a friendly flat dict
+    ``{time, temperature_c, info, latitude, longitude, altitude}`` (keys
+    absent when the sensor wasn't in the frame). Unknown sensor ids are
+    ignored. Never raises."""
+    out: dict = {}
+    if not isinstance(frame, dict):
+        return out
+    t = frame.get(SID_TIME)
+    if isinstance(t, (int, float)):
+        out["time"] = int(t)
+    temp = frame.get(SID_TEMPERATURE)
+    if isinstance(temp, (int, float)):
+        out["temperature_c"] = round(float(temp), 1)
+    info = frame.get(SID_INFORMATION)
+    if isinstance(info, (str, bytes)):
+        out["info"] = info.decode("utf-8", "replace") if isinstance(info, bytes) else info
+    loc = _unpack_location(frame.get(SID_LOCATION)) if SID_LOCATION in frame else None
+    if loc:
+        out["latitude"] = loc["latitude"]
+        out["longitude"] = loc["longitude"]
+        if loc["altitude"] is not None:
+            out["altitude"] = loc["altitude"]
+    return out

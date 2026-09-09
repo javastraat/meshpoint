@@ -5,7 +5,7 @@ See `memory/plugin-reticulum.md` for implementation detail (dated sections,
 one per feature) and `memory/project_m1_meshpoint.md` for wider session
 context.
 
-Last updated 2026-09-09 (new-builds #1 Contacts, #2 Propagation client, #3 Telemetry publish — all built, none Pi-verified).
+Last updated 2026-09-09 (new-builds #1 Contacts, #2 Propagation client, #3 Telemetry publish + location [Pi-verified], #4 Telemetry collector+map).
 
 ---
 
@@ -99,6 +99,15 @@ checked on the Pi.
   `.cfg-field__input` instead of `#111`/`#eee` fallbacks (re-check both
   themes anyway). Detail: `memory/project_m1_meshpoint.md` dated
   2026-09-09.
+- **Telemetry collect + map (#4) — BUILT 2026-09-09, not Pi-tested.**
+  The receive side already worked (that's how #3 was verified); this
+  adds the store + UI. Check: with two nodes publishing to each other,
+  each shows the other on its **Telemetry tab** (table row: heard /
+  node / status line / temp + OSM link); a peer that sent location
+  appears on the map; the `reticulum_telemetry` WS event live-updates
+  the tab without reload; a telemetry-only frame does NOT show up as a
+  blank message in the Messages tab (this was a latent bug — check it's
+  gone); the map renders (Leaflet is globally loaded) and fits bounds.
 - **Propagation client — BUILT 2026-09-09, not tested end-to-end.**
   Set `propagation_outbound_node` (Settings tab dropdown of
   `lxmf.propagation` peers), restart. Check: the dropdown lists heard
@@ -136,8 +145,13 @@ checked on the Pi.
   `device.latitude/longitude` (Configuration → GPS pin) resolved in
   `__init__.py` `build()`, no plugin lat/lon keys. `_pack_location` =
   the 7-el struct-packed list from `sense.py`. Settings shows a warn
-  hint if the toggle is on but no pin is set. NOT re-tested — needs
-  another two-node run with a pin set + ideally the Sideband map check.
+  hint if the toggle is on but no pin is set.
+  **TWO-NODE VERIFIED WITH LOCATION 2026-09-09** (ti pin
+  52.34579/4.82638/5m → rakv2): key `2` present, lat `0x031ebbbe`=
+  52345790/1e6=52.34579, lon `0x0049a50c`=4826380/1e6=4.82638, alt
+  `0x1f4`=5.0, speed/bearing/accuracy 0 — byte-exact match to
+  `sense.py`. Only the Sideband-app visual render is still unconfirmed
+  (low risk).
   **UX gotcha hit + fixed:** clicking "Send telemetry now" / "Sync
   inbox" right after Save (before a meshpoint restart) failed with a
   confusing "no collector/node" — the running service reads that config
@@ -205,7 +219,8 @@ checked on the Pi.
 | Notifications | ntfy / webhook on inbound DM | `notify_url` config; fire-and-forget POST (`backend/notify.py`) |
 | Propagation node | LXMF store-and-forward relay (server) | `propagation_enabled` + `propagation_storage_limit_mb`; own `lxmf.propagation` hash, re-announced 6 h; status line on Settings tab; `propagation` block on `GET /api/reticulum/status` |
 | Propagation client | Use another node as your relay | `propagation_outbound_node` (Settings dropdown of `lxmf.propagation` peers) + `propagation_auto_sync_interval_s`; "Sync inbox" button in the Reticulum page header with live transfer state; `GET /api/reticulum/propagation` + admin `POST .../propagation/sync[/cancel]`; `propagation_client` block on `/status`. `backend/lxmf_service.py` `set_outbound_propagation_node`/`sync_propagation_messages`/`propagation_client_status`, mirrors reticulum-meshchat |
-| Telemetry publish | Send host stats as LXMF telemetry | `telemetry_enabled` + `telemetry_collector` + `telemetry_interval_s`; `backend/telemetry.py` builds a Sideband-compatible `FIELD_TELEMETRY` (0x02) msgpack frame — **v1 subset only**: `SID_TIME`/`SID_TEMPERATURE`/`SID_INFORMATION` (string), no structured processor/RAM/NVM or location. `lxmf_service.send_telemetry()`/`_telemetry_loop()`/`telemetry_status()`. `GET /api/reticulum/telemetry` + admin `POST .../telemetry/send`; "Send telemetry now" button on Settings tab |
+| Telemetry publish | Send host stats as LXMF telemetry | `telemetry_enabled` + `telemetry_collector` + `telemetry_interval_s` + `telemetry_include_location` (coords from core Configuration→GPS pin). `backend/telemetry.py` `build_telemetry` → Sideband `FIELD_TELEMETRY` (0x02) frame: `SID_TIME`/`SID_TEMPERATURE`/`SID_INFORMATION`/`SID_LOCATION`. `lxmf_service.send_telemetry()`/`_telemetry_loop()`. `GET /api/reticulum/telemetry` + admin `POST .../telemetry/send`; "Send telemetry now" button |
+| Telemetry collect + map | Receive peers' telemetry | `_record_inbound_telemetry` decodes inbound `FIELD_TELEMETRY` → `telemetry.decode_telemetry` → `backend/telemetry_store.py` (in-mem, latest-per-peer, 24h prune, 500 cap). New **Telemetry tab** on the Reticulum page: table (heard / node / status / temp+location) + a small own-Leaflet map of located peers. `GET /api/reticulum/telemetry/peers`, live over `reticulum_telemetry` WS. Telemetry-only frames no longer create blank message rows |
 | Peers/Activity | Click-to-detail | Peers row → right-side drawer (identity, live routing via `GET /peers/{hash}/link`: hops/path/next-hop/identity-resolved/announce-count, signal from most recent announce, recent activity, a Send Message button for `lxmf.delivery` peers, a favourite star for `nomadnetwork.node` peers sharing the Browse tab's own favourites list); Activity row → detail popup (routing, signal if heard via RNode, payload/app_data hex, "View peer"). Own JS/data (`reticulum_detail_panels.js`) but literally emits core's own `node_drawer.css`/`packet_detail_modal.css` class names (`nd-drawer`/`nd-section`/`nd-row`, `pdm-overlay`/`pdm-layer`/`pdm-row`) for pixel-identical styling — same reuse-not-duplicate pattern as `lw-*`/`mt-badge`/`terminal-button` elsewhere in this plugin |
 | Contacts | Operator petnames for peers | Peers drawer → Contact section (admin): name + note + "known" flag per destination hash, `data/reticulum/contacts.json` (`backend/contacts.py`), never announced. Name wins across Peers/Activity/Messages/Send; announced name → "announced as X". `GET /contacts` + admin `PUT`/`DELETE /contacts/{hash}`; `/peers` + `/announces` gain `petname`/`trusted` |
 | Browsing | NomadNet node browser | Browse tab: live filter, ☆ favourites, `:/page/x.mu` shortcuts |
@@ -264,7 +279,7 @@ plugins:
 | Med | **Attachments in Send** | images / small files over `LXMF.FIELD_IMAGE` / `FIELD_FILE_ATTACHMENTS` | Send side is easy (set `lxm.fields` before `handle_outbound`). Inbound is the blocker: shared `messages` table (`src/storage/message_repository.py`) has no attachment columns and core's conversation UI can't render them — needs a design decision (disk store + flag vs a JSON column on the shared table) |
 | ~~Med~~ | ~~**Propagation node polish**~~ | **MOSTLY BUILT 2026-09-09** (new-build #2): outbound node + "Sync inbox" + live transfer state + auto-sync. Still open: **PN peering** (propagation nodes syncing to each other) and a message-arrival WS push after a sync completes | — |
 | ~~Med~~ | ~~**Telemetry publish**~~ | **BUILT 2026-09-09** (new-build #3): time + temp + status-line frame, two-node verified. **+ SID_LOCATION added same day** — opt-in `telemetry_include_location`, coords from core's Configuration→GPS pin (`device.latitude/longitude`), no separate keys. Only follow-up left: structured processor/RAM/NVM sensors (nested `[[label,val],...]` — needs verifying against a real Sideband client; low value, INFO string already carries the numbers) | Low |
-| Med | **Telemetry collector + map** | *receive* peers' telemetry (parse inbound `FIELD_TELEMETRY`), plot on the dashboard's local map tiles. Now the natural pair for #3. Needs `SID_LOCATION` in the publish side too | Med–High |
+| ~~Med~~ | ~~**Telemetry collector + map**~~ | **BUILT 2026-09-09** (new-build #4). Telemetry tab: table + own-Leaflet map (not the dashboard NodeMap — Reticulum telemetry peers aren't in the core `nodes` table; a standalone mini-map was the right call). Not Pi-tested yet. Possible follow-up: also feed into the dashboard map, but that needs core `nodes`-table integration — probably not worth it | — |
 | Low | **Audio calls** (`call.audio` / LXST) | answer / receive voice; min viable = a recorded announcement on call | High — audio I/O + codec on the Pi, its own project |
 | Low | **Group chat** (`RNS.Destination.GROUP`) | experimental shared-key room, no membership mgmt | Medium — non-standard |
 | Low | **Interface manager UI** | add / remove RNS interfaces from the dashboard vs hand-editing config | Medium |
@@ -273,6 +288,16 @@ plugins:
 
 ## Done (this backlog's completed items)
 
+- **2026-09-09** — Telemetry collector + map (new-build #4). Inbound
+  `FIELD_TELEMETRY` decoded (`telemetry.decode_telemetry` +
+  `_unpack_location`) into `backend/telemetry_store.py` (in-mem,
+  latest-per-peer, 24h prune / 500 cap). New **Telemetry tab** on the
+  Reticulum page: table + a self-contained Leaflet map of located peers
+  (globally-loaded `L`, own markers — NOT the dashboard NodeMap, which
+  is fed from the core `nodes` table). `GET /api/reticulum/telemetry/
+  peers`, live over a new `reticulum_telemetry` WS event. Bonus fix: a
+  telemetry-only LXMF frame no longer saves a blank message row /
+  fires message events. 20 new tests. Suite 200 passed. NOT Pi-tested.
 - **2026-09-09** — Telemetry publish, v1 subset (new-build #3).
   **Two-node round trip LIVE-VERIFIED same day** (ti → rakv2: frame
   built, msgpacked, transported over real LXMF, received + decoded

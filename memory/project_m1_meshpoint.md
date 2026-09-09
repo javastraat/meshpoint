@@ -12900,9 +12900,56 @@ keys. `_pack_location()` = the 7-el struct-packed list from `sense.py`
 (speed/bearing/accuracy 0 for a fixed pin). Settings tab "Include
 location" toggle + a hint that reads back the actual pin coords, or
 warns if none is set. `telemetry_status()` gains `location_included`.
-9 more tests. Suite 192 passed. NOT re-tested on the Pi — needs another
-two-node run with a pin set.
+9 more tests. Suite 192 passed. **TWO-NODE VERIFIED same day** (ti pin
+52.34579/4.82638/5m → rakv2): frame gained key `2`, all six struct
+fields decode byte-exact (lat 52345790/1e6, lon 4826380/1e6, alt 500/1e2,
+zeros for speed/bearing/accuracy). Sideband-app visual render still
+unconfirmed but low-risk.
 
 Only follow-up left for #3: structured processor/RAM/NVM sensors (low
 value — the INFO string already has the numbers). Checklist in
 `memory/reticulum_todo.md`.
+
+## Reticulum — Telemetry collector + map (new-build #4, 2026-09-09)
+
+The receive half of telemetry. The decode-and-log groundwork already
+existed (it's how #3 was verified); this adds a store + a UI.
+
+- `telemetry.py` gains `decode_telemetry(frame)` (msgunpacked
+  `{sid: value}` → flat `{time, temperature_c, info, latitude,
+  longitude, altitude}`) + `_unpack_location` (inverse of
+  `_pack_location`, struct-unpacks the 7-el list; tolerant of junk).
+- `backend/telemetry_store.py` — `TelemetryStore`: in-mem dict keyed by
+  peer hash, latest reading only, 24h staleness prune, 500 cap, ignores
+  a frame with nothing useful. Created in `LxmfService.__init__`
+  (always on — it's just a dict).
+- `lxmf_service.py`: `_log_inbound_telemetry` renamed →
+  `_record_inbound_telemetry` (logs raw frame + records decoded into
+  the store, returns whether a telemetry field was present).
+  `_handle_inbound_message` now: compute name first, then
+  `_record_inbound_telemetry` + `_broadcast_telemetry_update`
+  (`reticulum_telemetry` WS), and **if it's a telemetry-only frame
+  (no text) return before saving a message row** — fixes a latent bug
+  where every telemetry frame created a blank conversation entry.
+  `telemetry_peers()` accessor.
+- `routes.py`: `GET /api/reticulum/telemetry/peers`.
+- `reticulum_panel.js`: new **Telemetry tab** (viewer-visible, between
+  Activity and Messages). `_loadTelemetry`/`_renderTelemetry` (table:
+  heard / node / status / temp+OSM-link, row click → peer drawer) +
+  `_renderTelemetryMap` (own `L.map` — Leaflet is globally loaded by
+  the app shell — markers for located peers, `invalidateSize` after
+  the hidden container shows). `_onWsTelemetry` for live updates.
+  `reticulum.css` `.rt-telemetry-map`.
+- **Map decision:** NOT the dashboard's `NodeMap` — that's fed from
+  `GET /api/nodes` (the core `nodes` table), and putting Reticulum
+  telemetry peers in that table would make them "nodes" everywhere
+  (node list, packet feed). A standalone ~45-line Leaflet map on the
+  tab was the right scope.
+- Tests: `test_telemetry.py` +6 (decode / round-trip / junk),
+  `test_telemetry_store.py` ×5 (new), `test_telemetry_route.py` +1,
+  `test_lxmf_service.py` telemetry tests updated + store assertions.
+  Suite **200 passed**. `test_status_route.py` untouched.
+- **NOT Pi-tested.** Owed: two nodes publishing to each other each show
+  the other on the Telemetry tab + map; WS live-update; the
+  blank-message-row bug is actually gone. Checklist in
+  `memory/reticulum_todo.md`.
