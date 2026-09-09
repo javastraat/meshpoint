@@ -398,6 +398,17 @@
     color: var(--text-muted, #777);
 }
 
+/* Settings tab: one extra-interface editor row. */
+.rt-iface-row {
+    border: 1px solid var(--border, #333);
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+}
+.rt-iface-row .cfg-card__actions {
+    margin-top: 4px;
+}
+
 /* Settings tab: visual break before the propagation-client sub-block. */
 .rt-prop-divider {
     border-top: 1px solid var(--border-subtle, #333);

@@ -99,6 +99,17 @@ checked on the Pi.
   `.cfg-field__input` instead of `#111`/`#eee` fallbacks (re-check both
   themes anyway). Detail: `memory/project_m1_meshpoint.md` dated
   2026-09-09.
+- **Extra interfaces (Interface manager) — BUILT 2026-09-09, not
+  Pi-tested.** Settings tab → "Extra interfaces": add a row, pick type
+  (TCPClient/TCPServer/UDP), fill fields, Save → Restart rnsd. Check:
+  the row editor works (add/remove/type-switch keeps in-progress
+  edits); a valid TCPClient shows up in the rnsd config
+  (`cat data/reticulum/rns_config/config`) and rnsd starts; a
+  deliberately broken entry (missing port) is skipped with a journal
+  warning and rnsd STILL starts (the whole point); RNode+backbone both
+  off with one active extra interface is accepted. `write_rnsd_config`
+  reads `plugins.reticulum.extra_interfaces` raw; `_extra_interface_blocks`
+  is the pure, tested generator.
 - **Telemetry collect + map (#4) — BUILT + BROWSER-VERIFIED 2026-09-09**
   (user screenshot: TI-Meshpoint plotted near Schiphol at 52.3458/
   4.8264, table row, working OSM link, live WS). Two display tweaks from
@@ -219,6 +230,7 @@ checked on the Pi.
 | Area | Feature | Notes |
 |---|---|---|
 | Transport | RNode radio + TCP backbone, independent on/off | attaches to `rnsd` shared instance; Settings tab + Restart-rnsd button |
+| Transport | **Extra interfaces** (operator-added) | `extra_interfaces` list: TCPClient/TCPServer/UDP; Settings-tab editor (add/remove rows, per-type fields), validated on save (`ExtraInterface` model) + again in `write_rnsd_config.py`'s `_extra_interface_blocks` (skips bad entries, never crashes rnsd's ExecStartPre); applied on Restart rnsd |
 | Messaging | LXMF direct messages, send + receive | own `lxmf.delivery` dest on the shared identity; Messages / Send tabs |
 | Presence | Peer roster from announces | Peers tab; topbar pill = own address + RNode frequency |
 | Activity | Raw announce feed | Activity tab: 200-entry ring buffer, live over `reticulum_announce` WS; incl. `call.audio` (stream-only); `nomadnetwork.node` rows get a Browse button |
@@ -267,6 +279,8 @@ plugins:
     telemetry_enabled: false             # publish host stats as LXMF FIELD_TELEMETRY frames
     telemetry_collector: ""              # LXMF address to send telemetry to
     telemetry_interval_s: 900            # min 300
+    telemetry_include_location: false    # add Configuration→GPS pin to the frame
+    extra_interfaces: []                 # [{name,type,enabled,...}] TCPClient/TCPServer/UDP → write_rnsd_config
     node_enabled: false                  # host a NomadNet node
     node_name: ""                        # blank = display_name
     node_pages_dir: data/reticulum/pages
@@ -288,7 +302,7 @@ plugins:
 | ~~Med~~ | ~~**Telemetry collector + map**~~ | **BUILT 2026-09-09** (new-build #4). Telemetry tab: table + own-Leaflet map (not the dashboard NodeMap — Reticulum telemetry peers aren't in the core `nodes` table; a standalone mini-map was the right call). Not Pi-tested yet. Possible follow-up: also feed into the dashboard map, but that needs core `nodes`-table integration — probably not worth it | — |
 | Low | **Audio calls** (`call.audio` / LXST) | answer / receive voice; min viable = a recorded announcement on call | High — audio I/O + codec on the Pi, its own project |
 | Low | **Group chat** (`RNS.Destination.GROUP`) | experimental shared-key room, no membership mgmt | Medium — non-standard |
-| Low | **Interface manager UI** | add / remove RNS interfaces from the dashboard vs hand-editing config | Medium |
+| ~~Low~~ | ~~**Interface manager UI**~~ | **BUILT 2026-09-09** — `extra_interfaces` (TCPClient/TCPServer/UDP), Settings-tab editor, dual validation, not Pi-tested. Chose structured over raw-textarea (bad config = rnsd won't start = all Reticulum down). Follow-up: more interface types (I2P needs i2pd; a 2nd RNode) if asked | — |
 | ~~Low~~ | ~~**Contacts / petnames**~~ | **BUILT 2026-09-09** (new-build #1) — see Done + Pi-verification list | — |
 | Low | **Paper messages / QR** | Sideband-style offline message export | Low–Med |
 

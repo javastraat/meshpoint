@@ -204,6 +204,7 @@ plugins:
     backbone_enabled: true
     backbone_host: "node.reticulumnet.nl"
     backbone_port: 4242
+    extra_interfaces: []                        # extra RNS interfaces (Settings tab); see below
     notify_url: ""                              # optional: ntfy topic / webhook, POSTed on an inbound LXMF DM
     propagation_enabled: false                  # run an LXMF store-and-forward relay (added role, not a replacement)
     propagation_storage_limit_mb: 250           # cap the on-disk propagation store (0 = LXMF default)
@@ -240,6 +241,20 @@ turned off independently (e.g. LoRa-only with no internet backbone, or
 backbone-only with no RNode attached). The save is rejected if you try to
 turn both off — use Settings → Plugins to disable Reticulum entirely
 instead of leaving it running with no interfaces.
+
+`plugins.reticulum.extra_interfaces` (Settings tab → **Extra interfaces**):
+a list of additional RNS interfaces beyond the two above. Each entry is
+`{name, type, enabled, …type fields}` where `type` is one of
+`TCPClientInterface` (`target_host`/`target_port` — a second backbone, or
+connect out to another node), `TCPServerInterface` (`listen_ip`/
+`listen_port` — let other nodes connect *in*) or `UDPInterface`
+(`listen_ip`/`listen_port`/`forward_ip`/`forward_port` — a local mesh).
+They're written into `rnsd`'s config verbatim and applied on **Restart
+rnsd**. Both the save and the config generator validate them (names can't
+clash with the built-in interfaces or each other, ports must be in range,
+each type's fields are required); the generator drops a bad entry with a
+log warning rather than letting it stop `rnsd` from starting. An enabled
+extra interface satisfies the "at least one interface" rule on its own.
 
 The **Activity** tab is the raw announce feed (every `lxmf.delivery` /
 `lxmf.propagation` / `nomadnetwork.node` / `call.audio` announce heard since

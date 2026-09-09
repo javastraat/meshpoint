@@ -26,6 +26,7 @@ class ReticulumSettingsTab {
         this._enumeratedPorts = [];
         this._portUsage = {};
         this._pendingPort = '';
+        this._extraIfaces = [];
     }
 
     show() {
@@ -135,6 +136,24 @@ class ReticulumSettingsTab {
                                     <input class="cfg-field__input" type="number"
                                            min="1" max="65535" data-rt-backbone-port>
                                 </label>
+                            </div>
+                        </fieldset>
+                        <fieldset class="cfg-fieldset">
+                            <legend class="cfg-fieldset__legend">Extra interfaces</legend>
+                            <p class="cfg-field__hint">
+                                Additional RNS interfaces beyond the RNode radio and the TCP
+                                backbone above — e.g. a second backbone, a listener so other
+                                nodes can connect in, or a UDP interface for a local mesh.
+                                <strong>These are written straight into <code>rnsd</code>'s
+                                config; a bad one can stop rnsd from starting</strong>, which
+                                takes all Reticulum down until fixed. Applied on
+                                <em>Restart rnsd</em> below.
+                            </p>
+                            <div data-rt-extra-ifaces></div>
+                            <div class="cfg-card__actions">
+                                <button class="terminal-button" type="button" data-rt-extra-iface-add>
+                                    Add interface
+                                </button>
                             </div>
                         </fieldset>
                         <fieldset class="cfg-fieldset">
@@ -356,6 +375,7 @@ class ReticulumSettingsTab {
         this._backboneEnabled = this._q('[data-rt-backbone-enabled]');
         this._backboneHost = this._q('[data-rt-backbone-host]');
         this._backbonePort = this._q('[data-rt-backbone-port]');
+        this._extraIfacesEl = this._q('[data-rt-extra-ifaces]');
         this._propEnabled = this._q('[data-rt-prop-enabled]');
         this._propStorage = this._q('[data-rt-prop-storage]');
         this._propStatusEl = this._q('[data-rt-prop-status]');
@@ -386,6 +406,137 @@ class ReticulumSettingsTab {
         this._q('[data-rt-rescan-usb]').addEventListener('click', (e) => this._rescanUsb(e.currentTarget));
         this._q('[data-rt-restart-rnsd]').addEventListener('click', () => this._restartRnsd());
         this._q('[data-rt-telemetry-send]')?.addEventListener('click', (e) => this._sendTelemetry(e.currentTarget));
+
+        this._q('[data-rt-extra-iface-add]')?.addEventListener('click', () => {
+            this._readExtraInterfaces();  // keep any in-progress edits
+            this._extraIfaces.push({ name: '', type: 'TCPClientInterface', enabled: true });
+            this._renderExtraInterfaces();
+        });
+        this._extraIfacesEl?.addEventListener('click', (e) => {
+            const removeBtn = e.target.closest('[data-rt-iface-remove]');
+            if (removeBtn) {
+                this._readExtraInterfaces();
+                this._extraIfaces.splice(Number(removeBtn.dataset.rtIfaceRemove), 1);
+                this._renderExtraInterfaces();
+            }
+        });
+        this._extraIfacesEl?.addEventListener('change', (e) => {
+            if (e.target.matches('[data-rt-iface-type]')) {
+                this._readExtraInterfaces();
+                this._renderExtraInterfaces();  // swap the type-specific fields
+            }
+        });
+    }
+
+    _IFACE_FIELDS() {
+        return {
+            TCPClientInterface: [
+                ['target_host', 'Target host', 'text', 'example.com'],
+                ['target_port', 'Target port', 'number', '4242'],
+            ],
+            TCPServerInterface: [
+                ['listen_ip', 'Listen IP', 'text', '0.0.0.0'],
+                ['listen_port', 'Listen port', 'number', '4242'],
+            ],
+            UDPInterface: [
+                ['listen_ip', 'Listen IP', 'text', '0.0.0.0'],
+                ['listen_port', 'Listen port', 'number', '4242'],
+                ['forward_ip', 'Forward IP', 'text', '255.255.255.255'],
+                ['forward_port', 'Forward port', 'number', '4242'],
+            ],
+        };
+    }
+
+    _renderExtraInterfaces() {
+        if (!this._extraIfacesEl) return;
+        if (!this._extraIfaces.length) {
+            this._extraIfacesEl.innerHTML =
+                '<p class="cfg-field__hint">No extra interfaces. The RNode radio and TCP backbone above are separate.</p>';
+            return;
+        }
+        const specs = this._IFACE_FIELDS();
+        this._extraIfacesEl.innerHTML = this._extraIfaces.map((iface, idx) => {
+            const type = iface.type || 'TCPClientInterface';
+            const fields = (specs[type] || []).map(([key, label, kind, ph]) => `
+                <label class="cfg-field cfg-field--narrow">
+                    <span class="cfg-field__label">${label}</span>
+                    <input class="cfg-field__input" type="${kind}" placeholder="${ph}"
+                           ${kind === 'number' ? 'min="1" max="65535"' : ''}
+                           data-rt-iface-field="${key}" data-rt-iface-idx="${idx}"
+                           value="${this._esc(iface[key] ?? '')}">
+                </label>
+            `).join('');
+            return `
+                <div class="rt-iface-row" data-rt-iface-row="${idx}">
+                    <div class="cfg-row">
+                        <label class="cfg-field">
+                            <span class="cfg-field__label">Name</span>
+                            <input class="cfg-field__input" type="text" maxlength="48"
+                                   placeholder="My interface" data-rt-iface-name data-rt-iface-idx="${idx}"
+                                   value="${this._esc(iface.name ?? '')}">
+                        </label>
+                        <label class="cfg-field cfg-field--narrow">
+                            <span class="cfg-field__label">Type</span>
+                            <select class="cfg-field__input" data-rt-iface-type data-rt-iface-idx="${idx}">
+                                ${['TCPClientInterface', 'TCPServerInterface', 'UDPInterface']
+                                    .map((t) => `<option value="${t}"${t === type ? ' selected' : ''}>${t}</option>`).join('')}
+                            </select>
+                        </label>
+                        <label class="cfg-field cfg-field--toggle">
+                            <input type="checkbox" data-rt-iface-enabled data-rt-iface-idx="${idx}"
+                                   ${iface.enabled === false ? '' : 'checked'}>
+                            <span class="cfg-field__label">Enabled</span>
+                        </label>
+                    </div>
+                    <div class="cfg-row">${fields}</div>
+                    <div class="cfg-card__actions">
+                        <button class="terminal-button" type="button" data-rt-iface-remove="${idx}">Remove</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    /** Client-side mirror of ExtraInterface's validators -- returns an
+     * error string or '' (the backend re-checks regardless). */
+    _validateExtraInterfaces() {
+        const reserved = new Set(['default interface', 'rnode lora', 'reticulumnet internet']);
+        const seen = new Set();
+        for (const i of this._extraIfaces) {
+            const name = (i.name || '').trim();
+            if (!name) return 'Every extra interface needs a name.';
+            if (reserved.has(name.toLowerCase())) return `"${name}" is a reserved interface name.`;
+            if (seen.has(name.toLowerCase())) return `Duplicate interface name: "${name}".`;
+            seen.add(name.toLowerCase());
+            const need = this._IFACE_FIELDS()[i.type] || [];
+            for (const [key, label] of need) {
+                const v = i[key];
+                if (v === '' || v == null) return `${name}: "${label}" is required.`;
+                if (key.endsWith('_port') && !(Number(v) >= 1 && Number(v) <= 65535)) {
+                    return `${name}: "${label}" must be 1–65535.`;
+                }
+            }
+        }
+        return '';
+    }
+
+    /** Pull the current DOM values back into this._extraIfaces (so a
+     * re-render on add/remove/type-change doesn't lose in-progress edits). */
+    _readExtraInterfaces() {
+        if (!this._extraIfacesEl) return;
+        this._extraIfacesEl.querySelectorAll('[data-rt-iface-row]').forEach((row) => {
+            const idx = Number(row.dataset.rtIfaceRow);
+            const cur = this._extraIfaces[idx];
+            if (!cur) return;
+            cur.name = row.querySelector('[data-rt-iface-name]')?.value.trim() || '';
+            cur.type = row.querySelector('[data-rt-iface-type]')?.value || 'TCPClientInterface';
+            cur.enabled = !!row.querySelector('[data-rt-iface-enabled]')?.checked;
+            row.querySelectorAll('[data-rt-iface-field]').forEach((inp) => {
+                cur[inp.dataset.rtIfaceField] = inp.type === 'number'
+                    ? (inp.value === '' ? '' : Number(inp.value))
+                    : inp.value.trim();
+            });
+        });
     }
 
     _q(sel) { return this._el.querySelector(sel); }
@@ -447,6 +598,9 @@ class ReticulumSettingsTab {
         if (this._backboneEnabled) this._backboneEnabled.checked = rt.backbone_enabled !== false;
         if (this._backboneHost) this._backboneHost.value = rt.backbone_host || 'node.reticulumnet.nl';
         if (this._backbonePort) this._backbonePort.value = rt.backbone_port ?? 4242;
+        this._extraIfaces = Array.isArray(rt.extra_interfaces)
+            ? rt.extra_interfaces.map((i) => ({ ...i })) : [];
+        this._renderExtraInterfaces();
         if (this._propEnabled) this._propEnabled.checked = !!rt.propagation_enabled;
         if (this._propStorage) this._propStorage.value = rt.propagation_storage_limit_mb ?? 250;
         if (this._propAutoSync) this._propAutoSync.value = rt.propagation_auto_sync_interval_s ?? 0;
@@ -650,11 +804,13 @@ class ReticulumSettingsTab {
         event.preventDefault();
         const rnodeEnabled = !!this._rnodeEnabled.checked;
         const backboneEnabled = !!this._backboneEnabled.checked;
-        if (!rnodeEnabled && !backboneEnabled) {
+        this._readExtraInterfaces();
+        const hasActiveExtra = this._extraIfaces.some((i) => i.enabled !== false);
+        if (!rnodeEnabled && !backboneEnabled && !hasActiveExtra) {
             this._setStatus(
                 'error',
-                'At least one of RNode radio or TCP backbone must stay enabled '
-                + '(disable the whole plugin from Settings → Plugins instead).',
+                'At least one interface must stay enabled — RNode radio, TCP backbone, '
+                + 'or an extra interface (disable the whole plugin from Settings → Plugins instead).',
             );
             return;
         }
@@ -682,6 +838,8 @@ class ReticulumSettingsTab {
             this._setStatus('error', 'Telemetry publishing needs a collector address — set one, or turn telemetry off.');
             return;
         }
+        const ifaceErr = this._validateExtraInterfaces();
+        if (ifaceErr) { this._setStatus('error', ifaceErr); return; }
         const payload = {
             display_name: this._displayName.value.trim() || 'Meshpoint',
             nomad_timeout_s: Number(this._nomadTimeout.value) || 20,
@@ -711,6 +869,7 @@ class ReticulumSettingsTab {
             backbone_enabled: backboneEnabled,
             backbone_host: this._backboneHost.value.trim() || 'node.reticulumnet.nl',
             backbone_port: Number(this._backbonePort.value),
+            extra_interfaces: this._extraIfaces.map((i) => ({ ...i })),
         };
 
         this._setStatus('pending', 'Saving…');

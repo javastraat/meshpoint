@@ -22,6 +22,8 @@ edits made here don't reach rnsd yet. Repointed in the Phase 5 cutover.
 
 from __future__ import annotations
 
+from typing import Literal
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -41,6 +43,63 @@ router = APIRouter(prefix="/api/config", tags=["config", "reticulum"])
 _VALID_BANDWIDTHS_HZ = frozenset(
     {7800, 10400, 15600, 20800, 31250, 41700, 62500, 125000, 250000, 500000}
 )
+
+
+_RESERVED_IFACE_NAMES = {"default interface", "rnode lora", "reticulumnet internet"}
+
+
+class ExtraInterface(BaseModel):
+    """One operator-added RNS interface. Only the three types the UI
+    offers; type-specific fields are validated in the model validator."""
+
+    name: str = Field(..., min_length=1, max_length=48)
+    type: Literal["TCPClientInterface", "TCPServerInterface", "UDPInterface"]
+    enabled: bool = True
+    target_host: str = ""
+    target_port: int = Field(0, ge=0, le=65535)
+    listen_ip: str = ""
+    listen_port: int = Field(0, ge=0, le=65535)
+    forward_ip: str = ""
+    forward_port: int = Field(0, ge=0, le=65535)
+
+    @field_validator("name")
+    @classmethod
+    def _name_ok(cls, value: str) -> str:
+        cleaned = value.strip().replace("[", "").replace("]", "").strip()
+        if not cleaned:
+            raise ValueError("interface name is required")
+        if cleaned.lower() in _RESERVED_IFACE_NAMES:
+            raise ValueError(f"'{cleaned}' is a reserved interface name")
+        return cleaned
+
+    @model_validator(mode="after")
+    def _type_fields_present(self) -> "ExtraInterface":
+        if self.type == "TCPClientInterface":
+            if not self.target_host.strip():
+                raise ValueError(f"{self.name}: TCPClientInterface needs a target host")
+            if not 1 <= self.target_port <= 65535:
+                raise ValueError(f"{self.name}: TCPClientInterface needs a target port")
+        elif self.type in ("TCPServerInterface", "UDPInterface"):
+            if not 1 <= self.listen_port <= 65535:
+                raise ValueError(f"{self.name}: {self.type} needs a listen port")
+        return self
+
+    def to_stored(self) -> dict:
+        """Only the fields this type actually uses -- keeps local.yaml tidy
+        and matches what write_rnsd_config.py reads back."""
+        base = {"name": self.name, "type": self.type, "enabled": self.enabled}
+        if self.type == "TCPClientInterface":
+            base["target_host"] = self.target_host.strip()
+            base["target_port"] = self.target_port
+        elif self.type == "TCPServerInterface":
+            base["listen_ip"] = self.listen_ip.strip() or "0.0.0.0"
+            base["listen_port"] = self.listen_port
+        elif self.type == "UDPInterface":
+            base["listen_ip"] = self.listen_ip.strip() or "0.0.0.0"
+            base["listen_port"] = self.listen_port
+            base["forward_ip"] = self.forward_ip.strip() or "255.255.255.255"
+            base["forward_port"] = self.forward_port or self.listen_port
+        return base
 
 
 class ReticulumUpdate(BaseModel):
@@ -72,6 +131,7 @@ class ReticulumUpdate(BaseModel):
     backbone_enabled: bool = True
     backbone_host: str = "node.reticulumnet.nl"
     backbone_port: int = Field(4242, ge=1, le=65535)
+    extra_interfaces: list[ExtraInterface] = Field(default_factory=list, max_length=20)
 
     @field_validator("rnode_bandwidth_hz")
     @classmethod
@@ -118,11 +178,20 @@ class ReticulumUpdate(BaseModel):
 
     @model_validator(mode="after")
     def _at_least_one_interface(self) -> "ReticulumUpdate":
-        if not self.rnode_enabled and not self.backbone_enabled:
+        active_extra = any(i.enabled for i in self.extra_interfaces)
+        if not self.rnode_enabled and not self.backbone_enabled and not active_extra:
             raise ValueError(
-                "At least one of RNode radio or TCP backbone must stay enabled "
-                "-- disable the whole plugin from Settings -> Plugins instead"
+                "At least one interface must stay enabled (RNode radio, TCP "
+                "backbone or an extra interface) -- disable the whole plugin "
+                "from Settings -> Plugins instead"
             )
+        return self
+
+    @model_validator(mode="after")
+    def _extra_interface_names_unique(self) -> "ReticulumUpdate":
+        names = [i.name.strip().lower() for i in self.extra_interfaces]
+        if len(names) != len(set(names)):
+            raise ValueError("extra interface names must be unique")
         return self
 
     @model_validator(mode="after")
@@ -197,6 +266,7 @@ async def update_reticulum(
         "backbone_enabled": req.backbone_enabled,
         "backbone_host": req.backbone_host,
         "backbone_port": req.backbone_port,
+        "extra_interfaces": [i.to_stored() for i in req.extra_interfaces],
     }
     with audit.timed_action(
         user=claims.subject,

@@ -898,6 +898,21 @@ Operator-assigned names for peers. Local address book, never announced.
   a core change — the plugin's own Messages tab does resolve them).
 - Pi verification: see `memory/reticulum_todo.md`.
 
+## 2026-09-09 — Extra interfaces / Interface manager UI
+
+`plugins.reticulum.extra_interfaces` = `[{name, type, enabled, ...}]`,
+types TCPClient/TCPServer/UDP. `write_rnsd_config.py`
+`_extra_interface_blocks()` (pure, tested; `load_config` deferred into
+`main()`) emits `[[name]]` blocks via a new `{extra_block}` slot —
+**never raises**, skips bad/reserved/dup/missing with a warning.
+`config_routes.ExtraInterface` model (name + type-fields + port
+validators, `to_stored()`); `ReticulumUpdate` gains the list, the
+"at least one interface" rule counts an active extra, + a dup-name
+validator. `state.extra_interfaces()`. Settings tab: add/remove row
+editor with type-specific fields + outage-risk warning. Chose
+structured over raw textarea (rnsd ExecStartPre crash = Reticulum
+down). Not Pi-tested. Not offered: I2P, 2nd RNode, AutoInterface.
+
 ## 2026-09-09 — Telemetry collector + map (new-build #4)
 
 Receive half. `telemetry.decode_telemetry` + `_unpack_location` (inverse

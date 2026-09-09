@@ -152,5 +152,27 @@ class TestReticulumStatePersistMerge(unittest.TestCase):
         self.assertEqual(values["reticulum"]["display_name"], "Merged")
 
 
+class TestExtraInterfaces(unittest.TestCase):
+    def tearDown(self) -> None:
+        state.init({})
+
+    def test_defaults_empty(self) -> None:
+        state.init({})
+        self.assertEqual(state.extra_interfaces(), [])
+
+    def test_reads_a_list_of_dicts(self) -> None:
+        state.init({"extra_interfaces": [
+            {"name": "A", "type": "TCPClientInterface"},
+            "not a dict",
+            {"name": "B", "type": "UDPInterface"},
+        ]})
+        got = state.extra_interfaces()
+        self.assertEqual([e["name"] for e in got], ["A", "B"])
+
+    def test_non_list_is_empty(self) -> None:
+        state.init({"extra_interfaces": "nope"})
+        self.assertEqual(state.extra_interfaces(), [])
+
+
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()

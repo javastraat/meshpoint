@@ -32,6 +32,66 @@ class TestTalkbackNeedsNode(unittest.TestCase):
         self.assertFalse(model.talkback_enabled)
 
 
+class TestExtraInterfaces(unittest.TestCase):
+    def _iface(self, **kw):
+        base = {"name": "X", "type": "TCPClientInterface",
+                "target_host": "h.example", "target_port": 4242}
+        base.update(kw)
+        return base
+
+    def test_defaults_to_empty(self) -> None:
+        self.assertEqual(ReticulumUpdate(**_REQUIRED).extra_interfaces, [])
+
+    def test_valid_tcp_client(self) -> None:
+        m = ReticulumUpdate(**_REQUIRED, extra_interfaces=[self._iface()])
+        stored = m.extra_interfaces[0].to_stored()
+        self.assertEqual(stored, {
+            "name": "X", "type": "TCPClientInterface", "enabled": True,
+            "target_host": "h.example", "target_port": 4242,
+        })
+
+    def test_reserved_name_rejected(self) -> None:
+        with self.assertRaises(ValidationError):
+            ReticulumUpdate(**_REQUIRED, extra_interfaces=[self._iface(name="RNode LoRa")])
+
+    def test_missing_type_field_rejected(self) -> None:
+        with self.assertRaises(ValidationError):
+            ReticulumUpdate(**_REQUIRED, extra_interfaces=[
+                {"name": "X", "type": "TCPClientInterface"},  # no target_host/port
+            ])
+
+    def test_duplicate_names_rejected(self) -> None:
+        with self.assertRaises(ValidationError) as cm:
+            ReticulumUpdate(**_REQUIRED, extra_interfaces=[
+                self._iface(name="dup"), self._iface(name="Dup", target_host="y"),
+            ])
+        self.assertIn("unique", str(cm.exception))
+
+    def test_udp_stored_fills_defaults(self) -> None:
+        m = ReticulumUpdate(**_REQUIRED, extra_interfaces=[
+            {"name": "lan", "type": "UDPInterface", "listen_port": 4242},
+        ])
+        s = m.extra_interfaces[0].to_stored()
+        self.assertEqual(s["listen_ip"], "0.0.0.0")
+        self.assertEqual(s["forward_ip"], "255.255.255.255")
+        self.assertEqual(s["forward_port"], 4242)
+
+    def test_only_extra_interface_satisfies_at_least_one(self) -> None:
+        # rnode + backbone both off, but an active extra interface -> ok
+        m = ReticulumUpdate(
+            **_REQUIRED, rnode_enabled=False, backbone_enabled=False,
+            extra_interfaces=[self._iface()],
+        )
+        self.assertEqual(len(m.extra_interfaces), 1)
+
+    def test_all_interfaces_off_still_rejected(self) -> None:
+        with self.assertRaises(ValidationError):
+            ReticulumUpdate(
+                **_REQUIRED, rnode_enabled=False, backbone_enabled=False,
+                extra_interfaces=[self._iface(enabled=False)],
+            )
+
+
 class TestPropagationOutboundNode(unittest.TestCase):
     def test_blank_is_fine(self) -> None:
         m = ReticulumUpdate(**_REQUIRED, propagation_outbound_node="")

@@ -87,6 +87,10 @@ _DEFAULTS: dict[str, Any] = {
     "backbone_enabled": True,
     "backbone_host": "node.reticulumnet.nl",
     "backbone_port": 4242,
+    # Operator-added extra RNS interfaces (Settings tab). A list of
+    # {name, type, enabled, ...type-specific fields}. Consumed only by
+    # write_rnsd_config.py -- rnsd needs a restart to apply.
+    "extra_interfaces": [],
     # NomadNet "Browse" tab: path/link timeout budget in seconds (request
     # gets 1.5x). 20 suits a TCP backbone; bump for multi-hop LoRa nodes.
     "nomad_timeout_s": 20,
@@ -146,6 +150,13 @@ def identity_path() -> str:
 
 def lxmf_storage_dir() -> str:
     return str(_config["lxmf_storage_dir"])
+
+
+def extra_interfaces() -> list[dict]:
+    """Operator-added RNS interfaces, resolved -- a list of dicts. Only
+    read by the Settings tab; write_rnsd_config.py reads the raw YAML."""
+    val = _config.get("extra_interfaces")
+    return [dict(e) for e in val if isinstance(e, dict)] if isinstance(val, list) else []
 
 
 def contacts_path() -> str:

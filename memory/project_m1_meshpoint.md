@@ -12953,3 +12953,44 @@ existed (it's how #3 was verified); this adds a store + a UI.
   the other on the Telemetry tab + map; WS live-update; the
   blank-message-row bug is actually gone. Checklist in
   `memory/reticulum_todo.md`.
+
+## Reticulum — Extra interfaces / Interface manager UI (2026-09-09)
+
+User greenlit "structured" over "raw textarea" — a bad config makes
+`write_rnsd_config.py` (rnsd's ExecStartPre) fail or rnsd reject the
+file → all Reticulum down until fixed on the Pi, so validation matters.
+
+- New `plugins.reticulum.extra_interfaces` = list of `{name, type,
+  enabled, ...type fields}`. Types: `TCPClientInterface`
+  (target_host/port), `TCPServerInterface` (listen_ip/port),
+  `UDPInterface` (listen + forward ip/port).
+- `write_rnsd_config.py`: `from src.config import load_config` moved
+  into `main()` so the pure builders import on the Mac.
+  `_extra_interface_blocks(entries)` + `_sanitise_interface_name` —
+  emits one `[[name]]` block per valid enabled entry, appended after
+  RNode/backbone via a new `{extra_block}` template slot. **Never
+  raises**: unknown type / reserved or dup name / missing field →
+  skipped with a printed warning. Reserved: "Default Interface",
+  "RNode LoRa", "ReticulumNet Internet".
+- `config_routes.py`: `ExtraInterface(BaseModel)` with a name validator
+  (strip brackets, reject reserved) + a model validator (type's fields
+  present, ports 1-65535) + `to_stored()` (only the type's fields, fills
+  UDP defaults). `ReticulumUpdate.extra_interfaces: list[ExtraInterface]`
+  (`max_length=20`); `_at_least_one_interface` now counts an active
+  extra; new `_extra_interface_names_unique`. Saved via `to_stored()`.
+- `state.py`: `"extra_interfaces": []` default + `extra_interfaces()`
+  accessor (Settings tab reads it; write_rnsd_config reads raw YAML).
+- `reticulum_settings_tab.js`: new "Extra interfaces" fieldset with an
+  add/remove row editor (`_renderExtraInterfaces` / `_extraIfaceRowHtml`
+  inline / `_readExtraInterfaces` to preserve edits across re-render /
+  `_validateExtraInterfaces` mirroring the backend). Type dropdown
+  re-renders the row's fields. Prominent outage-risk warning in the
+  hint. `reticulum.css` `.rt-iface-row`.
+- Tests: `test_write_rnsd_config.py` ×8 (Mac), `test_state.py` +3
+  (Mac), `test_config_routes.py::TestExtraInterfaces` ×8 (CI/Pi).
+  Suite 210 passed on the Mac.
+- **NOT Pi-tested.** Owed: the editor round-trips, a valid entry lands
+  in the generated config and rnsd starts, a broken entry is skipped +
+  rnsd STILL starts. Checklist in `memory/reticulum_todo.md`.
+- Deliberately NOT offered: I2P (needs i2pd), a 2nd RNodeInterface
+  (serial/firmware complexity), AutoInterface (already the default).
