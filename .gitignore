@@ -20,8 +20,9 @@ env/
 *.swp
 *.swo
 
-# Data
-data/
+# Data (repo-root runtime dir only -- unanchored would also swallow any
+# future frontend/**/data/ used for static assets, e.g. frontend/data/)
+/data/
 *.db
 
 # User-specific config (contains API keys)

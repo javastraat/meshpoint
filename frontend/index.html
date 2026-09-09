@@ -1064,6 +1064,9 @@
                             <p class="plugins-sources__subtitle">Add a GitHub repository of plugins and themes, then browse what it offers. <strong>A source can install code that runs with the service's privileges</strong> — only add sources you trust.</p>
                         </div>
                         <form class="plugins-sources__add" data-src-add-form>
+                            <select class="plugins-sources__preset" data-src-preset title="Fill in a known community repo">
+                                <option value="">Community presets…</option>
+                            </select>
                             <input type="text" class="plugins-sources__url" data-src-url placeholder="https://github.com/you/meshpoint-plugins" autocomplete="off" spellcheck="false">
                             <input type="text" class="plugins-sources__ref" data-src-ref placeholder="branch / tag (main)" autocomplete="off">
                             <button class="terminal-button" type="submit">Add source</button>

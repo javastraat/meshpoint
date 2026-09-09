@@ -1242,9 +1242,11 @@ select.update-field__input option:checked {
     align-items: center;
     margin-bottom: 0.5rem;
 }
+.plugins-sources__preset { flex: 0 1 200px; }
 .plugins-sources__url { flex: 1 1 320px; }
 .plugins-sources__ref { flex: 0 1 160px; }
-.plugins-sources__add input {
+.plugins-sources__add input,
+.plugins-sources__add select {
     background: var(--overlay-weak);
     border: 1px solid var(--hairline);
     border-radius: 8px;

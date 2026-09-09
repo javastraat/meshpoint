@@ -65,11 +65,13 @@ class PluginsPanelController {
         this._setupRunning = false;
         this.recheckAllBtn = rootEl.querySelector('[data-recheck-all]');
         this.srcAddForm = rootEl.querySelector('[data-src-add-form]');
+        this.srcPresetEl = rootEl.querySelector('[data-src-preset]');
         this.srcUrlEl = rootEl.querySelector('[data-src-url]');
         this.srcRefEl = rootEl.querySelector('[data-src-ref]');
         this.srcStatusEl = rootEl.querySelector('[data-src-status]');
         this.srcListEl = rootEl.querySelector('[data-src-list]');
         this._sources = [];
+        this._presets = [];
         // {pluginId: {url, ref, installed_version, version}} -- built from
         // each source's catalog on load, so a plugin whose source offers a
         // newer version shows an "Update" button on its own row in the
@@ -95,6 +97,41 @@ class PluginsPanelController {
             this.srcListEl.addEventListener('click', (e) => this._onSourceClick(e));
             this._loadSources();
         }
+        if (this.srcPresetEl) {
+            this.srcPresetEl.addEventListener('change', () => this._onPresetChange());
+            this._loadSourcePresets();
+        }
+    }
+
+    /** Fills the "Community presets…" dropdown next to the free-text add-
+     * source fields from a plain static JSON file (frontend/data/
+     * plugin_sources.json, served like any other static asset) -- growing
+     * the list is a one-line JSON edit, no code change or restart needed.
+     * The free-text fields keep working with any repo either way; this is
+     * only a shortcut for ones worth naming. Missing/broken file just
+     * leaves the dropdown at its single "Community presets…" option. */
+    async _loadSourcePresets() {
+        try {
+            const r = await fetch('/data/plugin_sources.json', { credentials: 'same-origin' });
+            if (!r.ok) return;
+            const data = await r.json();
+            const presets = Array.isArray(data.presets) ? data.presets : [];
+            this._presets = presets.filter((p) => p && typeof p.url === 'string' && p.url);
+            if (!this._presets.length) return;
+            this.srcPresetEl.insertAdjacentHTML('beforeend', this._presets.map((p, i) =>
+                `<option value="${i}">${this._escape(p.label || p.url)}</option>`).join(''));
+        } catch (_) { /* dropdown just stays at its default option */ }
+    }
+
+    _onPresetChange() {
+        const i = this.srcPresetEl.value;
+        if (i === '') return;
+        const preset = (this._presets || [])[Number(i)];
+        this.srcPresetEl.value = '';
+        if (!preset) return;
+        this.srcUrlEl.value = preset.url;
+        this.srcRefEl.value = preset.ref || '';
+        this.srcUrlEl.focus();
     }
 
     // --- Plugin sources (Settings -> Plugins -> "Add source") -----------

@@ -18,7 +18,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
-from src.api.auth.dependencies import require_admin
+from src.api.auth.dependencies import require_admin, require_auth
 from src.api.auth.jwt_session import SessionClaims
 
 from . import node_pages, nomad, state
@@ -48,7 +48,7 @@ _NODE_LIMIT = 300
 
 
 @router.get("/nodes")
-async def nomad_nodes():
+async def nomad_nodes(_claims: SessionClaims = Depends(require_auth)):
     """The most recently-seen `nomadnetwork.node` destinations (capped)."""
     if _service is None:
         raise HTTPException(503, "Reticulum companion is disabled")
@@ -65,7 +65,7 @@ class PageRequest(BaseModel):
 
 @router.post("/page")
 async def nomad_page(
-    req: PageRequest, _claims: SessionClaims = Depends(require_admin),
+    req: PageRequest, _claims: SessionClaims = Depends(require_auth),
 ):
     """Fetch one NomadNet page. Returns `{ok, content}` (Micron markup) or
     `{ok: false, error}` -- a fetch failure is a 200 with `ok: false`, not
@@ -89,7 +89,7 @@ class FileRequest(BaseModel):
 
 @router.post("/file")
 async def nomad_file(
-    req: FileRequest, _claims: SessionClaims = Depends(require_admin),
+    req: FileRequest, _claims: SessionClaims = Depends(require_auth),
 ):
     """Fetch a `/file/...` path -- returns the raw bytes as an attachment,
     or a 502 with the failure reason."""

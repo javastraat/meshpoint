@@ -1,0 +1,6 @@
+{
+  "_comment": "Preset options for Settings -> Plugins -> Add source's dropdown. Purely a convenience list -- the free-text URL/ref fields work with any GitHub repo without it. Add an entry to grow the list, no code change or restart needed (this file is served as a static asset). Each entry: label (shown in the dropdown), url (github.com repo), ref (branch/tag, default 'main' if omitted).",
+  "presets": [
+    { "label": "javastraat/meshpoint-plugins", "url": "https://github.com/javastraat/meshpoint-plugins", "ref": "main" }
+  ]
+}

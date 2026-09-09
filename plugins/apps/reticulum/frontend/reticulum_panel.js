@@ -62,8 +62,13 @@ class ReticulumPanel {
         try { stored = localStorage.getItem(RT_TAB_STORE_KEY); } catch (_) {}
         // 'pages' restores optimistically -- _syncPagesTab() bounces it
         // back to 'peers' on the first /status if no node is hosting.
-        this._tab = (['messages', 'announces', 'telemetry'].includes(stored)
-            || (['send', 'settings', 'browse', 'pages', 'contacts'].includes(stored) && this._isAdmin))
+        // 'browse' is read-only (fetching another node's hosted page/file
+        // over a Link, same risk class as reading messages) -- server-side
+        // now allows any authed session (nomad_routes.py), so it isn't
+        // gated behind _isAdmin here either. 'send'/'settings'/'pages'/
+        // 'contacts' write or reconfigure this node, so those stay admin-only.
+        this._tab = (['messages', 'announces', 'telemetry', 'browse'].includes(stored)
+            || (['send', 'settings', 'pages', 'contacts'].includes(stored) && this._isAdmin))
             ? stored : 'peers';
         this._settingsTab = null;
         this._nomadTab = null;
@@ -133,7 +138,7 @@ class ReticulumPanel {
                             <button class="lw-tab" type="button" role="tab"
                                     data-rt-tab="contacts" ${this._isAdmin ? '' : 'hidden'}>Contacts</button>
                             <button class="lw-tab" type="button" role="tab"
-                                    data-rt-tab="browse" ${this._isAdmin ? '' : 'hidden'}>Browse</button>
+                                    data-rt-tab="browse">Browse</button>
                             <button class="lw-tab" type="button" role="tab"
                                     data-rt-tab="settings" ${this._isAdmin ? '' : 'hidden'}>Settings</button>
                             <button class="lw-tab" type="button" role="tab"
@@ -552,7 +557,7 @@ class ReticulumPanel {
     _q(sel) { return this._root ? this._root.querySelector(sel) : null; }
 
     _setTab(tab) {
-        if ((tab === 'send' || tab === 'settings' || tab === 'browse' || tab === 'pages' || tab === 'contacts') && !this._isAdmin) return;
+        if ((tab === 'send' || tab === 'settings' || tab === 'pages' || tab === 'contacts') && !this._isAdmin) return;
         if (tab === 'pages' && !this._nodeHosting) return;
         if (tab === this._tab) return;
         this._tab = tab;
@@ -826,7 +831,7 @@ class ReticulumPanel {
                 <td class="mt-name"${announcedTitle}>${this._esc(shown)}${trust}</td>
                 <td class="lw-id">${this._esc(p.destination_hash)}</td>
                 <td>${this._fmtAspect(p.aspect)}${
-                    p.aspect === 'nomadnetwork.node' && this._isAdmin
+                    p.aspect === 'nomadnetwork.node'
                         ? ` <button type="button" class="lw-link-btn" data-rt-browse="${this._esc(p.destination_hash)}">Browse</button>`
                         : ''
                 }</td>
@@ -913,7 +918,7 @@ class ReticulumPanel {
                 <td class="mt-name"${announcedTitle}>${this._esc(shown)}</td>
                 <td class="lw-id">${this._esc(a.destination_hash)}</td>
                 <td>${this._fmtAspect(a.aspect)}${
-                    a.aspect === 'nomadnetwork.node' && this._isAdmin
+                    a.aspect === 'nomadnetwork.node'
                         ? ` <button type="button" class="lw-link-btn" data-rt-browse="${this._esc(a.destination_hash)}">Browse</button>`
                         : ''
                 }</td>

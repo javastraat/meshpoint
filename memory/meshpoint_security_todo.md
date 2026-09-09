@@ -88,6 +88,35 @@ _None yet. Template:_
 
 ## Fixed
 
+### 2026-09-09 — Reticulum "Browse" (NomadNet page fetch) wrongly required admin  (reported by auditor)
+- **Severity:** low (over-restrictive, not over-permissive — a usability/parity
+  gap, not exposure) — **plus one real finding surfaced while fixing it**,
+  see below.
+- **Where:** `plugins/apps/reticulum/backend/nomad_routes.py`,
+  `plugins/apps/reticulum/frontend/reticulum_panel.js`
+- **Issue:** fetching another `nomadnetwork.node`'s hosted `.mu` page/file
+  over a Link is a read-only action, the same risk class as reading LXMF
+  messages (already viewer-accessible) — but `POST /page` and `POST /file`
+  required `require_admin`, and the frontend hid the whole "Browse" tab +
+  every inline "Browse" button for a viewer session. A viewer could see
+  peers/announces but never actually browse a hosted node.
+- **Also found while auditing the same file:** `GET /nodes` (list recently-
+  seen `nomadnetwork.node` peers) had **no auth dependency at all** — not
+  even `require_auth` — so it was reachable unauthenticated. Not the
+  auditor's report, but the same file, same pass.
+- **Fix:** `nomad_routes.py` — `/nodes`, `/page`, `/file` now
+  `Depends(require_auth)` (any logged-in session) instead of
+  `require_admin`/nothing. `/pages*` (reading/editing *this node's own*
+  hosted content) stays `require_admin` — that's a config/write concern,
+  not browsing. Frontend: the Browse tab button, its tab-switch guard, and
+  the inline "Browse" buttons on the Peers/Activity tables no longer check
+  `_isAdmin`; the Contacts-tab Browse button stays admin-gated since
+  Contacts itself is still an admin-only tab.
+- **Tests:** none added — no test file covers `nomad_routes.py` auth wiring
+  yet; verified by reading the route/frontend logic only. Owed: a
+  regression test asserting `/nodes`/`/page`/`/file` accept a viewer
+  session and `/pages*` still 403s one.
+
 ### 2026-09-09 — self-update chain: no more `sudo git` / root `sudo pip`  (backlog #2 phase 2)
 - **Severity:** high (arbitrary code as root for any admin session / anything hijacking one)
 - **Where:** `config/sudoers-meshpoint`, `src/api/update/apply.py`, `install_status.py`, `scripts/apply_finish.sh`
