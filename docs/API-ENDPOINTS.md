@@ -176,6 +176,8 @@ Provided by the **Reticulum** plugin (`plugins/apps/reticulum/`, `plugins.reticu
 | GET | `/api/reticulum/propagation` | Viewer | Both halves of propagation: `local` (this box's relay, or null) and `client` (outbound node + current/last sync state) |
 | POST | `/api/reticulum/propagation/sync` | Admin | Pull messages parked for us on the configured outbound propagation node (400 if none configured); returns once dispatched — poll `GET /propagation` for state |
 | POST | `/api/reticulum/propagation/sync/cancel` | Admin | Cancel an in-flight propagation sync |
+| GET | `/api/reticulum/telemetry` | Viewer | Telemetry-publish status (collector, interval, last-sent, last-error) or null when not configured |
+| POST | `/api/reticulum/telemetry/send` | Admin | Send one telemetry frame (host stats → Sideband `FIELD_TELEMETRY`) to the collector now |
 | GET | `/api/reticulum/contacts` | Viewer | The operator's petname address book — `{hash: {petname, note, trusted, updated}}`, stored in `data/reticulum/contacts.json`, never announced |
 | PUT | `/api/reticulum/contacts/{destination_hash}` | Admin | Set a contact (`petname`, optional `note`, `trusted`); an empty `petname` removes it |
 | DELETE | `/api/reticulum/contacts/{destination_hash}` | Admin | Forget a contact |

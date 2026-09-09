@@ -1,0 +1,61 @@
+"""telemetry.build_telemetry / _info_line -- the Sideband-compatible
+frame builder. Pure, no RNS/LXMF, Mac-runnable."""
+
+from __future__ import annotations
+
+import time
+import unittest
+
+from plugins.apps.reticulum.backend import telemetry
+from plugins.apps.reticulum.backend.telemetry import (
+    SID_INFORMATION,
+    SID_TEMPERATURE,
+    SID_TIME,
+)
+
+_FULL_HOST = {
+    "pi_model": "Raspberry Pi 4",
+    "cpu_temp_c": 61.2,
+    "load_1m": 0.42,
+    "mem_used_mb": 400,
+    "mem_total_mb": 1000,
+    "disk_free_gb": 12.3,
+    "disk_total_gb": 28.0,
+}
+
+
+class TestBuildTelemetry(unittest.TestCase):
+    def test_time_is_always_present_and_recent(self) -> None:
+        frame = telemetry.build_telemetry({}, "")
+        self.assertIn(SID_TIME, frame)
+        self.assertAlmostEqual(frame[SID_TIME], int(time.time()), delta=5)
+
+    def test_temperature_included_as_float_when_available(self) -> None:
+        frame = telemetry.build_telemetry(_FULL_HOST, "meshpoint")
+        self.assertEqual(frame[SID_TEMPERATURE], 61.2)
+        self.assertIsInstance(frame[SID_TEMPERATURE], float)
+
+    def test_temperature_omitted_when_none(self) -> None:
+        frame = telemetry.build_telemetry({"cpu_temp_c": None}, "")
+        self.assertNotIn(SID_TEMPERATURE, frame)
+
+    def test_information_line_has_the_stats(self) -> None:
+        frame = telemetry.build_telemetry(_FULL_HOST, "ti-meshpoint")
+        info = frame[SID_INFORMATION]
+        self.assertIn("ti-meshpoint", info)
+        self.assertIn("load 0.42", info)
+        self.assertIn("RAM 40%", info)
+        self.assertIn("disk 12.3 GB free", info)
+        self.assertIn("61.2°C", info)
+
+    def test_information_line_degrades_gracefully(self) -> None:
+        self.assertEqual(telemetry._info_line({}, ""), "meshpoint")
+        self.assertEqual(telemetry._info_line({}, "node-x"), "node-x")
+
+    def test_frame_keys_are_ints(self) -> None:
+        frame = telemetry.build_telemetry(_FULL_HOST, "x")
+        self.assertTrue(all(isinstance(k, int) for k in frame))
+
+
+if __name__ == "__main__":  # pragma: no cover
+    unittest.main()

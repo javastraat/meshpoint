@@ -67,5 +67,33 @@ class TestPropagationOutboundNode(unittest.TestCase):
         self.assertEqual(m.propagation_auto_sync_interval_s, 900)
 
 
+class TestTelemetryConfig(unittest.TestCase):
+    def test_defaults_off(self) -> None:
+        m = ReticulumUpdate(**_REQUIRED)
+        self.assertFalse(m.telemetry_enabled)
+        self.assertEqual(m.telemetry_interval_s, 900)
+
+    def test_enabled_needs_a_collector(self) -> None:
+        with self.assertRaises(ValidationError) as cm:
+            ReticulumUpdate(**_REQUIRED, telemetry_enabled=True)
+        self.assertIn("collector", str(cm.exception))
+
+    def test_enabled_with_collector_ok_and_hash_normalised(self) -> None:
+        m = ReticulumUpdate(
+            **_REQUIRED, telemetry_enabled=True,
+            telemetry_collector="AB:CD" + "EF" * 14,
+        )
+        self.assertTrue(m.telemetry_enabled)
+        self.assertEqual(m.telemetry_collector, "abcd" + "ef" * 14)
+
+    def test_bad_collector_hash_rejected(self) -> None:
+        with self.assertRaises(ValidationError):
+            ReticulumUpdate(**_REQUIRED, telemetry_collector="xyz")
+
+    def test_interval_floor(self) -> None:
+        with self.assertRaises(ValidationError):
+            ReticulumUpdate(**_REQUIRED, telemetry_interval_s=60)
+
+
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()

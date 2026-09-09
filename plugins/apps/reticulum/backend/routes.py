@@ -203,6 +203,28 @@ async def reticulum_propagation_sync_cancel(
     return {"status": "cancelled"}
 
 
+# --- telemetry publish ---------------------------------------------------
+
+
+@router.get("/telemetry")
+async def reticulum_telemetry():
+    """Telemetry-publish status (or null when not configured)."""
+    if _service is None:
+        raise HTTPException(503, "Reticulum companion is disabled")
+    return _service.telemetry_status()
+
+
+@router.post("/telemetry/send")
+async def reticulum_telemetry_send(_claims: SessionClaims = Depends(require_admin)):
+    """Send one telemetry frame to the collector now."""
+    if _service is None:
+        raise HTTPException(503, "Reticulum companion is disabled")
+    result = _service.send_telemetry()
+    if not result.get("ok"):
+        raise HTTPException(400, result.get("error") or "telemetry send failed")
+    return {"status": "sent"}
+
+
 # --- contacts / petnames --------------------------------------------------
 # Local address book -- an operator-assigned name for a destination hash,
 # stored on disk (data/reticulum/contacts.json), never announced. Reads

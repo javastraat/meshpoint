@@ -58,6 +58,9 @@ class ReticulumUpdate(BaseModel):
     propagation_storage_limit_mb: int = Field(250, ge=0, le=100_000)
     propagation_outbound_node: str = ""
     propagation_auto_sync_interval_s: int = Field(0, ge=0, le=86_400)
+    telemetry_enabled: bool = False
+    telemetry_collector: str = ""
+    telemetry_interval_s: int = Field(900, ge=300, le=86_400)
     rnode_enabled: bool = True
     rnode_serial_port: str = ""
     rnode_frequency_hz: int = Field(..., ge=100_000_000, le=1_000_000_000)
@@ -93,9 +96,9 @@ class ReticulumUpdate(BaseModel):
             raise ValueError("must be an http(s) URL or blank")
         return stripped
 
-    @field_validator("propagation_outbound_node")
+    @field_validator("propagation_outbound_node", "telemetry_collector")
     @classmethod
-    def _prop_node_hash_ok(cls, value: str) -> str:
+    def _dest_hash_ok(cls, value: str) -> str:
         stripped = value.strip().lower().replace(":", "")
         if not stripped:
             return ""
@@ -104,8 +107,8 @@ class ReticulumUpdate(BaseModel):
             or any(c not in "0123456789abcdef" for c in stripped)
         ):
             raise ValueError(
-                "propagation_outbound_node must be a Reticulum destination hash "
-                "(hex, e.g. the 32-char hash from a peer's Destination column) or blank"
+                "must be a Reticulum destination hash (hex, e.g. the 32-char "
+                "hash from a peer's Destination column) or blank"
             )
         return stripped
 
@@ -127,6 +130,15 @@ class ReticulumUpdate(BaseModel):
             )
         if 0 < self.propagation_auto_sync_interval_s < 300:
             raise ValueError("propagation_auto_sync_interval_s must be 0 or at least 300")
+        return self
+
+    @model_validator(mode="after")
+    def _telemetry_needs_a_collector(self) -> "ReticulumUpdate":
+        if self.telemetry_enabled and not self.telemetry_collector:
+            raise ValueError(
+                "Telemetry publishing needs a collector address -- set one, or "
+                "turn telemetry off"
+            )
         return self
 
     @model_validator(mode="after")
@@ -167,6 +179,9 @@ async def update_reticulum(
         "propagation_storage_limit_mb": req.propagation_storage_limit_mb,
         "propagation_outbound_node": req.propagation_outbound_node,
         "propagation_auto_sync_interval_s": req.propagation_auto_sync_interval_s,
+        "telemetry_enabled": req.telemetry_enabled,
+        "telemetry_collector": req.telemetry_collector,
+        "telemetry_interval_s": req.telemetry_interval_s,
         "rnode_enabled": req.rnode_enabled,
         "rnode_serial_port": req.rnode_serial_port.strip(),
         "rnode_frequency_hz": req.rnode_frequency_hz,

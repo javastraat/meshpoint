@@ -12809,3 +12809,61 @@ the saved hash selected after restart; "Sync inbox" appears only with a
 node set; a real stopped→start→sync→message-lands cycle with transfer
 state cycling; auto-sync interval fires; an unreachable node shows a
 failed state, not a hang. Full checklist in `memory/reticulum_todo.md`.
+
+## Reticulum — Telemetry publish, v1 subset (new-build #3, 2026-09-09)
+
+User picked #3. Goal: broadcast this box's own host stats as an LXMF
+telemetry frame a Sideband client can read.
+
+**Key constraint hit:** no Sideband source on disk, no `lxmf`/`RNS` on
+the Mac, and reticulum-meshchat doesn't implement telemetry *publishing*
+(only detects Sideband telemetry *requests*). Pulled the wire format
+from `markqvist/Sideband` `sbapp/sideband/sense.py` via **WebFetch** —
+`Telemeter.packed()` returns `umsgpack.packb({sid: sensor.pack(), ...})`
+with `SID_TIME` always included. Confirmed pack formats for the simple
+sensors: `SID_TIME`=int, `SID_TEMPERATURE`(0x07)=float °C,
+`SID_INFORMATION`(0x0F)=str. The structured `SID_PROCESSOR`/`RAM`/`NVM`
+use a nested `[[label, value], ...]` layout the fetch summary was shaky
+on — **deliberately left out of v1**; that content goes into the
+INFORMATION string instead. `SID_LOCATION`(0x02) format is known (7-el
+struct-packed list) but deferred as an opt-in privacy surface + it's
+what the #4 collector/map needs anyway.
+
+**Built:**
+- `backend/telemetry.py` — `build_telemetry(host, node_name) -> dict[int,
+  obj]` (pure, Mac-testable): TIME always, TEMPERATURE if `cpu_temp_c`,
+  INFORMATION = `_info_line()` ("ti-meshpoint · load 0.42 · RAM 40% ·
+  disk 12.3 GB free · 61.2°C"). Caller msgpacks.
+- `state.py` `telemetry_config()`; `config_routes.py` 3 keys +
+  `telemetry_enabled`-needs-collector validator + collector hash
+  reuses the (renamed) `_dest_hash_ok` validator now shared with
+  `propagation_outbound_node`.
+- `lxmf_service.py` — `send_telemetry()` (builds frame, `RNS.vendor.
+  umsgpack.packb`, `lxm.fields[getattr(LXMF,"FIELD_TELEMETRY",0x02)] =
+  packed`, `handle_outbound`; returns `{ok,error}`; `request_path` on a
+  cold collector), `_telemetry_loop()` (30s warmup then every
+  `interval_s`), `telemetry_status()`, `_telemetry_last_sent_at/_error`.
+  Task started in `_connect`, cancelled in `stop()`. `telemetry_cfg`
+  ctor param, wired in `__init__.py`.
+- `routes.py` — `GET /api/reticulum/telemetry` (viewer) + admin `POST
+  .../telemetry/send`. NOT added to `/status` (avoided the test-fake
+  churn — dedicated endpoint only).
+- `reticulum_settings_tab.js` — "Telemetry" fieldset (enable / collector
+  / interval / "Send telemetry now" + status line); matching client
+  validation.
+
+**Tests:** `test_telemetry.py` ×6 (Mac), `test_lxmf_service.py::
+TestTelemetryPublish` ×4 (Mac), `test_config_routes.py::
+TestTelemetryConfig` ×5 + `test_telemetry_route.py` ×5 (CI/Pi). Suite
+**186 passed**, no regressions. `test_status_route.py` untouched (no
+`/status` change). JS clean.
+
+**Docs:** CHANGELOG v0.8.1 (31 sections), README, API-ENDPOINTS.md (2
+rows), CONFIGURATION.md (prose + 3 yaml keys) — all flag the v1-subset
+limitation.
+
+**Not browser/Pi-verified, and the real unknown is the wire format** —
+needs a live Sideband client subscribed as the collector to confirm the
+frame parses (the `SID_*` ids + msgpack shape are from `sense.py` text,
+not a round-trip). Follow-ups: structured sensors, `SID_LOCATION`.
+Checklist in `memory/reticulum_todo.md`.

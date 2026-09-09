@@ -5,7 +5,7 @@ See `memory/plugin-reticulum.md` for implementation detail (dated sections,
 one per feature) and `memory/project_m1_meshpoint.md` for wider session
 context.
 
-Last updated 2026-09-09 (new-build #1 Contacts + #2 Propagation client both built).
+Last updated 2026-09-09 (new-builds #1 Contacts, #2 Propagation client, #3 Telemetry publish — all built, none Pi-verified).
 
 ---
 
@@ -112,6 +112,17 @@ checked on the Pi.
   receiving → complete) and the message land in Messages. Also: auto-
   sync interval > 0 actually re-syncs; a bad/unreachable node shows a
   failed state not a hang; "Sync inbox" hidden when no outbound node.
+- **Telemetry publish — BUILT 2026-09-09, needs a real Sideband client
+  to verify.** Settings → Telemetry: enable + collector LXMF address +
+  interval. Check: "Send telemetry now" returns Sent (or a clear error
+  if the collector path is unknown — it fires `request_path` and asks
+  you to retry); a Sideband client subscribed to this node's telemetry
+  actually shows the CPU temp + the status line (this is the real
+  unknown — the `FIELD_TELEMETRY` msgpack format is from
+  `sense.py` via WebFetch, not tested against a live client); the
+  timed loop sends on interval; `last_error` surfaces on the status
+  line. If the frame doesn't parse in Sideband, the `SID_*` ids or the
+  msgpack shape need a real-client cross-check.
 - **sample-bbs-techinc nav links (fixed 2026-09-07, not walked in a real
   NomadNet client)**: browse the hosted node in Sideband/NomadNet/
   MeshChat, click "Next" through every page, confirm no dead links and
@@ -169,6 +180,7 @@ checked on the Pi.
 | Notifications | ntfy / webhook on inbound DM | `notify_url` config; fire-and-forget POST (`backend/notify.py`) |
 | Propagation node | LXMF store-and-forward relay (server) | `propagation_enabled` + `propagation_storage_limit_mb`; own `lxmf.propagation` hash, re-announced 6 h; status line on Settings tab; `propagation` block on `GET /api/reticulum/status` |
 | Propagation client | Use another node as your relay | `propagation_outbound_node` (Settings dropdown of `lxmf.propagation` peers) + `propagation_auto_sync_interval_s`; "Sync inbox" button in the Reticulum page header with live transfer state; `GET /api/reticulum/propagation` + admin `POST .../propagation/sync[/cancel]`; `propagation_client` block on `/status`. `backend/lxmf_service.py` `set_outbound_propagation_node`/`sync_propagation_messages`/`propagation_client_status`, mirrors reticulum-meshchat |
+| Telemetry publish | Send host stats as LXMF telemetry | `telemetry_enabled` + `telemetry_collector` + `telemetry_interval_s`; `backend/telemetry.py` builds a Sideband-compatible `FIELD_TELEMETRY` (0x02) msgpack frame — **v1 subset only**: `SID_TIME`/`SID_TEMPERATURE`/`SID_INFORMATION` (string), no structured processor/RAM/NVM or location. `lxmf_service.send_telemetry()`/`_telemetry_loop()`/`telemetry_status()`. `GET /api/reticulum/telemetry` + admin `POST .../telemetry/send`; "Send telemetry now" button on Settings tab |
 | Peers/Activity | Click-to-detail | Peers row → right-side drawer (identity, live routing via `GET /peers/{hash}/link`: hops/path/next-hop/identity-resolved/announce-count, signal from most recent announce, recent activity, a Send Message button for `lxmf.delivery` peers, a favourite star for `nomadnetwork.node` peers sharing the Browse tab's own favourites list); Activity row → detail popup (routing, signal if heard via RNode, payload/app_data hex, "View peer"). Own JS/data (`reticulum_detail_panels.js`) but literally emits core's own `node_drawer.css`/`packet_detail_modal.css` class names (`nd-drawer`/`nd-section`/`nd-row`, `pdm-overlay`/`pdm-layer`/`pdm-row`) for pixel-identical styling — same reuse-not-duplicate pattern as `lw-*`/`mt-badge`/`terminal-button` elsewhere in this plugin |
 | Contacts | Operator petnames for peers | Peers drawer → Contact section (admin): name + note + "known" flag per destination hash, `data/reticulum/contacts.json` (`backend/contacts.py`), never announced. Name wins across Peers/Activity/Messages/Send; announced name → "announced as X". `GET /contacts` + admin `PUT`/`DELETE /contacts/{hash}`; `/peers` + `/announces` gain `petname`/`trusted` |
 | Browsing | NomadNet node browser | Browse tab: live filter, ☆ favourites, `:/page/x.mu` shortcuts |
@@ -206,6 +218,9 @@ plugins:
     propagation_storage_limit_mb: 250    # 0 = LXMF default (don't leave uncapped on SD)
     propagation_outbound_node: ""        # client side: use another node's lxmf.propagation hash
     propagation_auto_sync_interval_s: 0  # 0 = manual only; else every N s (min 300)
+    telemetry_enabled: false             # publish host stats as LXMF FIELD_TELEMETRY frames
+    telemetry_collector: ""              # LXMF address to send telemetry to
+    telemetry_interval_s: 900            # min 300
     node_enabled: false                  # host a NomadNet node
     node_name: ""                        # blank = display_name
     node_pages_dir: data/reticulum/pages
@@ -223,8 +238,8 @@ plugins:
 |---|---|---|---|
 | Med | **Attachments in Send** | images / small files over `LXMF.FIELD_IMAGE` / `FIELD_FILE_ATTACHMENTS` | Send side is easy (set `lxm.fields` before `handle_outbound`). Inbound is the blocker: shared `messages` table (`src/storage/message_repository.py`) has no attachment columns and core's conversation UI can't render them — needs a design decision (disk store + flag vs a JSON column on the shared table) |
 | ~~Med~~ | ~~**Propagation node polish**~~ | **MOSTLY BUILT 2026-09-09** (new-build #2): outbound node + "Sync inbox" + live transfer state + auto-sync. Still open: **PN peering** (propagation nodes syncing to each other) and a message-arrival WS push after a sync completes | — |
-| Med | **Telemetry publish** (Sideband-style) | push Pi telemetry (CPU temp, load, GPS, sensors) as LXMF telemetry fields to a collector | Medium — reuse `backend/host_stats.py` |
-| Med | **Telemetry collector + map** | receive peers' telemetry, plot on the dashboard's local map tiles | Med–High |
+| ~~Med~~ | ~~**Telemetry publish**~~ | **MOSTLY BUILT 2026-09-09** (new-build #3): temp + status-line frame to a collector. Follow-ups: structured processor/RAM/NVM sensors (needs the Sideband `sense.py` nested `[[label,val],...]` format verified against a real client) and **location** (`SID_LOCATION` 0x02, the 7-element struct-packed list — format known from `sense.py`, deferred as an opt-in privacy surface) | Low each |
+| Med | **Telemetry collector + map** | *receive* peers' telemetry (parse inbound `FIELD_TELEMETRY`), plot on the dashboard's local map tiles. Now the natural pair for #3. Needs `SID_LOCATION` in the publish side too | Med–High |
 | Low | **Audio calls** (`call.audio` / LXST) | answer / receive voice; min viable = a recorded announcement on call | High — audio I/O + codec on the Pi, its own project |
 | Low | **Group chat** (`RNS.Destination.GROUP`) | experimental shared-key room, no membership mgmt | Medium — non-standard |
 | Low | **Interface manager UI** | add / remove RNS interfaces from the dashboard vs hand-editing config | Medium |
@@ -233,6 +248,21 @@ plugins:
 
 ## Done (this backlog's completed items)
 
+- **2026-09-09** — Telemetry publish, v1 subset (new-build #3).
+  `telemetry_enabled`/`telemetry_collector`/`telemetry_interval_s`;
+  `backend/telemetry.py` `build_telemetry(host, node_name)` → a
+  `{SID_TIME, SID_TEMPERATURE?, SID_INFORMATION}` dict the service
+  msgpacks (`RNS.vendor.umsgpack`) into `lxm.fields[FIELD_TELEMETRY]`.
+  `lxmf_service` gains `send_telemetry()` / `_telemetry_loop()` /
+  `telemetry_status()`. `GET /api/reticulum/telemetry` + admin `POST
+  .../telemetry/send`; Settings "Telemetry" fieldset + "Send telemetry
+  now" button. Format verified against Sideband `sbapp/sideband/sense.py`
+  via WebFetch — deliberately only the unambiguous single-value
+  sensors; structured processor/RAM/NVM and location are follow-ups.
+  16 new tests (6 telemetry-builder + 4 lxmf_service Mac-runnable, 5
+  config-model + 5 route CI/Pi). NOT browser/Pi-verified — needs a
+  real Sideband client subscribed as the collector to confirm the
+  frame parses.
 - **2026-09-09** — Propagation node polish, client side (new-build #2).
   `propagation_outbound_node` + `propagation_auto_sync_interval_s` config
   keys; `backend/lxmf_service.py` gains `set_outbound_propagation_node` /
@@ -273,9 +303,19 @@ plugins:
 
 ## Suggested order from here
 
-1. Whatever the user's interested in next. Telemetry is a coherent pair
-   (publish + collector). Audio is a separate project. Attachments need the
-   `messages`-table decision first.
+New-builds #1 (Contacts), #2 (Propagation client), #3 (Telemetry
+publish) all built 2026-09-09 — none Pi-verified yet.
+
+From here (user asks "what is it" then decides, one at a time):
+- **#4 Telemetry collector + map** — the natural pair for #3 now that
+  publish exists. Parse inbound `FIELD_TELEMETRY`, plot on the
+  dashboard's local map. Needs `SID_LOCATION` added to the publish side.
+- **Contacts / petnames** — could integrate into the Send tab picker
+  further, or an address-book tab.
+- **Interface manager UI**, **Paper messages / QR** — standalone, low.
+- **Attachments in Send** — still blocked on the `messages`-table
+  decision.
+- **Audio calls** — separate project.
 
 ## Notes / constraints (read before building)
 

@@ -117,6 +117,7 @@ def register(reg) -> None:
             notify_url=state.notify_url(),
             propagation_cfg=state.propagation_config(),
             talkback_enabled=state.node_config()["talkback_enabled"],
+            telemetry_cfg=state.telemetry_config(),
         )
 
     def wire(service, context):

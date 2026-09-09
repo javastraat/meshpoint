@@ -185,6 +185,40 @@ class ReticulumSettingsTab {
                             </label>
                         </fieldset>
                         <fieldset class="cfg-fieldset">
+                            <legend class="cfg-fieldset__legend">Telemetry</legend>
+                            <p class="cfg-field__hint" data-rt-telemetry-status>
+                                Periodically send this box's own host stats — CPU
+                                temperature, load, RAM/disk, a status line — to a
+                                collector address as a Sideband-compatible LXMF telemetry
+                                frame. Off by default; takes effect after a restart.
+                            </p>
+                            <label class="cfg-field cfg-field--toggle">
+                                <input type="checkbox" data-rt-telemetry-enabled>
+                                <span class="cfg-field__label">Publish telemetry</span>
+                            </label>
+                            <label class="cfg-field">
+                                <span class="cfg-field__label">Collector address</span>
+                                <input class="cfg-field__input" type="text" maxlength="64"
+                                       placeholder="lxmf.delivery destination hash"
+                                       data-rt-telemetry-collector>
+                                <span class="cfg-field__hint">
+                                    The LXMF address that should receive the frames — e.g.
+                                    a Sideband client subscribed to this node.
+                                </span>
+                            </label>
+                            <label class="cfg-field cfg-field--narrow">
+                                <span class="cfg-field__label">Send every (s)</span>
+                                <input class="cfg-field__input" type="number"
+                                       min="300" max="86400" step="60" data-rt-telemetry-interval>
+                            </label>
+                            <div class="cfg-card__actions">
+                                <button class="terminal-button" type="button" data-rt-telemetry-send>
+                                    Send telemetry now
+                                </button>
+                            </div>
+                            <p class="cfg-status" data-rt-telemetry-send-status aria-live="polite"></p>
+                        </fieldset>
+                        <fieldset class="cfg-fieldset">
                             <legend class="cfg-fieldset__legend">NomadNet node</legend>
                             <p class="cfg-field__hint" data-rt-node-status>
                                 Host a NomadNet node — serve Micron pages over Reticulum,
@@ -319,6 +353,11 @@ class ReticulumSettingsTab {
         this._propOutbound = this._q('[data-rt-prop-outbound]');
         this._propAutoSync = this._q('[data-rt-prop-autosync]');
         this._propClientStatusEl = this._q('[data-rt-prop-client-status]');
+        this._telemetryEnabled = this._q('[data-rt-telemetry-enabled]');
+        this._telemetryCollector = this._q('[data-rt-telemetry-collector]');
+        this._telemetryInterval = this._q('[data-rt-telemetry-interval]');
+        this._telemetryStatusEl = this._q('[data-rt-telemetry-status]');
+        this._telemetrySendStatusEl = this._q('[data-rt-telemetry-send-status]');
         this._nodeEnabled = this._q('[data-rt-node-enabled]');
         this._nodeName = this._q('[data-rt-node-name]');
         this._nodeInterval = this._q('[data-rt-node-interval]');
@@ -335,6 +374,7 @@ class ReticulumSettingsTab {
         this._frequency.addEventListener('input', () => this._renderFrequencyHint());
         this._q('[data-rt-rescan-usb]').addEventListener('click', (e) => this._rescanUsb(e.currentTarget));
         this._q('[data-rt-restart-rnsd]').addEventListener('click', () => this._restartRnsd());
+        this._q('[data-rt-telemetry-send]')?.addEventListener('click', (e) => this._sendTelemetry(e.currentTarget));
     }
 
     _q(sel) { return this._el.querySelector(sel); }
@@ -383,7 +423,34 @@ class ReticulumSettingsTab {
         if (this._propAutoSync) this._propAutoSync.value = rt.propagation_auto_sync_interval_s ?? 0;
         this._pendingOutbound = (rt.propagation_outbound_node || '').toLowerCase();
         this._populateOutboundNodes();
+        if (this._telemetryEnabled) this._telemetryEnabled.checked = !!rt.telemetry_enabled;
+        if (this._telemetryCollector) this._telemetryCollector.value = rt.telemetry_collector || '';
+        if (this._telemetryInterval) this._telemetryInterval.value = rt.telemetry_interval_s ?? 900;
         this._loadPropagationStatus();
+        this._loadTelemetryStatus();
+    }
+
+    async _loadTelemetryStatus() {
+        if (!this._telemetryStatusEl) return;
+        let t = null;
+        try {
+            const r = await fetch('/api/reticulum/telemetry', { credentials: 'same-origin' });
+            if (r.ok) t = await r.json();
+        } catch (_) { return; }
+        if (!t || !t.enabled) return;
+        const when = t.last_sent_at
+            ? `last sent ${this._agoStr(Math.round(Date.now() / 1000 - t.last_sent_at))}`
+            : 'nothing sent yet';
+        const err = t.last_error ? ` — last error: ${t.last_error}` : '';
+        this._telemetryStatusEl.textContent =
+            `Publishing to ${(t.collector || '?').slice(0, 12)}… every ${t.interval_s}s — ${when}${err}.`;
+    }
+
+    _agoStr(s) {
+        if (s == null) return 'never';
+        if (s < 90) return `${s}s ago`;
+        if (s < 5400) return `${Math.round(s / 60)}m ago`;
+        return `${Math.round(s / 3600)}h ago`;
     }
 
     /** Fill the outbound-propagation-node <select> from the roster's
@@ -578,6 +645,12 @@ class ReticulumSettingsTab {
             this._setStatus('error', 'Auto-sync interval must be 0 or at least 300 seconds.');
             return;
         }
+        const telemetryEnabled = !!this._telemetryEnabled?.checked;
+        const telemetryCollector = (this._telemetryCollector?.value || '').trim();
+        if (telemetryEnabled && !telemetryCollector) {
+            this._setStatus('error', 'Telemetry publishing needs a collector address — set one, or turn telemetry off.');
+            return;
+        }
         const payload = {
             display_name: this._displayName.value.trim() || 'Meshpoint',
             nomad_timeout_s: Number(this._nomadTimeout.value) || 20,
@@ -593,6 +666,9 @@ class ReticulumSettingsTab {
             propagation_storage_limit_mb: Number(this._propStorage?.value) || 0,
             propagation_outbound_node: outboundNode,
             propagation_auto_sync_interval_s: autoSync,
+            telemetry_enabled: telemetryEnabled,
+            telemetry_collector: telemetryCollector,
+            telemetry_interval_s: Number(this._telemetryInterval?.value) || 900,
             rnode_enabled: rnodeEnabled,
             rnode_serial_port: this._serialPort.value,
             rnode_frequency_hz: Number(this._frequency.value),
@@ -615,6 +691,27 @@ class ReticulumSettingsTab {
             );
         } else {
             this._setStatus('error', 'Save failed.');
+        }
+    }
+
+    async _sendTelemetry(button) {
+        const statusEl = this._telemetrySendStatusEl;
+        button.disabled = true;
+        if (statusEl) { statusEl.dataset.kind = 'pending'; statusEl.textContent = 'Sending…'; }
+        try {
+            const r = await fetch('/api/reticulum/telemetry/send', {
+                method: 'POST', credentials: 'same-origin',
+            });
+            const body = await r.json().catch(() => ({}));
+            if (statusEl) {
+                statusEl.dataset.kind = r.ok ? 'success' : 'error';
+                statusEl.textContent = r.ok ? 'Sent.' : (body.detail || 'Send failed.');
+            }
+        } catch (_) {
+            if (statusEl) { statusEl.dataset.kind = 'error'; statusEl.textContent = 'Send failed.'; }
+        } finally {
+            button.disabled = false;
+            this._loadTelemetryStatus();
         }
     }
 

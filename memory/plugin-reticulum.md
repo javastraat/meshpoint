@@ -898,6 +898,44 @@ Operator-assigned names for peers. Local address book, never announced.
   a core change — the plugin's own Messages tab does resolve them).
 - Pi verification: see `memory/reticulum_todo.md`.
 
+## 2026-09-09 — Telemetry publish, v1 subset (new-build #3)
+
+Broadcast this box's host stats as a Sideband-compatible LXMF telemetry
+frame. Wire format pulled from `markqvist/Sideband`
+`sbapp/sideband/sense.py` via WebFetch (no Sideband source locally, no
+`lxmf` on the Mac, meshchat only *detects* Sideband telemetry requests).
+
+- Format: `Telemeter.packed()` = `umsgpack.packb({sid: pack(), ...})`,
+  `SID_TIME` always present. v1 uses only the unambiguous single-value
+  sensors: `SID_TIME`(0x01)=int, `SID_TEMPERATURE`(0x07)=float °C,
+  `SID_INFORMATION`(0x0F)=str. Structured `SID_PROCESSOR`/`RAM`/`NVM`
+  (nested `[[label,val],...]`) and `SID_LOCATION`(0x02, 7-el
+  struct-packed list) are follow-ups — the latter is what #4
+  (collector/map) needs.
+- `backend/telemetry.py` — `build_telemetry(host, node_name)` pure dict
+  builder; `_info_line()` composes the INFORMATION string from
+  `host_stats` fields.
+- `state.py` `telemetry_config()`; `config_routes.py` 3 keys, the
+  collector-hash validator is the renamed `_dest_hash_ok` now shared
+  with `propagation_outbound_node`, plus an enabled-needs-collector
+  model validator.
+- `lxmf_service.py` `send_telemetry()` / `_telemetry_loop()` (30s warmup
+  + interval) / `telemetry_status()`; packs with `RNS.vendor.umsgpack`,
+  `lxm.fields[getattr(LXMF,"FIELD_TELEMETRY",0x02)] = packed`, empty
+  text body, `handle_outbound`. `request_path` on a cold collector then
+  asks the caller to retry. `telemetry_cfg` ctor param via `__init__.py`.
+- `routes.py` `GET /api/reticulum/telemetry` + admin `POST
+  .../telemetry/send`. Not on `/status` (avoids test-fake churn).
+- `reticulum_settings_tab.js` "Telemetry" fieldset + "Send telemetry
+  now".
+- Tests: `test_telemetry.py` ×6, `test_lxmf_service.py::
+  TestTelemetryPublish` ×4 (both Mac); `test_config_routes.py` ×5 +
+  `test_telemetry_route.py` ×5 (CI/Pi). Suite 186 passed.
+- **Real unknown:** the frame hasn't round-tripped through a live
+  Sideband client — the `SID_*` ids + msgpack shape are from `sense.py`
+  text only.
+- Pi verification: see `memory/reticulum_todo.md`.
+
 ## 2026-09-09 — Propagation node polish, client side (new-build #2)
 
 Server side (be a relay) shipped v0.8.1; this is the client half (use

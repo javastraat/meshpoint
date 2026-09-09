@@ -444,6 +444,34 @@ class TestPropagationClient(unittest.TestCase):
         self.assertIsNone(svc.propagation_client_status())
 
 
+class TestTelemetryPublish(unittest.TestCase):
+    def test_status_none_when_disabled(self) -> None:
+        self.assertIsNone(_make_service().telemetry_status())
+
+    def test_status_shape_when_enabled(self) -> None:
+        svc = _make_service(telemetry_cfg={
+            "enabled": True, "collector": "cd" * 16, "interval_s": 600,
+        })
+        st = svc.telemetry_status()
+        self.assertTrue(st["enabled"])
+        self.assertEqual(st["collector"], "cd" * 16)
+        self.assertEqual(st["interval_s"], 600)
+        self.assertIsNone(st["last_sent_at"])
+
+    def test_send_without_collector_errors(self) -> None:
+        svc = _make_service(telemetry_cfg={"enabled": True, "collector": ""})
+        res = svc.send_telemetry()
+        self.assertFalse(res["ok"])
+        self.assertIn("collector", res["error"])
+
+    def test_send_when_not_running_errors(self) -> None:
+        # RNS/LXMF absent on the dev Mac -> .available is False
+        svc = _make_service(telemetry_cfg={"enabled": True, "collector": "cd" * 16})
+        res = svc.send_telemetry()
+        self.assertFalse(res["ok"])
+        self.assertIn("not running", res["error"])
+
+
 class TestInboundNotify(unittest.TestCase):
     def test_notify_inbound_posts_preview_and_sender(self) -> None:
         svc = _make_service(notify_url="https://ntfy.sh/topic")

@@ -38,7 +38,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
-from . import notify, talkback
+from . import host_stats, notify, talkback, telemetry as telemetry_builder
 
 if TYPE_CHECKING:
     from src.api.websocket_manager import WebSocketManager
@@ -168,6 +168,7 @@ class LxmfService:
         notify_url: str = "",
         propagation_cfg: Optional[dict] = None,
         talkback_enabled: bool = False,
+        telemetry_cfg: Optional[dict] = None,
     ):
         self._display_name = display_name
         self._reticulum_config_dir = Path(reticulum_config_dir)
@@ -191,6 +192,12 @@ class LxmfService:
         self._prop_outbound = str(self._propagation_cfg.get("outbound_node") or "").strip()
         self._prop_auto_sync_s = int(self._propagation_cfg.get("auto_sync_interval_s") or 0)
         self._prop_sync_task: Optional[asyncio.Task] = None
+        # Telemetry publish: send this box's host stats to a collector on
+        # an interval (Sideband-compatible FIELD_TELEMETRY frames).
+        self._telemetry_cfg = telemetry_cfg or {"enabled": False}
+        self._telemetry_task: Optional[asyncio.Task] = None
+        self._telemetry_last_sent_at: Optional[float] = None
+        self._telemetry_last_error: Optional[str] = None
         # Requires node hosting: every command answers from data a hosted
         # node already caches (see talkback.py's module docstring) -- this
         # flag alone does nothing unless node_cfg["enabled"] is also true
@@ -293,6 +300,10 @@ class LxmfService:
 
         self._apply_outbound_propagation_node()
 
+        if self._telemetry_cfg.get("enabled") and self._telemetry_cfg.get("collector"):
+            if self._loop is not None:
+                self._telemetry_task = self._loop.create_task(self._telemetry_loop())
+
         if self._node_cfg.get("enabled"):
             from .nomad_node import NomadNode
             self._node = NomadNode(
@@ -317,6 +328,9 @@ class LxmfService:
         if self._prop_sync_task is not None:
             self._prop_sync_task.cancel()
             self._prop_sync_task = None
+        if self._telemetry_task is not None:
+            self._telemetry_task.cancel()
+            self._telemetry_task = None
         if self._node is not None:
             await self._node.stop()
             self._node = None
@@ -499,6 +513,70 @@ class LxmfService:
         while True:
             await asyncio.sleep(max(300, self._prop_auto_sync_s))
             self.sync_propagation_messages()
+
+    # --- telemetry publish -------------------------------------------------
+
+    def telemetry_status(self) -> Optional[dict]:
+        """``None`` unless telemetry publishing is configured. Feeds
+        GET /api/reticulum/telemetry and the Settings tab."""
+        if not self._telemetry_cfg.get("enabled"):
+            return None
+        return {
+            "enabled": True,
+            "collector": self._telemetry_cfg.get("collector") or None,
+            "interval_s": int(self._telemetry_cfg.get("interval_s") or 900),
+            "last_sent_at": self._telemetry_last_sent_at,
+            "last_error": self._telemetry_last_error,
+        }
+
+    def send_telemetry(self) -> dict:
+        """Send one telemetry frame (host stats -> Sideband
+        ``FIELD_TELEMETRY``) to the configured collector. ``{"ok": bool,
+        "error": str|None}``. Uses the same delivery path as a normal
+        message, just a msgpacked field instead of a text body."""
+        collector = str(self._telemetry_cfg.get("collector") or "").strip()
+        if not collector:
+            return {"ok": False, "error": "No telemetry collector configured"}
+        if not self.available or self._router is None or self._source is None:
+            return {"ok": False, "error": "Reticulum service is not running"}
+        try:
+            frame = telemetry_builder.build_telemetry(
+                host_stats.read_host(), self._display_name,
+            )
+            packed = RNS.vendor.umsgpack.packb(frame)
+            dest_hash = bytes.fromhex(collector)
+            identity = RNS.Identity.recall(dest_hash)
+            if identity is None:
+                RNS.Transport.request_path(dest_hash)
+                return {"ok": False, "error": "Collector path unknown -- requested it, try again shortly"}
+            destination = RNS.Destination(
+                identity, RNS.Destination.OUT, RNS.Destination.SINGLE,
+                "lxmf", "delivery",
+            )
+            lxm = LXMF.LXMessage(
+                destination, self._source, "",
+                desired_method=LXMF.LXMessage.DIRECT,
+            )
+            field_id = getattr(LXMF, "FIELD_TELEMETRY", 0x02)
+            lxm.fields[field_id] = packed
+            self._router.handle_outbound(lxm)
+        except Exception as exc:  # noqa: BLE001
+            self._telemetry_last_error = str(exc) or exc.__class__.__name__
+            logger.warning("telemetry send failed", exc_info=True)
+            return {"ok": False, "error": self._telemetry_last_error}
+        self._telemetry_last_sent_at = time.time()
+        self._telemetry_last_error = None
+        logger.info("telemetry frame sent to %s", collector)
+        return {"ok": True, "error": None}
+
+    async def _telemetry_loop(self) -> None:
+        interval = max(300, int(self._telemetry_cfg.get("interval_s") or 900))
+        # A short first delay so a cold path has a chance to resolve before
+        # the first frame (request_path fires on a miss anyway).
+        await asyncio.sleep(30)
+        while True:
+            self.send_telemetry()
+            await asyncio.sleep(interval)
 
     def reload_node_pages(self) -> bool:
         """Re-register the hosted node's ``.mu`` request handlers (Pages

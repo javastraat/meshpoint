@@ -209,6 +209,9 @@ plugins:
     propagation_storage_limit_mb: 250           # cap the on-disk propagation store (0 = LXMF default)
     propagation_outbound_node: ""               # optional: use another node's lxmf.propagation hash as your relay
     propagation_auto_sync_interval_s: 0         # 0 = manual sync only; else re-sync every N seconds (min 300)
+    telemetry_enabled: false                    # publish this box's host stats as LXMF telemetry frames
+    telemetry_collector: ""                     # LXMF address to send telemetry to (e.g. a Sideband client)
+    telemetry_interval_s: 900                   # how often to send (min 300)
     # storage paths — defaults shown; only set to override:
     # reticulum_config_dir: "data/reticulum/rns_config"
     # identity_path: "data/reticulum/identity"
@@ -268,6 +271,17 @@ propagation service on its own separate hash. `propagation_storage_limit_mb`
 (default 250) caps the on-disk store — `0` uses LXMF's own default. Restart
 to apply. The Settings tab shows a live status line (address, messages
 held); `GET /api/reticulum/status` carries the same in a `propagation` block.
+
+`plugins.reticulum.telemetry_enabled` (Settings tab → *Telemetry*): every
+`telemetry_interval_s` seconds (default 900, min 300), send this box's own
+host stats — CPU/SoC temperature, 1-min load, RAM/disk usage, a one-line
+status string — to `telemetry_collector` (an LXMF address, e.g. a Sideband
+client subscribed to this node) as a Sideband-compatible `FIELD_TELEMETRY`
+frame. Off by default; nothing is sent without a collector. A "Send
+telemetry now" button fires one frame on demand. `GET
+/api/reticulum/telemetry` reports status. *(v1 sends only the temperature
+and a human-readable status line; structured processor/RAM/disk sensors
+and location are a later addition.)*
 
 `plugins.reticulum.propagation_outbound_node` (Settings tab → *Propagation
 node*, dropdown of `lxmf.propagation` peers): use *another* node as your

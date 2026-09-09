@@ -63,6 +63,12 @@ _DEFAULTS: dict[str, Any] = {
     # else re-sync every N seconds (floored at 300 by the validator).
     "propagation_outbound_node": "",
     "propagation_auto_sync_interval_s": 0,
+    # Telemetry publish: periodically send this box's own host stats (CPU
+    # temp, load, RAM/disk) as an LXMF telemetry frame to a collector
+    # address, Sideband-style. Off by default. interval floored at 300.
+    "telemetry_enabled": False,
+    "telemetry_collector": "",
+    "telemetry_interval_s": 900,
     # RF and backbone are independent interfaces rnsd can run at once or
     # separately -- at least one must stay on (enforced by config_routes.py's
     # ReticulumUpdate validator), same as NomadNet needs one of them to
@@ -160,6 +166,15 @@ def propagation_config() -> dict[str, Any]:
         "storage_limit_mb": max(0, int(_config.get("propagation_storage_limit_mb") or 0)),
         "outbound_node": str(_config.get("propagation_outbound_node") or "").strip(),
         "auto_sync_interval_s": max(0, int(_config.get("propagation_auto_sync_interval_s") or 0)),
+    }
+
+
+def telemetry_config() -> dict[str, Any]:
+    """Telemetry-publish settings, resolved."""
+    return {
+        "enabled": bool(_config.get("telemetry_enabled")),
+        "collector": str(_config.get("telemetry_collector") or "").strip().lower(),
+        "interval_s": max(300, int(_config.get("telemetry_interval_s") or 900)),
     }
 
 
