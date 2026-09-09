@@ -36,6 +36,32 @@ function _rtFullTime(ts) {
     } catch (_) { return ts; }
 }
 
+// The telemetry INFORMATION sensor is one free-text "·"-joined line, not
+// separate fields on the wire (see telemetry.py::_info_line -- Sideband's
+// structured PROCESSOR/RAM/NVM sensors don't have a verified pack format,
+// so this string is the only place that data travels). Split it back into
+// its own labelled row per segment for the modal, instead of one dense
+// paragraph -- the leading node-name segment is dropped since the modal's
+// own title already shows it. Unrecognised segments (a differently-built
+// sender, a future field) still get their own row rather than being lost.
+function _rtInfoRows(info, nodeName) {
+    const segments = String(info || '').split(' · ').filter(Boolean);
+    return segments.map((seg) => {
+        if (seg === nodeName) return null;
+        const load = /^load (.+)$/.exec(seg);
+        if (load) return { key: 'Load', val: load[1] };
+        const ram = /^RAM (.+)$/.exec(seg);
+        if (ram) return { key: 'RAM', val: ram[1] };
+        const disk = /^disk (.+) free$/.exec(seg);
+        if (disk) return { key: 'Disk free', val: disk[1] };
+        const space = /^space (OPEN|CLOSED)$/.exec(seg);
+        if (space) {
+            return { key: 'Space', val: space[1], valClass: space[1] === 'OPEN' ? 'pdm-row__val--good' : 'pdm-row__val--bad' };
+        }
+        return { key: 'Info', val: seg };
+    }).filter(Boolean);
+}
+
 // Duplicated from reticulum_panel.js's own RT_ASPECT_BADGES (a top-level
 // `const` there, not a window property, so not reachable from here) --
 // four entries, not worth a cross-file export for.
@@ -714,7 +740,7 @@ class ReticulumTelemetryModal {
     _buildReadingLayer(entry) {
         const rows = [
             { key: 'Temperature', val: entry.temperature_c != null ? `${entry.temperature_c}°C` : null },
-            { key: 'Status', val: entry.info || null },
+            ..._rtInfoRows(entry.info, entry.name),
             {
                 key: 'Location',
                 val: (entry.latitude != null && entry.longitude != null)
@@ -729,7 +755,7 @@ class ReticulumTelemetryModal {
         rowsEl.className = 'pdm-layer__rows';
         for (const row of rows) {
             if (row.val == null || row.val === '') continue;
-            rowsEl.appendChild(this._row(row.key, row.html ? row.html() : _rtEsc(row.val), !!row.html));
+            rowsEl.appendChild(this._row(row.key, row.html ? row.html() : _rtEsc(row.val), !!row.html, row.valClass));
         }
         if (!rowsEl.children.length) return null;
 
@@ -740,12 +766,12 @@ class ReticulumTelemetryModal {
         return layer;
     }
 
-    _row(key, val, isHtml) {
+    _row(key, val, isHtml, valClass) {
         const row = document.createElement('div');
         row.className = 'pdm-row';
         row.innerHTML = `
             <span class="pdm-row__key">${_rtEsc(key)}:</span>
-            <span class="pdm-row__val">${isHtml ? val : val}</span>
+            <span class="pdm-row__val${valClass ? ` ${valClass}` : ''}">${isHtml ? val : val}</span>
         `;
         return row;
     }
