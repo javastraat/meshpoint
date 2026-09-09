@@ -267,13 +267,20 @@ class ReticulumPanel {
                             </form>
                             <div class="lw-table-wrap">
                                 <table class="lw-table lw-table--rt-contacts">
+                                    <colgroup>
+                                        <col class="col-cname">
+                                        <col class="col-cdest">
+                                        <col class="col-cnote">
+                                        <col class="col-cknown">
+                                        <col class="col-cactions">
+                                    </colgroup>
                                     <thead>
                                         <tr>
                                             <th>Name</th>
                                             <th>Destination</th>
                                             <th>Note</th>
-                                            <th class="lw-r">Known</th>
-                                            <th></th>
+                                            <th class="lw-c">Known</th>
+                                            <th class="lw-r">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody id="rt-contacts-tbody"></tbody>
@@ -1040,7 +1047,7 @@ class ReticulumPanel {
                 <td class="lw-id">${this._esc(hash)}</td>
                 <td><input class="cfg-field__input rt-contact-cell" type="text" maxlength="280"
                            data-rt-contact-note placeholder="—" value="${this._esc(c.note || '')}"></td>
-                <td class="lw-r"><input type="checkbox" data-rt-contact-known ${c.trusted ? 'checked' : ''}></td>
+                <td class="lw-c"><input type="checkbox" data-rt-contact-known ${c.trusted ? 'checked' : ''}></td>
                 <td class="lw-r rt-contact-actions">
                     ${action}
                     <button type="button" class="lw-link-btn" data-rt-contact-save>Save</button>

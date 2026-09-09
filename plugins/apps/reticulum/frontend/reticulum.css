@@ -409,16 +409,29 @@
 .rt-contact-add > .cfg-field__input { flex: 0 1 auto; }
 .rt-contact-add #rt-contact-add-hash { width: 300px; max-width: 100%; }
 .rt-contact-add #rt-contact-add-name { width: 160px; }
+.lw-table--rt-contacts { table-layout: auto; }
+.lw-table--rt-contacts col.col-cdest { width: 18em; }
+.lw-table--rt-contacts col.col-cknown { width: 4.5em; }
+.lw-table--rt-contacts col.col-cactions { width: 12em; }
+.lw-table--rt-contacts th.lw-c,
+.lw-table--rt-contacts td.lw-c { text-align: center; }
+.lw-table--rt-contacts td.lw-r { text-align: right; }
+.lw-table--rt-contacts td { padding: 10px 12px; vertical-align: middle; }
+
 .rt-contact-cell {
-    padding: 4px 6px;
+    padding: 5px 8px;
     font-size: 13px;
+    width: 100%;
+    max-width: 220px;
 }
+.lw-table--rt-contacts td:nth-child(3) .rt-contact-cell { max-width: none; }
 .rt-contact-announced {
     color: var(--text-muted, #777);
     font-size: 11px;
+    margin-left: 6px;
 }
 .rt-contact-actions { white-space: nowrap; }
-.rt-contact-actions .lw-link-btn { margin-left: 8px; }
+.rt-contact-actions .lw-link-btn { margin-left: 10px; }
 
 /* Settings tab: one extra-interface editor row -- a distinct card so a
    list of them reads as separate blocks, not one run-on form. */
