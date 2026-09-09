@@ -1374,6 +1374,21 @@ select.update-field__input option:checked {
     text-decoration: none;
 }
 
+.plugin-row__prov {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+.plugin-row__prov a { color: var(--accent-cyan); text-decoration: none; }
+.plugin-row__prov code {
+    font-size: 0.95em;
+    padding: 0 3px;
+    border-radius: 3px;
+    background: var(--overlay-weak);
+}
+
 .plugin-row__version a:hover {
     text-decoration: underline;
 }

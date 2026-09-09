@@ -8,10 +8,11 @@ verification evidence).
 See `memory/project_m1_meshpoint.md` for wider session context and
 `memory/reticulum_todo.md` for the Reticulum plugin backlog.
 
-Last updated 2026-09-09 — review pass: 2 findings fixed in the new
-plugin-sources / installer code + 1 by-design tradeoff noted (backlog #5);
-backlog #4 (Espressif udev rule `0666` → `0660`) fixed and verified on the
-SenseCap.
+Last updated 2026-09-09 — review pass: installer size caps + `ref` `..`
+traversal fixed; backlog #4 (Espressif udev `0666`→`0660`) fixed +
+verified on the SenseCap; backlog #5 (plugin-source commit SHA: record,
+resolve, Pin/Unpin) done. Open: #2 (services off root), #3 (web terminal
+→ plugin).
 
 ---
 
@@ -38,10 +39,12 @@ Read this before filing a finding — some of these are deliberate.
   but once added, Install/Update pull whatever that repo's `ref` points
   at *now* — a compromised repo account or a force-push lands on the next
   Update. Same class as `pip install` from the terminal. Mitigation
-  available today: pin the source `ref` to a tag or commit SHA instead of
-  a branch. Downloaded files are re-validated (`parse_manifest`, path
-  safety, size caps) but not signature-checked; `plugins.<id>.source`
-  records the resolved commit SHA as an audit anchor. See backlog #5.
+  available: **Pin** the source (Settings → Plugins → the source row) to
+  freeze its `ref` to the commit it points at now. Downloaded files are
+  re-validated (`parse_manifest`, path safety, size caps) but not
+  signature-checked; `plugins.<id>.source.commit` records the resolved
+  SHA as an audit anchor and the Update confirm shows old→new. Backlog #5
+  (done).
 
 ---
 
@@ -55,7 +58,7 @@ Priority order is the user's own (set 2026-09-08).
 | 2 | **Move services off root onto `meshpoint` user** | 🔴 Not started | Explicitly longer-term ("to limit attack surface"). Self-update chain's `pip install` runs as root via `config/sudoers-meshpoint` NOPASSWD. |
 | 3 | **Web terminal → opt-in plugin** | 🔴 Not started, needs design | Currently core, admin-gated but root-equivalent. Move to an explicitly opt-in plugin like every other powerful/risky capability. "The root thing needs some thought" — not yet scoped/greenlit. |
 | 4 | **USB companion udev rules too permissive** | 🟢 Fixed 2026-09-09 | `99-meshpoint-esp.rules` shipped `MODE="0666"` for `idVendor 303a` (Espressif native-USB: Heltec V3/V4, T-Beam S3). Now `MODE="0660", GROUP="dialout"` in `install.sh` + a `post_update.sh` migration that rewrites the stale rule. **Verified on the SenseCap 2026-09-09:** the box's current radios are `ttyUSB0/1` (CP210x/CH340, *not* `303a`) and already showed the safe OS default `crw-rw---- root:dialout` — the `0666` rule only ever bit a plugged-in `303a` board (none attached), so live blast radius was nil; latent until a Heltec V3 is connected for firmware-flash/relay. See Fixed below. |
-| 5 | Plugin source: record + surface the resolved commit SHA | 🟡 Half done 2026-09-09 | **Done:** the installer now reads the short SHA from the tarball's root dir and `plugins.<id>.source` records `commit` alongside `url`/`ref`/`version` — an audit anchor for *what code is running* (see Fixed). **Not done, low value:** showing old→new SHA / "N commits behind" / a one-click "pin to this SHA" before an Update. The security primitive (set `ref` to a tag/SHA to freeze) already works; that half is pure UX. |
+| 5 | Plugin source: record + surface the resolved commit SHA | 🟢 Done 2026-09-09 | `plugins.<id>.source.commit` records the resolved short SHA at install. Plugin row shows `from owner/repo @ ref · <sha>`. `GET /api/plugin-sources/resolve` resolves a ref to its current commit; the Update confirm shows `installed <sha> → incoming <sha> "msg"` and flags a moving branch. `PATCH /api/plugin-sources` + **Pin/Unpin** buttons on the source row freeze a branch to the commit it points at now (`pinned_from` remembers the branch for Unpin). See Fixed. |
 
 ---
 
@@ -76,6 +79,27 @@ _None yet. Template:_
 ---
 
 ## Fixed
+
+### 2026-09-09 — plugin source: commit SHA now recorded + pinnable  (backlog #5)
+- **Not a vuln** — reduces the "trusted code at branch HEAD" tradeoff.
+- **Done:**
+  - `install_from_source` returns the short SHA (from the tarball root
+    dir); `plugins.<id>.source.commit` records it -- an audit anchor for
+    *what code* is installed, since `ref` moves and `version` is
+    author-typed.
+  - `GET /api/plugin-sources/resolve?url=&ref=` -> the commit a ref points
+    at now (GitHub commits API): `{sha, short_sha, message, committed_at,
+    html_url, ref_is_pinned}`. `sources.resolve_commit()`.
+  - `PATCH /api/plugin-sources {url, ref}` re-points a configured source.
+    Pin = branch -> that commit's SHA (stores `pinned_from`); Unpin = SHA
+    -> `pinned_from`. Admin + audited (`config.plugin_source_repoint`).
+  - Frontend: **Pin / Unpin** buttons on the source row (📌 shown when
+    pinned); the plugin row shows `from owner/repo @ ref · <sha>`; the
+    Update confirm shows `installed abc → incoming def "msg"` and warns
+    when the ref is a moving branch.
+- **Tests:** `TestResolveCommit` ×3 (`test_plugin_sources.py`, Mac);
+  resolve + pin/unpin roundtrip + 404 in `test_plugin_source_routes.py`
+  (CI/Pi).
 
 ### 2026-09-09 — Espressif udev rule world-writable (`0666`)  (backlog #4, review pass)
 - **Severity:** low–medium, latent (any local account → raw serial access to the mesh radios; only live when a `303a` board is attached)

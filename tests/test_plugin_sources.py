@@ -6,12 +6,16 @@ from __future__ import annotations
 import json
 import unittest
 
+from unittest import mock
+
+from src.plugins import sources as _sources_mod
 from src.plugins.sources import (
     PluginSourceError,
     catalog_raw_url,
     normalise_ref,
     parse_catalog,
     parse_github_url,
+    resolve_commit,
     tarball_url,
 )
 
@@ -67,6 +71,34 @@ class TestUrlParsing(unittest.TestCase):
             tarball_url("o", "r", "v1"),
             "https://api.github.com/repos/o/r/tarball/v1",
         )
+
+
+class TestResolveCommit(unittest.TestCase):
+    _COMMIT_JSON = json.dumps({
+        "sha": "9abcdef012345678901234567890123456789abc",
+        "html_url": "https://github.com/o/r/commit/9abcdef",
+        "commit": {
+            "message": "fix: the thing\n\nlonger body",
+            "author": {"date": "2026-09-09T12:00:00Z"},
+        },
+    }).encode()
+
+    def test_parses_github_commit_json(self) -> None:
+        with mock.patch.object(_sources_mod, "_http_get", return_value=self._COMMIT_JSON):
+            out = resolve_commit("https://github.com/o/r", "main")
+        self.assertEqual(out["sha"], "9abcdef012345678901234567890123456789abc")
+        self.assertEqual(out["short_sha"], "9abcdef")
+        self.assertEqual(out["message"], "fix: the thing")   # first line only
+        self.assertEqual(out["committed_at"], "2026-09-09T12:00:00Z")
+
+    def test_no_commit_is_an_error(self) -> None:
+        with mock.patch.object(_sources_mod, "_http_get", return_value=b'{"message":"Not Found"}'):
+            with self.assertRaises(PluginSourceError):
+                resolve_commit("https://github.com/o/r", "nope")
+
+    def test_rejects_non_github(self) -> None:
+        with self.assertRaises(PluginSourceError):
+            resolve_commit("https://gitlab.com/o/r", "main")
 
 
 _GOOD = {

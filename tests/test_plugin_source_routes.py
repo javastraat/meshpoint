@@ -172,6 +172,48 @@ class TestPluginSourceRoutes(unittest.TestCase):
         })
         self.assertEqual(r.status_code, 400)
 
+    def test_resolve_ref_returns_commit(self) -> None:
+        self._mod.resolve_commit = lambda url, ref: {
+            "sha": "9" * 40, "short_sha": "9999999",
+            "message": "do a thing", "committed_at": "2026-09-09T00:00:00Z",
+            "html_url": "https://github.com/you/p/commit/9999999",
+        }
+        r = self.client.get(
+            "/api/plugin-sources/resolve?url=https://github.com/you/p&ref=main",
+        )
+        self.assertEqual(r.status_code, 200, r.text)
+        body = r.json()
+        self.assertEqual(body["short_sha"], "9999999")
+        self.assertFalse(body["ref_is_pinned"])
+
+    def test_pin_then_unpin_roundtrip(self) -> None:
+        self.client.post("/api/plugin-sources", json={
+            "url": "https://github.com/you/p", "confirm": True,
+        })
+        sha = "a" * 40
+        r = self.client.patch("/api/plugin-sources", json={
+            "url": "https://github.com/you/p", "ref": sha,
+        })
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertTrue(r.json()["changed"])
+        src = self.cfg.plugin_sources[0]
+        self.assertEqual(src["ref"], sha)
+        self.assertEqual(src["pinned_from"], "main")   # remembered the branch
+
+        r = self.client.patch("/api/plugin-sources", json={
+            "url": "https://github.com/you/p", "ref": "main",
+        })
+        self.assertEqual(r.status_code, 200)
+        src = self.cfg.plugin_sources[0]
+        self.assertEqual(src["ref"], "main")
+        self.assertNotIn("pinned_from", src)
+
+    def test_pin_unknown_source_404(self) -> None:
+        r = self.client.patch("/api/plugin-sources", json={
+            "url": "https://github.com/you/p", "ref": "b" * 40,
+        })
+        self.assertEqual(r.status_code, 404)
+
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()

@@ -957,6 +957,14 @@ tampered `repo.json` can't smuggle anything in.
    extra warning). Browse also offers *Reinstall* when the versions match
    — a fresh copy from the source, for a plugin you've broken by editing
    it on the device.
+5. **Pinning.** A source normally tracks a *branch*, so an Update pulls
+   whatever is newest there — a compromised repo or a force-push lands
+   automatically. The source row's **Pin** button freezes it to the
+   commit it points at now (📌); **Unpin** returns to the branch it was
+   pinned from. Each installed plugin's row shows `from owner/repo @ ref
+   · <short-sha>`, and the Update confirmation shows `installed abc1234 →
+   incoming def5678` so you see exactly what's changing. (You can also
+   just set a tag or full SHA as the `ref` when adding the source.)
 
 The source list lives in `local.yaml` (`plugin_sources:`), so it survives
 restarts and self-updates.

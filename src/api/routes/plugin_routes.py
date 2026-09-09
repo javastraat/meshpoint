@@ -155,6 +155,9 @@ def _describe(
     loaded = manifest.name in loaded_names
     deps_ok, deps_detail = _deps_status(manifest.name)
     host = _host_manifest(manifest, route_map)
+    conf = _config.plugins.get(manifest.name)
+    prov = conf.get("source") if isinstance(conf, dict) else None
+    prov = prov if isinstance(prov, dict) else None
     dependency = None
     if manifest.hook is not None:
         dependency = {
@@ -184,6 +187,11 @@ def _describe(
         "locked": manifest.locked,
         "deletable": manifest.source == SOURCE_COMMUNITY and not manifest.locked,
         "dependency": dependency,
+        # Where this folder was installed from, when installed via a plugin
+        # source (Settings -> Plugins -> Plugin sources). None for a
+        # built-in or a hand-dropped folder. {url, ref, version, commit,
+        # installed_at}.
+        "provenance": prov,
     }
 
 

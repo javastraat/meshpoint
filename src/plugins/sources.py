@@ -116,6 +116,41 @@ def tarball_url(owner: str, repo: str, ref: str) -> str:
     return f"https://api.github.com/repos/{owner}/{repo}/tarball/{ref}"
 
 
+def commits_api_url(owner: str, repo: str, ref: str) -> str:
+    return f"https://api.github.com/repos/{owner}/{repo}/commits/{ref}"
+
+
+_MAX_COMMIT_JSON_BYTES = 512 * 1024
+
+
+def resolve_commit(url: str, ref: str) -> dict:
+    """Resolve a source's branch/tag/SHA ``ref`` to the concrete commit it
+    points at *right now* -- used to show "installed abc → will update to
+    def" before an Update, and to pin a moving branch. Returns
+    ``{sha, short_sha, message, committed_at, html_url}``. Raises
+    :class:`PluginSourceError`."""
+    owner, repo = parse_github_url(url)
+    ref = normalise_ref(ref)
+    raw = _http_get(commits_api_url(owner, repo, ref), _MAX_COMMIT_JSON_BYTES)
+    try:
+        data = json.loads(raw.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError) as exc:
+        raise PluginSourceError("fetch", f"bad commit JSON from GitHub: {exc}") from exc
+    sha = data.get("sha") if isinstance(data, dict) else None
+    if not isinstance(sha, str) or not re.fullmatch(r"[0-9a-f]{40}", sha):
+        raise PluginSourceError("fetch", f"GitHub returned no commit for {ref!r}")
+    commit = data.get("commit") or {}
+    author = (commit.get("author") or {}) if isinstance(commit, dict) else {}
+    return {
+        "sha": sha,
+        "short_sha": sha[:7],
+        "message": (commit.get("message") or "").splitlines()[0][:200]
+        if isinstance(commit, dict) else "",
+        "committed_at": author.get("date", "") if isinstance(author, dict) else "",
+        "html_url": data.get("html_url", "") if isinstance(data, dict) else "",
+    }
+
+
 def _http_get(url: str, max_bytes: int) -> bytes:
     req = urllib.request.Request(url, headers={"User-Agent": "Meshpoint"})
     try:

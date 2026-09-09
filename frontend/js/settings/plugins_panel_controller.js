@@ -113,19 +113,26 @@ class PluginsPanelController {
             this.srcListEl.innerHTML = '<p class="plugins-sources__empty">No sources added.</p>';
             return;
         }
-        this.srcListEl.innerHTML = this._sources.map((s) => `
+        this.srcListEl.innerHTML = this._sources.map((s) => {
+            const ref = s.ref || 'main';
+            const pinned = /^[0-9a-f]{7,40}$/.test(ref);
+            const pinBtn = pinned
+                ? `<button type="button" class="plugin-row__update plugin-row__update--down" data-src-unpin title="Follow ${this._escape(s.pinned_from || 'main')} again">Unpin</button>`
+                : `<button type="button" class="plugin-row__update" data-src-pin title="Freeze this source to the commit it points at now">Pin</button>`;
+            return `
             <div class="plugins-source" data-src-row="${this._escape(s.url)}">
                 <div class="plugins-source__head">
                     <a href="${this._escape(s.url)}" target="_blank" rel="noopener" class="plugins-source__url">${this._escape(s.url)}</a>
-                    <span class="plugins-source__ref">@ ${this._escape(s.ref || 'main')}</span>
+                    <span class="plugins-source__ref" title="${pinned ? 'pinned to this commit' : 'tracks this branch — moves'}">${pinned ? '📌 ' : '@ '}${this._escape(pinned ? ref.slice(0, 7) : ref)}</span>
                     <span class="plugins-source__count" data-src-count></span>
                     <span class="plugins-source__spacer"></span>
+                    ${pinBtn}
                     <button type="button" class="terminal-button" data-src-browse>Browse</button>
                     <button type="button" class="plugin-row__toggle" data-src-remove title="Remove source">&times;</button>
                 </div>
                 <div class="plugins-source__catalog" data-src-catalog hidden></div>
-            </div>
-        `).join('');
+            </div>`;
+        }).join('');
         // Scan each source's catalog on load (one lightweight fetch per
         // source): fills the row's "— N plugins" count AND records which
         // installed plugins have a newer version available, so the main
@@ -163,6 +170,7 @@ class PluginsPanelController {
                 this._updates[p.id] = {
                     url: cat.url || url, ref: cat.ref || ref,
                     installed_version: p.installed_version, version: p.version,
+                    installed_commit: p.installed_commit || '',
                     downgrade: this._cmpVersions(p.version, p.installed_version) < 0,
                 };
             } else if (this._updates[p.id]) {
@@ -198,6 +206,8 @@ class PluginsPanelController {
         if (!row) return;
         const url = row.dataset.srcRow;
         if (e.target.closest('[data-src-remove]')) { this._removeSource(url); return; }
+        if (e.target.closest('[data-src-pin]')) { this._pinSource(url); return; }
+        if (e.target.closest('[data-src-unpin]')) { this._unpinSource(url); return; }
         const installBtn = e.target.closest('[data-src-install]');
         if (installBtn) {
             const cat = row.querySelector('[data-src-catalog]');
@@ -260,6 +270,53 @@ class PluginsPanelController {
             if (r.ok) { this._setSrcStatus('success', 'Source removed.'); this._loadSources(); }
             else this._setSrcStatus('error', `Failed (HTTP ${r.status}).`);
         } catch (e) { this._setSrcStatus('error', e.message || 'Failed.'); }
+    }
+
+    async _repointSource(url, ref, verb) {
+        try {
+            const r = await fetch('/api/plugin-sources', {
+                method: 'PATCH', credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url, ref }),
+            });
+            const body = await r.json().catch(() => ({}));
+            if (!r.ok) { this._setSrcStatus('error', body.detail || `Failed (HTTP ${r.status}).`); return; }
+            this._setSrcStatus('success', `${verb}. Future installs/updates from this source use ${/^[0-9a-f]{7,40}$/.test(ref) ? ref.slice(0, 7) : ref}.`);
+            this._loadSources();
+        } catch (e) { this._setSrcStatus('error', e.message || 'Failed.'); }
+    }
+
+    async _pinSource(url) {
+        const src = this._sources.find((s) => s.url === url) || {};
+        const ref = src.ref || 'main';
+        this._setSrcStatus('pending', `Resolving ${ref}…`);
+        let commit;
+        try {
+            const r = await fetch(`/api/plugin-sources/resolve?url=${encodeURIComponent(url)}&ref=${encodeURIComponent(ref)}`, { credentials: 'same-origin' });
+            commit = await r.json();
+            if (!r.ok) { this._setSrcStatus('error', commit.detail || `Could not resolve ${ref}.`); return; }
+        } catch (e) { this._setSrcStatus('error', e.message || 'Failed.'); return; }
+        const ok = await this._confirm(
+            `Pin "${url}" to commit ${commit.short_sha}?\n\n` +
+            `${commit.message ? `"${commit.message}"\n` : ''}${commit.committed_at ? `${commit.committed_at.slice(0, 10)}\n` : ''}\n` +
+            `Right now this source tracks the "${ref}" branch, so every Install/Update pulls whatever's newest there — a compromised repo or a force-push lands automatically. ` +
+            `Pinning freezes it to exactly ${commit.short_sha} until you Unpin.`,
+            { label: 'Pin plugin source?', command: `pin ${url} @ ${commit.short_sha}` },
+        );
+        if (!ok) { this._setSrcStatus('', ''); return; }
+        this._repointSource(url, commit.sha, `Pinned to ${commit.short_sha}`);
+    }
+
+    async _unpinSource(url) {
+        const src = this._sources.find((s) => s.url === url) || {};
+        const back = src.pinned_from || 'main';
+        const ok = await this._confirm(
+            `Unpin "${url}" and follow the "${back}" branch again?\n\n` +
+            `Install/Update will then pull whatever is newest on ${back}.`,
+            { label: 'Unpin plugin source?', command: `unpin ${url} → ${back}` },
+        );
+        if (!ok) return;
+        this._repointSource(url, back, `Unpinned — following ${back}`);
     }
 
     async _browseSource(url, ref, catEl) {
@@ -369,8 +426,21 @@ class PluginsPanelController {
         const warn = down
             ? `\n\n⚠ This is a DOWNGRADE (v${upd.installed_version} → v${upd.version}). Older plugin code may not read data or config written by the newer version — only go back if you know the older version works for you.`
             : '';
+        // Resolve the source ref to the commit this Update will actually
+        // pull, so the operator sees "3611b1b → 9abcdef  'message'" and
+        // whether the ref is a moving branch, before committing.
+        let shaLine = '';
+        try {
+            const rr = await fetch(`/api/plugin-sources/resolve?url=${encodeURIComponent(upd.url)}&ref=${encodeURIComponent(upd.ref || 'main')}`, { credentials: 'same-origin' });
+            if (rr.ok) {
+                const c = await rr.json();
+                const from = (upd.installed_commit || '').slice(0, 7) || '(unknown)';
+                shaLine = `\n\nCommit: ${from} → ${c.short_sha}${c.message ? `  "${c.message}"` : ''}`
+                    + (c.ref_is_pinned ? '' : `\n(the source tracks the "${upd.ref}" branch — this is wherever it points now)`);
+            }
+        } catch (_) { /* best-effort — the confirm still works without it */ }
         const ok = await this._confirm(
-            `${verb} "${plugin.id}" from v${upd.installed_version} to v${upd.version}?${warn}\n\n` +
+            `${verb} "${plugin.id}" from v${upd.installed_version} to v${upd.version}?${warn}${shaLine}\n\n` +
             `Downloaded from ${upd.url}${upd.ref ? ` @ ${upd.ref}` : ''}, re-validated, and ` +
             `installed in place. Its enabled state is kept — restart to load the new version.`,
             { label: `${verb} plugin?`, command: `${verb.toLowerCase()} ${plugin.id}` },
@@ -739,6 +809,19 @@ class PluginsPanelController {
             plugin.author ? this._escape(plugin.author) : '',
             plugin.homepage ? `<a href="${this._escape(plugin.homepage)}" target="_blank" rel="noopener noreferrer">homepage</a>` : '',
         ].filter(Boolean).join(' &middot; ');
+        // When installed from a plugin source, show where from + which
+        // commit -- the ref/version are mutable, the SHA is the real
+        // "what code is this" anchor (📌 = the source is pinned to it).
+        const pr = plugin.provenance;
+        let provHtml = '';
+        if (pr && pr.url) {
+            const short = (pr.commit || '').slice(0, 7);
+            const repo = this._escape(pr.url.replace(/^https?:\/\/github\.com\//, ''));
+            const refPinned = /^[0-9a-f]{7,40}$/.test(pr.ref || '');
+            provHtml = `<span class="plugin-row__prov">from <a href="${this._escape(pr.url)}" target="_blank" rel="noopener noreferrer">${repo}</a>`
+                + ` ${refPinned ? '📌' : '@'} ${this._escape(refPinned ? (pr.ref || '').slice(0, 7) : (pr.ref || 'main'))}`
+                + `${short ? ` &middot; <code>${this._escape(short)}</code>` : ''}</span>`;
+        }
         row.innerHTML = `
             <td>
                 <span${hostMeta ? ' class="plugin-row__namewrap--foldable" data-group-toggle-cell' : ''}>
@@ -746,6 +829,7 @@ class PluginsPanelController {
                     ${hostMeta && hostMeta.collapsed ? `<span class="plugin-row__count">+${hostMeta.memberCount} plugin${hostMeta.memberCount === 1 ? '' : 's'}</span>` : ''}
                 </span>
                 <span class="plugin-row__version">v${this._escape(plugin.version)}${byLine ? ` &middot; ${byLine}` : ''}</span>
+                ${provHtml}
             </td>
             <td><span class="plugin-row__badge plugin-row__badge--${badgeMod}">${badgeLabel}</span></td>
             <td class="plugin-row__meta">

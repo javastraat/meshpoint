@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -43,7 +44,10 @@ from src.plugins.sources import (
     fetch_catalog,
     normalise_ref,
     parse_github_url,
+    resolve_commit,
 )
+
+_SHA_RE = re.compile(r"^[0-9a-f]{7,40}$")
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +96,13 @@ def _installed_index() -> dict[str, str]:
     """id -> installed version, for every discovered plugin (built-in +
     community drop-in). Used to annotate catalog entries."""
     return {m.name: m.version for m in discover_plugins(_builtin_dir, _community_dir)}
+
+
+def _provenance(plugin_id: str) -> dict:
+    """``plugins.<id>.source`` for an installed plugin, or ``{}``."""
+    conf = _require_config().plugins.get(plugin_id)
+    src = conf.get("source") if isinstance(conf, dict) else None
+    return src if isinstance(src, dict) else {}
 
 
 @router.get("")
@@ -206,7 +217,88 @@ async def source_catalog(
         entry["installed"] = cur is not None
         entry["installed_version"] = cur
         entry["update_available"] = bool(cur and cur != entry["version"])
+        prov = _provenance(entry["id"]) if cur is not None else {}
+        entry["installed_commit"] = prov.get("commit") or ""
+        entry["installed_ref"] = prov.get("ref") or ""
     return catalog
+
+
+@router.get("/resolve")
+async def resolve_source_ref(
+    url: str, ref: str | None = None,
+    _claims: SessionClaims = Depends(require_admin),
+):
+    """Resolve a source's ``ref`` to the commit it points at *right now*
+    (GitHub commits API). Lets the UI show "installed abc1234 → will
+    update to def5678 (commit message)" before an Update, and feeds the
+    Pin action. ``ref`` defaults to the configured source ref."""
+    _require_config()
+    try:
+        owner, repo = parse_github_url(url)
+    except PluginSourceError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    canon = canonical_url(owner, repo)
+    if ref is None:
+        ref = next((s.get("ref") for s in _sources() if s.get("url") == canon), None) or "main"
+
+    try:
+        commit = resolve_commit(canon, ref)
+    except PluginSourceError as exc:
+        raise HTTPException(400 if exc.code in ("url", "ref") else 502, str(exc)) from exc
+    return {"url": canon, "ref": ref, "ref_is_pinned": bool(_SHA_RE.match(ref)), **commit}
+
+
+class RepointSource(BaseModel):
+    url: str = Field(..., min_length=4)
+    ref: str = Field(..., min_length=1, max_length=100)
+
+
+@router.patch("")
+async def repoint_source(
+    req: RepointSource,
+    claims: SessionClaims = Depends(require_admin),
+    audit: AuditLogWriter = Depends(get_audit_writer),
+):
+    """Change a configured source's ``ref`` -- the mechanism behind
+    **Pin** (branch -> the commit SHA it currently resolves to) and
+    **Unpin** (SHA -> the branch it was pinned from). When pinning, the
+    prior ref is remembered as ``pinned_from`` so Unpin can restore it.
+    Doesn't touch anything already installed -- only what the next
+    Install/Update from this source will pull."""
+    _require_config()
+    try:
+        owner, repo = parse_github_url(req.url)
+        new_ref = normalise_ref(req.ref)
+    except PluginSourceError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    canon = canonical_url(owner, repo)
+
+    sources = _sources()
+    idx = next((i for i, s in enumerate(sources) if s.get("url") == canon), None)
+    if idx is None:
+        raise HTTPException(404, f"{canon} is not a configured source")
+
+    updated = dict(sources[idx])
+    old_ref = updated.get("ref") or "main"
+    if new_ref == old_ref:
+        return {"changed": False, "source": updated}
+
+    now_pinned = bool(_SHA_RE.match(new_ref))
+    was_pinned = bool(_SHA_RE.match(old_ref))
+    if now_pinned and not was_pinned:
+        updated["pinned_from"] = old_ref            # remember the branch
+    elif not now_pinned:
+        updated.pop("pinned_from", None)            # unpinned / moved to another branch
+    updated["ref"] = new_ref
+
+    with audit.timed_action(
+        user=claims.subject, action="config.plugin_source_repoint",
+        params={"url": canon, "from": old_ref, "to": new_ref},
+    ):
+        _persist([*sources[:idx], updated, *sources[idx + 1:]])
+
+    logger.info("plugin source %s ref %s -> %s (by %s)", canon, old_ref, new_ref, claims.subject)
+    return {"changed": True, "source": updated}
 
 
 class InstallFromSource(BaseModel):
