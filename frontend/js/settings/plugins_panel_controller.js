@@ -157,14 +157,7 @@ class PluginsPanelController {
             return;
         }
         const entries = [...(cat.plugins || []), ...(cat.themes || [])];
-        if (el) {
-            const np = (cat.plugins || []).length;
-            const nt = (cat.themes || []).length;
-            const parts = [];
-            if (np) parts.push(`${np} plugin${np === 1 ? '' : 's'}`);
-            if (nt) parts.push(`${nt} theme${nt === 1 ? '' : 's'}`);
-            el.textContent = parts.length ? `— ${parts.join(', ')}` : '— empty';
-        }
+        if (el) el.textContent = this._formatCatalogCount(cat);
         entries.forEach((p) => {
             if (p.update_available) {
                 this._updates[p.id] = {
@@ -178,6 +171,19 @@ class PluginsPanelController {
             }
         });
         if (this._plugins.length) this._render();
+    }
+
+    /** "— N plugins, M themes" / "— empty" for a fetched catalog, shared by
+     * the header count (_scanSource, on load) and Browse (_browseSource) so
+     * a Browse re-fetch also corrects a stale count instead of leaving the
+     * page-load figure stuck. */
+    _formatCatalogCount(cat) {
+        const np = (cat.plugins || []).length;
+        const nt = (cat.themes || []).length;
+        const parts = [];
+        if (np) parts.push(`${np} plugin${np === 1 ? '' : 's'}`);
+        if (nt) parts.push(`${nt} theme${nt === 1 ? '' : 's'}`);
+        return parts.length ? `— ${parts.join(', ')}` : '— empty';
     }
 
     /** Rough semver-ish compare -> -1 / 0 / 1. Splits on . - + and
@@ -334,6 +340,8 @@ class PluginsPanelController {
             return;
         }
         catEl.dataset.ref = cat.ref || 'main';
+        const countEl = catEl.closest('.plugins-source')?.querySelector('[data-src-count]');
+        if (countEl) countEl.textContent = this._formatCatalogCount(cat);
         const rows = [...(cat.plugins || []), ...(cat.themes || [])];
         if (!rows.length) {
             catEl.innerHTML = '<p class="plugins-sources__empty">This source lists no plugins or themes.</p>';
