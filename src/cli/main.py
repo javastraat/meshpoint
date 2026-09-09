@@ -148,7 +148,7 @@ def main() -> None:
     )
     plugin_index = plugin_sub.add_parser(
         "index",
-        help="Generate meshpoint.json for a plugin repo (run in the repo, not "
+        help="Generate repo.json for a plugin repo (run in the repo, not "
              "on the device)",
     )
     plugin_index.add_argument(
@@ -158,7 +158,7 @@ def main() -> None:
     )
     plugin_index.add_argument(
         "-w", "--write", action="store_true",
-        help="Write meshpoint.json into the repo (default: print to stdout)",
+        help="Write repo.json into the repo (default: print to stdout)",
     )
     plugin_parser.set_defaults(plugin_parser=plugin_parser)
 

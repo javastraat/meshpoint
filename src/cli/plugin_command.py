@@ -218,7 +218,7 @@ def run_plugin_setup(plugin_id: str, *, skip_confirm: bool = False) -> int:
 
 
 def run_plugin_index(repo_dir: str, *, write: bool = False) -> int:
-    """Generate a plugin repo's ``meshpoint.json`` from the ``plugin.toml``
+    """Generate a plugin repo's ``repo.json`` from the ``plugin.toml``
     / ``theme.json`` files under its ``apps/`` and ``themes/`` dirs.
 
     Run this *in the plugin repo* (not on a device). It's the tool a repo
@@ -285,8 +285,8 @@ def run_plugin_index(repo_dir: str, *, write: bool = False) -> int:
 
     rendered = json.dumps(doc, indent=2) + "\n"
     if write:
-        (root / "meshpoint.json").write_text(rendered, encoding="utf-8")
-        print(f"  Wrote {root / 'meshpoint.json'} "
+        (root / "repo.json").write_text(rendered, encoding="utf-8")
+        print(f"  Wrote {root / 'repo.json'} "
               f"({len(plugins)} plugin(s), {len(themes)} theme(s)).\n")
     else:
         print(rendered)

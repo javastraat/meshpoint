@@ -1,24 +1,28 @@
 """Plugin *sources* -- operator-added GitHub repos of installable plugins
 and themes (Settings -> Plugins -> "Add source").
 
-Phase 2 (this file): add / remove a source, and browse its catalog. No
-install yet -- ``GET /api/plugin-sources/catalog`` returns what a repo
-offers, annotated with whether each entry is already installed / an
-update is available / compatible with this Meshpoint.
+Endpoints: add / remove a source, browse its catalog
+(``GET /api/plugin-sources/catalog`` -- what a repo offers, annotated with
+installed / update-available / compatible), and install one entry from it
+(``POST /api/plugin-sources/install`` -- see :mod:`src.plugins.installer`).
 
 Sources are persisted to ``local.yaml`` (``plugin_sources:``) so they
 survive restarts and self-updates -- ``local.yaml`` is user-owned and
-git never touches it, same as ``plugins.<id>.enabled``.
+git never touches it, same as ``plugins.<id>.enabled``. An installed
+plugin's provenance goes to ``plugins.<id>.source`` in the same file.
 
 **Trust model:** adding a source is the consent point. A source repo can
-later install code that runs in-process with the service's privileges
-(and root, via a plugin's ``setup.sh``), so ``POST`` requires an explicit
-``confirm: true`` and is audited. Installing (Phase 3) and running a
-setup script stay separate, explicit actions.
+install code that runs in-process with the service's privileges (and
+root, via a plugin's ``setup.sh``), so ``POST`` (add) requires an
+explicit ``confirm: true`` and is audited. Installing re-validates the
+real manifest from the downloaded files (never the catalog), refuses a
+built-in or ``locked`` id, and leaves the plugin disabled -- enabling it
+and running its setup script stay separate, explicit actions.
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
@@ -30,12 +34,14 @@ from src.api.audit import AuditLogWriter
 from src.api.audit.dependencies import get_audit_writer
 from src.api.auth.dependencies import require_admin
 from src.api.auth.jwt_session import SessionClaims
-from src.config import AppConfig, save_top_level_to_yaml
-from src.plugins.manifest import discover_plugins
+from src.config import AppConfig, save_section_to_yaml, save_top_level_to_yaml
+from src.plugins.installer import PluginInstallError, install_from_source
+from src.plugins.manifest import SOURCE_COMMUNITY, discover_plugins
 from src.plugins.sources import (
     PluginSourceError,
     canonical_url,
     fetch_catalog,
+    normalise_ref,
     parse_github_url,
 )
 
@@ -175,7 +181,7 @@ async def source_catalog(
     url: str, ref: str | None = None,
     _claims: SessionClaims = Depends(require_admin),
 ):
-    """Fetch a source's ``meshpoint.json`` and return its offerings,
+    """Fetch a source's ``repo.json`` and return its offerings,
     annotated with install/compat state. ``ref`` defaults to the source's
     configured ref, then ``main``."""
     _require_config()
@@ -201,3 +207,128 @@ async def source_catalog(
         entry["installed_version"] = cur
         entry["update_available"] = bool(cur and cur != entry["version"])
     return catalog
+
+
+class InstallFromSource(BaseModel):
+    url: str = Field(..., min_length=4)
+    id: str = Field(..., min_length=2, max_length=39)
+    ref: str | None = None
+
+
+def _record_provenance(plugin_id: str, url: str, ref: str, version: str) -> None:
+    """Write ``plugins.<id>.source`` so a later reader knows this folder
+    came from a source (and which ref/version). Best-effort -- the plugin
+    is already on disk, so a read-only ``local.yaml`` is a warning, not a
+    failed install."""
+    plugins = _require_config().plugins
+    existing = plugins.get(plugin_id)
+    existing = dict(existing) if isinstance(existing, dict) else {}
+    existing["source"] = {
+        "url": url,
+        "ref": ref,
+        "version": version,
+        "installed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    }
+    plugins[plugin_id] = existing
+    try:
+        save_section_to_yaml("plugins", {plugin_id: existing})
+    except PermissionError as exc:
+        logger.warning("could not persist provenance for %s: %s", plugin_id, exc)
+
+
+@router.post("/install")
+async def install_from_source_route(
+    req: InstallFromSource,
+    claims: SessionClaims = Depends(require_admin),
+    audit: AuditLogWriter = Depends(get_audit_writer),
+):
+    """Install (or update) one plugin/theme from an already-added source.
+
+    The trust decision was made when the source was added; this is
+    admin-only and audited. Meshpoint downloads just that entry's subtree
+    from GitHub, re-validates the real ``plugin.toml`` / ``theme.json``
+    (the catalog is never trusted for this), refuses a built-in id or a
+    ``locked`` plugin, and drops it into ``plugins/apps/<id>/`` (or
+    ``plugins/themes/<id>/``). It stays disabled; ``setup.sh`` is a
+    separate step.
+    """
+    if _config is None or _community_dir is None:
+        raise HTTPException(503, "Config not loaded")
+
+    try:
+        owner, repo = parse_github_url(req.url)
+    except PluginSourceError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    canon = canonical_url(owner, repo)
+
+    source = next((s for s in _sources() if s.get("url") == canon), None)
+    if source is None:
+        raise HTTPException(
+            400,
+            f"{canon} is not a configured plugin source -- add it first so the "
+            "trust decision is explicit.",
+        )
+    try:
+        ref = normalise_ref(req.ref or source.get("ref") or "main")
+    except PluginSourceError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+    try:
+        catalog = fetch_catalog(canon, ref)
+    except PluginSourceError as exc:
+        raise HTTPException(400 if exc.code in ("url", "ref") else 502, str(exc)) from exc
+
+    entry = next(
+        (e for e in catalog["plugins"] + catalog["themes"] if e["id"] == req.id), None,
+    )
+    if entry is None:
+        raise HTTPException(404, f"{req.id!r} is not in {canon}'s catalog at {ref}")
+    if not entry["compatible"]:
+        raise HTTPException(
+            400,
+            f"{req.id!r} needs meshpoint_api {entry['meshpoint_api']}; this "
+            "Meshpoint is older. Update Meshpoint first.",
+        )
+
+    # Re-validation happens again on the downloaded files, but catch the
+    # obvious refusals before spending a download.
+    manifests = discover_plugins(_builtin_dir, _community_dir)
+    existing = next((m for m in manifests if m.name == req.id), None)
+    if existing is not None and existing.source != SOURCE_COMMUNITY:
+        raise HTTPException(409, f"{req.id!r} is a built-in plugin id and can't be replaced.")
+    if existing is not None and existing.locked:
+        raise HTTPException(409, f"{req.id!r} is a locked plugin and can't be replaced.")
+    updating = existing is not None
+
+    with audit.timed_action(
+        user=claims.subject,
+        action="config.plugin_install",
+        params={"url": canon, "ref": ref, "id": req.id, "update": updating},
+    ):
+        try:
+            result = await asyncio.to_thread(
+                install_from_source, owner, repo, ref, entry, _community_dir,
+            )
+        except PluginInstallError as exc:
+            status = 502 if exc.code in ("fetch", "size", "archive") else 400
+            raise HTTPException(status, str(exc)) from exc
+        except PermissionError as exc:
+            raise HTTPException(
+                403,
+                f"Cannot write into {_community_dir} -- the service user lacks "
+                f"permission. Fix with: sudo chown -R meshpoint:meshpoint "
+                f"{_community_dir.parent}",
+            ) from exc
+        _record_provenance(result["id"], canon, ref, result["version"])
+
+    logger.info(
+        "plugin %s %s from %s@%s (v%s) by %s",
+        req.id, "updated" if updating else "installed", canon, ref,
+        result["version"], claims.subject,
+    )
+    return {
+        "installed": True,
+        "updated": updating,
+        "restart_required": True,
+        **result,
+    }

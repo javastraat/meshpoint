@@ -1270,6 +1270,7 @@ select.update-field__input option:checked {
 }
 .plugins-source__url { font-size: 0.82rem; }
 .plugins-source__ref { font-size: 0.72rem; color: var(--text-muted); }
+.plugins-source__count { font-size: 0.72rem; color: var(--text-muted); }
 .plugins-source__spacer { flex: 1 1 auto; }
 .plugins-source__catalog {
     margin-top: 0.6rem;

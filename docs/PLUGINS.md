@@ -884,7 +884,7 @@ manifest `name`:
 
 ```
 your-repo/
-  meshpoint.json          # the browse catalog (generated, see below)
+  repo.json               # the browse catalog (generated, see below)
   apps/
     my-thing/
       plugin.toml
@@ -896,7 +896,7 @@ your-repo/
       theme.css
 ```
 
-### `meshpoint.json`
+### `repo.json`
 
 A catalog at the repo root, one entry per plugin/theme:
 
@@ -920,28 +920,33 @@ A catalog at the repo root, one entry per plugin/theme:
 Every field but `id`/`kind`/`path` mirrors the plugin's own `plugin.toml` /
 `theme.json`. **Generate it — don't hand-write it.** Two ways:
 
-- A standalone `make-meshpoint-json.py` in your repo (Python 3.11+, no
+- A standalone `make-repo-json.py` in your repo (Python 3.11+, no
   Meshpoint checkout needed) — the template repo ships one; it scans
-  `apps/*/plugin.toml` + `themes/*/theme.json` and writes `meshpoint.json`,
+  `apps/*/plugin.toml` + `themes/*/theme.json` and writes `repo.json`,
   warning about folder/name mismatches, unknown `provides`, duplicate ids.
 - `meshpoint plugin index /path/to/your-repo --write` from a Meshpoint
   checkout — same output, using Meshpoint's own manifest validator.
 
 Re-run whenever you bump a version. Meshpoint re-reads and re-validates the
 real manifest on install, so the catalog is metadata only — a stale or
-tampered `meshpoint.json` can't smuggle anything in.
+tampered `repo.json` can't smuggle anything in.
 
 ### How an operator uses it
 
 1. **Add source** → paste the repo URL → an explicit trust confirmation
    (a source can install code that runs with the service's privileges, and
    its `setup.sh` runs as root).
-2. **Browse** → Meshpoint fetches `meshpoint.json` and shows what the repo
+2. **Browse** → Meshpoint fetches `repo.json` and shows what the repo
    offers, flagging what's already installed / has an update / needs a
    newer Meshpoint.
-3. **Install** *(landing in a later update)* → downloads just that plugin's
-   subtree, re-validates the manifest, drops it in `plugins/apps/<id>/`.
-   From there it's a normal drop-in — enable, run setup, restart.
+3. **Install** → downloads just that plugin's subtree from GitHub
+   (`api.github.com/…/tarball/<ref>`, no `git` needed), rejects any unsafe
+   archive member, re-validates the real `plugin.toml` with Meshpoint's own
+   parser, and drops it in `plugins/apps/<id>/`. From there it's a normal
+   drop-in — enable it, run setup if it needs it, restart. **Update** does
+   the same in place and keeps the enabled state; uninstall is the list's
+   existing Delete button. Provenance (source URL, ref, version) is
+   recorded under `plugins.<id>.source` in `local.yaml`.
 
 The source list lives in `local.yaml` (`plugin_sources:`), so it survives
 restarts and self-updates.

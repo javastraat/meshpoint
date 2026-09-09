@@ -12994,3 +12994,36 @@ file → all Reticulum down until fixed on the Pi, so validation matters.
   rnsd STILL starts. Checklist in `memory/reticulum_todo.md`.
 - Deliberately NOT offered: I2P (needs i2pd), a 2nd RNodeInterface
   (serial/firmware complexity), AutoInterface (already the default).
+
+## Plugin sources — Phase 3 install + repo.json rename (2026-09-09)
+
+Full details in `memory/project_plugin_sources.md`. Summary:
+
+- Renamed the repo catalog file `meshpoint.json` → **`repo.json`** at the
+  user's request ("makes more sense in the plugin repos"). Swept
+  `sources.py` (`MESHPOINT_REPO_MANIFEST`), `plugin_command.py` /
+  `main.py` (`meshpoint plugin index`), PLUGINS.md, tests. In the
+  meshpoint-plugins repo: `git mv meshpoint.json repo.json` and
+  `git mv make-meshpoint-json.py make-repo-json.py` (+ internals + README).
+  Internal version key stays `meshpoint_repo: 1`.
+- **Install now works.** New `src/plugins/installer.py` (FastAPI-free):
+  download `…/tarball/<ref>`, extract ONLY the entry's `<path>/**`
+  subtree, abort on any unsafe tar member (`..` / absolute / symlink /
+  hardlink / device), re-validate the real `plugin.toml` via
+  `parse_manifest` (refuse `locked=true`), `place()` into
+  `plugins/apps/<id>/` with a `.replacing` backup + rollback.
+- New `POST /api/plugin-sources/install {url,id,ref?}` in
+  `plugin_source_routes.py` — must be an already-configured source,
+  admin+audited, refuses built-in/locked/incompatible, records
+  `plugins.<id>.source` provenance. Same endpoint handles update
+  (id already installed → replace, keep `enabled`).
+- Frontend: Install/Update/Installed buttons wired in `_browseSource`,
+  `_installFromSource()`, plus per-source "— N plugins" count shown
+  without clicking Browse (`_fillSourceCount`).
+- Tests: `tests/test_plugin_installer.py` (Mac, in-test tarball) +
+  3 install route tests (CI/Pi). Mac suite green
+  (`pytest --ignore=plugins/apps/reticulum/backend/tests/test_config_routes.py`).
+- **NOT Pi-tested.** Owed: add source → Browse shows count → Install
+  hello-world-github → folder lands in `plugins/apps/` → enable +
+  restart → page loads; Update after a version bump; provenance written
+  to local.yaml.

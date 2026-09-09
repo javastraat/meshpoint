@@ -105,6 +105,7 @@ class PluginsPanelController {
                 <div class="plugins-source__head">
                     <a href="${this._escape(s.url)}" target="_blank" rel="noopener" class="plugins-source__url">${this._escape(s.url)}</a>
                     <span class="plugins-source__ref">@ ${this._escape(s.ref || 'main')}</span>
+                    <span class="plugins-source__count" data-src-count></span>
                     <span class="plugins-source__spacer"></span>
                     <button type="button" class="terminal-button" data-src-browse>Browse</button>
                     <button type="button" class="plugin-row__toggle" data-src-remove title="Remove source">&times;</button>
@@ -112,6 +113,32 @@ class PluginsPanelController {
                 <div class="plugins-source__catalog" data-src-catalog hidden></div>
             </div>
         `).join('');
+        // Fill each row's "— N plugins" count from its catalog without
+        // waiting for a Browse click. One lightweight fetch per source
+        // (there are rarely more than a couple); failures degrade to a
+        // quiet "— unreachable" rather than blocking the row.
+        this._sources.forEach((s) => this._fillSourceCount(s.url, s.ref || 'main'));
+    }
+
+    async _fillSourceCount(url, ref) {
+        const row = this.srcListEl.querySelector(`[data-src-row="${(window.CSS && CSS.escape) ? CSS.escape(url) : url}"]`);
+        const el = row && row.querySelector('[data-src-count]');
+        if (!el) return;
+        el.textContent = '— checking…';
+        try {
+            const qs = `url=${encodeURIComponent(url)}${ref ? `&ref=${encodeURIComponent(ref)}` : ''}`;
+            const r = await fetch(`/api/plugin-sources/catalog?${qs}`, { credentials: 'same-origin' });
+            if (!r.ok) { el.textContent = '— unreachable'; return; }
+            const cat = await r.json();
+            const np = (cat.plugins || []).length;
+            const nt = (cat.themes || []).length;
+            const parts = [];
+            if (np) parts.push(`${np} plugin${np === 1 ? '' : 's'}`);
+            if (nt) parts.push(`${nt} theme${nt === 1 ? '' : 's'}`);
+            el.textContent = parts.length ? `— ${parts.join(', ')}` : '— empty';
+        } catch (_) {
+            el.textContent = '';
+        }
     }
 
     _onSourceClick(e) {
@@ -119,6 +146,15 @@ class PluginsPanelController {
         if (!row) return;
         const url = row.dataset.srcRow;
         if (e.target.closest('[data-src-remove]')) { this._removeSource(url); return; }
+        const installBtn = e.target.closest('[data-src-install]');
+        if (installBtn) {
+            const cat = row.querySelector('[data-src-catalog]');
+            this._installFromSource(
+                url, installBtn.dataset.id, cat.dataset.ref,
+                installBtn.dataset.update === '1', cat,
+            );
+            return;
+        }
         if (e.target.closest('[data-src-browse]')) {
             const cat = row.querySelector('[data-src-catalog]');
             if (!cat.hidden) { cat.hidden = true; return; }
@@ -204,15 +240,54 @@ class PluginsPanelController {
                         : p.installed
                             ? '<span class="plugin-row__badge plugin-row__badge--builtin">installed</span>'
                             : '';
+                let btn;
+                if (!p.compatible) {
+                    btn = '<button type="button" class="terminal-button" disabled title="Update Meshpoint first">Install</button>';
+                } else if (p.update_available) {
+                    btn = `<button type="button" class="terminal-button" data-src-install data-id="${this._escape(p.id)}" data-update="1">Update</button>`;
+                } else if (p.installed) {
+                    btn = '<button type="button" class="terminal-button" disabled>Installed</button>';
+                } else {
+                    btn = `<button type="button" class="terminal-button" data-src-install data-id="${this._escape(p.id)}">Install</button>`;
+                }
                 return `<tr>
                     <td><span class="plugin-row__name">${this._escape(p.id)}</span>
                         <span class="plugin-row__version">v${this._escape(p.version)} · ${this._escape(p.kind)}${p.author ? ` · ${this._escape(p.author)}` : ''}</span>
                         ${p.description ? `<span class="plugin-row__version">${this._escape(p.description)}</span>` : ''}</td>
-                    <td class="plugins-source__catright">${badge}
-                        <button type="button" class="terminal-button" disabled title="Installing from a source lands in a later update">Install</button></td>
+                    <td class="plugins-source__catright">${badge}${btn}</td>
                 </tr>`;
             }).join('')}
             </tbody></table>`;
+    }
+
+    async _installFromSource(url, id, ref, isUpdate, catEl) {
+        const verb = isUpdate ? 'Update' : 'Install';
+        const ok = await this._confirm(
+            `${verb} "${id}" from ${url}${ref ? ` @ ${ref}` : ''}?\n\n` +
+            `Meshpoint downloads just this plugin's files, re-validates its plugin.toml, ` +
+            `and places it in plugins/apps/. It stays disabled until you enable it, and ` +
+            `any setup.sh is a separate step you run afterwards.`,
+            { label: `${verb} plugin?`, command: `${verb.toLowerCase()} ${id}` },
+        );
+        if (!ok) return;
+        this._setSrcStatus('pending', `${isUpdate ? 'Updating' : 'Installing'} ${id}…`);
+        try {
+            const r = await fetch('/api/plugin-sources/install', {
+                method: 'POST', credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url, id, ref: ref || null }),
+            });
+            const body = await r.json().catch(() => ({}));
+            if (!r.ok) { this._setSrcStatus('error', body.detail || `Failed (HTTP ${r.status}).`); return; }
+            this._setSrcStatus('success',
+                `${body.updated ? 'Updated' : 'Installed'} ${id} v${body.version}. ` +
+                `${body.has_setup ? 'It needs setup — enable it and run setup below, then restart.'
+                    : 'Enable it in the list above and restart to load it.'}`);
+            this.refresh();
+            if (catEl) this._browseSource(url, ref, catEl);
+        } catch (e) {
+            this._setSrcStatus('error', e.message || 'Failed.');
+        }
     }
 
     _setSrcStatus(kind, message) {

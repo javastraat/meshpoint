@@ -1,9 +1,9 @@
 """Plugin *sources* -- operator-added GitHub repos that offer installable
 plugins and themes.
 
-A source repo has a ``meshpoint.json`` at its root listing what it ships;
+A source repo has a ``repo.json`` at its root listing what it ships;
 that file is only a browse catalog -- when a plugin is actually installed
-(Phase 3) Meshpoint re-reads and re-validates the real ``plugin.toml`` /
+Meshpoint re-reads and re-validates the real ``plugin.toml`` /
 ``theme.json`` from the downloaded files, so nothing here is trusted
 beyond "this is a GitHub URL and the JSON parses".
 
@@ -12,7 +12,7 @@ This module does the network + parsing + validation; the route layer
 ``local.yaml`` and the HTTP shapes. FastAPI-free so it unit-tests on the
 Mac, same as ``src/plugins/manifest.py`` and ``src/api/theme_registry.py``.
 
-Repo manifest shape (``meshpoint.json`` at the repo root)::
+Repo manifest shape (``repo.json`` at the repo root)::
 
     {
       "meshpoint_repo": 1,
@@ -42,7 +42,7 @@ from src.plugins.manifest import PLUGIN_API_VERSION
 
 logger = logging.getLogger(__name__)
 
-MESHPOINT_REPO_MANIFEST = "meshpoint.json"
+MESHPOINT_REPO_MANIFEST = "repo.json"
 _REPO_MANIFEST_VERSION = 1
 
 _TIMEOUT_S = 12
@@ -177,14 +177,14 @@ def _entry(raw: dict, kind: str) -> dict:
 
 
 def parse_catalog(data: bytes) -> dict:
-    """Validate a fetched ``meshpoint.json``. Returns
+    """Validate a fetched ``repo.json``. Returns
     ``{name, description, plugins: [...], themes: [...]}``."""
     try:
         raw = json.loads(data.decode("utf-8"))
     except (ValueError, UnicodeDecodeError) as exc:
-        raise PluginSourceError("catalog", f"meshpoint.json is not valid JSON: {exc}") from exc
+        raise PluginSourceError("catalog", f"repo.json is not valid JSON: {exc}") from exc
     if not isinstance(raw, dict):
-        raise PluginSourceError("catalog", "meshpoint.json must be a JSON object")
+        raise PluginSourceError("catalog", "repo.json must be a JSON object")
 
     ver = raw.get("meshpoint_repo")
     if ver != _REPO_MANIFEST_VERSION:
@@ -199,7 +199,7 @@ def parse_catalog(data: bytes) -> dict:
     seen: set[str] = set()
     for e in plugins + themes:
         if e["id"] in seen:
-            raise PluginSourceError("catalog", f"duplicate id {e['id']!r} in meshpoint.json")
+            raise PluginSourceError("catalog", f"duplicate id {e['id']!r} in repo.json")
         seen.add(e["id"])
 
     name = raw.get("name")
@@ -213,7 +213,7 @@ def parse_catalog(data: bytes) -> dict:
 
 
 def fetch_catalog(url: str, ref: str) -> dict:
-    """Resolve *url*, fetch its ``meshpoint.json`` at *ref*, validate it.
+    """Resolve *url*, fetch its ``repo.json`` at *ref*, validate it.
     Returns the parsed catalog plus ``owner``/``repo``/``ref``/``url``."""
     owner, repo = parse_github_url(url)
     ref = normalise_ref(ref)

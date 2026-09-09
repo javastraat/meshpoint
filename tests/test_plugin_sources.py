@@ -1,4 +1,4 @@
-"""src/plugins/sources.py -- GitHub URL parsing + meshpoint.json catalog
+"""src/plugins/sources.py -- GitHub URL parsing + repo.json catalog
 validation. Pure, no network (fetch_catalog's HTTP is not exercised here)."""
 
 from __future__ import annotations
@@ -54,7 +54,7 @@ class TestUrlParsing(unittest.TestCase):
     def test_url_builders(self) -> None:
         self.assertEqual(
             catalog_raw_url("o", "r", "main"),
-            "https://raw.githubusercontent.com/o/r/main/meshpoint.json",
+            "https://raw.githubusercontent.com/o/r/main/repo.json",
         )
         self.assertEqual(
             tarball_url("o", "r", "v1"),

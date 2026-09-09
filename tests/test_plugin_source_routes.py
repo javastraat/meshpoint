@@ -115,6 +115,60 @@ class TestPluginSourceRoutes(unittest.TestCase):
         self.assertTrue(entry["update_available"])
         self.assertEqual(entry["installed_version"], "1.0")
 
+    def _catalog_with(self, entry_overrides: dict) -> dict:
+        entry = {
+            "id": "a", "kind": "app", "path": "apps/a", "version": "2.0",
+            "meshpoint_api": 1, "provides": ["service"], "description": "",
+            "author": "", "homepage": "", "has_setup": False, "compatible": True,
+        }
+        entry.update(entry_overrides)
+        return {
+            "name": "t", "description": "", "owner": "you", "repo": "p", "ref": "main",
+            "url": "https://github.com/you/p", "plugins": [entry], "themes": [],
+        }
+
+    def test_install_requires_a_configured_source(self) -> None:
+        self._mod.fetch_catalog = lambda url, ref: self._catalog_with({})
+        r = self.client.post("/api/plugin-sources/install", json={
+            "url": "https://github.com/you/p", "id": "a",
+        })
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("not a configured", r.json()["detail"])
+
+    def test_install_places_and_records_provenance(self) -> None:
+        self.client.post("/api/plugin-sources", json={
+            "url": "https://github.com/you/p", "confirm": True,
+        })
+        self._mod.fetch_catalog = lambda url, ref: self._catalog_with({})
+        seen = {}
+        self._mod.install_from_source = lambda owner, repo, ref, entry, cdir: (
+            seen.update(owner=owner, repo=repo, ref=ref, id=entry["id"])
+            or {"id": entry["id"], "kind": "app", "version": entry["version"], "has_setup": False}
+        )
+        r = self.client.post("/api/plugin-sources/install", json={
+            "url": "https://github.com/you/p", "id": "a",
+        })
+        self.assertEqual(r.status_code, 200, r.text)
+        body = r.json()
+        self.assertTrue(body["installed"])
+        self.assertFalse(body["updated"])
+        self.assertEqual(seen["id"], "a")
+        prov = self.cfg.plugins["a"]["source"]
+        self.assertEqual(prov["url"], "https://github.com/you/p")
+        self.assertEqual(prov["version"], "2.0")
+
+    def test_install_refuses_incompatible(self) -> None:
+        self.client.post("/api/plugin-sources", json={
+            "url": "https://github.com/you/p", "confirm": True,
+        })
+        self._mod.fetch_catalog = lambda url, ref: self._catalog_with(
+            {"compatible": False, "meshpoint_api": 9},
+        )
+        r = self.client.post("/api/plugin-sources/install", json={
+            "url": "https://github.com/you/p", "id": "a",
+        })
+        self.assertEqual(r.status_code, 400)
+
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()
