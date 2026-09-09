@@ -277,7 +277,7 @@ plugins:
     propagation_outbound_node: ""        # client side: use another node's lxmf.propagation hash
     propagation_auto_sync_interval_s: 0  # 0 = manual only; else every N s (min 300)
     telemetry_enabled: false             # publish host stats as LXMF FIELD_TELEMETRY frames
-    telemetry_collector: ""              # LXMF address to send telemetry to
+    telemetry_collector: ""              # LXMF address(es), one per line — sent to each
     telemetry_interval_s: 900            # min 300
     telemetry_include_location: false    # add Configuration→GPS pin to the frame
     extra_interfaces: []                 # [{name,type,enabled,...}] TCPClient/TCPServer/UDP → write_rnsd_config

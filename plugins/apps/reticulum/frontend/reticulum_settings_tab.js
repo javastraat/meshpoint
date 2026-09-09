@@ -216,13 +216,13 @@ class ReticulumSettingsTab {
                                 <span class="cfg-field__label">Publish telemetry</span>
                             </label>
                             <label class="cfg-field">
-                                <span class="cfg-field__label">Collector address</span>
-                                <input class="cfg-field__input" type="text" maxlength="64"
-                                       placeholder="lxmf.delivery destination hash"
-                                       data-rt-telemetry-collector>
+                                <span class="cfg-field__label">Collector addresses</span>
+                                <textarea class="cfg-field__input" rows="3" spellcheck="false"
+                                          placeholder="one lxmf.delivery destination hash per line"
+                                          data-rt-telemetry-collector></textarea>
                                 <span class="cfg-field__hint">
-                                    The LXMF address that should receive the frames — e.g.
-                                    a Sideband client subscribed to this node.
+                                    One LXMF address per line — the frame is sent to each
+                                    (e.g. your own Sideband client and a shared map node).
                                 </span>
                             </label>
                             <label class="cfg-field cfg-field--narrow">
@@ -627,8 +627,12 @@ class ReticulumSettingsTab {
             : 'nothing sent yet';
         const err = t.last_error ? ` — last error: ${t.last_error}` : '';
         const loc = t.location_included ? ', location included' : '';
+        const n = t.collector_count ?? (t.collector ? 1 : 0);
+        const to = n === 1
+            ? `${(t.collectors?.[0] || t.collector || '?').slice(0, 12)}…`
+            : `${n} collectors`;
         this._telemetryStatusEl.textContent =
-            `Publishing to ${(t.collector || '?').slice(0, 12)}… every ${t.interval_s}s${loc} — ${when}${err}.`;
+            `Publishing to ${to} every ${t.interval_s}s${loc} — ${when}${err}.`;
     }
 
     _agoStr(s) {
@@ -834,8 +838,9 @@ class ReticulumSettingsTab {
         }
         const telemetryEnabled = !!this._telemetryEnabled?.checked;
         const telemetryCollector = (this._telemetryCollector?.value || '').trim();
-        if (telemetryEnabled && !telemetryCollector) {
-            this._setStatus('error', 'Telemetry publishing needs a collector address — set one, or turn telemetry off.');
+        const collectorCount = telemetryCollector.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean).length;
+        if (telemetryEnabled && !collectorCount) {
+            this._setStatus('error', 'Telemetry publishing needs at least one collector address — add one, or turn telemetry off.');
             return;
         }
         const ifaceErr = this._validateExtraInterfaces();
@@ -896,7 +901,13 @@ class ReticulumSettingsTab {
             const body = await r.json().catch(() => ({}));
             if (statusEl) {
                 statusEl.dataset.kind = r.ok ? 'success' : 'error';
-                statusEl.textContent = r.ok ? 'Sent.' : (body.detail || 'Send failed.');
+                if (r.ok) {
+                    const n = body.sent ?? 1;
+                    statusEl.textContent = `Sent to ${n} collector${n === 1 ? '' : 's'}.`
+                        + (body.note ? ` (${body.note})` : '');
+                } else {
+                    statusEl.textContent = body.detail || 'Send failed.';
+                }
             }
         } catch (_) {
             if (statusEl) { statusEl.dataset.kind = 'error'; statusEl.textContent = 'Send failed.'; }

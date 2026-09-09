@@ -913,6 +913,20 @@ editor with type-specific fields + outage-risk warning. Chose
 structured over raw textarea (rnsd ExecStartPre crash = Reticulum
 down). Not Pi-tested. Not offered: I2P, 2nd RNode, AutoInterface.
 
+## 2026-09-09 — Telemetry: multiple collectors
+
+`telemetry_collector` field is now a textarea — one LXMF hash per line
+(commas / `<hex>` / `aa:bb` tolerated). `state._parse_collectors` →
+`telemetry_config()` returns `collectors: list` (+ `collector` = first,
+back-compat). `config_routes._collector_hashes_ok` field validator
+splits/normalises/dedupes, re-joins one per line, rejects the whole
+value if any line is a bad hash (shared `_clean_dest_hash` helper, also
+used by `propagation_outbound_node`). `lxmf_service.send_telemetry()`
+builds+packs once, loops `_send_telemetry_frame(collector, packed)` per
+address, returns `{ok (>=1 sent), sent: int, error}`. `telemetry_status`
+gains `collectors`/`collector_count`. Settings status line + "Send now"
+report the count. Suite 213.
+
 ## 2026-09-09 — Telemetry collector + map (new-build #4)
 
 Receive half. `telemetry.decode_telemetry` + `_unpack_location` (inverse

@@ -155,6 +155,16 @@ class TestTelemetryConfig(unittest.TestCase):
         with self.assertRaises(ValidationError):
             ReticulumUpdate(**_REQUIRED, telemetry_collector="xyz")
 
+    def test_multiline_collectors_normalised_and_deduped(self) -> None:
+        m = ReticulumUpdate(**_REQUIRED, telemetry_collector=(
+            f"<{'ab' * 16}>\n{'CD' * 16}, {'ab' * 16}"
+        ))
+        self.assertEqual(m.telemetry_collector, "ab" * 16 + "\n" + "cd" * 16)
+
+    def test_one_bad_line_rejects_the_lot(self) -> None:
+        with self.assertRaises(ValidationError):
+            ReticulumUpdate(**_REQUIRED, telemetry_collector=f"{'ab' * 16}\nnope")
+
     def test_interval_floor(self) -> None:
         with self.assertRaises(ValidationError):
             ReticulumUpdate(**_REQUIRED, telemetry_interval_s=60)

@@ -211,7 +211,7 @@ plugins:
     propagation_outbound_node: ""               # optional: use another node's lxmf.propagation hash as your relay
     propagation_auto_sync_interval_s: 0         # 0 = manual sync only; else re-sync every N seconds (min 300)
     telemetry_enabled: false                    # publish this box's host stats as LXMF telemetry frames
-    telemetry_collector: ""                     # LXMF address to send telemetry to (e.g. a Sideband client)
+    telemetry_collector: ""                     # LXMF address(es) to send telemetry to, one per line
     telemetry_interval_s: 900                   # how often to send (min 300)
     telemetry_include_location: false           # add the Configuration -> GPS pin to the frame (opt-in)
     # storage paths — defaults shown; only set to override:
@@ -291,10 +291,13 @@ held); `GET /api/reticulum/status` carries the same in a `propagation` block.
 `plugins.reticulum.telemetry_enabled` (Settings tab → *Telemetry*): every
 `telemetry_interval_s` seconds (default 900, min 300), send this box's own
 host stats — CPU/SoC temperature, 1-min load, RAM/disk usage, a one-line
-status string — to `telemetry_collector` (an LXMF address, e.g. a Sideband
-client subscribed to this node) as a Sideband-compatible `FIELD_TELEMETRY`
-frame. Off by default; nothing is sent without a collector. A "Send
-telemetry now" button fires one frame on demand. `GET
+status string — to `telemetry_collector` as a Sideband-compatible
+`FIELD_TELEMETRY` frame. The collector field takes **one LXMF address per
+line** (commas / RNS's `<hex>` and `aa:bb` forms also accepted); the frame
+is sent to each — e.g. your own Sideband client *and* a shared map node.
+Off by default; nothing is sent without a collector. A "Send telemetry
+now" button fires one round on demand (and reports how many collectors
+got it). `GET
 /api/reticulum/telemetry` reports status. `telemetry_include_location`
 (opt-in, off by default) adds this node's fixed position to the frame,
 taken from the **Configuration → GPS** pin (`device.latitude` /

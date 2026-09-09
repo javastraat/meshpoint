@@ -309,7 +309,7 @@ class LxmfService:
 
         self._apply_outbound_propagation_node()
 
-        if self._telemetry_cfg.get("enabled") and self._telemetry_cfg.get("collector"):
+        if self._telemetry_cfg.get("enabled") and self._telemetry_collectors():
             if self._loop is not None:
                 self._telemetry_task = self._loop.create_task(self._telemetry_loop())
 
@@ -525,41 +525,35 @@ class LxmfService:
 
     # --- telemetry publish -------------------------------------------------
 
+    def _telemetry_collectors(self) -> list[str]:
+        return [c for c in (self._telemetry_cfg.get("collectors") or []) if c]
+
     def telemetry_status(self) -> Optional[dict]:
         """``None`` unless telemetry publishing is configured. Feeds
         GET /api/reticulum/telemetry and the Settings tab."""
         if not self._telemetry_cfg.get("enabled"):
             return None
+        collectors = self._telemetry_collectors()
         return {
             "enabled": True,
-            "collector": self._telemetry_cfg.get("collector") or None,
+            "collectors": collectors,
+            "collector": collectors[0] if collectors else None,   # back-compat
+            "collector_count": len(collectors),
             "interval_s": int(self._telemetry_cfg.get("interval_s") or 900),
             "location_included": self._telemetry_cfg.get("location") is not None,
             "last_sent_at": self._telemetry_last_sent_at,
             "last_error": self._telemetry_last_error,
         }
 
-    def send_telemetry(self) -> dict:
-        """Send one telemetry frame (host stats -> Sideband
-        ``FIELD_TELEMETRY``) to the configured collector. ``{"ok": bool,
-        "error": str|None}``. Uses the same delivery path as a normal
-        message, just a msgpacked field instead of a text body."""
-        collector = str(self._telemetry_cfg.get("collector") or "").strip()
-        if not collector:
-            return {"ok": False, "error": "No telemetry collector configured"}
-        if not self.available or self._router is None or self._source is None:
-            return {"ok": False, "error": "Reticulum service is not running"}
+    def _send_telemetry_frame(self, collector: str, packed: bytes) -> str | None:
+        """Send one packed frame to one collector. Returns an error
+        string, or ``None`` on success."""
         try:
-            frame = telemetry_codec.build_telemetry(
-                host_stats.read_host(), self._display_name,
-                location=self._telemetry_cfg.get("location"),
-            )
-            packed = RNS.vendor.umsgpack.packb(frame)
             dest_hash = bytes.fromhex(collector)
             identity = RNS.Identity.recall(dest_hash)
             if identity is None:
                 RNS.Transport.request_path(dest_hash)
-                return {"ok": False, "error": "Collector path unknown -- requested it, try again shortly"}
+                return "path unknown (requested it, try again shortly)"
             destination = RNS.Destination(
                 identity, RNS.Destination.OUT, RNS.Destination.SINGLE,
                 "lxmf", "delivery",
@@ -568,17 +562,48 @@ class LxmfService:
                 destination, self._source, "",
                 desired_method=LXMF.LXMessage.DIRECT,
             )
-            field_id = getattr(LXMF, "FIELD_TELEMETRY", 0x02)
-            lxm.fields[field_id] = packed
+            lxm.fields[getattr(LXMF, "FIELD_TELEMETRY", 0x02)] = packed
             self._router.handle_outbound(lxm)
         except Exception as exc:  # noqa: BLE001
-            self._telemetry_last_error = str(exc) or exc.__class__.__name__
-            logger.warning("telemetry send failed", exc_info=True)
-            return {"ok": False, "error": self._telemetry_last_error}
-        self._telemetry_last_sent_at = time.time()
-        self._telemetry_last_error = None
-        logger.info("telemetry frame sent to %s", collector)
-        return {"ok": True, "error": None}
+            logger.warning("telemetry send to %s failed", collector, exc_info=True)
+            return str(exc) or exc.__class__.__name__
+        return None
+
+    def send_telemetry(self) -> dict:
+        """Send one telemetry frame (host stats -> Sideband
+        ``FIELD_TELEMETRY``) to every configured collector.
+        ``{"ok": bool, "sent": int, "error": str|None}`` -- ``ok`` is true
+        if at least one collector got it."""
+        collectors = self._telemetry_collectors()
+        if not collectors:
+            return {"ok": False, "sent": 0, "error": "No telemetry collector configured"}
+        if not self.available or self._router is None or self._source is None:
+            return {"ok": False, "sent": 0, "error": "Reticulum service is not running"}
+
+        frame = telemetry_codec.build_telemetry(
+            host_stats.read_host(), self._display_name,
+            location=self._telemetry_cfg.get("location"),
+        )
+        packed = RNS.vendor.umsgpack.packb(frame)
+
+        sent = 0
+        failures: list[str] = []
+        for collector in collectors:
+            err = self._send_telemetry_frame(collector, packed)
+            if err is None:
+                sent += 1
+                logger.info("telemetry frame sent to %s", collector)
+            else:
+                failures.append(f"{collector[:12]}…: {err}")
+
+        if sent:
+            self._telemetry_last_sent_at = time.time()
+        self._telemetry_last_error = "; ".join(failures) or None
+        return {
+            "ok": sent > 0,
+            "sent": sent,
+            "error": None if sent else ("; ".join(failures) or "all sends failed"),
+        }
 
     async def _telemetry_loop(self) -> None:
         interval = max(300, int(self._telemetry_cfg.get("interval_s") or 900))

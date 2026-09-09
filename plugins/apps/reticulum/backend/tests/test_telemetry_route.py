@@ -34,13 +34,15 @@ class TestTelemetryRoute(unittest.TestCase):
 
             def telemetry_status(self):
                 return {
-                    "enabled": True, "collector": "cd" * 16, "interval_s": 900,
+                    "enabled": True, "collectors": ["cd" * 16], "collector": "cd" * 16,
+                    "collector_count": 1, "interval_s": 900,
                     "last_sent_at": None, "last_error": None,
                 }
 
             def send_telemetry(self):
                 self.sent = True
-                return {"ok": self.ok, "error": None if self.ok else "Collector path unknown"}
+                return {"ok": self.ok, "sent": 1 if self.ok else 0,
+                        "error": None if self.ok else "path unknown"}
 
             def telemetry_peers(self):
                 return [
@@ -64,7 +66,8 @@ class TestTelemetryRoute(unittest.TestCase):
     def test_get_status(self) -> None:
         r = self.client.get("/api/reticulum/telemetry")
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()["collector"], "cd" * 16)
+        self.assertEqual(r.json()["collectors"], ["cd" * 16])
+        self.assertEqual(r.json()["collector_count"], 1)
 
     def test_send_ok(self) -> None:
         r = self.client.post("/api/reticulum/telemetry/send")

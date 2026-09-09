@@ -22,6 +22,7 @@ edits made here don't reach rnsd yet. Repointed in the Phase 5 cutover.
 
 from __future__ import annotations
 
+import re
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -43,6 +44,22 @@ router = APIRouter(prefix="/api/config", tags=["config", "reticulum"])
 _VALID_BANDWIDTHS_HZ = frozenset(
     {7800, 10400, 15600, 20800, 31250, 41700, 62500, 125000, 250000, 500000}
 )
+
+
+def _clean_dest_hash(value: str) -> str | None:
+    """Normalise one Reticulum destination hash. Tolerates the shapes
+    users actually paste -- a bare hex hash, or RNS's ``<hex>`` / ``aa:bb``
+    display forms (the startup banner + "You:" line use ``<hex>``).
+    Returns the cleaned hash, ``""`` for blank, or ``None`` if malformed."""
+    stripped = str(value or "").strip().lower().replace(":", "").strip("<>")
+    if not stripped:
+        return ""
+    if (
+        len(stripped) < 8 or len(stripped) > 64 or len(stripped) % 2
+        or any(c not in "0123456789abcdef" for c in stripped)
+    ):
+        return None
+    return stripped
 
 
 _RESERVED_IFACE_NAMES = {"default interface", "rnode lora", "reticulumnet internet"}
@@ -157,24 +174,34 @@ class ReticulumUpdate(BaseModel):
             raise ValueError("must be an http(s) URL or blank")
         return stripped
 
-    @field_validator("propagation_outbound_node", "telemetry_collector")
+    @field_validator("propagation_outbound_node")
     @classmethod
     def _dest_hash_ok(cls, value: str) -> str:
-        # Tolerate the shapes users actually paste: a bare hex hash from a
-        # peer's Destination column, or RNS's own ``<hex>`` / ``aa:bb:..``
-        # display forms (the startup banner + "You:" line use ``<hex>``).
-        stripped = value.strip().lower().replace(":", "").strip("<>")
-        if not stripped:
-            return ""
-        if (
-            len(stripped) < 8 or len(stripped) > 64 or len(stripped) % 2
-            or any(c not in "0123456789abcdef" for c in stripped)
-        ):
+        cleaned = _clean_dest_hash(value)
+        if cleaned is None:
             raise ValueError(
                 "must be a Reticulum destination hash (hex, e.g. the 32-char "
                 "hash from a peer's Destination column) or blank"
             )
-        return stripped
+        return cleaned
+
+    @field_validator("telemetry_collector")
+    @classmethod
+    def _collector_hashes_ok(cls, value: str) -> str:
+        # A textarea: one address per line (commas / extra whitespace also
+        # accepted). Normalise each, drop blanks/dupes, re-join one per line.
+        out: list[str] = []
+        seen: set = set()
+        for token in re.split(r"[\s,]+", value or ""):
+            if not token:
+                continue
+            cleaned = _clean_dest_hash(token)
+            if not cleaned:
+                raise ValueError(f"{token!r} is not a valid Reticulum destination hash")
+            if cleaned not in seen:
+                seen.add(cleaned)
+                out.append(cleaned)
+        return "\n".join(out)
 
     @model_validator(mode="after")
     def _at_least_one_interface(self) -> "ReticulumUpdate":

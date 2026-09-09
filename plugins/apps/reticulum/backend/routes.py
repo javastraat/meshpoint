@@ -237,10 +237,10 @@ async def reticulum_telemetry_send(_claims: SessionClaims = Depends(require_admi
         # The running service reads telemetry config once at startup, so a
         # just-saved collector isn't live until a meshpoint restart -- say
         # so rather than the bare "no collector" the service reports.
-        if "collector" in error.lower() and state.telemetry_config().get("collector"):
+        if "collector" in error.lower() and state.telemetry_config().get("collectors"):
             error = "Saved, but not active until meshpoint restarts (Settings -> System)."
         raise HTTPException(400, error)
-    return {"status": "sent"}
+    return {"status": "sent", "sent": result.get("sent", 0), "note": result.get("error")}
 
 
 # --- contacts / petnames --------------------------------------------------

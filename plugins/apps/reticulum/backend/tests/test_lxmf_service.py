@@ -450,30 +450,33 @@ class TestTelemetryPublish(unittest.TestCase):
 
     def test_status_shape_when_enabled(self) -> None:
         svc = _make_service(telemetry_cfg={
-            "enabled": True, "collector": "cd" * 16, "interval_s": 600,
+            "enabled": True, "collectors": ["cd" * 16, "ab" * 16], "interval_s": 600,
         })
         st = svc.telemetry_status()
         self.assertTrue(st["enabled"])
-        self.assertEqual(st["collector"], "cd" * 16)
+        self.assertEqual(st["collectors"], ["cd" * 16, "ab" * 16])
+        self.assertEqual(st["collector_count"], 2)
+        self.assertEqual(st["collector"], "cd" * 16)  # back-compat: first
         self.assertEqual(st["interval_s"], 600)
         self.assertFalse(st["location_included"])
         self.assertIsNone(st["last_sent_at"])
 
     def test_status_reports_location_included(self) -> None:
         svc = _make_service(telemetry_cfg={
-            "enabled": True, "collector": "cd" * 16, "location": (1.0, 2.0, 0.0),
+            "enabled": True, "collectors": ["cd" * 16], "location": (1.0, 2.0, 0.0),
         })
         self.assertTrue(svc.telemetry_status()["location_included"])
 
     def test_send_without_collector_errors(self) -> None:
-        svc = _make_service(telemetry_cfg={"enabled": True, "collector": ""})
+        svc = _make_service(telemetry_cfg={"enabled": True, "collectors": []})
         res = svc.send_telemetry()
         self.assertFalse(res["ok"])
+        self.assertEqual(res["sent"], 0)
         self.assertIn("collector", res["error"])
 
     def test_send_when_not_running_errors(self) -> None:
         # RNS/LXMF absent on the dev Mac -> .available is False
-        svc = _make_service(telemetry_cfg={"enabled": True, "collector": "cd" * 16})
+        svc = _make_service(telemetry_cfg={"enabled": True, "collectors": ["cd" * 16]})
         res = svc.send_telemetry()
         self.assertFalse(res["ok"])
         self.assertIn("not running", res["error"])

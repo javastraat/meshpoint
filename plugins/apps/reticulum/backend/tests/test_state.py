@@ -152,6 +152,30 @@ class TestReticulumStatePersistMerge(unittest.TestCase):
         self.assertEqual(values["reticulum"]["display_name"], "Merged")
 
 
+class TestTelemetryCollectors(unittest.TestCase):
+    def tearDown(self) -> None:
+        state.init({})
+
+    def test_multiline_collectors_parsed_normalised_deduped(self) -> None:
+        state.init({"telemetry_enabled": True, "telemetry_collector":
+                    f"<{'ab' * 16}>\n{'CD' * 16}\n{'ab' * 16}\n  \n"})
+        cfg = state.telemetry_config()
+        self.assertEqual(cfg["collectors"], ["ab" * 16, "cd" * 16])
+        self.assertEqual(cfg["collector"], "ab" * 16)
+
+    def test_comma_and_colon_forms(self) -> None:
+        state.init({"telemetry_collector": "aa:bb:cc:dd:ee:ff:00:11, " + "bb" * 16})
+        self.assertEqual(
+            state.telemetry_config()["collectors"],
+            ["aabbccddeeff0011", "bb" * 16],
+        )
+
+    def test_empty(self) -> None:
+        state.init({})
+        self.assertEqual(state.telemetry_config()["collectors"], [])
+        self.assertEqual(state.telemetry_config()["collector"], "")
+
+
 class TestExtraInterfaces(unittest.TestCase):
     def tearDown(self) -> None:
         state.init({})

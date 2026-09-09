@@ -42,6 +42,7 @@ there.
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 _DEFAULTS: dict[str, Any] = {
@@ -184,11 +185,27 @@ def propagation_config() -> dict[str, Any]:
     }
 
 
+def _parse_collectors(raw: str) -> list[str]:
+    """``telemetry_collector`` is a textarea -- one hash per line (commas /
+    extra whitespace tolerated). Normalise, drop blanks + dupes."""
+    seen: set = set()
+    out: list[str] = []
+    for token in re.split(r"[\s,]+", str(raw or "")):
+        h = token.strip().lower().replace(":", "").strip("<>")
+        if h and h not in seen:
+            seen.add(h)
+            out.append(h)
+    return out
+
+
 def telemetry_config() -> dict[str, Any]:
-    """Telemetry-publish settings, resolved."""
+    """Telemetry-publish settings, resolved. ``collectors`` is the parsed
+    list; ``collector`` is the first (back-compat / simple display)."""
+    collectors = _parse_collectors(_config.get("telemetry_collector") or "")
     return {
         "enabled": bool(_config.get("telemetry_enabled")),
-        "collector": str(_config.get("telemetry_collector") or "").strip().lower().replace(":", "").strip("<>"),
+        "collectors": collectors,
+        "collector": collectors[0] if collectors else "",
         "interval_s": max(300, int(_config.get("telemetry_interval_s") or 900)),
         "include_location": bool(_config.get("telemetry_include_location")),
     }
