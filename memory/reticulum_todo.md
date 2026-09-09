@@ -101,12 +101,15 @@ checked on the Pi.
   2026-09-09.
 - **Telemetry collect + map (#4) — BUILT + BROWSER-VERIFIED 2026-09-09**
   (user screenshot: TI-Meshpoint plotted near Schiphol at 52.3458/
-  4.8264, table row, working OSM link, live WS). Fixed a double-print
-  found there: `_info_line` was appending `°C` even though temperature
-  is its own column/sensor — dropped it. Still not a full two-node run.
+  4.8264, table row, working OSM link, live WS). Two display tweaks from
+  feedback: `_info_line` dropped its `°C` suffix (was double-printing —
+  temp is its own sensor); then the temp moved from the cramped last
+  column to the end of the STATUS cell, last column now Location-only.
+  Both frontend-display only — wire `info` string stays temp-free.
+  Still not a full two-node run.
   Check: with two nodes publishing to each other,
   each shows the other on its **Telemetry tab** (table row: heard /
-  node / status line / temp + OSM link); a peer that sent location
+  node / status + temp / location OSM link); a peer that sent location
   appears on the map; the `reticulum_telemetry` WS event live-updates
   the tab without reload; a telemetry-only frame does NOT show up as a
   blank message in the Messages tab (this was a latent bug — check it's

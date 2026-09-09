@@ -237,7 +237,7 @@ class ReticulumPanel {
                                         <th>Heard</th>
                                         <th>Node</th>
                                         <th>Status</th>
-                                        <th class="lw-r">Temp / Location</th>
+                                        <th class="lw-r">Location</th>
                                     </tr>
                                 </thead>
                                 <tbody id="rt-telemetry-tbody"></tbody>
@@ -864,17 +864,17 @@ class ReticulumPanel {
             const hash = t.destination_hash;
             const name = this._contacts[hash]?.petname || t.name || `${hash.slice(0, 12)}…`;
             const heard = t.received_at ? this._fmtTime(new Date(t.received_at * 1000).toISOString()) : '--';
-            const right = [];
-            if (t.temperature_c != null) right.push(`${t.temperature_c}°C`);
-            if (t.latitude != null && t.longitude != null) {
-                right.push(`<a href="https://www.openstreetmap.org/?mlat=${t.latitude}&mlon=${t.longitude}#map=13/${t.latitude}/${t.longitude}" target="_blank" rel="noopener">${t.latitude.toFixed(4)}, ${t.longitude.toFixed(4)}</a>`);
-            }
+            const status = [t.info || '', t.temperature_c != null ? `${t.temperature_c}°C` : '']
+                .filter(Boolean).join(' · ');
+            const loc = (t.latitude != null && t.longitude != null)
+                ? `<a href="https://www.openstreetmap.org/?mlat=${t.latitude}&mlon=${t.longitude}#map=13/${t.latitude}/${t.longitude}" target="_blank" rel="noopener">${t.latitude.toFixed(4)}, ${t.longitude.toFixed(4)}</a>`
+                : '--';
             return `
             <tr class="lw-pkt-row" data-rt-tele-hash="${this._esc(hash)}" title="Click for peer details">
                 <td class="lw-time">${heard}</td>
                 <td class="mt-name">${this._esc(name)}</td>
-                <td>${this._esc(t.info || '')}</td>
-                <td class="lw-r">${right.join(' · ') || '--'}</td>
+                <td>${this._esc(status)}</td>
+                <td class="lw-r">${loc}</td>
             </tr>
         `;
         }).join('');
