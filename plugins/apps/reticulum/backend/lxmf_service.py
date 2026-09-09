@@ -610,9 +610,15 @@ class LxmfService:
         if not self.available or self._router is None or self._source is None:
             return {"ok": False, "sent": 0, "error": "Reticulum service is not running"}
 
+        # self._node only exists when node hosting is enabled, and
+        # spaceapi_snapshot() itself is a no-op dict when no SpaceAPI URL is
+        # configured -- either way this stays None and _info_line() omits
+        # the space status rather than sending a stale/meaningless value.
+        space_open = self._node.spaceapi_snapshot().get("open") if self._node else None
         frame = telemetry_codec.build_telemetry(
             host_stats.read_host(), self._display_name,
             location=self._telemetry_cfg.get("location"),
+            space_open=space_open,
         )
         packed = RNS.vendor.umsgpack.packb(frame)
 

@@ -54,6 +54,21 @@ class TestBuildTelemetry(unittest.TestCase):
         self.assertEqual(telemetry._info_line({}, ""), "meshpoint")
         self.assertEqual(telemetry._info_line({}, "node-x"), "node-x")
 
+    def test_information_line_space_state(self) -> None:
+        # None (no SpaceAPI URL configured, or nothing fetched yet) omits
+        # it entirely rather than printing a meaningless "unknown".
+        self.assertEqual(telemetry._info_line({}, "x", None), "x")
+        self.assertEqual(telemetry._info_line({}, "x", True), "x · space OPEN")
+        self.assertEqual(telemetry._info_line({}, "x", False), "x · space CLOSED")
+
+    def test_build_telemetry_passes_through_space_open(self) -> None:
+        frame = telemetry.build_telemetry({}, "x", space_open=True)
+        self.assertIn("space OPEN", frame[SID_INFORMATION])
+        frame = telemetry.build_telemetry({}, "x", space_open=False)
+        self.assertIn("space CLOSED", frame[SID_INFORMATION])
+        frame = telemetry.build_telemetry({}, "x")
+        self.assertNotIn("space", frame[SID_INFORMATION])
+
     def test_frame_keys_are_ints(self) -> None:
         frame = telemetry.build_telemetry(_FULL_HOST, "x")
         self.assertTrue(all(isinstance(k, int) for k in frame))

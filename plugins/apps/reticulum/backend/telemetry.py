@@ -39,11 +39,14 @@ SID_TEMPERATURE = 0x07
 SID_INFORMATION = 0x0F
 
 
-def _info_line(host: dict, node_name: str) -> str:
+def _info_line(host: dict, node_name: str, space_open: bool | None = None) -> str:
     """A compact, human-readable status string for the INFORMATION sensor
     -- what shows on a subscriber's telemetry screen as free text.
     Temperature is deliberately left out: it's its own ``SID_TEMPERATURE``
-    sensor, so repeating it here just double-prints it."""
+    sensor, so repeating it here just double-prints it. ``space_open`` is
+    the hosted node's SpaceAPI status (nomad_node.py's ``spaceapi_snapshot``)
+    -- ``None`` (no SpaceAPI URL configured, or nothing fetched yet) omits
+    it rather than printing a meaningless "unknown" on every frame."""
     parts: list[str] = []
     if node_name:
         parts.append(node_name)
@@ -56,6 +59,8 @@ def _info_line(host: dict, node_name: str) -> str:
     free_gb = host.get("disk_free_gb")
     if free_gb is not None:
         parts.append(f"disk {free_gb} GB free")
+    if space_open is not None:
+        parts.append(f"space {'OPEN' if space_open else 'CLOSED'}")
     return " · ".join(parts) or "meshpoint"
 
 
@@ -77,12 +82,15 @@ def _pack_location(lat: float, lon: float, alt: float = 0.0) -> list:
 def build_telemetry(
     host: dict, node_name: str = "",
     location: tuple[float, float, float] | None = None,
+    space_open: bool | None = None,
 ) -> dict[int, object]:
     """The ``{ sensor_id: packed_value }`` dict for one telemetry frame.
     The caller msgpacks it. ``host`` is ``host_stats.read_host()``'s
     output (any field may be ``None``). ``location`` is
     ``(lat, lon, alt)`` -- included as ``SID_LOCATION`` only when both
-    lat and lon are real numbers."""
+    lat and lon are real numbers. ``space_open`` folds the hosted node's
+    SpaceAPI open/closed status into the INFORMATION line when known --
+    see ``_info_line``."""
     frame: dict[int, object] = {SID_TIME: int(time.time())}
     if location and isinstance(location[0], (int, float)) and isinstance(location[1], (int, float)):
         alt = location[2] if len(location) > 2 and isinstance(location[2], (int, float)) else 0.0
@@ -90,7 +98,7 @@ def build_telemetry(
     temp = host.get("cpu_temp_c")
     if isinstance(temp, (int, float)):
         frame[SID_TEMPERATURE] = float(temp)
-    frame[SID_INFORMATION] = _info_line(host, node_name)
+    frame[SID_INFORMATION] = _info_line(host, node_name, space_open)
     return frame
 
 

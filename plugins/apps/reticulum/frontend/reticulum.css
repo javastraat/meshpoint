@@ -481,4 +481,53 @@
 }
 .rt-telemetry-map .leaflet-container { background: var(--bg, #111); }
 
+/* Telemetry map popup -- Leaflet's stock chrome is a plain white box with
+   generic sans-serif text, which looks foreign next to the rest of the
+   app. Re-skin the wrapper/tip to the app's own card look, and give the
+   content real structure (name + temp on one line, the info line split
+   into small tags) instead of one dense <br>-joined string. */
+.rt-telemetry-map .leaflet-popup-content-wrapper {
+    background: var(--bg-card, #1a1a1a);
+    color: var(--text-primary, #eee);
+    border: 1px solid var(--border, #333);
+    border-radius: 10px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+.rt-telemetry-map .leaflet-popup-content { margin: 10px 12px; }
+.rt-telemetry-map .leaflet-popup-tip { background: var(--bg-card, #1a1a1a); }
+.rt-telemetry-map .leaflet-popup-close-button { color: var(--text-muted, #888) !important; }
+
+.rt-tele-popup__head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    margin-bottom: 4px;
+}
+.rt-tele-popup__name {
+    font-weight: 700;
+    font-size: 0.85rem;
+    color: var(--text-primary, #eee);
+}
+.rt-tele-popup__temp {
+    font-size: 0.78rem;
+    color: var(--accent-amber, #f59e0b);
+    white-space: nowrap;
+}
+.rt-tele-popup__tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    max-width: 220px;
+}
+.rt-tele-popup__tag {
+    font-size: 0.68rem;
+    color: var(--text-secondary, #aaa);
+    background: var(--overlay-weak, rgba(255, 255, 255, 0.06));
+    border-radius: 5px;
+    padding: 2px 6px;
+    white-space: nowrap;
+}
+.rt-tele-popup__tag--open { color: var(--accent-green, #00e5a0); }
+.rt-tele-popup__tag--closed { color: var(--accent-red, #ef4444); }
+
 .rt-amodal__view-peer { width: 100%; margin-top: 0.75rem; }

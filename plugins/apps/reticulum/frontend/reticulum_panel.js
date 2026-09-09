@@ -1006,11 +1006,29 @@ class ReticulumPanel {
         const bounds = [];
         located.forEach((t) => {
             const name = this._contacts[t.destination_hash]?.petname || t.name || t.destination_hash.slice(0, 12);
-            const lines = [`<strong>${this._esc(name)}</strong>`];
-            if (t.temperature_c != null) lines.push(`${t.temperature_c}°C`);
-            if (t.info) lines.push(this._esc(t.info));
+            // The info line is a "·"-joined free-text string (see
+            // telemetry.py::_info_line -- node name, load, RAM, disk, and
+            // optionally the hosted node's SpaceAPI open/closed state).
+            // Split it back into its own small tags instead of one dense
+            // line; "space OPEN"/"space CLOSED" get a colour cue matching
+            // the same convention the NomadNet page itself uses.
+            const tags = (t.info || '').split(' · ').filter(Boolean).map((seg) => {
+                const spaceState = /^space (OPEN|CLOSED)$/.exec(seg);
+                const cls = spaceState
+                    ? `rt-tele-popup__tag rt-tele-popup__tag--${spaceState[1] === 'OPEN' ? 'open' : 'closed'}`
+                    : 'rt-tele-popup__tag';
+                return `<span class="${cls}">${this._esc(seg)}</span>`;
+            }).join('');
+            const popupHtml = `
+                <div class="rt-tele-popup">
+                    <div class="rt-tele-popup__head">
+                        <span class="rt-tele-popup__name">${this._esc(name)}</span>
+                        ${t.temperature_c != null ? `<span class="rt-tele-popup__temp">${t.temperature_c}°C</span>` : ''}
+                    </div>
+                    ${tags ? `<div class="rt-tele-popup__tags">${tags}</div>` : ''}
+                </div>`;
             L.marker([t.latitude, t.longitude])
-                .bindPopup(lines.join('<br>'))
+                .bindPopup(popupHtml)
                 .addTo(this._teleMarkers);
             bounds.push([t.latitude, t.longitude]);
         });
