@@ -685,8 +685,32 @@ class LxmfService:
                 self._handle_inbound_message(message), self._loop,
             )
 
+    def _log_inbound_telemetry(self, message, source_hex: str) -> None:
+        """If an inbound LXMF message carries a Sideband ``FIELD_TELEMETRY``
+        frame, msgunpack it and log the decoded ``{sensor_id: value}`` dict
+        at INFO. Purely observational -- meshpoint doesn't act on received
+        telemetry yet -- but it's how you verify the telemetry-publish
+        wire format against a real client (or a loopback to our own
+        address), and the groundwork for a telemetry collector."""
+        fields = getattr(message, "fields", None)
+        if not isinstance(fields, dict):
+            return
+        field_id = getattr(LXMF, "FIELD_TELEMETRY", 0x02)
+        raw = fields.get(field_id)
+        if raw is None:
+            return
+        try:
+            decoded = RNS.vendor.umsgpack.unpackb(raw) if isinstance(raw, (bytes, bytearray)) else raw
+            logger.info("LXMF telemetry from %s: %r", source_hex, decoded)
+        except Exception:  # noqa: BLE001
+            logger.info(
+                "LXMF telemetry from %s: %d bytes, could not decode", source_hex,
+                len(raw) if hasattr(raw, "__len__") else -1,
+            )
+
     async def _handle_inbound_message(self, message) -> None:
         source_hex = RNS.hexrep(message.source_hash, delimit=False)
+        self._log_inbound_telemetry(message, source_hex)
         text = (
             message.content.decode("utf-8", errors="replace")
             if message.content else ""

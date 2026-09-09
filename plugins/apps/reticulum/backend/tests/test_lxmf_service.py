@@ -471,6 +471,29 @@ class TestTelemetryPublish(unittest.TestCase):
         self.assertFalse(res["ok"])
         self.assertIn("not running", res["error"])
 
+    def test_inbound_telemetry_logging_ignores_a_plain_message(self) -> None:
+        svc = _make_service()
+
+        class _Msg:
+            fields = {}
+
+        with self.assertNoLogs("plugins.apps.reticulum.backend.lxmf_service", "INFO"):
+            svc._log_inbound_telemetry(_Msg(), "abc")
+            svc._log_inbound_telemetry(object(), "abc")  # no .fields at all
+
+    def test_inbound_telemetry_logging_fires_on_a_telemetry_field(self) -> None:
+        svc = _make_service()
+
+        class _Msg:
+            # field id 2 = FIELD_TELEMETRY; value would normally be msgpack
+            # bytes -- on the Mac RNS is absent so it can't decode, but it
+            # must still log rather than raise.
+            fields = {0x02: b"\x81\x01\x0f"}
+
+        with self.assertLogs("plugins.apps.reticulum.backend.lxmf_service", "INFO") as cm:
+            svc._log_inbound_telemetry(_Msg(), "deadbeef")
+        self.assertTrue(any("telemetry from deadbeef" in line for line in cm.output))
+
 
 class TestInboundNotify(unittest.TestCase):
     def test_notify_inbound_posts_preview_and_sender(self) -> None:

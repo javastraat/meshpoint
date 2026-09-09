@@ -931,10 +931,18 @@ frame. Wire format pulled from `markqvist/Sideband`
 - Tests: `test_telemetry.py` ×6, `test_lxmf_service.py::
   TestTelemetryPublish` ×4 (both Mac); `test_config_routes.py` ×5 +
   `test_telemetry_route.py` ×5 (CI/Pi). Suite 186 passed.
-- **Real unknown:** the frame hasn't round-tripped through a live
-  Sideband client — the `SID_*` ids + msgpack shape are from `sense.py`
-  text only.
-- Pi verification: see `memory/reticulum_todo.md`.
+- SID ids + `packed()` shape confirmed verbatim from `sense.py` (2nd
+  WebFetch): `SID_TIME=0x01`, `SID_TEMPERATURE=0x07`,
+  `SID_INFORMATION=0x0F`; `packed()` = `umsgpack.packb({sid: pack()})`
+  with TIME set directly. Encoding matches.
+- `_log_inbound_telemetry(message, source_hex)` in
+  `_handle_inbound_message` — decodes an inbound `FIELD_TELEMETRY` and
+  logs `{sid: value}` at INFO. Observational only (no collector yet),
+  but it's the test rig: loopback (`telemetry_collector` = own address)
+  or a real Sideband → Pi telemetry message both show the decoded frame
+  in the journal. Groundwork for #4.
+- Pi verification: see `memory/reticulum_todo.md` (loopback is the
+  fastest check).
 
 ## 2026-09-09 — Propagation node polish, client side (new-build #2)
 

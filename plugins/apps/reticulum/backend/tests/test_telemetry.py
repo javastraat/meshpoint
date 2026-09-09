@@ -56,6 +56,15 @@ class TestBuildTelemetry(unittest.TestCase):
         frame = telemetry.build_telemetry(_FULL_HOST, "x")
         self.assertTrue(all(isinstance(k, int) for k in frame))
 
+    def test_all_values_are_msgpack_safe_primitives(self) -> None:
+        # umsgpack.packb on the Pi must not choke -- the frame may only
+        # contain ints / floats / strs (no None, no custom objects).
+        for host in (_FULL_HOST, {}, {"cpu_temp_c": None, "load_1m": 3}):
+            frame = telemetry.build_telemetry(host, "node")
+            for key, val in frame.items():
+                self.assertIsInstance(key, int)
+                self.assertIsInstance(val, (int, float, str))
+
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()

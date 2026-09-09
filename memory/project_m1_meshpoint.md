@@ -12862,8 +12862,18 @@ TestTelemetryConfig` ×5 + `test_telemetry_route.py` ×5 (CI/Pi). Suite
 rows), CONFIGURATION.md (prose + 3 yaml keys) — all flag the v1-subset
 limitation.
 
-**Not browser/Pi-verified, and the real unknown is the wire format** —
-needs a live Sideband client subscribed as the collector to confirm the
-frame parses (the `SID_*` ids + msgpack shape are from `sense.py` text,
-not a round-trip). Follow-ups: structured sensors, `SID_LOCATION`.
-Checklist in `memory/reticulum_todo.md`.
+**Testing:** SID ids + `packed()` shape were then confirmed VERBATIM
+from `sense.py` (a 2nd, more targeted WebFetch) — `SID_TIME=0x01`,
+`SID_TEMPERATURE=0x07`, `SID_INFORMATION=0x0F`, dict shape matches. Added
+`_log_inbound_telemetry()` to `_handle_inbound_message` — decodes an
+inbound `FIELD_TELEMETRY` and logs `{sid: value}` at INFO. So the Pi is
+its own test rig:
+- **Loopback:** set `telemetry_collector` to the Pi's own
+  `lxmf.delivery` address → journal shows send + decoded receive within
+  ~30s (proves build→pack→transport→unpack).
+- **Real Sideband:** send telemetry from Sideband to the Pi's address →
+  the log shows Sideband's actual frame to compare against ours.
+3 more tests (1 builder primitives-safety, 2 `_log_inbound_telemetry`
+via `assertNoLogs`/`assertLogs`). Suite 189 passed. Follow-ups:
+structured sensors, `SID_LOCATION`. Checklist in
+`memory/reticulum_todo.md`.

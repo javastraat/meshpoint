@@ -112,17 +112,23 @@ checked on the Pi.
   receiving → complete) and the message land in Messages. Also: auto-
   sync interval > 0 actually re-syncs; a bad/unreachable node shows a
   failed state not a hang; "Sync inbox" hidden when no outbound node.
-- **Telemetry publish — BUILT 2026-09-09, needs a real Sideband client
-  to verify.** Settings → Telemetry: enable + collector LXMF address +
-  interval. Check: "Send telemetry now" returns Sent (or a clear error
-  if the collector path is unknown — it fires `request_path` and asks
-  you to retry); a Sideband client subscribed to this node's telemetry
-  actually shows the CPU temp + the status line (this is the real
-  unknown — the `FIELD_TELEMETRY` msgpack format is from
-  `sense.py` via WebFetch, not tested against a live client); the
-  timed loop sends on interval; `last_error` surfaces on the status
-  line. If the frame doesn't parse in Sideband, the `SID_*` ids or the
-  msgpack shape need a real-client cross-check.
+- **Telemetry publish — BUILT 2026-09-09.** SID ids (`0x01`/`0x07`/`0x0F`)
+  + `packed()` dict shape confirmed VERBATIM from Sideband `sense.py`
+  (2nd WebFetch) — encoding is solid. Inbound `FIELD_TELEMETRY` is now
+  logged decoded at INFO (`_log_inbound_telemetry`), so testing is:
+  1. **Loopback (fastest):** set `telemetry_collector` to the Pi's OWN
+     `lxmf.delivery` address, `telemetry_enabled: true`, restart. Within
+     ~30s the journal shows a telemetry send then
+     `LXMF telemetry from <self>: {1: <ts>, 7: <temp>, 15: '<info>'}`.
+     Proves build→pack→LXMF transport→unpack round-trips.
+  2. **"Send telemetry now"** on the Settings tab — returns Sent, or a
+     clear "path unknown, retry" if the collector hasn't been heard.
+  3. **Real Sideband cross-check:** from Sideband send a telemetry
+     message to the Pi's LXMF address; the same INFO log shows
+     Sideband's real frame → compare structure to ours. Also confirm a
+     Sideband client subscribed to the Pi shows its temp + status line.
+  4. Timed loop fires on `telemetry_interval_s`; `last_error` surfaces
+     on the Settings status line.
 - **sample-bbs-techinc nav links (fixed 2026-09-07, not walked in a real
   NomadNet client)**: browse the hosted node in Sideband/NomadNet/
   MeshChat, click "Next" through every page, confirm no dead links and
