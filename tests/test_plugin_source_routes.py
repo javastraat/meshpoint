@@ -117,7 +117,7 @@ class TestPluginSourceRoutes(unittest.TestCase):
 
     def _catalog_with(self, entry_overrides: dict) -> dict:
         entry = {
-            "id": "a", "kind": "app", "path": "apps/a", "version": "2.0",
+            "id": "demo", "kind": "app", "path": "apps/demo", "version": "2.0",
             "meshpoint_api": 1, "provides": ["service"], "description": "",
             "author": "", "homepage": "", "has_setup": False, "compatible": True,
         }
@@ -130,7 +130,7 @@ class TestPluginSourceRoutes(unittest.TestCase):
     def test_install_requires_a_configured_source(self) -> None:
         self._mod.fetch_catalog = lambda url, ref: self._catalog_with({})
         r = self.client.post("/api/plugin-sources/install", json={
-            "url": "https://github.com/you/p", "id": "a",
+            "url": "https://github.com/you/p", "id": "demo",
         })
         self.assertEqual(r.status_code, 400)
         self.assertIn("not a configured", r.json()["detail"])
@@ -147,15 +147,15 @@ class TestPluginSourceRoutes(unittest.TestCase):
                 "has_setup": False, "commit": "abc1234"}
         )
         r = self.client.post("/api/plugin-sources/install", json={
-            "url": "https://github.com/you/p", "id": "a",
+            "url": "https://github.com/you/p", "id": "demo",
         })
         self.assertEqual(r.status_code, 200, r.text)
         body = r.json()
         self.assertTrue(body["installed"])
         self.assertFalse(body["updated"])
         self.assertEqual(body["commit"], "abc1234")
-        self.assertEqual(seen["id"], "a")
-        prov = self.cfg.plugins["a"]["source"]
+        self.assertEqual(seen["id"], "demo")
+        prov = self.cfg.plugins["demo"]["source"]
         self.assertEqual(prov["url"], "https://github.com/you/p")
         self.assertEqual(prov["version"], "2.0")
         self.assertEqual(prov["commit"], "abc1234")
@@ -168,7 +168,7 @@ class TestPluginSourceRoutes(unittest.TestCase):
             {"compatible": False, "meshpoint_api": 9},
         )
         r = self.client.post("/api/plugin-sources/install", json={
-            "url": "https://github.com/you/p", "id": "a",
+            "url": "https://github.com/you/p", "id": "demo",
         })
         self.assertEqual(r.status_code, 400)
 
