@@ -40,7 +40,8 @@ Read this before filing a finding — some of these are deliberate.
   Update. Same class as `pip install` from the terminal. Mitigation
   available today: pin the source `ref` to a tag or commit SHA instead of
   a branch. Downloaded files are re-validated (`parse_manifest`, path
-  safety, size caps) but not signature-checked. See backlog #5.
+  safety, size caps) but not signature-checked; `plugins.<id>.source`
+  records the resolved commit SHA as an audit anchor. See backlog #5.
 
 ---
 
@@ -54,7 +55,7 @@ Priority order is the user's own (set 2026-09-08).
 | 2 | **Move services off root onto `meshpoint` user** | 🔴 Not started | Explicitly longer-term ("to limit attack surface"). Self-update chain's `pip install` runs as root via `config/sudoers-meshpoint` NOPASSWD. |
 | 3 | **Web terminal → opt-in plugin** | 🔴 Not started, needs design | Currently core, admin-gated but root-equivalent. Move to an explicitly opt-in plugin like every other powerful/risky capability. "The root thing needs some thought" — not yet scoped/greenlit. |
 | 4 | **USB companion udev rules too permissive** | 🟢 Fixed 2026-09-09 | `99-meshpoint-esp.rules` shipped `MODE="0666"` for `idVendor 303a` (Espressif native-USB: Heltec V3/V4, T-Beam S3). Now `MODE="0660", GROUP="dialout"` in `install.sh` + a `post_update.sh` migration that rewrites the stale rule. **Verified on the SenseCap 2026-09-09:** the box's current radios are `ttyUSB0/1` (CP210x/CH340, *not* `303a`) and already showed the safe OS default `crw-rw---- root:dialout` — the `0666` rule only ever bit a plugged-in `303a` board (none attached), so live blast radius was nil; latent until a Heltec V3 is connected for firmware-flash/relay. See Fixed below. |
-| 5 | **Plugin source: record + pin the resolved commit SHA** | 🔴 Not started, low | On install, resolve the branch `ref` to a commit SHA and store it in `plugins.<id>.source`. On Update, if the source `ref` is a moving branch, show what changed (old SHA → new SHA) before applying, and offer "pin to this SHA". Makes the by-design "trusted code at HEAD" tradeoff visible + freezable. Purely additive to the v0.8.1 installer. |
+| 5 | Plugin source: record + surface the resolved commit SHA | 🟡 Half done 2026-09-09 | **Done:** the installer now reads the short SHA from the tarball's root dir and `plugins.<id>.source` records `commit` alongside `url`/`ref`/`version` — an audit anchor for *what code is running* (see Fixed). **Not done, low value:** showing old→new SHA / "N commits behind" / a one-click "pin to this SHA" before an Update. The security primitive (set `ref` to a tag/SHA to freeze) already works; that half is pure UX. |
 
 ---
 

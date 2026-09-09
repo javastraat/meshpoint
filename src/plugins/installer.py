@@ -21,6 +21,7 @@ explicit "Run setup" step.
 from __future__ import annotations
 
 import logging
+import re
 import shutil
 import tarfile
 import tempfile
@@ -116,10 +117,23 @@ def _safe_members(tar: tarfile.TarFile, subpath: str):
         )
 
 
-def stage_from_tarball(owner: str, repo: str, ref: str, subpath: str, plugin_id: str) -> Path:
+def _commit_from_toplevel(toplevel: str) -> str:
+    """GitHub names a tarball's root dir ``<owner>-<repo>-<short-sha>``.
+    The short SHA is always the final ``-``-delimited segment (owner and
+    repo may themselves contain dashes). Returns ``""`` if it doesn't
+    look like a commit -- provenance is best-effort, never a hard error."""
+    tail = toplevel.rsplit("-", 1)[-1] if "-" in toplevel else ""
+    return tail if re.fullmatch(r"[0-9a-f]{7,40}", tail) else ""
+
+
+def stage_from_tarball(
+    owner: str, repo: str, ref: str, subpath: str, plugin_id: str,
+) -> tuple[Path, str]:
     """Download + extract just ``<subpath>/**`` into a fresh temp dir.
-    Returns the extracted plugin folder (``<tmp>/<plugin_id>/``). The
-    caller is responsible for cleaning the temp dir's parent."""
+    Returns ``(plugin_folder, commit)`` -- ``plugin_folder`` is
+    ``<tmp>/<plugin_id>/`` and ``commit`` is the short SHA the ref
+    resolved to (from the archive's root dir name; ``""`` if unreadable).
+    The caller cleans the temp dir's parent."""
     staging = Path(tempfile.mkdtemp(prefix="meshpoint-plugin-"))
     archive = staging / "src.tar.gz"
     try:
@@ -127,7 +141,11 @@ def stage_from_tarball(owner: str, repo: str, ref: str, subpath: str, plugin_id:
         out_dir = staging / plugin_id
         out_dir.mkdir()
         written = 0
+        commit = ""
         with tarfile.open(archive, "r:gz") as tar:
+            names = tar.getnames()
+            if names:
+                commit = _commit_from_toplevel(names[0].split("/", 1)[0])
             for member, rel in _safe_members(tar, subpath):
                 target = out_dir / rel
                 if member.isdir():
@@ -148,7 +166,7 @@ def stage_from_tarball(owner: str, repo: str, ref: str, subpath: str, plugin_id:
                             )
                         fh.write(chunk)
         archive.unlink(missing_ok=True)
-        return out_dir
+        return out_dir, commit
     except BaseException:
         shutil.rmtree(staging, ignore_errors=True)
         raise
@@ -213,12 +231,12 @@ def install_from_source(
     """End to end: stage -> validate -> place. *entry* is a catalog entry
     (``{id, kind, path, version, ...}``). *community_dir* is
     ``<plugins_dir>/apps`` -- themes go to its sibling ``themes/``.
-    Returns ``{id, kind, version, has_setup}``."""
+    Returns ``{id, kind, version, has_setup, commit}``."""
     pid = entry["id"]
     kind = entry.get("kind", "app")
     subpath = entry["path"]
 
-    staged = stage_from_tarball(owner, repo, ref, subpath, pid)
+    staged, commit = stage_from_tarball(owner, repo, ref, subpath, pid)
     staging_root = staged.parent
     try:
         if kind == "theme":
@@ -233,8 +251,14 @@ def install_from_source(
     finally:
         shutil.rmtree(staging_root, ignore_errors=True)
 
-    logger.info("installed %s %s v%s from %s/%s@%s", kind, pid, version, owner, repo, ref)
-    return {"id": pid, "kind": kind, "version": version, "has_setup": has_setup}
+    logger.info(
+        "installed %s %s v%s (%s) from %s/%s@%s",
+        kind, pid, version, commit or "unknown-commit", owner, repo, ref,
+    )
+    return {
+        "id": pid, "kind": kind, "version": version,
+        "has_setup": has_setup, "commit": commit,
+    }
 
 
 __all__ = [

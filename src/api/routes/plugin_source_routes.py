@@ -215,11 +215,15 @@ class InstallFromSource(BaseModel):
     ref: str | None = None
 
 
-def _record_provenance(plugin_id: str, url: str, ref: str, version: str) -> None:
+def _record_provenance(
+    plugin_id: str, url: str, ref: str, version: str, commit: str,
+) -> None:
     """Write ``plugins.<id>.source`` so a later reader knows this folder
-    came from a source (and which ref/version). Best-effort -- the plugin
-    is already on disk, so a read-only ``local.yaml`` is a warning, not a
-    failed install."""
+    came from a source -- which url/ref, the author's version string, and
+    the actual commit SHA the ref resolved to (an audit anchor for *what
+    code is running*, since ``ref`` moves and ``version`` is just a string
+    the repo author types). Best-effort -- the plugin is already on disk,
+    so a read-only ``local.yaml`` is a warning, not a failed install."""
     plugins = _require_config().plugins
     existing = plugins.get(plugin_id)
     existing = dict(existing) if isinstance(existing, dict) else {}
@@ -227,6 +231,7 @@ def _record_provenance(plugin_id: str, url: str, ref: str, version: str) -> None
         "url": url,
         "ref": ref,
         "version": version,
+        "commit": commit,
         "installed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
     plugins[plugin_id] = existing
@@ -319,7 +324,9 @@ async def install_from_source_route(
                 f"permission. Fix with: sudo chown -R meshpoint:meshpoint "
                 f"{_community_dir.parent}",
             ) from exc
-        _record_provenance(result["id"], canon, ref, result["version"])
+        _record_provenance(
+            result["id"], canon, ref, result["version"], result.get("commit", ""),
+        )
 
     logger.info(
         "plugin %s %s from %s@%s (v%s) by %s",

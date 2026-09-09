@@ -945,8 +945,11 @@ tampered `repo.json` can't smuggle anything in.
    parser, and drops it in `plugins/apps/<id>/`. From there it's a normal
    drop-in — enable it, run setup if it needs it, restart. **Update** does
    the same in place and keeps the enabled state; uninstall is the list's
-   existing Delete button. Provenance (source URL, ref, version) is
-   recorded under `plugins.<id>.source` in `local.yaml`.
+   existing Delete button. Provenance — source URL, ref, the author's
+   version string, **and the commit SHA the ref actually resolved to** —
+   is recorded under `plugins.<id>.source` in `local.yaml`, so there's a
+   record of exactly what code was installed (a branch `ref` moves;
+   `version` is just a string the author types).
 4. **Updates** surface on their own — the plugin list scans every source's
    catalog on load, so a plugin whose source offers a different version
    shows an *Update vX → vY* button on its row without you having to open

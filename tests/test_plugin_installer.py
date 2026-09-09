@@ -74,9 +74,15 @@ class StageFromTarball(unittest.TestCase):
         self.addCleanup(patcher.stop)
 
     def _stage(self, subpath="apps/hello-svc", pid="hello-svc") -> Path:
-        out = stage_from_tarball("o", "r", "main", subpath, pid)
+        out, commit = stage_from_tarball("o", "r", "main", subpath, pid)
+        self._last_commit = commit
         self.addCleanup(lambda: shutil.rmtree(out.parent, ignore_errors=True))
         return out
+
+    def test_reports_the_commit_from_the_archive_root_dir(self) -> None:
+        self._stage()
+        # _TOPLEVEL is "<owner>-<repo>-deadbeef"
+        self.assertEqual(self._last_commit, "deadbeef")
 
     def test_extracts_only_the_requested_subtree(self) -> None:
         out = self._stage()
@@ -207,6 +213,7 @@ class InstallFromSource(unittest.TestCase):
         result = install_from_source("javastraat", "meshpoint-plugins", "main", entry, self.community)
         self.assertEqual(result["id"], "hello-svc")
         self.assertEqual(result["version"], "0.2.0")
+        self.assertEqual(result["commit"], "deadbeef")
         self.assertFalse(result["has_setup"])
         self.assertTrue((self.community / "hello-svc" / "plugin.toml").is_file())
         self.assertTrue((self.community / "hello-svc" / "backend" / "__init__.py").is_file())

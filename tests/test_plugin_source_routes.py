@@ -143,7 +143,8 @@ class TestPluginSourceRoutes(unittest.TestCase):
         seen = {}
         self._mod.install_from_source = lambda owner, repo, ref, entry, cdir: (
             seen.update(owner=owner, repo=repo, ref=ref, id=entry["id"])
-            or {"id": entry["id"], "kind": "app", "version": entry["version"], "has_setup": False}
+            or {"id": entry["id"], "kind": "app", "version": entry["version"],
+                "has_setup": False, "commit": "abc1234"}
         )
         r = self.client.post("/api/plugin-sources/install", json={
             "url": "https://github.com/you/p", "id": "a",
@@ -152,10 +153,12 @@ class TestPluginSourceRoutes(unittest.TestCase):
         body = r.json()
         self.assertTrue(body["installed"])
         self.assertFalse(body["updated"])
+        self.assertEqual(body["commit"], "abc1234")
         self.assertEqual(seen["id"], "a")
         prov = self.cfg.plugins["a"]["source"]
         self.assertEqual(prov["url"], "https://github.com/you/p")
         self.assertEqual(prov["version"], "2.0")
+        self.assertEqual(prov["commit"], "abc1234")
 
     def test_install_refuses_incompatible(self) -> None:
         self.client.post("/api/plugin-sources", json={
