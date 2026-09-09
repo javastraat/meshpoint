@@ -13027,3 +13027,36 @@ Full details in `memory/project_plugin_sources.md`. Summary:
   hello-world-github → folder lands in `plugins/apps/` → enable +
   restart → page loads; Update after a version bump; provenance written
   to local.yaml.
+
+## Web terminal opt-in (security #3 phase 1, 2026-09-09)
+
+Auditor: "enabled by default is a huge hole securitywise (partly due to
+sudo setup of meshpoint)". Decision: keep it in **core** (not a plugin —
+"could always move later"), gate with a config flag, off by default.
+
+- `dashboard.web_terminal_enabled: bool = False` (src/config.py).
+- `terminal_routes.init_routes(..., enabled=...)` — every HTTP endpoint
+  403s via `_require_enabled()`, the `/ws` upgrade is refused, when off.
+- `identity_routes.init_routes(..., web_terminal_enabled=...)` —
+  `_sections_for()` drops `"terminal"` so the sidebar hides the nav item.
+- `server.py` wires `config.dashboard.web_terminal_enabled` into both.
+- Toggle: **Web terminal** card in Settings → System
+  (`frontend/index.html` + `dangerous_panel_controller.js`), `PUT
+  /api/config/dashboard` (new, in config_routes.py, audited
+  `config.dashboard_update`), `DangerousModal` ack on enable. `GET
+  /api/config` now returns a `dashboard: {web_terminal_enabled}` block.
+- **No grandfather migration** — 5 testers, they just re-enable it;
+  CHANGELOG says "re-enable it in Settings → System if you use it".
+  (Built a sentinel-file migration first, then cut it — grandfathering
+  keeps the hole open for exactly the population the change protects.)
+- Tests: test_config_loader (default off + yaml), test_identity_route
+  (section hidden, CI/Pi), test_terminal_routes (403 + ws refused, CI/Pi).
+- Docs: CHANGELOG v0.8.1, CONFIGURATION.md Dashboard section.
+
+**Key finding while scoping #2 (services off root):** `/opt/meshpoint`,
+`.git`, `venv`, `pip` are ALL already `meshpoint:meshpoint`-owned on the
+SenseCap. So `sudo pip install *` + ~16 `sudo git` NOPASSWD lines in
+`config/sudoers-meshpoint` are dead weight — next phase is dropping them
++ changing `apply.py`'s hardcoded `sudo git` to plain git. The real
+de-root (phase 3) needs the sudoers-invoked scripts moved out of the
+service-user-writable tree. See memory/meshpoint_security_todo.md #2/#3.

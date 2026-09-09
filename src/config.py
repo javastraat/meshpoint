@@ -390,6 +390,11 @@ class DashboardConfig:
     # dashboard moves here. Bookmarks/QR codes to :port stop working as
     # a dashboard URL and instead just bounce to :tls_port.
     tls_port: int = 8443
+    # Ops -> Terminal, a real root-capable shell on the device (an admin
+    # session is effectively root once this is on -- it can run sudo). Off
+    # by default so a box has no web-shell surface unless someone opts in
+    # via Settings -> System. Restart required to apply.
+    web_terminal_enabled: bool = False
 
 
 @dataclass

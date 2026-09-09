@@ -1141,11 +1141,14 @@ dashboard:
   tls_cert_path: "data/tls/cert.pem"
   tls_key_path: "data/tls/key.pem"
   tls_port: 8443              # the real HTTPS dashboard moves here once tls_enabled is on
+  web_terminal_enabled: false  # Ops -> Terminal (a root-capable shell); off by default
 ```
 
 Access at `http://<pi-ip>:8080`. Bind to `127.0.0.1` to restrict to local access only.
 
 Changes to `host`/`port`/`static_dir`/`plugins_dir` take effect on service restart. If the configured address can't be used (config typo, port already taken, privileged port), the server logs the problem and falls back to `0.0.0.0:8080` so the dashboard stays reachable.
+
+**`web_terminal_enabled`** (default `false`; also a toggle in Settings → System): the Ops → Terminal page is a full interactive shell on the device. It can run `sudo` (package installs, plugin setup, service control via `config/sudoers-meshpoint`), so **any admin session is effectively root on the host while this is on** — the real security boundary is the admin login, not root-vs-not. Off by default so a box has no web-shell surface unless someone deliberately opts in; when off, the routes and websocket 403 and the sidebar entry is hidden. The Settings → System toggle shows a confirm dialog spelling out the implication. Restart to apply.
 
 **`tls_enabled`** (config-file only, no Settings-tab toggle yet — same as `host`/`port`): serve HTTPS instead of plain HTTP. Off by default; without it, the dashboard — **including the login form** — is plaintext HTTP, readable by anything on the same network segment. There's no real DNS name to get a CA-signed cert against for a LAN device, so meshpoint generates and manages its own self-signed cert (`src/tls_cert.py`, using the `cryptography` package already bundled — no `openssl` install needed). Every address the dashboard might actually be reached at goes into the cert: every IP `hostname -I` reports (LAN, Tailscale/VPN, anything live), plus the machine's hostname and its `.local` mDNS name, plus `127.0.0.1`/`localhost`. The cert is (re)generated automatically at startup whenever that address set has drifted from what's already baked in — a DHCP lease renewal, connecting/disconnecting a VPN, or a hostname change all trigger a fresh cert next restart, so it never goes stale relative to what you're actually connecting to. `tls_cert_path`/`tls_key_path` default under `data/` (survives a backup/restore of `data/`, not committed to git); the private key is written `0600`. If cert generation fails for any reason, the dashboard falls back to plain HTTP rather than crash-loop — same "never lock the operator out of the tool that could fix the config" reasoning as a bad `host`/`port`.
 

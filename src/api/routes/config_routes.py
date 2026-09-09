@@ -16,6 +16,8 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from src.api.audit import AuditLogWriter
+from src.api.audit.dependencies import get_audit_writer
 from src.api.auth.dependencies import require_admin, require_auth
 from src.api.auth.jwt_session import ROLE_ADMIN, SessionClaims
 from src.api.routes import (
@@ -390,6 +392,9 @@ async def get_config(claims: SessionClaims = Depends(require_auth)):
         "channels": channels,
         "meshcore": mc_status,
         "serial": serial_status,
+        "dashboard": {
+            "web_terminal_enabled": _config.dashboard.web_terminal_enabled,
+        },
         "duty_cycle": duty_info,
         "presets": all_presets_list(),
         "regions": [
@@ -553,6 +558,42 @@ async def update_identity(
             raise HTTPException(403, str(exc))
 
     return {"saved": True, "restart_required": restart_needed, "updates": updates}
+
+
+class DashboardUpdate(BaseModel):
+    web_terminal_enabled: Optional[bool] = None
+
+
+@router.put("/dashboard")
+async def update_dashboard(
+    req: DashboardUpdate,
+    claims: SessionClaims = Depends(require_admin),
+    audit: AuditLogWriter = Depends(get_audit_writer),
+):
+    """Dashboard-level settings that are safe to change at runtime but only
+    take effect on the next restart. Currently just
+    ``web_terminal_enabled`` -- turning it on gives every admin session a
+    root-capable shell on the device, so it's audited."""
+    if _config is None:
+        raise HTTPException(503, "Config not loaded")
+
+    updates: dict = {}
+    if req.web_terminal_enabled is not None:
+        _config.dashboard.web_terminal_enabled = req.web_terminal_enabled
+        updates["web_terminal_enabled"] = req.web_terminal_enabled
+
+    if not updates:
+        return {"saved": True, "restart_required": False, "updates": {}}
+
+    with audit.timed_action(
+        user=claims.subject, action="config.dashboard_update", params=updates,
+    ):
+        try:
+            save_section_to_yaml("dashboard", updates)
+        except PermissionError as exc:
+            raise HTTPException(403, str(exc))
+
+    return {"saved": True, "restart_required": True, "updates": updates}
 
 
 class RadioUpdate(BaseModel):

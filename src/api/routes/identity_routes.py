@@ -81,26 +81,44 @@ _VIEWER_SECTIONS: tuple[str, ...] = (
 )
 
 
-def init_routes(identity: DeviceIdentity, auth_service: AuthService) -> None:
-    """Bind device identity + auth service used by the handler."""
-    global _identity, _auth_service
+_web_terminal_enabled: bool = True
+
+
+def init_routes(
+    identity: DeviceIdentity,
+    auth_service: AuthService,
+    web_terminal_enabled: bool = True,
+) -> None:
+    """Bind device identity + auth service used by the handler.
+
+    *web_terminal_enabled* mirrors ``dashboard.web_terminal_enabled`` --
+    when off, ``"terminal"`` is dropped from ``available_sections`` so the
+    sidebar hides the Terminal nav item (the route itself also 403s, see
+    ``terminal_routes``)."""
+    global _identity, _auth_service, _web_terminal_enabled
     _identity = identity
     _auth_service = auth_service
+    _web_terminal_enabled = web_terminal_enabled
 
 
 def reset_routes() -> None:
     """Test helper: clear module-level state between cases."""
-    global _identity, _auth_service
+    global _identity, _auth_service, _web_terminal_enabled
     _identity = None
     _auth_service = None
+    _web_terminal_enabled = True
 
 
 def _sections_for(role: str) -> list[str]:
     if role == ROLE_ADMIN:
-        return list(_ADMIN_SECTIONS)
-    if role == ROLE_VIEWER:
-        return list(_VIEWER_SECTIONS)
-    return []
+        sections = list(_ADMIN_SECTIONS)
+    elif role == ROLE_VIEWER:
+        sections = list(_VIEWER_SECTIONS)
+    else:
+        return []
+    if not _web_terminal_enabled and "terminal" in sections:
+        sections.remove("terminal")
+    return sections
 
 
 class IdentityResponse(BaseModel):

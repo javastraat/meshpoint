@@ -30,7 +30,7 @@ _SECRET = "identity-test-secret-" + "k" * 16
 
 
 def _build_client(
-    *, with_password: bool = False
+    *, with_password: bool = False, web_terminal_enabled: bool = True,
 ) -> tuple[TestClient, WebAuthConfig, JwtSessionService]:
     cfg = WebAuthConfig()
     if with_password:
@@ -55,7 +55,9 @@ def _build_client(
         hardware_description="RAK2287 + Raspberry Pi 4",
         firmware_version="0.7.3-test",
     )
-    identity_routes.init_routes(identity, auth_service)
+    identity_routes.init_routes(
+        identity, auth_service, web_terminal_enabled=web_terminal_enabled,
+    )
     app = FastAPI()
     app.include_router(identity_routes.router)
     return TestClient(app), cfg, jwt_service
@@ -107,6 +109,13 @@ class TestIdentityEndpoint(unittest.TestCase):
         self.assertNotIn("terminal", sections)
         self.assertNotIn("settings.dangerous", sections)
         self.assertIn("dashboard", sections)
+
+    def test_terminal_section_hidden_when_web_terminal_disabled(self) -> None:
+        client, _cfg, jwt = _build_client(with_password=True, web_terminal_enabled=False)
+        client.cookies.set("meshpoint_session", jwt.issue("admin", "admin"))
+        sections = set(client.get("/api/identity").json()["available_sections"] or [])
+        self.assertNotIn("terminal", sections)
+        self.assertIn("settings.dangerous", sections)  # everything else stays
 
     def test_response_does_not_leak_pii_fields(self) -> None:
         client, _, _ = _build_client()

@@ -1024,6 +1024,15 @@
                         </div>
                         <p class="auth-status" data-backup-status aria-live="polite"></p>
                     </article>
+                    <article class="auth-card web-terminal-card" id="meshpoint-web-terminal">
+                        <h3 class="auth-card__title">Web terminal</h3>
+                        <p class="auth-card__hint">A full shell on the device at <strong>Ops &rarr; Terminal</strong>. It can run <code>sudo</code>, so an admin session is effectively root while this is on &mdash; leave it off unless you actually use it. Takes effect after a restart.</p>
+                        <label class="cfg-field cfg-field--toggle">
+                            <input type="checkbox" data-web-terminal-toggle disabled>
+                            <span class="cfg-field__label">Enable the web terminal</span>
+                        </label>
+                        <p class="auth-status" data-web-terminal-status aria-live="polite"></p>
+                    </article>
                     <header class="dangerous-panel__head dangerous-panel__head--secondary">
                         <h3 class="dangerous-panel__title">Service actions</h3>
                         <p class="dangerous-panel__subtitle">Each requires confirmation and is recorded in the audit log.</p>

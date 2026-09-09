@@ -480,6 +480,27 @@ class LoadConfigIntegrationTest(unittest.TestCase):
         self.assertEqual(cfg.repeater_poll.repeaters[0].key, "da0b77f13bc7")
         self.assertEqual(cfg.repeater_poll.repeaters[0].name, "PD2EMC")
 
+    def test_web_terminal_defaults_off_and_loads_from_yaml(self):
+        self.assertFalse(AppConfig().dashboard.web_terminal_enabled)
+        tmp = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", delete=False, encoding="utf-8"
+        )
+        tmp.write("dashboard:\n  web_terminal_enabled: true\n")
+        tmp.close()
+        path = Path(tmp.name)
+        self.addCleanup(lambda: path.unlink(missing_ok=True))
+        old = os.environ.get("CONCENTRATOR_CONFIG")
+        os.environ["CONCENTRATOR_CONFIG"] = str(path)
+        try:
+            with self.assertNoLogs("src.config", level="WARNING"):
+                cfg = load_config()
+        finally:
+            if old is None:
+                os.environ.pop("CONCENTRATOR_CONFIG", None)
+            else:
+                os.environ["CONCENTRATOR_CONFIG"] = old
+        self.assertTrue(cfg.dashboard.web_terminal_enabled)
+
 
 if __name__ == "__main__":
     unittest.main()

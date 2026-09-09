@@ -250,6 +250,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
         command_catalog=CommandCatalog(),
         jwt_service=auth_subsystem.jwt_service,
         audit_writer=audit_writer,
+        enabled=config.dashboard.web_terminal_enabled,
     )
     update_routes.init_routes(
         applier=UpdateApplier(
@@ -1836,7 +1837,10 @@ def _init_routes(
     message_repo: MessageRepository | None = None,
     channel_hash_resolver=None,
 ) -> None:
-    identity_routes.init_routes(identity, auth_subsystem.service)
+    identity_routes.init_routes(
+        identity, auth_subsystem.service,
+        web_terminal_enabled=config.dashboard.web_terminal_enabled,
+    )
     network_mapper = NetworkMapper(coord.node_repo)
     signal_analyzer = SignalAnalyzer(coord.packet_repo)
     traffic_monitor = TrafficMonitor(coord.packet_repo)

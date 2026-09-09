@@ -9,10 +9,12 @@ See `memory/project_m1_meshpoint.md` for wider session context and
 `memory/reticulum_todo.md` for the Reticulum plugin backlog.
 
 Last updated 2026-09-09 — review pass: installer size caps + `ref` `..`
-traversal fixed; backlog #4 (Espressif udev `0666`→`0660`) fixed +
-verified on the SenseCap; backlog #5 (plugin-source commit SHA: record,
-resolve, Pin/Unpin) done. Open: #2 (services off root), #3 (web terminal
-→ plugin).
+traversal fixed; #4 (Espressif udev `0666`→`0660`) fixed + verified;
+#5 (plugin-source commit SHA: record, resolve, Pin/Unpin) done;
+**#3 phase 1 done** — web terminal is now opt-in (`dashboard.web_terminal_enabled`,
+default false). Open: #2 (services off root, which is really the same
+work as #3 phase 3 — moving the sudoers-invoked scripts out of the
+service-user-writable tree).
 
 ---
 
@@ -55,8 +57,8 @@ Priority order is the user's own (set 2026-09-08).
 | # | Item | Status | Notes |
 |---|---|---|---|
 | 1 | **HTTPS/TLS option** | 🟢 Built, partially live-verified | `dashboard.tls_enabled` / `tls_cert_path` / `tls_key_path` / `tls_port` (default 8443). Self-signed cert via bundled `cryptography` (no new dep), `src/tls_cert.py`. SAN covers every `hostname -I` address + hostname + `<hostname>.local` + `127.0.0.1`/`localhost`; auto-regenerates at startup if the address set drifted. `:8080` becomes a 308-redirect-only listener when TLS is on (two `uvicorn.Server`s via `asyncio.gather`). 28 tests (`test_tls_cert.py` ×12, `test_serve.py` ×13, `test_banner_sources.py` ×3). Boot log verified on ti-meshpoint. **Still owed:** real browser round-trip against all 3 addresses (LAN IP / Tailscale IP / `sensecap.local`) — confirm only the self-signed warning appears, not also a hostname-mismatch warning. |
-| 2 | **Move services off root onto `meshpoint` user** | 🔴 Not started | Explicitly longer-term ("to limit attack surface"). Self-update chain's `pip install` runs as root via `config/sudoers-meshpoint` NOPASSWD. |
-| 3 | **Web terminal → opt-in plugin** | 🔴 Not started, needs design | Currently core, admin-gated but root-equivalent. Move to an explicitly opt-in plugin like every other powerful/risky capability. "The root thing needs some thought" — not yet scoped/greenlit. |
+| 2 | **Move services off root onto `meshpoint` user** | 🟡 Partly clear | **Confirmed 2026-09-09 on the SenseCap: `/opt/meshpoint`, `.git`, `venv`, `pip` are ALL already `meshpoint:meshpoint`-owned** (`post_update.sh:55` chowns the tree every update; the sudoers file's "owned by root" comment is stale). So the `sudo pip install *` and ~16 `sudo git …` NOPASSWD lines are *dead weight* — the code can call plain `git`/`pip`. Phase 2: drop those lines, change `apply.py`'s hardcoded `["sudo","git",…]` to plain git (`install_status.py::sudo_needed()` already auto-detects). Phase 3 (the real de-root): the remaining sudoers lines point at scripts *in the writable tree* (`apply_finish.sh`, `post_update.sh`, `install.sh`), so the service user can rewrite-then-`sudo`-run them → still root-equivalent. True fix = move those scripts to a root-owned dir (`/usr/local/lib/meshpoint/`) updated only by a root process; needs a root-side update component. Same work as #3 phase 3. |
+| 3 | **Web terminal → opt-in** | 🟢 Phase 1 done 2026-09-09 | **Kept in core (not a plugin) + config-gated.** `dashboard.web_terminal_enabled`, default `false`. Off = `terminal_routes` (HTTP + ws) 403, `identity_routes` drops `"terminal"` from `available_sections` so the sidebar hides it. Toggle: **Web terminal** card in Settings → System (`PUT /api/config/dashboard`, audited `config.dashboard_update`) with a `DangerousModal` ack spelling out the root implication. **No grandfather migration** (5 testers, they re-enable; CHANGELOG says so). Tests: `test_config_loader` (default off + yaml load), `test_identity_route` (section hidden), `test_terminal_routes` (403 + ws refused). Phase 2/3 = the sudoers/de-root work above (#2). |
 | 4 | **USB companion udev rules too permissive** | 🟢 Fixed 2026-09-09 | `99-meshpoint-esp.rules` shipped `MODE="0666"` for `idVendor 303a` (Espressif native-USB: Heltec V3/V4, T-Beam S3). Now `MODE="0660", GROUP="dialout"` in `install.sh` + a `post_update.sh` migration that rewrites the stale rule. **Verified on the SenseCap 2026-09-09:** the box's current radios are `ttyUSB0/1` (CP210x/CH340, *not* `303a`) and already showed the safe OS default `crw-rw---- root:dialout` — the `0666` rule only ever bit a plugged-in `303a` board (none attached), so live blast radius was nil; latent until a Heltec V3 is connected for firmware-flash/relay. See Fixed below. |
 | 5 | Plugin source: record + surface the resolved commit SHA | 🟢 Done 2026-09-09 | `plugins.<id>.source.commit` records the resolved short SHA at install. Plugin row shows `from owner/repo @ ref · <sha>`. `GET /api/plugin-sources/resolve` resolves a ref to its current commit; the Update confirm shows `installed <sha> → incoming <sha> "msg"` and flags a moving branch. `PATCH /api/plugin-sources` + **Pin/Unpin** buttons on the source row freeze a branch to the commit it points at now (`pinned_from` remembers the branch for Unpin). See Fixed. |
 

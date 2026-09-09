@@ -16,11 +16,18 @@ class DangerousPanelController {
         this.statusEl = rootEl.querySelector('[data-dangerous-status]');
         this.modal = new window.DangerousModal();
         this._actions = [];
+        this.wtToggle = rootEl.querySelector('[data-web-terminal-toggle]');
+        this.wtStatusEl = rootEl.querySelector('[data-web-terminal-status]');
     }
 
-    bind() {}
+    bind() {
+        if (this.wtToggle) {
+            this.wtToggle.addEventListener('change', () => this._onWebTerminalToggle());
+        }
+    }
 
     async refresh() {
+        this._loadWebTerminalState();
         try {
             const response = await fetch('/api/dangerous/actions', {
                 credentials: 'same-origin',
@@ -35,6 +42,69 @@ class DangerousPanelController {
         } catch (_e) {
             this._setStatus('error', 'Network error loading actions.');
         }
+    }
+
+    // ── Web terminal enable/disable ─────────────────────────────────────
+
+    async _loadWebTerminalState() {
+        if (!this.wtToggle) return;
+        try {
+            const r = await fetch('/api/config', { credentials: 'same-origin' });
+            if (!r.ok) { this._setWtStatus('error', `Could not load (HTTP ${r.status}).`); return; }
+            const cfg = await r.json();
+            const on = !!(cfg.dashboard && cfg.dashboard.web_terminal_enabled);
+            this.wtToggle.checked = on;
+            this.wtToggle.disabled = false;
+            this._setWtStatus('', on ? 'On.' : 'Off — the Terminal page is hidden and its API is disabled.');
+        } catch (_e) {
+            this._setWtStatus('error', 'Network error.');
+        }
+    }
+
+    async _onWebTerminalToggle() {
+        const want = this.wtToggle.checked;
+        if (want) {
+            const ok = await this.modal.confirm({
+                label: 'Enable the web terminal?',
+                command: 'Enable web terminal',
+                description:
+                    'This exposes a full shell on the device at Ops → Terminal. It can run ' +
+                    'sudo (package installs, plugin setup, service control), so anyone with ' +
+                    'an admin session — or anything that hijacks one — effectively has root ' +
+                    'on this host. Only enable it if you actively use it. Restart required.',
+            });
+            if (!ok) { this.wtToggle.checked = false; return; }
+        }
+        this.wtToggle.disabled = true;
+        this._setWtStatus('pending', 'Saving…');
+        try {
+            const r = await fetch('/api/config/dashboard', {
+                method: 'PUT',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ web_terminal_enabled: want }),
+            });
+            const body = await r.json().catch(() => ({}));
+            if (!r.ok) {
+                this.wtToggle.checked = !want;
+                this._setWtStatus('error', body.detail || `Failed (HTTP ${r.status}).`);
+                return;
+            }
+            this._setWtStatus('success',
+                `${want ? 'Enabled' : 'Disabled'}. Restart the service to apply — `
+                + 'use "Restart service" in Plugins, or reboot.');
+        } catch (_e) {
+            this.wtToggle.checked = !want;
+            this._setWtStatus('error', 'Network error.');
+        } finally {
+            this.wtToggle.disabled = false;
+        }
+    }
+
+    _setWtStatus(kind, message) {
+        if (!this.wtStatusEl) return;
+        this.wtStatusEl.dataset.kind = kind;
+        this.wtStatusEl.textContent = message;
     }
 
     _render() {

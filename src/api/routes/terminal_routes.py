@@ -72,29 +72,50 @@ _jwt_service: JwtSessionService | None = None
 _audit_writer: AuditLogWriter | None = None
 
 
+_enabled: bool = True
+
+
 def init_routes(
     session_manager: SessionManager,
     command_catalog: CommandCatalog,
     jwt_service: JwtSessionService,
     audit_writer: AuditLogWriter,
+    enabled: bool = True,
 ) -> None:
-    """Bind app-scope dependencies for the terminal endpoints."""
-    global _session_manager, _command_catalog, _jwt_service, _audit_writer
+    """Bind app-scope dependencies for the terminal endpoints.
+
+    *enabled* mirrors ``dashboard.web_terminal_enabled``. When off, every
+    endpoint here 403s and the ``/ws`` upgrade is refused -- the web
+    terminal is a root-capable shell, so a fresh install ships it dark
+    (turn it on in Settings -> System). Belt-and-braces with
+    ``identity_routes`` dropping ``"terminal"`` from the sidebar."""
+    global _session_manager, _command_catalog, _jwt_service, _audit_writer, _enabled
     _session_manager = session_manager
     _command_catalog = command_catalog
     _jwt_service = jwt_service
     _audit_writer = audit_writer
+    _enabled = enabled
 
 
 def reset_routes() -> None:
-    global _session_manager, _command_catalog, _jwt_service, _audit_writer
+    global _session_manager, _command_catalog, _jwt_service, _audit_writer, _enabled
     _session_manager = None
     _command_catalog = None
     _jwt_service = None
     _audit_writer = None
+    _enabled = True
+
+
+def _require_enabled() -> None:
+    if not _enabled:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="The web terminal is disabled. Enable it in Settings → System.",
+        )
 
 
 def _require_initialized() -> tuple[SessionManager, CommandCatalog]:
+    _require_enabled()
     if _session_manager is None or _command_catalog is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -132,7 +153,7 @@ async def terminal_websocket(websocket: WebSocket) -> None:
     pattern (Willard regression). Admin-only by role check after
     the cookie/JWT decode succeeds.
     """
-    if _session_manager is None or _jwt_service is None:
+    if not _enabled or _session_manager is None or _jwt_service is None:
         await websocket.accept()
         await websocket.close(code=WS_AUTH_CLOSE_CODE)
         return

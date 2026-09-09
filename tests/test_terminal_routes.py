@@ -82,6 +82,35 @@ class TestTerminalRoutes(unittest.TestCase):
         response = self.client.get("/api/terminal/commands")
         self.assertEqual(response.status_code, 403)
 
+    def test_endpoints_403_when_web_terminal_disabled(self) -> None:
+        terminal_routes.init_routes(
+            session_manager=self.manager,
+            command_catalog=CommandCatalog(),
+            jwt_service=self.jwt,
+            audit_writer=self.audit,
+            enabled=False,
+        )
+        self.client.cookies.set("meshpoint_session", self.admin_token)
+        for path in ("/api/terminal/commands", "/api/terminal/status"):
+            r = self.client.get(path)
+            self.assertEqual(r.status_code, 403, path)
+            self.assertIn("disabled", r.json()["detail"].lower())
+
+    def test_websocket_refused_when_web_terminal_disabled(self) -> None:
+        from starlette.websockets import WebSocketDisconnect
+
+        terminal_routes.init_routes(
+            session_manager=self.manager,
+            command_catalog=CommandCatalog(),
+            jwt_service=self.jwt,
+            audit_writer=self.audit,
+            enabled=False,
+        )
+        self.client.cookies.set("meshpoint_session", self.admin_token)
+        with self.assertRaises(WebSocketDisconnect):
+            with self.client.websocket_connect("/api/terminal/ws") as ws:
+                ws.receive_text()
+
     def test_status_reports_session_counts(self) -> None:
         with mock.patch.object(
             PtySession, "spawn", side_effect=lambda **_kw: _FakePtySession()
