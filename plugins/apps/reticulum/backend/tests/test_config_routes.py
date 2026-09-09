@@ -41,6 +41,11 @@ class TestPropagationOutboundNode(unittest.TestCase):
         m = ReticulumUpdate(**_REQUIRED, propagation_outbound_node="AB:CD" + "EF" * 14)
         self.assertEqual(m.propagation_outbound_node, "abcd" + "ef" * 14)
 
+    def test_angle_bracket_form_is_accepted(self) -> None:
+        # RNS's own <hex> display form (startup banner / "You:" line)
+        m = ReticulumUpdate(**_REQUIRED, telemetry_collector="<" + "ab" * 16 + ">")
+        self.assertEqual(m.telemetry_collector, "ab" * 16)
+
     def test_non_hex_is_rejected(self) -> None:
         with self.assertRaises(ValidationError):
             ReticulumUpdate(**_REQUIRED, propagation_outbound_node="not-a-hash")

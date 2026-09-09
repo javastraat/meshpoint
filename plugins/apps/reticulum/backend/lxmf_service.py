@@ -446,7 +446,7 @@ class LxmfService:
         """Route outbound-to-offline messages through, and sync a parked
         inbox from, this ``lxmf.propagation`` destination. ``None``/blank
         clears it. Returns whether it's now set."""
-        h = str(hash_hex or "").strip().lower().replace(":", "")
+        h = str(hash_hex or "").strip().lower().replace(":", "").strip("<>")
         if self._router is None:
             self._prop_outbound = h
             return bool(h)

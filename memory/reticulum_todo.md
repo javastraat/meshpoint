@@ -112,23 +112,35 @@ checked on the Pi.
   receiving → complete) and the message land in Messages. Also: auto-
   sync interval > 0 actually re-syncs; a bad/unreachable node shows a
   failed state not a hang; "Sync inbox" hidden when no outbound node.
-- **Telemetry publish — BUILT 2026-09-09.** SID ids (`0x01`/`0x07`/`0x0F`)
-  + `packed()` dict shape confirmed VERBATIM from Sideband `sense.py`
-  (2nd WebFetch) — encoding is solid. Inbound `FIELD_TELEMETRY` is now
-  logged decoded at INFO (`_log_inbound_telemetry`), so testing is:
-  1. **Loopback (fastest):** set `telemetry_collector` to the Pi's OWN
-     `lxmf.delivery` address, `telemetry_enabled: true`, restart. Within
-     ~30s the journal shows a telemetry send then
-     `LXMF telemetry from <self>: {1: <ts>, 7: <temp>, 15: '<info>'}`.
-     Proves build→pack→LXMF transport→unpack round-trips.
-  2. **"Send telemetry now"** on the Settings tab — returns Sent, or a
-     clear "path unknown, retry" if the collector hasn't been heard.
-  3. **Real Sideband cross-check:** from Sideband send a telemetry
-     message to the Pi's LXMF address; the same INFO log shows
-     Sideband's real frame → compare structure to ours. Also confirm a
-     Sideband client subscribed to the Pi shows its temp + status line.
-  4. Timed loop fires on `telemetry_interval_s`; `last_error` surfaces
-     on the Settings status line.
+- **Telemetry publish — BUILT 2026-09-09, PARTIALLY VERIFIED on
+  rakv2-meshpoint same day.** SID ids (`0x01`/`0x07`/`0x0F`) + `packed()`
+  shape confirmed VERBATIM from Sideband `sense.py` (2nd WebFetch).
+  **Confirmed working:** config saves, and after a **meshpoint** restart
+  (not rnsd) the timed loop emits frames —
+  `lxmf_service: telemetry frame sent to 5771b31b…` in the journal at
+  the configured cadence.
+  **NOT working — self-loopback:** frames sent to the Pi's own
+  `lxmf.delivery` address did NOT come back (LXMF won't self-Link) —
+  use two nodes.
+  **TWO-NODE TEST PASSED 2026-09-09:** ti-meshpoint → rakv2. rakv2's
+  journal:
+  `LXMF telemetry from f59ffeffe1a465e6bbd0df88710db93a: {1: 1788948494, 7: 51.1, 15: 'TI-Meshpoint · load 0.42 · RAM 26% · disk 42.2 GB free · 51.1°C'}`
+  — correct SIDs (1/7/15), correct types, well-formed string. Full
+  pipeline verified: build → umsgpack → real LXMF DIRECT transport →
+  receive → unpack. **Only remaining check (low-risk):** a real Sideband
+  app rendering the frame — SIDs + `packed()` shape are verbatim from
+  `sense.py` so structure matches; just not visually confirmed in
+  Sideband yet.
+  **UX gotcha hit + fixed:** clicking "Send telemetry now" / "Sync
+  inbox" right after Save (before a meshpoint restart) failed with a
+  confusing "no collector/node" — the running service reads that config
+  once at startup. Routes now detect "saved but service not restarted"
+  and say so. The red "No telemetry collector configured" the user saw
+  was this stale state.
+  **Also noted:** core has its OWN unrelated `telemetry_broadcaster`
+  module (`Telemetry broadcaster scheduled: first TX in 120s...`) —
+  different feature, don't confuse the log sources. Ours is
+  `lxmf_service: telemetry frame sent to…`.
 - **sample-bbs-techinc nav links (fixed 2026-09-07, not walked in a real
   NomadNet client)**: browse the hosted node in Sideband/NomadNet/
   MeshChat, click "Next" through every page, confirm no dead links and
@@ -255,6 +267,9 @@ plugins:
 ## Done (this backlog's completed items)
 
 - **2026-09-09** — Telemetry publish, v1 subset (new-build #3).
+  **Two-node round trip LIVE-VERIFIED same day** (ti → rakv2: frame
+  built, msgpacked, transported over real LXMF, received + decoded
+  correctly — `{1: ts, 7: temp, 15: info}`).
   `telemetry_enabled`/`telemetry_collector`/`telemetry_interval_s`;
   `backend/telemetry.py` `build_telemetry(host, node_name)` → a
   `{SID_TIME, SID_TEMPERATURE?, SID_INFORMATION}` dict the service

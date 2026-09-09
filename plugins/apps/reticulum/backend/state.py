@@ -164,7 +164,7 @@ def propagation_config() -> dict[str, Any]:
     return {
         "enabled": bool(_config.get("propagation_enabled")),
         "storage_limit_mb": max(0, int(_config.get("propagation_storage_limit_mb") or 0)),
-        "outbound_node": str(_config.get("propagation_outbound_node") or "").strip(),
+        "outbound_node": str(_config.get("propagation_outbound_node") or "").strip().lower().replace(":", "").strip("<>"),
         "auto_sync_interval_s": max(0, int(_config.get("propagation_auto_sync_interval_s") or 0)),
     }
 
@@ -173,7 +173,7 @@ def telemetry_config() -> dict[str, Any]:
     """Telemetry-publish settings, resolved."""
     return {
         "enabled": bool(_config.get("telemetry_enabled")),
-        "collector": str(_config.get("telemetry_collector") or "").strip().lower(),
+        "collector": str(_config.get("telemetry_collector") or "").strip().lower().replace(":", "").strip("<>"),
         "interval_s": max(300, int(_config.get("telemetry_interval_s") or 900)),
     }
 

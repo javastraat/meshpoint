@@ -99,7 +99,10 @@ class ReticulumUpdate(BaseModel):
     @field_validator("propagation_outbound_node", "telemetry_collector")
     @classmethod
     def _dest_hash_ok(cls, value: str) -> str:
-        stripped = value.strip().lower().replace(":", "")
+        # Tolerate the shapes users actually paste: a bare hex hash from a
+        # peer's Destination column, or RNS's own ``<hex>`` / ``aa:bb:..``
+        # display forms (the startup banner + "You:" line use ``<hex>``).
+        stripped = value.strip().lower().replace(":", "").strip("<>")
         if not stripped:
             return ""
         if (

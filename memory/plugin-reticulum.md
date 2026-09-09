@@ -937,12 +937,20 @@ frame. Wire format pulled from `markqvist/Sideband`
   with TIME set directly. Encoding matches.
 - `_log_inbound_telemetry(message, source_hex)` in
   `_handle_inbound_message` — decodes an inbound `FIELD_TELEMETRY` and
-  logs `{sid: value}` at INFO. Observational only (no collector yet),
-  but it's the test rig: loopback (`telemetry_collector` = own address)
-  or a real Sideband → Pi telemetry message both show the decoded frame
-  in the journal. Groundwork for #4.
-- Pi verification: see `memory/reticulum_todo.md` (loopback is the
-  fastest check).
+  logs `{sid: value}` at INFO. Observational only; groundwork for #4.
+- **Partially verified on rakv2-meshpoint 2026-09-09:** the send loop
+  works (`telemetry frame sent to <collector>` on cadence, after a
+  *meshpoint* restart). **Self-loopback does NOT work** — LXMF won't
+  deliver a DIRECT message to your own `lxmf.delivery` dest, so the
+  inbound log never fired. Verify via real Sideband → Pi instead.
+- Config-needs-restart UX: `POST /telemetry/send` and
+  `/propagation/sync` now detect "config saved but service not
+  restarted yet" (running service's error says "no collector/node" but
+  `state.*_config()` has one) and return a clearer message. This is
+  what the stale red "No telemetry collector configured" was.
+- Unrelated: core has its own `telemetry_broadcaster` module (logs
+  "Telemetry broadcaster scheduled") — different feature entirely.
+- Pi verification: see `memory/reticulum_todo.md`.
 
 ## 2026-09-09 — Propagation node polish, client side (new-build #2)
 

@@ -15,6 +15,9 @@
 		{
 			"name": "basicstation-docker",
 			"path": "../basicstation-docker"
+		},
+		{
+			"path": "../meshpoint-plugins"
 		}
 	],
 	"settings": {}

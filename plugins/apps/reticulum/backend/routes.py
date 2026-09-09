@@ -189,7 +189,10 @@ async def reticulum_propagation_sync(_claims: SessionClaims = Depends(require_ad
         raise HTTPException(503, "Reticulum companion is disabled")
     result = _service.sync_propagation_messages()
     if not result.get("ok"):
-        raise HTTPException(400, result.get("error") or "sync failed")
+        error = result.get("error") or "sync failed"
+        if "propagation node" in error.lower() and state.propagation_config().get("outbound_node"):
+            error = "Saved, but not active until meshpoint restarts (Settings -> System)."
+        raise HTTPException(400, error)
     return {"status": "syncing"}
 
 
@@ -221,7 +224,13 @@ async def reticulum_telemetry_send(_claims: SessionClaims = Depends(require_admi
         raise HTTPException(503, "Reticulum companion is disabled")
     result = _service.send_telemetry()
     if not result.get("ok"):
-        raise HTTPException(400, result.get("error") or "telemetry send failed")
+        error = result.get("error") or "telemetry send failed"
+        # The running service reads telemetry config once at startup, so a
+        # just-saved collector isn't live until a meshpoint restart -- say
+        # so rather than the bare "no collector" the service reports.
+        if "collector" in error.lower() and state.telemetry_config().get("collector"):
+            error = "Saved, but not active until meshpoint restarts (Settings -> System)."
+        raise HTTPException(400, error)
     return {"status": "sent"}
 
 

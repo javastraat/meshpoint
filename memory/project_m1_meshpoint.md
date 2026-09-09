@@ -12874,6 +12874,23 @@ its own test rig:
 - **Real Sideband:** send telemetry from Sideband to the Pi's address →
   the log shows Sideband's actual frame to compare against ours.
 3 more tests (1 builder primitives-safety, 2 `_log_inbound_telemetry`
-via `assertNoLogs`/`assertLogs`). Suite 189 passed. Follow-ups:
-structured sensors, `SID_LOCATION`. Checklist in
+via `assertNoLogs`/`assertLogs`). Suite 189 passed.
+
+**TWO-NODE ROUND TRIP LIVE-VERIFIED 2026-09-09** (ti-meshpoint → rakv2;
+self-loopback doesn't work — LXMF won't self-Link). rakv2 journal:
+`LXMF telemetry from f59ffeffe1a465e6bbd0df88710db93a: {1: 1788948494,
+7: 51.1, 15: 'TI-Meshpoint · load 0.42 · RAM 26% · disk 42.2 GB free ·
+51.1°C'}` — correct SIDs, types, string. Full pipeline (build →
+umsgpack → real LXMF transport → receive → unpack) works. Only the
+"real Sideband app renders it" check is outstanding, and that's
+low-risk (SIDs + shape verbatim from `sense.py`).
+
+Also fixed a UX gotcha the user hit: clicking "Send telemetry now" /
+"Sync inbox" right after Save (before a meshpoint restart) failed
+confusingly — the running service reads that config once at startup.
+Routes now detect "saved but not restarted" and say so. Dest-hash
+fields also now accept RNS `<hex>` / `aa:bb` display forms (the "You:"
+line / startup banner use `<hex>`).
+
+Follow-ups: structured sensors, `SID_LOCATION`. Checklist in
 `memory/reticulum_todo.md`.
