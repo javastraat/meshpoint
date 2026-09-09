@@ -22,6 +22,14 @@
  * (``POST /api/dangerous/invoke``, same one Settings > System's "Restart
  * service" card triggers) so a pending enable/disable/delete change can be
  * applied without leaving this page.
+ *
+ * The "Plugin sources" card below the list adds/browses/installs from
+ * operator-added GitHub repos (``/api/plugin-sources``). On load it scans
+ * each source's catalog once -- that fills the per-source plugin count and
+ * records which installed plugins have a newer version upstream, so a
+ * plugin with an available update shows an **Update vX → vY** button right
+ * on its own row in the main list (not only inside that source's Browse
+ * panel), calling the same ``POST /api/plugin-sources/install``.
  */
 
 class PluginsPanelController {
@@ -62,6 +70,11 @@ class PluginsPanelController {
         this.srcStatusEl = rootEl.querySelector('[data-src-status]');
         this.srcListEl = rootEl.querySelector('[data-src-list]');
         this._sources = [];
+        // {pluginId: {url, ref, installed_version, version}} -- built from
+        // each source's catalog on load, so a plugin whose source offers a
+        // newer version shows an "Update" button on its own row in the
+        // main list, not only inside that source's Browse panel.
+        this._updates = {};
     }
 
     bind() {
@@ -113,32 +126,49 @@ class PluginsPanelController {
                 <div class="plugins-source__catalog" data-src-catalog hidden></div>
             </div>
         `).join('');
-        // Fill each row's "— N plugins" count from its catalog without
-        // waiting for a Browse click. One lightweight fetch per source
-        // (there are rarely more than a couple); failures degrade to a
-        // quiet "— unreachable" rather than blocking the row.
-        this._sources.forEach((s) => this._fillSourceCount(s.url, s.ref || 'main'));
+        // Scan each source's catalog on load (one lightweight fetch per
+        // source): fills the row's "— N plugins" count AND records which
+        // installed plugins have a newer version available, so the main
+        // list can show an Update button per row. Failures degrade to a
+        // quiet "— unreachable".
+        this._updates = {};
+        this._sources.forEach((s) => this._scanSource(s.url, s.ref || 'main'));
     }
 
-    async _fillSourceCount(url, ref) {
+    async _scanSource(url, ref) {
         const row = this.srcListEl.querySelector(`[data-src-row="${(window.CSS && CSS.escape) ? CSS.escape(url) : url}"]`);
         const el = row && row.querySelector('[data-src-count]');
-        if (!el) return;
-        el.textContent = '— checking…';
+        if (el) el.textContent = '— checking…';
+        let cat = null;
         try {
             const qs = `url=${encodeURIComponent(url)}${ref ? `&ref=${encodeURIComponent(ref)}` : ''}`;
             const r = await fetch(`/api/plugin-sources/catalog?${qs}`, { credentials: 'same-origin' });
-            if (!r.ok) { el.textContent = '— unreachable'; return; }
-            const cat = await r.json();
+            if (!r.ok) { if (el) el.textContent = '— unreachable'; return; }
+            cat = await r.json();
+        } catch (_) {
+            if (el) el.textContent = '';
+            return;
+        }
+        const entries = [...(cat.plugins || []), ...(cat.themes || [])];
+        if (el) {
             const np = (cat.plugins || []).length;
             const nt = (cat.themes || []).length;
             const parts = [];
             if (np) parts.push(`${np} plugin${np === 1 ? '' : 's'}`);
             if (nt) parts.push(`${nt} theme${nt === 1 ? '' : 's'}`);
             el.textContent = parts.length ? `— ${parts.join(', ')}` : '— empty';
-        } catch (_) {
-            el.textContent = '';
         }
+        entries.forEach((p) => {
+            if (p.update_available) {
+                this._updates[p.id] = {
+                    url: cat.url || url, ref: cat.ref || ref,
+                    installed_version: p.installed_version, version: p.version,
+                };
+            } else if (this._updates[p.id]) {
+                delete this._updates[p.id];
+            }
+        });
+        if (this._plugins.length) this._render();
     }
 
     _onSourceClick(e) {
@@ -283,10 +313,52 @@ class PluginsPanelController {
                 `${body.updated ? 'Updated' : 'Installed'} ${id} v${body.version}. ` +
                 `${body.has_setup ? 'It needs setup — enable it and run setup below, then restart.'
                     : 'Enable it in the list above and restart to load it.'}`);
+            delete this._updates[id];
             this.refresh();
+            this._loadSources();
             if (catEl) this._browseSource(url, ref, catEl);
         } catch (e) {
             this._setSrcStatus('error', e.message || 'Failed.');
+        }
+    }
+
+    async _updatePluginFromRow(plugin, button, resultEl) {
+        const upd = this._updates[plugin.id];
+        if (!upd) return;
+        const ok = await this._confirm(
+            `Update "${plugin.id}" from v${upd.installed_version} to v${upd.version}?\n\n` +
+            `Downloaded from ${upd.url}${upd.ref ? ` @ ${upd.ref}` : ''}, re-validated, and ` +
+            `installed in place. Its enabled state is kept — restart to load the new version.`,
+            { label: 'Update plugin?', command: `update ${plugin.id}` },
+        );
+        if (!ok) return;
+        button.disabled = true;
+        resultEl.dataset.kind = 'pending';
+        resultEl.textContent = 'Updating…';
+        try {
+            const r = await fetch('/api/plugin-sources/install', {
+                method: 'POST', credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url: upd.url, id: plugin.id, ref: upd.ref || null }),
+            });
+            const body = await r.json().catch(() => ({}));
+            if (!r.ok) {
+                resultEl.dataset.kind = 'error';
+                resultEl.textContent = body.detail || `Failed (HTTP ${r.status}).`;
+                button.disabled = false;
+                return;
+            }
+            delete this._updates[plugin.id];
+            this._pendingMessage = {
+                id: plugin.id, kind: 'success',
+                text: `Updated to v${body.version}. Restart to load it.`,
+            };
+            await this.refresh();
+            this._loadSources();
+        } catch (_e) {
+            resultEl.dataset.kind = 'error';
+            resultEl.textContent = 'Network error.';
+            button.disabled = false;
         }
     }
 
@@ -634,6 +706,7 @@ class PluginsPanelController {
                     <input type="checkbox" data-toggle ${plugin.enabled ? 'checked' : ''} ${depBlocksEnable ? 'disabled' : ''}>
                     <span class="r-switch__track"></span>
                 </label>
+                ${this._updates[plugin.id] ? `<button type="button" class="plugin-row__update" data-plugin-update title="From ${this._escape(this._updates[plugin.id].url)}">Update v${this._escape(this._updates[plugin.id].installed_version)} → v${this._escape(this._updates[plugin.id].version)}</button>` : ''}
                 ${plugin.deletable ? `<button type="button" class="plugin-row__del" data-delete>Delete</button>` : ''}
                 ${plugin.restart_required ? `<span class="plugin-row__restart" data-restart>Restart to ${plugin.enabled ? 'load' : 'unload'}</span>` : ''}
                 <span class="plugin-row__result" data-result aria-live="polite"></span>
@@ -645,6 +718,10 @@ class PluginsPanelController {
         const delBtn = row.querySelector('[data-delete]');
         if (delBtn) {
             delBtn.addEventListener('click', () => this._deletePlugin(plugin, delBtn, resultEl));
+        }
+        const updBtn = row.querySelector('[data-plugin-update]');
+        if (updBtn) {
+            updBtn.addEventListener('click', () => this._updatePluginFromRow(plugin, updBtn, resultEl));
         }
         const recheckBtn = row.querySelector('[data-recheck]');
         if (recheckBtn) {

@@ -947,6 +947,9 @@ tampered `repo.json` can't smuggle anything in.
    the same in place and keeps the enabled state; uninstall is the list's
    existing Delete button. Provenance (source URL, ref, version) is
    recorded under `plugins.<id>.source` in `local.yaml`.
+4. **Updates** surface on their own — the plugin list scans every source's
+   catalog on load, so a plugin with a newer version upstream shows an
+   *Update vX → vY* button on its row without you having to open Browse.
 
 The source list lives in `local.yaml` (`plugin_sources:`), so it survives
 restarts and self-updates.
