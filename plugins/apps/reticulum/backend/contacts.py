@@ -37,14 +37,29 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-_MAX_HASH = 64        # a Reticulum destination hash is 32 hex chars; be lenient but bounded
+_MAX_HASH = 64
 _MAX_PETNAME = 64
 _MAX_NOTE = 280
+_HEX_RE = re.compile(r"^[0-9a-f]+$")
+
+
+def looks_like_hash(value: str) -> bool:
+    """True when *value* is a plausible Reticulum destination hash (hex,
+    8-64 chars, even length). Used to reject a typo in the Contacts-tab
+    add form -- the drawer flow always passes a real roster hash."""
+    h = _clean_hash(value)
+    return bool(8 <= len(h) <= 64 and not len(h) % 2 and _HEX_RE.match(h))
+
+
+def _clean_hash(value: str) -> str:
+    """Strip the wrappers RNS's display forms add (``<hex>`` / ``aa:bb``)."""
+    return str(value or "").strip().lower().replace(":", "").strip("<>")
 
 
 class ContactStore:
@@ -88,7 +103,8 @@ class ContactStore:
         return {k: dict(v) for k, v in self._load().items()}
 
     def get(self, destination_hash: str) -> dict | None:
-        entry = self._load().get(destination_hash)
+        data = self._load()
+        entry = data.get(destination_hash) or data.get(_clean_hash(destination_hash))
         return dict(entry) if entry else None
 
     # --- writes ---------------------------------------------------------
@@ -100,7 +116,10 @@ class ContactStore:
         """Create or replace a contact. Raises ``ValueError`` on an empty
         petname or an over-long field -- the route layer maps a cleared
         petname to :meth:`delete` before it gets here."""
-        destination_hash = (destination_hash or "").strip()
+        # A real roster hash is already clean hex; only reshape RNS's
+        # display forms (<hex> / aa:bb) so keys stay consistent.
+        cleaned = _clean_hash(destination_hash)
+        destination_hash = cleaned if _HEX_RE.match(cleaned) else (destination_hash or "").strip()
         petname = (petname or "").strip()
         note = (note or "").strip()
         if not destination_hash or len(destination_hash) > _MAX_HASH:
@@ -126,9 +145,10 @@ class ContactStore:
     def delete(self, destination_hash: str) -> bool:
         """Remove a contact. Returns whether it existed."""
         data = self._load()
-        if destination_hash not in data:
+        key = destination_hash if destination_hash in data else _clean_hash(destination_hash)
+        if key not in data:
             return False
-        del data[destination_hash]
+        del data[key]
         self._save(data)
         return True
 

@@ -398,6 +398,27 @@
     color: var(--text-muted, #777);
 }
 
+/* Contacts tab: add-form row + inline-editable table cells. */
+.rt-contact-add {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 14px;
+}
+.rt-contact-add #rt-contact-add-hash { flex: 1 1 260px; max-width: 320px; }
+.rt-contact-add #rt-contact-add-name { flex: 0 1 160px; }
+.rt-contact-cell {
+    padding: 4px 6px;
+    font-size: 13px;
+}
+.rt-contact-announced {
+    color: var(--text-muted, #777);
+    font-size: 11px;
+}
+.rt-contact-actions { white-space: nowrap; }
+.rt-contact-actions .lw-link-btn { margin-left: 8px; }
+
 /* Settings tab: one extra-interface editor row -- a distinct card so a
    list of them reads as separate blocks, not one run-on form. */
 .rt-iface-row {

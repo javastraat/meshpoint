@@ -63,7 +63,7 @@ class ReticulumPanel {
         // 'pages' restores optimistically -- _syncPagesTab() bounces it
         // back to 'peers' on the first /status if no node is hosting.
         this._tab = (['messages', 'announces', 'telemetry'].includes(stored)
-            || (['send', 'settings', 'browse', 'pages'].includes(stored) && this._isAdmin))
+            || (['send', 'settings', 'browse', 'pages', 'contacts'].includes(stored) && this._isAdmin))
             ? stored : 'peers';
         this._settingsTab = null;
         this._nomadTab = null;
@@ -130,6 +130,8 @@ class ReticulumPanel {
                                     data-rt-tab="messages">Messages</button>
                             <button class="lw-tab" type="button" role="tab"
                                     data-rt-tab="send" ${this._isAdmin ? '' : 'hidden'}>Send</button>
+                            <button class="lw-tab" type="button" role="tab"
+                                    data-rt-tab="contacts" ${this._isAdmin ? '' : 'hidden'}>Contacts</button>
                             <button class="lw-tab" type="button" role="tab"
                                     data-rt-tab="browse" ${this._isAdmin ? '' : 'hidden'}>Browse</button>
                             <button class="lw-tab" type="button" role="tab"
@@ -248,6 +250,41 @@ class ReticulumPanel {
                             </p>
                         </div>
                     </div>
+                    <div data-rt-view="contacts" hidden>
+                        <div class="panel__body">
+                            <p class="lw-panel__limit">
+                                Your own names for Reticulum destinations — shown across the
+                                Peers, Activity, Messages and Send views. Stored locally,
+                                never announced.
+                            </p>
+                            <form class="cfg-form rt-contact-add" id="rt-contact-add-form">
+                                <input class="cfg-field__input" type="text" id="rt-contact-add-hash"
+                                       placeholder="destination hash" autocomplete="off" spellcheck="false">
+                                <input class="cfg-field__input" type="text" id="rt-contact-add-name"
+                                       maxlength="64" placeholder="name" autocomplete="off">
+                                <button class="terminal-button" type="submit">Add contact</button>
+                                <span class="cfg-status" id="rt-contact-add-status" aria-live="polite"></span>
+                            </form>
+                            <div class="lw-table-wrap">
+                                <table class="lw-table lw-table--rt-contacts">
+                                    <thead>
+                                        <tr>
+                                            <th>Name</th>
+                                            <th>Destination</th>
+                                            <th>Note</th>
+                                            <th class="lw-r">Known</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="rt-contacts-tbody"></tbody>
+                                </table>
+                                <p class="lw-empty" id="rt-contacts-empty" style="display:none">
+                                    No contacts yet — add one above, or name a peer from its
+                                    drawer on the Peers tab.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
                     <div data-rt-view="settings" hidden>
                         <div class="panel__body" data-rt-settings-body></div>
                     </div>
@@ -341,6 +378,20 @@ class ReticulumPanel {
         }
         this._q('#rt-send-form')?.addEventListener('submit', (e) => this._handleSend(e));
 
+        this._q('#rt-contact-add-form')?.addEventListener('submit', (e) => this._handleAddContact(e));
+        const contactsTbody = this._q('#rt-contacts-tbody');
+        if (contactsTbody) {
+            contactsTbody.addEventListener('click', (e) => {
+                const tr = e.target.closest('tr[data-rt-contact-hash]');
+                if (!tr) return;
+                const hash = tr.dataset.rtContactHash;
+                if (e.target.closest('[data-rt-contact-save]')) this._saveContactRow(tr, hash);
+                else if (e.target.closest('[data-rt-contact-remove]')) this._deleteContact(hash);
+                else if (e.target.closest('[data-rt-contact-send]')) this.composeMessageTo(hash);
+                else if (e.target.closest('[data-rt-contact-browse]')) this.browseNode(hash);
+            });
+        }
+
         const sendPeerSearchEl = this._q('#rt-send-peer-search');
         const sendPeerSearchClearEl = this._q('#rt-send-peer-search-clear');
         if (sendPeerSearchEl) {
@@ -397,6 +448,7 @@ class ReticulumPanel {
         else if (this._tab === 'pages' && this._nodePagesTab) this._nodePagesTab.show();
         else if (this._tab === 'announces') this._loadAnnounces();
         else if (this._tab === 'telemetry') this._loadTelemetry();
+        else if (this._tab === 'contacts') this._renderContacts();
     }
 
     /** Open the Browse tab pointed at a specific node (Peers-row "Browse" button). */
@@ -493,7 +545,7 @@ class ReticulumPanel {
     _q(sel) { return this._root ? this._root.querySelector(sel) : null; }
 
     _setTab(tab) {
-        if ((tab === 'send' || tab === 'settings' || tab === 'browse' || tab === 'pages') && !this._isAdmin) return;
+        if ((tab === 'send' || tab === 'settings' || tab === 'browse' || tab === 'pages' || tab === 'contacts') && !this._isAdmin) return;
         if (tab === 'pages' && !this._nodeHosting) return;
         if (tab === this._tab) return;
         this._tab = tab;
@@ -535,6 +587,14 @@ class ReticulumPanel {
         return this._contacts[hash]?.petname || announced || '--';
     }
 
+    _refreshContactSurfaces() {
+        this._renderPeers();
+        this._renderSendPeers();
+        if (this._tab === 'announces') this._renderAnnounces();
+        if (this._tab === 'contacts') this._renderContacts();
+        this._loadMessages();
+    }
+
     async _saveContact(hash, data) {
         try {
             const r = await fetch(`/api/reticulum/contacts/${encodeURIComponent(hash)}`, {
@@ -543,13 +603,14 @@ class ReticulumPanel {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data),
             });
-            if (!r.ok) { this._toast('Could not save contact.'); return false; }
+            if (!r.ok) {
+                const err = await r.json().catch(() => ({}));
+                this._toast(err.detail || 'Could not save contact.');
+                return false;
+            }
         } catch (_) { this._toast('Could not save contact.'); return false; }
         await this._loadContacts();
-        this._renderPeers();
-        this._renderSendPeers();
-        if (this._tab === 'announces') this._renderAnnounces();
-        this._loadMessages();
+        this._refreshContactSurfaces();
         this._toast(data.petname ? 'Contact saved.' : 'Contact removed.');
         return true;
     }
@@ -562,10 +623,7 @@ class ReticulumPanel {
             if (!r.ok) { this._toast('Could not remove contact.'); return false; }
         } catch (_) { this._toast('Could not remove contact.'); return false; }
         await this._loadContacts();
-        this._renderPeers();
-        this._renderSendPeers();
-        if (this._tab === 'announces') this._renderAnnounces();
-        this._loadMessages();
+        this._refreshContactSurfaces();
         this._toast('Contact removed.');
         return true;
     }
@@ -948,6 +1006,82 @@ class ReticulumPanel {
         else this._teleMap.fitBounds(bounds, { padding: [30, 30], maxZoom: 13 });
         // Container was hidden until now — Leaflet needs a nudge to re-measure.
         setTimeout(() => this._teleMap && this._teleMap.invalidateSize(), 60);
+    }
+
+    // --- Contacts tab -----------------------------------------------------
+
+    _renderContacts() {
+        const tbody = this._q('#rt-contacts-tbody');
+        const empty = this._q('#rt-contacts-empty');
+        if (!tbody) return;
+        const hashes = Object.keys(this._contacts).sort((a, b) => {
+            const na = (this._contacts[a].petname || '').toLowerCase();
+            const nb = (this._contacts[b].petname || '').toLowerCase();
+            return na.localeCompare(nb);
+        });
+        if (!hashes.length) {
+            tbody.innerHTML = '';
+            if (empty) empty.style.display = '';
+            return;
+        }
+        if (empty) empty.style.display = 'none';
+        tbody.innerHTML = hashes.map((hash) => {
+            const c = this._contacts[hash];
+            const peer = this._peers.find((p) => p.destination_hash === hash);
+            const announced = peer && peer.display_name && peer.display_name !== c.petname
+                ? ` <span class="rt-contact-announced">(announced: ${this._esc(peer.display_name)})</span>` : '';
+            const action = (peer && peer.aspect === 'nomadnetwork.node')
+                ? `<button type="button" class="lw-link-btn" data-rt-contact-browse>Browse</button>`
+                : `<button type="button" class="lw-link-btn" data-rt-contact-send>Send</button>`;
+            return `
+            <tr data-rt-contact-hash="${this._esc(hash)}">
+                <td><input class="cfg-field__input rt-contact-cell" type="text" maxlength="64"
+                           data-rt-contact-name value="${this._esc(c.petname || '')}">${announced}</td>
+                <td class="lw-id">${this._esc(hash)}</td>
+                <td><input class="cfg-field__input rt-contact-cell" type="text" maxlength="280"
+                           data-rt-contact-note placeholder="—" value="${this._esc(c.note || '')}"></td>
+                <td class="lw-r"><input type="checkbox" data-rt-contact-known ${c.trusted ? 'checked' : ''}></td>
+                <td class="lw-r rt-contact-actions">
+                    ${action}
+                    <button type="button" class="lw-link-btn" data-rt-contact-save>Save</button>
+                    <button type="button" class="lw-link-btn" data-rt-contact-remove>Remove</button>
+                </td>
+            </tr>`;
+        }).join('');
+    }
+
+    async _saveContactRow(tr, hash) {
+        const petname = tr.querySelector('[data-rt-contact-name]')?.value.trim() || '';
+        if (!petname) { this._toast('A contact needs a name — use Remove to delete it.'); return; }
+        await this._saveContact(hash, {
+            petname,
+            note: tr.querySelector('[data-rt-contact-note]')?.value.trim() || '',
+            trusted: !!tr.querySelector('[data-rt-contact-known]')?.checked,
+        });
+    }
+
+    async _handleAddContact(event) {
+        event.preventDefault();
+        const hashEl = this._q('#rt-contact-add-hash');
+        const nameEl = this._q('#rt-contact-add-name');
+        const statusEl = this._q('#rt-contact-add-status');
+        const hash = (hashEl?.value || '').trim().toLowerCase().replace(/[:<>]/g, '');
+        const name = (nameEl?.value || '').trim();
+        if (!hash || !name) {
+            if (statusEl) { statusEl.dataset.kind = 'error'; statusEl.textContent = 'Both a hash and a name are needed.'; }
+            return;
+        }
+        if (!/^[0-9a-f]{8,64}$/.test(hash) || hash.length % 2) {
+            if (statusEl) { statusEl.dataset.kind = 'error'; statusEl.textContent = "That doesn't look like a Reticulum destination hash."; }
+            return;
+        }
+        if (statusEl) { statusEl.dataset.kind = 'pending'; statusEl.textContent = 'Adding…'; }
+        const ok = await this._saveContact(hash, { petname: name, note: '', trusted: false });
+        if (statusEl) {
+            statusEl.dataset.kind = ok ? 'success' : 'error';
+            statusEl.textContent = ok ? 'Added.' : 'Could not add — check the hash.';
+        }
+        if (ok) { hashEl.value = ''; nameEl.value = ''; }
     }
 
     async _handleAnnounce() {

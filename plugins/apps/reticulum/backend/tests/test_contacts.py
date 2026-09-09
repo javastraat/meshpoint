@@ -85,6 +85,26 @@ class TestContactStore(unittest.TestCase):
         store.set("hash1", "Bob")
         self.assertEqual(store.get("hash1")["petname"], "Bob")
 
+    def test_display_forms_normalise_to_the_same_key(self) -> None:
+        h = "ab" * 16
+        store = ContactStore(self.path)
+        store.set(f"<{h}>", "Bob")
+        # stored under the bare hex; reachable via any display form
+        self.assertIn(h, store.all())
+        self.assertEqual(store.get(h)["petname"], "Bob")
+        self.assertEqual(store.get(f"<{h}>")["petname"], "Bob")
+        self.assertTrue(store.delete("ab:ab:ab:ab:ab:ab:ab:ab:ab:ab:ab:ab:ab:ab:ab:ab"))
+        self.assertEqual(store.all(), {})
+
+    def test_looks_like_hash(self) -> None:
+        from plugins.apps.reticulum.backend.contacts import looks_like_hash
+        self.assertTrue(looks_like_hash("ab" * 16))
+        self.assertTrue(looks_like_hash(f"<{'cd' * 16}>"))
+        self.assertFalse(looks_like_hash("nope"))
+        self.assertFalse(looks_like_hash("abc"))        # odd length
+        self.assertFalse(looks_like_hash("ab"))         # too short
+        self.assertFalse(looks_like_hash(""))
+
     def test_load_skips_malformed_entries(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.write_text(json.dumps({

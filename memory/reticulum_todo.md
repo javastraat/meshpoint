@@ -8,8 +8,8 @@ context.
 Last updated 2026-09-09. Session builds: #1 Contacts, #2 Propagation
 client, #3 Telemetry publish (+location, +multi-collector), #4 Telemetry
 collect+map, Extra interfaces, UI padding pass. **Verification status
-table below** — #3 and #4 Pi-verified; #2, extra interfaces and
-multi-collector never run on the Pi.
+table below** — #1, #3, #4 and multi-collector Pi-verified; only #2
+(propagation client) and extra interfaces still never run on the Pi.
 
 ---
 
@@ -32,19 +32,19 @@ checked on the Pi.
 
 | Feature | Pi status |
 |---|---|
-| Contacts / petnames (#1) | 🟡 **Partial** — save + name in the Peers table + green ✓ (trusted) confirmed on rakv2. **Still to check:** Send-tab picker shows the name (not the hash); **Remove** clears it on all surfaces (Peers/Activity/Messages/Send) and drops the ✓ |
+| Contacts / petnames (#1) | ✅ **Verified 2026-09-09** — add + name propagation + Remove confirmed via the Peers drawer. **NEW: Contacts tab** (address book — inline-edit table + add-from-pasted-hash) built 2026-09-09, not yet walked on the Pi (check: table lists contacts, inline Save updates the name everywhere, "Add contact" with a valid hash works + a garbage hash is rejected, Remove works, Send/Browse row links jump correctly) |
 | Propagation client (#2) | 🔴 **Untested** — never run on the Pi. Needs a real `lxmf.propagation` relay to point `propagation_outbound_node` at. Check: outbound-node dropdown lists heard relays + keeps the saved hash after restart; "Sync inbox" button appears; a stopped→start→sync cycle shows transfer state (requesting→link→receiving→complete) and a parked message lands; auto-sync interval fires; a completed sync (manual or auto) shows a "synced N messages" toast + refreshes the thread (new `reticulum_propagation_sync` WS, 2026-09-09); an unreachable node shows a failed state not a hang |
 | Telemetry publish (#3) | ✅ **Verified** — two-node ti → rakv2, frame decoded byte-exact (SID_TIME/TEMPERATURE/INFORMATION + LOCATION from the GPS pin) |
 | Telemetry collect + map (#4) | ✅ **Mostly verified** — rakv2's Telemetry tab plotted ti on the map ("techinc on the map"), so decode → store → table → map all work. **Still to check:** `reticulum_telemetry` WS live-updates the tab without a reload; a telemetry-only frame does NOT create a blank row in the Messages tab (was a latent bug — confirm it's gone) |
-| Telemetry: multiple collectors | 🔴 **Untested** — built same day. Check: 2+ addresses (one per line) each get the frame; "Send telemetry now" reports "Sent to N collectors"; a bad/unreachable address doesn't stop the others |
+| Telemetry: multiple collectors | ✅ **Verified 2026-09-09** — 2+ addresses each got the frame, "Send telemetry now" reported "Sent to N collectors", a bad/unreachable address didn't block the others |
 | Extra interfaces (Interface manager) | 🔴 **Untested** — never added one on the Pi. Check: the row editor works (add/remove/type-switch keeps edits); a valid TCPClient shows up in `data/reticulum/rns_config/config` and rnsd starts after Restart rnsd; a deliberately broken entry (missing port) is skipped with a journal warning and **rnsd still starts**; RNode+backbone both off + one active extra is accepted |
 | Real-Sideband render | 🔴 Open — the telemetry frame's structure is verified against `sense.py` and byte-exact on the wire, but no real Sideband *app* has displayed one yet (low risk) |
 | UI padding fixes (listener/SDR panels, sub-plugin chevron) | ✅ Tester confirmed |
 
-**Quick summary:** publish + collect/map are proven. The three things
-that have never touched the Pi: **propagation client (#2)**, **extra
-interfaces**, **multi-collector**. Plus finish the Contacts checklist
-and (nice-to-have) a real-Sideband render check.
+**Quick summary:** Contacts (#1), telemetry publish (#3) + location +
+multi-collector, and collect/map (#4) are all Pi-verified. The two
+things that have never touched the Pi: **propagation client (#2)** and
+**extra interfaces**. Nice-to-have: a real-Sideband render check.
 
 ### Pi verification still owed (older items)
 
@@ -318,11 +318,11 @@ plugins:
 
 | Prio | Feature | What it is | Effort / risk |
 |---|---|---|---|
-| Med | **Attachments in Send** | images / small files over `LXMF.FIELD_IMAGE` / `FIELD_FILE_ATTACHMENTS` | Send side is easy (set `lxm.fields` before `handle_outbound`). Inbound is the blocker: shared `messages` table (`src/storage/message_repository.py`) has no attachment columns and core's conversation UI can't render them — needs a design decision (disk store + flag vs a JSON column on the shared table) |
+| Med | **Attachments in Send** | images / small files over `LXMF.FIELD_IMAGE` / `FIELD_FILE_ATTACHMENTS` | **UNBLOCKED 2026-09-09 — schema decision made, not built.** Approach: **nullable JSON `attachments` column on the shared `messages` table** (`ALTER TABLE messages ADD COLUMN attachments TEXT`, same guarded-migration pattern as rssi/snr + rx_count; NULL for every non-Reticulum msg). Column = JSON array of `{kind,name,size,path}`; **bytes on disk under `data/reticulum/attachments/<msg_id>/`, never in SQLite**. Send: `lxm.fields[FIELD_IMAGE]`/`FIELD_FILE_ATTACHMENTS` before `handle_outbound`. Inbound: write bytes + populate column. ~5 MB cap. One contained core UI touch: the shared Messages renderer shows an attachment chip/thumbnail when `attachments` non-empty (generic capability, not a Reticulum special-case). Rejected: a plugin-private `reticulum_attachments` table — attachments would then only show on the plugin's own Messages tab, not the shared cross-protocol page. Effort now: Med (send + inbound + the migration + the one UI block). |
 | ~~Med~~ | ~~**Propagation node polish**~~ | **BUILT 2026-09-09** (new-build #2): outbound node + "Sync inbox" + live transfer state + auto-sync + a `reticulum_propagation_sync` WS event when any sync completes (2026-09-09). Untested on Pi. | — |
 | ~~Med~~ | ~~**Telemetry publish**~~ | **BUILT 2026-09-09** (new-build #3): time + temp + status-line frame, two-node verified. **+ SID_LOCATION added same day** — opt-in `telemetry_include_location`, coords from core's Configuration→GPS pin (`device.latitude/longitude`), no separate keys. Only follow-up left: structured processor/RAM/NVM sensors (nested `[[label,val],...]` — needs verifying against a real Sideband client; low value, INFO string already carries the numbers) | Low |
 | ~~Med~~ | ~~**Telemetry collector + map**~~ | **BUILT 2026-09-09** (new-build #4). Telemetry tab: table + own-Leaflet map (not the dashboard NodeMap — Reticulum telemetry peers aren't in the core `nodes` table; a standalone mini-map was the right call). Not Pi-tested yet. Possible follow-up: also feed into the dashboard map, but that needs core `nodes`-table integration — probably not worth it | — |
-| Low | **Audio calls** (`call.audio` / LXST) | answer / receive voice; min viable = a recorded announcement on call | High — audio I/O + codec on the Pi, its own project |
+| Med | **Audio calls** (`call.audio`) | browser-to-browser voice, Pi as bridge | **REASSESSED 2026-09-09 — NOT hardware-blocked.** reticulum-meshchat already does this: its `src/backend/audio_call_manager.py` `AudioCall` is a dumb byte pipe (`send_audio_packet` → `RNS.Packet(link, data).send()`), **Codec2 runs in the browser** (`codec2-emscripten` WASM), Pi is purely a browser-WS ↔ RNS-Link bridge — no mic/speaker/USB-adapter on the Pi. Build: (1) port `AudioCallManager`/`AudioCall`/`AudioCallReceiver` (~250 lines MIT) + `call.audio` announce + incoming-call WS event; (2) a WS route `/api/reticulum/call/{hash}/audio` = the byte pipe; (3) **frontend is the bulk** — Call panel (dial by hash, ring/answer/hangup), vendor the Codec2 WASM, mic via AudioWorklet, WebAudio playback (port meshchat's `CallPage.vue` + `codec2-microphone-recorder.js` + `MicrophoneRecorder.js`). Latency fine over TCP backbone, marginal over LoRa. Effort Med–High, frontend-heavy, full reference exists. **Mobile works too** — any browser reaching the dashboard (phone over LAN/Tailscale); needs HTTPS for `getUserMedia` (have it, self-signed cert accept required; iOS Safari fussier). Other end could be another meshpoint, reticulum-meshchat, or Sideband (if its audio wire format = meshchat's raw-Codec2-over-RNS-packet — verify). |
 | Low | **Group chat** (`RNS.Destination.GROUP`) | experimental shared-key room, no membership mgmt | Medium — non-standard |
 | ~~Low~~ | ~~**Interface manager UI**~~ | **BUILT 2026-09-09** — `extra_interfaces` (TCPClient/TCPServer/UDP), Settings-tab editor, dual validation, not Pi-tested. Chose structured over raw-textarea (bad config = rnsd won't start = all Reticulum down). Follow-up: more interface types (I2P needs i2pd; a 2nd RNode) if asked | — |
 | ~~Low~~ | ~~**Contacts / petnames**~~ | **BUILT 2026-09-09** (new-build #1) — see Done + Pi-verification list | — |
@@ -425,12 +425,15 @@ From here (user asks "what is it" then decides, one at a time):
 - **#4 Telemetry collector + map** — the natural pair for #3 now that
   publish exists. Parse inbound `FIELD_TELEMETRY`, plot on the
   dashboard's local map. Needs `SID_LOCATION` added to the publish side.
-- **Contacts / petnames** — could integrate into the Send tab picker
-  further, or an address-book tab.
+- **Contacts / petnames** — ✅ address-book tab BUILT 2026-09-09
+  (Contacts tab: inline-edit table + "add from pasted hash"). Further
+  polish possible but nothing pending.
 - **Interface manager UI**, **Paper messages / QR** — standalone, low.
-- **Attachments in Send** — still blocked on the `messages`-table
-  decision.
-- **Audio calls** — separate project.
+- **Attachments in Send** — unblocked 2026-09-09 (schema decided: JSON
+  `attachments` column on the shared `messages` table + bytes on disk;
+  see the "Could build" row). Ready to build when wanted.
+- **Audio calls** — separate project (needs audio hardware on the Pi —
+  SenseCap M1 has no mic/speaker). Parked.
 
 ## Notes / constraints (read before building)
 

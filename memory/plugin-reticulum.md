@@ -913,6 +913,30 @@ editor with type-specific fields + outage-risk warning. Chose
 structured over raw textarea (rnsd ExecStartPre crash = Reticulum
 down). Not Pi-tested. Not offered: I2P, 2nd RNode, AutoInterface.
 
+## 2026-09-09 — Contacts tab (address book)
+
+New admin-only **Contacts** tab on the Reticulum page (between Send and
+Browse). Backend was already complete — this is a frontend view over the
+existing `/api/reticulum/contacts` CRUD:
+- `reticulum_panel.js`: `_renderContacts` (inline-editable table: name +
+  note `<input>`s, known checkbox, per-row Save/Remove reusing
+  `_saveContact`/`_deleteContact`, + a Send/Browse link joined from the
+  roster), `_handleAddContact` (paste hash + name — client-side hex
+  check `^[0-9a-f]{8,64}$` even-length, tolerates `<hex>`/`:`),
+  `_saveContactRow`, `_refreshContactSurfaces` (Peers/Send/Activity/
+  Contacts/Messages all re-render after any contact change).
+  `_saveContact` now surfaces the server's error detail in the toast.
+- `contacts.py`: `looks_like_hash()` helper + `_clean_hash()`; `set`/
+  `get`/`delete` reshape RNS display forms (`<hex>`/`aa:bb`) to the bare
+  hex key so entries stay consistent — but stay lenient on length only
+  (no hex *rejection* server-side; the test fixtures use short fake
+  hashes, and a dead contact from a bad API call is harmless — the Add
+  *form* does the strict check).
+- `reticulum.css`: `.rt-contact-add`, `.rt-contact-cell`,
+  `.rt-contact-announced`, `.rt-contact-actions`.
+- Tests: `test_contacts.py` +2 (display-form normalisation,
+  `looks_like_hash`). Suite 217.
+
 ## 2026-09-09 — Propagation: WS push on sync completion
 
 `sync_propagation_messages()` now spawns `_watch_propagation_sync()`
