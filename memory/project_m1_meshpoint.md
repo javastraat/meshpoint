@@ -13080,7 +13080,12 @@ AND arbitrary-code-as-root. Removed.
 - `post_update.sh` + `install.sh`: `visudo -c` the file before installing
   (a bad drop-in otherwise breaks all sudo on the box).
 - Tests: test_update_apply +4 (no-sudo, preflight ×2). 101 update tests pass.
-- NOT Pi-verified — owed: a real self-update round-trip on the device.
+- **Pi-verified 2026-09-09:** real dashboard self-update ran on the new
+  plain-git path. Journal showed `runuser` dropping uid 0→999 for pip,
+  `apply_finish.sh` via sudo as root (kept grant), no `sudo git`.
+  `sudo -l -U meshpoint` → zero git grants, only `(meshpoint) NOPASSWD:
+  …/pip install *`. `find /opt/meshpoint/venv -not -user meshpoint` empty.
+  Service `active` after restart.
 
 Phase 3 (the real de-root, still open): `apply_finish.sh` / `post_update.sh`
 / `install.sh` live in the meshpoint-writable tree and are `sudo bash`-able
