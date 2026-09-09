@@ -41,7 +41,9 @@ SID_INFORMATION = 0x0F
 
 def _info_line(host: dict, node_name: str) -> str:
     """A compact, human-readable status string for the INFORMATION sensor
-    -- what shows on a subscriber's telemetry screen as free text."""
+    -- what shows on a subscriber's telemetry screen as free text.
+    Temperature is deliberately left out: it's its own ``SID_TEMPERATURE``
+    sensor, so repeating it here just double-prints it."""
     parts: list[str] = []
     if node_name:
         parts.append(node_name)
@@ -54,9 +56,6 @@ def _info_line(host: dict, node_name: str) -> str:
     free_gb = host.get("disk_free_gb")
     if free_gb is not None:
         parts.append(f"disk {free_gb} GB free")
-    temp = host.get("cpu_temp_c")
-    if temp is not None:
-        parts.append(f"{temp}°C")
     return " · ".join(parts) or "meshpoint"
 
 

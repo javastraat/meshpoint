@@ -99,9 +99,12 @@ checked on the Pi.
   `.cfg-field__input` instead of `#111`/`#eee` fallbacks (re-check both
   themes anyway). Detail: `memory/project_m1_meshpoint.md` dated
   2026-09-09.
-- **Telemetry collect + map (#4) — BUILT 2026-09-09, not Pi-tested.**
-  The receive side already worked (that's how #3 was verified); this
-  adds the store + UI. Check: with two nodes publishing to each other,
+- **Telemetry collect + map (#4) — BUILT + BROWSER-VERIFIED 2026-09-09**
+  (user screenshot: TI-Meshpoint plotted near Schiphol at 52.3458/
+  4.8264, table row, working OSM link, live WS). Fixed a double-print
+  found there: `_info_line` was appending `°C` even though temperature
+  is its own column/sensor — dropped it. Still not a full two-node run.
+  Check: with two nodes publishing to each other,
   each shows the other on its **Telemetry tab** (table row: heard /
   node / status line / temp + OSM link); a peer that sent location
   appears on the map; the `reticulum_telemetry` WS event live-updates

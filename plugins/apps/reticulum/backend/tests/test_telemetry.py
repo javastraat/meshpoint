@@ -47,7 +47,8 @@ class TestBuildTelemetry(unittest.TestCase):
         self.assertIn("load 0.42", info)
         self.assertIn("RAM 40%", info)
         self.assertIn("disk 12.3 GB free", info)
-        self.assertIn("61.2°C", info)
+        # temperature is its own SID_TEMPERATURE sensor -- not repeated here
+        self.assertNotIn("°C", info)
 
     def test_information_line_degrades_gracefully(self) -> None:
         self.assertEqual(telemetry._info_line({}, ""), "meshpoint")
