@@ -13,6 +13,30 @@ table below** — #1, #3, #4 and multi-collector Pi-verified; only #2
 
 ---
 
+## Todo — prioritised (2026-09-09)
+
+Builds first (priority order), then the Pi-verification backlog. Detail
+for each build item is in **Could build — next up** further down.
+
+| # | Item | Type | Effort | Impact | Risk | Notes |
+|---|---|---|---|---|---|---|
+| 1 | **Attachments in Send** | build | Med | High | Low | Schema decided: JSON `attachments` col on the shared `messages` table + bytes on disk under `data/reticulum/attachments/<msg_id>/`. Send via `FIELD_IMAGE`/`FIELD_FILE_ATTACHMENTS`, ~5 MB cap, one contained core UI touch (attachment chip in the shared Messages renderer) |
+| 2 | **Paper messages / QR** | build | Low–Med | Med | Low | Sideband-style offline message export; reuses the existing QR-export pattern |
+| 3 | **Audio calls** (`call.audio`) | build | Med–High | High | Med | Frontend-heavy: Codec2 WASM in browser, AudioWorklet mic, ring/answer/hangup UI. Pi is a byte-pipe bridge only. Full reference in `reticulum-meshchat` (`audio_call_manager.py` + `CallPage.vue`). Needs HTTPS (have it). Latency fine on TCP, marginal on LoRa |
+| 4 | **Group chat** (`RNS.Destination.GROUP`) | build | Med | Low | Med | Non-standard, no membership model, easy to half-build. Only on request |
+| 5 | **Structured telemetry sensors** (`SID_PROCESSOR/RAM/NVM`) | build | Med | Low | Med | Nested `[[label,val]]` pack format needs a careful `sense.py` read + Sideband cross-check. Only worth it once a graphing collector exists |
+| 6 | **PN peering** (relay↔relay store sync) | build | Med | Low | Med | No reference impl (meshchat doesn't do it). Only matters for multi-relay setups |
+| V1 | **Verify: propagation client (#2)** | verify | Low (½ day) | High | — | Never run on Pi. Dropdown lists relays, saved hash survives restart, Sync-inbox cycle (requesting→link→receiving→complete), auto-sync timer fires, unreachable node fails not hangs |
+| V2 | **Verify: extra interfaces** | verify | Low | High | — | Never added one. Valid TCPClient lands in rnsd config + rnsd starts; broken entry skipped w/ journal warning and **rnsd still starts**; RNode+backbone off + one active extra accepted |
+| V3 | **Verify: Contacts tab + peer-drawer additions** | verify | Low | Med | — | Inline-edit propagates name everywhere, add-from-hash + garbage rejected, Remove clears all surfaces; Send Message button pre-fills, favourite star syncs w/ Browse list, next-hop tooltip; light/dark |
+| V4 | **Verify: telemetry collect+map (#4) leftovers** | verify | Low | Med | — | `reticulum_telemetry` WS live-updates the tab w/o reload; a telemetry-only frame leaves no blank row in Messages |
+| V5 | **Verify: real-Sideband render** | verify | Low | Low | — | Telemetry frame is byte-exact vs `sense.py`; just never displayed in the actual Sideband app |
+
+**Suggested sequence:** 1 → (V1, V2 on the Pi) → 2 → 3, with V3·V4·V5 folded
+into the next Pi session and 4–6 left reactive.
+
+---
+
 ## Status — where we are
 
 All three items from the first pass are **built and committed** on `main`:
@@ -418,22 +442,15 @@ plugins:
 
 ## Suggested order from here
 
-New-builds #1 (Contacts), #2 (Propagation client), #3 (Telemetry
-publish) all built 2026-09-09 — none Pi-verified yet.
+**See "Todo — prioritised (2026-09-09)" near the top of this file** — that
+table is the current answer. Short version: **Attachments in Send** →
+Pi-verify propagation client + extra interfaces → **Paper messages / QR**
+→ **Audio calls**; V3–V5 fold into the next Pi session; group chat /
+structured sensors / PN peering stay reactive.
 
-From here (user asks "what is it" then decides, one at a time):
-- **#4 Telemetry collector + map** — the natural pair for #3 now that
-  publish exists. Parse inbound `FIELD_TELEMETRY`, plot on the
-  dashboard's local map. Needs `SID_LOCATION` added to the publish side.
-- **Contacts / petnames** — ✅ address-book tab BUILT 2026-09-09
-  (Contacts tab: inline-edit table + "add from pasted hash"). Further
-  polish possible but nothing pending.
-- **Interface manager UI**, **Paper messages / QR** — standalone, low.
-- **Attachments in Send** — unblocked 2026-09-09 (schema decided: JSON
-  `attachments` column on the shared `messages` table + bytes on disk;
-  see the "Could build" row). Ready to build when wanted.
-- **Audio calls** — separate project (needs audio hardware on the Pi —
-  SenseCap M1 has no mic/speaker). Parked.
+Note the earlier "needs audio hardware" concern on Audio calls was
+retracted 2026-09-09 — Codec2 runs in the browser, the Pi is only a
+byte-pipe bridge (see the Could-build row).
 
 ## Notes / constraints (read before building)
 

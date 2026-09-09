@@ -80,10 +80,21 @@ def parse_github_url(url: str) -> tuple[str, str]:
 
 
 def normalise_ref(ref: str | None) -> str:
-    """A git ref (branch / tag / SHA). Blank -> ``main``. Rejects anything
-    with a slash or whitespace so it can't smuggle a path into a URL."""
+    """A git ref (branch / tag / SHA). Blank -> ``main``.
+
+    The ref is interpolated straight into a ``raw.githubusercontent.com`` /
+    ``api.github.com`` path, so it must not be able to smuggle path
+    navigation: no whitespace, no leading/trailing slash, and crucially no
+    ``..`` segment (``ref="../../other/repo/main"`` would otherwise make
+    the catalog fetch resolve to a *different* repo than the source URL
+    the operator sees). Slashes are allowed because real branch names use
+    them (``feature/x``), but only between non-``..`` segments."""
     ref = str(ref or "").strip() or "main"
-    if not re.match(r"^[A-Za-z0-9._\-/]{1,100}$", ref) or ref.startswith("/"):
+    if (
+        not re.match(r"^[A-Za-z0-9._\-/]{1,100}$", ref)
+        or ref.startswith("/") or ref.endswith("/")
+        or ".." in ref.split("/")
+    ):
         raise PluginSourceError("ref", "ref must be a branch, tag or commit SHA")
     return ref
 

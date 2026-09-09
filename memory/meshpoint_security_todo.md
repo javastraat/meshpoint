@@ -8,8 +8,9 @@ verification evidence).
 See `memory/project_m1_meshpoint.md` for wider session context and
 `memory/reticulum_todo.md` for the Reticulum plugin backlog.
 
-Last updated 2026-09-09 (file created, seeded from the security-hardening
-backlog in `project_m1_meshpoint.md`).
+Last updated 2026-09-09 — added a review pass on the new plugin-sources /
+installer code (2 small findings fixed, see Fixed; 1 by-design tradeoff
+noted in the backlog).
 
 ---
 
@@ -31,6 +32,14 @@ Read this before filing a finding — some of these are deliberate.
 - **Hosted `.mu` pages are served non-executable on purpose** (Reticulum
   plugin) — dynamic content only via generated pages or token substitution.
 - Passwords live only in `local.yaml`, never returned in GET responses.
+- **A plugin source is trusted code, at branch HEAD.** Adding a GitHub
+  source (v0.8.1) is a consent gate (dangerous modal + `confirm:true`),
+  but once added, Install/Update pull whatever that repo's `ref` points
+  at *now* — a compromised repo account or a force-push lands on the next
+  Update. Same class as `pip install` from the terminal. Mitigation
+  available today: pin the source `ref` to a tag or commit SHA instead of
+  a branch. Downloaded files are re-validated (`parse_manifest`, path
+  safety, size caps) but not signature-checked. See backlog #5.
 
 ---
 
@@ -44,6 +53,7 @@ Priority order is the user's own (set 2026-09-08).
 | 2 | **Move services off root onto `meshpoint` user** | 🔴 Not started | Explicitly longer-term ("to limit attack surface"). Self-update chain's `pip install` runs as root via `config/sudoers-meshpoint` NOPASSWD. |
 | 3 | **Web terminal → opt-in plugin** | 🔴 Not started, needs design | Currently core, admin-gated but root-equivalent. Move to an explicitly opt-in plugin like every other powerful/risky capability. "The root thing needs some thought" — not yet scoped/greenlit. |
 | 4 | **USB companion udev rules too permissive** | 🔴 Not started, unprioritized | Every user on the box currently gets full serial-device access. Should be `0660` with a `dialout`-or-`meshpoint` group. |
+| 5 | **Plugin source: record + pin the resolved commit SHA** | 🔴 Not started, low | On install, resolve the branch `ref` to a commit SHA and store it in `plugins.<id>.source`. On Update, if the source `ref` is a moving branch, show what changed (old SHA → new SHA) before applying, and offer "pin to this SHA". Makes the by-design "trusted code at HEAD" tradeoff visible + freezable. Purely additive to the v0.8.1 installer. |
 
 ---
 
@@ -64,6 +74,42 @@ _None yet. Template:_
 ---
 
 ## Fixed
+
+### 2026-09-09 — plugin installer: no uncompressed-size / member-count cap  (review pass)
+- **Severity:** medium (disk-fill DoS from a trusted-but-hostile or compromised source repo)
+- **Where:** `src/plugins/installer.py`, `_safe_members()` / `stage_from_tarball()`
+- **Issue:** `_download_tarball` capped the *compressed* GitHub tarball at
+  25 MB, but extraction had no bound on total uncompressed bytes or file
+  count — a gzip-bomb `repo.json` source could unpack to gigabytes and
+  fill `/` (the plugin runs as the `meshpoint` user, so it can fill the
+  data partition). GitHub's own repo-size limits make this hard to weaponise
+  in practice, but it's cheap defence in depth and matches the stance the
+  backup/restore path already takes.
+- **Fix:** `_MAX_UNCOMPRESSED_BYTES = 80 MB` + `_MAX_MEMBERS = 4000`,
+  checked twice — once against each member's declared header size in
+  `_safe_members`, and again against the real bytes written during the
+  streamed copy in `stage_from_tarball` (covers a lying header / sparse
+  member). Aborts the whole install.
+- **Tests:** `test_uncompressed_size_cap`, `test_member_count_cap` in
+  `tests/test_plugin_installer.py` (both patch the constant low and run
+  the normal fixture).
+
+### 2026-09-09 — plugin source `ref` allowed `..` path segments  (review pass)
+- **Severity:** low (catalog fetch could resolve to a different repo than the source URL shown)
+- **Where:** `src/plugins/sources.py`, `normalise_ref()`
+- **Issue:** the ref regex allowed `.` and `/`, and only rejected a
+  leading slash — so `ref="../../other-owner/other-repo/main"` passed and
+  got interpolated straight into
+  `raw.githubusercontent.com/<o>/<r>/<ref>/repo.json`, which GitHub
+  resolves server-side to `other-owner/other-repo`. The operator sets
+  their own ref, so this is self-inflicted rather than a privilege
+  escalation — but a copy-pasted "add this source with this ref"
+  instruction could make the browsed/installed catalog come from a repo
+  other than the one the UI displays.
+- **Fix:** `normalise_ref` now also rejects a trailing slash and any `..`
+  path segment (`".." in ref.split("/")`). Real slashed branch names
+  (`feature/x`) still pass.
+- **Tests:** extended `test_ref_normalisation` in `tests/test_plugin_sources.py`.
 
 ### 2026-09-08 — backup/restore tar-symlink extraction  (found by the user)
 - **Severity:** high (arbitrary root-owned file write from a crafted upload)

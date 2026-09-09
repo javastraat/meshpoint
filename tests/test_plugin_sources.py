@@ -46,10 +46,17 @@ class TestUrlParsing(unittest.TestCase):
         self.assertEqual(normalise_ref(None), "main")
         self.assertEqual(normalise_ref("v1.2.0"), "v1.2.0")
         self.assertEqual(normalise_ref("a1b2c3d"), "a1b2c3d")
-        with self.assertRaises(PluginSourceError):
-            normalise_ref("bad ref with spaces")
-        with self.assertRaises(PluginSourceError):
-            normalise_ref("/etc/passwd")
+        self.assertEqual(normalise_ref("feature/thing"), "feature/thing")  # slash ok
+        for bad in (
+            "bad ref with spaces",
+            "/etc/passwd",
+            "trailing/",
+            "../../other-repo/main",   # would repoint the raw.githubusercontent fetch
+            "main/../..",
+            "..",
+        ):
+            with self.assertRaises(PluginSourceError):
+                normalise_ref(bad)
 
     def test_url_builders(self) -> None:
         self.assertEqual(

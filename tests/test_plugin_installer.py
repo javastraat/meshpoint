@@ -115,6 +115,19 @@ class StageFromTarball(unittest.TestCase):
             self._stage()
         self.assertEqual(cm.exception.code, "archive")
 
+    def test_uncompressed_size_cap(self) -> None:
+        with mock.patch.object(installer, "_MAX_UNCOMPRESSED_BYTES", 8):
+            with self.assertRaises(PluginInstallError) as cm:
+                self._stage()
+        self.assertEqual(cm.exception.code, "archive")
+        self.assertIn("MB", str(cm.exception))
+
+    def test_member_count_cap(self) -> None:
+        with mock.patch.object(installer, "_MAX_MEMBERS", 1):
+            with self.assertRaises(PluginInstallError) as cm:
+                self._stage()
+        self.assertEqual(cm.exception.code, "archive")
+
     def test_symlink_member_aborts(self) -> None:
         link = tarfile.TarInfo(name=f"{_TOPLEVEL}/apps/hello-svc/passwd")
         link.type = tarfile.SYMTYPE

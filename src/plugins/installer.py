@@ -33,7 +33,9 @@ from src.plugins.sources import tarball_url
 logger = logging.getLogger(__name__)
 
 _TIMEOUT_S = 30
-_MAX_TARBALL_BYTES = 25 * 1024 * 1024
+_MAX_TARBALL_BYTES = 25 * 1024 * 1024          # compressed download cap
+_MAX_UNCOMPRESSED_BYTES = 80 * 1024 * 1024     # sum of extracted member sizes
+_MAX_MEMBERS = 4000                            # entries in the subtree
 
 
 class PluginInstallError(Exception):
@@ -74,6 +76,8 @@ def _safe_members(tar: tarfile.TarFile, subpath: str):
     prefix = f"{toplevel}/{subpath.strip('/')}/"
 
     matched = False
+    count = 0
+    total_bytes = 0
     for member in tar.getmembers():
         name = member.name
         if name == prefix.rstrip("/"):
@@ -88,6 +92,20 @@ def _safe_members(tar: tarfile.TarFile, subpath: str):
         if not (member.isfile() or member.isdir()):
             raise PluginInstallError(
                 "archive", f"archive member {name!r} is not a regular file or dir",
+            )
+        # Bound the extraction -- the 25 MB compressed cap says nothing
+        # about the uncompressed size, and a hostile source could ship a
+        # gzip bomb that fills the disk. This checks the header's declared
+        # size; stage_from_tarball also caps the real bytes written.
+        count += 1
+        total_bytes += max(member.size, 0)
+        if count > _MAX_MEMBERS:
+            raise PluginInstallError("archive", f"more than {_MAX_MEMBERS} files in {subpath!r}")
+        if total_bytes > _MAX_UNCOMPRESSED_BYTES:
+            raise PluginInstallError(
+                "archive",
+                f"{subpath!r} unpacks to more than "
+                f"{_MAX_UNCOMPRESSED_BYTES // 1024 // 1024} MB",
             )
         matched = True
         yield member, rel
@@ -108,6 +126,7 @@ def stage_from_tarball(owner: str, repo: str, ref: str, subpath: str, plugin_id:
         _download_tarball(owner, repo, ref, archive)
         out_dir = staging / plugin_id
         out_dir.mkdir()
+        written = 0
         with tarfile.open(archive, "r:gz") as tar:
             for member, rel in _safe_members(tar, subpath):
                 target = out_dir / rel
@@ -119,7 +138,15 @@ def stage_from_tarball(owner: str, repo: str, ref: str, subpath: str, plugin_id:
                 if extracted is None:
                     raise PluginInstallError("archive", f"could not read {member.name!r}")
                 with open(target, "wb") as fh:
-                    shutil.copyfileobj(extracted, fh)
+                    while chunk := extracted.read(256 * 1024):
+                        written += len(chunk)
+                        if written > _MAX_UNCOMPRESSED_BYTES:
+                            raise PluginInstallError(
+                                "archive",
+                                f"{subpath!r} unpacks to more than "
+                                f"{_MAX_UNCOMPRESSED_BYTES // 1024 // 1024} MB",
+                            )
+                        fh.write(chunk)
         archive.unlink(missing_ok=True)
         return out_dir
     except BaseException:
