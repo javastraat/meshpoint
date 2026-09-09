@@ -641,5 +641,125 @@ class ReticulumAnnounceModal {
     }
 }
 
+/** Telemetry tab: clicking a row used to just open the Peers drawer --
+ * identity/routing, none of the actual reading (temperature, status
+ * line, location, when it was heard) the row itself is about. This is
+ * the Telemetry equivalent of ReticulumAnnounceModal: same pdm-* shell,
+ * its own small set of rows for a telemetry entry instead of an
+ * announce. Deliberately its own class rather than a generalised base --
+ * matches this file's existing one-class-per-tab shape (see the header
+ * comment), and the two modals' row sets don't overlap enough to be
+ * worth threading a shared abstraction through. */
+class ReticulumTelemetryModal {
+    constructor() {
+        this._overlay = null;
+        this._onKeyDown = this._onKeyDown.bind(this);
+    }
+
+    /**
+     * @param {object} entry -- one row from GET /api/reticulum/telemetry/peers:
+     *   {destination_hash, name, received_at, temperature_c, info, latitude, longitude}
+     * @param {{knownPeer?: boolean, onViewPeer?: function}} opts
+     */
+    show(entry, opts = {}) {
+        this.close();
+
+        const overlay = document.createElement('div');
+        overlay.className = 'pdm-overlay';
+        overlay.setAttribute('role', 'dialog');
+        overlay.setAttribute('aria-modal', 'true');
+        overlay.setAttribute('aria-label', 'Telemetry detail');
+        overlay.addEventListener('click', () => this.close());
+
+        const modal = document.createElement('div');
+        modal.className = 'pdm-modal';
+        modal.addEventListener('click', (e) => e.stopPropagation());
+
+        const heard = entry.received_at ? new Date(entry.received_at * 1000).toISOString() : null;
+        modal.innerHTML = `
+            <header class="pdm-modal__header">
+                <div>
+                    <h2 class="pdm-modal__title">${_rtEsc(entry.name || 'Telemetry')}</h2>
+                    <div class="pdm-modal__meta">${_rtEsc(_rtFullTime(heard))}</div>
+                </div>
+                <button type="button" class="pdm-modal__close" aria-label="Close">&times;</button>
+            </header>
+            <div class="pdm-modal__body"></div>
+        `;
+
+        const body = modal.querySelector('.pdm-modal__body');
+        const layer = this._buildReadingLayer(entry);
+        if (layer) body.appendChild(layer);
+
+        if (opts.knownPeer && typeof opts.onViewPeer === 'function') {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'terminal-button rt-amodal__view-peer';
+            btn.textContent = 'View peer';
+            btn.addEventListener('click', () => {
+                this.close();
+                opts.onViewPeer(entry.destination_hash);
+            });
+            body.appendChild(btn);
+        }
+
+        modal.querySelector('.pdm-modal__close').addEventListener('click', () => this.close());
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+        this._overlay = overlay;
+        document.addEventListener('keydown', this._onKeyDown);
+        modal.querySelector('.pdm-modal__close').focus();
+    }
+
+    _buildReadingLayer(entry) {
+        const rows = [
+            { key: 'Temperature', val: entry.temperature_c != null ? `${entry.temperature_c}°C` : null },
+            { key: 'Status', val: entry.info || null },
+            {
+                key: 'Location',
+                val: (entry.latitude != null && entry.longitude != null)
+                    ? `${entry.latitude.toFixed(4)}, ${entry.longitude.toFixed(4)}` : null,
+                html: (entry.latitude != null && entry.longitude != null) ? () =>
+                    `<a href="https://www.openstreetmap.org/?mlat=${entry.latitude}&mlon=${entry.longitude}#map=13/${entry.latitude}/${entry.longitude}" target="_blank" rel="noopener">${entry.latitude.toFixed(4)}, ${entry.longitude.toFixed(4)}</a>`
+                    : null,
+            },
+            { key: 'Destination', val: entry.destination_hash },
+        ];
+        const rowsEl = document.createElement('div');
+        rowsEl.className = 'pdm-layer__rows';
+        for (const row of rows) {
+            if (row.val == null || row.val === '') continue;
+            rowsEl.appendChild(this._row(row.key, row.html ? row.html() : _rtEsc(row.val), !!row.html));
+        }
+        if (!rowsEl.children.length) return null;
+
+        const layer = document.createElement('section');
+        layer.className = 'pdm-layer';
+        layer.innerHTML = '<div class="pdm-layer__label">Reading</div>';
+        layer.appendChild(rowsEl);
+        return layer;
+    }
+
+    _row(key, val, isHtml) {
+        const row = document.createElement('div');
+        row.className = 'pdm-row';
+        row.innerHTML = `
+            <span class="pdm-row__key">${_rtEsc(key)}:</span>
+            <span class="pdm-row__val">${isHtml ? val : val}</span>
+        `;
+        return row;
+    }
+
+    close() {
+        document.removeEventListener('keydown', this._onKeyDown);
+        if (this._overlay) { this._overlay.remove(); this._overlay = null; }
+    }
+
+    _onKeyDown(e) {
+        if (e.key === 'Escape') this.close();
+    }
+}
+
 window.ReticulumPeerDrawer = ReticulumPeerDrawer;
 window.ReticulumAnnounceModal = ReticulumAnnounceModal;
+window.ReticulumTelemetryModal = ReticulumTelemetryModal;

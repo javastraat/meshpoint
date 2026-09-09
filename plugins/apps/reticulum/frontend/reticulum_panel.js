@@ -75,6 +75,7 @@ class ReticulumPanel {
         this._nodePagesTab = null;
         this._peerDrawer = null;
         this._announceModal = null;
+        this._telemetryModal = null;
         this._onWsPeer = this._onWsPeer.bind(this);
         this._onWsMessage = this._onWsMessage.bind(this);
         this._onWsAnnounce = this._onWsAnnounce.bind(this);
@@ -352,6 +353,9 @@ class ReticulumPanel {
         if (window.ReticulumAnnounceModal) {
             this._announceModal = new window.ReticulumAnnounceModal();
         }
+        if (window.ReticulumTelemetryModal) {
+            this._telemetryModal = new window.ReticulumTelemetryModal();
+        }
 
         this._q('#rt-refresh-btn')?.addEventListener('click', () => this._load());
         this._q('#rt-announce-btn')?.addEventListener('click', () => this._handleAnnounce());
@@ -501,6 +505,20 @@ class ReticulumPanel {
             canEditContact: this._isAdmin,
             onSaveContact: (hash, data) => this._saveContact(hash, data),
             onDeleteContact: (hash) => this._deleteContact(hash),
+        });
+    }
+
+    /** Telemetry-row click -> the reading itself (temperature/status/
+     * location/heard), not the generic peer drawer -- the drawer has no
+     * telemetry fields at all, so it used to show everything BUT the data
+     * the row is actually about. "View peer" inside still reaches identity/
+     * routing for anyone who wants that too. */
+    _openTelemetryModal(entry) {
+        if (!this._telemetryModal) return;
+        const peer = this._peers.find((p) => p.destination_hash === entry.destination_hash);
+        this._telemetryModal.show(entry, {
+            knownPeer: !!peer,
+            onViewPeer: () => { if (peer) this._openPeerDrawer(peer); },
         });
     }
 
@@ -960,7 +978,7 @@ class ReticulumPanel {
                 ? `<a href="https://www.openstreetmap.org/?mlat=${t.latitude}&mlon=${t.longitude}#map=13/${t.latitude}/${t.longitude}" target="_blank" rel="noopener">${t.latitude.toFixed(4)}, ${t.longitude.toFixed(4)}</a>`
                 : '--';
             return `
-            <tr class="lw-pkt-row" data-rt-tele-hash="${this._esc(hash)}" title="Click for peer details">
+            <tr class="lw-pkt-row" data-rt-tele-hash="${this._esc(hash)}" title="Click for telemetry detail">
                 <td class="lw-time">${heard}</td>
                 <td class="mt-name">${this._esc(name)}</td>
                 <td>${this._esc(status)}</td>
@@ -972,8 +990,8 @@ class ReticulumPanel {
         tbody.querySelectorAll('tr[data-rt-tele-hash]').forEach((tr) => {
             tr.addEventListener('click', (e) => {
                 if (e.target.closest('a')) return;
-                const peer = this._peers.find((p) => p.destination_hash === tr.dataset.rtTeleHash);
-                if (peer) this._openPeerDrawer(peer);
+                const entry = this._telemetry.find((t) => t.destination_hash === tr.dataset.rtTeleHash);
+                if (entry) this._openTelemetryModal(entry);
             });
         });
 
