@@ -458,7 +458,7 @@ class ReticulumSettingsTab {
         this._extraIfacesEl.innerHTML = this._extraIfaces.map((iface, idx) => {
             const type = iface.type || 'TCPClientInterface';
             const fields = (specs[type] || []).map(([key, label, kind, ph]) => `
-                <label class="cfg-field cfg-field--narrow">
+                <label class="cfg-field rt-iface-field rt-iface-field--${kind === 'number' ? 'port' : 'host'}">
                     <span class="cfg-field__label">${label}</span>
                     <input class="cfg-field__input" type="${kind}" placeholder="${ph}"
                            ${kind === 'number' ? 'min="1" max="65535"' : ''}
@@ -468,27 +468,27 @@ class ReticulumSettingsTab {
             `).join('');
             return `
                 <div class="rt-iface-row" data-rt-iface-row="${idx}">
-                    <div class="cfg-row">
-                        <label class="cfg-field">
+                    <div class="rt-iface-head">
+                        <label class="cfg-field rt-iface-head__name">
                             <span class="cfg-field__label">Name</span>
                             <input class="cfg-field__input" type="text" maxlength="48"
                                    placeholder="My interface" data-rt-iface-name data-rt-iface-idx="${idx}"
                                    value="${this._esc(iface.name ?? '')}">
                         </label>
-                        <label class="cfg-field cfg-field--narrow">
+                        <label class="cfg-field rt-iface-head__type">
                             <span class="cfg-field__label">Type</span>
                             <select class="cfg-field__input" data-rt-iface-type data-rt-iface-idx="${idx}">
                                 ${['TCPClientInterface', 'TCPServerInterface', 'UDPInterface']
                                     .map((t) => `<option value="${t}"${t === type ? ' selected' : ''}>${t}</option>`).join('')}
                             </select>
                         </label>
-                        <label class="cfg-field cfg-field--toggle">
+                        <label class="cfg-field cfg-field--toggle rt-iface-head__enabled">
                             <input type="checkbox" data-rt-iface-enabled data-rt-iface-idx="${idx}"
                                    ${iface.enabled === false ? '' : 'checked'}>
                             <span class="cfg-field__label">Enabled</span>
                         </label>
                     </div>
-                    <div class="cfg-row">${fields}</div>
+                    <div class="rt-iface-fields">${fields}</div>
                     <div class="cfg-card__actions">
                         <button class="terminal-button" type="button" data-rt-iface-remove="${idx}">Remove</button>
                     </div>

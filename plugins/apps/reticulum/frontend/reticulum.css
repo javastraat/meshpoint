@@ -398,16 +398,36 @@
     color: var(--text-muted, #777);
 }
 
-/* Settings tab: one extra-interface editor row. */
+/* Settings tab: one extra-interface editor row -- a distinct card so a
+   list of them reads as separate blocks, not one run-on form. */
 .rt-iface-row {
     border: 1px solid var(--border, #333);
-    border-radius: 6px;
-    padding: 10px 12px;
-    margin-bottom: 10px;
+    border-radius: 8px;
+    padding: 14px 16px 12px;
+    margin-bottom: 16px;
+    background: var(--overlay-weak, rgba(255, 255, 255, 0.03));
+}
+.rt-iface-row:last-of-type {
+    margin-bottom: 8px;
 }
 .rt-iface-row .cfg-card__actions {
     margin-top: 4px;
 }
+
+.rt-iface-head,
+.rt-iface-fields {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    align-items: flex-end;
+    margin-bottom: 12px;
+}
+.rt-iface-head__name { flex: 1 1 180px; }
+.rt-iface-head__type { flex: 0 0 190px; }        /* fits "TCPClientInterface" */
+.rt-iface-head__enabled { flex: 0 0 auto; margin-bottom: 6px; }
+
+.rt-iface-field--host { flex: 1 1 200px; max-width: 260px; }
+.rt-iface-field--port { flex: 0 0 100px; }
 
 /* Settings tab: visual break before the propagation-client sub-block. */
 .rt-prop-divider {
