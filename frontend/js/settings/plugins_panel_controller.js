@@ -342,45 +342,96 @@ class PluginsPanelController {
         catEl.dataset.ref = cat.ref || 'main';
         const countEl = catEl.closest('.plugins-source')?.querySelector('[data-src-count]');
         if (countEl) countEl.textContent = this._formatCatalogCount(cat);
-        const rows = [...(cat.plugins || []), ...(cat.themes || [])];
-        if (!rows.length) {
-            catEl.innerHTML = '<p class="plugins-sources__empty">This source lists no plugins or themes.</p>';
+
+        const headerHtml = `<p class="plugins-sources__catmeta">${this._escape(cat.name || url)} — <code>@ ${this._escape(cat.ref)}</code>`
+            + ` <button type="button" class="plugins-source__refresh" data-src-catalog-refresh `
+            + `title="raw.githubusercontent.com can take a few minutes to pick up a fresh push — re-fetch now">⟳ Refresh</button></p>`;
+
+        const apps = cat.plugins || [];
+        const themes = cat.themes || [];
+        if (!apps.length && !themes.length) {
+            catEl.innerHTML = `${headerHtml}<p class="plugins-sources__empty">This source lists no plugins or themes.</p>`;
             return;
         }
-        catEl.innerHTML = `
-            <p class="plugins-sources__catmeta">${this._escape(cat.name || url)} — <code>@ ${this._escape(cat.ref)}</code></p>
-            <table class="plugins-table"><tbody>
-            ${rows.map((p) => {
-                const down = p.update_available
-                    && this._cmpVersions(p.version, p.installed_version) < 0;
-                const badge = !p.compatible
-                    ? '<span class="plugin-row__badge plugin-row__badge--community">needs newer Meshpoint</span>'
-                    : p.update_available
-                        ? `<span class="plugin-row__count">${down ? 'downgrade' : 'update'} ${this._escape(p.installed_version)} → ${this._escape(p.version)}</span>`
-                        : p.installed
-                            ? '<span class="plugin-row__badge plugin-row__badge--builtin">installed</span>'
-                            : '';
-                const attrs = (action) => `data-src-install data-id="${this._escape(p.id)}" `
-                    + `data-action="${action}" data-from="${this._escape(p.installed_version || '')}" `
-                    + `data-to="${this._escape(p.version)}"`;
-                let btn;
-                if (!p.compatible) {
-                    btn = '<button type="button" class="terminal-button" disabled title="Update Meshpoint first">Install</button>';
-                } else if (p.update_available) {
-                    btn = `<button type="button" class="terminal-button" ${attrs(down ? 'downgrade' : 'update')}>${down ? 'Downgrade' : 'Update'}</button>`;
-                } else if (p.installed) {
-                    btn = `<button type="button" class="terminal-button" ${attrs('reinstall')} title="Replace with a fresh copy from the source">Reinstall</button>`;
-                } else {
-                    btn = `<button type="button" class="terminal-button" ${attrs('install')}>Install</button>`;
-                }
-                return `<tr>
-                    <td><span class="plugin-row__name">${this._escape(p.id)}</span>
-                        <span class="plugin-row__version">v${this._escape(p.version)} · ${this._escape(p.kind)}${p.author ? ` · ${this._escape(p.author)}` : ''}</span>
-                        ${p.description ? `<span class="plugin-row__version">${this._escape(p.description)}</span>` : ''}</td>
-                    <td class="plugins-source__catright">${badge}${btn}</td>
-                </tr>`;
-            }).join('')}
-            </tbody></table>`;
+        const appsHtml = apps.length
+            ? `<h4 class="plugins-source__sectiontitle">Apps</h4><table class="plugins-table"><tbody>`
+              + this._orderCatalogApps(apps).map((row) => this._catalogRowHtml(row)).join('') + `</tbody></table>`
+            : '';
+        const themesHtml = themes.length
+            ? `<h4 class="plugins-source__sectiontitle">Themes</h4><table class="plugins-table"><tbody>`
+              + themes.map((t) => this._catalogRowHtml({ plugin: t })).join('') + `</tbody></table>`
+            : '';
+        catEl.innerHTML = headerHtml + appsHtml + themesHtml;
+    }
+
+    /** Reorders a catalog's ``plugins`` array so a "hook" app whose
+     * [hook].host is another app IN THIS SAME CATALOG sits right after that
+     * host, marked for indentation -- same "belongs to" grouping the
+     * installed-plugins list already does (see _groupedPlugins()). A hook
+     * whose host isn't in this catalog (built into core, or a different
+     * source) just renders standalone -- there's nothing to nest it under. */
+    _orderCatalogApps(apps) {
+        const byId = new Set(apps.map((p) => p.id));
+        const childrenOf = new Map();
+        apps.forEach((p) => {
+            if (p.hook_host && p.hook_host !== p.id && byId.has(p.hook_host)) {
+                if (!childrenOf.has(p.hook_host)) childrenOf.set(p.hook_host, []);
+                childrenOf.get(p.hook_host).push(p);
+            }
+        });
+        const nested = new Set([...childrenOf.values()].flat().map((p) => p.id));
+        const rows = [];
+        apps.forEach((p) => {
+            if (nested.has(p.id)) return; // placed under its host below
+            const kids = childrenOf.get(p.id) || [];
+            rows.push({ plugin: p, grouped: kids.length > 0 });
+            kids.forEach((child) => rows.push({ plugin: child, grouped: true, dependent: true }));
+        });
+        return rows;
+    }
+
+    /** One Browse row -- shared by apps and themes (``plugin`` covers both;
+     * ``grouped``/``dependent`` only apply to a hook nested under its host,
+     * see _orderCatalogApps()). */
+    _catalogRowHtml({ plugin: p, grouped = false, dependent = false }) {
+        const down = p.update_available && this._cmpVersions(p.version, p.installed_version) < 0;
+        const badge = !p.compatible
+            ? '<span class="plugin-row__badge plugin-row__badge--community">needs newer Meshpoint</span>'
+            : p.update_available
+                ? `<span class="plugin-row__count">${down ? 'downgrade' : 'update'} ${this._escape(p.installed_version)} → ${this._escape(p.version)}</span>`
+                : p.installed
+                    ? '<span class="plugin-row__badge plugin-row__badge--builtin">installed</span>'
+                    : '';
+        const attrs = (action) => `data-src-install data-id="${this._escape(p.id)}" `
+            + `data-action="${action}" data-from="${this._escape(p.installed_version || '')}" `
+            + `data-to="${this._escape(p.version)}"`;
+        let btn;
+        if (!p.compatible) {
+            btn = '<button type="button" class="terminal-button" disabled title="Update Meshpoint first">Install</button>';
+        } else if (p.update_available) {
+            btn = `<button type="button" class="terminal-button" ${attrs(down ? 'downgrade' : 'update')}>${down ? 'Downgrade' : 'Update'}</button>`;
+        } else if (p.installed) {
+            btn = `<button type="button" class="terminal-button" ${attrs('reinstall')} title="Replace with a fresh copy from the source">Reinstall</button>`;
+        } else {
+            btn = `<button type="button" class="terminal-button" ${attrs('install')}>Install</button>`;
+        }
+        // Themes carry no `provides`/`has_setup`/`hook_host` -- these are
+        // simply absent from a theme's catalog entry, so all three lines
+        // below are naturally skipped for a theme row.
+        const provides = (p.provides || []).join(', ');
+        const setupNote = p.has_setup
+            ? '<p class="plugin-row__deps">⚙ Runs a setup script after install</p>' : '';
+        const hookNote = p.hook_host
+            ? `<p class="plugin-row__dep">Hooks into: <code>${this._escape(p.hook_host)}</code></p>` : '';
+        const rowClass = dependent ? ' class="plugin-row--dependent"' : (grouped ? ' class="plugin-row--host"' : '');
+        return `<tr${rowClass}>
+            <td><span class="plugin-row__name">${this._escape(p.id)}</span>
+                <span class="plugin-row__version">v${this._escape(p.version)} · ${this._escape(p.kind)}${p.author ? ` · ${this._escape(p.author)}` : ''}</span>
+                ${p.description ? `<span class="plugin-row__version">${this._escape(p.description)}</span>` : ''}
+                ${provides ? `<p class="plugin-row__provides">${this._escape(provides)}</p>` : ''}
+                ${setupNote}${hookNote}</td>
+            <td class="plugins-source__catright">${badge}${btn}</td>
+        </tr>`;
     }
 
     async _installFromSource(url, id, ref, opts, catEl) {

@@ -241,7 +241,7 @@ def run_plugin_index(repo_dir: str, *, write: bool = False) -> int:
         except PluginManifestError as exc:
             print(f"  {_YELLOW}skip apps/{child.name}: {exc}{_RESET}")
             continue
-        plugins.append({
+        entry = {
             "id": m.name,
             "kind": "app",
             "path": f"apps/{m.name}",
@@ -252,7 +252,10 @@ def run_plugin_index(repo_dir: str, *, write: bool = False) -> int:
             "author": m.author,
             "homepage": m.homepage,
             "has_setup": m.setup is not None,
-        })
+        }
+        if m.hook is not None:
+            entry["hook_host"] = m.hook.host
+        plugins.append(entry)
 
     themes: list[dict] = []
     for child in sorted((root / "themes").glob("*/")):
@@ -265,6 +268,10 @@ def run_plugin_index(repo_dir: str, *, write: bool = False) -> int:
             print(f"  {_YELLOW}skip themes/{child.name}: {exc}{_RESET}")
             continue
         tid = str(raw.get("id") or child.name).strip()
+        if tid != child.name:
+            print(f"  {_YELLOW}skip themes/{child.name}: 'id' is {tid!r} -- "
+                  f"rename the folder to match{_RESET}")
+            continue
         themes.append({
             "id": tid,
             "kind": "theme",

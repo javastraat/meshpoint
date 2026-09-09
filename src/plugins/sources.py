@@ -22,7 +22,10 @@ Repo manifest shape (``repo.json`` at the repo root)::
         { "id": "hello-service", "kind": "app", "path": "apps/hello-service",
           "version": "0.1.0", "meshpoint_api": 1, "provides": ["service"],
           "description": "...", "author": "...", "homepage": "...",
-          "has_setup": false }                  # metadata beyond id/kind/path
+          "has_setup": false,                   # metadata beyond id/kind/path
+          "hook_host": "some-other-plugin" }    # optional -- only for a
+                                                 # "hook" plugin; its target's
+                                                 # own [sidebar].route
       ],                                         # mirrors each plugin.toml
       "themes": [
         { "id": "dracula", "kind": "theme", "path": "themes/dracula",
@@ -206,7 +209,18 @@ def _entry(raw: dict, kind: str) -> dict:
     if not isinstance(provides, list) or any(not isinstance(p, str) for p in provides):
         provides = []
 
-    return {
+    # Optional: the [sidebar].route of the app this one hooks into (only
+    # meaningful for a plugin that provides "hook"). Purely a browse-catalog
+    # display/grouping hint -- Meshpoint re-derives the real dependency from
+    # the installed plugin's own plugin.toml, same as every other field
+    # here, so a malformed/absent value just means no grouping, not an
+    # error. Not validated against a sibling entry's id: the host may live
+    # outside this catalog entirely (built into Meshpoint core, or a
+    # different source).
+    hook_host = raw.get("hook_host")
+    hook_host = hook_host.strip() if isinstance(hook_host, str) and _SLUG_RE.match(hook_host.strip()) else ""
+
+    entry = {
         "id": pid,
         "kind": "theme" if kind == "theme" else "app",
         "path": path.strip("/"),
@@ -220,6 +234,9 @@ def _entry(raw: dict, kind: str) -> dict:
         # True when this Meshpoint is new enough to load it.
         "compatible": api <= PLUGIN_API_VERSION,
     }
+    if kind != "theme" and hook_host:
+        entry["hook_host"] = hook_host
+    return entry
 
 
 def parse_catalog(data: bytes) -> dict:

@@ -908,7 +908,11 @@ A catalog at the repo root, one entry per plugin/theme:
     { "id": "my-thing", "kind": "app", "path": "apps/my-thing",
       "version": "0.2.0", "meshpoint_api": 1, "provides": ["sidebar"],
       "description": "...", "author": "...", "homepage": "...",
-      "has_setup": false }
+      "has_setup": false },
+    { "id": "my-thing-hook", "kind": "app", "path": "apps/my-thing-hook",
+      "version": "0.1.0", "meshpoint_api": 1, "provides": ["hook"],
+      "description": "...", "author": "...", "homepage": "...",
+      "has_setup": false, "hook_host": "my-thing" }
   ],
   "themes": [
     { "id": "my-palette", "kind": "theme", "path": "themes/my-palette",
@@ -918,7 +922,10 @@ A catalog at the repo root, one entry per plugin/theme:
 ```
 
 Every field but `id`/`kind`/`path` mirrors the plugin's own `plugin.toml` /
-`theme.json`. **Generate it — don't hand-write it.** Two ways:
+`theme.json`. `hook_host` is only present for a "hook" plugin (its
+`[hook].host`) — Settings → Plugins' Browse panel uses it to nest the hook
+under the app it targets, the same way the installed-plugins list already
+groups them. **Generate it — don't hand-write it.** Two ways:
 
 - A standalone `make-repo-json.py` in your repo (Python 3.11+, no
   Meshpoint checkout needed) — the template repo ships one; it scans
