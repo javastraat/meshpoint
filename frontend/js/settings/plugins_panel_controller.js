@@ -119,7 +119,7 @@ class PluginsPanelController {
             this._presets = presets.filter((p) => p && typeof p.url === 'string' && p.url);
             if (!this._presets.length) return;
             this.srcPresetEl.insertAdjacentHTML('beforeend', this._presets.map((p, i) =>
-                `<option value="${i}">${this._escape(p.label || p.url)}</option>`).join(''));
+                `<option value="${i}"${p.description ? ` title="${this._escape(p.description)}"` : ''}>${this._escape(p.label || p.url)}</option>`).join(''));
         } catch (_) { /* dropdown just stays at its default option */ }
     }
 
