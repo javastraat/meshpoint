@@ -1226,6 +1226,62 @@ select.update-field__input option:checked {
     font-size: 0.82rem;
 }
 
+/* --- Plugin sources (Settings -> Plugins -> "Add source") -------------- */
+.plugins-sources { margin-top: 1rem; }
+.plugins-sources__title { margin: 0 0 0.25rem; font-size: 0.95rem; }
+.plugins-sources__subtitle {
+    margin: 0 0 0.75rem;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+}
+.plugins-sources__add {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+.plugins-sources__url { flex: 1 1 320px; }
+.plugins-sources__ref { flex: 0 1 160px; }
+.plugins-sources__add input {
+    background: var(--overlay-weak);
+    border: 1px solid var(--hairline);
+    border-radius: 8px;
+    color: var(--text-primary);
+    padding: 8px 10px;
+    font: inherit;
+}
+.plugins-sources__empty,
+.plugins-sources__catmeta {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin: 0.5rem 0;
+}
+.plugins-source {
+    border-top: 1px solid var(--hairline);
+    padding: 0.6rem 0;
+}
+.plugins-source__head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+.plugins-source__url { font-size: 0.82rem; }
+.plugins-source__ref { font-size: 0.72rem; color: var(--text-muted); }
+.plugins-source__spacer { flex: 1 1 auto; }
+.plugins-source__catalog {
+    margin-top: 0.6rem;
+    padding-left: 0.75rem;
+    border-left: 2px solid var(--hairline);
+}
+.plugins-source__catright {
+    text-align: right;
+    white-space: nowrap;
+}
+.plugins-source__catright .terminal-button { margin-left: 0.5rem; }
+
 .plugins-table th {
     text-align: left;
     font-size: 0.65rem;

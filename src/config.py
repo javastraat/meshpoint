@@ -713,6 +713,11 @@ class AppConfig:
     # in-process plugin runs with the service user's rights, so loading
     # is opt-in). See src/plugins/loader.py.
     plugins: dict = field(default_factory=dict)
+    # Operator-added plugin repositories (Settings -> Plugins -> "Add
+    # source"). A list of {url, ref, added_at, added_by}. Read by
+    # src/api/routes/plugin_source_routes.py; persisted here so a source
+    # survives restarts and self-updates (local.yaml is user-owned).
+    plugin_sources: list = field(default_factory=list)
 
 
 def _resolve_radio_frequency(radio: "RadioConfig") -> None:
@@ -794,6 +799,13 @@ def _apply_yaml(cfg: AppConfig, path: Path) -> None:
                 cfg.plugins[plugin_id].update(plugin_conf)
             else:
                 cfg.plugins[plugin_id] = plugin_conf
+
+    # plugin_sources is an opaque list of {url, ref, ...} dicts -- pop it
+    # so the section loop doesn't flag it, and replace (not merge) so a
+    # later YAML layer's list wins wholesale, same as capture.serial etc.
+    sources_raw = raw.pop("plugin_sources", None)
+    if isinstance(sources_raw, list):
+        cfg.plugin_sources = [s for s in sources_raw if isinstance(s, dict)]
 
     # meshcore_usb supports both a legacy single-dict and a new list-of-dicts.
     # Pop it before the generic merge so _merge_dataclass doesn't store raw dicts.
@@ -917,6 +929,29 @@ def save_section_to_yaml(section: str, values: dict) -> None:
     else:
         existing[section] = values
 
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with open(path, "w") as fh:
+            yaml.dump(existing, fh, default_flow_style=False, sort_keys=False)
+    except PermissionError:
+        import getpass
+        hint_user = getpass.getuser() or "meshpoint"
+        raise PermissionError(
+            f"Cannot write to {path}. "
+            f"Fix with: sudo chown {hint_user}:{hint_user} {path}"
+        )
+
+
+def save_top_level_to_yaml(key: str, value) -> None:
+    """Set a whole top-level key in local.yaml (for list/scalar values that
+    aren't a mergeable section dict, e.g. ``plugin_sources``). Leaves every
+    other key untouched."""
+    path = _get_local_yaml_path()
+    existing: dict = {}
+    if path.exists():
+        with open(path, "r") as fh:
+            existing = yaml.safe_load(fh) or {}
+    existing[key] = value
     path.parent.mkdir(parents=True, exist_ok=True)
     try:
         with open(path, "w") as fh:

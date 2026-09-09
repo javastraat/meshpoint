@@ -872,6 +872,79 @@ Both are read from `discover_plugins()` fresh each time, so nothing needs
 telling about a new plugin beyond it existing on disk with a valid
 `plugin.toml`.
 
+## Publishing a plugin repository
+
+You can keep your plugins in your own GitHub repo and let operators add it
+as a **plugin source** (Settings → Plugins → *Add source*).
+
+### Repo layout
+
+Mirror Meshpoint's own dirs — one folder per plugin/theme, folder name ==
+manifest `name`:
+
+```
+your-repo/
+  meshpoint.json          # the browse catalog (generated, see below)
+  apps/
+    my-thing/
+      plugin.toml
+      backend/__init__.py
+      frontend/...
+  themes/
+    my-palette/
+      theme.json
+      theme.css
+```
+
+### `meshpoint.json`
+
+A catalog at the repo root, one entry per plugin/theme:
+
+```json
+{
+  "meshpoint_repo": 1,
+  "name": "your repo's display name",
+  "plugins": [
+    { "id": "my-thing", "kind": "app", "path": "apps/my-thing",
+      "version": "0.2.0", "meshpoint_api": 1, "provides": ["sidebar"],
+      "description": "...", "author": "...", "homepage": "...",
+      "has_setup": false }
+  ],
+  "themes": [
+    { "id": "my-palette", "kind": "theme", "path": "themes/my-palette",
+      "version": "1.0.0", "description": "...", "author": "..." }
+  ]
+}
+```
+
+Every field but `id`/`kind`/`path` mirrors the plugin's own `plugin.toml` /
+`theme.json`. **Generate it — don't hand-write it:** run
+
+```sh
+meshpoint plugin index /path/to/your-repo --write
+```
+
+in a Meshpoint checkout (it reads each `plugin.toml` via the same
+validator Meshpoint uses, so it also catches folder/name mismatches). Re-run
+it whenever you bump a version. Meshpoint re-reads and re-validates the real
+manifest on install, so the catalog is metadata only — a stale or tampered
+`meshpoint.json` can't smuggle anything in.
+
+### How an operator uses it
+
+1. **Add source** → paste the repo URL → an explicit trust confirmation
+   (a source can install code that runs with the service's privileges, and
+   its `setup.sh` runs as root).
+2. **Browse** → Meshpoint fetches `meshpoint.json` and shows what the repo
+   offers, flagging what's already installed / has an update / needs a
+   newer Meshpoint.
+3. **Install** *(landing in a later update)* → downloads just that plugin's
+   subtree, re-validates the manifest, drops it in `plugins/apps/<id>/`.
+   From there it's a normal drop-in — enable, run setup, restart.
+
+The source list lives in `local.yaml` (`plugin_sources:`), so it survives
+restarts and self-updates.
+
 ## Current limitations
 
 Don't build around these — if you need one, that's a signal to extend the

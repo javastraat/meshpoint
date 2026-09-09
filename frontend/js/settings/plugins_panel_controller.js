@@ -56,6 +56,12 @@ class PluginsPanelController {
         this._setupModal = null;
         this._setupRunning = false;
         this.recheckAllBtn = rootEl.querySelector('[data-recheck-all]');
+        this.srcAddForm = rootEl.querySelector('[data-src-add-form]');
+        this.srcUrlEl = rootEl.querySelector('[data-src-url]');
+        this.srcRefEl = rootEl.querySelector('[data-src-ref]');
+        this.srcStatusEl = rootEl.querySelector('[data-src-status]');
+        this.srcListEl = rootEl.querySelector('[data-src-list]');
+        this._sources = [];
     }
 
     bind() {
@@ -71,6 +77,148 @@ class PluginsPanelController {
                 this._render();
             });
         }
+        if (this.srcAddForm) {
+            this.srcAddForm.addEventListener('submit', (e) => { e.preventDefault(); this._addSource(); });
+            this.srcListEl.addEventListener('click', (e) => this._onSourceClick(e));
+            this._loadSources();
+        }
+    }
+
+    // --- Plugin sources (Settings -> Plugins -> "Add source") -----------
+
+    async _loadSources() {
+        try {
+            const r = await fetch('/api/plugin-sources', { credentials: 'same-origin' });
+            if (r.ok) this._sources = (await r.json()).sources || [];
+        } catch (_) {}
+        this._renderSources();
+    }
+
+    _renderSources() {
+        if (!this.srcListEl) return;
+        if (!this._sources.length) {
+            this.srcListEl.innerHTML = '<p class="plugins-sources__empty">No sources added.</p>';
+            return;
+        }
+        this.srcListEl.innerHTML = this._sources.map((s) => `
+            <div class="plugins-source" data-src-row="${this._escape(s.url)}">
+                <div class="plugins-source__head">
+                    <a href="${this._escape(s.url)}" target="_blank" rel="noopener" class="plugins-source__url">${this._escape(s.url)}</a>
+                    <span class="plugins-source__ref">@ ${this._escape(s.ref || 'main')}</span>
+                    <span class="plugins-source__spacer"></span>
+                    <button type="button" class="terminal-button" data-src-browse>Browse</button>
+                    <button type="button" class="plugin-row__toggle" data-src-remove title="Remove source">&times;</button>
+                </div>
+                <div class="plugins-source__catalog" data-src-catalog hidden></div>
+            </div>
+        `).join('');
+    }
+
+    _onSourceClick(e) {
+        const row = e.target.closest('[data-src-row]');
+        if (!row) return;
+        const url = row.dataset.srcRow;
+        if (e.target.closest('[data-src-remove]')) { this._removeSource(url); return; }
+        if (e.target.closest('[data-src-browse]')) {
+            const cat = row.querySelector('[data-src-catalog]');
+            if (!cat.hidden) { cat.hidden = true; return; }
+            this._browseSource(url, row.querySelector('.plugins-source__ref')?.textContent.replace('@ ', '').trim(), cat);
+        }
+        if (e.target.closest('[data-src-catalog-refresh]')) {
+            const cat = row.querySelector('[data-src-catalog]');
+            this._browseSource(url, cat.dataset.ref, cat);
+        }
+    }
+
+    async _addSource() {
+        const url = (this.srcUrlEl.value || '').trim();
+        const ref = (this.srcRefEl.value || '').trim();
+        if (!url) return;
+        const ok = await this._confirm(
+            `Add "${url}" as a plugin source?\n\nA source repository can install plugins that run in-process ` +
+            `with the Meshpoint service's privileges, and their setup scripts run as root. ` +
+            `Only add repositories whose author you trust.`,
+            { label: 'Add plugin source?', command: `add source ${url}` },
+        );
+        if (!ok) return;
+        this._setSrcStatus('pending', 'Adding…');
+        try {
+            const r = await fetch('/api/plugin-sources', {
+                method: 'POST', credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url, ref: ref || 'main', confirm: true }),
+            });
+            const body = await r.json().catch(() => ({}));
+            if (!r.ok) { this._setSrcStatus('error', body.detail || `Failed (HTTP ${r.status}).`); return; }
+            this.srcUrlEl.value = ''; this.srcRefEl.value = '';
+            this._setSrcStatus('success', 'Source added.');
+            this._loadSources();
+        } catch (e) {
+            this._setSrcStatus('error', e.message || 'Failed.');
+        }
+    }
+
+    async _removeSource(url) {
+        const ok = await this._confirm(
+            `Forget "${url}"? Plugins already installed from it are not removed.`,
+            { label: 'Remove plugin source?', command: `remove source ${url}` },
+        );
+        if (!ok) return;
+        try {
+            const r = await fetch(`/api/plugin-sources?url=${encodeURIComponent(url)}`, {
+                method: 'DELETE', credentials: 'same-origin',
+            });
+            if (r.ok) { this._setSrcStatus('success', 'Source removed.'); this._loadSources(); }
+            else this._setSrcStatus('error', `Failed (HTTP ${r.status}).`);
+        } catch (e) { this._setSrcStatus('error', e.message || 'Failed.'); }
+    }
+
+    async _browseSource(url, ref, catEl) {
+        catEl.hidden = false;
+        catEl.innerHTML = '<p class="plugins-sources__empty">Loading catalog…</p>';
+        let cat = null;
+        try {
+            const qs = `url=${encodeURIComponent(url)}${ref ? `&ref=${encodeURIComponent(ref)}` : ''}`;
+            const r = await fetch(`/api/plugin-sources/catalog?${qs}`, { credentials: 'same-origin' });
+            const body = await r.json().catch(() => ({}));
+            if (!r.ok) { catEl.innerHTML = `<p class="plugins-panel__status" data-kind="error">${this._escape(body.detail || `HTTP ${r.status}`)}</p>`; return; }
+            cat = body;
+        } catch (e) {
+            catEl.innerHTML = `<p class="plugins-panel__status" data-kind="error">${this._escape(e.message || 'Failed')}</p>`;
+            return;
+        }
+        catEl.dataset.ref = cat.ref || 'main';
+        const rows = [...(cat.plugins || []), ...(cat.themes || [])];
+        if (!rows.length) {
+            catEl.innerHTML = '<p class="plugins-sources__empty">This source lists no plugins or themes.</p>';
+            return;
+        }
+        catEl.innerHTML = `
+            <p class="plugins-sources__catmeta">${this._escape(cat.name || url)} — <code>@ ${this._escape(cat.ref)}</code></p>
+            <table class="plugins-table"><tbody>
+            ${rows.map((p) => {
+                const badge = !p.compatible
+                    ? '<span class="plugin-row__badge plugin-row__badge--community">needs newer Meshpoint</span>'
+                    : p.update_available
+                        ? `<span class="plugin-row__count">update ${this._escape(p.installed_version)} → ${this._escape(p.version)}</span>`
+                        : p.installed
+                            ? '<span class="plugin-row__badge plugin-row__badge--builtin">installed</span>'
+                            : '';
+                return `<tr>
+                    <td><span class="plugin-row__name">${this._escape(p.id)}</span>
+                        <span class="plugin-row__version">v${this._escape(p.version)} · ${this._escape(p.kind)}${p.author ? ` · ${this._escape(p.author)}` : ''}</span>
+                        ${p.description ? `<span class="plugin-row__version">${this._escape(p.description)}</span>` : ''}</td>
+                    <td class="plugins-source__catright">${badge}
+                        <button type="button" class="terminal-button" disabled title="Installing from a source lands in a later update">Install</button></td>
+                </tr>`;
+            }).join('')}
+            </tbody></table>`;
+    }
+
+    _setSrcStatus(kind, message) {
+        if (!this.srcStatusEl) return;
+        this.srcStatusEl.dataset.kind = kind;
+        this.srcStatusEl.textContent = message;
     }
 
     async _restartService() {

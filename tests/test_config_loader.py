@@ -164,6 +164,19 @@ class PluginsNamespaceTest(unittest.TestCase):
         _apply_yaml(cfg, self._write("plugins:\n  acars:\n    gain: 40\n"))
         self.assertEqual(cfg.plugins["acars"], {"enabled": True, "gain": 40})
 
+    def test_plugin_sources_load_as_a_list_without_warning(self):
+        cfg = AppConfig()
+        self.assertEqual(cfg.plugin_sources, [])
+        path = self._write(
+            "plugin_sources:\n"
+            "  - url: https://github.com/you/meshpoint-plugins\n"
+            "    ref: main\n"
+        )
+        with self.assertNoLogs("src.config", level="WARNING"):
+            _apply_yaml(cfg, path)
+        self.assertEqual(len(cfg.plugin_sources), 1)
+        self.assertEqual(cfg.plugin_sources[0]["ref"], "main")
+
 
 class SerialDeviceConfigTest(unittest.TestCase):
     """Multi-stick Meshtastic USB capture (T5): opt-in capture.serial list."""

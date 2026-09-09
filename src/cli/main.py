@@ -69,6 +69,7 @@ def cmd_version(_args: argparse.Namespace) -> None:
 def cmd_plugin(args: argparse.Namespace) -> None:
     from src.cli.plugin_command import (
         run_plugin_check,
+        run_plugin_index,
         run_plugin_list,
         run_plugin_setup,
     )
@@ -79,6 +80,8 @@ def cmd_plugin(args: argparse.Namespace) -> None:
         sys.exit(run_plugin_setup(args.id, skip_confirm=args.yes))
     elif args.plugin_command == "check":
         sys.exit(run_plugin_check(args.id))
+    elif args.plugin_command == "index":
+        sys.exit(run_plugin_index(args.dir, write=args.write))
     else:
         args.plugin_parser.print_help()
         sys.exit(1)
@@ -142,6 +145,20 @@ def main() -> None:
         "id", nargs="?",
         help="Plugin id to re-check; omit to re-check every plugin that has a "
              "[deps] check script",
+    )
+    plugin_index = plugin_sub.add_parser(
+        "index",
+        help="Generate meshpoint.json for a plugin repo (run in the repo, not "
+             "on the device)",
+    )
+    plugin_index.add_argument(
+        "dir", nargs="?", default=".",
+        help="The plugin repo directory (default: current dir). Must have "
+             "apps/ and/or themes/ subdirs.",
+    )
+    plugin_index.add_argument(
+        "-w", "--write", action="store_true",
+        help="Write meshpoint.json into the repo (default: print to stdout)",
     )
     plugin_parser.set_defaults(plugin_parser=plugin_parser)
 

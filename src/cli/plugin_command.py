@@ -10,6 +10,7 @@ required, since installing a plugin's system deps (apt packages + its own
 
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 
@@ -214,6 +215,82 @@ def run_plugin_setup(plugin_id: str, *, skip_confirm: bool = False) -> int:
     else:
         print(f"  Setup script exited with code {result.returncode}.\n")
     return result.returncode
+
+
+def run_plugin_index(repo_dir: str, *, write: bool = False) -> int:
+    """Generate a plugin repo's ``meshpoint.json`` from the ``plugin.toml``
+    / ``theme.json`` files under its ``apps/`` and ``themes/`` dirs.
+
+    Run this *in the plugin repo* (not on a device). It's the tool a repo
+    author uses to keep the browse catalog in sync -- Meshpoint re-reads
+    the real manifests on install anyway, so this file is only metadata.
+    """
+    from src.plugins.manifest import PluginManifestError, parse_manifest
+
+    root = Path(repo_dir).expanduser().resolve()
+    if not root.is_dir():
+        print(f"  {root} is not a directory.\n")
+        return 1
+
+    plugins: list[dict] = []
+    for child in sorted((root / "apps").glob("*/")):
+        if not (child / "plugin.toml").is_file():
+            continue
+        try:
+            m = parse_manifest(child)
+        except PluginManifestError as exc:
+            print(f"  {_YELLOW}skip apps/{child.name}: {exc}{_RESET}")
+            continue
+        plugins.append({
+            "id": m.name,
+            "kind": "app",
+            "path": f"apps/{m.name}",
+            "version": m.version,
+            "meshpoint_api": m.api_version,
+            "provides": list(m.provides),
+            "description": m.description,
+            "author": m.author,
+            "homepage": m.homepage,
+            "has_setup": m.setup is not None,
+        })
+
+    themes: list[dict] = []
+    for child in sorted((root / "themes").glob("*/")):
+        manifest = child / "theme.json"
+        if not manifest.is_file():
+            continue
+        try:
+            raw = json.loads(manifest.read_text(encoding="utf-8"))
+        except (ValueError, OSError) as exc:
+            print(f"  {_YELLOW}skip themes/{child.name}: {exc}{_RESET}")
+            continue
+        tid = str(raw.get("id") or child.name).strip()
+        themes.append({
+            "id": tid,
+            "kind": "theme",
+            "path": f"themes/{tid}",
+            "version": str(raw.get("version") or "1.0.0"),
+            "description": str(raw.get("description") or ""),
+            "author": str(raw.get("author") or ""),
+            "homepage": str(raw.get("homepage") or ""),
+        })
+
+    doc: dict = {
+        "meshpoint_repo": 1,
+        "name": root.name,
+        "plugins": plugins,
+    }
+    if themes:
+        doc["themes"] = themes
+
+    rendered = json.dumps(doc, indent=2) + "\n"
+    if write:
+        (root / "meshpoint.json").write_text(rendered, encoding="utf-8")
+        print(f"  Wrote {root / 'meshpoint.json'} "
+              f"({len(plugins)} plugin(s), {len(themes)} theme(s)).\n")
+    else:
+        print(rendered)
+    return 0
 
 
 def _confirm(message: str, default_yes: bool = False) -> bool:

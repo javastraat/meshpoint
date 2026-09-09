@@ -75,6 +75,7 @@ from src.api.routes import (
     nodes,
     packets,
     plugin_routes,
+    plugin_source_routes,
     public_radar_routes,
     metrics_config_routes,
     repeater_config_routes,
@@ -186,6 +187,7 @@ _BUILTIN_ROUTERS: list[tuple] = [
     (serial_config_routes.router, False),
     (rfenv_companion_config_routes.router, False),
     (plugin_routes.router, False),
+    (plugin_source_routes.router, False),
     (pager_firmware_routes.router, False),
     (rfenv_companion_firmware_routes.router, False),
     (reticulum_companion_firmware_routes.router, False),
@@ -1927,11 +1929,18 @@ def _init_routes(
     )
     serial_config_routes.init_routes(config=config, serial_sources=_find_serial_sources(coord))
     rfenv_companion_config_routes.init_routes(config=config, service=_rfenv_companion_service)
+    _plugins_builtin_dir = Path(__file__).resolve().parents[1] / "plugins" / "apps"
+    _plugins_community_dir = Path(config.dashboard.plugins_dir) / "apps"
     plugin_routes.init_routes(
         config=config,
-        builtin_dir=Path(__file__).resolve().parents[1] / "plugins" / "apps",
-        community_dir=Path(config.dashboard.plugins_dir) / "apps",
+        builtin_dir=_plugins_builtin_dir,
+        community_dir=_plugins_community_dir,
         loaded_plugins=_loaded_plugins,
+    )
+    plugin_source_routes.init_routes(
+        config=config,
+        builtin_dir=_plugins_builtin_dir,
+        community_dir=_plugins_community_dir,
     )
     meshtastic_firmware_routes.init_routes(config=config, serial_sources=_find_serial_sources(coord))
     meshcore_firmware_routes.init_routes(config=config, meshcore_sources=_find_meshcore_sources(coord))
