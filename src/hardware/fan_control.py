@@ -128,8 +128,8 @@ class FanController:
                 logger.error(
                     "GPIO%d PWM unsupported on gpiozero's fallback pin "
                     "factory (no lgpio/RPi.GPIO/pigpio installed) -- "
-                    "run: sudo /opt/meshpoint/venv/bin/pip install lgpio, "
-                    "then restart. Not driving the fan.", self._pin,
+                    "run: sudo -u meshpoint /opt/meshpoint/venv/bin/pip "
+                    "install lgpio, then restart. Not driving the fan.", self._pin,
                 )
             else:
                 logger.exception(

@@ -8,13 +8,13 @@ verification evidence).
 See `memory/project_m1_meshpoint.md` for wider session context and
 `memory/reticulum_todo.md` for the Reticulum plugin backlog.
 
-Last updated 2026-09-09 — review pass: installer size caps + `ref` `..`
-traversal fixed; #4 (Espressif udev `0666`→`0660`) fixed + verified;
-#5 (plugin-source commit SHA: record, resolve, Pin/Unpin) done;
-**#3 phase 1 done** — web terminal is now opt-in (`dashboard.web_terminal_enabled`,
-default false). Open: #2 (services off root, which is really the same
-work as #3 phase 3 — moving the sudoers-invoked scripts out of the
-service-user-writable tree).
+Last updated 2026-09-09 — session: installer size caps + `ref` traversal;
+#4 (udev `0666`→`0660`) fixed+verified; #5 (plugin-source SHA/pin) done;
+#3 phase 1 (web terminal opt-in) done; **#2 phase 2 (drop the `sudo git` /
+`sudo pip`-as-root grants) done** — not Pi-verified yet. **Only real work
+left: #2/#3 phase 3** — move the sudoers-invoked scripts (`apply_finish.sh`,
+`post_update.sh`, `install.sh`) out of the service-user-writable tree.
+Plus 2 device checks (#1 browser, self-update round-trip).
 
 ---
 
@@ -22,13 +22,16 @@ service-user-writable tree).
 
 Read this before filing a finding — some of these are deliberate.
 
-- **The web terminal is root-equivalent by design.** `config/sudoers-meshpoint`
-  grants `NOPASSWD` for `pip install *` and `plugins/apps/*/setup.sh`, so an
-  authenticated admin can trivially get root from Ops → Terminal. This is
-  documented in `command_catalog.py`'s docstring and the sudoers file's own
-  comments. The real security boundary is `require_admin` auth, **not**
-  root-vs-non-root once authenticated. Items 2–3 below aim to shrink this
-  surface anyway.
+- **An enabled web terminal is still effectively root** — but it's now
+  **off by default** (`dashboard.web_terminal_enabled`, #3 phase 1). While
+  on: `config/sudoers-meshpoint` still grants `NOPASSWD: /bin/bash
+  <plugins>/setup.sh` and `NOPASSWD: /bin/bash scripts/{apply_finish,
+  post_update,install}.sh` — and those scripts live in a tree the
+  `meshpoint` user can rewrite, so a shell can rewrite-then-`sudo`-run
+  them → root. The `git` and root-`pip` wildcards are **gone** as of
+  2026-09-09 (#2 phase 2). #2/#3 phase 3 (move those scripts to a
+  root-owned dir) is what finally makes "admin session ≠ root" true. The
+  real security boundary is `require_admin` auth.
 - **Viewer vs admin** is the primary authz boundary. Viewer-role lockdown was
   done 2026-07-06 (`0c1cd41`) — viewers get 403 + toast on write routes
   (`config_routes.py`, `messages.py`, `nodeinfo_routes.py`,
@@ -57,7 +60,7 @@ Priority order is the user's own (set 2026-09-08).
 | # | Item | Status | Notes |
 |---|---|---|---|
 | 1 | **HTTPS/TLS option** | 🟢 Built, partially live-verified | `dashboard.tls_enabled` / `tls_cert_path` / `tls_key_path` / `tls_port` (default 8443). Self-signed cert via bundled `cryptography` (no new dep), `src/tls_cert.py`. SAN covers every `hostname -I` address + hostname + `<hostname>.local` + `127.0.0.1`/`localhost`; auto-regenerates at startup if the address set drifted. `:8080` becomes a 308-redirect-only listener when TLS is on (two `uvicorn.Server`s via `asyncio.gather`). 28 tests (`test_tls_cert.py` ×12, `test_serve.py` ×13, `test_banner_sources.py` ×3). Boot log verified on ti-meshpoint. **Still owed:** real browser round-trip against all 3 addresses (LAN IP / Tailscale IP / `sensecap.local`) — confirm only the self-signed warning appears, not also a hostname-mismatch warning. |
-| 2 | **Move services off root onto `meshpoint` user** | 🟡 Partly clear | **Confirmed 2026-09-09 on the SenseCap: `/opt/meshpoint`, `.git`, `venv`, `pip` are ALL already `meshpoint:meshpoint`-owned** (`post_update.sh:55` chowns the tree every update; the sudoers file's "owned by root" comment is stale). So the `sudo pip install *` and ~16 `sudo git …` NOPASSWD lines are *dead weight* — the code can call plain `git`/`pip`. Phase 2: drop those lines, change `apply.py`'s hardcoded `["sudo","git",…]` to plain git (`install_status.py::sudo_needed()` already auto-detects). Phase 3 (the real de-root): the remaining sudoers lines point at scripts *in the writable tree* (`apply_finish.sh`, `post_update.sh`, `install.sh`), so the service user can rewrite-then-`sudo`-run them → still root-equivalent. True fix = move those scripts to a root-owned dir (`/usr/local/lib/meshpoint/`) updated only by a root process; needs a root-side update component. Same work as #3 phase 3. |
+| 2 | **Move services off root onto `meshpoint` user** | 🟡 Phase 2 done 2026-09-09 | **Phase 2 done:** `/opt/meshpoint` + venv are already `meshpoint`-owned (verified on the SenseCap), so the `NOPASSWD: git …` (~16 lines incl. `git reset --hard *`) and `NOPASSWD: venv/bin/pip install *` sudoers grants were dead weight *and* arbitrary-code-as-root. **Removed.** `apply.py` runs plain `git` (`_git()`) + a `_precheck_tree_ownership()` that fails with a "chown the tree" message if ownership drifts; `install_status.py::_git_argv` is plain-only now (reads work on a mis-owned tree via `safe.directory`). `apply_finish.sh` runs pip via `runuser -u meshpoint`. venv-pip grant kept but narrowed to `Runas=(meshpoint)` (never root) so `sudo -u meshpoint …/pip install <pkg>` still works from the terminal/SSH — the form the fan/mqtt hints + docs now use. `post_update.sh`/`install.sh` `visudo -c` before installing. Tests: `test_update_apply` (no-sudo + preflight ×2). **NOT Pi-verified** — owed: a real self-update on the Pi still works end to end. **Phase 3 (the real de-root, still open):** the remaining sudoers lines point at scripts *in the meshpoint-writable tree* (`apply_finish.sh`, `post_update.sh`, `install.sh`) → the service user can rewrite-then-`sudo`-run them → still root-equivalent. Fix = move those to a root-owned dir (`/usr/local/lib/meshpoint/`) only a root process updates; needs a root-side update component. Same work as #3 phase 3. |
 | 3 | **Web terminal → opt-in** | 🟢 Phase 1 done 2026-09-09 | **Kept in core (not a plugin) + config-gated.** `dashboard.web_terminal_enabled`, default `false`. Off = `terminal_routes` (HTTP + ws) 403, `identity_routes` drops `"terminal"` from `available_sections` so the sidebar hides it. Toggle: **Web terminal** card in Settings → System (`PUT /api/config/dashboard`, audited `config.dashboard_update`) with a `DangerousModal` ack spelling out the root implication. **No grandfather migration** (5 testers, they re-enable; CHANGELOG says so). Tests: `test_config_loader` (default off + yaml load), `test_identity_route` (section hidden), `test_terminal_routes` (403 + ws refused). Phase 2/3 = the sudoers/de-root work above (#2). |
 | 4 | **USB companion udev rules too permissive** | 🟢 Fixed 2026-09-09 | `99-meshpoint-esp.rules` shipped `MODE="0666"` for `idVendor 303a` (Espressif native-USB: Heltec V3/V4, T-Beam S3). Now `MODE="0660", GROUP="dialout"` in `install.sh` + a `post_update.sh` migration that rewrites the stale rule. **Verified on the SenseCap 2026-09-09:** the box's current radios are `ttyUSB0/1` (CP210x/CH340, *not* `303a`) and already showed the safe OS default `crw-rw---- root:dialout` — the `0666` rule only ever bit a plugged-in `303a` board (none attached), so live blast radius was nil; latent until a Heltec V3 is connected for firmware-flash/relay. See Fixed below. |
 | 5 | Plugin source: record + surface the resolved commit SHA | 🟢 Done 2026-09-09 | `plugins.<id>.source.commit` records the resolved short SHA at install. Plugin row shows `from owner/repo @ ref · <sha>`. `GET /api/plugin-sources/resolve` resolves a ref to its current commit; the Update confirm shows `installed <sha> → incoming <sha> "msg"` and flags a moving branch. `PATCH /api/plugin-sources` + **Pin/Unpin** buttons on the source row freeze a branch to the commit it points at now (`pinned_from` remembers the branch for Unpin). See Fixed. |
@@ -81,6 +84,28 @@ _None yet. Template:_
 ---
 
 ## Fixed
+
+### 2026-09-09 — self-update chain: no more `sudo git` / root `sudo pip`  (backlog #2 phase 2)
+- **Severity:** high (arbitrary code as root for any admin session / anything hijacking one)
+- **Where:** `config/sudoers-meshpoint`, `src/api/update/apply.py`, `install_status.py`, `scripts/apply_finish.sh`
+- **Issue:** `NOPASSWD: /opt/meshpoint/venv/bin/pip install *` (as root) →
+  `sudo …/pip install <malicious-pkg>` = root code exec. Plus ~16
+  `NOPASSWD: git …` lines including `git reset --hard *` / `git checkout *`
+  → reset the (root-owned, per the stale comment) tree to anything as
+  root. But `/opt/meshpoint` + `.git` + venv are **already `meshpoint`-owned**
+  (confirmed on the SenseCap), so none of it was needed.
+- **Fix:** deleted every `git` line and the root `pip install *` line.
+  `apply.py` runs plain `git` (`_git()`), with `_precheck_tree_ownership()`
+  failing early + actionably if `.git` isn't ours. `install_status._git_argv`
+  is plain-only. `apply_finish.sh` runs pip via `runuser -u meshpoint`.
+  The venv-pip grant is kept but `Runas=(meshpoint)` — never root —
+  purely so `sudo -u meshpoint …/pip install <pkg>` keeps working (the
+  fan / mqtt "install this" hints + docs updated to that form).
+  `post_update.sh`/`install.sh` now `visudo -c` before installing the file.
+- **Tests:** `test_update_apply` — git steps carry no `sudo`; preflight
+  fails (chain never starts) when `sudo_needed()` is True, for apply +
+  rollback. 101 update-suite tests pass.
+- **NOT Pi-verified:** a real dashboard self-update round-trip on the Pi.
 
 ### 2026-09-09 — plugin source: commit SHA now recorded + pinnable  (backlog #5)
 - **Not a vuln** — reduces the "trusted code at branch HEAD" tradeoff.

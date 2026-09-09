@@ -13060,3 +13060,29 @@ SenseCap. So `sudo pip install *` + ~16 `sudo git` NOPASSWD lines in
 + changing `apply.py`'s hardcoded `sudo git` to plain git. The real
 de-root (phase 3) needs the sudoers-invoked scripts moved out of the
 service-user-writable tree. See memory/meshpoint_security_todo.md #2/#3.
+
+## Sudoers de-root, phase 2 (security #2, 2026-09-09)
+
+Tree + venv already `meshpoint`-owned on the SenseCap, so the `sudo git`
+(~16 lines) + root `sudo pip install *` NOPASSWD grants were dead weight
+AND arbitrary-code-as-root. Removed.
+
+- `config/sudoers-meshpoint`: deleted all `git` lines + the `(ALL) pip
+  install *` line. Kept a narrowed `(meshpoint) NOPASSWD: venv/bin/pip
+  install *` (never root — only exists so `sudo -u meshpoint …/pip
+  install <pkg>` works from the web terminal / SSH; fan_control.py +
+  mqtt_publisher.py hints + ~10 doc spots updated to that form).
+- `src/api/update/apply.py`: `_git()` = plain `git -c safe.directory …`,
+  new `_precheck_tree_ownership()` (uses `install_status.sudo_needed()`)
+  fails apply/rollback up front with "chown the tree" if `.git` isn't ours.
+- `install_status._git_argv`: plain-only now (`use_sudo` param ignored).
+- `scripts/apply_finish.sh`: pip via `runuser -u meshpoint` (was root).
+- `post_update.sh` + `install.sh`: `visudo -c` the file before installing
+  (a bad drop-in otherwise breaks all sudo on the box).
+- Tests: test_update_apply +4 (no-sudo, preflight ×2). 101 update tests pass.
+- NOT Pi-verified — owed: a real self-update round-trip on the device.
+
+Phase 3 (the real de-root, still open): `apply_finish.sh` / `post_update.sh`
+/ `install.sh` live in the meshpoint-writable tree and are `sudo bash`-able
+→ rewrite-then-sudo = root. Move them to `/usr/local/lib/meshpoint/`
+(root-owned, root-updated). Needs a root-side update component. = #3 phase 3.

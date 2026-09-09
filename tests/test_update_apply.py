@@ -107,6 +107,38 @@ class TestUpdateApplier(unittest.TestCase):
         self.assertFalse(result.success)
         self.assertEqual(result.failed_step, "git reset")
 
+    def test_git_steps_run_without_sudo(self) -> None:
+        # The install tree is meshpoint-owned; the sudoers file grants no
+        # git at all. Every git invocation must be plain `git`, never
+        # `sudo git` (which would now just fail).
+        runner = _RecorderRunner()
+        applier = UpdateApplier(runner=runner, repo_path=".")
+        applier.apply(branch="main")
+        git_calls = [c for c in runner.calls if "fetch" in c or "reset" in c or "checkout" in c]
+        self.assertTrue(git_calls)
+        for call in git_calls:
+            self.assertNotIn("sudo", call)
+            self.assertEqual(call[0], "git")
+
+    def test_apply_preflight_fails_when_tree_not_ours(self) -> None:
+        runner = _RecorderRunner()
+        applier = UpdateApplier(runner=runner, repo_path=".")
+        with patch("src.api.update.apply.sudo_needed", return_value=True):
+            result = applier.apply(branch="main")
+        self.assertFalse(result.success)
+        self.assertEqual(result.failed_step, "preflight")
+        self.assertEqual(runner.calls, [])  # chain never started
+        self.assertIn("chown", result.log[0]["stderr"])
+
+    def test_rollback_preflight_fails_when_tree_not_ours(self) -> None:
+        runner = _RecorderRunner()
+        applier = UpdateApplier(runner=runner, repo_path=".")
+        with patch("src.api.update.apply.sudo_needed", return_value=True):
+            result = applier.rollback(sha="deadbeef")
+        self.assertFalse(result.success)
+        self.assertEqual(result.failed_step, "preflight")
+        self.assertEqual(runner.calls, [])
+
 
 if __name__ == "__main__":
     unittest.main()

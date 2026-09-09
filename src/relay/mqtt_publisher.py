@@ -121,7 +121,7 @@ class MqttPublisher:
         if not PAHO_AVAILABLE:
             logger.error(
                 "paho-mqtt not installed. Run: "
-                "sudo /opt/meshpoint/venv/bin/pip install paho-mqtt"
+                "sudo -u meshpoint /opt/meshpoint/venv/bin/pip install paho-mqtt"
             )
             return False
 

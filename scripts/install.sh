@@ -934,8 +934,12 @@ fi
 
 # Allow service user to restart/stop its own service (dashboard + remote commands)
 info "Installing sudoers rule for service management..."
-cp "${MESHPOINT_DIR}/config/sudoers-meshpoint" /etc/sudoers.d/meshpoint
-chmod 440 /etc/sudoers.d/meshpoint
+if visudo -cf "${MESHPOINT_DIR}/config/sudoers-meshpoint" >/dev/null 2>&1; then
+    install -m 440 -o root -g root \
+        "${MESHPOINT_DIR}/config/sudoers-meshpoint" /etc/sudoers.d/meshpoint
+else
+    fail "config/sudoers-meshpoint failed 'visudo -c' -- not installing it (would break sudo)"
+fi
 
 # ── 16. Configure journald log rotation ───────────────────────────
 

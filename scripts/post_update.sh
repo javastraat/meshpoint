@@ -15,10 +15,16 @@ SUDOERS_SRC="${MESHPOINT_DIR}/config/sudoers-meshpoint"
 SUDOERS_DST="/etc/sudoers.d/meshpoint"
 if [ -f "$SUDOERS_SRC" ]; then
     if ! diff -q "$SUDOERS_SRC" "$SUDOERS_DST" >/dev/null 2>&1; then
-        info "Updating sudoers rule..."
-        cp "$SUDOERS_SRC" "$SUDOERS_DST"
-        chmod 440 "$SUDOERS_DST"
-        CHANGED=1
+        # Validate before installing -- a malformed drop-in breaks sudo
+        # for the whole box, and this file is edited as the sudo surface
+        # gets tightened over time.
+        if visudo -cf "$SUDOERS_SRC" >/dev/null 2>&1; then
+            info "Updating sudoers rule..."
+            install -m 440 -o root -g root "$SUDOERS_SRC" "$SUDOERS_DST"
+            CHANGED=1
+        else
+            info "WARNING: $SUDOERS_SRC failed visudo -c; keeping the existing rule"
+        fi
     fi
 fi
 

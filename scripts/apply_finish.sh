@@ -30,9 +30,20 @@ trap '_on_error ${LINENO}' ERR
 
 if [[ -x "$PIP" && -f "$REQ" ]]; then
     log "Refreshing Python dependencies"
-    "$PIP" install --upgrade pip -q
-    "$PIP" install -r "$REQ" -q
-    "$PIP" install pyserial -q
+    # This script runs as root (sudo bash), but the venv is owned by the
+    # meshpoint user -- drop to meshpoint for pip so installed files stay
+    # meshpoint-owned (no root-owned files in the venv for post_update.sh
+    # to chown back). runuser (util-linux) is root->user with no PAM/
+    # password; fall back to plain pip if it's somehow missing or we're
+    # already meshpoint.
+    if [[ "$(id -un)" == "meshpoint" ]] || ! command -v runuser >/dev/null; then
+        run_pip() { "$PIP" "$@"; }
+    else
+        run_pip() { runuser -u meshpoint -- "$PIP" "$@"; }
+    fi
+    run_pip install --upgrade pip -q
+    run_pip install -r "$REQ" -q
+    run_pip install pyserial -q
 fi
 
 log "Running post_update migrations"

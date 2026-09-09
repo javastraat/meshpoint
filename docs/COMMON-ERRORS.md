@@ -92,7 +92,7 @@ sudo systemctl restart meshpoint
 
 Hard-refresh the dashboard (Ctrl+Shift+R). First time on v0.7.3+, complete `/setup` for the admin password.
 
-**Faster path (v0.7.3+ only, when release notes say no new deps):** `sudo git pull origin main` and `sudo systemctl restart meshpoint`. If the service fails to start, use the full block above.
+**Faster path (v0.7.3+ only, when release notes say no new deps):** `sudo -u meshpoint git -c safe.directory=/opt/meshpoint pull origin main` and `sudo systemctl restart meshpoint`. If the service fails to start, use the full block above.
 
 ### Check for updates fails: `Could not fetch origin: sudo: a terminal is required to read the password`
 
@@ -107,13 +107,14 @@ fetch itself is what is broken.
 
 ```bash
 cd /opt/meshpoint
-sudo git fetch origin main
-sudo git reset --hard origin/main
+sudo -u meshpoint git -c safe.directory=/opt/meshpoint fetch origin main
+sudo -u meshpoint git -c safe.directory=/opt/meshpoint reset --hard origin/main
 sudo systemctl restart meshpoint
 ```
 
 The restart installs the corrected sudoers rules; Check for updates and Apply
-work from Settings → Updates afterwards.
+work from Settings → Updates afterwards. (Run git as `meshpoint`, not root —
+the tree is owned by the service user and there are no `sudo git` grants.)
 
 ### Startup WARN: "Stale compiled core modules detected"
 
@@ -210,7 +211,7 @@ skipped pip entirely. The new code then fails at startup in
 **Fix (recovery):** Refresh the venv, then restart:
 
 ```bash
-sudo /opt/meshpoint/venv/bin/pip install -r /opt/meshpoint/requirements.txt
+sudo -u meshpoint /opt/meshpoint/venv/bin/pip install -r /opt/meshpoint/requirements.txt
 sudo systemctl restart meshpoint
 ```
 
@@ -252,7 +253,7 @@ sudo bash /opt/meshpoint/scripts/apply_finish.sh
 Or manually:
 
 ```bash
-sudo /opt/meshpoint/venv/bin/pip install -r /opt/meshpoint/requirements.txt
+sudo -u meshpoint /opt/meshpoint/venv/bin/pip install -r /opt/meshpoint/requirements.txt
 sudo systemctl restart meshpoint
 ```
 
@@ -285,7 +286,7 @@ OS Python.
 **Fix:** Always use the Meshpoint venv path:
 
 ```bash
-sudo /opt/meshpoint/venv/bin/pip install -r /opt/meshpoint/requirements.txt
+sudo -u meshpoint /opt/meshpoint/venv/bin/pip install -r /opt/meshpoint/requirements.txt
 ```
 
 The full update path (recommended for mixed-version fleets) is:
@@ -332,7 +333,7 @@ package, but `pip install` was not re-run.
 
 ```bash
 cd /opt/meshpoint
-sudo /opt/meshpoint/venv/bin/pip install -r requirements.txt
+sudo -u meshpoint /opt/meshpoint/venv/bin/pip install -r requirements.txt
 sudo systemctl restart meshpoint
 ```
 
@@ -1228,7 +1229,7 @@ sudo journalctl -u meshpoint --since "5 min ago" | grep -i mqtt
 |---|---|---|
 | (no MQTT lines at all) | The `mqtt:` section did not parse | Check `local.yaml` indentation: two-space indent under `mqtt:`, no tabs. Did you put the block in `default.yaml` by mistake? |
 | `MQTT publishing disabled` | `enabled: true` was not set | Set `mqtt.enabled: true` in `local.yaml` |
-| `paho-mqtt not installed` | The MQTT library is not in the venv | `sudo /opt/meshpoint/venv/bin/pip install paho-mqtt && sudo systemctl restart meshpoint` |
+| `paho-mqtt not installed` | The MQTT library is not in the venv | `sudo -u meshpoint /opt/meshpoint/venv/bin/pip install paho-mqtt && sudo systemctl restart meshpoint` |
 | `MQTT publisher failed to connect` | Broker / network issue at the MQTT protocol level | Check broker hostname, port, credentials. Note that `telnet broker 1883` succeeding does not guarantee the paho handshake works. |
 | `MQTT publisher started as !XXXXXXXX` | Working correctly | You should see `MQTT pub rc=0 topic=...` lines as packets arrive. If not, no packets are matching your `publish_channels` allowlist. |
 

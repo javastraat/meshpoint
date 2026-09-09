@@ -9,13 +9,13 @@ meshpoint logs
 Common issues:
 - **"No module named 'src'"**: Check that `/opt/meshpoint` contains the source code.
 - **"Permission denied: /dev/spidev0.0"**: Run `sudo usermod -a -G spi meshpoint`
-- **"No module named 'psutil'"**: Run `sudo /opt/meshpoint/venv/bin/pip install psutil`
+- **"No module named 'psutil'"**: Run `sudo -u meshpoint /opt/meshpoint/venv/bin/pip install psutil`
 - **"no GPIO tool found (pinctrl or gpioset)"**: This means the concentrator reset script can't toggle GPIO. Raspberry Pi OS Lite (64-bit) includes `pinctrl` by default. If you're on a non-standard image, install `gpiod`: `sudo apt install -y gpiod`
-- **"fan control enabled but gpiozero is not installed"**: `fan.enabled: true` is set but the Meshpoint **venv** doesn't have `gpiozero` (Raspberry Pi OS ships it system-wide, which is a different Python environment). Run `sudo /opt/meshpoint/venv/bin/pip install gpiozero` and restart. The fan is simply not driven while this is missing -- the app still starts normally.
+- **"fan control enabled but gpiozero is not installed"**: `fan.enabled: true` is set but the Meshpoint **venv** doesn't have `gpiozero` (Raspberry Pi OS ships it system-wide, which is a different Python environment). Run `sudo -u meshpoint /opt/meshpoint/venv/bin/pip install gpiozero` and restart. The fan is simply not driven while this is missing -- the app still starts normally.
 - **"GPIO13 PWM unsupported on gpiozero's fallback pin factory"** (or a raw `gpiozero.exc.PinPWMUnsupported` traceback): `gpiozero` is installed but none of `lgpio`/`RPi.GPIO`/`pigpio` are, so it fell back to its pure-Python `NativeFactory`, which only allows PWM on pins from a hardcoded per-Pi-model table -- a custom carrier board's repurposed GPIO isn't in it, even though it's a real PWM-capable pin on the SoC. `lgpio` is the Raspberry Pi Foundation's current recommended backend (Bookworm/Pi4/Pi5, no daemon needed) and doesn't have that restriction, but `pip install lgpio` builds a C extension from source (piwheels has no prebuilt wheel for every Python/OS combination) and needs three things first -- on a fresh Bookworm/trixie image expect to install all three:
   ```bash
   sudo apt install -y python3-dev swig liblgpio-dev
-  sudo /opt/meshpoint/venv/bin/pip install lgpio
+  sudo -u meshpoint /opt/meshpoint/venv/bin/pip install lgpio
   sudo systemctl restart meshpoint
   ```
   `python3-dev` (headers) and `swig` (generates the C wrapper) get the build itself running; `liblgpio-dev` provides the compiled `liblgpio.so` the extension links against (`/usr/bin/ld: cannot find -llgpio` if missing). Confirm with `meshpoint logs`: `Fan control started on GPIO13` with no exception.
@@ -208,7 +208,7 @@ sudo cp /tmp/local-yaml-backup /opt/meshpoint/config/local.yaml
 sudo chmod 777 /opt/meshpoint/data
 sudo chmod 666 /opt/meshpoint/data/*.db
 sudo python3 -m venv /opt/meshpoint/venv
-sudo /opt/meshpoint/venv/bin/pip install -r /opt/meshpoint/requirements.txt
+sudo -u meshpoint /opt/meshpoint/venv/bin/pip install -r /opt/meshpoint/requirements.txt
 sudo systemctl restart meshpoint
 ```
 
@@ -233,7 +233,7 @@ Restore always returns the Pi to the **backup snapshot**, even if you cleared th
 Raspberry Pi OS (Bookworm and later) uses PEP 668 externally-managed environments. Never use the system `pip` directly: always use the venv:
 
 ```bash
-sudo /opt/meshpoint/venv/bin/pip install -r requirements.txt
+sudo -u meshpoint /opt/meshpoint/venv/bin/pip install -r requirements.txt
 ```
 
 Running `sudo pip install ...` without the venv path will fail with `error: externally-managed-environment`.

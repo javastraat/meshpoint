@@ -137,14 +137,14 @@ DEFAULT_CATALOG: tuple[CommandEntry, ...] = (
     CommandEntry(
         id="git-status",
         label="Git status",
-        command="cd /opt/meshpoint && sudo git status",
+        command="cd /opt/meshpoint && git status",
         category=CATEGORY_GIT,
         description="Repository state for the install tree.",
     ),
     CommandEntry(
         id="git-log",
         label="Git log (10)",
-        command="cd /opt/meshpoint && sudo git log -n 10 --oneline",
+        command="cd /opt/meshpoint && git log -n 10 --oneline",
         category=CATEGORY_GIT,
         description="Last 10 commits on the install tree.",
     ),

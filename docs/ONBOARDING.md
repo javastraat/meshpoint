@@ -308,7 +308,7 @@ The SenseCap M1 has an onboard fan header, an LED, and a user button on GPIO 13,
 
 ```bash
 sudo apt install -y python3-dev swig liblgpio-dev
-sudo /opt/meshpoint/venv/bin/pip install gpiozero lgpio
+sudo -u meshpoint /opt/meshpoint/venv/bin/pip install gpiozero lgpio
 ```
 
 Without `lgpio` (or `RPi.GPIO`/`pigpio`), gpiozero falls back to a pure-Python pin factory that refuses PWM on this board's repurposed GPIO 13 (`PinPWMUnsupported`), even though it's a genuine PWM-capable pin on the Pi 4 SoC underneath.

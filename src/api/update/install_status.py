@@ -44,18 +44,20 @@ def default_git_runner(
 
 
 def sudo_needed(repo_path: str) -> bool:
-    """True when the install tree's git metadata belongs to another user.
+    """True when the install tree's git metadata is NOT owned by us.
 
-    On the Pi ``.git`` is root-owned (sudo clone, sudo apply chain) and the
-    service runs as ``meshpoint``, which has NOPASSWD sudoers rules for
-    exactly these git commands. A dev checkout owned by the current user
-    (e.g. on macOS, where no sudoers rules exist) needs no sudo — and using
-    it there breaks with "a terminal is required to read the password".
+    ``/opt/meshpoint`` and its ``.git`` are owned by the ``meshpoint``
+    service user (install.sh sets it; post_update.sh re-asserts it every
+    update), so this is normally ``False`` and the dashboard runs ``git``
+    unprivileged -- there are no ``git`` sudoers grants. It stays a signal,
+    not an action: :meth:`UpdateApplier._precheck_tree_ownership` uses it
+    to fail an update up front with a "chown the tree" message instead of
+    a bare permission error, on a box whose ownership somehow drifted.
 
     Stat ``.git`` rather than the repo root: the systemd unit chowns
     ``/opt/meshpoint`` itself to the service user (lgpio must create its
     notification pipe in WorkingDirectory), so the top directory no longer
-    says who owns the tree — fetch/reset write into ``.git``.
+    says who owns the tree -- fetch/reset write into ``.git``.
     """
     try:
         return _ownership_probe(repo_path).stat().st_uid != os.getuid()
@@ -69,17 +71,16 @@ def _ownership_probe(repo_path: str) -> Path:
     return git_dir if git_dir.exists() else Path(repo_path)
 
 
-def _git_argv(repo_path: str, use_sudo: Optional[bool]) -> list[str]:
-    """Base git argv for the install tree; ``use_sudo=None`` auto-detects.
+def _git_argv(repo_path: str, use_sudo: Optional[bool] = None) -> list[str]:
+    """Base git argv for the install tree -- plain ``git``, never ``sudo``.
 
-    Always passes ``-c safe.directory=<repo>`` so git trusts the repo
-    regardless of ownership (dashboard runs git as the meshpoint service
-    user on a root-owned tree).
+    The tree is meshpoint-owned and the sudoers file grants no ``git``.
+    These are all read-only ops (``rev-parse``/``log``/``rev-list``) which
+    work fine even on a mis-owned tree as long as ``-c safe.directory``
+    silences the dubious-ownership check, which it always does here. The
+    ``use_sudo`` parameter is kept for call-site compatibility but ignored.
     """
-    if use_sudo is None:
-        use_sudo = sudo_needed(repo_path)
-    sd = ["-c", f"safe.directory={repo_path}"]
-    return ["sudo", "git", *sd] if use_sudo else ["git", *sd]
+    return ["git", "-c", f"safe.directory={repo_path}"]
 
 
 def read_install_git_ref(

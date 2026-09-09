@@ -39,7 +39,7 @@ from src.api.dangerous.handlers import (
     schedule_detached_apply_finish,
     schedule_systemctl_restart,
 )
-from src.api.update.install_status import read_head_full_sha
+from src.api.update.install_status import read_head_full_sha, sudo_needed
 from src.api.update.rollback_state import (
     DEFAULT_ROLLBACK_STATE_PATH,
     write_rollback_state,
@@ -123,6 +123,22 @@ class UpdateApplier:
         """Run the chain end-to-end; return an :class:`ApplyResult`."""
         start = time.time()
         log: list[dict] = []
+
+        ownership_problem = self._precheck_tree_ownership()
+        if ownership_problem:
+            logger.error("apply: %s", ownership_problem)
+            return ApplyResult(
+                success=False,
+                duration_seconds=time.time() - start,
+                pre_update_sha=None,
+                target_branch=branch,
+                failed_step="preflight",
+                log=[{
+                    "label": "preflight", "returncode": 1,
+                    "stdout": "", "stderr": ownership_problem,
+                }],
+            )
+
         pre_sha = self._capture_head_sha()
         if pre_sha:
             # Persist before mutating the tree. The apply stream often dies when
@@ -173,11 +189,26 @@ class UpdateApplier:
         """Reset the install tree to a prior commit and restart service."""
         start = time.time()
         log: list[dict] = []
+
+        ownership_problem = self._precheck_tree_ownership()
+        if ownership_problem:
+            logger.error("rollback: %s", ownership_problem)
+            return ApplyResult(
+                success=False,
+                duration_seconds=time.time() - start,
+                pre_update_sha=sha,
+                target_branch="rollback",
+                failed_step="preflight",
+                log=[{
+                    "label": "preflight", "returncode": 1,
+                    "stdout": "", "stderr": ownership_problem,
+                }],
+            )
+
         steps = [
             ApplyAttempt(
                 label="git reset",
-                args=["sudo", "git", "-c", f"safe.directory={self._repo_path}",
-                      "reset", "--hard", sha],
+                args=self._git("reset", "--hard", sha),
                 cwd=self._repo_path,
             ),
             ApplyAttempt(
@@ -208,26 +239,48 @@ class UpdateApplier:
             log=log,
         )
 
+    def _git(self, *args: str) -> list[str]:
+        """``git`` argv for the install tree -- plain, no ``sudo``.
+
+        ``/opt/meshpoint`` (and its ``.git``) is owned by the ``meshpoint``
+        service user, so the dashboard mutates the tree as itself; the
+        sudoers file grants no ``git`` at all. ``-c safe.directory`` stays
+        in case a box's top dir ownership differs from ``.git``'s.
+        :meth:`_precheck_tree_ownership` catches the "someone re-chowned
+        the tree to root" case up front with an actionable message rather
+        than a bare permission error mid-chain.
+        """
+        return ["git", "-c", f"safe.directory={self._repo_path}", *args]
+
+    def _precheck_tree_ownership(self) -> Optional[str]:
+        """``None`` if the tree is writable by us; otherwise the operator
+        message to fail with."""
+        if sudo_needed(self._repo_path):
+            return (
+                f"The install tree at {self._repo_path} is not owned by the "
+                "service user, so the dashboard can't update it. Run "
+                f"`sudo chown -R meshpoint:meshpoint {self._repo_path}` "
+                "(or `sudo bash scripts/install.sh`) once, then retry."
+            )
+        return None
+
     def _build_chain(self, branch: str) -> Iterable[ApplyAttempt]:
         return (
             ApplyAttempt(
                 label="git fetch",
-                args=["sudo", "git", "-c", f"safe.directory={self._repo_path}",
-                      "fetch", "origin", branch],
+                args=self._git("fetch", "origin", branch),
                 cwd=self._repo_path,
                 timeout_seconds=180,
             ),
             ApplyAttempt(
                 label="git checkout",
-                args=["sudo", "git", "-c", f"safe.directory={self._repo_path}",
-                      "checkout", "-f", branch],
+                args=self._git("checkout", "-f", branch),
                 cwd=self._repo_path,
                 timeout_seconds=60,
             ),
             ApplyAttempt(
                 label="git reset",
-                args=["sudo", "git", "-c", f"safe.directory={self._repo_path}",
-                      "reset", "--hard", f"origin/{branch}"],
+                args=self._git("reset", "--hard", f"origin/{branch}"),
                 cwd=self._repo_path,
                 timeout_seconds=60,
             ),

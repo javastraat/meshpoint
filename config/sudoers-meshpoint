@@ -30,34 +30,15 @@ meshpoint ALL=(ALL) NOPASSWD: /usr/bin/systemctl is-active rnsd
 meshpoint ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart rnsd
 
 # ── Self-update apply chain (Settings → Updates) ──────────────────────
-# /opt/meshpoint is owned by root, so all repo mutations need sudo.
-# Branch arg is wildcarded so any release channel (main, rc-074,
-# custom branch) can be checked out.
-# Each rule has a second form with the literal
-# `-c safe.directory=/opt/meshpoint` prefix: the dashboard passes it on
-# every git call to survive the dubious-ownership check, and sudo
-# matches argv exactly, so the prefixed form must be enumerated too.
-meshpoint ALL=(ALL) NOPASSWD: /usr/bin/git fetch origin *
-meshpoint ALL=(ALL) NOPASSWD: /usr/bin/git -c safe.directory=/opt/meshpoint fetch origin *
-meshpoint ALL=(ALL) NOPASSWD: /usr/bin/git checkout *
-meshpoint ALL=(ALL) NOPASSWD: /usr/bin/git -c safe.directory=/opt/meshpoint checkout *
-meshpoint ALL=(ALL) NOPASSWD: /usr/bin/git pull origin *
-meshpoint ALL=(ALL) NOPASSWD: /usr/bin/git -c safe.directory=/opt/meshpoint pull origin *
-meshpoint ALL=(ALL) NOPASSWD: /usr/bin/git reset --hard *
-meshpoint ALL=(ALL) NOPASSWD: /usr/bin/git -c safe.directory=/opt/meshpoint reset --hard *
-
-# Read-only git ops that hit the dubious-ownership check on the
-# root-owned tree; the terminal catalog surfaces these as buttons.
-meshpoint ALL=(ALL) NOPASSWD: /usr/bin/git status
-meshpoint ALL=(ALL) NOPASSWD: /usr/bin/git -c safe.directory=/opt/meshpoint status
-meshpoint ALL=(ALL) NOPASSWD: /usr/bin/git log *
-meshpoint ALL=(ALL) NOPASSWD: /usr/bin/git -c safe.directory=/opt/meshpoint log *
-meshpoint ALL=(ALL) NOPASSWD: /usr/bin/git rev-list *
-meshpoint ALL=(ALL) NOPASSWD: /usr/bin/git -c safe.directory=/opt/meshpoint rev-list *
-meshpoint ALL=(ALL) NOPASSWD: /usr/bin/git rev-parse HEAD
-# Settings → Updates install_status (read branch + SHA from root-owned tree)
-meshpoint ALL=(ALL) NOPASSWD: /usr/bin/git rev-parse *
-meshpoint ALL=(ALL) NOPASSWD: /usr/bin/git -c safe.directory=/opt/meshpoint rev-parse *
+# NOTE: there are deliberately NO `git` or `pip install` grants here.
+# `/opt/meshpoint` and its venv are owned by the `meshpoint` service
+# user (install.sh sets this; post_update.sh re-asserts it every update),
+# so the dashboard runs `git fetch/checkout/reset` and `pip install -r
+# requirements.txt` as itself, unprivileged -- see src/api/update/apply.py
+# and install_status.py. A `git`/`pip` NOPASSWD wildcard would have let
+# any admin session (or anything that hijacked one) run arbitrary code as
+# root; the only privileged step left in an update is the fixed
+# apply_finish.sh below.
 
 # ── Plugin system deps (meshpoint plugin setup <id> / manual `sudo bash
 #    plugins/apps/<id>/setup.sh`) ──────────────────────────────────────
@@ -72,8 +53,18 @@ meshpoint ALL=(ALL) NOPASSWD: /usr/bin/git -c safe.directory=/opt/meshpoint rev-
 meshpoint ALL=(ALL) NOPASSWD: /bin/bash /opt/meshpoint/plugins/apps/*/setup.sh
 meshpoint ALL=(ALL) NOPASSWD: /bin/bash /opt/meshpoint/src/plugins/apps/*/setup.sh
 
+# ── venv pip, as `meshpoint`, never as root ──────────────────────────
+# The venv (/opt/meshpoint/venv) is owned by the meshpoint user, so this
+# grants NOTHING the service can't already do -- it only exists so the
+# one documented command form `sudo -u meshpoint /opt/meshpoint/venv/bin/pip
+# install <pkg>` works from every context: the web terminal (runs as
+# meshpoint, which has no password), an SSH `pi` session, and the
+# "install the missing package" hints in fan_control / mqtt_publisher.
+# Runas is (meshpoint), NOT (ALL) -- the old `(ALL) pip install *` line
+# was arbitrary-code-as-root for any admin session.
+meshpoint ALL=(meshpoint) NOPASSWD: /opt/meshpoint/venv/bin/pip install *
+
 # ── Post-update hooks ─────────────────────────────────────────────────
-meshpoint ALL=(ALL) NOPASSWD: /opt/meshpoint/venv/bin/pip install *
 meshpoint ALL=(ALL) NOPASSWD: /bin/bash /opt/meshpoint/scripts/install.sh
 meshpoint ALL=(ALL) NOPASSWD: /bin/bash /opt/meshpoint/scripts/apply_finish.sh
 meshpoint ALL=(ALL) NOPASSWD: /bin/bash /opt/meshpoint/scripts/launch_restore_finish.sh *

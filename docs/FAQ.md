@@ -209,7 +209,7 @@ A newer version of Meshpoint is available on GitHub. To update:
 ```bash
 cd /opt/meshpoint
 sudo git pull origin main
-sudo /opt/meshpoint/venv/bin/pip install -r requirements.txt
+sudo -u meshpoint /opt/meshpoint/venv/bin/pip install -r requirements.txt
 sudo systemctl restart meshpoint
 ```
 
