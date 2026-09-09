@@ -395,7 +395,7 @@ class PluginsPanelController {
             <td>
                 <span${hostMeta ? ' class="plugin-row__namewrap--foldable" data-group-toggle-cell' : ''}>
                     ${toggleHtml}<span class="plugin-row__name">${this._escape(plugin.id)}</span>
-                    ${hostMeta && hostMeta.collapsed ? `<span class="plugin-row__count">(${hostMeta.memberCount})</span>` : ''}
+                    ${hostMeta && hostMeta.collapsed ? `<span class="plugin-row__count">+${hostMeta.memberCount} plugin${hostMeta.memberCount === 1 ? '' : 's'}</span>` : ''}
                 </span>
                 <span class="plugin-row__version">v${this._escape(plugin.version)}${byLine ? ` &middot; ${byLine}` : ''}</span>
             </td>

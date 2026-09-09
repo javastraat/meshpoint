@@ -144,10 +144,18 @@
     overflow-y: auto;
     font-family: var(--font-mono);
     font-size: 12.5px;
+    /* Rows and the empty-state line align with the panel header's inset
+       instead of sitting flush against the panel's left edge. */
+    padding: 2px 12px;
 }
 
 .pager-log__empty {
     color: var(--text-muted);
+    padding: 12px;   /* standalone uses (DAB+ scan/station prompts) need their own inset */
+}
+
+/* ...but inside .pager-log the container already provides the inset. */
+.pager-log > .pager-log__empty {
     padding: 12px 0;
 }
 

@@ -1274,20 +1274,33 @@ select.update-field__input option:checked {
     appearance: none;
     background: none;
     border: none;
-    color: var(--text-muted);
-    font-size: 0.7rem;
+    /* Cyan (the app's interactive colour, same as the name's hover state)
+       + a bit larger, so a collapsed group of sub-plugins reads as an
+       open-me control rather than a stray character. */
+    color: var(--accent-cyan);
+    font-size: 0.9rem;
+    line-height: 1;
     width: 1rem;
     display: inline-block;
     text-align: center;
     cursor: pointer;
     padding: 0;
 }
+.plugin-row__namewrap--foldable:hover .plugin-row__toggle { filter: brightness(1.25); }
 
+/* The "N plugins" hint shown next to a collapsed host row -- a small
+   cyan pill, matching the source badge's shape. */
 .plugin-row__count {
-    color: var(--text-muted);
-    font-size: 0.75rem;
-    font-weight: 400;
-    margin-left: 2px;
+    display: inline-block;
+    margin-left: 6px;
+    padding: 0 7px;
+    border-radius: 999px;
+    font-size: 0.66rem;
+    font-weight: 600;
+    color: var(--accent-cyan);
+    background: var(--overlay-weak);
+    border: 1px solid var(--border);
+    vertical-align: 1px;
 }
 
 .plugin-row__version {
