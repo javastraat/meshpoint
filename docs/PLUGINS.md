@@ -902,3 +902,49 @@ you need it, that's a signal to extend the core seam
 (`src/plugins/registry.py`, `src/plugins/manifest.py`'s
 `KNOWN_PROVIDES`), not to work around it inside a plugin. Full
 background: `memory/plugin-architecture-review.md`.
+
+===========
+
+A plugin author installs a pip dependency by writing a setup.sh that installs into meshpoint's venv (venv/bin/pip), not system Python. Here's the whole pattern.
+
+1. plugin.toml
+
+[deps]
+setup = "setup.sh"
+check = "check.sh"   # required whenever setup.sh exists — a test enforces this
+2. setup.sh — installs into the venv, idempotently
+
+#!/usr/bin/env bash
+set -euo pipefail
+
+# plugins/apps/<id>/setup.sh  ->  repo root is three levels up
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO="$(cd "${HERE}/../../.." && pwd)"
+VENV_PY="${REPO}/venv/bin/python3"
+VENV_PIP="${REPO}/venv/bin/pip"
+
+if "${VENV_PY}" -c "import somepackage" &>/dev/null; then
+    echo "somepackage already installed -- skipping"
+else
+    echo "Installing somepackage into the venv ..."
+    "${VENV_PIP}" install --quiet 'somepackage>=1.2'
+fi
+3. check.sh — unprivileged probe, mirrors setup.sh minus the installing
+
+#!/usr/bin/env bash
+set -uo pipefail
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO="$(cd "${HERE}/../../.." && pwd)"
+
+if "${REPO}/venv/bin/python3" -c "import somepackage" &>/dev/null; then
+    echo "somepackage installed"
+    exit 0
+fi
+echo "somepackage is not installed in the venv"
+echo "run: sudo meshpoint plugin setup <id>"
+exit 1
+How it runs
+Not automatic. The operator runs it once: sudo meshpoint plugin setup <id>, or the "Run setup" button in Settings → Plugins (streams the output into a modal, no SSH needed), or sudo bash /opt/meshpoint/plugins/apps/<id>/setup.sh.
+All three are passwordless — config/sudoers-meshpoint grants NOPASSWD for /opt/meshpoint/plugins/apps/*/setup.sh (absolute path only).
+The check.sh probe runs at boot and on demand; when it fails, Settings → Plugins shows "⚠ Setup needed" with the reason instead of letting the plugin load half-broken.
+Reference implementation: plugins/apps/reticulum/setup.sh + check.sh do exactly this for lxmf.
