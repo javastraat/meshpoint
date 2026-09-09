@@ -61,6 +61,16 @@ def register(reg) -> None:
     def build(context):
         peer_repo = ReticulumPeerRepository(context.pipeline.database)
 
+        def _telemetry_cfg() -> dict:
+            """plugins.reticulum.telemetry_* plus, when opted in, the
+            operator's fixed location from core's Configuration -> GPS
+            pin (device.latitude/longitude) -- no separate lat/lon keys."""
+            cfg = state.telemetry_config()
+            dev = context.config.device
+            if cfg.get("include_location") and dev.latitude is not None and dev.longitude is not None:
+                cfg = {**cfg, "location": (dev.latitude, dev.longitude, dev.altitude or 0.0)}
+            return cfg
+
         async def _mesh_stats() -> dict:
             """Aggregate packet counts for /page/info.mu -- totals + a
             per-protocol split, nothing node-level (that page is served to
@@ -117,7 +127,7 @@ def register(reg) -> None:
             notify_url=state.notify_url(),
             propagation_cfg=state.propagation_config(),
             talkback_enabled=state.node_config()["talkback_enabled"],
-            telemetry_cfg=state.telemetry_config(),
+            telemetry_cfg=_telemetry_cfg(),
         )
 
     def wire(service, context):

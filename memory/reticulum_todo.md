@@ -131,6 +131,13 @@ checked on the Pi.
   app rendering the frame — SIDs + `packed()` shape are verbatim from
   `sense.py` so structure matches; just not visually confirmed in
   Sideband yet.
+  **SID_LOCATION added 2026-09-09 (after the two-node test):** opt-in
+  `telemetry_include_location`; coords from core's
+  `device.latitude/longitude` (Configuration → GPS pin) resolved in
+  `__init__.py` `build()`, no plugin lat/lon keys. `_pack_location` =
+  the 7-el struct-packed list from `sense.py`. Settings shows a warn
+  hint if the toggle is on but no pin is set. NOT re-tested — needs
+  another two-node run with a pin set + ideally the Sideband map check.
   **UX gotcha hit + fixed:** clicking "Send telemetry now" / "Sync
   inbox" right after Save (before a meshpoint restart) failed with a
   confusing "no collector/node" — the running service reads that config
@@ -256,7 +263,7 @@ plugins:
 |---|---|---|---|
 | Med | **Attachments in Send** | images / small files over `LXMF.FIELD_IMAGE` / `FIELD_FILE_ATTACHMENTS` | Send side is easy (set `lxm.fields` before `handle_outbound`). Inbound is the blocker: shared `messages` table (`src/storage/message_repository.py`) has no attachment columns and core's conversation UI can't render them — needs a design decision (disk store + flag vs a JSON column on the shared table) |
 | ~~Med~~ | ~~**Propagation node polish**~~ | **MOSTLY BUILT 2026-09-09** (new-build #2): outbound node + "Sync inbox" + live transfer state + auto-sync. Still open: **PN peering** (propagation nodes syncing to each other) and a message-arrival WS push after a sync completes | — |
-| ~~Med~~ | ~~**Telemetry publish**~~ | **MOSTLY BUILT 2026-09-09** (new-build #3): temp + status-line frame to a collector. Follow-ups: structured processor/RAM/NVM sensors (needs the Sideband `sense.py` nested `[[label,val],...]` format verified against a real client) and **location** (`SID_LOCATION` 0x02, the 7-element struct-packed list — format known from `sense.py`, deferred as an opt-in privacy surface) | Low each |
+| ~~Med~~ | ~~**Telemetry publish**~~ | **BUILT 2026-09-09** (new-build #3): time + temp + status-line frame, two-node verified. **+ SID_LOCATION added same day** — opt-in `telemetry_include_location`, coords from core's Configuration→GPS pin (`device.latitude/longitude`), no separate keys. Only follow-up left: structured processor/RAM/NVM sensors (nested `[[label,val],...]` — needs verifying against a real Sideband client; low value, INFO string already carries the numbers) | Low |
 | Med | **Telemetry collector + map** | *receive* peers' telemetry (parse inbound `FIELD_TELEMETRY`), plot on the dashboard's local map tiles. Now the natural pair for #3. Needs `SID_LOCATION` in the publish side too | Med–High |
 | Low | **Audio calls** (`call.audio` / LXST) | answer / receive voice; min viable = a recorded announcement on call | High — audio I/O + codec on the Pi, its own project |
 | Low | **Group chat** (`RNS.Destination.GROUP`) | experimental shared-key room, no membership mgmt | Medium — non-standard |

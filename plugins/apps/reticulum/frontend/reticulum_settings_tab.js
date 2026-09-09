@@ -211,6 +211,15 @@ class ReticulumSettingsTab {
                                 <input class="cfg-field__input" type="number"
                                        min="300" max="86400" step="60" data-rt-telemetry-interval>
                             </label>
+                            <label class="cfg-field cfg-field--toggle">
+                                <input type="checkbox" data-rt-telemetry-location>
+                                <span class="cfg-field__label">Include location</span>
+                            </label>
+                            <p class="cfg-field__hint" data-rt-telemetry-location-hint>
+                                Adds this node's fixed position to the frame, from the pin
+                                set in <strong>Configuration → GPS</strong>. Off = the
+                                collector never learns where this node is.
+                            </p>
                             <div class="cfg-card__actions">
                                 <button class="terminal-button" type="button" data-rt-telemetry-send>
                                     Send telemetry now
@@ -356,6 +365,8 @@ class ReticulumSettingsTab {
         this._telemetryEnabled = this._q('[data-rt-telemetry-enabled]');
         this._telemetryCollector = this._q('[data-rt-telemetry-collector]');
         this._telemetryInterval = this._q('[data-rt-telemetry-interval]');
+        this._telemetryLocation = this._q('[data-rt-telemetry-location]');
+        this._telemetryLocationHintEl = this._q('[data-rt-telemetry-location-hint]');
         this._telemetryStatusEl = this._q('[data-rt-telemetry-status]');
         this._telemetrySendStatusEl = this._q('[data-rt-telemetry-send-status]');
         this._nodeEnabled = this._q('[data-rt-node-enabled]');
@@ -391,7 +402,25 @@ class ReticulumSettingsTab {
         this._request('GET', '/api/config').then((config) => {
             this._portUsage = this._buildPortUsageMap(config || {});
             this._refreshSerialPortsList();
+            this._renderLocationHint(config || {});
         });
+    }
+
+    _renderLocationHint(config) {
+        const el = this._telemetryLocationHintEl;
+        if (!el) return;
+        const dev = config.device || {};
+        const hasPin = dev.latitude != null && dev.longitude != null;
+        if (hasPin) {
+            el.textContent = `Adds this node's fixed position (${Number(dev.latitude).toFixed(4)}, `
+                + `${Number(dev.longitude).toFixed(4)}, from Configuration → GPS) to the frame. `
+                + 'Off = the collector never learns where this node is.';
+            el.dataset.kind = '';
+        } else {
+            el.textContent = 'No location pin set — set one in Configuration → GPS first, '
+                + 'or this toggle does nothing.';
+            el.dataset.kind = 'warn';
+        }
     }
 
     _render(rt) {
@@ -426,6 +455,7 @@ class ReticulumSettingsTab {
         if (this._telemetryEnabled) this._telemetryEnabled.checked = !!rt.telemetry_enabled;
         if (this._telemetryCollector) this._telemetryCollector.value = rt.telemetry_collector || '';
         if (this._telemetryInterval) this._telemetryInterval.value = rt.telemetry_interval_s ?? 900;
+        if (this._telemetryLocation) this._telemetryLocation.checked = !!rt.telemetry_include_location;
         this._loadPropagationStatus();
         this._loadTelemetryStatus();
     }
@@ -442,8 +472,9 @@ class ReticulumSettingsTab {
             ? `last sent ${this._agoStr(Math.round(Date.now() / 1000 - t.last_sent_at))}`
             : 'nothing sent yet';
         const err = t.last_error ? ` — last error: ${t.last_error}` : '';
+        const loc = t.location_included ? ', location included' : '';
         this._telemetryStatusEl.textContent =
-            `Publishing to ${(t.collector || '?').slice(0, 12)}… every ${t.interval_s}s — ${when}${err}.`;
+            `Publishing to ${(t.collector || '?').slice(0, 12)}… every ${t.interval_s}s${loc} — ${when}${err}.`;
     }
 
     _agoStr(s) {
@@ -669,6 +700,7 @@ class ReticulumSettingsTab {
             telemetry_enabled: telemetryEnabled,
             telemetry_collector: telemetryCollector,
             telemetry_interval_s: Number(this._telemetryInterval?.value) || 900,
+            telemetry_include_location: !!this._telemetryLocation?.checked,
             rnode_enabled: rnodeEnabled,
             rnode_serial_port: this._serialPort.value,
             rnode_frequency_hz: Number(this._frequency.value),

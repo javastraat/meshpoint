@@ -99,6 +99,11 @@ class TestTelemetryConfig(unittest.TestCase):
         with self.assertRaises(ValidationError):
             ReticulumUpdate(**_REQUIRED, telemetry_interval_s=60)
 
+    def test_include_location_defaults_off_and_round_trips(self) -> None:
+        self.assertFalse(ReticulumUpdate(**_REQUIRED).telemetry_include_location)
+        m = ReticulumUpdate(**_REQUIRED, telemetry_include_location=True)
+        self.assertTrue(m.telemetry_include_location)
+
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()

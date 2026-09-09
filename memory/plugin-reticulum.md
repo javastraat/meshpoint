@@ -943,6 +943,15 @@ frame. Wire format pulled from `markqvist/Sideband`
   *meshpoint* restart). **Self-loopback does NOT work** — LXMF won't
   deliver a DIRECT message to your own `lxmf.delivery` dest, so the
   inbound log never fired. Verify via real Sideband → Pi instead.
+- `SID_LOCATION` (0x02) added same day: opt-in
+  `telemetry_include_location` config key; coords come from core's
+  `context.config.device.latitude/longitude` (Configuration → GPS pin),
+  resolved into the telemetry cfg dict in `__init__.py` `build()` — no
+  plugin lat/lon keys. `telemetry._pack_location()` = the 7-element
+  `[pack("!i",lat*1e6), lon, alt*1e2, speed=0, bearing=0, accuracy=0,
+  last_update]` list from `sense.py`. `telemetry_status()` reports
+  `location_included`. Settings tab: "Include location" toggle + a hint
+  that warns when on with no pin set.
 - Config-needs-restart UX: `POST /telemetry/send` and
   `/propagation/sync` now detect "config saved but service not
   restarted yet" (running service's error says "no collector/node" but

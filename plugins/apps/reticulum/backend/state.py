@@ -69,6 +69,10 @@ _DEFAULTS: dict[str, Any] = {
     "telemetry_enabled": False,
     "telemetry_collector": "",
     "telemetry_interval_s": 900,
+    # Include the operator's fixed location (Configuration -> GPS pin,
+    # core's device.latitude/longitude) in the telemetry frame. Opt-in --
+    # off means the collector never learns where this node is.
+    "telemetry_include_location": False,
     # RF and backbone are independent interfaces rnsd can run at once or
     # separately -- at least one must stay on (enforced by config_routes.py's
     # ReticulumUpdate validator), same as NomadNet needs one of them to
@@ -175,6 +179,7 @@ def telemetry_config() -> dict[str, Any]:
         "enabled": bool(_config.get("telemetry_enabled")),
         "collector": str(_config.get("telemetry_collector") or "").strip().lower().replace(":", "").strip("<>"),
         "interval_s": max(300, int(_config.get("telemetry_interval_s") or 900)),
+        "include_location": bool(_config.get("telemetry_include_location")),
     }
 
 

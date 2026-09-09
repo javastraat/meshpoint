@@ -9,6 +9,7 @@ import unittest
 from plugins.apps.reticulum.backend import telemetry
 from plugins.apps.reticulum.backend.telemetry import (
     SID_INFORMATION,
+    SID_LOCATION,
     SID_TEMPERATURE,
     SID_TIME,
 )
@@ -56,14 +57,44 @@ class TestBuildTelemetry(unittest.TestCase):
         frame = telemetry.build_telemetry(_FULL_HOST, "x")
         self.assertTrue(all(isinstance(k, int) for k in frame))
 
-    def test_all_values_are_msgpack_safe_primitives(self) -> None:
-        # umsgpack.packb on the Pi must not choke -- the frame may only
-        # contain ints / floats / strs (no None, no custom objects).
+    def test_all_values_are_msgpack_safe(self) -> None:
+        # umsgpack.packb on the Pi must not choke -- every value must be a
+        # msgpack-native type (int/float/str/bytes/list/dict), recursively.
+        def _ok(v):
+            if isinstance(v, (int, float, str, bytes, bool)):
+                return True
+            if isinstance(v, (list, tuple)):
+                return all(_ok(x) for x in v)
+            if isinstance(v, dict):
+                return all(_ok(x) for x in v.values())
+            return False
+
         for host in (_FULL_HOST, {}, {"cpu_temp_c": None, "load_1m": 3}):
-            frame = telemetry.build_telemetry(host, "node")
+            frame = telemetry.build_telemetry(host, "node", location=(52.37, 4.89, 3.0))
             for key, val in frame.items():
                 self.assertIsInstance(key, int)
-                self.assertIsInstance(val, (int, float, str))
+                self.assertTrue(_ok(val), f"{key}={val!r} not msgpack-safe")
+
+    def test_location_included_only_with_real_coords(self) -> None:
+        self.assertNotIn(SID_LOCATION, telemetry.build_telemetry(_FULL_HOST, "x"))
+        self.assertNotIn(SID_LOCATION, telemetry.build_telemetry(_FULL_HOST, "x", location=None))
+        self.assertNotIn(
+            SID_LOCATION,
+            telemetry.build_telemetry(_FULL_HOST, "x", location=(None, None, 0)),
+        )
+        frame = telemetry.build_telemetry(_FULL_HOST, "x", location=(52.370216, 4.895168, 5.0))
+        self.assertIn(SID_LOCATION, frame)
+
+    def test_location_pack_layout(self) -> None:
+        loc = telemetry._pack_location(52.370216, 4.895168, 5.0)
+        self.assertEqual(len(loc), 7)
+        # lat/lon/alt are big-endian signed ints scaled 1e6 / 1e6 / 1e2
+        import struct
+        self.assertEqual(struct.unpack("!i", loc[0])[0], 52370216)
+        self.assertEqual(struct.unpack("!i", loc[1])[0], 4895168)
+        self.assertEqual(struct.unpack("!i", loc[2])[0], 500)
+        self.assertEqual(struct.unpack("!I", loc[3])[0], 0)   # speed
+        self.assertIsInstance(loc[6], int)                    # last_update
 
 
 if __name__ == "__main__":  # pragma: no cover

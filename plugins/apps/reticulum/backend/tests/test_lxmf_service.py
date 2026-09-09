@@ -456,7 +456,14 @@ class TestTelemetryPublish(unittest.TestCase):
         self.assertTrue(st["enabled"])
         self.assertEqual(st["collector"], "cd" * 16)
         self.assertEqual(st["interval_s"], 600)
+        self.assertFalse(st["location_included"])
         self.assertIsNone(st["last_sent_at"])
+
+    def test_status_reports_location_included(self) -> None:
+        svc = _make_service(telemetry_cfg={
+            "enabled": True, "collector": "cd" * 16, "location": (1.0, 2.0, 0.0),
+        })
+        self.assertTrue(svc.telemetry_status()["location_included"])
 
     def test_send_without_collector_errors(self) -> None:
         svc = _make_service(telemetry_cfg={"enabled": True, "collector": ""})

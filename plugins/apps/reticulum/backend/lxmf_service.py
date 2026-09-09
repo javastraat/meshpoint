@@ -525,6 +525,7 @@ class LxmfService:
             "enabled": True,
             "collector": self._telemetry_cfg.get("collector") or None,
             "interval_s": int(self._telemetry_cfg.get("interval_s") or 900),
+            "location_included": self._telemetry_cfg.get("location") is not None,
             "last_sent_at": self._telemetry_last_sent_at,
             "last_error": self._telemetry_last_error,
         }
@@ -542,6 +543,7 @@ class LxmfService:
         try:
             frame = telemetry_builder.build_telemetry(
                 host_stats.read_host(), self._display_name,
+                location=self._telemetry_cfg.get("location"),
             )
             packed = RNS.vendor.umsgpack.packb(frame)
             dest_hash = bytes.fromhex(collector)

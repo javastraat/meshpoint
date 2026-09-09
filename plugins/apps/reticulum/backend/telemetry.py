@@ -14,21 +14,25 @@ the sensors whose ``pack()`` format is a single unambiguous scalar/string
     SID_TEMPERATURE 0x07  float  celsius -- the CPU/SoC temperature
     SID_INFORMATION 0x0F  str    a one-line human-readable status
 
+    SID_LOCATION    0x02  [7-element struct-packed list] -- only when the
+                          operator opts in (Configuration -> GPS pin)
+
 Sideband's structured PROCESSOR / RAM / NVM sensors pack as a nested
 ``[[label, value], ...]`` list whose exact shape we haven't verified
 against a real client, so for now that content goes into the INFORMATION
-string instead. Location is intentionally omitted from v1 (opt-in privacy
-surface + its own struct layout) -- add it when the collector/map lands.
+string instead.
 
 FastAPI-free, stdlib only.
 """
 
 from __future__ import annotations
 
+import struct
 import time
 
 # Sideband sensor IDs (sbapp/sideband/sense.py :: Sensor.SID_*)
 SID_TIME = 0x01
+SID_LOCATION = 0x02
 SID_TEMPERATURE = 0x07
 SID_INFORMATION = 0x0F
 
@@ -54,11 +58,34 @@ def _info_line(host: dict, node_name: str) -> str:
     return " · ".join(parts) or "meshpoint"
 
 
-def build_telemetry(host: dict, node_name: str = "") -> dict[int, object]:
+def _pack_location(lat: float, lon: float, alt: float = 0.0) -> list:
+    """Sideband's ``Location.pack()`` layout (sense.py) for a fixed pin --
+    speed / bearing / accuracy are all 0. Coordinates are big-endian ints
+    scaled by 1e6 (deg) / 1e2 (m)."""
+    return [
+        struct.pack("!i", int(round(lat, 6) * 1e6)),
+        struct.pack("!i", int(round(lon, 6) * 1e6)),
+        struct.pack("!i", int(round(alt, 2) * 1e2)),
+        struct.pack("!I", 0),                       # speed
+        struct.pack("!i", 0),                       # bearing
+        struct.pack("!H", 0),                       # accuracy
+        int(time.time()),                           # last_update
+    ]
+
+
+def build_telemetry(
+    host: dict, node_name: str = "",
+    location: tuple[float, float, float] | None = None,
+) -> dict[int, object]:
     """The ``{ sensor_id: packed_value }`` dict for one telemetry frame.
     The caller msgpacks it. ``host`` is ``host_stats.read_host()``'s
-    output (any field may be ``None``)."""
+    output (any field may be ``None``). ``location`` is
+    ``(lat, lon, alt)`` -- included as ``SID_LOCATION`` only when both
+    lat and lon are real numbers."""
     frame: dict[int, object] = {SID_TIME: int(time.time())}
+    if location and isinstance(location[0], (int, float)) and isinstance(location[1], (int, float)):
+        alt = location[2] if len(location) > 2 and isinstance(location[2], (int, float)) else 0.0
+        frame[SID_LOCATION] = _pack_location(location[0], location[1], alt)
     temp = host.get("cpu_temp_c")
     if isinstance(temp, (int, float)):
         frame[SID_TEMPERATURE] = float(temp)

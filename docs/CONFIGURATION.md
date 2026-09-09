@@ -212,6 +212,7 @@ plugins:
     telemetry_enabled: false                    # publish this box's host stats as LXMF telemetry frames
     telemetry_collector: ""                     # LXMF address to send telemetry to (e.g. a Sideband client)
     telemetry_interval_s: 900                   # how often to send (min 300)
+    telemetry_include_location: false           # add the Configuration -> GPS pin to the frame (opt-in)
     # storage paths — defaults shown; only set to override:
     # reticulum_config_dir: "data/reticulum/rns_config"
     # identity_path: "data/reticulum/identity"
@@ -279,9 +280,13 @@ status string — to `telemetry_collector` (an LXMF address, e.g. a Sideband
 client subscribed to this node) as a Sideband-compatible `FIELD_TELEMETRY`
 frame. Off by default; nothing is sent without a collector. A "Send
 telemetry now" button fires one frame on demand. `GET
-/api/reticulum/telemetry` reports status. *(v1 sends only the temperature
-and a human-readable status line; structured processor/RAM/disk sensors
-and location are a later addition.)*
+/api/reticulum/telemetry` reports status. `telemetry_include_location`
+(opt-in, off by default) adds this node's fixed position to the frame,
+taken from the **Configuration → GPS** pin (`device.latitude` /
+`device.longitude` — no separate keys); off means the collector never
+learns where the node is. *(v1 sends time, temperature, a status line,
+and — when opted in — location; structured processor/RAM/disk sensors
+are a later addition.)*
 
 `plugins.reticulum.propagation_outbound_node` (Settings tab → *Propagation
 node*, dropdown of `lxmf.propagation` peers): use *another* node as your

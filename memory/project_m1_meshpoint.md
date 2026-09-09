@@ -12892,5 +12892,17 @@ Routes now detect "saved but not restarted" and say so. Dest-hash
 fields also now accept RNS `<hex>` / `aa:bb` display forms (the "You:"
 line / startup banner use `<hex>`).
 
-Follow-ups: structured sensors, `SID_LOCATION`. Checklist in
+**`SID_LOCATION` added same day** (after the two-node test, user's
+call): opt-in `telemetry_include_location` — coords pulled from core's
+`device.latitude/longitude` (Configuration → GPS pin, the user already
+had one set) in `__init__.py` `build()`, deliberately no plugin lat/lon
+keys. `_pack_location()` = the 7-el struct-packed list from `sense.py`
+(speed/bearing/accuracy 0 for a fixed pin). Settings tab "Include
+location" toggle + a hint that reads back the actual pin coords, or
+warns if none is set. `telemetry_status()` gains `location_included`.
+9 more tests. Suite 192 passed. NOT re-tested on the Pi — needs another
+two-node run with a pin set.
+
+Only follow-up left for #3: structured processor/RAM/NVM sensors (low
+value — the INFO string already has the numbers). Checklist in
 `memory/reticulum_todo.md`.

@@ -61,6 +61,7 @@ class ReticulumUpdate(BaseModel):
     telemetry_enabled: bool = False
     telemetry_collector: str = ""
     telemetry_interval_s: int = Field(900, ge=300, le=86_400)
+    telemetry_include_location: bool = False
     rnode_enabled: bool = True
     rnode_serial_port: str = ""
     rnode_frequency_hz: int = Field(..., ge=100_000_000, le=1_000_000_000)
@@ -185,6 +186,7 @@ async def update_reticulum(
         "telemetry_enabled": req.telemetry_enabled,
         "telemetry_collector": req.telemetry_collector,
         "telemetry_interval_s": req.telemetry_interval_s,
+        "telemetry_include_location": req.telemetry_include_location,
         "rnode_enabled": req.rnode_enabled,
         "rnode_serial_port": req.rnode_serial_port.strip(),
         "rnode_frequency_hz": req.rnode_frequency_hz,
