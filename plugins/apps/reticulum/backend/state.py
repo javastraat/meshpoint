@@ -132,6 +132,15 @@ def lxmf_storage_dir() -> str:
     return str(_config["lxmf_storage_dir"])
 
 
+def contacts_path() -> str:
+    """The operator's petname address book -- a JSON file next to the
+    identity / LXMF store, so it follows a relocated reticulum data dir
+    rather than a hardcoded ``data/reticulum/``."""
+    from pathlib import Path
+
+    return str(Path(_config["identity_path"]).parent / "contacts.json")
+
+
 def notify_url() -> str:
     return str(_config.get("notify_url") or "").strip()
 

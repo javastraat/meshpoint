@@ -169,10 +169,13 @@ Provided by the **Reticulum** plugin (`plugins/apps/reticulum/`, `plugins.reticu
 | Method | Path | Role | Description |
 |---|---|---|---|
 | GET | `/api/reticulum/status` | Viewer | Service state: running, own LXMF address, peer count, and a `node` block (hosting state / page count / requests served / last announce) when a NomadNet node is hosted |
-| GET | `/api/reticulum/peers` | Viewer | Known-destinations roster from announces (`lxmf.delivery` / `lxmf.propagation` / `nomadnetwork.node`), newest first |
+| GET | `/api/reticulum/peers` | Viewer | Known-destinations roster from announces (`lxmf.delivery` / `lxmf.propagation` / `nomadnetwork.node`), newest first; a row gains `petname`/`trusted` when a contact exists for it |
 | GET | `/api/reticulum/messages/{destination_hash}` | Viewer | One conversation's message history (from the shared `messages` table) |
 | POST | `/api/reticulum/send` | Admin | Send a direct LXMF message (`destination_hash`, `text`) — the Messages page posts here for `protocol='reticulum'` conversations |
 | POST | `/api/reticulum/announce` | Admin | Re-send meshpoint's own LXMF delivery announce on demand |
+| GET | `/api/reticulum/contacts` | Viewer | The operator's petname address book — `{hash: {petname, note, trusted, updated}}`, stored in `data/reticulum/contacts.json`, never announced |
+| PUT | `/api/reticulum/contacts/{destination_hash}` | Admin | Set a contact (`petname`, optional `note`, `trusted`); an empty `petname` removes it |
+| DELETE | `/api/reticulum/contacts/{destination_hash}` | Admin | Forget a contact |
 | GET | `/api/reticulum/nomad/nodes` | Viewer | `nomadnetwork.node` peers in the roster (the Browse tab's node list) |
 | POST | `/api/reticulum/nomad/page` | Admin | Fetch one NomadNet page over an RNS Link (`destination_hash`, `path`, optional `field_data`) → `{ok, content}` (Micron markup) or `{ok: false, error}` |
 | POST | `/api/reticulum/nomad/file` | Admin | Fetch a `/file/...` path → the raw bytes as an attachment, or a 502 |

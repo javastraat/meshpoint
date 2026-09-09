@@ -246,6 +246,17 @@ direct message fires a one-line `POST` there (message text as body, sender
 as `Title` header). This sends the message text to that service — self-host
 ntfy or use a private webhook if that's a concern. Blank = off.
 
+**Contacts** (Peers drawer → *Contact* section, admin only): give a peer
+your own name — "Philster", "TechInc BBS" — plus an optional note and a
+"mark as known" flag. That name then wins everywhere the peer is shown (the
+Peers/Activity tables, the Messages list, the Send picker); the announced
+name moves to an "announced as …" sub-line and flags if it later changes.
+There's no config key — it's stored in `data/reticulum/contacts.json`
+(one JSON object keyed by destination hash), which is picked up by
+backups. Local only: nothing is announced, and a peer can't see what
+you've called them. `GET /api/reticulum/contacts` + admin `PUT`/`DELETE
+/api/reticulum/contacts/{hash}`.
+
 `plugins.reticulum.propagation_enabled` (also on the Settings tab): run an
 **LXMF propagation node** — a store-and-forward relay so peers who were
 offline can sync their messages from this box later. It's an *added* role,

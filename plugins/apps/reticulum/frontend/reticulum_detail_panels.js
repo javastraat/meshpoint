@@ -187,7 +187,12 @@ class ReticulumPeerDrawer {
         drawer.className = 'nd-drawer';
         drawer.addEventListener('click', (e) => e.stopPropagation());
 
-        const name = _rtEsc(peer.display_name || peer.destination_hash);
+        const contact = opts.contact || null;
+        const petname = (contact && contact.petname) || '';
+        const announced = peer.display_name || '';
+        const name = _rtEsc(petname || announced || peer.destination_hash);
+        const announcedSub = (petname && announced && announced !== petname)
+            ? `<div class="nd-header__sub">announced as ${_rtEsc(announced)}</div>` : '';
         const shortLabel = _rtEsc((peer.destination_hash || '').slice(0, 2)).toUpperCase();
         const color = _rtHashColor(peer.destination_hash || '');
         const canFavourite = peer.aspect === 'nomadnetwork.node';
@@ -200,6 +205,7 @@ class ReticulumPeerDrawer {
                     <div class="nd-header__info">
                         <div class="nd-header__name">${name}</div>
                         <div class="nd-header__id">${_rtEsc(peer.destination_hash)}</div>
+                        ${announcedSub}
                     </div>
                 </div>
                 ${canFavourite ? `
@@ -298,6 +304,10 @@ class ReticulumPeerDrawer {
             { label: 'Last seen', value: _rtEsc(_rtFullTime(peer.last_seen)) },
         ], true));
 
+        if (opts.canEditContact && typeof opts.onSaveContact === 'function') {
+            body.appendChild(this._buildContactSection(peer, opts));
+        }
+
         if (link === null) {
             const loading = document.createElement('div');
             loading.className = 'nd-loading';
@@ -342,6 +352,121 @@ class ReticulumPeerDrawer {
             });
         }
         body.appendChild(activitySection);
+    }
+
+    /** Editable "Contact" section -- an operator-assigned name (+ note,
+     * + a "known" flag) for this destination hash, saved via the panel's
+     * onSaveContact / onDeleteContact callbacks (PUT/DELETE
+     * /api/reticulum/contacts). Local only; never announced. Same
+     * `.nd-section` chrome as the read-only sections, but its content is a
+     * small form rather than `.nd-row` pairs. */
+    _buildContactSection(peer, opts) {
+        const contact = opts.contact || {};
+        const section = document.createElement('div');
+        section.className = 'nd-section';
+
+        const header = document.createElement('div');
+        header.className = 'nd-section__header';
+        header.innerHTML = `<span class="nd-section__title">Contact</span>
+            <span class="nd-section__arrow">▼</span>`;
+
+        const content = document.createElement('div');
+        content.className = 'nd-section__content';
+        content.innerHTML = `
+            <form class="rt-contact-form">
+                <label>Name
+                    <input type="text" class="rt-contact-form__name" maxlength="64"
+                           placeholder="e.g. Philster" value="${_rtEsc(contact.petname || '')}">
+                </label>
+                <label>Note
+                    <input type="text" class="rt-contact-form__note" maxlength="280"
+                           placeholder="optional" value="${_rtEsc(contact.note || '')}">
+                </label>
+                <label class="rt-contact-form__check">
+                    <input type="checkbox" class="rt-contact-form__trust"${contact.trusted ? ' checked' : ''}>
+                    Mark as known
+                </label>
+                <div class="rt-contact-form__actions">
+                    <button type="submit" class="nd-action-btn nd-action-btn--primary rt-contact-form__save">Save</button>
+                    <button type="button" class="nd-action-btn rt-contact-form__remove"${contact.petname ? '' : ' hidden'}>Remove</button>
+                    <span class="rt-contact-form__status" aria-live="polite"></span>
+                </div>
+            </form>
+        `;
+
+        const form = content.querySelector('form');
+        const nameEl = content.querySelector('.rt-contact-form__name');
+        const noteEl = content.querySelector('.rt-contact-form__note');
+        const trustEl = content.querySelector('.rt-contact-form__trust');
+        const saveBtn = content.querySelector('.rt-contact-form__save');
+        const removeBtn = content.querySelector('.rt-contact-form__remove');
+        const statusEl = content.querySelector('.rt-contact-form__status');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const petname = nameEl.value.trim();
+            saveBtn.disabled = true;
+            statusEl.textContent = 'Saving…';
+            const ok = await opts.onSaveContact(peer.destination_hash, {
+                petname, note: noteEl.value.trim(), trusted: trustEl.checked,
+            });
+            saveBtn.disabled = false;
+            statusEl.textContent = ok ? (petname ? 'Saved.' : 'Removed.') : 'Could not save.';
+            if (ok) {
+                opts.contact = petname
+                    ? { petname, note: noteEl.value.trim(), trusted: trustEl.checked }
+                    : null;
+                removeBtn.hidden = !petname;
+                this._refreshHeaderName(peer, opts);
+            }
+        });
+
+        removeBtn.addEventListener('click', async () => {
+            removeBtn.disabled = true;
+            statusEl.textContent = 'Removing…';
+            const ok = await opts.onDeleteContact(peer.destination_hash);
+            removeBtn.disabled = false;
+            if (ok) {
+                nameEl.value = ''; noteEl.value = ''; trustEl.checked = false;
+                removeBtn.hidden = true;
+                statusEl.textContent = 'Removed.';
+                opts.contact = null;
+                this._refreshHeaderName(peer, opts);
+            } else {
+                statusEl.textContent = 'Could not remove.';
+            }
+        });
+
+        header.addEventListener('click', () => {
+            const visible = content.style.display !== 'none';
+            content.style.display = visible ? 'none' : '';
+            header.querySelector('.nd-section__arrow').textContent = visible ? '▶' : '▼';
+        });
+
+        section.appendChild(header);
+        section.appendChild(content);
+        return section;
+    }
+
+    /** Re-point the drawer header's name/sub-line after a contact edit,
+     * without a full re-render (which would drop the open form). */
+    _refreshHeaderName(peer, opts) {
+        if (!this._drawer) return;
+        const petname = (opts.contact && opts.contact.petname) || '';
+        const announced = peer.display_name || '';
+        const nameEl = this._drawer.querySelector('.nd-header__name');
+        if (nameEl) nameEl.textContent = petname || announced || peer.destination_hash;
+        let subEl = this._drawer.querySelector('.nd-header__sub');
+        const wantSub = petname && announced && announced !== petname;
+        if (wantSub && !subEl) {
+            subEl = document.createElement('div');
+            subEl.className = 'nd-header__sub';
+            this._drawer.querySelector('.nd-header__id')?.after(subEl);
+        }
+        if (subEl) {
+            if (wantSub) subEl.textContent = `announced as ${announced}`;
+            else subEl.remove();
+        }
     }
 
     close() {
@@ -431,7 +556,9 @@ class ReticulumAnnounceModal {
     }
 
     _buildPayloadLayer(entry) {
-        const rows = [{ key: 'Display name', val: entry.display_name || '--' }];
+        const rows = [];
+        if (entry.petname) rows.push({ key: 'Contact', val: entry.petname });
+        rows.push({ key: 'Display name', val: entry.display_name || '--' });
         if (entry.app_data_hex) {
             rows.push({ key: 'App data (hex)', expandable: true, full: entry.app_data_hex, previewLen: 120 });
         }

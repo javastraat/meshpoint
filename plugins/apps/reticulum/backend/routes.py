@@ -21,24 +21,32 @@ from src.api.auth.jwt_session import SessionClaims
 from src.storage.message_repository import MessageRepository
 
 from . import state
+from .contacts import ContactStore
 from .lxmf_service import LxmfService
 
 router = APIRouter(prefix="/api/reticulum", tags=["reticulum"])
 
 _service: LxmfService | None = None
 _message_repo: MessageRepository | None = None
+_contacts: ContactStore | None = None
 
 
 def init_routes(service: LxmfService, message_repo: MessageRepository) -> None:
-    global _service, _message_repo
+    global _service, _message_repo, _contacts
     _service = service
     _message_repo = message_repo
+    _contacts = ContactStore(state.contacts_path())
 
 
 def reset_routes() -> None:
-    global _service, _message_repo
+    global _service, _message_repo, _contacts
     _service = None
     _message_repo = None
+    _contacts = None
+
+
+def _contact_map() -> dict:
+    return _contacts.all() if _contacts is not None else {}
 
 
 @router.get("/status")
@@ -73,7 +81,16 @@ async def reticulum_peers():
     if _service is None:
         raise HTTPException(503, "Reticulum companion is disabled")
     peers = await _service.list_peers()
-    return [p.to_dict() for p in peers]
+    contacts = _contact_map()
+    out = []
+    for p in peers:
+        row = p.to_dict()
+        c = contacts.get(row["destination_hash"])
+        if c:
+            row["petname"] = c["petname"]
+            row["trusted"] = c["trusted"]
+        out.append(row)
+    return out
 
 
 @router.get("/announces")
@@ -82,7 +99,18 @@ async def reticulum_announces():
     ring buffer, so it starts empty on each restart."""
     if _service is None:
         raise HTTPException(503, "Reticulum companion is disabled")
-    return _service.announce_log()
+    contacts = _contact_map()
+    # Copy each entry -- the service hands back its own ring-buffer dicts,
+    # and a later petname change / removal must not leave a stale key on them.
+    out = []
+    for entry in _service.announce_log():
+        row = dict(entry)
+        c = contacts.get(row.get("destination_hash"))
+        if c:
+            row["petname"] = c["petname"]
+            row["trusted"] = c["trusted"]
+        out.append(row)
+    return out
 
 
 @router.get("/peers/{destination_hash}/link")
@@ -134,3 +162,53 @@ async def reticulum_announce(_claims: SessionClaims = Depends(require_admin)):
     except RuntimeError as exc:
         raise HTTPException(503, str(exc))
     return {"status": "announced"}
+
+
+# --- contacts / petnames --------------------------------------------------
+# Local address book -- an operator-assigned name for a destination hash,
+# stored on disk (data/reticulum/contacts.json), never announced. Reads
+# stay open to any authenticated viewer (same as /peers); writes are
+# admin-only (same as /send).
+
+
+class ContactUpdate(BaseModel):
+    petname: str = Field("", max_length=64)
+    note: str = Field("", max_length=280)
+    trusted: bool = False
+
+
+@router.get("/contacts")
+async def reticulum_contacts():
+    if _contacts is None:
+        raise HTTPException(503, "Reticulum companion is disabled")
+    return _contacts.all()
+
+
+@router.put("/contacts/{destination_hash}")
+async def reticulum_contact_set(
+    destination_hash: str, req: ContactUpdate,
+    _claims: SessionClaims = Depends(require_admin),
+):
+    if _contacts is None:
+        raise HTTPException(503, "Reticulum companion is disabled")
+    petname = req.petname.strip()
+    if not petname:
+        # A cleared petname field and the drawer's "Remove" button both
+        # land here -- treat an empty name as "forget this contact".
+        removed = _contacts.delete(destination_hash)
+        return {"status": "removed" if removed else "absent"}
+    try:
+        entry = _contacts.set(destination_hash, petname, req.note, req.trusted)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    return {"status": "saved", "contact": entry}
+
+
+@router.delete("/contacts/{destination_hash}")
+async def reticulum_contact_delete(
+    destination_hash: str, _claims: SessionClaims = Depends(require_admin),
+):
+    if _contacts is None:
+        raise HTTPException(503, "Reticulum companion is disabled")
+    removed = _contacts.delete(destination_hash)
+    return {"status": "removed" if removed else "absent"}

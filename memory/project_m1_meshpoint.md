@@ -12676,3 +12676,73 @@ Pi-verification list (confirm Send Message pre-fills and focuses
 correctly, confirm cross-navigation between drawer-starred and
 Browse-tab-starred nodes actually shares state, confirm the interface
 name shortens with a working tooltip).
+
+## Reticulum — Contacts / petnames (new build #1, 2026-09-09)
+
+User walked the "could build" list, asked what each item was one at a
+time, picked **Contacts / petnames** as new-build #1 (lowest effort,
+plugin-only, no blockers; also makes every other UI more legible).
+Decisions settled with the user first: display = petname wins in compact
+lists, "announced as X" sub-line + tooltip in detail views (NomadNet's
+spirit without its clutter, not Sideband's silent override); storage =
+`data/reticulum/contacts.json` (derived from `identity_path`'s dir, so it
+follows a relocated data dir; picked up by backups since it's under
+`data/`). User pushed back on "petname address book" as jargon --
+feature is called **Contacts** everywhere user-facing; `petname` survives
+only as the JSON/wire field name, UI input is just labelled "Name".
+
+**Built:**
+- `backend/contacts.py` -- `ContactStore`: one JSON file, atomic write
+  (tmp + `os.replace`), lazy load-once cache, tolerates a
+  hand-corrupted file (starts empty, still writable), skips malformed
+  entries. `set(hash, petname, note, trusted)` validates (petname
+  required + ≤64, note ≤280, hash ≤64), `delete()`, `all()` returns
+  copies. FastAPI-free, stdlib only.
+- `backend/state.py` -- `contacts_path()` = `Path(identity_path).parent
+  / "contacts.json"`.
+- `backend/routes.py` -- `_contacts` module global set in
+  `init_routes` / cleared in `reset_routes`. New `GET /contacts`
+  (viewer), `PUT /contacts/{hash}` + `DELETE /contacts/{hash}` (admin,
+  `require_admin`). `PUT` with a blank/whitespace petname == delete
+  (the cleared-field and Remove-button paths converge). `/peers` and
+  `/announces` responses gain `petname`/`trusted` when a contact exists
+  -- announces are **copied** (`dict(entry)`) before annotating so a
+  later removal doesn't leave a stale key on the service's ring-buffer
+  dicts.
+- `frontend/reticulum_panel.js` -- `this._contacts` map loaded in
+  `_load()`; `_peerLabel(hash, announced)` helper; petname used in the
+  Peers table (with `title="announced as X"` + a small `✓` for
+  trusted), Activity table, Messages list, Send `<select>` options +
+  the Send search filter. `_saveContact`/`_deleteContact` PUT/DELETE
+  then reload contacts + re-render + toast. Drawer opened with
+  `contact`/`canEditContact`/`onSaveContact`/`onDeleteContact`;
+  announce modal gets `petname`.
+- `frontend/reticulum_detail_panels.js` -- drawer header shows petname
+  with an `.nd-header__sub` "announced as X" line; new editable
+  **Contact** `.nd-section` (`_buildContactSection`) with Name/Note
+  inputs + "Mark as known" checkbox + Save/Remove + inline status;
+  `_refreshHeaderName()` re-points the header after an edit without a
+  full re-render (which would drop the open form). Announce modal's
+  Payload layer gets a "Contact" row.
+- `frontend/reticulum.css` -- `.nd-header__sub`, `.rt-trust`,
+  `.rt-contact-form*` (form lives inside core's `.nd-section__content`).
+
+**Tests**: `backend/tests/test_contacts.py` (10, Mac-runnable -- pure
+disk/validation) all pass; `backend/tests/test_contacts_route.py` (6,
+FastAPI-gated, points `routes._contacts` at a tempdir) -- CI/Pi only.
+Full plugin suite 169 passed / 20 skipped, no regressions
+(`test_config_routes.py` has a *pre-existing* collection error on the
+Mac -- imports `pydantic` unconditionally, unrelated to this change,
+confirmed by stashing). `node --check` clean on both JS files.
+
+**Docs**: CHANGELOG v0.8.1 bullet (parser reverified: 31 sections,
+v0.8.1 present), README "What's Different" + API table row,
+API-ENDPOINTS.md (3 new rows + `/peers` note), CONFIGURATION.md
+Contacts paragraph.
+
+**Not yet opened in a browser / on the Pi.** Owed: the Contact section
+saves + the name propagates to all four surfaces (Peers/Activity/
+Messages/Send); "announced as X" appears only when the names differ;
+Remove works; the small `✓` shows for trusted; light/dark theme on the
+form inputs; `contacts.json` actually lands under
+`/opt/meshpoint/data/reticulum/`.

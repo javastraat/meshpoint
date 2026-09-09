@@ -5,7 +5,7 @@ See `memory/plugin-reticulum.md` for implementation detail (dated sections,
 one per feature) and `memory/project_m1_meshpoint.md` for wider session
 context.
 
-Last updated 2026-09-08 (talk-back bot built + switched to dot-prefixed commands).
+Last updated 2026-09-09 (Contacts / petnames built — new-build #1).
 
 ---
 
@@ -84,6 +84,18 @@ checked on the Pi.
   starring a node from the drawer shows up in the Browse tab's
   Favourites optgroup and vice versa, and that the interface name looks
   right (short text + working tooltip).
+- **Contacts / petnames — BUILT 2026-09-09, not opened in a browser.**
+  Peers drawer gains an editable **Contact** section (admin only): your
+  own name for a destination hash + note + "mark as known" flag, stored
+  in `data/reticulum/contacts.json`, never announced. The name wins in
+  the Peers/Activity tables, Messages list and Send picker; announced
+  name → "announced as X" sub-line/tooltip. New `GET /contacts` +
+  admin `PUT`/`DELETE /contacts/{hash}`; `/peers` + `/announces` gain
+  `petname`/`trusted`. Check: the section saves and the name shows on
+  all four surfaces; "announced as X" only when names differ; Remove
+  works; `✓` shows for trusted; form inputs OK in light/dark; the JSON
+  file lands under `/opt/meshpoint/data/reticulum/`. Detail:
+  `memory/project_m1_meshpoint.md` dated 2026-09-09.
 - **sample-bbs-techinc nav links (fixed 2026-09-07, not walked in a real
   NomadNet client)**: browse the hosted node in Sideband/NomadNet/
   MeshChat, click "Next" through every page, confirm no dead links and
@@ -141,6 +153,7 @@ checked on the Pi.
 | Notifications | ntfy / webhook on inbound DM | `notify_url` config; fire-and-forget POST (`backend/notify.py`) |
 | Propagation node | LXMF store-and-forward relay | `propagation_enabled` + `propagation_storage_limit_mb`; own `lxmf.propagation` hash, re-announced 6 h; status line on Settings tab; `propagation` block on `GET /api/reticulum/status` |
 | Peers/Activity | Click-to-detail | Peers row → right-side drawer (identity, live routing via `GET /peers/{hash}/link`: hops/path/next-hop/identity-resolved/announce-count, signal from most recent announce, recent activity, a Send Message button for `lxmf.delivery` peers, a favourite star for `nomadnetwork.node` peers sharing the Browse tab's own favourites list); Activity row → detail popup (routing, signal if heard via RNode, payload/app_data hex, "View peer"). Own JS/data (`reticulum_detail_panels.js`) but literally emits core's own `node_drawer.css`/`packet_detail_modal.css` class names (`nd-drawer`/`nd-section`/`nd-row`, `pdm-overlay`/`pdm-layer`/`pdm-row`) for pixel-identical styling — same reuse-not-duplicate pattern as `lw-*`/`mt-badge`/`terminal-button` elsewhere in this plugin |
+| Contacts | Operator petnames for peers | Peers drawer → Contact section (admin): name + note + "known" flag per destination hash, `data/reticulum/contacts.json` (`backend/contacts.py`), never announced. Name wins across Peers/Activity/Messages/Send; announced name → "announced as X". `GET /contacts` + admin `PUT`/`DELETE /contacts/{hash}`; `/peers` + `/announces` gain `petname`/`trusted` |
 | Browsing | NomadNet node browser | Browse tab: live filter, ☆ favourites, `:/page/x.mu` shortcuts |
 | Hosting | Our own `nomadnetwork.node` | one hash = "message me" + "browse me" |
 | Hosting | Generated `index` / `info` / `nodes` pages | `info.mu` = live version/uptime/host/mesh-activity stats |
@@ -196,11 +209,17 @@ plugins:
 | Low | **Audio calls** (`call.audio` / LXST) | answer / receive voice; min viable = a recorded announcement on call | High — audio I/O + codec on the Pi, its own project |
 | Low | **Group chat** (`RNS.Destination.GROUP`) | experimental shared-key room, no membership mgmt | Medium — non-standard |
 | Low | **Interface manager UI** | add / remove RNS interfaces from the dashboard vs hand-editing config | Medium |
-| Low | **Contacts / petnames** | address book with friendly names + trust / identity display | Low–Med |
+| ~~Low~~ | ~~**Contacts / petnames**~~ | **BUILT 2026-09-09** (new-build #1) — see Done + Pi-verification list | — |
 | Low | **Paper messages / QR** | Sideband-style offline message export | Low–Med |
 
 ## Done (this backlog's completed items)
 
+- **2026-09-09** — Contacts / petnames (new-build #1). Editable Contact
+  section in the Peers drawer, `data/reticulum/contacts.json` store
+  (`backend/contacts.py`), `GET /contacts` + admin `PUT`/`DELETE`,
+  `petname`/`trusted` enrichment on `/peers` + `/announces`, petname
+  used across Peers/Activity/Messages/Send in the frontend. 16 tests
+  (10 Mac-runnable). Not yet browser/Pi-verified — see list above.
 - **2026-09-08** — LXMF talk-back bot (`.help`/`.ping`/`.stats`/
   `.spacestate`/`.events`/`.nodes` over DM, requires `node_enabled`;
   dot prefix required, added same day so a bare conversational word

@@ -48,6 +48,10 @@ class ReticulumPanel {
         this._peers = [];
         this._peersShowAll = false;
         this._announces = [];
+        // Operator petname address book -- {hash: {petname, note, trusted}}
+        // from GET /api/reticulum/contacts. Petnames win over the announced
+        // name everywhere a peer is shown.
+        this._contacts = {};
         this._sendPeerSearchQuery = '';
         // Fails open like every other panel's own guard (no identity/role
         // info at all means show it) -- the real security boundary is
@@ -387,6 +391,10 @@ class ReticulumPanel {
             onSendMessage: (peer.aspect === 'lxmf.delivery' && this._isAdmin)
                 ? (hash) => this.composeMessageTo(hash) : undefined,
             onViewAnnounce: (entry) => this._openAnnounceModal(entry),
+            contact: this._contacts[peer.destination_hash] || null,
+            canEditContact: this._isAdmin,
+            onSaveContact: (hash, data) => this._saveContact(hash, data),
+            onDeleteContact: (hash) => this._deleteContact(hash),
         });
     }
 
@@ -394,10 +402,13 @@ class ReticulumPanel {
     _openAnnounceModal(entry) {
         if (!this._announceModal) return;
         const peer = this._peers.find((p) => p.destination_hash === entry.destination_hash);
-        this._announceModal.show(entry, {
-            knownPeer: !!peer,
-            onViewPeer: () => { if (peer) this._openPeerDrawer(peer); },
-        });
+        this._announceModal.show(
+            { ...entry, petname: this._contacts[entry.destination_hash]?.petname || '' },
+            {
+                knownPeer: !!peer,
+                onViewPeer: () => { if (peer) this._openPeerDrawer(peer); },
+            },
+        );
     }
 
     _onWsPeer() { this._loadPeers(); }
@@ -437,9 +448,58 @@ class ReticulumPanel {
     }
 
     async _load() {
-        const jobs = [this._loadStatus(), this._loadPeers(), this._loadMessages()];
+        const jobs = [
+            this._loadStatus(), this._loadContacts(), this._loadPeers(), this._loadMessages(),
+        ];
         if (this._tab === 'announces') jobs.push(this._loadAnnounces());
         await Promise.all(jobs);
+    }
+
+    async _loadContacts() {
+        try {
+            const r = await fetch('/api/reticulum/contacts', { credentials: 'same-origin' });
+            if (r.ok) this._contacts = (await r.json()) || {};
+        } catch (_) {}
+    }
+
+    /** Petname if the operator set one, else the announced name, else a dash. */
+    _peerLabel(hash, announced) {
+        return this._contacts[hash]?.petname || announced || '--';
+    }
+
+    async _saveContact(hash, data) {
+        try {
+            const r = await fetch(`/api/reticulum/contacts/${encodeURIComponent(hash)}`, {
+                method: 'PUT',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+            });
+            if (!r.ok) { this._toast('Could not save contact.'); return false; }
+        } catch (_) { this._toast('Could not save contact.'); return false; }
+        await this._loadContacts();
+        this._renderPeers();
+        this._renderSendPeers();
+        if (this._tab === 'announces') this._renderAnnounces();
+        this._loadMessages();
+        this._toast(data.petname ? 'Contact saved.' : 'Contact removed.');
+        return true;
+    }
+
+    async _deleteContact(hash) {
+        try {
+            const r = await fetch(`/api/reticulum/contacts/${encodeURIComponent(hash)}`, {
+                method: 'DELETE', credentials: 'same-origin',
+            });
+            if (!r.ok) { this._toast('Could not remove contact.'); return false; }
+        } catch (_) { this._toast('Could not remove contact.'); return false; }
+        await this._loadContacts();
+        this._renderPeers();
+        this._renderSendPeers();
+        if (this._tab === 'announces') this._renderAnnounces();
+        this._loadMessages();
+        this._toast('Contact removed.');
+        return true;
     }
 
     async _loadStatus() {
@@ -492,6 +552,7 @@ class ReticulumPanel {
             const q = this._sendPeerSearchQuery;
             deliveryPeers = deliveryPeers.filter((p) =>
                 (p.display_name || '').toLowerCase().includes(q)
+                || (this._contacts[p.destination_hash]?.petname || '').toLowerCase().includes(q)
                 || p.destination_hash.toLowerCase().includes(q)
             );
         }
@@ -499,7 +560,7 @@ class ReticulumPanel {
         select.innerHTML = deliveryPeers.length
             ? deliveryPeers.map((p) => `
                 <option value="${this._esc(p.destination_hash)}">
-                    ${this._esc(p.display_name || p.destination_hash)}
+                    ${this._esc(this._peerLabel(p.destination_hash, p.display_name || p.destination_hash))}
                 </option>
             `).join('')
             : '<option value="" disabled selected>No matching peers</option>';
@@ -546,10 +607,16 @@ class ReticulumPanel {
             }
         }
 
-        tbody.innerHTML = visible.map((p) => `
+        tbody.innerHTML = visible.map((p) => {
+            const c = this._contacts[p.destination_hash];
+            const shown = c?.petname || p.display_name || '--';
+            const announcedTitle = (c?.petname && p.display_name && p.display_name !== c.petname)
+                ? ` title="announced as ${this._esc(p.display_name)}"` : '';
+            const trust = c?.trusted ? ' <span class="rt-trust" title="Marked as known">✓</span>' : '';
+            return `
             <tr class="lw-pkt-row" data-rt-peer-hash="${this._esc(p.destination_hash)}" title="Click for details">
                 <td class="lw-time">${this._fmtTime(p.last_seen)}</td>
-                <td class="mt-name">${this._esc(p.display_name || '--')}</td>
+                <td class="mt-name"${announcedTitle}>${this._esc(shown)}${trust}</td>
                 <td class="lw-id">${this._esc(p.destination_hash)}</td>
                 <td>${this._fmtAspect(p.aspect)}${
                     p.aspect === 'nomadnetwork.node' && this._isAdmin
@@ -558,7 +625,8 @@ class ReticulumPanel {
                 }</td>
                 <td class="lw-time">${this._fmtTime(p.first_seen)}</td>
             </tr>
-        `).join('');
+        `;
+        }).join('');
 
         tbody.querySelectorAll('[data-rt-browse]').forEach((btn) => {
             btn.addEventListener('click', () => this.browseNode(btn.dataset.rtBrowse));
@@ -601,7 +669,7 @@ class ReticulumPanel {
             <tr class="lw-pkt-row" data-node-id="${this._esc(c.node_id)}"
                 ${c.unread_count ? 'title="Click to mark as read"' : ''}>
                 <td class="lw-time">${this._fmtTime(c.last_timestamp)}</td>
-                <td class="mt-name">${this._esc(c.node_name || c.node_id)}</td>
+                <td class="mt-name">${this._esc(this._peerLabel(c.node_id, c.node_name || c.node_id))}</td>
                 <td>${this._esc(c.last_message || '')}</td>
                 <td class="lw-num">${c.unread_count ? c.unread_count : ''}</td>
             </tr>
@@ -627,10 +695,15 @@ class ReticulumPanel {
             return;
         }
         if (empty) empty.style.display = 'none';
-        tbody.innerHTML = this._announces.slice(0, RT_ANNOUNCE_LIMIT).map((a) => `
+        tbody.innerHTML = this._announces.slice(0, RT_ANNOUNCE_LIMIT).map((a) => {
+            const c = this._contacts[a.destination_hash];
+            const shown = c?.petname || a.display_name || '--';
+            const announcedTitle = (c?.petname && a.display_name && a.display_name !== c.petname)
+                ? ` title="announced as ${this._esc(a.display_name)}"` : '';
+            return `
             <tr class="lw-pkt-row" data-rt-ts="${this._esc(a.ts)}" data-rt-hash="${this._esc(a.destination_hash)}" title="Click for details">
                 <td class="lw-time">${this._fmtTime(a.ts)}</td>
-                <td class="mt-name">${this._esc(a.display_name || '--')}</td>
+                <td class="mt-name"${announcedTitle}>${this._esc(shown)}</td>
                 <td class="lw-id">${this._esc(a.destination_hash)}</td>
                 <td>${this._fmtAspect(a.aspect)}${
                     a.aspect === 'nomadnetwork.node' && this._isAdmin
@@ -638,7 +711,8 @@ class ReticulumPanel {
                         : ''
                 }</td>
             </tr>
-        `).join('');
+        `;
+        }).join('');
 
         tbody.querySelectorAll('[data-rt-browse]').forEach((btn) => {
             btn.addEventListener('click', () => this.browseNode(btn.dataset.rtBrowse));

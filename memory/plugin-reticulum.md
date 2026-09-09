@@ -855,3 +855,43 @@ identity, all concurrent: `lxmf.delivery` (inbox), `nomadnetwork.node`
 - Pi verification needed: enable, restart, check Settings status line shows a
   PN address; from another node/Sideband set this hash as propagation node and
   send to an offline 3rd party, then bring them online and sync.
+
+## 2026-09-09 — Contacts / petnames (new-build #1)
+
+Operator-assigned names for peers. Local address book, never announced.
+
+- `backend/contacts.py` — `ContactStore`: one JSON file
+  (`data/reticulum/contacts.json`), atomic write (tmp + `os.replace`),
+  lazy load-once cache, corrupt-file tolerant, skips malformed entries.
+  `set(hash, petname, note, trusted)` validates (petname required + ≤64,
+  note ≤280); `delete()`; `all()` returns copies. Stdlib only, no FastAPI.
+- `backend/state.py` — `contacts_path()` = `Path(identity_path).parent /
+  "contacts.json"` (follows a relocated data dir).
+- `backend/routes.py` — `_contacts` global (set in `init_routes`, cleared
+  in `reset_routes`). `GET /contacts` (viewer), `PUT`/`DELETE
+  /contacts/{hash}` (admin). Blank petname on PUT == delete. `/peers` +
+  `/announces` gain `petname`/`trusted` when a contact exists — announce
+  rows are copied before annotating so a removal leaves no stale key.
+- `frontend/reticulum_panel.js` — `this._contacts` map;
+  `_peerLabel(hash, announced)`; petname used in Peers/Activity/Messages
+  tables + Send `<select>` + Send search; `_saveContact`/`_deleteContact`.
+- `frontend/reticulum_detail_panels.js` — drawer header petname +
+  `.nd-header__sub` "announced as X"; editable **Contact** `.nd-section`
+  (`_buildContactSection`: Name/Note inputs, "Mark as known" checkbox,
+  Save/Remove, inline status); `_refreshHeaderName()` avoids a full
+  re-render (keeps the open form). Announce modal Payload gets a
+  "Contact" row.
+- `frontend/reticulum.css` — `.nd-header__sub`, `.rt-trust`,
+  `.rt-contact-form*`.
+- Naming: feature is **Contacts** everywhere user-facing; `petname` is
+  only the JSON/wire field name (Sideband/NomadNet's term), UI says
+  "Name". User explicitly rejected "petname address book" wording.
+- Display decision: petname wins in compact lists; "announced as X"
+  sub-line + tooltip in detail views, flags on change. (NomadNet's
+  approach, not Sideband's silent override.)
+- Tests: `test_contacts.py` ×10 (Mac-runnable), `test_contacts_route.py`
+  ×6 (FastAPI-gated; points `routes._contacts` at a tempdir). Plugin
+  suite 169 passed, no regressions.
+- NOT done: petnames in the core cross-protocol Messages page (would need
+  a core change — the plugin's own Messages tab does resolve them).
+- Pi verification: see `memory/reticulum_todo.md`.
