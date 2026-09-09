@@ -5,6 +5,10 @@
 			"path": "."
 		},
 		{
+			"name": "meshpoint-plugins",
+			"path": "../meshpoint-plugins"
+		},
+		{
 			"name": "meshpoint_app",
 			"path": "../flutter/meshpoint_app"
 		},
@@ -15,9 +19,6 @@
 		{
 			"name": "basicstation-docker",
 			"path": "../basicstation-docker"
-		},
-		{
-			"path": "../meshpoint-plugins"
 		}
 	],
 	"settings": {}

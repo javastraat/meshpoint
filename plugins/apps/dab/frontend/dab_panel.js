@@ -118,7 +118,7 @@ class DabPanel {
                         <span>Channel</span>
                         <button type="button" class="terminal-button" data-dab-stop>Stop</button>
                     </div>
-                    <div class="panel__body">
+                    <div class="panel__body lsn-panel-body">
                         <div class="lsn-tabbar dab-chantabs" data-dab-chantabs>${this._chanTabsHtml()}</div>
                         <div class="dab-chanhint" data-dab-chanhint style="display:none"></div>
                         <div class="dab-chantab-content" data-dab-chantab-content></div>

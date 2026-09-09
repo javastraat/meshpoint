@@ -113,7 +113,7 @@
 
 .dabcfg-empty {
     color: var(--text-muted);
-    padding: 12px;   /* not flush against the panel's left edge */
+    padding: 12px 0;   /* horizontal inset comes from .lsn-panel-body */
 }
 
 .dabcfg-meta {

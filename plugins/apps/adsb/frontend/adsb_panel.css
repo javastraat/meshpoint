@@ -74,7 +74,9 @@
     position: sticky;
     top: 0;
     text-align: left;
-    padding: 6px 10px 6px 0;
+    /* Symmetric cell padding so the first column isn't jammed against the
+       table edge (the panel body still supplies the outer inset). */
+    padding: 6px 10px;
     color: var(--text-muted);
     font-weight: 400;
     background: var(--bg-glass);
@@ -82,7 +84,7 @@
 }
 
 .adsb-table td {
-    padding: 5px 10px 5px 0;
+    padding: 5px 10px;
     border-bottom: 1px solid var(--hairline);
     color: var(--text-primary);
 }
@@ -93,7 +95,7 @@
 
 .adsb-table__empty td {
     color: var(--text-muted);
-    padding: 12px 0;
+    padding: 12px 10px;
     border-bottom: none;
 }
 

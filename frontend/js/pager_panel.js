@@ -80,7 +80,7 @@ class PagerPanel {
             <section class="lsn-section">
                 <div class="panel">
                     <div class="panel__header">Messages <span class="pager-count" data-pager-count></span></div>
-                    <div class="panel__body">
+                    <div class="panel__body lsn-panel-body">
                         <div class="pager-log" data-pager-log>
                             <div class="pager-log__empty">No messages yet.</div>
                         </div>

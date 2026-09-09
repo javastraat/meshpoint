@@ -65,7 +65,7 @@
                 <section class="lsn-section">
                     <div class="panel">
                         <div class="panel__header">Aircraft <span class="pager-count" data-adsb-count></span></div>
-                        <div class="panel__body">
+                        <div class="panel__body lsn-panel-body">
                             <div class="adsb-table-wrap">
                                 <table class="adsb-table">
                                     <thead>

@@ -51,7 +51,7 @@ class DabConfigPanel {
                     <div class="panel__header">
                         <span>Scan for DAB+ Channels</span>
                     </div>
-                    <div class="panel__body">
+                    <div class="panel__body lsn-panel-body">
                         <div class="dabcfg-hint">
                             Drives welle-cli across the Band III raster to find which channels decode
                             content at this antenna. A full scan can take up to ~19 minutes; scanning
@@ -111,7 +111,7 @@ class DabConfigPanel {
                         <span>DAB+ Config</span>
                         <button class="terminal-button" type="button" data-dabcfg-refresh>Refresh</button>
                     </div>
-                    <div class="panel__body">
+                    <div class="panel__body lsn-panel-body">
                         <div class="dabcfg-hint">
                             Channels found by the scan above. Names here are editable overrides --
                             the raw scanned label is kept underneath and used as the default whenever
