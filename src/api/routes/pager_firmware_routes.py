@@ -85,6 +85,23 @@ def _sketch_ino_path() -> Path:
     return _SKETCH_DIR / "pager_client.ino"
 
 
+def _ensure_secrets_header() -> None:
+    """``#include "secrets.h"`` is gitignored (real WiFi/OTA/web-password
+    values never land in a tracked .ino), so a fresh checkout -- e.g. the
+    Pi -- lacks it and arduino-cli fails with ``secrets.h: No such file``.
+    Seed it from the committed ``secrets.h.example`` (all-placeholder: the
+    sketch treats placeholder / empty creds as "no WiFi, standalone
+    RX/TX", real values set later over serial or the unit's web UI).
+    Never overwrites an existing ``secrets.h``."""
+    secrets = _SKETCH_DIR / "secrets.h"
+    if secrets.exists():
+        return
+    example = _SKETCH_DIR / "secrets.h.example"
+    if example.is_file():
+        shutil.copyfile(example, secrets)
+        logger.info("seeded %s from secrets.h.example (placeholder creds)", secrets)
+
+
 def _rewrite_my_capcodes(text: str, capcodes: list[int]) -> str:
     literal = "{ " + ", ".join(f"{c}UL" for c in capcodes) + " }"
     new_text, count = _MY_CAPCODES_RE.subn(rf"\g<1>{literal}\g<2>", text)
@@ -229,6 +246,7 @@ async def compile_firmware_stream(
             text = _rewrite_my_capcodes(text, req.my_capcodes)
             text = _rewrite_send_to_capcode(text, send_to)
             ino_path.write_text(text)
+            _ensure_secrets_header()
             yield _ndjson({
                 "type": "line", "stream": "stdout",
                 "text": f"Programming capcodes {req.my_capcodes}, "

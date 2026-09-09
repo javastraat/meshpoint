@@ -101,6 +101,24 @@ def _sketch_ino_path() -> Path:
     return _SKETCH_DIR / "pocsag_companion.ino"
 
 
+def _ensure_secrets_header() -> None:
+    """The sketch's ``#include "secrets.h"`` is gitignored (real
+    WiFi/OTA/web-password values must never land in a tracked .ino), so a
+    fresh checkout -- e.g. the Pi -- doesn't have the file and arduino-cli
+    fails with ``secrets.h: No such file or directory``. Seed it from the
+    committed ``secrets.h.example`` (all-placeholder: the sketch treats
+    placeholder / empty WiFi creds as "no WiFi, RX/TX-only", and the real
+    values are set later over serial or the companion's own web UI).
+    Never overwrites an existing ``secrets.h``."""
+    secrets = _SKETCH_DIR / "secrets.h"
+    if secrets.exists():
+        return
+    example = _SKETCH_DIR / "secrets.h.example"
+    if example.is_file():
+        shutil.copyfile(example, secrets)
+        logger.info("seeded %s from secrets.h.example (placeholder creds)", secrets)
+
+
 def _discover_board_targets() -> list[dict]:
     """Board choices for the Compile/Flash pulldown: every ``BOARD_*``
     toggle found in the sketch, matched against ``_KNOWN_BOARDS``. Macros
@@ -243,6 +261,7 @@ async def compile_firmware_stream(
             params={"board_macro": req.board_macro},
         ) as ctx:
             _select_board_define(req.board_macro)
+            _ensure_secrets_header()
             cmd = [
                 _ARDUINO_CLI_BIN, "--config-file", _ARDUINO_CLI_CONFIG,
                 "compile", "-v", "--fqbn", board["fqbn"], str(_SKETCH_DIR),

@@ -81,6 +81,23 @@ def _sketch_ino_path() -> Path:
     return _SKETCH_DIR / "rfenv_companion.ino"
 
 
+def _ensure_secrets_header() -> None:
+    """``#include "secrets.h"`` is gitignored (real WiFi/OTA/web-password
+    values never land in a tracked .ino), so a fresh checkout -- e.g. the
+    Pi -- lacks it and arduino-cli fails with ``secrets.h: No such file``.
+    Seed it from the committed ``secrets.h.example`` (all-placeholder: the
+    sketch treats placeholder / empty creds as "no WiFi", real values set
+    later over serial or the unit's web UI). Never overwrites an existing
+    ``secrets.h``."""
+    secrets = _SKETCH_DIR / "secrets.h"
+    if secrets.exists():
+        return
+    example = _SKETCH_DIR / "secrets.h.example"
+    if example.is_file():
+        shutil.copyfile(example, secrets)
+        logger.info("seeded %s from secrets.h.example (placeholder creds)", secrets)
+
+
 def _discover_band_targets() -> list[dict]:
     """Band choices for the Compile pulldown: every ``BAND_*`` toggle
     found in the sketch, matched against ``_KNOWN_BANDS``. Mirrors
@@ -219,6 +236,7 @@ async def compile_firmware_stream(
             params={"band_macro": req.band_macro},
         ) as ctx:
             _select_band_define(req.band_macro)
+            _ensure_secrets_header()
             yield _ndjson({
                 "type": "line", "stream": "stdout",
                 "text": f"Building for {_KNOWN_BANDS[req.band_macro]['label']}…",
