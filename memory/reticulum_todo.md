@@ -93,12 +93,11 @@ checked on the Pi.
   check:** Send-tab picker shows the name (not the hash); Messages list
   shows it; Activity row + tooltip; **Remove** clears it on all
   surfaces and drops the ✓; both light/dark themes on the form; the
-  JSON file at `/opt/meshpoint/data/reticulum/contacts.json`. **One
-  possible issue from the screenshot:** the Name `<input>` looked
-  dark-on-dark (value hard to read) while the Note field rendered
-  normally — may just be a post-type selection highlight; if real, the
-  `.rt-contact-form input` colours (`#111`/`#eee` fallbacks) need to
-  follow the theme. Detail: `memory/project_m1_meshpoint.md` dated
+  JSON file at `/opt/meshpoint/data/reticulum/contacts.json`. **The
+  dark-on-dark Name-input from the first screenshot was FIXED same
+  day** — the Contact form inputs now reuse core's theme-aware
+  `.cfg-field__input` instead of `#111`/`#eee` fallbacks (re-check both
+  themes anyway). Detail: `memory/project_m1_meshpoint.md` dated
   2026-09-09.
 - **Propagation client — BUILT 2026-09-09, not tested end-to-end.**
   Set `propagation_outbound_node` (Settings tab dropdown of

@@ -12747,12 +12747,13 @@ with "mark as known" ticked: drawer showed "Saved.", Peers row became
 save→render loop works. Still owed: Send picker / Messages list /
 Activity row + tooltip show the name; **Remove** clears it everywhere +
 drops the ✓; both themes on the form; `contacts.json` under
-`/opt/meshpoint/data/reticulum/`. **Possible issue from the
-screenshot:** the Name `<input>` looked dark-on-dark while Note
-rendered fine — likely a post-type text-selection artifact, but if
-real the `.rt-contact-form input` `#111`/`#eee` colour fallbacks need
-to be theme-aware (same latent issue the Browse tab's own inputs would
-have).
+`/opt/meshpoint/data/reticulum/`. **Dark-on-dark Name input from the
+screenshot — FIXED same day:** the Contact form inputs now carry core's
+`.cfg-field__input` class (theme tokens `--overlay-weak` / `--hairline`
+/ `--text-primary`) instead of the plugin's own `#111`/`#eee`
+fallbacks; `reticulum.css` keeps only a padding/size trim. The Browse
+tab's own `.rt-nomad__page input` still uses the old fallback pattern —
+latent, not touched this session.
 
 ## Reticulum — Propagation node polish, client side (new-build #2, 2026-09-09)
 

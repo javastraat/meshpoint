@@ -882,7 +882,9 @@ Operator-assigned names for peers. Local address book, never announced.
   re-render (keeps the open form). Announce modal Payload gets a
   "Contact" row.
 - `frontend/reticulum.css` — `.nd-header__sub`, `.rt-trust`,
-  `.rt-contact-form*`.
+  `.rt-contact-form*`. The Name/Note inputs carry core's
+  `.cfg-field__input` class (fixed a same-day dark-on-dark bug — the
+  first cut used `#111`/`#eee` fallbacks assuming dark theme).
 - Naming: feature is **Contacts** everywhere user-facing; `petname` is
   only the JSON/wire field name (Sideband/NomadNet's term), UI says
   "Name". User explicitly rejected "petname address book" wording.

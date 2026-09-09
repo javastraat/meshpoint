@@ -375,11 +375,11 @@ class ReticulumPeerDrawer {
         content.innerHTML = `
             <form class="rt-contact-form">
                 <label>Name
-                    <input type="text" class="rt-contact-form__name" maxlength="64"
+                    <input type="text" class="cfg-field__input rt-contact-form__name" maxlength="64"
                            placeholder="e.g. Philster" value="${_rtEsc(contact.petname || '')}">
                 </label>
                 <label>Note
-                    <input type="text" class="rt-contact-form__note" maxlength="280"
+                    <input type="text" class="cfg-field__input rt-contact-form__note" maxlength="280"
                            placeholder="optional" value="${_rtEsc(contact.note || '')}">
                 </label>
                 <label class="rt-contact-form__check">

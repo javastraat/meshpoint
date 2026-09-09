@@ -374,15 +374,13 @@
     flex-direction: column;
     gap: 0.2rem;
     font-size: 12px;
-    color: var(--text-secondary, #999);
+    color: var(--text-secondary);
 }
-.rt-contact-form input[type="text"] {
-    background: var(--bg, #111);
-    color: var(--text, #eee);
-    border: 1px solid var(--border, #444);
-    border-radius: 4px;
-    padding: 4px 6px;
-    font: inherit;
+/* Inputs reuse core's theme-aware .cfg-field__input; only trim its padding
+ * a touch for the tighter drawer context. */
+.rt-contact-form .cfg-field__input {
+    padding: 6px 8px;
+    font-size: 13px;
 }
 .rt-contact-form__check {
     flex-direction: row;
