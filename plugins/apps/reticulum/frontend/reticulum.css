@@ -422,7 +422,7 @@
     align-items: flex-end;
     margin-bottom: 12px;
 }
-.rt-iface-head__name { flex: 1 1 180px; }
+.rt-iface-head__name { flex: 0 1 320px; }        /* a name, not a paragraph */
 .rt-iface-head__type { flex: 0 0 190px; }        /* fits "TCPClientInterface" */
 .rt-iface-head__enabled { flex: 0 0 auto; margin-bottom: 6px; }
 
