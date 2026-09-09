@@ -257,7 +257,7 @@ class ReticulumPanel {
                                 Peers, Activity, Messages and Send views. Stored locally,
                                 never announced.
                             </p>
-                            <form class="cfg-form rt-contact-add" id="rt-contact-add-form">
+                            <form class="rt-contact-add" id="rt-contact-add-form">
                                 <input class="cfg-field__input" type="text" id="rt-contact-add-hash"
                                        placeholder="destination hash" autocomplete="off" spellcheck="false">
                                 <input class="cfg-field__input" type="text" id="rt-contact-add-name"

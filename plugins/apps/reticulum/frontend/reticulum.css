@@ -401,13 +401,14 @@
 /* Contacts tab: add-form row + inline-editable table cells. */
 .rt-contact-add {
     display: flex;
-    flex-wrap: wrap;
+    flex-flow: row wrap;
     gap: 8px;
     align-items: center;
     margin-bottom: 14px;
 }
-.rt-contact-add #rt-contact-add-hash { flex: 1 1 260px; max-width: 320px; }
-.rt-contact-add #rt-contact-add-name { flex: 0 1 160px; }
+.rt-contact-add > .cfg-field__input { flex: 0 1 auto; }
+.rt-contact-add #rt-contact-add-hash { width: 300px; max-width: 100%; }
+.rt-contact-add #rt-contact-add-name { width: 160px; }
 .rt-contact-cell {
     padding: 4px 6px;
     font-size: 13px;
