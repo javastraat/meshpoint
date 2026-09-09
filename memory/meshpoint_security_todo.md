@@ -8,9 +8,10 @@ verification evidence).
 See `memory/project_m1_meshpoint.md` for wider session context and
 `memory/reticulum_todo.md` for the Reticulum plugin backlog.
 
-Last updated 2026-09-09 — added a review pass on the new plugin-sources /
-installer code (2 small findings fixed, see Fixed; 1 by-design tradeoff
-noted in the backlog).
+Last updated 2026-09-09 — review pass: 2 findings fixed in the new
+plugin-sources / installer code + 1 by-design tradeoff noted (backlog #5);
+backlog #4 (Espressif udev rule `0666` → `0660`) fixed and verified on the
+SenseCap.
 
 ---
 
@@ -52,7 +53,7 @@ Priority order is the user's own (set 2026-09-08).
 | 1 | **HTTPS/TLS option** | 🟢 Built, partially live-verified | `dashboard.tls_enabled` / `tls_cert_path` / `tls_key_path` / `tls_port` (default 8443). Self-signed cert via bundled `cryptography` (no new dep), `src/tls_cert.py`. SAN covers every `hostname -I` address + hostname + `<hostname>.local` + `127.0.0.1`/`localhost`; auto-regenerates at startup if the address set drifted. `:8080` becomes a 308-redirect-only listener when TLS is on (two `uvicorn.Server`s via `asyncio.gather`). 28 tests (`test_tls_cert.py` ×12, `test_serve.py` ×13, `test_banner_sources.py` ×3). Boot log verified on ti-meshpoint. **Still owed:** real browser round-trip against all 3 addresses (LAN IP / Tailscale IP / `sensecap.local`) — confirm only the self-signed warning appears, not also a hostname-mismatch warning. |
 | 2 | **Move services off root onto `meshpoint` user** | 🔴 Not started | Explicitly longer-term ("to limit attack surface"). Self-update chain's `pip install` runs as root via `config/sudoers-meshpoint` NOPASSWD. |
 | 3 | **Web terminal → opt-in plugin** | 🔴 Not started, needs design | Currently core, admin-gated but root-equivalent. Move to an explicitly opt-in plugin like every other powerful/risky capability. "The root thing needs some thought" — not yet scoped/greenlit. |
-| 4 | **USB companion udev rules too permissive** | 🔴 Not started, unprioritized | Every user on the box currently gets full serial-device access. Should be `0660` with a `dialout`-or-`meshpoint` group. |
+| 4 | **USB companion udev rules too permissive** | 🟢 Fixed 2026-09-09 | `99-meshpoint-esp.rules` shipped `MODE="0666"` for `idVendor 303a` (Espressif native-USB: Heltec V3/V4, T-Beam S3). Now `MODE="0660", GROUP="dialout"` in `install.sh` + a `post_update.sh` migration that rewrites the stale rule. **Verified on the SenseCap 2026-09-09:** the box's current radios are `ttyUSB0/1` (CP210x/CH340, *not* `303a`) and already showed the safe OS default `crw-rw---- root:dialout` — the `0666` rule only ever bit a plugged-in `303a` board (none attached), so live blast radius was nil; latent until a Heltec V3 is connected for firmware-flash/relay. See Fixed below. |
 | 5 | **Plugin source: record + pin the resolved commit SHA** | 🔴 Not started, low | On install, resolve the branch `ref` to a commit SHA and store it in `plugins.<id>.source`. On Update, if the source `ref` is a moving branch, show what changed (old SHA → new SHA) before applying, and offer "pin to this SHA". Makes the by-design "trusted code at HEAD" tradeoff visible + freezable. Purely additive to the v0.8.1 installer. |
 
 ---
@@ -74,6 +75,32 @@ _None yet. Template:_
 ---
 
 ## Fixed
+
+### 2026-09-09 — Espressif udev rule world-writable (`0666`)  (backlog #4, review pass)
+- **Severity:** low–medium, latent (any local account → raw serial access to the mesh radios; only live when a `303a` board is attached)
+- **Where:** `scripts/install.sh` (the `UDEV_RULE` heredoc), file `/etc/udev/rules.d/99-meshpoint-esp.rules`
+- **Issue:** the rule was `SUBSYSTEM=="tty", ATTRS{idVendor}=="303a", MODE="0666"`
+  — world read+write on any Espressif native-USB serial device (Heltec
+  V3/V4, T-Beam ESP32-S3), which Meshpoint uses for the relay companion
+  and MeshCore. The `meshpoint` user is already in `dialout`, so `0666`
+  bought nothing and exposed the radios to every other local user /
+  process. Generic USB-serial adapters (CP210x/CH340, `ttyUSB*`) were
+  never covered by this rule and already get the OS default
+  `0660 root:dialout`.
+- **Verified on the SenseCap (2026-09-09):** `cat` of the rule file
+  confirmed `0666`; `ls -l /dev/ttyUSB*` showed `crw-rw---- root dialout`
+  (the box's radios aren't `303a`, so unaffected); `groups meshpoint`
+  includes `dialout`. No `303a` device attached → nothing world-writable
+  right now, but it would be the moment a Heltec V3 is plugged in for
+  firmware flashing.
+- **Fix:** rule is now `MODE="0660", GROUP="dialout"`. `install.sh`'s
+  guard changed from "create if missing" to "write if content differs"
+  so a re-run replaces a stale rule. New `post_update.sh` block 3b does
+  the same on self-update (rewrites + `udevadm control --reload-rules` +
+  `trigger`), so existing boxes get patched without a manual `install.sh`.
+- **Follow-up owed:** confirm on a box *with* a Heltec V3 connected that
+  after the migration the device shows `crw-rw---- root:dialout` and
+  Meshpoint can still open it for flashing/relay.
 
 ### 2026-09-09 — plugin installer: no uncompressed-size / member-count cap  (review pass)
 - **Severity:** medium (disk-fill DoS from a trusted-but-hostile or compromised source repo)

@@ -66,6 +66,20 @@ for grp in systemd-journal adm; do
     fi
 done
 
+# ── 3b. Espressif udev rule: 0666 → 0660 (idempotent) ──────────────
+# Installs before 2026-09 shipped MODE="0666" (world-writable) for
+# idVendor 303a devices. The meshpoint user is in dialout, so 0660 +
+# GROUP="dialout" is enough; tighten any box still carrying the old rule.
+UDEV_RULE_ESP='SUBSYSTEM=="tty", ATTRS{idVendor}=="303a", MODE="0660", GROUP="dialout"'
+UDEV_FILE_ESP="/etc/udev/rules.d/99-meshpoint-esp.rules"
+if [ -f "$UDEV_FILE_ESP" ] && [ "$(cat "$UDEV_FILE_ESP")" != "$UDEV_RULE_ESP" ]; then
+    info "Tightening Espressif udev rule (was world-writable)..."
+    echo "$UDEV_RULE_ESP" > "$UDEV_FILE_ESP"
+    udevadm control --reload-rules 2>/dev/null || true
+    udevadm trigger 2>/dev/null || true
+    CHANGED=1
+fi
+
 # ── 4. HAL TX sync word patch (one-time, ~2 minutes if needed) ──────
 # Marker is the NEW explicit-setter patch (sx1302_set_tx_syncword); Pis
 # carrying only the old static-peaks patch (sx1302_tx_sw_peak1, which

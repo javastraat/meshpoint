@@ -917,13 +917,16 @@ if [ -d "${MESHPOINT_DIR}/.git" ]; then
         || git config --system --add safe.directory "${MESHPOINT_DIR}"
 fi
 
-# Espressif USB serial devices (Heltec V3/V4, T-Beam ESP32-S3) may not
-# default to dialout group on all Pi OS versions. Add a udev rule so
-# the meshpoint service user can access them for relay and MeshCore.
-UDEV_RULE='SUBSYSTEM=="tty", ATTRS{idVendor}=="303a", MODE="0666"'
+# Espressif USB serial devices (Heltec V3/V4, T-Beam ESP32-S3) enumerate
+# with native USB (idVendor 303a) and may not land in the dialout group
+# on all Pi OS versions. Add a udev rule that puts them there at 0660 --
+# NOT 0666: the meshpoint user is already in dialout (see usermod above),
+# so world-writable would only hand every other local account raw access
+# to the mesh radios for nothing.
+UDEV_RULE='SUBSYSTEM=="tty", ATTRS{idVendor}=="303a", MODE="0660", GROUP="dialout"'
 UDEV_FILE="/etc/udev/rules.d/99-meshpoint-esp.rules"
-if [ ! -f "$UDEV_FILE" ]; then
-    info "Installing udev rule for Espressif USB serial devices..."
+if [ "$(cat "$UDEV_FILE" 2>/dev/null)" != "$UDEV_RULE" ]; then
+    info "Installing/updating udev rule for Espressif USB serial devices..."
     echo "$UDEV_RULE" > "$UDEV_FILE"
     udevadm control --reload-rules 2>/dev/null || true
     udevadm trigger 2>/dev/null || true
