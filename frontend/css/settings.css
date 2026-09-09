@@ -1555,6 +1555,8 @@ select.update-field__input option:checked {
 }
 .plugin-row__update:hover { background: var(--accent-cyan); color: var(--bg-primary); }
 .plugin-row__update:disabled { opacity: 0.5; cursor: default; }
+.plugin-row__update--down { border-color: var(--accent-amber); color: var(--accent-amber); }
+.plugin-row__update--down:hover { background: var(--accent-amber); color: var(--bg-primary); }
 
 .plugin-row__restart {
     display: block;

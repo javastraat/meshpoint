@@ -948,8 +948,12 @@ tampered `repo.json` can't smuggle anything in.
    existing Delete button. Provenance (source URL, ref, version) is
    recorded under `plugins.<id>.source` in `local.yaml`.
 4. **Updates** surface on their own — the plugin list scans every source's
-   catalog on load, so a plugin with a newer version upstream shows an
-   *Update vX → vY* button on its row without you having to open Browse.
+   catalog on load, so a plugin whose source offers a different version
+   shows an *Update vX → vY* button on its row without you having to open
+   Browse. An older offered version reads as *Downgrade* (amber, with an
+   extra warning). Browse also offers *Reinstall* when the versions match
+   — a fresh copy from the source, for a plugin you've broken by editing
+   it on the device.
 
 The source list lives in `local.yaml` (`plugin_sources:`), so it survives
 restarts and self-updates.

@@ -163,12 +163,34 @@ class PluginsPanelController {
                 this._updates[p.id] = {
                     url: cat.url || url, ref: cat.ref || ref,
                     installed_version: p.installed_version, version: p.version,
+                    downgrade: this._cmpVersions(p.version, p.installed_version) < 0,
                 };
             } else if (this._updates[p.id]) {
                 delete this._updates[p.id];
             }
         });
         if (this._plugins.length) this._render();
+    }
+
+    /** Rough semver-ish compare -> -1 / 0 / 1. Splits on . - + and
+     * compares numeric segments as numbers, the rest as strings; a
+     * missing segment sorts lower (so 0.1 < 0.1.0). Good enough to tell
+     * an update from a downgrade -- not a full semver implementation. */
+    _cmpVersions(a, b) {
+        const seg = (v) => String(v == null ? '' : v).split(/[.\-+]/)
+            .map((x) => (/^\d+$/.test(x) ? parseInt(x, 10) : x));
+        const pa = seg(a);
+        const pb = seg(b);
+        for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+            const x = pa[i];
+            const y = pb[i];
+            if (x === undefined) return -1;
+            if (y === undefined) return 1;
+            if (x === y) continue;
+            if (typeof x === 'number' && typeof y === 'number') return x < y ? -1 : 1;
+            return String(x) < String(y) ? -1 : 1;
+        }
+        return 0;
     }
 
     _onSourceClick(e) {
@@ -179,10 +201,11 @@ class PluginsPanelController {
         const installBtn = e.target.closest('[data-src-install]');
         if (installBtn) {
             const cat = row.querySelector('[data-src-catalog]');
-            this._installFromSource(
-                url, installBtn.dataset.id, cat.dataset.ref,
-                installBtn.dataset.update === '1', cat,
-            );
+            this._installFromSource(url, installBtn.dataset.id, cat.dataset.ref, {
+                action: installBtn.dataset.action || 'install',
+                from: installBtn.dataset.from || '',
+                to: installBtn.dataset.to || '',
+            }, cat);
             return;
         }
         if (e.target.closest('[data-src-browse]')) {
@@ -263,22 +286,27 @@ class PluginsPanelController {
             <p class="plugins-sources__catmeta">${this._escape(cat.name || url)} — <code>@ ${this._escape(cat.ref)}</code></p>
             <table class="plugins-table"><tbody>
             ${rows.map((p) => {
+                const down = p.update_available
+                    && this._cmpVersions(p.version, p.installed_version) < 0;
                 const badge = !p.compatible
                     ? '<span class="plugin-row__badge plugin-row__badge--community">needs newer Meshpoint</span>'
                     : p.update_available
-                        ? `<span class="plugin-row__count">update ${this._escape(p.installed_version)} → ${this._escape(p.version)}</span>`
+                        ? `<span class="plugin-row__count">${down ? 'downgrade' : 'update'} ${this._escape(p.installed_version)} → ${this._escape(p.version)}</span>`
                         : p.installed
                             ? '<span class="plugin-row__badge plugin-row__badge--builtin">installed</span>'
                             : '';
+                const attrs = (action) => `data-src-install data-id="${this._escape(p.id)}" `
+                    + `data-action="${action}" data-from="${this._escape(p.installed_version || '')}" `
+                    + `data-to="${this._escape(p.version)}"`;
                 let btn;
                 if (!p.compatible) {
                     btn = '<button type="button" class="terminal-button" disabled title="Update Meshpoint first">Install</button>';
                 } else if (p.update_available) {
-                    btn = `<button type="button" class="terminal-button" data-src-install data-id="${this._escape(p.id)}" data-update="1">Update</button>`;
+                    btn = `<button type="button" class="terminal-button" ${attrs(down ? 'downgrade' : 'update')}>${down ? 'Downgrade' : 'Update'}</button>`;
                 } else if (p.installed) {
-                    btn = '<button type="button" class="terminal-button" disabled>Installed</button>';
+                    btn = `<button type="button" class="terminal-button" ${attrs('reinstall')} title="Replace with a fresh copy from the source">Reinstall</button>`;
                 } else {
-                    btn = `<button type="button" class="terminal-button" data-src-install data-id="${this._escape(p.id)}">Install</button>`;
+                    btn = `<button type="button" class="terminal-button" ${attrs('install')}>Install</button>`;
                 }
                 return `<tr>
                     <td><span class="plugin-row__name">${this._escape(p.id)}</span>
@@ -290,17 +318,28 @@ class PluginsPanelController {
             </tbody></table>`;
     }
 
-    async _installFromSource(url, id, ref, isUpdate, catEl) {
-        const verb = isUpdate ? 'Update' : 'Install';
+    async _installFromSource(url, id, ref, opts, catEl) {
+        const { action = 'install', from = '', to = '' } = opts || {};
+        const VERB = { install: 'Install', update: 'Update', downgrade: 'Downgrade', reinstall: 'Reinstall' };
+        const PROG = { install: 'Installing', update: 'Updating', downgrade: 'Downgrading', reinstall: 'Reinstalling' };
+        const DONE = { install: 'Installed', update: 'Updated', downgrade: 'Downgraded', reinstall: 'Reinstalled' };
+        const verb = VERB[action] || 'Install';
+
+        let extra = '';
+        if (action === 'downgrade') {
+            extra = `\n\n⚠ This is a DOWNGRADE (v${from} → v${to}). Older plugin code may not read data or config written by the newer version — only go back if you know the older version works for you.`;
+        } else if (action === 'reinstall') {
+            extra = `\n\nThis replaces the plugin's files with a fresh v${to} copy from the source — any changes you made to it on the device are lost. Its enabled state is kept.`;
+        }
         const ok = await this._confirm(
-            `${verb} "${id}" from ${url}${ref ? ` @ ${ref}` : ''}?\n\n` +
+            `${verb} "${id}" from ${url}${ref ? ` @ ${ref}` : ''}?${extra}\n\n` +
             `Meshpoint downloads just this plugin's files, re-validates its plugin.toml, ` +
-            `and places it in plugins/apps/. It stays disabled until you enable it, and ` +
-            `any setup.sh is a separate step you run afterwards.`,
+            `and places it in plugins/apps/.${action === 'install' ? ' It stays disabled until you enable it.' : ''} ` +
+            `Any setup.sh is a separate step.`,
             { label: `${verb} plugin?`, command: `${verb.toLowerCase()} ${id}` },
         );
         if (!ok) return;
-        this._setSrcStatus('pending', `${isUpdate ? 'Updating' : 'Installing'} ${id}…`);
+        this._setSrcStatus('pending', `${PROG[action]} ${id}…`);
         try {
             const r = await fetch('/api/plugin-sources/install', {
                 method: 'POST', credentials: 'same-origin',
@@ -310,7 +349,7 @@ class PluginsPanelController {
             const body = await r.json().catch(() => ({}));
             if (!r.ok) { this._setSrcStatus('error', body.detail || `Failed (HTTP ${r.status}).`); return; }
             this._setSrcStatus('success',
-                `${body.updated ? 'Updated' : 'Installed'} ${id} v${body.version}. ` +
+                `${DONE[action]} ${id} v${body.version}. ` +
                 `${body.has_setup ? 'It needs setup — enable it and run setup below, then restart.'
                     : 'Enable it in the list above and restart to load it.'}`);
             delete this._updates[id];
@@ -325,16 +364,21 @@ class PluginsPanelController {
     async _updatePluginFromRow(plugin, button, resultEl) {
         const upd = this._updates[plugin.id];
         if (!upd) return;
+        const down = upd.downgrade;
+        const verb = down ? 'Downgrade' : 'Update';
+        const warn = down
+            ? `\n\n⚠ This is a DOWNGRADE (v${upd.installed_version} → v${upd.version}). Older plugin code may not read data or config written by the newer version — only go back if you know the older version works for you.`
+            : '';
         const ok = await this._confirm(
-            `Update "${plugin.id}" from v${upd.installed_version} to v${upd.version}?\n\n` +
+            `${verb} "${plugin.id}" from v${upd.installed_version} to v${upd.version}?${warn}\n\n` +
             `Downloaded from ${upd.url}${upd.ref ? ` @ ${upd.ref}` : ''}, re-validated, and ` +
             `installed in place. Its enabled state is kept — restart to load the new version.`,
-            { label: 'Update plugin?', command: `update ${plugin.id}` },
+            { label: `${verb} plugin?`, command: `${verb.toLowerCase()} ${plugin.id}` },
         );
         if (!ok) return;
         button.disabled = true;
         resultEl.dataset.kind = 'pending';
-        resultEl.textContent = 'Updating…';
+        resultEl.textContent = `${down ? 'Downgrading' : 'Updating'}…`;
         try {
             const r = await fetch('/api/plugin-sources/install', {
                 method: 'POST', credentials: 'same-origin',
@@ -351,7 +395,7 @@ class PluginsPanelController {
             delete this._updates[plugin.id];
             this._pendingMessage = {
                 id: plugin.id, kind: 'success',
-                text: `Updated to v${body.version}. Restart to load it.`,
+                text: `${down ? 'Downgraded' : 'Updated'} to v${body.version}. Restart to load it.`,
             };
             await this.refresh();
             this._loadSources();
@@ -682,6 +726,15 @@ class PluginsPanelController {
             ? `<p class="plugin-row__dep${dep.host_enabled ? '' : ' plugin-row__dep--unmet'}">Depends on: <code>${this._escape(dep.host_id || dep.host_route)}</code>${dep.host_id ? (dep.host_enabled ? ' (enabled)' : ' (not enabled)') : ' — not installed'}</p>`
             : '';
         const depBlocksEnable = !!dep && !dep.host_enabled && !plugin.enabled;
+        // A source offers a different version than what's installed -- one
+        // button on the row (Update, or Downgrade + a caution colour when
+        // the offered version is older), so the operator doesn't have to
+        // open Browse to find it. See _scanSource()/_updatePluginFromRow().
+        const upd = this._updates[plugin.id];
+        const updateBtnHtml = upd
+            ? `<button type="button" class="plugin-row__update${upd.downgrade ? ' plugin-row__update--down' : ''}" data-plugin-update title="From ${this._escape(upd.url)}">`
+              + `${upd.downgrade ? 'Downgrade' : 'Update'} v${this._escape(upd.installed_version)} &rarr; v${this._escape(upd.version)}</button>`
+            : '';
         const byLine = [
             plugin.author ? this._escape(plugin.author) : '',
             plugin.homepage ? `<a href="${this._escape(plugin.homepage)}" target="_blank" rel="noopener noreferrer">homepage</a>` : '',
@@ -706,7 +759,7 @@ class PluginsPanelController {
                     <input type="checkbox" data-toggle ${plugin.enabled ? 'checked' : ''} ${depBlocksEnable ? 'disabled' : ''}>
                     <span class="r-switch__track"></span>
                 </label>
-                ${this._updates[plugin.id] ? `<button type="button" class="plugin-row__update" data-plugin-update title="From ${this._escape(this._updates[plugin.id].url)}">Update v${this._escape(this._updates[plugin.id].installed_version)} → v${this._escape(this._updates[plugin.id].version)}</button>` : ''}
+                ${updateBtnHtml}
                 ${plugin.deletable ? `<button type="button" class="plugin-row__del" data-delete>Delete</button>` : ''}
                 ${plugin.restart_required ? `<span class="plugin-row__restart" data-restart>Restart to ${plugin.enabled ? 'load' : 'unload'}</span>` : ''}
                 <span class="plugin-row__result" data-result aria-live="polite"></span>
