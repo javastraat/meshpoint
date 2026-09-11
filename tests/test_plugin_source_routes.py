@@ -30,6 +30,19 @@ class TestPluginSourceRoutes(unittest.TestCase):
 
         self._mod = plugin_source_routes
         plugin_source_routes.reset_routes()
+        # Several tests below monkeypatch these module-level functions
+        # directly (fetch_catalog / _installed_index / resolve_commit /
+        # install_from_source) to fake a GitHub response without touching
+        # the network. The module object is a process-wide singleton --
+        # unlike self.cfg/self.client, an assignment to it survives past
+        # the test that made it, leaking into every test that runs after
+        # (alphabetically, not file order) unless it's restored. Snapshot
+        # + restore in tearDown so each test starts from the real
+        # implementation regardless of run order.
+        self._orig_fetch_catalog = plugin_source_routes.fetch_catalog
+        self._orig_installed_index = plugin_source_routes._installed_index
+        self._orig_resolve_commit = plugin_source_routes.resolve_commit
+        self._orig_install_from_source = plugin_source_routes.install_from_source
 
         self._tmp = tempfile.TemporaryDirectory()
         self._local_yaml = Path(self._tmp.name) / "local.yaml"
@@ -57,6 +70,10 @@ class TestPluginSourceRoutes(unittest.TestCase):
         self.client = TestClient(app)
 
     def tearDown(self) -> None:
+        self._mod.fetch_catalog = self._orig_fetch_catalog
+        self._mod._installed_index = self._orig_installed_index
+        self._mod.resolve_commit = self._orig_resolve_commit
+        self._mod.install_from_source = self._orig_install_from_source
         self._mod.reset_routes()
         self._tmp.cleanup()
 
