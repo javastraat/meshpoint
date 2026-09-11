@@ -71,18 +71,24 @@ class PluginsPanelController {
         this.srcStatusEl = rootEl.querySelector('[data-src-status]');
         this.srcListEl = rootEl.querySelector('[data-src-list]');
         this.srcSubtitleEl = rootEl.querySelector('[data-src-subtitle]');
-        this.srcDisabledNoteEl = rootEl.querySelector('[data-src-disabled-note]');
         this._sources = [];
-        // data-src-subtitle / data-src-add-form / data-src-disabled-note all
-        // start `hidden` in the markup itself (index.html) -- neither the
-        // "enabled" nor the "disabled" version of this card ever paints
-        // before /api/plugin-sources answers, so there's nothing to flash
-        // on reload while that fetch is in flight. This flag only matters
-        // as the fallback if the fetch itself fails (see _loadSources'
-        // catch) -- assume enabled so a network blip reveals the working
-        // form rather than getting stuck showing "disabled". Purely
-        // cosmetic either way -- POST /api/plugin-sources still 403s
-        // server-side regardless of what this hides.
+        // data-src-subtitle / data-src-add-form both start `hidden` in the
+        // markup itself (index.html) -- neither ever paints before
+        // /api/plugin-sources answers, so there's nothing to flash on
+        // reload while that fetch is in flight. While off, there's no
+        // note either -- same treatment as the Web terminal card in
+        // dangerous_panel_controller.js: don't hint the capability exists
+        // to a session that hasn't earned it. The already-configured
+        // sources list (data-src-list) is NOT part of this gate -- it
+        // renders unconditionally in _loadSources() below, since
+        // browsing/pinning/removing a source you already trust stays
+        // available no matter what this flag is (see
+        // plugin_source_routes.py's module docstring). This flag only
+        // matters as the fallback if the /api/plugin-sources fetch itself
+        // fails -- assume enabled so a network blip reveals the working
+        // form rather than getting stuck hidden. Purely cosmetic either
+        // way -- POST /api/plugin-sources still 403s server-side
+        // regardless of what this hides.
         this._sourcesEnabled = true;
         this._presets = [];
         // {pluginId: {url, ref, installed_version, version}} -- built from
@@ -162,20 +168,19 @@ class PluginsPanelController {
         this._renderSources();
     }
 
-    /** Reveals exactly one of "Add source" form + subtitle, or the disabled
-     * note, based on the ``plugin_sources_enabled`` master switch -- see
-     * plugin_source_routes.py. All three start `hidden` in the markup, so
-     * this is the first thing that un-hides any of them; nothing paints in
-     * the wrong (or a guessed) state while /api/plugin-sources is still in
-     * flight. There's no UI to flip the switch itself: it's
-     * filesystem-only, deliberately unreachable from a web session (admin
-     * or otherwise). Also clears any stale status text (e.g. a 403 from a
-     * click before this render ran) so the disabled note is the only thing
-     * shown, not both stacked. */
+    /** Reveals the "Add source" form + its subtitle once the
+     * ``plugin_sources_enabled`` master switch confirms true -- see
+     * plugin_source_routes.py. Both start `hidden` in the markup, so this
+     * is the first thing that ever un-hides them; nothing paints in a
+     * guessed state while /api/plugin-sources is still in flight. There's
+     * no UI to flip the switch itself (filesystem-only), and deliberately
+     * no "this is disabled" note while it's off either -- same silent
+     * treatment as the Web terminal card. Also clears any stale status
+     * text (e.g. a 403 from a click on a since-hidden form) so nothing is
+     * left behind once the form disappears. */
     _renderSourcesGate() {
         if (this.srcAddForm) this.srcAddForm.hidden = !this._sourcesEnabled;
         if (this.srcSubtitleEl) this.srcSubtitleEl.hidden = !this._sourcesEnabled;
-        if (this.srcDisabledNoteEl) this.srcDisabledNoteEl.hidden = this._sourcesEnabled;
         if (!this._sourcesEnabled) this._setSrcStatus('', '');
     }
 

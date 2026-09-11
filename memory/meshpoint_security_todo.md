@@ -92,7 +92,7 @@ Priority order is the user's own (set 2026-09-08).
 | 3 | **Web terminal → opt-in** | 🟢 Phase 1 done 2026-09-09 | **Kept in core (not a plugin) + config-gated.** `dashboard.web_terminal_enabled`, default `false`. Off = `terminal_routes` (HTTP + ws) 403, `identity_routes` drops `"terminal"` from `available_sections` so the sidebar hides it. Toggle: **Web terminal** card in Settings → System (`PUT /api/config/dashboard`, audited `config.dashboard_update`) with a `DangerousModal` ack spelling out the root implication. **No grandfather migration** (5 testers, they re-enable; CHANGELOG says so). Tests: `test_config_loader` (default off + yaml load), `test_identity_route` (section hidden), `test_terminal_routes` (403 + ws refused). Phase 2/3 = the sudoers/de-root work above (#2). |
 | 4 | **USB companion udev rules too permissive** | 🟢 Fixed 2026-09-09 | `99-meshpoint-esp.rules` shipped `MODE="0666"` for `idVendor 303a` (Espressif native-USB: Heltec V3/V4, T-Beam S3). Now `MODE="0660", GROUP="dialout"` in `install.sh` + a `post_update.sh` migration that rewrites the stale rule. **Verified on the SenseCap 2026-09-09:** the box's current radios are `ttyUSB0/1` (CP210x/CH340, *not* `303a`) and already showed the safe OS default `crw-rw---- root:dialout` — the `0666` rule only ever bit a plugged-in `303a` board (none attached), so live blast radius was nil; latent until a Heltec V3 is connected for firmware-flash/relay. See Fixed below. |
 | 5 | Plugin source: record + surface the resolved commit SHA | 🟢 Done 2026-09-09 | `plugins.<id>.source.commit` records the resolved short SHA at install. Plugin row shows `from owner/repo @ ref · <sha>`. `GET /api/plugin-sources/resolve` resolves a ref to its current commit; the Update confirm shows `installed <sha> → incoming <sha> "msg"` and flags a moving branch. `PATCH /api/plugin-sources` + **Pin/Unpin** buttons on the source row freeze a branch to the commit it points at now (`pinned_from` remembers the branch for Unpin). See Fixed. |
-| 6 | Plugin sources: filesystem-only enable gate | 🟢 Done 2026-09-11 | `plugin_sources_enabled: bool = False` (`src/config.py`, top-level, popped in `_apply_yaml` before the section loop so it's not flagged as an unknown key). **No API route sets it** — hand-edit `local.yaml` + restart, by design (see threat-model note above). `add_source`/`install_from_source_route` in `plugin_source_routes.py` 403 via `_require_sources_enabled()` while off; list/remove/catalog/resolve/repoint stay open. `GET /api/plugin-sources` now also returns `sources_enabled` so the frontend hides the Add-source form + shows an explanatory note. See Fixed. |
+| 6 | Plugin sources: filesystem-only enable gate | 🟢 Done 2026-09-11 | `plugin_sources_enabled: bool = False` (`src/config.py`, top-level, popped in `_apply_yaml` before the section loop so it's not flagged as an unknown key). **No API route sets it** — hand-edit `local.yaml` + restart, by design (see threat-model note above). `add_source`/`install_from_source_route` in `plugin_source_routes.py` 403 via `_require_sources_enabled()` while off; list/remove/catalog/resolve/repoint stay open. `GET /api/plugin-sources` now also returns `sources_enabled`. Frontend splits **show** (the already-configured sources list — always renders, since those routes were never gated) from **add** (form + subtitle hidden with no note while off, matching #7's silent treatment — follow-up 2026-09-11, see Fixed). |
 | 7 | Web terminal: filesystem-only toggle gate | 🟢 Done 2026-09-11 | `dashboard.web_terminal_toggle: bool = False` (`src/config.py`, nested — regular `dashboard:` section field, no special popping needed). **No API route sets it.** `PUT /api/config/dashboard` in `config_routes.py` 403s on any `web_terminal_enabled` change while it's off; `GET /api/config`'s `dashboard` block now also returns `web_terminal_toggle`. Settings → System's whole "Web terminal" card starts `hidden` in `index.html` and only un-hides once the fetched value is true — no explanatory note when it's off, unlike plugin sources, by explicit design (asked by auditor: don't hint the feature exists at all). See Fixed. |
 
 ---
@@ -217,6 +217,21 @@ _None yet. Template:_
   written up before this pass either); `docs/CHANGELOG.md` under
   `### Unreleased` → Plugins; `README.md`'s existing "Plugin sources"
   bullet extended in place.
+- **Follow-up 2026-09-11 (asked by auditor, after #7 landed):** split
+  "show" from "add" instead of showing a disabled note. The already-
+  configured sources list (`data-src-list` — Browse/Pin/Unpin/Remove)
+  was never actually gated by `sources_enabled` (those routes stay open
+  regardless, see Issue above), so it renders unconditionally in
+  `_loadSources()` same as before. What changed: `data-src-disabled-note`
+  is **gone** — removed from `index.html` entirely, along with
+  `srcDisabledNoteEl` in the controller. The Add-source form + its
+  subtitle now get exactly the same silent treatment as #7's Web terminal
+  card: both start `hidden` in the markup, `_renderSourcesGate()` only
+  un-hides them once `sources_enabled: true` is confirmed, nothing
+  indicates the capability exists while it's off. Considered and
+  rejected: hiding the *whole* card (list included) while disabled — would
+  have hidden a still-fully-functional Browse/Pin/Remove UI for a source
+  already added, for no security benefit (those verbs were never gated).
 
 ### 2026-09-09 — Reticulum "Browse" (NomadNet page fetch) wrongly required admin  (reported by auditor)
 - **Severity:** low (over-restrictive, not over-permissive — a usability/parity
