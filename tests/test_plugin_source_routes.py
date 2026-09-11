@@ -40,10 +40,13 @@ class TestPluginSourceRoutes(unittest.TestCase):
 
         self.cfg = AppConfig()
         self.cfg.plugin_sources_enabled = True  # off by default; most tests need it on
+        self._community_themes_dir = Path(self._tmp.name) / "plugin-themes"
         plugin_source_routes.init_routes(
             config=self.cfg,
             builtin_dir=Path(self._tmp.name) / "builtin",
             community_dir=Path(self._tmp.name) / "community",
+            themes_dir=Path(self._tmp.name) / "builtin-themes",
+            community_themes_dir=self._community_themes_dir,
         )
 
         app = FastAPI()
@@ -115,6 +118,72 @@ class TestPluginSourceRoutes(unittest.TestCase):
         self.assertTrue(entry["installed"])
         self.assertTrue(entry["update_available"])
         self.assertEqual(entry["installed_version"], "1.0")
+
+    def _write_installed_theme(self, theme_id: str) -> None:
+        """Drop a real theme.json on disk so scan_themes() (called for
+        real by _installed_index -- not monkeypatched, unlike the plugin
+        test above) actually discovers it."""
+        theme_dir = self._community_themes_dir / theme_id
+        theme_dir.mkdir(parents=True, exist_ok=True)
+        (theme_dir / "theme.json").write_text(
+            '{"id": "%s", "label": "%s"}' % (theme_id, theme_id), encoding="utf-8",
+        )
+        (theme_dir / "theme.css").write_text("/* not empty */\nbody{}", encoding="utf-8")
+
+    def test_catalog_marks_installed_theme_with_no_provenance(self) -> None:
+        """A theme dropped in some other way (no plugins.<id>.source
+        record) still shows installed -- just with an empty version rather
+        than a guessed one, since theme.json carries no version field."""
+        self._write_installed_theme("github-dark-theme")
+        catalog = {
+            "name": "t", "description": "", "owner": "you", "repo": "p", "ref": "main",
+            "url": "https://github.com/you/p", "plugins": [],
+            "themes": [
+                {"id": "github-dark-theme", "kind": "theme", "path": "themes/github-dark-theme",
+                 "version": "1.0.0", "meshpoint_api": 1, "provides": [], "description": "",
+                 "author": "", "homepage": "", "has_setup": False, "compatible": True},
+            ],
+        }
+        self._mod.fetch_catalog = lambda url, ref: dict(catalog)
+
+        r = self.client.get(
+            "/api/plugin-sources/catalog?url=https://github.com/you/p&ref=main",
+        )
+        self.assertEqual(r.status_code, 200, r.text)
+        entry = r.json()["themes"][0]
+        self.assertTrue(entry["installed"])
+        self.assertEqual(entry["installed_version"], "")
+        self.assertFalse(entry["update_available"])
+
+    def test_catalog_marks_installed_theme_with_provenance_version(self) -> None:
+        """Once installed through the Install button, plugins.<id>.source
+        records a version -- the catalog should report that, and flag an
+        update the same way it already does for apps."""
+        self._write_installed_theme("github-dark-theme")
+        self.cfg.plugins["github-dark-theme"] = {
+            "source": {"url": "https://github.com/you/p", "ref": "main",
+                       "version": "1.0.0", "commit": "abc1234"},
+        }
+        catalog = {
+            "name": "t", "description": "", "owner": "you", "repo": "p", "ref": "main",
+            "url": "https://github.com/you/p", "plugins": [],
+            "themes": [
+                {"id": "github-dark-theme", "kind": "theme", "path": "themes/github-dark-theme",
+                 "version": "2.0.0", "meshpoint_api": 1, "provides": [], "description": "",
+                 "author": "", "homepage": "", "has_setup": False, "compatible": True},
+            ],
+        }
+        self._mod.fetch_catalog = lambda url, ref: dict(catalog)
+
+        r = self.client.get(
+            "/api/plugin-sources/catalog?url=https://github.com/you/p&ref=main",
+        )
+        self.assertEqual(r.status_code, 200, r.text)
+        entry = r.json()["themes"][0]
+        self.assertTrue(entry["installed"])
+        self.assertEqual(entry["installed_version"], "1.0.0")
+        self.assertTrue(entry["update_available"])
+        self.assertEqual(entry["installed_commit"], "abc1234")
 
     def _catalog_with(self, entry_overrides: dict) -> dict:
         entry = {

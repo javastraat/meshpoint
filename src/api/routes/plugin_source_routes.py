@@ -46,6 +46,7 @@ from src.api.audit import AuditLogWriter
 from src.api.audit.dependencies import get_audit_writer
 from src.api.auth.dependencies import require_admin
 from src.api.auth.jwt_session import SessionClaims
+from src.api.theme_registry import scan_themes
 from src.config import AppConfig, save_section_to_yaml, save_top_level_to_yaml
 from src.plugins.installer import PluginInstallError, install_from_source
 from src.plugins.manifest import SOURCE_COMMUNITY, discover_plugins
@@ -67,22 +68,32 @@ router = APIRouter(prefix="/api/plugin-sources", tags=["plugins"])
 _config: AppConfig | None = None
 _builtin_dir: Path | None = None
 _community_dir: Path | None = None
+_themes_dir: Path | None = None
+_community_themes_dir: Path | None = None
 
 
 def init_routes(
-    config: AppConfig, builtin_dir: Path, community_dir: Path,
+    config: AppConfig,
+    builtin_dir: Path,
+    community_dir: Path,
+    themes_dir: Path | None = None,
+    community_themes_dir: Path | None = None,
 ) -> None:
-    global _config, _builtin_dir, _community_dir
+    global _config, _builtin_dir, _community_dir, _themes_dir, _community_themes_dir
     _config = config
     _builtin_dir = builtin_dir
     _community_dir = community_dir
+    _themes_dir = themes_dir
+    _community_themes_dir = community_themes_dir
 
 
 def reset_routes() -> None:
-    global _config, _builtin_dir, _community_dir
+    global _config, _builtin_dir, _community_dir, _themes_dir, _community_themes_dir
     _config = None
     _builtin_dir = None
     _community_dir = None
+    _themes_dir = None
+    _community_themes_dir = None
 
 
 def _require_config() -> AppConfig:
@@ -119,8 +130,21 @@ def _persist(sources: list[dict]) -> None:
 
 def _installed_index() -> dict[str, str]:
     """id -> installed version, for every discovered plugin (built-in +
-    community drop-in). Used to annotate catalog entries."""
-    return {m.name: m.version for m in discover_plugins(_builtin_dir, _community_dir)}
+    community drop-in) AND every discovered theme (built-in + plugin
+    drop-in). Used to annotate catalog entries so an already-installed
+    theme shows "installed"/"Reinstall" in Browse, not "Install" forever --
+    themes don't carry their own version the way ``plugin.toml`` does (no
+    such field in ``theme.json`` / ``scan_themes()``'s output), so a
+    theme's reported version comes from install provenance
+    (``plugins.<id>.source.version``, written by ``_record_provenance``)
+    when there is one, else ``""`` -- still marks it installed, just with
+    nothing to diff a catalog version against (``update_available`` stays
+    False rather than guessing)."""
+    installed = {m.name: m.version for m in discover_plugins(_builtin_dir, _community_dir)}
+    if _themes_dir is not None:
+        for t in scan_themes(_themes_dir, _community_themes_dir):
+            installed.setdefault(t["id"], _provenance(t["id"]).get("version") or "")
+    return installed
 
 
 def _provenance(plugin_id: str) -> dict:

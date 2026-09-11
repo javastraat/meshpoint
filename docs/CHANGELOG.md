@@ -24,7 +24,14 @@
   403s until `plugin_sources_enabled: true` is hand-set in `config/local.yaml`
   and the service restarted — there's no API route or UI toggle for it, so a
   compromised admin session can't re-enable the capability on its own. The
-  Add-source form hides itself with an explanatory note while it's off.
+  Add-source form hides itself (no explanatory note, matching Web terminal
+  above) while it's off; an already-configured source's Browse/Pin/Remove
+  stay available regardless.
+- **Browse now recognizes an already-installed theme.** A source's catalog
+  view showed "Install" forever for a theme even after installing it —
+  only app plugins were checked against what's actually on disk. Themes now
+  show "installed"/"Reinstall" too, and flag an update the same way apps do
+  when a later install recorded a newer version.
 
 #### Docs
 

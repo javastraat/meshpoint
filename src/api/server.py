@@ -1945,6 +1945,8 @@ def _init_routes(
         config=config,
         builtin_dir=_plugins_builtin_dir,
         community_dir=_plugins_community_dir,
+        themes_dir=Path(config.dashboard.static_dir) / "themes",
+        community_themes_dir=Path(config.dashboard.plugins_dir) / "themes",
     )
     meshtastic_firmware_routes.init_routes(config=config, serial_sources=_find_serial_sources(coord))
     meshcore_firmware_routes.init_routes(config=config, meshcore_sources=_find_meshcore_sources(coord))
