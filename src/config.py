@@ -395,6 +395,22 @@ class DashboardConfig:
     # by default so a box has no web-shell surface unless someone opts in
     # via Settings -> System. Restart required to apply.
     web_terminal_enabled: bool = False
+    # Master switch for the Settings -> System "Web terminal" card itself --
+    # off by default, and (like plugin_sources_enabled) there is NO API
+    # route that sets it, only hand-editing local.yaml + restart. Without
+    # it, `PUT /api/config/dashboard` refuses to change web_terminal_enabled
+    # and the card doesn't render at all (not even a "disabled" note --
+    # nothing hints the feature exists). This is deliberately a *second*
+    # flag rather than making web_terminal_enabled itself filesystem-only:
+    # once an operator has opted in here, the existing on/off checkbox
+    # keeps working normally for day-to-day convenience, instead of every
+    # enable/disable needing its own SSH trip. The tradeoff is real and
+    # accepted -- after opting in, a compromised admin session can still
+    # flip web_terminal_enabled + trigger a restart (POST
+    # /api/dangerous/invoke) exactly as before. What this closes is the
+    # much larger population who never opt in at all: for them the
+    # capability is completely inert, not just hidden.
+    web_terminal_toggle: bool = False
 
 
 @dataclass

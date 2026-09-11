@@ -150,7 +150,7 @@ This is a customized fork of upstream [KMX415/meshpoint](https://github.com/KMX4
 
 **Radio configuration from the dashboard.** Change region, modem preset, frequency, TX power, and duty cycle without SSH. Add and remove channels with custom PSKs. Toggle TX enable/disable. All settings saved to `local.yaml` and survive restarts.
 
-**Web terminal.** A full shell in the browser (Ops → Terminal, admin only): a real PTY streamed over WebSocket with search, clipboard support, and a one-click catalog of common maintenance commands. Quick fixes without reaching for an SSH client.
+**Web terminal.** A full shell in the browser (Ops → Terminal, admin only): a real PTY streamed over WebSocket with search, clipboard support, and a one-click catalog of common maintenance commands. Quick fixes without reaching for an SSH client. Off by default (`dashboard.web_terminal_enabled`), toggleable from Settings → System with a confirm dialog — and that toggle itself only appears once `dashboard.web_terminal_toggle: true` is hand-set in `local.yaml` and the service restarted (same filesystem-only opt-in as plugin sources, below), so a compromised admin session can't enable a root shell on a device that was never meant to have one.
 
 **Dashboard authentication.** First visit prompts you to set an admin password; sessions are HttpOnly cookies with failed-login lockout. An optional read-only **viewer** role shares the dashboard without exposing configuration, channel keys, or any write access.
 

@@ -55,6 +55,15 @@
     animation: authPanelFadeIn 360ms ease-out both;
 }
 
+/* `display: flex` above beats the browser's built-in `[hidden] { display:
+ * none }` UA rule (author CSS always wins on equal specificity) -- see
+ * .plugins-sources__add[hidden] and configuration.css's .cfg-field[hidden]
+ * for the same fix elsewhere. Needed so the Web terminal card can start
+ * (and stay) hidden while dashboard.web_terminal_toggle is off. */
+.web-terminal-card[hidden] {
+    display: none;
+}
+
 .auth-card:focus-within {
     border-color: rgba(255, 184, 77, 0.4);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.32);

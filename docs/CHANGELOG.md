@@ -7,6 +7,15 @@
 - **Local map tiles.** OSM raster with a dark invert filter, replacing
   CARTO Dark Matter after anonymous CARTO raster requests started
   returning an API-key watermark.
+- **Web terminal's Settings toggle needs a filesystem-only opt-in first.**
+  Settings → System's "Web terminal" card is now hidden by default (no
+  card, no note, no hint it exists) until `web_terminal_toggle: true` is
+  hand-set under `dashboard:` in `config/local.yaml` and the service
+  restarted. Once opted in, the existing on/off checkbox works as before.
+  Closes the same class of gap as the plugin-sources change below: a
+  hijacked admin session could previously enable the terminal and
+  self-trigger a restart via two ordinary admin-audited API calls, no
+  filesystem access needed.
 
 #### Plugins
 

@@ -16,6 +16,7 @@ class DangerousPanelController {
         this.statusEl = rootEl.querySelector('[data-dangerous-status]');
         this.modal = new window.DangerousModal();
         this._actions = [];
+        this.wtCardEl = rootEl.querySelector('[data-web-terminal-card]');
         this.wtToggle = rootEl.querySelector('[data-web-terminal-toggle]');
         this.wtStatusEl = rootEl.querySelector('[data-web-terminal-status]');
     }
@@ -46,12 +47,24 @@ class DangerousPanelController {
 
     // ── Web terminal enable/disable ─────────────────────────────────────
 
+    /** The whole card starts `hidden` in the markup (index.html) -- it
+     * only appears once ``dashboard.web_terminal_toggle`` confirms true.
+     * That flag has no API/UI of its own to set it (filesystem-only, see
+     * src/config.py and update_dashboard()'s 403 in config_routes.py), so
+     * unlike the plugin-sources disabled state, there's deliberately no
+     * "this is disabled, here's how to enable it" note either -- an
+     * operator who never opted in shouldn't see any hint the web terminal
+     * exists at all. Leaving it hidden is also the safe default on a
+     * failed fetch, same reasoning as _renderSourcesGate() in
+     * plugins_panel_controller.js. */
     async _loadWebTerminalState() {
         if (!this.wtToggle) return;
         try {
             const r = await fetch('/api/config', { credentials: 'same-origin' });
             if (!r.ok) { this._setWtStatus('error', `Could not load (HTTP ${r.status}).`); return; }
             const cfg = await r.json();
+            if (!(cfg.dashboard && cfg.dashboard.web_terminal_toggle)) return;
+            if (this.wtCardEl) this.wtCardEl.hidden = false;
             const on = !!(cfg.dashboard && cfg.dashboard.web_terminal_enabled);
             this.wtToggle.checked = on;
             this.wtToggle.disabled = false;

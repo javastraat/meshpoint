@@ -128,6 +128,15 @@ dashboard:                # web dashboard / API server
   # Off by default -- any admin session is effectively root while this is
   # on. Settings -> System also has a toggle for it.
   web_terminal_enabled: false
+  # Master switch for the Settings -> System "Web terminal" card itself.
+  # Off by default, and -- same as plugin_sources_enabled below -- there
+  # is deliberately NO Settings page toggle or API route for this one:
+  # hand-edit it here (or in local.yaml) and restart. Until it's true, the
+  # card above doesn't render at all and PUT /api/config/dashboard refuses
+  # to change web_terminal_enabled, so a compromised admin session can't
+  # opt a device into the web terminal being possible at all -- it can
+  # only flip web_terminal_enabled once the device owner already has.
+  web_terminal_toggle: false
 
 metrics:                  # Prometheus-compatible /metrics scrape endpoint
   enabled: false

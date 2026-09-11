@@ -394,6 +394,7 @@ async def get_config(claims: SessionClaims = Depends(require_auth)):
         "serial": serial_status,
         "dashboard": {
             "web_terminal_enabled": _config.dashboard.web_terminal_enabled,
+            "web_terminal_toggle": _config.dashboard.web_terminal_toggle,
         },
         "duty_cycle": duty_info,
         "presets": all_presets_list(),
@@ -573,12 +574,25 @@ async def update_dashboard(
     """Dashboard-level settings that are safe to change at runtime but only
     take effect on the next restart. Currently just
     ``web_terminal_enabled`` -- turning it on gives every admin session a
-    root-capable shell on the device, so it's audited."""
+    root-capable shell on the device, so it's audited.
+
+    Gated behind ``dashboard.web_terminal_toggle``: with no API route of
+    its own (filesystem-only, see src/config.py), it's the actual consent
+    point -- 403 here until an operator has hand-set it in local.yaml, so
+    a compromised admin session can't enable the terminal on a device
+    where the owner never opted into that being possible at all."""
     if _config is None:
         raise HTTPException(503, "Config not loaded")
 
     updates: dict = {}
     if req.web_terminal_enabled is not None:
+        if not _config.dashboard.web_terminal_toggle:
+            raise HTTPException(
+                403,
+                "The web terminal is disabled on this device. Enable it by "
+                "setting `web_terminal_toggle: true` under `dashboard:` in "
+                "config/local.yaml and restarting the service.",
+            )
         _config.dashboard.web_terminal_enabled = req.web_terminal_enabled
         updates["web_terminal_enabled"] = req.web_terminal_enabled
 

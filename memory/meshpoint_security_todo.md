@@ -8,8 +8,10 @@ verification evidence).
 See `memory/project_m1_meshpoint.md` for wider session context and
 `memory/reticulum_todo.md` for the Reticulum plugin backlog.
 
-Last updated 2026-09-11 — **#6 (plugin sources: filesystem-only enable
-gate) done**, per auditor question. #4 (udev `0666`→`0660`) fixed+verified;
+Last updated 2026-09-11 — **#7 (web terminal: filesystem-only toggle gate)
+done**, closing the exact gap #6's own threat-model note called out against
+`dashboard.web_terminal_enabled`. **#6 (plugin sources: filesystem-only
+enable gate) done**, per auditor question. #4 (udev `0666`→`0660`) fixed+verified;
 #5 (plugin-source SHA/pin) done; #3 phase 1 (web terminal opt-in) done;
 **#2 phase 2 (drop the `sudo git` / `sudo pip`-as-root grants) done AND
 Pi-verified 2026-09-09** — real self-update ran on the new plain-git path,
@@ -59,9 +61,23 @@ Read this before filing a finding — some of these are deliberate.
   box. As of #6, adding a source / installing from one is also gated by
   `plugin_sources_enabled` (default `false`), which has **no API route or
   dashboard toggle** — filesystem-only, `local.yaml` + restart. That's the
-  actual defense-in-depth: unlike `dashboard.web_terminal_enabled` (#3,
-  toggleable over the API), a session that's fully compromised still
+  actual defense-in-depth: a session that's fully compromised still
   cannot turn this one on. Backlog #6 (done).
+- **`dashboard.web_terminal_enabled` itself is still toggleable over the
+  API** (`PUT /api/config/dashboard`) — same shape of gap as the one above,
+  and a shorter chain to root: enable it, then `POST
+  /api/dangerous/invoke {id:"restart_service"}` (also just admin +
+  a static confirm string) applies it. Backlog #7 closes this **for anyone
+  who's never opted in**: `dashboard.web_terminal_toggle` (default
+  `false`, filesystem-only, same as `plugin_sources_enabled`) gates both
+  the `PUT` route (403 until true) and whether the Settings → System card
+  renders at all. Deliberately a *second* flag rather than making
+  `web_terminal_enabled` itself filesystem-only — once opted in, the
+  existing checkbox keeps working for convenience, which means a
+  compromised session can still flip it + restart *after that point*,
+  same as before #7. The population this protects is whoever leaves the
+  master switch off, i.e. anyone who doesn't actually use the terminal.
+  Backlog #7 (done).
 
 ---
 
@@ -77,6 +93,7 @@ Priority order is the user's own (set 2026-09-08).
 | 4 | **USB companion udev rules too permissive** | 🟢 Fixed 2026-09-09 | `99-meshpoint-esp.rules` shipped `MODE="0666"` for `idVendor 303a` (Espressif native-USB: Heltec V3/V4, T-Beam S3). Now `MODE="0660", GROUP="dialout"` in `install.sh` + a `post_update.sh` migration that rewrites the stale rule. **Verified on the SenseCap 2026-09-09:** the box's current radios are `ttyUSB0/1` (CP210x/CH340, *not* `303a`) and already showed the safe OS default `crw-rw---- root:dialout` — the `0666` rule only ever bit a plugged-in `303a` board (none attached), so live blast radius was nil; latent until a Heltec V3 is connected for firmware-flash/relay. See Fixed below. |
 | 5 | Plugin source: record + surface the resolved commit SHA | 🟢 Done 2026-09-09 | `plugins.<id>.source.commit` records the resolved short SHA at install. Plugin row shows `from owner/repo @ ref · <sha>`. `GET /api/plugin-sources/resolve` resolves a ref to its current commit; the Update confirm shows `installed <sha> → incoming <sha> "msg"` and flags a moving branch. `PATCH /api/plugin-sources` + **Pin/Unpin** buttons on the source row freeze a branch to the commit it points at now (`pinned_from` remembers the branch for Unpin). See Fixed. |
 | 6 | Plugin sources: filesystem-only enable gate | 🟢 Done 2026-09-11 | `plugin_sources_enabled: bool = False` (`src/config.py`, top-level, popped in `_apply_yaml` before the section loop so it's not flagged as an unknown key). **No API route sets it** — hand-edit `local.yaml` + restart, by design (see threat-model note above). `add_source`/`install_from_source_route` in `plugin_source_routes.py` 403 via `_require_sources_enabled()` while off; list/remove/catalog/resolve/repoint stay open. `GET /api/plugin-sources` now also returns `sources_enabled` so the frontend hides the Add-source form + shows an explanatory note. See Fixed. |
+| 7 | Web terminal: filesystem-only toggle gate | 🟢 Done 2026-09-11 | `dashboard.web_terminal_toggle: bool = False` (`src/config.py`, nested — regular `dashboard:` section field, no special popping needed). **No API route sets it.** `PUT /api/config/dashboard` in `config_routes.py` 403s on any `web_terminal_enabled` change while it's off; `GET /api/config`'s `dashboard` block now also returns `web_terminal_toggle`. Settings → System's whole "Web terminal" card starts `hidden` in `index.html` and only un-hides once the fetched value is true — no explanatory note when it's off, unlike plugin sources, by explicit design (asked by auditor: don't hint the feature exists at all). See Fixed. |
 
 ---
 
@@ -97,6 +114,61 @@ _None yet. Template:_
 ---
 
 ## Fixed
+
+### 2026-09-11 — web terminal: filesystem-only toggle gate  (asked by auditor)
+- **Not a vuln in isolation** — same shape as the plugin-sources fix right
+  below, closing the gap between "admin session compromised" and "root
+  shell obtained," which the existing mitigations (confirm dialog, audit
+  log) leave open since both only require *an* admin session.
+- **Issue:** `PUT /api/config/dashboard {web_terminal_enabled: true}` is a
+  plain admin-gated route. `POST /api/dangerous/invoke {id:
+  "restart_service", confirmation: "restart"}` is too. Both just need an
+  admin session and a static, publicly-known confirm string — no
+  filesystem access anywhere. So a compromised/phished admin session could
+  enable the terminal, trigger its own restart, and have a root-capable
+  shell within seconds. Worse than the plugin-sources gap: the payoff here
+  is immediate and total, not "a plugin sitting disabled on disk."
+- **Design conversation:** two options considered — (A) make
+  `web_terminal_enabled` itself filesystem-only, full stop, matching
+  `plugin_sources_enabled` exactly (strongest, but every future on/off
+  needs an SSH round-trip, not just the first); (B) a second, purely
+  filesystem-only master flag that gates whether the *existing* checkbox
+  is reachable at all — once opted in, the convenient web toggle keeps
+  working. Presented both with the tradeoff spelled out
+  (`AskUserQuestion`); **user picked (B)**, their original proposal.
+- **Fix:** `dashboard.web_terminal_toggle: bool = False` (`src/config.py`).
+  No route sets it. `update_dashboard()` in `config_routes.py` 403s any
+  `web_terminal_enabled` change (either direction) while it's off, with a
+  message pointing at the config key. `get_config()`'s `dashboard` block
+  now also returns `web_terminal_toggle`. Frontend: the whole "Web
+  terminal" `<article>` in `index.html` starts `hidden` (plus a
+  `.web-terminal-card[hidden] { display: none }` CSS rule -- `.auth-card`'s
+  `display: flex` otherwise beats the bare `[hidden]` UA rule, same gotcha
+  as the plugin-sources fix two commits earlier); `dangerous_panel_controller.js`'s
+  `_loadWebTerminalState()` only un-hides it once `GET /api/config`
+  confirms `web_terminal_toggle: true` — **no explanatory note when it's
+  off**, unlike plugin sources' disabled note, by explicit ask: don't hint
+  the feature exists at all to a session that hasn't earned it.
+  `config/default.yaml` documents both flags at their `false` default.
+- **Known, accepted limitation:** once an operator opts in
+  (`web_terminal_toggle: true`), the underlying `web_terminal_enabled`
+  flip is reachable via the API exactly as before — a compromised session
+  at that point can still enable + restart. This only fully protects
+  operators who never opt in. Full closure would need option (A); revisit
+  if that tradeoff ever stops being acceptable.
+- **Tests:** `tests/test_config_routes.py` (new file, 6 cases — default
+  off, `GET /api/config` reports both flags, enable refused / disable
+  refused while off, enable succeeds once on, confirms no field on
+  `DashboardUpdate` can set the toggle itself), `tests/test_config_loader.py`
+  +1 (`web_terminal_toggle` default off + loads from yaml, no unknown-key
+  warning). All CI/Pi-gated (`_HAS_FASTAPI`) except the loader test, which
+  ran green on the Mac (32 passed). **Not yet Pi-verified**: the actual
+  `local.yaml` edit + restart + Settings → System round trip (card hidden
+  while off, 403 attempting the route directly, card appears and checkbox
+  works once set).
+- **Docs:** `docs/CONFIGURATION.md` (new `web_terminal_toggle` writeup next
+  to `web_terminal_enabled`'s existing one), `docs/CHANGELOG.md` under
+  `### Unreleased` → Dashboard, `README.md`'s "Web terminal" bullet extended.
 
 ### 2026-09-11 — plugin sources: filesystem-only enable gate  (asked by auditor)
 - **Not a vuln in isolation** — closes the gap between "admin session
