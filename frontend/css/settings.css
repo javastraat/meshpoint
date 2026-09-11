@@ -1216,6 +1216,16 @@ select.update-field__input option:checked {
 
 .plugins-panel__status[data-kind="error"] { color: var(--accent-red); }
 
+/* No reserved gap while there's nothing to say -- the min-height/margin
+   above exist so a status message doesn't cause a layout jump when it
+   DOES appear, but an empty one (e.g. the plugin-sources status line
+   whenever the Add-source form is hidden) shouldn't leave blank space
+   behind. */
+.plugins-panel__status:empty {
+    min-height: 0;
+    margin: 0;
+}
+
 /* Same table language as Settings > Themes' "Installed themes" list
    (.te-installed in theme_editor.css) -- kept as its own class rather than
    a shared one so the two features don't couple, but the rules mirror it
