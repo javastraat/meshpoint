@@ -1071,6 +1071,7 @@
                             <input type="text" class="plugins-sources__ref" data-src-ref placeholder="branch / tag (main)" autocomplete="off">
                             <button class="terminal-button" type="submit">Add source</button>
                         </form>
+                        <p class="plugins-panel__status" data-src-disabled-note hidden>Adding plugin sources is disabled on this device. Enable it by setting <code>plugin_sources_enabled: true</code> in <code>config/local.yaml</code> and restarting the service.</p>
                         <p class="plugins-panel__status" data-src-status aria-live="polite"></p>
                         <div data-src-list></div>
                     </article>

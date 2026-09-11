@@ -18,6 +18,17 @@ explicit ``confirm: true`` and is audited. Installing re-validates the
 real manifest from the downloaded files (never the catalog), refuses a
 built-in or ``locked`` id, and leaves the plugin disabled -- enabling it
 and running its setup script stay separate, explicit actions.
+
+**Master switch:** the whole subsystem also sits behind
+``plugin_sources_enabled`` (default ``False``, see ``src/config.py``),
+which has no API route -- it's set by hand-editing ``local.yaml`` and
+restarting. ``confirm: true`` only proves the *current* admin session
+consents; a compromised/phished session is still just an admin session,
+so if this switch were toggleable over the API it would protect
+nothing. Gated here: adding a source and installing from one. Left
+open regardless of the switch: listing/removing configured sources and
+browsing/resolving an already-added one's catalog -- read-only, and
+removal only ever narrows what's trusted.
 """
 
 from __future__ import annotations
@@ -80,6 +91,20 @@ def _require_config() -> AppConfig:
     return _config
 
 
+def _require_sources_enabled() -> None:
+    """403 unless ``plugin_sources_enabled`` was hand-set in local.yaml.
+
+    No route in this file can flip that flag -- see the module docstring.
+    """
+    if not _require_config().plugin_sources_enabled:
+        raise HTTPException(
+            403,
+            "Plugin sources are disabled on this device. Enable them by "
+            "setting `plugin_sources_enabled: true` in config/local.yaml "
+            "and restarting the service.",
+        )
+
+
 def _sources() -> list[dict]:
     return [s for s in _require_config().plugin_sources if isinstance(s, dict)]
 
@@ -107,8 +132,10 @@ def _provenance(plugin_id: str) -> dict:
 
 @router.get("")
 async def list_sources():
-    """Every configured plugin source (not fetched -- just what's in config)."""
-    return {"sources": _sources()}
+    """Every configured plugin source (not fetched -- just what's in config),
+    plus ``sources_enabled`` so the Settings -> Plugins UI can hide the
+    "Add source" form / Install buttons when the master switch is off."""
+    return {"sources": _sources(), "sources_enabled": _require_config().plugin_sources_enabled}
 
 
 class AddSource(BaseModel):
@@ -125,7 +152,7 @@ async def add_source(
 ):
     """Add a plugin source. ``confirm: true`` is required -- the caller has
     acknowledged that a source can install privileged code."""
-    _require_config()
+    _require_sources_enabled()
     if not req.confirm:
         raise HTTPException(
             400,
@@ -351,6 +378,7 @@ async def install_from_source_route(
     """
     if _config is None or _community_dir is None:
         raise HTTPException(503, "Config not loaded")
+    _require_sources_enabled()
 
     try:
         owner, repo = parse_github_url(req.url)

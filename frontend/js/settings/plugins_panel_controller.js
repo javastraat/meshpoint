@@ -70,7 +70,13 @@ class PluginsPanelController {
         this.srcRefEl = rootEl.querySelector('[data-src-ref]');
         this.srcStatusEl = rootEl.querySelector('[data-src-status]');
         this.srcListEl = rootEl.querySelector('[data-src-list]');
+        this.srcDisabledNoteEl = rootEl.querySelector('[data-src-disabled-note]');
         this._sources = [];
+        // Assume enabled until /api/plugin-sources says otherwise, so the
+        // form doesn't flash hidden->shown on the common case. Purely
+        // cosmetic either way -- POST /api/plugin-sources still 403s
+        // server-side regardless of what this hides.
+        this._sourcesEnabled = true;
         this._presets = [];
         // {pluginId: {url, ref, installed_version, version}} -- built from
         // each source's catalog on load, so a plugin whose source offers a
@@ -139,9 +145,24 @@ class PluginsPanelController {
     async _loadSources() {
         try {
             const r = await fetch('/api/plugin-sources', { credentials: 'same-origin' });
-            if (r.ok) this._sources = (await r.json()).sources || [];
+            if (r.ok) {
+                const body = await r.json();
+                this._sources = body.sources || [];
+                this._sourcesEnabled = body.sources_enabled !== false;
+            }
         } catch (_) {}
+        this._renderSourcesGate();
         this._renderSources();
+    }
+
+    /** Hides the "Add source" form (and its presets dropdown) and shows an
+     * explanatory note when the ``plugin_sources_enabled`` master switch is
+     * off -- see plugin_source_routes.py. There's no UI to flip the switch
+     * itself: it's filesystem-only, deliberately unreachable from a web
+     * session (admin or otherwise). */
+    _renderSourcesGate() {
+        if (this.srcAddForm) this.srcAddForm.hidden = !this._sourcesEnabled;
+        if (this.srcDisabledNoteEl) this.srcDisabledNoteEl.hidden = this._sourcesEnabled;
     }
 
     _renderSources() {

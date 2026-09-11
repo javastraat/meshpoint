@@ -124,6 +124,10 @@ dashboard:                # web dashboard / API server
   # Once tls_enabled is on, `port` above becomes a plain-HTTP listener
   # that only 308-redirects to this port -- the real dashboard moves here.
   tls_port: 8443
+  # Ops -> Terminal: a full interactive shell on the device, sudo-capable.
+  # Off by default -- any admin session is effectively root while this is
+  # on. Settings -> System also has a toggle for it.
+  web_terminal_enabled: false
 
 metrics:                  # Prometheus-compatible /metrics scrape endpoint
   enabled: false
@@ -347,4 +351,20 @@ plugins: {}
   #   freqs: [131.525, 131.725, 131.800, 131.825]  # optional, default: EU channels above
   #   gain: 34             # optional, default: 34 (not AGC -- overloads on strong ground stations)
   #   device: 0            # optional, default: 0 (RTL-SDR device index)
-  
+
+# Operator-added plugin repositories (Settings -> Plugins -> "Add source").
+# Set by the dashboard when you add a source there, not normally hand-edited.
+# plugin_sources:
+#   - url: https://github.com/you/meshpoint-plugins
+#     ref: main
+plugin_sources: []
+
+# Master switch for the whole plugin-sources subsystem (add a source /
+# browse its catalog / install from it) -- see docs/CONFIGURATION.md
+# "Plugin sources". Off by default, and there is deliberately NO Settings
+# page toggle or API route for this one, unlike every other flag in this
+# file: it can only be changed by hand-editing this value in local.yaml
+# and restarting. That's intentional -- adding/installing a source is one
+# admin click away otherwise, so if a compromised admin session could also
+# flip this on over the API, it would guard nothing.
+plugin_sources_enabled: false

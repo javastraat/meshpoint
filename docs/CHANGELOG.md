@@ -8,6 +8,15 @@
   CARTO Dark Matter after anonymous CARTO raster requests started
   returning an API-key watermark.
 
+#### Plugins
+
+- **Plugin sources are off by default, filesystem-only to turn on.** Settings
+  → Plugins → "Add source" (and installing from an already-added one) now
+  403s until `plugin_sources_enabled: true` is hand-set in `config/local.yaml`
+  and the service restarted — there's no API route or UI toggle for it, so a
+  compromised admin session can't re-enable the capability on its own. The
+  Add-source form hides itself with an explanatory note while it's off.
+
 #### Docs
 
 - **Bobcat 300 capture yaml.** Step 5 now uses `capture.concentrator_spi_device`

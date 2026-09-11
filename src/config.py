@@ -723,6 +723,15 @@ class AppConfig:
     # src/api/routes/plugin_source_routes.py; persisted here so a source
     # survives restarts and self-updates (local.yaml is user-owned).
     plugin_sources: list = field(default_factory=list)
+    # Master switch for the plugin-sources subsystem (add a source / browse
+    # its catalog / install from it). Off by default, and deliberately has
+    # NO api route to flip it -- unlike other opt-in flags (e.g.
+    # dashboard.web_terminal_enabled), adding a source already only takes an
+    # admin session + a client-side confirm click, so a route to toggle this
+    # would let a compromised/phished admin session re-enable the very thing
+    # it's meant to gate. It's filesystem-only: hand-edit
+    # `plugin_sources_enabled: true` into local.yaml and restart.
+    plugin_sources_enabled: bool = False
 
 
 def _resolve_radio_frequency(radio: "RadioConfig") -> None:
@@ -811,6 +820,14 @@ def _apply_yaml(cfg: AppConfig, path: Path) -> None:
     sources_raw = raw.pop("plugin_sources", None)
     if isinstance(sources_raw, list):
         cfg.plugin_sources = [s for s in sources_raw if isinstance(s, dict)]
+
+    # Filesystem-only master switch (see the field's docstring) -- popped
+    # here, same as plugin_sources, so it never lands in section_map / the
+    # unknown-key warning below and there is nowhere in the API surface
+    # that can set it.
+    enabled_raw = raw.pop("plugin_sources_enabled", None)
+    if isinstance(enabled_raw, bool):
+        cfg.plugin_sources_enabled = enabled_raw
 
     # meshcore_usb supports both a legacy single-dict and a new list-of-dicts.
     # Pop it before the generic merge so _merge_dataclass doesn't store raw dicts.

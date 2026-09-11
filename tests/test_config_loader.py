@@ -501,6 +501,30 @@ class LoadConfigIntegrationTest(unittest.TestCase):
                 os.environ["CONCENTRATOR_CONFIG"] = old
         self.assertTrue(cfg.dashboard.web_terminal_enabled)
 
+    def test_plugin_sources_enabled_defaults_off_and_loads_from_yaml(self):
+        self.assertFalse(AppConfig().plugin_sources_enabled)
+        tmp = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", delete=False, encoding="utf-8"
+        )
+        tmp.write("plugin_sources_enabled: true\n")
+        tmp.close()
+        path = Path(tmp.name)
+        self.addCleanup(lambda: path.unlink(missing_ok=True))
+        old = os.environ.get("CONCENTRATOR_CONFIG")
+        os.environ["CONCENTRATOR_CONFIG"] = str(path)
+        try:
+            # Top-level, not a dataclass section -- must be popped before
+            # the section loop or it logs as an unknown key (same check
+            # web_terminal_enabled's sibling test runs for its own key).
+            with self.assertNoLogs("src.config", level="WARNING"):
+                cfg = load_config()
+        finally:
+            if old is None:
+                os.environ.pop("CONCENTRATOR_CONFIG", None)
+            else:
+                os.environ["CONCENTRATOR_CONFIG"] = old
+        self.assertTrue(cfg.plugin_sources_enabled)
+
 
 if __name__ == "__main__":
     unittest.main()

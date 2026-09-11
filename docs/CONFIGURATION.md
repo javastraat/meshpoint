@@ -1470,6 +1470,42 @@ community plugin (a shipped/bundled one, like ACARS — see below) can't be
 deleted this way; `git` tracks their files, so removing them wouldn't stick
 past the next `Update` anyway.
 
+### Plugin sources
+
+**Settings → Plugins → "Add source"** lets an admin point Meshpoint at a
+GitHub repo of installable plugins/themes (its `repo.json` catalog — see
+[docs/PLUGINS.md](PLUGINS.md) for the repo format), browse it, and install
+an entry from it. Added sources persist to `local.yaml`:
+
+```yaml
+plugin_sources:
+  - url: https://github.com/you/meshpoint-plugins
+    ref: main                # branch, tag, or a pinned commit SHA
+    added_at: "2026-09-10T12:00:00+00:00"
+    added_by: admin
+```
+
+**`plugin_sources_enabled`** (default `false`; **no API route or dashboard
+toggle sets it** — hand-edit `local.yaml` and restart):
+
+```yaml
+plugin_sources_enabled: true
+```
+
+Adding a source is a one-click, in-session `confirm: true` away from
+installing code that runs with the service's privileges (and root, via a
+plugin's `setup.sh`). That's a reasonable bar against an *accidental* click,
+but it's no bar at all against a *compromised* admin session — whoever holds
+the session can just tick the same confirm box. So unlike other opt-in
+dashboard flags (`dashboard.web_terminal_enabled` among them), this one is
+deliberately unreachable from any authenticated route: `POST`
+(add)/`POST /install` 403 with an explanatory message until you've set it by
+hand on the device and restarted. The Settings → Plugins "Add source" form
+hides itself with the same explanation while it's off. Listing/removing
+already-configured sources and browsing/resolving one's catalog stay
+available regardless — read-only, and removal only ever narrows what's
+trusted.
+
 ## Device Identity
 
 ```yaml

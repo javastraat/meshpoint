@@ -39,6 +39,7 @@ class TestPluginSourceRoutes(unittest.TestCase):
         self.addCleanup(os.environ.pop, "CONCENTRATOR_CONFIG", None)
 
         self.cfg = AppConfig()
+        self.cfg.plugin_sources_enabled = True  # off by default; most tests need it on
         plugin_source_routes.init_routes(
             config=self.cfg,
             builtin_dir=Path(self._tmp.name) / "builtin",
@@ -213,6 +214,84 @@ class TestPluginSourceRoutes(unittest.TestCase):
             "url": "https://github.com/you/p", "ref": "b" * 40,
         })
         self.assertEqual(r.status_code, 404)
+
+    def test_list_reports_sources_enabled(self) -> None:
+        r = self.client.get("/api/plugin-sources")
+        self.assertTrue(r.json()["sources_enabled"])
+
+
+@unittest.skipUnless(_HAS_FASTAPI, "routes import fastapi (CI / Pi only)")
+class TestPluginSourcesDisabledByDefault(unittest.TestCase):
+    """``plugin_sources_enabled`` defaults False and has no API to flip it --
+    add/install must 403 until it's hand-set in local.yaml, while read-only
+    list/catalog/resolve and source removal stay unaffected."""
+
+    def setUp(self) -> None:
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+
+        from src.api.auth.dependencies import require_admin
+        from src.api.auth.jwt_session import ROLE_ADMIN, SessionClaims
+        from src.api.routes import plugin_source_routes
+        from src.config import AppConfig
+
+        self._mod = plugin_source_routes
+        plugin_source_routes.reset_routes()
+
+        self._tmp = tempfile.TemporaryDirectory()
+        import os
+        os.environ["CONCENTRATOR_CONFIG"] = str(Path(self._tmp.name) / "local.yaml")
+        self.addCleanup(os.environ.pop, "CONCENTRATOR_CONFIG", None)
+
+        self.cfg = AppConfig()  # plugin_sources_enabled left at its False default
+        plugin_source_routes.init_routes(
+            config=self.cfg,
+            builtin_dir=Path(self._tmp.name) / "builtin",
+            community_dir=Path(self._tmp.name) / "community",
+        )
+
+        app = FastAPI()
+        app.dependency_overrides[require_admin] = lambda: SessionClaims(
+            subject="admin", role=ROLE_ADMIN, session_version=1,
+        )
+        app.include_router(plugin_source_routes.router)
+        self.client = TestClient(app)
+
+    def tearDown(self) -> None:
+        self._mod.reset_routes()
+        self._tmp.cleanup()
+
+    def test_config_defaults_disabled(self) -> None:
+        from src.config import AppConfig
+        self.assertFalse(AppConfig().plugin_sources_enabled)
+
+    def test_add_source_403_when_disabled(self) -> None:
+        r = self.client.post("/api/plugin-sources", json={
+            "url": "https://github.com/you/meshpoint-plugins", "confirm": True,
+        })
+        self.assertEqual(r.status_code, 403)
+        self.assertIn("plugin_sources_enabled", r.json()["detail"])
+
+    def test_install_403_when_disabled(self) -> None:
+        r = self.client.post("/api/plugin-sources/install", json={
+            "url": "https://github.com/you/p", "id": "demo",
+        })
+        self.assertEqual(r.status_code, 403)
+
+    def test_list_reports_disabled(self) -> None:
+        r = self.client.get("/api/plugin-sources")
+        self.assertEqual(r.status_code, 200)
+        self.assertFalse(r.json()["sources_enabled"])
+
+    def test_no_route_can_enable_it(self) -> None:
+        """There is deliberately no PUT/PATCH that touches this flag --
+        confirm the config object is untouched by every other verb this
+        router exposes."""
+        self.client.patch("/api/plugin-sources", json={
+            "url": "https://github.com/you/p", "ref": "main",
+        })
+        self.client.delete("/api/plugin-sources?url=https://github.com/you/p")
+        self.assertFalse(self.cfg.plugin_sources_enabled)
 
 
 if __name__ == "__main__":  # pragma: no cover
