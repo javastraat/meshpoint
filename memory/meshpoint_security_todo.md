@@ -8,18 +8,22 @@ verification evidence).
 See `memory/project_m1_meshpoint.md` for wider session context and
 `memory/reticulum_todo.md` for the Reticulum plugin backlog.
 
-Last updated 2026-09-11 — **#7 (web terminal: filesystem-only toggle gate)
-done**, closing the exact gap #6's own threat-model note called out against
-`dashboard.web_terminal_enabled`. **#6 (plugin sources: filesystem-only
-enable gate) done**, per auditor question. #4 (udev `0666`→`0660`) fixed+verified;
-#5 (plugin-source SHA/pin) done; #3 phase 1 (web terminal opt-in) done;
-**#2 phase 2 (drop the `sudo git` / `sudo pip`-as-root grants) done AND
-Pi-verified 2026-09-09** — real self-update ran on the new plain-git path,
-`sudo -l -U meshpoint` shows no git grants + pip is `(meshpoint)`, venv has
-no root-owned files, service healthy. #1 (TLS) cert SAN verified on the
-SenseCap — every live address in the cert. **Only real work left: #2/#3
-phase 3** — move the sudoers-invoked scripts (`apply_finish.sh`,
-`post_update.sh`, `install.sh`) out of the service-user-writable tree.
+Last updated 2026-09-11 — **#6 and #7 (plugin-sources / web-terminal
+filesystem-only gates) done AND Pi-verified by the user** — the
+`local.yaml` edit + restart + UI round trip confirmed working for both
+(disabled state hides the right UI with no hint, re-appears once opted
+in). Reticulum Browse auth-gating (2026-09-09 fix) now has real regression
+tests (`TestBrowseAuthGating`, 6 cases). #4 (udev `0666`→`0660`)
+fixed+verified; #5 (plugin-source SHA/pin) done; #3 phase 1 (web terminal
+opt-in) done; **#2 phase 2 (drop the `sudo git` / `sudo pip`-as-root
+grants) done AND Pi-verified 2026-09-09** — real self-update ran on the
+new plain-git path, `sudo -l -U meshpoint` shows no git grants + pip is
+`(meshpoint)`, venv has no root-owned files, service healthy. #1 (TLS)
+cert SAN verified on the SenseCap — every live address in the cert.
+**Only real work left: #2/#3 phase 3** — move the sudoers-invoked scripts
+(`apply_finish.sh`, `post_update.sh`, `install.sh`) out of the
+service-user-writable tree. Small owed follow-up: #4's udev fix has never
+been confirmed with an actual Heltec V3 (`303a`) device plugged in.
 
 ---
 
@@ -92,8 +96,8 @@ Priority order is the user's own (set 2026-09-08).
 | 3 | **Web terminal → opt-in** | 🟢 Phase 1 done 2026-09-09 | **Kept in core (not a plugin) + config-gated.** `dashboard.web_terminal_enabled`, default `false`. Off = `terminal_routes` (HTTP + ws) 403, `identity_routes` drops `"terminal"` from `available_sections` so the sidebar hides it. Toggle: **Web terminal** card in Settings → System (`PUT /api/config/dashboard`, audited `config.dashboard_update`) with a `DangerousModal` ack spelling out the root implication. **No grandfather migration** (5 testers, they re-enable; CHANGELOG says so). Tests: `test_config_loader` (default off + yaml load), `test_identity_route` (section hidden), `test_terminal_routes` (403 + ws refused). Phase 2/3 = the sudoers/de-root work above (#2). |
 | 4 | **USB companion udev rules too permissive** | 🟢 Fixed 2026-09-09 | `99-meshpoint-esp.rules` shipped `MODE="0666"` for `idVendor 303a` (Espressif native-USB: Heltec V3/V4, T-Beam S3). Now `MODE="0660", GROUP="dialout"` in `install.sh` + a `post_update.sh` migration that rewrites the stale rule. **Verified on the SenseCap 2026-09-09:** the box's current radios are `ttyUSB0/1` (CP210x/CH340, *not* `303a`) and already showed the safe OS default `crw-rw---- root:dialout` — the `0666` rule only ever bit a plugged-in `303a` board (none attached), so live blast radius was nil; latent until a Heltec V3 is connected for firmware-flash/relay. See Fixed below. |
 | 5 | Plugin source: record + surface the resolved commit SHA | 🟢 Done 2026-09-09 | `plugins.<id>.source.commit` records the resolved short SHA at install. Plugin row shows `from owner/repo @ ref · <sha>`. `GET /api/plugin-sources/resolve` resolves a ref to its current commit; the Update confirm shows `installed <sha> → incoming <sha> "msg"` and flags a moving branch. `PATCH /api/plugin-sources` + **Pin/Unpin** buttons on the source row freeze a branch to the commit it points at now (`pinned_from` remembers the branch for Unpin). See Fixed. |
-| 6 | Plugin sources: filesystem-only enable gate | 🟢 Done 2026-09-11 | `plugin_sources_enabled: bool = False` (`src/config.py`, top-level, popped in `_apply_yaml` before the section loop so it's not flagged as an unknown key). **No API route sets it** — hand-edit `local.yaml` + restart, by design (see threat-model note above). `add_source`/`install_from_source_route` in `plugin_source_routes.py` 403 via `_require_sources_enabled()` while off; list/remove/catalog/resolve/repoint stay open. `GET /api/plugin-sources` now also returns `sources_enabled`. Frontend splits **show** (the already-configured sources list — always renders, since those routes were never gated) from **add** (form + subtitle hidden with no note while off, matching #7's silent treatment — follow-up 2026-09-11, see Fixed). |
-| 7 | Web terminal: filesystem-only toggle gate | 🟢 Done 2026-09-11 | `dashboard.web_terminal_toggle: bool = False` (`src/config.py`, nested — regular `dashboard:` section field, no special popping needed). **No API route sets it.** `PUT /api/config/dashboard` in `config_routes.py` 403s on any `web_terminal_enabled` change while it's off; `GET /api/config`'s `dashboard` block now also returns `web_terminal_toggle`. Settings → System's whole "Web terminal" card starts `hidden` in `index.html` and only un-hides once the fetched value is true — no explanatory note when it's off, unlike plugin sources, by explicit design (asked by auditor: don't hint the feature exists at all). See Fixed. |
+| 6 | Plugin sources: filesystem-only enable gate | 🟢 Done + Pi-verified 2026-09-11 | `plugin_sources_enabled: bool = False` (`src/config.py`, top-level, popped in `_apply_yaml` before the section loop so it's not flagged as an unknown key). **No API route sets it** — hand-edit `local.yaml` + restart, by design (see threat-model note above). `add_source`/`install_from_source_route` in `plugin_source_routes.py` 403 via `_require_sources_enabled()` while off; list/remove/catalog/resolve/repoint stay open. `GET /api/plugin-sources` now also returns `sources_enabled`. Frontend splits **show** (the already-configured sources list — always renders, since those routes were never gated) from **add** (form + subtitle hidden with no note while off, matching #7's silent treatment — follow-up 2026-09-11, see Fixed). |
+| 7 | Web terminal: filesystem-only toggle gate | 🟢 Done + Pi-verified 2026-09-11 | `dashboard.web_terminal_toggle: bool = False` (`src/config.py`, nested — regular `dashboard:` section field, no special popping needed). **No API route sets it.** `PUT /api/config/dashboard` in `config_routes.py` 403s on any `web_terminal_enabled` change while it's off; `GET /api/config`'s `dashboard` block now also returns `web_terminal_toggle`. Settings → System's whole "Web terminal" card starts `hidden` in `index.html` and only un-hides once the fetched value is true — no explanatory note when it's off, unlike plugin sources, by explicit design (asked by auditor: don't hint the feature exists at all). See Fixed. |
 
 ---
 
@@ -162,10 +166,10 @@ _None yet. Template:_
   `DashboardUpdate` can set the toggle itself), `tests/test_config_loader.py`
   +1 (`web_terminal_toggle` default off + loads from yaml, no unknown-key
   warning). All CI/Pi-gated (`_HAS_FASTAPI`) except the loader test, which
-  ran green on the Mac (32 passed). **Not yet Pi-verified**: the actual
-  `local.yaml` edit + restart + Settings → System round trip (card hidden
-  while off, 403 attempting the route directly, card appears and checkbox
-  works once set).
+  ran green on the Mac (32 passed). **Pi-verified 2026-09-11 by the user**:
+  the `local.yaml` edit + restart + Settings → System round trip confirmed
+  working (card hidden while off, appears with the checkbox working once
+  `web_terminal_toggle: true` is set).
 - **Docs:** `docs/CONFIGURATION.md` (new `web_terminal_toggle` writeup next
   to `web_terminal_enabled`'s existing one), `docs/CHANGELOG.md` under
   `### Unreleased` → Dashboard, `README.md`'s "Web terminal" bullet extended.
@@ -209,9 +213,10 @@ _None yet. Template:_
   `test_plugin_sources_enabled_defaults_off_and_loads_from_yaml` (default
   False, loads from a bare top-level YAML key, no unknown-key warning).
   All CI/Pi-gated (`_HAS_FASTAPI`) except the config-loader test, which
-  ran green on the Mac. **Not yet Pi-verified**: the actual `local.yaml`
-  edit + restart + Settings → Plugins page round trip (form hidden while
-  off, 403 attempting the route directly, form reappears once set).
+  ran green on the Mac. **Pi-verified 2026-09-11 by the user**: the
+  `local.yaml` edit + restart + Settings → Plugins page round trip
+  confirmed working (form hidden while off, reappears once
+  `plugin_sources_enabled: true` is set).
 - **Docs:** `docs/CONFIGURATION.md` new "### Plugin sources" subsection
   (previously undocumented entirely — `plugin_sources` itself wasn't
   written up before this pass either); `docs/CHANGELOG.md` under

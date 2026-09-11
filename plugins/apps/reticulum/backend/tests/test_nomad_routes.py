@@ -100,14 +100,20 @@ class _FakeLxmfService:
         return []
 
 
-async def _deny_forbidden(*_a, **_kw):
+async def _deny_forbidden():
     """Stand-in for require_admin as seen by a non-admin session -- same
-    status/detail the real dependency raises for claims.role != admin."""
+    status/detail the real dependency raises for claims.role != admin.
+
+    Deliberately zero-argument: FastAPI inspects an override's own
+    signature to build its dependant tree, and a `*args, **kwargs` catch-
+    all (the first version of this) gets misread as requiring a request
+    body, turning every route that used it into a 422 instead of the
+    401/403 being tested for."""
     from fastapi import HTTPException
     raise HTTPException(403, "admin role required")
 
 
-async def _deny_unauthorized(*_a, **_kw):
+async def _deny_unauthorized():
     """Stand-in for require_auth/require_admin as seen by no session at
     all -- same status/detail the real dependency raises when unauthed."""
     from fastapi import HTTPException
