@@ -257,10 +257,19 @@ _None yet. Template:_
   the inline "Browse" buttons on the Peers/Activity tables no longer check
   `_isAdmin`; the Contacts-tab Browse button stays admin-gated since
   Contacts itself is still an admin-only tab.
-- **Tests:** none added — no test file covers `nomad_routes.py` auth wiring
-  yet; verified by reading the route/frontend logic only. Owed: a
-  regression test asserting `/nodes`/`/page`/`/file` accept a viewer
-  session and `/pages*` still 403s one.
+- **Tests (added 2026-09-11):** `plugins/apps/reticulum/backend/tests/test_nomad_routes.py`
+  gains `TestBrowseAuthGating` (6 cases) — explicit `dependency_overrides`
+  for both `require_auth` and `require_admin` per test (not a real JWT
+  service, not leaving one unoverridden -- FastAPI only rewires the exact
+  `Depends(...)` callable a route declares, so `require_admin`'s own
+  internal `await require_auth(...)` call is untouched by overriding
+  `require_auth` alone). Viewer session: `GET /nodes` 200 (empty roster),
+  `POST /page`/`POST /file` 200 (both stub `nomad.fetch_page`/`fetch_file`
+  to skip a real Reticulum Link), all five `/pages*` routes 403. Separate
+  case: no session at all -> `GET /nodes` 401, covering the second bug
+  above. `nomad.fetch_page`/`fetch_file` monkeypatches are snapshotted +
+  restored in `tearDown` (see the plugin-sources test-isolation fix same
+  day for the leak this guards against).
 
 ### 2026-09-09 — self-update chain: no more `sudo git` / root `sudo pip`  (backlog #2 phase 2)
 - **Severity:** high (arbitrary code as root for any admin session / anything hijacking one)
