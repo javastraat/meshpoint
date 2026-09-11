@@ -70,6 +70,7 @@ class PluginsPanelController {
         this.srcRefEl = rootEl.querySelector('[data-src-ref]');
         this.srcStatusEl = rootEl.querySelector('[data-src-status]');
         this.srcListEl = rootEl.querySelector('[data-src-list]');
+        this.srcSubtitleEl = rootEl.querySelector('[data-src-subtitle]');
         this.srcDisabledNoteEl = rootEl.querySelector('[data-src-disabled-note]');
         this._sources = [];
         // Assume enabled until /api/plugin-sources says otherwise, so the
@@ -155,14 +156,19 @@ class PluginsPanelController {
         this._renderSources();
     }
 
-    /** Hides the "Add source" form (and its presets dropdown) and shows an
-     * explanatory note when the ``plugin_sources_enabled`` master switch is
-     * off -- see plugin_source_routes.py. There's no UI to flip the switch
-     * itself: it's filesystem-only, deliberately unreachable from a web
-     * session (admin or otherwise). */
+    /** Hides the "Add source" form (and its presets dropdown) and swaps the
+     * normal subtitle for an explanatory note when the
+     * ``plugin_sources_enabled`` master switch is off -- see
+     * plugin_source_routes.py. There's no UI to flip the switch itself:
+     * it's filesystem-only, deliberately unreachable from a web session
+     * (admin or otherwise). Also clears any stale status text (e.g. a 403
+     * from a click before this render ran) so the disabled note is the
+     * only thing shown, not both stacked. */
     _renderSourcesGate() {
         if (this.srcAddForm) this.srcAddForm.hidden = !this._sourcesEnabled;
+        if (this.srcSubtitleEl) this.srcSubtitleEl.hidden = !this._sourcesEnabled;
         if (this.srcDisabledNoteEl) this.srcDisabledNoteEl.hidden = this._sourcesEnabled;
+        if (!this._sourcesEnabled) this._setSrcStatus('', '');
     }
 
     _renderSources() {

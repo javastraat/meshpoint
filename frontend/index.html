@@ -1061,7 +1061,8 @@
                     <article class="auth-card plugins-sources">
                         <div class="plugins-sources__head">
                             <h3 class="plugins-sources__title">Plugin sources</h3>
-                            <p class="plugins-sources__subtitle">Add a GitHub repository of plugins and themes, then browse what it offers. <strong>A source can install code that runs with the service's privileges</strong> — only add sources you trust.</p>
+                            <p class="plugins-sources__subtitle" data-src-subtitle>Add a GitHub repository of plugins and themes, then browse what it offers. <strong>A source can install code that runs with the service's privileges</strong> — only add sources you trust.</p>
+                            <p class="plugins-sources__subtitle" data-src-disabled-note hidden>Adding plugin sources is disabled on this device. Enable it by setting <code>plugin_sources_enabled: true</code> in <code>config/local.yaml</code> and restarting the service.</p>
                         </div>
                         <form class="plugins-sources__add" data-src-add-form>
                             <select class="plugins-sources__preset" data-src-preset title="Fill in a known community repo">
@@ -1071,7 +1072,6 @@
                             <input type="text" class="plugins-sources__ref" data-src-ref placeholder="branch / tag (main)" autocomplete="off">
                             <button class="terminal-button" type="submit">Add source</button>
                         </form>
-                        <p class="plugins-panel__status" data-src-disabled-note hidden>Adding plugin sources is disabled on this device. Enable it by setting <code>plugin_sources_enabled: true</code> in <code>config/local.yaml</code> and restarting the service.</p>
                         <p class="plugins-panel__status" data-src-status aria-live="polite"></p>
                         <div data-src-list></div>
                     </article>

@@ -1242,6 +1242,14 @@ select.update-field__input option:checked {
     align-items: center;
     margin-bottom: 0.5rem;
 }
+/* `display: flex` above beats the browser's built-in `[hidden] { display:
+ * none }` UA rule (author CSS always wins on equal specificity) -- see
+ * configuration.css's .cfg-field[hidden] for the same fix. Needed so
+ * PluginsPanelController hiding this form while plugin_sources_enabled is
+ * off actually hides it. */
+.plugins-sources__add[hidden] {
+    display: none;
+}
 .plugins-sources__preset { flex: 0 1 200px; }
 .plugins-sources__url { flex: 1 1 320px; }
 .plugins-sources__ref { flex: 0 1 160px; }
