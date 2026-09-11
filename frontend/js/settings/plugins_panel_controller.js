@@ -71,6 +71,7 @@ class PluginsPanelController {
         this.srcStatusEl = rootEl.querySelector('[data-src-status]');
         this.srcListEl = rootEl.querySelector('[data-src-list]');
         this.srcSubtitleEl = rootEl.querySelector('[data-src-subtitle]');
+        this.srcCardEl = rootEl.querySelector('[data-plugin-sources-card]');
         this._sources = [];
         // data-src-subtitle / data-src-add-form both start `hidden` in the
         // markup itself (index.html) -- neither ever paints before
@@ -177,10 +178,19 @@ class PluginsPanelController {
      * no "this is disabled" note while it's off either -- same silent
      * treatment as the Web terminal card. Also clears any stale status
      * text (e.g. a 403 from a click on a since-hidden form) so nothing is
-     * left behind once the form disappears. */
+     * left behind once the form disappears.
+     *
+     * The whole card also stays hidden in one specific case: disabled AND
+     * no source configured. There's nothing to browse/manage (empty list)
+     * and nothing to add (form hidden) -- an empty "Plugin sources" box
+     * with no explanation is just confusing clutter, worse than not being
+     * there. Any source already configured keeps the card (and its own
+     * management UI) visible regardless of the flag, same reasoning as
+     * leaving list/remove/pin ungated server-side. */
     _renderSourcesGate() {
         if (this.srcAddForm) this.srcAddForm.hidden = !this._sourcesEnabled;
         if (this.srcSubtitleEl) this.srcSubtitleEl.hidden = !this._sourcesEnabled;
+        if (this.srcCardEl) this.srcCardEl.hidden = !this._sourcesEnabled && this._sources.length === 0;
         if (!this._sourcesEnabled) this._setSrcStatus('', '');
     }
 

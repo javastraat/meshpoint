@@ -59,8 +59,11 @@
  * none }` UA rule (author CSS always wins on equal specificity) -- see
  * .plugins-sources__add[hidden] and configuration.css's .cfg-field[hidden]
  * for the same fix elsewhere. Needed so the Web terminal card can start
- * (and stay) hidden while dashboard.web_terminal_toggle is off. */
-.web-terminal-card[hidden] {
+ * (and stay) hidden while dashboard.web_terminal_toggle is off, and same
+ * for the whole Plugin sources card when plugin_sources_enabled is off
+ * AND no source is configured -- nothing to browse, nothing to add. */
+.web-terminal-card[hidden],
+.plugins-sources[hidden] {
     display: none;
 }
 
