@@ -137,6 +137,11 @@ dashboard:                # web dashboard / API server
   # opt a device into the web terminal being possible at all -- it can
   # only flip web_terminal_enabled once the device owner already has.
   web_terminal_toggle: false
+  # Leaflet tile source for the Dashboard + Topology maps. Default is the
+  # public OSM tile server -- override for offline/emergency use once tiles
+  # are downloaded locally (e.g. via the offline-map plugin):
+  #   map_tile_url: "http://127.0.0.1:8080/api/offline-map/tiles/<collection>/<style>/{z}/{x}/{y}.png"
+  map_tile_url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
 
 metrics:                  # Prometheus-compatible /metrics scrape endpoint
   enabled: false

@@ -395,6 +395,7 @@ async def get_config(claims: SessionClaims = Depends(require_auth)):
         "dashboard": {
             "web_terminal_enabled": _config.dashboard.web_terminal_enabled,
             "web_terminal_toggle": _config.dashboard.web_terminal_toggle,
+            "map_tile_url": _config.dashboard.map_tile_url,
         },
         "duty_cycle": duty_info,
         "presets": all_presets_list(),
@@ -563,6 +564,7 @@ async def update_identity(
 
 class DashboardUpdate(BaseModel):
     web_terminal_enabled: Optional[bool] = None
+    map_tile_url: Optional[str] = None
 
 
 @router.put("/dashboard")
@@ -571,20 +573,27 @@ async def update_dashboard(
     claims: SessionClaims = Depends(require_admin),
     audit: AuditLogWriter = Depends(get_audit_writer),
 ):
-    """Dashboard-level settings that are safe to change at runtime but only
-    take effect on the next restart. Currently just
-    ``web_terminal_enabled`` -- turning it on gives every admin session a
-    root-capable shell on the device, so it's audited.
+    """Dashboard-level settings that persist to local.yaml.
 
-    Gated behind ``dashboard.web_terminal_toggle``: with no API route of
-    its own (filesystem-only, see src/config.py), it's the actual consent
-    point -- 403 here until an operator has hand-set it in local.yaml, so
-    a compromised admin session can't enable the terminal on a device
-    where the owner never opted into that being possible at all."""
+    ``web_terminal_enabled`` only takes effect on the next restart (it's
+    baked into terminal_routes/identity_routes at boot) -- turning it on
+    gives every admin session a root-capable shell on the device, so it's
+    audited, and gated behind ``dashboard.web_terminal_toggle``: with no
+    API route of its own (filesystem-only, see src/config.py), that's the
+    actual consent point -- 403 here until an operator has hand-set it in
+    local.yaml, so a compromised admin session can't enable the terminal
+    on a device where the owner never opted into that being possible at
+    all.
+
+    ``map_tile_url`` takes effect immediately -- every map re-fetches
+    GET /api/config fresh each time it's created (frontend/js/
+    map_tile_source.js), nothing about it is cached at server startup."""
     if _config is None:
         raise HTTPException(503, "Config not loaded")
 
     updates: dict = {}
+    restart_required = False
+
     if req.web_terminal_enabled is not None:
         if not _config.dashboard.web_terminal_toggle:
             raise HTTPException(
@@ -595,6 +604,18 @@ async def update_dashboard(
             )
         _config.dashboard.web_terminal_enabled = req.web_terminal_enabled
         updates["web_terminal_enabled"] = req.web_terminal_enabled
+        restart_required = True
+
+    if req.map_tile_url is not None:
+        url = req.map_tile_url.strip()
+        if not url:
+            raise HTTPException(400, "map_tile_url cannot be blank")
+        if not all(placeholder in url for placeholder in ("{z}", "{x}", "{y}")):
+            raise HTTPException(
+                400, "map_tile_url must contain {z}, {x}, and {y} placeholders",
+            )
+        _config.dashboard.map_tile_url = url
+        updates["map_tile_url"] = url
 
     if not updates:
         return {"saved": True, "restart_required": False, "updates": {}}
@@ -607,7 +628,7 @@ async def update_dashboard(
         except PermissionError as exc:
             raise HTTPException(403, str(exc))
 
-    return {"saved": True, "restart_required": True, "updates": updates}
+    return {"saved": True, "restart_required": restart_required, "updates": updates}
 
 
 class RadioUpdate(BaseModel):

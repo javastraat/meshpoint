@@ -66,6 +66,7 @@ class TestWebTerminalToggleGate(unittest.TestCase):
         self.assertEqual(r.json()["dashboard"], {
             "web_terminal_enabled": False,
             "web_terminal_toggle": False,
+            "map_tile_url": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
         })
 
     def test_enable_refused_while_toggle_off(self) -> None:
@@ -100,6 +101,27 @@ class TestWebTerminalToggleGate(unittest.TestCase):
         })
         self.assertEqual(r.status_code, 200, r.text)
         self.assertTrue(self.cfg.dashboard.web_terminal_toggle)  # untouched
+
+    def test_map_tile_url_updates_without_needing_a_restart(self) -> None:
+        """Unlike web_terminal_enabled, a tile source change takes effect
+        on the next map load -- nothing about it is baked in at boot."""
+        url = "http://127.0.0.1:8080/api/offline-map/tiles/meshpoint/OSM/{z}/{x}/{y}.png"
+        r = self.client.put("/api/config/dashboard", json={"map_tile_url": url})
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual(self.cfg.dashboard.map_tile_url, url)
+        self.assertFalse(r.json()["restart_required"])
+
+    def test_map_tile_url_rejects_missing_placeholders(self) -> None:
+        original = self.cfg.dashboard.map_tile_url
+        r = self.client.put("/api/config/dashboard", json={
+            "map_tile_url": "http://127.0.0.1:8080/tiles/x/y/z.png",
+        })
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(self.cfg.dashboard.map_tile_url, original)  # unchanged
+
+    def test_map_tile_url_rejects_blank(self) -> None:
+        r = self.client.put("/api/config/dashboard", json={"map_tile_url": "   "})
+        self.assertEqual(r.status_code, 400)
 
 
 if __name__ == "__main__":  # pragma: no cover

@@ -194,10 +194,12 @@ class TopologyTab {
         if (this._map || !window.L) return;
         const mapEl = this.root.querySelector('.topo-map');
         this._map = L.map(mapEl, { zoomControl: false, scrollWheelZoom: true });
-        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>',
-            maxZoom: 19,
-        }).addTo(this._map);
+        window.getMapTileUrl().then((url) => {
+            L.tileLayer(url, {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>',
+                maxZoom: 19,
+            }).addTo(this._map);
+        });
         this._mapLayer = L.layerGroup().addTo(this._map);
         this._map.setView([52.37, 4.89], 11);
     }

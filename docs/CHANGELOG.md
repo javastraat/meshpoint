@@ -7,6 +7,13 @@
 - **Local map tiles.** OSM raster with a dark invert filter, replacing
   CARTO Dark Matter after anonymous CARTO raster requests started
   returning an API-key watermark.
+- **Map tile source is now configurable, for offline/emergency use.** New
+  `dashboard.map_tile_url` (default: today's public OSM server, unchanged)
+  feeds both the Dashboard and Topology maps through one shared helper
+  instead of each hardcoding the URL. Point it at a local tile source (e.g.
+  the community `offline-map` plugin's own `/api/offline-map/tiles/...`
+  route) to read pre-downloaded tiles straight off disk with no internet
+  reachable at all.
 - **Web terminal's Settings toggle needs a filesystem-only opt-in first.**
   Settings → System's "Web terminal" card is now hidden by default (no
   card, no note, no hint it exists) until `web_terminal_toggle: true` is

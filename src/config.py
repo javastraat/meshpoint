@@ -411,6 +411,14 @@ class DashboardConfig:
     # much larger population who never opt in at all: for them the
     # capability is completely inert, not just hidden.
     web_terminal_toggle: bool = False
+    # Leaflet tile URL template for both the Dashboard and Topology maps
+    # ({z}/{x}/{y} placeholders, same syntax L.tileLayer() itself takes).
+    # Defaults to the public OSM tile server (today's hardcoded behavior,
+    # unchanged). Override to read tiles from disk instead -- e.g. an
+    # offline-map plugin install serving its own downloaded tiles at
+    # "/api/offline-map/tiles/<collection>/<style>/{z}/{x}/{y}.png" -- for
+    # offline/emergency use with no internet reachable at all.
+    map_tile_url: str = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
 
 
 @dataclass

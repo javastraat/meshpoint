@@ -522,6 +522,33 @@ class LoadConfigIntegrationTest(unittest.TestCase):
                 os.environ["CONCENTRATOR_CONFIG"] = old
         self.assertTrue(cfg.dashboard.web_terminal_toggle)
 
+    def test_map_tile_url_defaults_to_osm_and_loads_from_yaml(self):
+        self.assertEqual(
+            AppConfig().dashboard.map_tile_url,
+            "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+        )
+        tmp = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", delete=False, encoding="utf-8"
+        )
+        tmp.write("dashboard:\n  map_tile_url: 'http://127.0.0.1:8080/api/offline-map/tiles/x/y/{z}/{x}/{y}.png'\n")
+        tmp.close()
+        path = Path(tmp.name)
+        self.addCleanup(lambda: path.unlink(missing_ok=True))
+        old = os.environ.get("CONCENTRATOR_CONFIG")
+        os.environ["CONCENTRATOR_CONFIG"] = str(path)
+        try:
+            with self.assertNoLogs("src.config", level="WARNING"):
+                cfg = load_config()
+        finally:
+            if old is None:
+                os.environ.pop("CONCENTRATOR_CONFIG", None)
+            else:
+                os.environ["CONCENTRATOR_CONFIG"] = old
+        self.assertEqual(
+            cfg.dashboard.map_tile_url,
+            "http://127.0.0.1:8080/api/offline-map/tiles/x/y/{z}/{x}/{y}.png",
+        )
+
     def test_plugin_sources_enabled_defaults_off_and_loads_from_yaml(self):
         self.assertFalse(AppConfig().plugin_sources_enabled)
         tmp = tempfile.NamedTemporaryFile(
