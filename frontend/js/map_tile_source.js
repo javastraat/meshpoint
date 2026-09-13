@@ -23,4 +23,13 @@ function getMapTileUrl() {
     return _mapTileUrlPromise;
 }
 
+// Callers add a tile layer with this SYNCHRONOUSLY, immediately at map
+// construction, then swap it out once getMapTileUrl() resolves if it
+// turns out to be something else. A map with zero tile layers has no
+// maxZoom at all -- anything that runs before an async-only tileLayer.
+// addTo() finishes (fitBounds, a saved-view setView, etc.) throws
+// "Uncaught (in promise) Map has no maxZoom specified". Keeping this
+// synchronous removes that race entirely rather than chasing every call
+// site that could lose it.
+window.MAP_TILE_URL_FALLBACK = MAP_TILE_URL_FALLBACK;
 window.getMapTileUrl = getMapTileUrl;

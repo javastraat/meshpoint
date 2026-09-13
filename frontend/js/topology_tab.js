@@ -194,11 +194,18 @@ class TopologyTab {
         if (this._map || !window.L) return;
         const mapEl = this.root.querySelector('.topo-map');
         this._map = L.map(mapEl, { zoomControl: false, scrollWheelZoom: true });
+        const tileOpts = {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>',
+            maxZoom: 19,
+        };
+        // Synchronous first -- see map_tile_source.js's own comment on
+        // MAP_TILE_URL_FALLBACK for why this can't wait on the async fetch.
+        let tileLayer = L.tileLayer(window.MAP_TILE_URL_FALLBACK, tileOpts).addTo(this._map);
         window.getMapTileUrl().then((url) => {
-            L.tileLayer(url, {
-                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>',
-                maxZoom: 19,
-            }).addTo(this._map);
+            if (url && url !== window.MAP_TILE_URL_FALLBACK) {
+                this._map.removeLayer(tileLayer);
+                tileLayer = L.tileLayer(url, tileOpts).addTo(this._map);
+            }
         });
         this._mapLayer = L.layerGroup().addTo(this._map);
         this._map.setView([52.37, 4.89], 11);
