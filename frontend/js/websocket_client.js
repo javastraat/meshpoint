@@ -109,8 +109,22 @@ class ConcentratorWebSocket {
                 ? 'status-dot status-dot--connected'
                 : 'status-dot status-dot--disconnected';
         }
-        if (sidebarText && !connected) {
-            sidebarText.textContent = 'reconnecting...';
+        if (sidebarText) {
+            if (connected) {
+                // Fast paint: clear the static "connecting..." placeholder
+                // as soon as the WS handshake completes, rather than
+                // waiting on app.js's full _updateStats() fetch chain
+                // (device/analytics/metrics) to resolve. Only touch the
+                // placeholder states here so a later reconnect never
+                // regresses the richer "online · vX.Y.Z" text that
+                // _updateStats() fills in once it lands.
+                if (sidebarText.textContent === 'connecting...'
+                    || sidebarText.textContent === 'reconnecting...') {
+                    sidebarText.textContent = 'online';
+                }
+            } else {
+                sidebarText.textContent = 'reconnecting...';
+            }
         }
     }
 }

@@ -34,9 +34,15 @@
 })();
 
 document.addEventListener('DOMContentLoaded', async () => {
-    if (await _redirectIfSetupRequired()) return;
-
+    // Single /api/identity fetch covers both concerns (used to be two
+    // separate fetches to the same endpoint): redirect to /setup when
+    // no admin password exists yet, otherwise keep the identity payload
+    // for role-gating below.
     const identity = await _loadIdentity();
+    if (identity && identity.setup_required) {
+        location.replace('/setup');
+        return;
+    }
     // Exposed globally so a plugin's own frontend script (registerSidebarPage's
     // make(), which has no way to receive this as a constructor argument the
     // way a core _boot*Panel(router, identity) call could) can role-gate its
@@ -253,10 +259,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    await _loadInitial(nodeMap, nodeCards, packetFeed);
-    await _updateStats();
-    _checkForUpdate();
-
+    // Open the WS before the initial data fetches below, not after: the
+    // socket handshake is cheap and can run concurrently with them, and
+    // ConcentratorWebSocket's onopen/onclose handlers are what actually
+    // flip the sidebar "connecting..." placeholder to "online" now (see
+    // _updateStatusIndicator in websocket_client.js) -- connecting first
+    // means that happens as soon as the WS is up instead of waiting on
+    // the full _loadInitial + _updateStats fetch chain to resolve.
     window.concentratorWS.on('packet', (packet) => {
         packetFeed.addPacket(packet);
         nodeMap.updateFromPacket(packet);
@@ -265,6 +274,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     window.concentratorWS.connect();
+
+    await _loadInitial(nodeMap, nodeCards, packetFeed);
+    await _updateStats();
+    _checkForUpdate();
 
     setInterval(() => {
         _refreshData(nodeMap, nodeCards, packetFeed);
@@ -878,21 +891,6 @@ function _resolveDeviceLabel(device) {
     if (name && name !== 'Meshpoint') return name;
     if (long && long !== 'Meshpoint') return long;
     return neither ? 'Meshpoint' : (name || long || 'Meshpoint');
-}
-
-async function _redirectIfSetupRequired() {
-    try {
-        const res = await fetch('/api/identity', { credentials: 'same-origin' });
-        if (!res.ok) return false;
-        const data = await res.json();
-        if (data.setup_required) {
-            location.replace('/setup');
-            return true;
-        }
-    } catch (_) {
-        /* silent: the dashboard handles its own auth via 401 interception */
-    }
-    return false;
 }
 
 function _bootCommandPaletteAndKeymap(router) {
