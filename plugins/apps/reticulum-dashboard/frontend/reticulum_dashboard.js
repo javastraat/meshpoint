@@ -652,7 +652,14 @@ class ReticulumDashboard {
             if (!r.ok) return;
             const s = await r.json();
             this._setText('rtd-stat-status', s.running ? 'Running' : (s.available ? 'Stopped' : 'Unavailable'));
-            this._setText('rtd-own-address', s.own_address || '--');
+            // own_address comes as RNS.prettyhexrep()'s "<hex>" (Reticulum's
+            // own log/display convention) -- stripped here so it matches
+            // the plain hex "Nomad Node" card next to it, and so copying
+            // either one pastes straight into an address bar/curl command
+            // with no bracket-trimming needed. Scoped to this page only;
+            // own_address is used elsewhere (the Reticulum page's own
+            // header) bracketed as-is, not touched.
+            this._setText('rtd-own-address', (s.own_address || '--').replace(/[<>]/g, ''));
             // A different destination hash from "You" above -- hosting a
             // NomadNet node uses a separate aspect on the same identity,
             // so it hashes differently even though it's the same box. Card

@@ -1814,3 +1814,27 @@ Pi-checking specifically since this is the first change this session that
 touches the reticulum plugin's *backend* (everything else was frontend-
 only) -- confirm the hash actually shows and matches what `info.mu`/the
 main Reticulum page's own header line reports for the hosted node.
+
+**Nomad-node hash — LIVE VERIFIED on the VM (Sept 14).** User hit exactly
+the deploy-timing trap flagged when this landed: browser hard-refresh
+alone doesn't apply backend Python changes (`nomad_node.py`'s new
+`status()["hash"]` field), needs `sudo systemctl restart meshpoint` too.
+Confirmed via the `/api/reticulum/status` JSON directly (`"node"` object
+had no `"hash"` key at all pre-restart -- not empty, absent -- proving old
+code was still running) before the restart, then confirmed working after.
+Dashboard's "Nomad Node" stat card now shows `693b94beae452e8bf286aca4d3193cfc`
+correctly on vm-meshpoint.
+
+**Follow-up: "You" hash bracket inconsistency (uncommitted, JS-only).**
+User noticed "You" showed `<22a60e4b...>` (angle brackets) while "Nomad
+Node" showed plain `693b94be...` -- traced to `own_address` being built
+via `RNS.prettyhexrep()` (lxmf_service.py, Reticulum's own log-display
+convention) vs. my `node.hash` being plain `.hex()`. Stripped brackets
+client-side in `reticulum_dashboard.js`'s `_loadStatus()` only (regex
+`.replace(/[<>]/g, '')`) -- scoped to this page, `own_address` stays
+bracketed everywhere else (e.g. the Reticulum page's own header) since
+that's not this page's call to change. Plain hex is also the more useful
+format for the stated "easy to copy" goal -- no bracket-trimming needed
+before pasting into an address bar or curl command. Verified: `node
+--check`, ruff clean. JS-only, hard refresh applies it, no restart
+needed.
