@@ -92,6 +92,17 @@
     cursor: pointer;
 }
 
+/* Same fix as .topbar__group[hidden] above, needed here too since this
+ * chip is its own element rather than a .topbar__group: the author
+ * `display: inline-flex` rule beats the browser's `[hidden] {
+ * display: none }` UA rule regardless of specificity, so setting the
+ * `hidden` property from topbar_meshtastic_chip.js did nothing without
+ * this override -- the chip kept rendering (as "online", no less, since
+ * that's the WS-lamp default) even with no Meshtastic source configured. */
+.topbar-meshtastic[hidden] {
+    display: none;
+}
+
 .topbar-meshtastic:hover {
     border-color: rgba(6, 182, 212, 0.55);
     box-shadow:
