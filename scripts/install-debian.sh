@@ -188,7 +188,8 @@ apt-get install -y -qq \
     libliquid-dev \
     libpulse-dev \
     libx11-dev \
-    pipx
+    pipx \
+    rsync
 
 # ── 2. gpsd for USB GPS receivers (generic, no Pi-specific step) ───
 
