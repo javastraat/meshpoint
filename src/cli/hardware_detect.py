@@ -212,9 +212,17 @@ def print_report(report: HardwareReport) -> None:
     else:
         print("  SPI devices:     none found")
 
-    print(f"  libloragw.so:    {'installed' if report.libloragw_installed else 'NOT found'}")
+    print(f"  libloragw.so:    {'installed' if report.libloragw_installed else 'not found'}")
     print(f"  Concentrator:    {'ready' if report.concentrator_available else 'not available'}")
-    print(f"  Carrier board:   {report.hardware_description}")
+    # hardware_description defaults to a Pi+concentrator guess
+    # ("SX1302/SX1303 + Raspberry Pi 4") for CARRIER_UNKNOWN -- fine when
+    # there's at least an SPI device to guess *about*, misleading when
+    # there's no concentrator-related signal at all (e.g. a Debian VM):
+    # it reads as a detection result rather than "nothing found".
+    if report.carrier_type == CARRIER_UNKNOWN and not report.spi_devices:
+        print("  Carrier board:   not detected")
+    else:
+        print(f"  Carrier board:   {report.hardware_description}")
 
     if report.serial_ports:
         print(f"  Serial ports:    {', '.join(report.serial_ports)}")
