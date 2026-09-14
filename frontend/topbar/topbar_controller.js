@@ -89,9 +89,12 @@ class TopbarController {
             const cfg = await res.json();
             this._meshcore.setDashboardReachable(true);
             const tx = cfg.transmit || {};
+            const captureSources = (cfg.capture && cfg.capture.sources) || [];
             this._meshtastic.setMeshtastic({
                 shortName: tx.short_name,
                 radio: cfg.radio || null,
+                configured: captureSources.includes('concentrator')
+                    || captureSources.includes('serial'),
             });
             this._meshcore.setMeshcore(cfg.meshcore || null);
             this._serial.setSerial(cfg.serial || []);

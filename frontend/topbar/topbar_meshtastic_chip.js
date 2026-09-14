@@ -4,6 +4,15 @@
  * Cyan-grouped readout: dashboard WebSocket lamp, short name (no CALL
  * label), region, frequency, and preset. Replaces the separate lamp,
  * identity badge, and radio chip.
+ *
+ * Hidden by default (see the `hidden` attribute in index.html) and only
+ * shown once `setMeshtastic()` reports a real Meshtastic-capable capture
+ * source configured (`capture.sources` containing "concentrator" or
+ * "serial") -- same pattern TopbarMeshcoreChip/TopbarSerialChip already
+ * use for their own companions/devices. Before this, the chip's green
+ * lamp only ever meant "the browser's WebSocket to the dashboard is
+ * connected", which reads as "Meshtastic is running" even on a box with
+ * `capture.sources: []` and no radio hardware at all.
  */
 class TopbarMeshtasticChip {
     constructor(chipEl) {
@@ -57,7 +66,9 @@ class TopbarMeshtasticChip {
         }
     }
 
-    setMeshtastic({ shortName, radio }) {
+    setMeshtastic({ shortName, radio, configured }) {
+        this._root.hidden = !configured;
+        if (!configured) return;
         this._lastData = { shortName, radio };
         if (this._connState === 'offline' || this._connState === 'reconnecting') {
             return;  // keep showing Reconnecting… until the lamp is green
