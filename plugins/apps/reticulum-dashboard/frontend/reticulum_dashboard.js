@@ -532,7 +532,7 @@ class ReticulumDashboard {
         });
         // General entry point, not tied to any one peer row -- opens on
         // the modal's empty state (type an address, or pick a favourite).
-        this._q('#rtd-browse-btn')?.addEventListener('click', () => this._quickBrowse.open());
+        this._q('#rtd-browse-btn')?.addEventListener('click', () => this._openBrowse());
 
         this._syncBasemapBtn(this._basemapLight);
         this._q('#rtd-map-basemap-btn')?.addEventListener('click', () => this._toggleBasemap());
@@ -554,7 +554,7 @@ class ReticulumDashboard {
             const browseBtn = e.target.closest('[data-browse]');
             if (browseBtn) {
                 const peer = this._peers.find((p) => p.destination_hash === browseBtn.dataset.browse);
-                if (peer) this._quickBrowse.open(peer.destination_hash, peer.display_name);
+                if (peer) this._openBrowse(peer.destination_hash, peer.display_name);
                 return;
             }
             const row = e.target.closest('[data-hash]');
@@ -577,17 +577,35 @@ class ReticulumDashboard {
      * message actions, this page is a glanceable companion, not the full
      * management page -- but "view announce" and, for a nomadnetwork.node
      * peer, "Browse" both still work, matching the real thing's
-     * cross-links (Browse opens this page's own quick-view modal, not
-     * the Reticulum page's full Browse tab). */
+     * cross-links (Browse prefers the reticulum-browser plugin's full
+     * multi-tab browser when it's installed, this page's own quick-view
+     * modal otherwise -- see _openBrowse). */
     _openPeerDrawer(peer) {
         if (!this._peerDrawer) return;
         const recent = this._announces.filter((a) => a.destination_hash === peer.destination_hash);
         this._peerDrawer.open(peer, recent, {
             onViewAnnounce: (entry) => this._openAnnounceModal(entry),
             onBrowse: peer.aspect === 'nomadnetwork.node'
-                ? (hash) => this._quickBrowse.open(hash, peer.display_name)
+                ? (hash) => this._openBrowse(hash, peer.display_name)
                 : undefined,
         });
+    }
+
+    /** Every "Browse" action on this page goes through here: if the
+     * reticulum-browser plugin is installed (feature-detected via
+     * window.reticulumBrowserPanel -- same pattern app.js's own
+     * window.dabPanel hook uses), hand off to its full multi-tab browser
+     * instead of this page's own smaller quick-view modal, since that's
+     * strictly the better experience when it's available. hash/label are
+     * both optional -- the general Browse button (not tied to a peer)
+     * calls this with neither, same as before. */
+    _openBrowse(hash = null, label = null) {
+        if (window.reticulumBrowserPanel) {
+            location.hash = '#/reticulum-browser';
+            if (hash) window.reticulumBrowserPanel.openHash(hash, label);
+            return;
+        }
+        this._quickBrowse.open(hash, label);
     }
 
     /** Activity-row click -> the same center modal the Reticulum page's

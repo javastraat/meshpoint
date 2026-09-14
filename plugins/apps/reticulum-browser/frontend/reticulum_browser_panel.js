@@ -433,10 +433,32 @@ class ReticulumBrowserPanel {
             .replace(/>/g, '&gt;');
     }
 
+    /** Called from outside this class -- the reticulum-dashboard plugin's
+     * own Browse actions feature-detect window.reticulumBrowserPanel
+     * (set below, same pattern app.js's own window.dabPanel uses for
+     * DAB+'s mini-player hook) and hand a hash off here instead of
+     * opening their own smaller quick-view modal, when this plugin is
+     * installed -- always a fresh tab, so it never clobbers whatever the
+     * user already has open here. */
+    openHash(hash, label) {
+        if (!hash) return;
+        this._newTab();
+        const tab = this._activeTab();
+        if (tab && label) {
+            tab.title = label; // provisional -- _fetch() below overwrites
+            this._renderTabStrip(); // it with the real name once resolved
+        }
+        this._go(hash, '/page/index.mu');
+    }
+
     _q(sel) { return this._root ? this._root.querySelector(sel) : null; }
 }
 
 window.registerSidebarPage({
     route: 'reticulum-browser',
-    make: () => new ReticulumBrowserPanel(),
+    make: () => {
+        const panel = new ReticulumBrowserPanel();
+        window.reticulumBrowserPanel = panel;
+        return panel;
+    },
 });

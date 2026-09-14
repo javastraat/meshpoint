@@ -21,7 +21,7 @@ styles = ["frontend/reticulum_browser_panel.css"]
 [sidebar]
 route = "reticulum-browser"
 label = "Reticulum Browser"
-category = "top"
+category = "networks"
 icon = "reticulum"    # same glyph as the reticulum plugin's own nav item --
                        # icon names are a shared curated set, not exclusive
                        # to one plugin.

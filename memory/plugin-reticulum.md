@@ -1951,3 +1951,38 @@ running device at all (pure new-plugin add, no existing behavior to
 regress) -- still worth a real restart + smoke test (open a tab, browse
 a known node, confirm favourites sync with the other three surfaces)
 before calling it done.
+
+**Follow-up, same session: Reticulum Dashboard's Browse prefers the full
+browser when installed (uncommitted).** User: can the dashboard's Browse
+button open the reticulum-browser plugin's full multi-tab experience
+instead of the smaller quick-view modal, if it's installed? Yes --
+optional, soft integration (reticulum-dashboard doesn't `requires`
+reticulum-browser, it's a nice-to-have, not a dependency):
+
+- `reticulum_browser_panel.js`: `registerSidebarPage`'s `make()` now
+  stashes the instance on `window.reticulumBrowserPanel` -- same
+  feature-detection-handle pattern `app.js`'s own `window.dabPanel` (the
+  sidebar mini-player's hook into DAB+) already uses, confirmed by
+  grepping that exact precedent before copying it. New public
+  `openHash(hash, label)` -- opens a fresh tab (never clobbers whatever
+  the user already has open there), provisionally sets the tab title from
+  `label` before `_fetch()`'s real data overwrites it.
+- `reticulum_dashboard.js`: all three "Browse" call sites (the peer
+  drawer's `onBrowse`, the inline peer-row button, the general
+  Peers-panel-header button) now go through one new `_openBrowse(hash =
+  null, label = null)` helper -- if `window.reticulumBrowserPanel` exists,
+  navigates to `#/reticulum-browser` (plain `location.hash =`, same
+  native hashchange event `router.js`'s own `navigate()` relies on, safe
+  to trigger from outside the Router) and hands the hash off via
+  `openHash()`; otherwise falls back to this page's own
+  `ReticulumQuickBrowseModal`, completely unchanged. Fails open cleanly
+  either way -- reticulum-browser being disabled/not installed just means
+  every call site behaves exactly as it did before this change.
+
+Verified: `node --check` both files, ruff clean, plugin-loader/manifest
+suite 70 passed / 6 skipped, confirmed no leftover direct
+`this._quickBrowse.open(...)` call sites outside the new helper's own
+fallback line. **NOT committed, NOT yet verified live** -- worth checking
+both states on a real device: reticulum-browser disabled (dashboard's
+Browse should behave exactly as before) and enabled (Browse should jump
+to a fresh tab there instead).
