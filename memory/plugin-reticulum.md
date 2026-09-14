@@ -1094,3 +1094,96 @@ someone else's relay). Mirrors reticulum-meshchat's `meshchat.py`.
   Messages tab, a timed one on an idle page goes unnoticed until the
   15s poll).
 - Pi verification: see `memory/reticulum_todo.md`.
+
+---
+
+## 2026-09-14 — Reticulum Dashboard: new companion plugin (uncommitted)
+
+User: core Dashboard is empty on a Reticulum-only box (concentrator/serial/
+MeshCore all unconfigured) — "NODES DISCOVERED 0/0", empty map, empty
+packet table — even though Reticulum clearly has data (1500+ peers, a live
+Activity feed). Explored piping Reticulum announces into the *existing*
+dashboard widgets as synthetic "packet" WS events (`simple_packet_feed.js`
+and `node_cards.js` are both already protocol-tolerant — verified: RSSI/
+SNR/freq/SF/hops already fall back to '--' for the pager project today, and
+`lxmf_service.py`'s `_handle_announce()` already builds almost the exact
+fields needed, including real rssi/snr when RNode resolves them for that
+announce packet). Set that aside: volume risk (announces flood far faster
+than RF packets) would need a noisy default-off toggle, and stat cards
+(NODES DISCOVERED/TOTAL PACKETS/etc.) are SQL aggregates over the core
+`packets`/`nodes` tables Reticulum deliberately never writes to — that
+part can't be fixed by a WS event either way.
+
+**Landed instead: a standalone "Reticulum Dashboard" page**, same stat-card
++ live-table visual language as the reticulum plugin's own page, fed from
+Reticulum's own shape (no RF fields faked). New plugin, not a tab on the
+existing Reticulum page or a new core dashboard widget seam — discovered
+`src/plugins/manifest.py`'s `sidebar: SidebarSpec | None` only supports
+ONE `[sidebar]` table per plugin (confirmed: `_parse_sidebar` + `mountPlugin
+SidebarPages()` in `sidebar_plugin_registry.js` both assume 1:1 plugin→nav-
+item), so a second top-level nav item needs a second plugin folder — user's
+own suggestion mid-conversation, correct and confirmed zero-core-change
+after checking the `hello-world` plugin precedent (`provides = ["sidebar"]`,
+no-op `backend/__init__.py`, plain manifest `[sidebar]` table — the exact
+shape needed, just pointed at reticulum's existing routes instead of saying
+hello).
+
+`plugins/apps/reticulum-dashboard/` (**new**, backend-free):
+- `plugin.toml` — `provides = ["sidebar"]` only (no `routes`/`service`),
+  `[sidebar]` route=`reticulum-dashboard`, category=`networks`,
+  icon=`reticulum` (icon names are a shared set, not plugin-exclusive —
+  confirmed in `sidebar_plugin_registry.js`), no `[frontend].styles` (reuses
+  core's already-global `stat-card`/`lw-*`/`.packet-row--new` classes from
+  `dashboard.css`+`lorawan.css`, both unconditionally `<link>`ed in
+  `index.html`'s `<head>`).
+- `backend/__init__.py` — no-op `register(reg): pass`, verbatim hello-world
+  pattern.
+- `frontend/reticulum_dashboard.js` (**new**, `ReticulumDashboard` class):
+  5 stat cards (Status/Known Peers/People/Infrastructure/Conversations,
+  same split logic as `reticulum_panel.js` — `lxmf.delivery` = People, rest
+  = Infrastructure) + a live activity ticker table (Time/Display
+  name/Destination/Aspect). Reads `/api/reticulum/status`,
+  `/api/reticulum/peers`, `/api/reticulum/announces` (seed only, once),
+  `/api/messages/conversations` (filtered `protocol==='reticulum'`) via
+  plain `fetch()` — all already-public reticulum-plugin routes, no new
+  backend. Subscribes to `window.concentratorWS.on('reticulum_announce', …)`
+  / `('reticulum_peer', …)` (the SAME broadcasts `reticulum_panel.js`
+  already listens for) for live updates. New announces are `insertBefore`d
+  as individual `<tr class="packet-row--new">` (not a full re-render) so
+  the core dashboard's own `@keyframes packetFlash` animation
+  (`dashboard.css`) actually plays per row — reused verbatim, no new CSS.
+  Ticker capped client-side at 60 rows (glanceable live view, not a log —
+  smaller than the Activity tab's 200-row ring buffer). 20s refresh timer
+  for stat cards as a fallback, same interval pattern as the main page's
+  15s (slightly longer since this page has less to keep fresh).
+  `hide()`/`show()` mirror `reticulum_panel.js`'s own (no WS unsubscribe
+  primitive exists — documented as harmless, matches precedent).
+- `README.md` — mirrors `hello-world/README.md`'s structure.
+- Requires `plugins.reticulum.enabled: true` too (undeclared — no plugin
+  dependency mechanism exists in the manifest; fails open, same as
+  everywhere else in this app — a disabled reticulum plugin just means
+  every fetch 404s and the page sits in its empty/`--` state, no crash).
+
+Verified: `node --check` on the new JS; `parse_manifest()` +
+`discover_plugins()` both succeed (15 plugins found, up from 14); full
+plugin test suite (`test_plugin_loader.py`/`test_plugin_manifest.py`/
+`test_plugin_registry_facade.py`, python3.11) 77 passed / 6 skipped — no
+hardcoded plugin-count canary broke (checked specifically, given the
+router-count canary bug earlier this session). `ruff check` clean.
+CHANGELOG parses (31 sections). `docs/PLUGINS.md` intro paragraph gained a
+4th worked-example pointer (the "read another plugin's API instead of
+adding your own backend" pattern, since none of the existing 3 reference
+plugins demonstrate that).
+
+**NOT committed, NOT Pi-tested.** Pi verify: enable
+`plugins.reticulum-dashboard.enabled: true` (needs `plugins.reticulum.
+enabled: true` already on), restart, Networks → Reticulum Dashboard —
+5 stat cards populate, announce rows flash in live as they're heard, no
+console errors if reticulum ever gets disabled later.
+
+**Deferred (2 + 3 from the original 3-part ask, not started):** hide core
+Dashboard's nav item via `data-requires-source` when nothing RF is
+configured, and a smarter `Router` `defaultRoute` fallback (currently
+hardcoded `'dashboard'` in `app.js`) so a reticulum-only box actually lands
+somewhere sensible on a fresh load instead of an empty, unlinked Dashboard
+section.

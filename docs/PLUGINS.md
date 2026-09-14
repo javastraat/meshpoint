@@ -16,9 +16,16 @@ the minimal **Hello World** / **Hello World Hook** /
 each isolating one seam, and **DAPNET**
 ([`plugins/apps/dapnet/`](../plugins/apps/dapnet/)) and **Reticulum**
 ([`plugins/apps/reticulum/`](../plugins/apps/reticulum/)) as full
-multi-seam plugins extracted out of core. Every section below points at
-the real file that does the thing being described. When in doubt, go read
-that file; it's real, tested, shipped code, not a toy example.
+multi-seam plugins extracted out of core. **Reticulum Dashboard**
+([`plugins/apps/reticulum-dashboard/`](../plugins/apps/reticulum-dashboard/))
+is a fourth sidebar-only example, worth a look if your page wants to read
+*another* plugin's already-public routes/WS broadcasts instead of adding
+its own backend — the manifest only allows one `[sidebar]` table per
+plugin, so a second top-level nav item companion to an existing plugin's
+page needs its own plugin folder, not a `provides` addition to the first.
+Every section below points at the real file that does the thing being
+described. When in doubt, go read that file; it's real, tested, shipped
+code, not a toy example.
 
 ---
 
