@@ -8,6 +8,13 @@ provides = ["sidebar"]    # a whole top-level sidebar page of its own -- see
                            # /api/reticulum/* endpoints + the shared
                            # dashboard WebSocket instead (see backend/README).
 locked = true  # shipped with this fork -- not user-installed, can't be deleted
+requires = "reticulum"  # not a [hook] -- this page doesn't attach to
+                         # reticulum's own page, it just has nothing to show
+                         # without it running. Enforced the same way a hook's
+                         # [hook].host is: PUT /api/plugins/reticulum-dashboard
+                         # refuses to enable it until reticulum is enabled,
+                         # and disabling reticulum cascades to disable this
+                         # too (src/api/routes/plugin_routes.py).
 
 [frontend]
 scripts = ["frontend/reticulum_dashboard.js"]

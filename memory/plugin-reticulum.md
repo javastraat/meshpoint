@@ -1187,3 +1187,66 @@ configured, and a smarter `Router` `defaultRoute` fallback (currently
 hardcoded `'dashboard'` in `app.js`) so a reticulum-only box actually lands
 somewhere sensible on a fresh load instead of an empty, unlinked Dashboard
 section.
+
+**Follow-up, same session: generic plugin `requires` dependency (uncommitted).**
+User, looking at Settings → Plugins with both `reticulum` and
+`reticulum-dashboard` rows visible: "shouldn't it depend on reticulum, like
+hello-world-hook to hello-world?" Checked and corrected an earlier
+understatement — `[hook].host` isn't just soft/informational, `src/api/
+routes/plugin_routes.py`'s `PUT` genuinely refuses to enable a hook plugin
+whose host isn't enabled, and cascades disable to dependents
+(`_cascade_disable_dependents`); the frontend already groups/indents a
+dependent plugin under its host. But reticulum-dashboard isn't a `hook` —
+it doesn't attach UI into reticulum's page, it renders its own page fine
+standalone, just empty without reticulum's data. Asked user: enforce the
+same hard way, or just show it softly? **User: hard, same as hook.**
+
+Generalized rather than special-cased:
+- `src/plugins/manifest.py`: new optional top-level `requires: str | None`
+  on `PluginManifest` — another plugin's **name** (not a route, unlike
+  `hook.host`). `_parse_requires()`: same slug shape as `name`, rejects
+  self-reference. A plugin declares at most one dependency total (`hook` OR
+  `requires`, checked structurally by which field is set — nothing stops a
+  manifest setting both today, not worth guarding, no plugin does).
+- `src/api/routes/plugin_routes.py`: new `_name_map()` (mirrors
+  `_route_map()`, keyed by plugin name) + `_dependency_target(manifest,
+  route_map, name_map)` replacing `_host_manifest()` — returns `(target,
+  ref)` for EITHER a hook (`ref` = route) or a `requires` (`ref` = plugin
+  name), or `(None, None)`. `_describe()`, `update_plugin()` (PUT
+  enable-refusal, separate error messages for the two cases — hook says
+  "nowhere to render", requires says "needs it enabled to show anything"),
+  and `_cascade_disable_dependents()` all now key off this one function
+  instead of `manifest.hook is not None` directly — hook and `requires`
+  plugins are disabled-cascaded identically.
+- **Frontend needed ZERO changes** — `plugins_panel_controller.js`'s
+  "Depends on: … (not enabled)" row text and toggle-greying already keyed
+  generically on `dependency.host_id`/`host_enabled` (only `host_route` is
+  hook-specific-sounding, reused as the raw reference string either way).
+- `plugins/apps/reticulum-dashboard/plugin.toml`: `requires = "reticulum"`.
+- `docs/PLUGINS.md`: new manifest-fields-table row for `requires`.
+- `docs/CHANGELOG.md`: separate v0.8.1 bullet (generalizable core feature,
+  not just a reticulum-dashboard implementation detail).
+
+Verified (Mac, no fastapi/pydantic installed — CLAUDE.md constraint):
+manifest re-parses (`m.requires == 'reticulum'`), `discover_plugins()`
+still finds 15; `ruff check` clean on `manifest.py`/`plugin_routes.py`/the
+new plugin; full plugin-loader/manifest/registry suite still 77 passed / 6
+skipped (no regression). `plugin_routes.py` itself can't run on the Mac
+(needs fastapi+pydantic for `tests/test_plugin_routes.py`'s `TestClient`),
+so hand-verified the actual changed logic instead: stubbed `fastapi`/
+`pydantic` just enough to import the module, built real `PluginManifest`s
+for reticulum/reticulum-dashboard/hello-world/hello-world-hook, and
+asserted directly against `_dependency_target()` (both requires- and
+hook-based resolve correctly, hook path unchanged from before — a real
+regression check), `_describe()`'s `dependency` dict shape, and
+`_cascade_disable_dependents()` (disabling `reticulum` while
+`reticulum-dashboard` is enabled correctly cascades it off).
+
+**NOT committed, NOT Pi-tested.** Pi/CI verify: `pytest tests/
+test_plugin_routes.py` (needs the real venv, fastapi+pydantic present
+there unlike the Mac) plus a live check — try enabling reticulum-dashboard
+with reticulum off (should 400: "Enable 'reticulum' first..."), enable
+both, then disable reticulum and confirm reticulum-dashboard auto-disables
+too (`also_disabled` in the response) and the Settings → Plugins row shows
+"Depends on: reticulum (not enabled)" / greys the toggle when reticulum is
+off.

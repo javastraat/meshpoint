@@ -157,6 +157,7 @@ author = "Your Name"
 | `[sidebar].route` / `.label` / `.category` | required iff `sidebar` in `provides` | See [Adding a top-level sidebar page](#adding-a-top-level-sidebar-page-sidebar) below. `category` must be one of `KNOWN_SIDEBAR_CATEGORIES` in `src/plugins/manifest.py`. |
 | `[sidebar].icon` | no, default `"plug"` | One of `KNOWN_SIDEBAR_ICONS` (`src/plugins/manifest.py`) — a curated key, not raw SVG. See [Adding a top-level sidebar page](#adding-a-top-level-sidebar-page-sidebar). |
 | `[hook].host` | required iff `hook` in `provides` | Another plugin's `[sidebar].route` — not validated against real plugins at parse time (resolved at runtime in the browser). See [Injecting into another page](#injecting-into-another-page-hook). |
+| `requires` | no | Another plugin's **`name`** (not a route) that must be enabled first — for a plugin that needs another plugin's backend/data but isn't a `hook` (doesn't attach UI into its page). Enforced exactly like `[hook].host`: Settings → Plugins refuses to enable this plugin until the required one is enabled, and disabling the required plugin cascades to disable this one too (`src/api/routes/plugin_routes.py`). A plugin declares at most one dependency total — `[hook].host` or `requires`, not both. Reticulum Dashboard uses this: `requires = "reticulum"`. |
 | `[meta].*` | no | Shown on Settings → Plugins: description, a clickable homepage link, author. |
 
 ## The `register(reg)` entry point

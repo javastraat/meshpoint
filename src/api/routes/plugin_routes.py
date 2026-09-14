@@ -9,16 +9,20 @@ effect on the next restart (plugins are loaded once at ``create_app`` time),
 so the response always reports both the *configured* state and whether the
 plugin is actually ``loaded`` in this running process.
 
-A ``"hook"`` plugin (``[hook] host = "..."``) has a real dependency on
-whichever plugin provides that ``[sidebar].route`` -- with nothing enforcing
-it, a hook could be enabled with its host off and end up permanently
-orphaned (enabled, loaded, but nowhere to render). ``PUT`` refuses to enable
-a hook plugin unless its host is already enabled, and disabling a host
-plugin cascades: every enabled plugin that hooks into it (directly, or
-transitively through another hook) gets disabled right along with it,
-reported back as ``also_disabled`` so it's never a silent side effect.
-``GET`` surfaces the same relationship per plugin as a ``dependency`` field
-so the UI can grey out a not-yet-enableable toggle before anyone touches it.
+A plugin can declare a real dependency on another plugin two ways: a
+``"hook"`` plugin (``[hook] host = "..."``) attaches UI into whichever
+plugin provides that ``[sidebar].route`` (nowhere to render without it), or
+any plugin can set the plain top-level ``requires = "<plugin-name>"`` when
+it just needs that other plugin's backend/data running, without attaching
+to its page (e.g. reticulum-dashboard requiring reticulum). Either way,
+with nothing enforcing it a plugin could be enabled with its dependency off
+and end up permanently orphaned. ``PUT`` refuses to enable a dependent
+plugin unless its dependency is already enabled, and disabling a plugin
+cascades: every enabled plugin that depends on it (directly, or
+transitively) gets disabled right along with it, reported back as
+``also_disabled`` so it's never a silent side effect. ``GET`` surfaces the
+same relationship per plugin as a ``dependency`` field so the UI can grey
+out a not-yet-enableable toggle before anyone touches it.
 
 A plugin that declares ``[deps] check`` gets an unprivileged "are its deps
 installed?" probe, run at boot by the loader and re-runnable on demand via
@@ -136,34 +140,55 @@ def _route_map(manifests: list[PluginManifest]) -> dict[str, PluginManifest]:
     return {m.sidebar.route: m for m in manifests if m.sidebar is not None}
 
 
-def _host_manifest(
-    manifest: PluginManifest, route_map: dict[str, PluginManifest]
-) -> PluginManifest | None:
-    """The host this plugin hooks into, or None if it isn't a hook plugin
-    or its declared host route doesn't match any known plugin."""
-    if manifest.hook is None:
-        return None
-    return route_map.get(manifest.hook.host)
+def _name_map(manifests: list[PluginManifest]) -> dict[str, PluginManifest]:
+    """Every plugin's own name -> its manifest -- what a plain
+    ``requires`` reference resolves against (a plugin id, not a route)."""
+    return {m.name: m for m in manifests}
+
+
+def _dependency_target(
+    manifest: PluginManifest,
+    route_map: dict[str, PluginManifest],
+    name_map: dict[str, PluginManifest],
+) -> tuple[PluginManifest | None, str | None]:
+    """The plugin this one depends on (must be enabled first), and the raw
+    reference string it was declared with -- or ``(None, None)`` if it has
+    no dependency at all. Two ways a plugin declares one:
+      - ``[hook].host`` -- a sidebar *route* it attaches UI into (nowhere
+        to render without it).
+      - ``requires`` -- another plugin's *name* it uses the backend/data
+        of, without attaching to its page (e.g. reticulum-dashboard
+        requiring reticulum).
+    A plugin only ever declares one of the two. The reference string is
+    returned even when it resolves to nothing, so the caller can still show
+    "requires reticulum, not installed" rather than silently dropping it.
+    """
+    if manifest.hook is not None:
+        return route_map.get(manifest.hook.host), manifest.hook.host
+    if manifest.requires is not None:
+        return name_map.get(manifest.requires), manifest.requires
+    return None, None
 
 
 def _describe(
     manifest: PluginManifest,
     loaded_names: set[str],
     route_map: dict[str, PluginManifest],
+    name_map: dict[str, PluginManifest],
 ) -> dict:
     enabled = _is_enabled(manifest)
     loaded = manifest.name in loaded_names
     deps_ok, deps_detail = _deps_status(manifest.name)
-    host = _host_manifest(manifest, route_map)
+    target, ref = _dependency_target(manifest, route_map, name_map)
     conf = _config.plugins.get(manifest.name)
     prov = conf.get("source") if isinstance(conf, dict) else None
     prov = prov if isinstance(prov, dict) else None
     dependency = None
-    if manifest.hook is not None:
+    if ref is not None:
         dependency = {
-            "host_route": manifest.hook.host,
-            "host_id": host.name if host else None,
-            "host_enabled": _is_enabled(host) if host else False,
+            "host_route": ref,
+            "host_id": target.name if target else None,
+            "host_enabled": _is_enabled(target) if target else False,
         }
     return {
         "id": manifest.name,
@@ -217,24 +242,26 @@ def _cascade_disable_dependents(
     disabled_id: str,
     manifests: list[PluginManifest],
     route_map: dict[str, PluginManifest],
+    name_map: dict[str, PluginManifest],
 ) -> list[str]:
-    """Disable every currently-enabled plugin that hooks into
-    ``disabled_id``, directly or transitively (a hook could itself be
-    someone else's host, though nothing ships like that today) -- a
-    plugin left enabled with its host off would just sit there loaded
-    with nowhere to render. Returns the ids actually disabled, in the
-    order they were processed, so the caller can report it rather than
-    letting it happen silently.
+    """Disable every currently-enabled plugin that depends on
+    ``disabled_id`` (hooks into its page, or plainly ``requires`` it),
+    directly or transitively (a dependent could itself be someone else's
+    dependency, though nothing ships nested like that today) -- a plugin
+    left enabled with its dependency off would just sit there loaded with
+    nowhere to render, or nothing to show. Returns the ids actually
+    disabled, in the order they were processed, so the caller can report
+    it rather than letting it happen silently.
     """
     disabled: list[str] = []
     frontier = {disabled_id}
     while frontier:
         newly_disabled: set[str] = set()
         for m in manifests:
-            if m.name in disabled or m.name in frontier or m.hook is None:
+            if m.name in disabled or m.name in frontier:
                 continue
-            host = route_map.get(m.hook.host)
-            if host is None or host.name not in frontier:
+            target, ref = _dependency_target(m, route_map, name_map)
+            if ref is None or target is None or target.name not in frontier:
                 continue
             if not _is_enabled(m):
                 continue
@@ -253,7 +280,8 @@ async def list_plugins():
     loaded_names = {p.manifest.name for p in _loaded_plugins}
     manifests = discover_plugins(_builtin_dir, _community_dir)
     route_map = _route_map(manifests)
-    return {"plugins": [_describe(m, loaded_names, route_map) for m in manifests]}
+    name_map = _name_map(manifests)
+    return {"plugins": [_describe(m, loaded_names, route_map, name_map) for m in manifests]}
 
 
 class PluginUpdate(BaseModel):
@@ -269,17 +297,19 @@ async def update_plugin(
 ):
     """Persist ``plugins.<id>.enabled``. Takes effect on the next restart.
 
-    Enabling a hook plugin whose host isn't enabled is refused outright --
-    it would just load with nowhere to render. Disabling a plugin cascades
-    to every enabled plugin that hooks into it (see
-    :func:`_cascade_disable_dependents`), reported back as
-    ``also_disabled``.
+    Enabling a plugin whose dependency (``[hook].host`` or plain
+    ``requires``) isn't enabled is refused outright -- a hook plugin would
+    load with nowhere to render, a ``requires`` plugin would load with
+    nothing to show. Disabling a plugin cascades to every enabled plugin
+    that depends on it (see :func:`_cascade_disable_dependents`), reported
+    back as ``also_disabled``.
     """
     if _config is None:
         raise HTTPException(503, "Config not loaded")
 
     manifests = discover_plugins(_builtin_dir, _community_dir)
     route_map = _route_map(manifests)
+    name_map = _name_map(manifests)
     manifest = next((m for m in manifests if m.name == plugin_id), None)
     if manifest is None:
         raise HTTPException(404, f"No plugin {plugin_id!r} found")
@@ -291,24 +321,38 @@ async def update_plugin(
         action="config.plugin_update",
         params={"plugin_id": plugin_id, "enabled": req.enabled},
     ):
-        if req.enabled and manifest.hook is not None:
-            host = _host_manifest(manifest, route_map)
-            if host is None:
-                raise HTTPException(
-                    400,
-                    f"{plugin_id!r} hooks into {manifest.hook.host!r}, but no "
-                    "installed plugin provides that page.",
-                )
-            if not _is_enabled(host):
-                raise HTTPException(
-                    400,
-                    f"Enable {host.name!r} first -- {plugin_id!r} hooks into "
-                    "its page and has nowhere to render without it.",
-                )
+        if req.enabled and (manifest.hook is not None or manifest.requires is not None):
+            target, ref = _dependency_target(manifest, route_map, name_map)
+            if manifest.hook is not None:
+                if target is None:
+                    raise HTTPException(
+                        400,
+                        f"{plugin_id!r} hooks into {ref!r}, but no "
+                        "installed plugin provides that page.",
+                    )
+                if not _is_enabled(target):
+                    raise HTTPException(
+                        400,
+                        f"Enable {target.name!r} first -- {plugin_id!r} hooks "
+                        "into its page and has nowhere to render without it.",
+                    )
+            else:
+                if target is None:
+                    raise HTTPException(
+                        400,
+                        f"{plugin_id!r} requires {ref!r}, but no installed "
+                        "plugin has that name.",
+                    )
+                if not _is_enabled(target):
+                    raise HTTPException(
+                        400,
+                        f"Enable {target.name!r} first -- {plugin_id!r} needs "
+                        "it enabled to show anything.",
+                    )
 
         _save_enabled(plugin_id, req.enabled)
         if not req.enabled:
-            also_disabled = _cascade_disable_dependents(plugin_id, manifests, route_map)
+            also_disabled = _cascade_disable_dependents(plugin_id, manifests, route_map, name_map)
 
     logger.info(
         "plugin %s enabled=%s (restart required)%s",
@@ -320,7 +364,7 @@ async def update_plugin(
     return {
         "saved": True,
         "restart_required": True,
-        "plugin": _describe(manifest, loaded_names, route_map),
+        "plugin": _describe(manifest, loaded_names, route_map, name_map),
         "also_disabled": also_disabled,
     }
 
@@ -353,8 +397,10 @@ async def recheck_plugin_deps(
     logger.info("plugin %s dependency re-check: deps_ok=%s", plugin_id, deps_ok)
 
     loaded_names = {p.manifest.name for p in _loaded_plugins}
-    route_map = _route_map(discover_plugins(_builtin_dir, _community_dir))
-    return {"checked": True, "plugin": _describe(manifest, loaded_names, route_map)}
+    all_manifests = discover_plugins(_builtin_dir, _community_dir)
+    route_map = _route_map(all_manifests)
+    name_map = _name_map(all_manifests)
+    return {"checked": True, "plugin": _describe(manifest, loaded_names, route_map, name_map)}
 
 
 @router.post("/check-all")
@@ -393,9 +439,10 @@ async def recheck_all_plugin_deps(
 
     loaded_names = {p.manifest.name for p in _loaded_plugins}
     route_map = _route_map(manifests)
+    name_map = _name_map(manifests)
     return {
         "checked": len(checkable),
-        "plugins": [_describe(m, loaded_names, route_map) for m in manifests],
+        "plugins": [_describe(m, loaded_names, route_map, name_map) for m in manifests],
     }
 
 

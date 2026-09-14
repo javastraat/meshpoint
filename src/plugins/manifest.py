@@ -172,6 +172,18 @@ class PluginManifest:
     sidebar: SidebarSpec | None = None
     # Set iff "hook" in provides.
     hook: HookSpec | None = None
+    # Optional, any provides type: another plugin's *name* (not a route --
+    # unlike hook.host, this plugin isn't attaching to that plugin's page,
+    # it's using its backend/data some other way) that must be enabled
+    # first. Generalizes hook.host's enforcement (src/api/routes/
+    # plugin_routes.py refuses to enable this plugin until that one is,
+    # and cascades disable the same way) to a plugin that renders fine on
+    # its own but has nothing to show without the other one running --
+    # e.g. reticulum-dashboard requiring reticulum. No backend existence
+    # check at parse time, same as hook.host -- resolved at describe/
+    # enable time in plugin_routes.py, a dangling reference just shows
+    # "not installed" there.
+    requires: str | None = None
 
     @property
     def setup_path(self) -> Path | None:
@@ -321,6 +333,7 @@ def parse_manifest(
 
     sidebar = _parse_sidebar(data.get("sidebar"), provides)
     hook = _parse_hook(data.get("hook"), provides)
+    requires = _parse_requires(data.get("requires"), name)
 
     return PluginManifest(
         name=name,
@@ -340,7 +353,23 @@ def parse_manifest(
         locked=locked,
         sidebar=sidebar,
         hook=hook,
+        requires=requires,
     )
+
+
+def _parse_requires(value, own_name: str) -> str | None:
+    """Validate the optional top-level ``requires`` key: another plugin's
+    ``name`` (same shape as this manifest's own ``name``, not a route)."""
+    if value is None:
+        return None
+    if not isinstance(value, str) or not _SLUG_RE.match(value):
+        raise PluginManifestError(
+            "requires",
+            "'requires' must be lowercase [a-z0-9-], 2-39 chars, starting alphanumeric.",
+        )
+    if value == own_name:
+        raise PluginManifestError("requires", "'requires' can't reference itself.")
+    return value
 
 
 def _parse_sidebar(value, provides: list) -> SidebarSpec | None:
