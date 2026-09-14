@@ -51,21 +51,25 @@ class ReticulumNomadTab {
         this._el.innerHTML = `
             <div class="rt-nomad">
                 <div class="rt-nomad__bar">
-                    <input type="search" class="cfg-field__input rt-nomad__search" data-nomad-search
-                           placeholder="Filter nodes…" autocomplete="off" spellcheck="false"
-                           aria-label="Filter NomadNet nodes">
-                    <select class="cfg-field__input rt-nomad__nodes" data-nomad-nodes>
-                        <option value="">— pick a node —</option>
-                    </select>
-                    <button class="terminal-button rt-nomad__fav" type="button" data-nomad-fav
-                            title="Favourite the current node" disabled>&#9734;</button>
-                    <input type="text" class="cfg-field__input rt-nomad__addr" data-nomad-addr
-                           placeholder="&lt;hash&gt;:/page/x.mu  —  or  :/page/info.mu on the current node"
-                           autocomplete="off" spellcheck="false">
-                    <button class="terminal-button" type="button" data-nomad-go>Go</button>
-                    <button class="terminal-button" type="button" data-nomad-back title="Back" disabled>&larr;</button>
-                    <button class="terminal-button" type="button" data-nomad-fwd title="Forward" disabled>&rarr;</button>
-                    <button class="terminal-button" type="button" data-nomad-reload title="Reload" disabled>&#x21bb;</button>
+                    <div class="rt-nomad__bar-row rt-nomad__bar-row--find">
+                        <input type="search" class="cfg-field__input rt-nomad__search" data-nomad-search
+                               placeholder="Filter nodes…" autocomplete="off" spellcheck="false"
+                               aria-label="Filter NomadNet nodes">
+                        <select class="cfg-field__input rt-nomad__nodes" data-nomad-nodes>
+                            <option value="">— pick a node —</option>
+                        </select>
+                        <button class="terminal-button rt-nomad__fav" type="button" data-nomad-fav
+                                title="Favourite the current node" disabled>&#9734;</button>
+                    </div>
+                    <div class="rt-nomad__bar-row rt-nomad__bar-row--nav">
+                        <button class="terminal-button" type="button" data-nomad-back title="Back" disabled>&larr;</button>
+                        <button class="terminal-button" type="button" data-nomad-fwd title="Forward" disabled>&rarr;</button>
+                        <button class="terminal-button" type="button" data-nomad-reload title="Reload" disabled>&#x21bb;</button>
+                        <input type="text" class="cfg-field__input rt-nomad__addr" data-nomad-addr
+                               placeholder="&lt;hash&gt;:/page/x.mu  —  or  :/page/info.mu on the current node"
+                               autocomplete="off" spellcheck="false">
+                        <button class="terminal-button" type="button" data-nomad-go>Go</button>
+                    </div>
                 </div>
                 <p class="cfg-status" data-nomad-status aria-live="polite"></p>
                 <div class="rt-nomad__page" data-nomad-page>

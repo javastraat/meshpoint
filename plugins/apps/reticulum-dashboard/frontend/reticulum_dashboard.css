@@ -159,9 +159,12 @@
     margin: 6px 0;
 }
 
-/* Quick-browse modal toolbar -- back/forward/reload + address bar,
-   mirrors the Browse tab's own .rt-nomad__bar layout minus the
-   node-picker/favourites/search pieces this modal doesn't have. */
+/* Quick-browse modal toolbar -- back/forward/reload/favourite + address
+   bar, mirrors the Browse tab's own .rt-nomad__bar "navigate" row
+   (reticulum.css). No node-picker/search here -- this modal always opens
+   scoped to one specific peer, no free node-switching, so there's
+   nothing for a picker to pick between (see memory/plugin-reticulum.md
+   for the "why not" reasoning). */
 .rtd-browse-toolbar {
     display: flex;
     align-items: center;
@@ -175,3 +178,16 @@
     font-family: var(--font-mono, ui-monospace, "SF Mono", Menlo, monospace);
     font-size: 0.82rem;
 }
+
+/* Favourite star -- copied from reticulum.css's .rt-nomad__fav (same
+   cross-plugin-asset reason as everything else copied in this file), so
+   it looks identical to the Browse tab's and the Peers drawer's own
+   star despite three separate small implementations sharing one
+   localStorage list. */
+.rt-nomad__fav {
+    font-size: 15px;
+    line-height: 1;
+    padding-inline: 9px;
+}
+.rt-nomad__fav--on { color: var(--accent-amber, #f5b942); border-color: currentColor; }
+.rt-nomad__fav:disabled { opacity: 0.4; }

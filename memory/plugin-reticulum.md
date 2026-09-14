@@ -1642,3 +1642,74 @@ styling + nav chrome (uncommitted, 2 asks).**
 Verified: `node --check`, CSS comment-balance script 0, ruff clean,
 plugin-loader/manifest suite 70 passed / 6 skipped, no duplicate method
 definitions. **NOT committed, NOT yet verified live.**
+
+**Follow-up, same session: Browse tab two-row toolbar restructure +
+shared favourites on the quick-browse modal (uncommitted, both
+confirmed after an explicit "tell me first" design discussion).**
+
+**1. Reticulum page's own Browse tab -- two-row toolbar.** User liked the
+new quick-browse modal's cleaner toolbar and asked to bring that design
+language to the real Browse tab too, keeping its search/node-picker/
+favourites. Recommended (and built, after "yes please"): don't clone the
+modal's toolbar 1:1 (it has fewer responsibilities), instead split the
+existing 7-control single flex-wrap row into two purpose-grouped rows --
+"find a node" (search/picker/favourite) above "navigate"
+(back/forward/reload/address/Go, reordered to match the modal's own
+control order). `reticulum_nomad.js`'s `_mount()` template gained
+`.rt-nomad__bar-row--find`/`--nav` wrapper divs (pure markup nesting, zero
+JS query/wiring changes needed -- attribute selectors don't care about
+depth); `reticulum.css`'s `.rt-nomad__bar` became `flex-direction:
+column`, new `.rt-nomad__bar-row { display:flex; flex-wrap:wrap; ...}`
+for each row (the existing per-control flex-basis rules needed no
+changes).
+
+**Found + fixed while in there (pre-existing, unrelated to today):**
+`reticulum.css` had the *exact* comment-closing bug from earlier this
+session ("lw-*/foo" -- the `*` ending "lw-*" immediately followed by `/`
+accidentally closes the block comment) -- **twice**, at the file's own
+header comment (line 2) and the Peer-drawer/Announce-modal explanation
+comment (line 338). Found via the same brace-balance script + a targeted
+regex (`[\w-]+-\*/[\w.]+`) that pinpointed both exactly. Confirmed via
+`git show HEAD:...` that both predate this session entirely. Lower real
+impact than my own version of this bug (each corrupted span was comment
+prose followed by a blank line then a cleanly-separated rule, not glued
+directly onto a real rule the way `.rtd-grid` was), but genuinely
+malformed source -- fixed both the same way as before (comma instead of
+slash to break the adjacency). Comment-balance script confirms 0 now.
+
+**2. Quick-browse modal -- shared favourites star.** Asked first
+(feasibility + scope), user confirmed. `_rtIsFavourite`/`_rtToggleFavourite`
+(reticulum_detail_panels.js) and their independent copy
+(reticulum_nomad.js) are **already duplicated on purpose** between those
+two files, same `RT_NOMAD_FAV_KEY`/`meshpoint.rtNomadFavourites`
+localStorage key+shape, neither exported to `window` -- matches this
+codebase's established small-duplication convention (same reasoning as
+`RTD_ASPECT_BADGES`). Added a third copy (`_RTD_FAV_KEY`/
+`_rtdFavourites`/`_rtdIsFavourite`/`_rtdToggleFavourite`, module-level
+functions) to `reticulum_dashboard.js`, same key -- a node favourited from
+any of the three places (this modal, the Peers drawer, the Browse tab)
+now shows favourited in all three, one shared list. New `data-qb-fav`
+star button in the toolbar (between Reload and the address input),
+`.rt-nomad__fav`/`.rt-nomad__fav--on`/`:disabled` CSS copied from
+reticulum.css (same cross-plugin-asset reason as the rest of this file).
+`_syncFavBtn(isFav)` called after every successful `_fetch()`, keyed off
+`_rtdIsFavourite(hash)` for whichever node is now showing.
+`this._currentName` (only real for the node the modal was opened *with*
+-- link-followed nodes have no display name in the page response) is
+cleared whenever `_fetch` lands on a different hash than before, so a
+favourite added after following a link doesn't get mislabelled with the
+stale original name.
+
+**Deliberately NOT added:** a node-picker dropdown + search in the quick-
+browse modal. Explicit design call, explained to the user before
+building: the modal always opens scoped to one specific peer (there's no
+free "switch to a different node" concept in it at all), so a picker
+would mean re-adding exactly what makes the real Browse tab "full" --
+the whole reason this is a separate, smaller modal. Jumping between
+favourited nodes freely stays a Browse-tab-only workflow.
+
+Verified: `node --check` both `reticulum_nomad.js` and
+`reticulum_dashboard.js`, CSS comment-balance script 0 on both
+`reticulum.css` and `reticulum_dashboard.css`, `ruff check` clean on both
+plugin dirs, plugin-loader/manifest suite 70 passed / 6 skipped, no
+duplicate method definitions. **NOT committed, NOT yet verified live.**

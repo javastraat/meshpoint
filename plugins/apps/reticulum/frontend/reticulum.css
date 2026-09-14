@@ -1,12 +1,23 @@
 /* Reticulum plugin -- the "Browse" (NomadNet) tab. Everything else on the
- * page reuses core's shared lw-*/stat-card/mt-badge/cfg-* classes. */
+ * page reuses core's shared lw-*, stat-card/mt-badge/cfg-* classes. */
 
+/* Two purpose-grouped rows -- "find a node" (search/picker/favourite)
+ * above "navigate" (back/forward/reload/address/Go) -- rather than all
+ * 7 controls fighting for space on one flex-wrap line, which reads as
+ * clutter and wraps unpredictably below desktop widths. Matches the
+ * reticulum-dashboard plugin's own quick-browse modal toolbar, which
+ * only has the navigate row (no node search/picker/favourites there). */
 .rt-nomad__bar {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+.rt-nomad__bar-row {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
     align-items: center;
-    margin-bottom: 8px;
 }
 
 .rt-nomad__search { flex: 1 1 130px; min-width: 0; }
@@ -324,7 +335,7 @@
  * Deliberately reuses core's own node_drawer.css (.nd-drawer/.nd-header/
  * .nd-section/.nd-row) and packet_detail_modal.css (.pdm-*) class names
  * directly -- both already load globally on every page, same as this
- * plugin already reuses lw-*/mt-badge/terminal-button/cfg-* elsewhere.
+ * plugin already reuses lw-*, mt-badge/terminal-button/cfg-* elsewhere.
  * Those classes are just layout/color rules with no protocol-specific
  * behaviour baked in, so this gets pixel-identical styling to the
  * Meshtastic/MeshCore node drawer and packet-detail modal for free,

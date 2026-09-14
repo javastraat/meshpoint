@@ -80,6 +80,34 @@ const RTD_ASPECT_BADGES = {
     'call.audio': 'mt-badge--routing',
 };
 
+// Same localStorage key + {hash, name} shape as reticulum_nomad.js's own
+// Browse-tab favourites (and reticulum_detail_panels.js's own copy for
+// the Peers drawer's star) -- duplicated a third time on purpose, same
+// small-duplication convention as RTD_ASPECT_BADGES above, so a node
+// favourited from any of the three places (this modal, the drawer, the
+// Browse tab) shows up in all three: one shared list, not three.
+const _RTD_FAV_KEY = 'meshpoint.rtNomadFavourites';
+
+function _rtdFavourites() {
+    try {
+        const v = JSON.parse(localStorage.getItem(_RTD_FAV_KEY) || '[]');
+        return Array.isArray(v) ? v.filter((f) => f && f.hash) : [];
+    } catch (_) { return []; }
+}
+
+function _rtdIsFavourite(hash) {
+    return _rtdFavourites().some((f) => f.hash === hash);
+}
+
+function _rtdToggleFavourite(hash, name) {
+    const list = _rtdFavourites();
+    const idx = list.findIndex((f) => f.hash === hash);
+    if (idx >= 0) list.splice(idx, 1);
+    else list.push({ hash, name: name || `${hash.slice(0, 12)}…` });
+    try { localStorage.setItem(_RTD_FAV_KEY, JSON.stringify(list)); } catch (_) {}
+    return idx < 0; // true if it's now favourited
+}
+
 /**
  * A read-only "quick view" for a NomadNet node -- not the Reticulum
  * page's own Browse tab (node-picker dropdown, favourites, form-field
@@ -134,6 +162,8 @@ class ReticulumQuickBrowseModal {
                 <button type="button" class="terminal-button" data-qb-back title="Back" disabled>&larr;</button>
                 <button type="button" class="terminal-button" data-qb-forward title="Forward" disabled>&rarr;</button>
                 <button type="button" class="terminal-button" data-qb-reload title="Reload" disabled>&#x21bb;</button>
+                <button type="button" class="terminal-button rt-nomad__fav" data-qb-fav
+                        title="Favourite this node" disabled>&#9734;</button>
                 <input type="text" class="cfg-field__input rtd-browse-toolbar__addr" data-qb-addr
                        autocomplete="off" spellcheck="false" aria-label="Node address">
                 <button type="button" class="terminal-button" data-qb-go>Go</button>
@@ -153,6 +183,7 @@ class ReticulumQuickBrowseModal {
         this._backBtn = modal.querySelector('[data-qb-back]');
         this._fwdBtn = modal.querySelector('[data-qb-forward]');
         this._reloadBtn = modal.querySelector('[data-qb-reload]');
+        this._favBtn = modal.querySelector('[data-qb-fav]');
         modal.querySelector('[data-qb-go]').addEventListener('click', () => this._goFromAddr());
         this._addrEl.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') { e.preventDefault(); this._goFromAddr(); }
@@ -163,14 +194,28 @@ class ReticulumQuickBrowseModal {
             const e = this._history[this._historyIdx];
             if (e) this._fetch(e.hash, e.path, false);
         });
+        this._favBtn.addEventListener('click', () => {
+            if (!this._currentHash) return;
+            const nowOn = _rtdToggleFavourite(this._currentHash, this._currentName);
+            this._syncFavBtn(nowOn);
+        });
 
         overlay.appendChild(modal);
         document.body.appendChild(overlay);
         this._overlay = overlay;
         this._currentHash = hash;
+        this._currentName = label || null;
         document.addEventListener('keydown', this._onKeyDown);
         modal.querySelector('.pdm-modal__close').focus();
         this._go(hash, '/page/index.mu');
+    }
+
+    _syncFavBtn(isFav) {
+        if (!this._favBtn) return;
+        this._favBtn.disabled = !this._currentHash;
+        this._favBtn.classList.toggle('rt-nomad__fav--on', !!isFav);
+        this._favBtn.innerHTML = isFav ? '&#9733;' : '&#9734;';
+        this._favBtn.title = isFav ? 'Remove from favourites' : 'Favourite this node';
     }
 
     _goFromAddr() {
@@ -211,6 +256,11 @@ class ReticulumQuickBrowseModal {
                 if (bodyEl) bodyEl.textContent = data.error || `Failed (HTTP ${r.status})`;
                 return;
             }
+            // Only the node we opened *with* has a real display name --
+            // any node reached by following a link doesn't (the page
+            // response has no name field), so drop the stale one rather
+            // than mislabel a favourite added from here.
+            if (hash !== this._currentHash) this._currentName = null;
             this._currentHash = hash;
             if (bodyEl) {
                 bodyEl.textContent = '';
@@ -226,6 +276,7 @@ class ReticulumQuickBrowseModal {
                 this._historyIdx = this._history.length - 1;
             }
             this._syncNav();
+            this._syncFavBtn(_rtdIsFavourite(hash));
         } catch (e) {
             if (bodyEl) bodyEl.textContent = `Network error: ${e.message}`;
         }
