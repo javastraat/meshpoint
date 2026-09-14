@@ -18,9 +18,13 @@ requires = "reticulum"  # not a [hook] -- this page doesn't attach to
 
 [frontend]
 scripts = ["frontend/reticulum_dashboard.js"]
-# No [styles]: reuses core's stat-card / lw-* / packet-row--new classes
-# (dashboard.css + lorawan.css), both loaded globally already -- same
-# reuse the reticulum plugin's own page relies on for its stat cards.
+styles = ["frontend/reticulum_dashboard.css"]
+# Most of the look reuses core's stat-card / lw-* / panel / packet-row--new
+# classes (dashboard.css + lorawan.css), both loaded globally already --
+# same reuse the reticulum plugin's own page relies on. The one own
+# stylesheet holds the two-column map+peers grid and a copy of the
+# reticulum plugin's telemetry-map/popup rules (asset serving is scoped
+# per-plugin, so its reticulum.css isn't reachable from here).
 
 [sidebar]
 route = "reticulum-dashboard"
@@ -31,6 +35,6 @@ icon = "reticulum"    # same glyph as the reticulum plugin's own nav item --
                        # to one plugin (see sidebar_plugin_registry.js).
 
 [meta]
-description = "A live, standalone view of Reticulum activity -- known-peer/people/infrastructure/conversation counts plus a flashing real-time announce ticker. Companion to the reticulum plugin's own Peers/Messages/Settings page; requires reticulum enabled to show data."
+description = "A live, standalone view of Reticulum activity -- stat cards, a telemetry map of located peers, a live peer list, and a flashing real-time announce ticker. Companion to the reticulum plugin's own Peers/Messages/Settings page; requires reticulum enabled to show data."
 homepage = "https://reticulum.network"
 author = "Einstein PD2EMC"

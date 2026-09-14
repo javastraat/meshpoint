@@ -1,0 +1,118 @@
+/* Reticulum Dashboard -- own stylesheet.
+ *
+ * Cross-plugin asset isolation (src/plugins/assets.py:resolve_plugin_asset
+ * only serves files a plugin's OWN manifest lists) means this page can't
+ * just link plugins/apps/reticulum/frontend/reticulum.css even though it
+ * wants two things straight from it -- the telemetry-map + popup rules are
+ * copied verbatim below (kept in sync by hand; small, stable, unlikely to
+ * drift). Everything else reuses core's already-global panel/lw-*/stat-card
+ * classes, so this file only holds what's genuinely new to this page.
+ */
+
+/* ---- Map + Peers side-by-side row, mirrors the core Dashboard's own
+   .dashboard__main (2fr 1fr) -- but this page scrolls normally rather
+   than living in a fixed-height flex shell, so it just stacks under a
+   plain width breakpoint instead of that shell's overflow tricks. ---- */
+.rtd-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 0.5rem;
+    align-items: start;
+}
+@media (max-width: 900px) {
+    .rtd-grid { grid-template-columns: 1fr; }
+}
+
+.rtd-map-panel .panel__body { padding: 0.75rem; }
+
+/* ---- Peers list (right column) -- a lighter-weight readout than the
+   Reticulum page's own sortable/searchable Peers table; this is a
+   glanceable "who's around" list, full management stays on that page. */
+.rtd-peers-panel .panel__body {
+    padding: 0.5rem 0.75rem 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+.rtd-peers-list {
+    max-height: 360px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+.rtd-peer-row {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    padding: 0.35rem 0.15rem;
+    border-bottom: 1px solid var(--border, #2a2a2a);
+}
+.rtd-peer-row:last-child { border-bottom: none; }
+.rtd-peer-row__name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.82rem;
+    color: var(--text-primary, #eee);
+}
+.rtd-peer-row__time {
+    flex: 0 0 auto;
+    font-size: 0.72rem;
+    color: var(--text-muted, #888);
+    white-space: nowrap;
+}
+
+/* ---- Telemetry map + its popup -- verbatim from the reticulum plugin's
+   own reticulum.css (see file header note above). ---- */
+.rt-telemetry-map {
+    height: 300px;
+    width: 100%;
+    border: 1px solid var(--border, #333);
+    border-radius: 6px;
+}
+.rt-telemetry-map .leaflet-container { background: var(--bg, #111); }
+.rt-telemetry-map .leaflet-popup-content-wrapper {
+    background: var(--bg-card, #1a1a1a);
+    color: var(--text-primary, #eee);
+    border: 1px solid var(--border, #333);
+    border-radius: 10px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+.rt-telemetry-map .leaflet-popup-content { margin: 10px 12px; }
+.rt-telemetry-map .leaflet-popup-tip { background: var(--bg-card, #1a1a1a); }
+.rt-telemetry-map .leaflet-popup-close-button { color: var(--text-muted, #888) !important; }
+
+.rt-tele-popup__head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    margin-bottom: 4px;
+}
+.rt-tele-popup__name {
+    font-weight: 700;
+    font-size: 0.85rem;
+    color: var(--text-primary, #eee);
+}
+.rt-tele-popup__temp {
+    font-size: 0.78rem;
+    color: var(--accent-amber, #f59e0b);
+    white-space: nowrap;
+}
+.rt-tele-popup__tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    max-width: 220px;
+}
+.rt-tele-popup__tag {
+    font-size: 0.68rem;
+    color: var(--text-secondary, #aaa);
+    background: var(--overlay-weak, rgba(255, 255, 255, 0.06));
+    border-radius: 5px;
+    padding: 2px 6px;
+    white-space: nowrap;
+}
+.rt-tele-popup__tag--open { color: var(--accent-green, #00e5a0); }
+.rt-tele-popup__tag--closed { color: var(--accent-red, #ef4444); }

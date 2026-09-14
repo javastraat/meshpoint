@@ -1250,3 +1250,49 @@ both, then disable reticulum and confirm reticulum-dashboard auto-disables
 too (`also_disabled` in the response) and the Settings → Plugins row shows
 "Depends on: reticulum (not enabled)" / greys the toggle when reticulum is
 off.
+
+**Follow-up, same session: full dashboard layout (uncommitted).** User,
+looking at both pages side by side: "cant you make the ret dashboard like
+the real dashboard? we have contacts/peers for the right side, we have
+activity for bottom and even telemetry with location etc for the map?"
+Right call — reticulum_panel.js already has everything needed, just on a
+different tab: a Leaflet telemetry map (`_renderTelemetryMap()`, own
+markers keyed off `GET /api/reticulum/telemetry/peers` entries with
+lat/lon — Sideband-style LXMF telemetry frames, not RF nodes) and the
+peers roster (`GET /api/reticulum/peers`, `last_seen` DESC from the API).
+Ported both into the new page:
+
+- `reticulum_dashboard.js`: new `.rtd-grid` two-column row between the
+  stat cards and the ticker — left: telemetry map (verbatim port of
+  `_renderTelemetryMap`, own `#rtd-telemetry-map` Leaflet instance,
+  `reticulum_telemetry` WS event -> `_loadTelemetry()`), right: a
+  lighter "who's around" peers list (`display_name`/aspect badge/last-seen,
+  client-side search-as-you-type by name or hash, capped at 150 — full
+  sortable/searchable table stays on the Reticulum page). `_loadPeers()`
+  (renamed from `_loadPeerCounts()`) now keeps `this._peers` around
+  instead of discarding it after computing the stat-card counts.
+- `reticulum_dashboard.css` (**new** — plugin previously had none):
+  `.rtd-grid` (2fr/1fr, mirrors core `dashboard.css`'s own
+  `.dashboard__main`, stacks under 900px since this page scrolls normally
+  rather than living in the core dashboard's fixed-height flex shell),
+  `.rtd-peers-list`/`.rtd-peer-row`, and a **verbatim copy** of
+  reticulum.css's `.rt-telemetry-map`/`.rt-tele-popup*` rules — cross-plugin
+  asset serving is scoped per-plugin (`resolve_plugin_asset` only serves a
+  plugin's own manifest-listed files), so reticulum.css genuinely can't be
+  linked from this plugin; documented as a "kept in sync by hand" copy in
+  both the CSS file's header and this note.
+- `plugin.toml`: added `[frontend].styles`.
+
+Verified: `node --check`, manifest re-parses (styles tuple populated,
+15 plugins still discovered), `ruff check` clean, plugin-loader/manifest/
+registry suite still 77 passed / 6 skipped, CHANGELOG parses (31 sections,
+bullet expanded in place rather than a new one — same feature landing in
+the same version).
+
+**NOT committed, NOT Pi-tested.** Pi verify: peers list populates and
+search-filters live; telemetry map shows/hides correctly (most Reticulum
+peers won't have telemetry, so likely empty unless the VM/Pi has telemetry
+senders on the mesh — the "No located peers yet" empty state should show
+cleanly in that case, not a broken/blank map); WS-driven updates (new
+peer, new telemetry report, new announce) all reflect live without a
+manual refresh.
