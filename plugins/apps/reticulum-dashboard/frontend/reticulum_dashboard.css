@@ -92,9 +92,11 @@
     align-items: baseline;
     gap: 0.5rem;
     padding: 0.35rem 0.75rem;
+    cursor: pointer;
     border-bottom: 1px solid var(--border, #2a2a2a);
 }
 .rtd-peer-row:last-child { border-bottom: none; }
+.rtd-peer-row:hover { background: var(--overlay-weak, rgba(255, 255, 255, 0.06)); }
 .rtd-peer-row__name {
     flex: 1 1 auto;
     min-width: 0;

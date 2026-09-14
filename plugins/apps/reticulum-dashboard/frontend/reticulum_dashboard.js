@@ -86,7 +86,11 @@ class ReticulumDashboard {
         this._refreshTimer = null;
         this._peers = [];
         this._telemetry = [];
+        this._announces = []; // mirrors the ticker's DOM rows -- needed to
+        // look up an entry on click (row click-through -> detail panels)
         this._peerSearchQuery = '';
+        this._peerDrawer = null;
+        this._announceModal = null;
         // Same localStorage key node_map.js's own basemap toggle uses --
         // deliberately shared, not a separate preference: "I like a light
         // map" is one setting the user expects to carry across every map
@@ -222,6 +226,56 @@ class ReticulumDashboard {
         this._q('#rtd-map-basemap-btn')?.addEventListener('click', () => this._toggleBasemap());
         this._q('#rtd-map-fit-btn')?.addEventListener('click', () => this._fitTelemetryBounds());
         this._q('#rtd-map-expand-btn')?.addEventListener('click', () => this._toggleExpand());
+
+        // Same detail drawer/modal the Reticulum page's own Peers/Activity
+        // rows open (plugins/apps/reticulum/frontend/reticulum_detail_
+        // panels.js, exposed as window.ReticulumPeerDrawer/
+        // ReticulumAnnounceModal -- reticulum is a hard `requires` of this
+        // plugin, so its scripts are always loaded alongside this page's
+        // own). Constructed lazily here rather than referenced only at
+        // click time so a missing script (reticulum somehow not loaded)
+        // fails visibly once at mount instead of silently on every click.
+        if (window.ReticulumPeerDrawer) this._peerDrawer = new window.ReticulumPeerDrawer();
+        if (window.ReticulumAnnounceModal) this._announceModal = new window.ReticulumAnnounceModal();
+
+        this._q('#rtd-peers-list')?.addEventListener('click', (e) => {
+            const row = e.target.closest('[data-hash]');
+            if (!row) return;
+            const peer = this._peers.find((p) => p.destination_hash === row.dataset.hash);
+            if (peer) this._openPeerDrawer(peer);
+        });
+        this._q('#rtd-ticker-tbody')?.addEventListener('click', (e) => {
+            const tr = e.target.closest('tr[data-rt-ts]');
+            if (!tr) return;
+            const entry = this._announces.find(
+                (a) => a.ts === tr.dataset.rtTs && a.destination_hash === tr.dataset.rtHash,
+            );
+            if (entry) this._openAnnounceModal(entry);
+        });
+    }
+
+    /** Peer-row click -> the same right-side drawer the Reticulum page's
+     * own Peers tab opens. Read-only here -- no contact editing / browse /
+     * send-message actions, this page is a glanceable companion, not the
+     * full management page -- but "view announce" still pivots to this
+     * page's own announce modal, matching the real thing's cross-link. */
+    _openPeerDrawer(peer) {
+        if (!this._peerDrawer) return;
+        const recent = this._announces.filter((a) => a.destination_hash === peer.destination_hash);
+        this._peerDrawer.open(peer, recent, {
+            onViewAnnounce: (entry) => this._openAnnounceModal(entry),
+        });
+    }
+
+    /** Activity-row click -> the same center modal the Reticulum page's
+     * own Activity tab opens. */
+    _openAnnounceModal(entry) {
+        if (!this._announceModal) return;
+        const peer = this._peers.find((p) => p.destination_hash === entry.destination_hash);
+        this._announceModal.show(entry, {
+            knownPeer: !!peer,
+            onViewPeer: () => { if (peer) this._openPeerDrawer(peer); },
+        });
     }
 
     /** Called by the router (via registerSidebarPage) when the page becomes active. */
@@ -300,6 +354,7 @@ class ReticulumDashboard {
             const empty = this._q('#rtd-ticker-empty');
             if (!tbody) return;
             const rows = announces.slice(0, RTD_TICKER_LIMIT);
+            this._announces = rows;
             if (!rows.length) {
                 if (empty) empty.style.display = '';
                 return;
@@ -344,7 +399,7 @@ class ReticulumDashboard {
         // Already last_seen DESC from the API -- same assumption
         // reticulum_panel.js's own Peers tab relies on.
         list.innerHTML = filtered.slice(0, RTD_PEER_LIST_LIMIT).map((p) => `
-            <div class="rtd-peer-row" title="${this._esc(p.destination_hash)}">
+            <div class="rtd-peer-row" data-hash="${this._esc(p.destination_hash)}" title="${this._esc(p.destination_hash)}">
                 <span class="rtd-peer-row__name">${this._esc(p.display_name || p.destination_hash.slice(0, 12) + '…')}</span>
                 ${this._fmtAspect(p.aspect)}
                 <span class="rtd-peer-row__time">${this._fmtTime(p.last_seen)}</span>
@@ -544,8 +599,14 @@ class ReticulumDashboard {
         const empty = this._q('#rtd-ticker-empty');
         if (empty) empty.style.display = 'none';
 
+        this._announces.unshift(entry);
+        if (this._announces.length > RTD_TICKER_LIMIT) this._announces.length = RTD_TICKER_LIMIT;
+
         const tr = document.createElement('tr');
         tr.className = 'lw-pkt-row packet-row--new';
+        tr.dataset.rtTs = entry.ts;
+        tr.dataset.rtHash = entry.destination_hash;
+        tr.title = 'Click for details';
         tr.innerHTML = this._rowInner(entry);
         tr.addEventListener('animationend', () => tr.classList.remove('packet-row--new'));
         tbody.insertBefore(tr, tbody.firstChild);
@@ -556,7 +617,7 @@ class ReticulumDashboard {
     }
 
     _rowHtml(a) {
-        return `<tr class="lw-pkt-row">${this._rowInner(a)}</tr>`;
+        return `<tr class="lw-pkt-row" data-rt-ts="${this._esc(a.ts)}" data-rt-hash="${this._esc(a.destination_hash)}" title="Click for details">${this._rowInner(a)}</tr>`;
     }
 
     _rowInner(a) {

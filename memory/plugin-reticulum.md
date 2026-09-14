@@ -1511,3 +1511,46 @@ a widget in a normal-scrolling page shouldn't hijack scroll). This page's
 map plays the core Dashboard's dominant NODE MAP role instead, which is
 `scrollWheelZoom: true` (node_map.js) -- flipped to match. Verified:
 `node --check`. **NOT committed, NOT yet verified live.**
+
+**Follow-up, same session: peer drawer + announce modal click-through
+(uncommitted).** User: clicking a peer/activity row should open the same
+right-side drawer / center modal the Reticulum page's own Peers/Activity
+rows do. Turned out cleanly reusable -- `reticulum_detail_panels.js`
+exposes `window.ReticulumPeerDrawer`/`ReticulumAnnounceModal`/
+`ReticulumTelemetryModal` as plain globals (self-contained, no host
+element needed, `new X()` then `.open()`/`.show()`), and since
+`requires = "reticulum"` guarantees that plugin's scripts are always
+loaded alongside this page's own, no cross-plugin asset-serving workaround
+needed this time (unlike the CSS files earlier).
+
+- Constructed both (`ReticulumPeerDrawer`/`ReticulumAnnounceModal`) once
+  in `mount()`, guarded by `if (window.X)` -- fails visibly once at mount
+  if reticulum's scripts somehow aren't loaded, rather than silently on
+  every click.
+- Added `this._announces` array (mirrors the ticker's DOM rows -- needed
+  a backing array to look an entry up by `{ts, destination_hash}` on
+  click, which the DOM-only ticker never needed before). Seeded in
+  `_loadTickerSeed()`, kept in sync in `_onWsAnnounce()` (unshift + trim,
+  same cap as the DOM rows). Row markup (`_rowHtml` and the WS-driven
+  `<tr>` in `_onWsAnnounce`) both gained `data-rt-ts`/`data-rt-hash` +
+  "Click for details" title, matching reticulum_panel.js's own Activity
+  rows exactly.
+- Peer rows gained `data-hash`; click-delegation listeners on
+  `#rtd-peers-list` and `#rtd-ticker-tbody` (added once in `mount()`) look
+  up the entry/peer and call the new `_openPeerDrawer(peer)`/
+  `_openAnnounceModal(entry)`, same method names and same
+  `onViewAnnounce`/`onViewPeer` cross-link `reticulum_panel.js` wires
+  between the two -- clicking "view announce" in the drawer or "view peer"
+  in the modal works the same way here.
+- **Deliberately read-only**, unlike the real page's version: no
+  `onBrowse`/`onSendMessage`/`onSaveContact`/`onDeleteContact` passed to
+  the drawer (all optional per `ReticulumPeerDrawer.open()`'s own JSDoc,
+  confirmed safe to omit) -- this page is a glanceable companion, not a
+  second copy of the management page; full peer/contact/message actions
+  stay on the Reticulum page.
+- CSS: `.rtd-peer-row` gained `cursor:pointer` + `:hover` background,
+  matching `.lw-pkt-row`'s own existing affordance for the ticker rows.
+
+Verified: `node --check`, comment-balance script 0, ruff clean,
+plugin-loader/manifest suite 70 passed / 6 skipped, no duplicate method
+definitions. **NOT committed, NOT yet verified live.**
