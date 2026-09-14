@@ -19,16 +19,22 @@ class DangerousPanelController {
         this.wtCardEl = rootEl.querySelector('[data-web-terminal-card]');
         this.wtToggle = rootEl.querySelector('[data-web-terminal-toggle]');
         this.wtStatusEl = rootEl.querySelector('[data-web-terminal-status]');
+        this.lpSelect = rootEl.querySelector('[data-landing-page-select]');
+        this.lpStatusEl = rootEl.querySelector('[data-landing-page-status]');
     }
 
     bind() {
         if (this.wtToggle) {
             this.wtToggle.addEventListener('change', () => this._onWebTerminalToggle());
         }
+        if (this.lpSelect) {
+            this.lpSelect.addEventListener('change', () => this._onLandingPageChange());
+        }
     }
 
     async refresh() {
         this._loadWebTerminalState();
+        this._loadLandingPageState();
         try {
             const response = await fetch('/api/dangerous/actions', {
                 credentials: 'same-origin',
@@ -118,6 +124,64 @@ class DangerousPanelController {
         if (!this.wtStatusEl) return;
         this.wtStatusEl.dataset.kind = kind;
         this.wtStatusEl.textContent = message;
+    }
+
+    // ── Landing page ─────────────────────────────────────────────────────
+
+    /** Options are "Dashboard" (always) plus every currently-mounted
+     * "top"-category plugin in `window.MESHPOINT_SIDEBAR_PLUGINS`
+     * (server-injected by src/plugins/assets.py -- a disabled plugin
+     * never gets a descriptor there, so it never shows up as a choice
+     * here either, matching what the backend accepts). Current value
+     * comes from GET /api/config's `dashboard.landing_page`. */
+    async _loadLandingPageState() {
+        if (!this.lpSelect) return;
+        const topPages = (window.MESHPOINT_SIDEBAR_PLUGINS || [])
+            .filter((p) => p.category === 'top');
+        const options = [{ route: 'dashboard', label: 'Dashboard' }, ...topPages];
+        this.lpSelect.innerHTML = options
+            .map((p) => `<option value="${this._escape(p.route)}">${this._escape(p.label)}</option>`)
+            .join('');
+        try {
+            const r = await fetch('/api/config', { credentials: 'same-origin' });
+            if (!r.ok) { this._setLpStatus('error', `Could not load (HTTP ${r.status}).`); return; }
+            const cfg = await r.json();
+            const current = (cfg.dashboard && cfg.dashboard.landing_page) || 'dashboard';
+            if (options.some((p) => p.route === current)) this.lpSelect.value = current;
+            this.lpSelect.disabled = false;
+        } catch (_e) {
+            this._setLpStatus('error', 'Network error.');
+        }
+    }
+
+    async _onLandingPageChange() {
+        const landingPage = this.lpSelect.value;
+        this.lpSelect.disabled = true;
+        this._setLpStatus('pending', 'Saving…');
+        try {
+            const r = await fetch('/api/config/dashboard', {
+                method: 'PUT',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ landing_page: landingPage }),
+            });
+            const body = await r.json().catch(() => ({}));
+            if (!r.ok) {
+                this._setLpStatus('error', body.detail || `Failed (HTTP ${r.status}).`);
+                return;
+            }
+            this._setLpStatus('success', 'Saved.');
+        } catch (_e) {
+            this._setLpStatus('error', 'Network error.');
+        } finally {
+            this.lpSelect.disabled = false;
+        }
+    }
+
+    _setLpStatus(kind, message) {
+        if (!this.lpStatusEl) return;
+        this.lpStatusEl.dataset.kind = kind;
+        this.lpStatusEl.textContent = message;
     }
 
     _render() {

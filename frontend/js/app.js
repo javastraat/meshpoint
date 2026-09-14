@@ -58,21 +58,32 @@ document.addEventListener('DOMContentLoaded', async () => {
     const pluginSidebarPages = window.mountPluginSidebarPages
         ? window.mountPluginSidebarPages() : [];
 
+    const allowedRoutes = [
+        'dashboard', 'meshtastic', 'meshcore', 'lorawan', 'pager', 'stats', 'rf', 'repeaters', 'topology', 'messages', 'radio', 'terminal',
+        'configuration/identity', 'configuration/radio',
+        'configuration/channels', 'configuration/transmit',
+        'configuration/mqtt',
+        'configuration/gps',
+        'configuration/peripherals',
+        'configuration/meshcore', 'configuration/serial',
+        'configuration/firmware',
+        'configuration/repeater-poll', 'configuration/metrics',
+        'settings/updates', 'settings/themes', 'settings/auth', 'settings/dangerous', 'settings/storage', 'settings/plugins',
+        ...pluginSidebarPages.map((p) => p.routeId),
+    ];
+    // Settings -> System's "Landing page" picker (dashboard.landing_page in
+    // local.yaml) -- server-stamped onto <html> by stamp_landing_page() so
+    // it's known before the first paint. Falls back to 'dashboard' if the
+    // stamped id no longer names a mounted route (its plugin got disabled
+    // after the setting was saved) -- Router.start() dispatches
+    // defaultRoute directly with no allowedRoutes check of its own.
+    const configuredLandingPage = document.documentElement.dataset.landingPage;
+    const defaultRoute = allowedRoutes.includes(configuredLandingPage)
+        ? configuredLandingPage : 'dashboard';
+
     const router = new Router({
-        defaultRoute: 'dashboard',
-        allowedRoutes: [
-            'dashboard', 'meshtastic', 'meshcore', 'lorawan', 'pager', 'stats', 'rf', 'repeaters', 'topology', 'messages', 'radio', 'terminal',
-            'configuration/identity', 'configuration/radio',
-            'configuration/channels', 'configuration/transmit',
-            'configuration/mqtt',
-            'configuration/gps',
-            'configuration/peripherals',
-            'configuration/meshcore', 'configuration/serial',
-            'configuration/firmware',
-            'configuration/repeater-poll', 'configuration/metrics',
-            'settings/updates', 'settings/themes', 'settings/auth', 'settings/dangerous', 'settings/storage', 'settings/plugins',
-            ...pluginSidebarPages.map((p) => p.routeId),
-        ],
+        defaultRoute,
+        allowedRoutes,
         guard: _buildRouteGuard(identity),
         onDenied: _toastAdminRequired,
     });

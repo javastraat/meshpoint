@@ -21,9 +21,10 @@ Kept free of FastAPI imports.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
-from src.plugins.manifest import PluginManifest
+from src.plugins.manifest import PluginManifest, landing_page_ids
 
 # Emitted verbatim into index.html; server.py runs bust_asset_urls() after
 # this, which appends the ?v=<boot> cache token to each URL.
@@ -126,3 +127,25 @@ def inject_plugin_assets(html: str, manifests: list[PluginManifest]) -> str:
     if "</body>" in html:
         return html.replace("</body>", tags + "</body>", 1)
     return html + tags
+
+
+_LANDING_PAGE_TAG_RE = re.compile(r"<html\b(?![^>]*\bdata-landing-page=)", re.IGNORECASE)
+
+
+def stamp_landing_page(html: str, landing_page: str, manifests: list[PluginManifest]) -> str:
+    """Stamp ``data-landing-page`` on the ``<html>`` tag so ``app.js`` can
+    read the configured default route (``DashboardConfig.landing_page``)
+    without an extra round trip to ``GET /api/config``. No-op for the
+    "dashboard" baseline (``Router``'s own default) or an id that no
+    longer resolves to a loaded "top"-category plugin -- e.g. the plugin
+    was disabled after ``landing_page`` was set to it; the router.js
+    ``options.defaultRoute || 'dashboard'`` fallback then applies instead
+    of navigating to a page that was never mounted. Mirrors
+    ``theme_registry.stamp_default_theme``'s same-tag-attribute pattern.
+    """
+    landing_page = (landing_page or "").strip()
+    if not landing_page or landing_page == "dashboard":
+        return html
+    if landing_page not in landing_page_ids(manifests):
+        return html
+    return _LANDING_PAGE_TAG_RE.sub(f'<html data-landing-page="{landing_page}"', html, count=1)

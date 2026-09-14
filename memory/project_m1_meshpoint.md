@@ -13135,3 +13135,93 @@ edit.
 
 Not yet Pi-verified (pure CSS, low risk) — worth a quick look in an
 actual browser in light mode next session if it hasn't been checked.
+
+## Landing page picker: which "top"-tier page loads with no hash in the URL (2026-09-14, same session)
+
+User asked "did we build [a setting for] which dashboard to load [at
+start]?" after the reticulum-browser tab fix, having just noticed there
+are now two dashboard-tier pages (built-in Dashboard + the
+reticulum-dashboard plugin). Checked: no such setting existed --
+`frontend/js/app.js` hardcoded `defaultRoute: 'dashboard'` on the
+`Router`. I asked whether it made sense to scope the picker to every
+sidebar page or just the "top" tier; user asked my opinion back
+("is it smart to choose any page? maybe only what in top?") -- agreed
+with limiting to "top": most built-in tabs (Meshtastic/MeshCore/LoRaWAN)
+hide themselves entirely with no matching radio/companion configured,
+so a "top"-tier-only picker can't land on a page that renders blank.
+
+Built:
+- `src/config.py`: new `DashboardConfig.landing_page: str = "dashboard"`.
+- `src/plugins/manifest.py`: new shared `landing_page_ids(manifests)` ->
+  `{"dashboard"} | {sidebar.route for "top"-category manifests}` --
+  single source of truth so the PUT validator and the HTML-stamping
+  code can't drift apart on what counts as a valid choice.
+- `src/plugins/assets.py`: new `stamp_landing_page(html, landing_page,
+  manifests)`, same `<html data-X=...>` regex-substitution pattern as
+  `theme_registry.stamp_default_theme` -- no-op for `"dashboard"` or a
+  stale id (plugin since disabled), so a bad value degrades to the
+  default instead of routing to an unmounted page.
+- `src/api/server.py`: `serve_dashboard_root()` calls the new stamp
+  function; `config_routes.init_routes()` now also takes
+  `loaded_plugins=_loaded_plugins` (needed for validating the PUT).
+- `src/api/routes/config_routes.py`: `PUT /api/config/dashboard` gains
+  `landing_page` (validated against `landing_page_ids`, 400 if unknown);
+  `GET /api/config`'s `dashboard` block reports the current value.
+- `frontend/js/app.js`: `defaultRoute` now reads
+  `document.documentElement.dataset.landingPage`, falling back to
+  `'dashboard'` if it's not in `allowedRoutes` -- deliberately checked
+  in app.js, not inside `Router` itself, since `Router.start()` calls
+  `navigate(this._defaultRoute, ...)` directly with no allowedRoutes
+  check of its own (that check only runs for a real `location.hash`
+  value in `_readRouteFromHash`).
+- Settings → System (`settings/dangerous` section) gains a "Landing
+  page" `<select>` card, next to the existing Web terminal card --
+  `frontend/js/settings/dangerous_panel_controller.js` populates it from
+  `window.MESHPOINT_SIDEBAR_PLUGINS` (already server-injected per
+  loaded plugin, filtered to `category === 'top'`) plus a hardcoded
+  "Dashboard" option, loads the current value from `GET /api/config`,
+  saves on `change` via the same `PUT /api/config/dashboard` used above.
+
+Also updated `docs/CONFIGURATION.md` (new `landing_page` key + its own
+explainer paragraph under Dashboard) and `docs/CHANGELOG.md` under
+`### v0.8.1` (verified it still parses). Skipped README's "What's
+Different" section -- this is a small settings convenience, not a
+headline feature (`map_tile_url`, a comparably-sized dashboard setting,
+also isn't in README, only CONFIGURATION.md).
+
+Verified on the Mac: `landing_page_ids()` and `stamp_landing_page()`
+both exercised directly with hand-built `PluginManifest`/`SidebarSpec`
+objects (no fastapi needed, matches the CLAUDE.md Mac-testing
+convention) -- correctly includes `dashboard` + a `"top"`-category
+route, excludes a `"networks"`-category one, and falls back to a no-op
+for a stale/unknown id. `node --check` on both edited JS files, a
+stdlib `HTMLParser` pass on `index.html`, and
+`ChangelogParser.parse_file` all passed. **Not yet Pi-verified** -- the
+actual Settings → System dropdown + a real page reload with a
+non-dashboard `landing_page` set haven't been tried on the live device.
+
+### Unrelated CI failure caught in the same turn, fixed: stale `capture.rtl_sdr_page_enabled` key in `config/default.yaml`
+
+User pasted a CI log: 5 failures in `tests/test_config_loader.py`, all
+`assertNoLogs` assertions tripping on `WARNING:src.config:Ignoring 1
+unknown config key(s)... capture.rtl_sdr_page_enabled`. Root cause,
+confirmed by reading the changelog's own history: the v0.8.1 "Removed:
+the dead RTL-SDR Page toggle" entry (`docs/CHANGELOG.md`) says the
+`capture.rtl_sdr_page_enabled` *dataclass field* was deleted from
+`config.py` -- but nobody removed the now-orphaned `rtl_sdr_page_enabled:
+true` line + its explanatory comment still sitting in
+`config/default.yaml`'s `capture:` block. Every config load hit that
+key, found no matching field, and logged the "unknown key" warning --
+harmless in practice (the value is silently dropped either way) but
+loud enough to fail every test that asserts a clean load. Confirmed no
+other **active** code (only changelog/memory history entries, which are
+correctly left alone) still references the field.
+
+Fix: deleted the `rtl_sdr_page_enabled: true` line + its 4-line comment
+from `config/default.yaml`. Verified directly on the Mac (`src.config`
+has no fastapi dependency, so `load_config()` runs standalone):
+`load_config('config/default.yaml')` with a `logging.basicConfig`
+handler attached now loads with **zero** warnings logged, and
+`landing_page` (this session's other change, above) defaults correctly
+to `"dashboard"`. Not re-run through the actual CI/pytest suite (no
+fastapi on the Mac) -- should be confirmed green on the next CI run.

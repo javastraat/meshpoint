@@ -108,7 +108,11 @@ from src.api.update.rollback_state import resolve_rollback_state_path
 from src.api.upstream_client import UpstreamClient
 from src.api.websocket_manager import WebSocketManager
 from src.config import AppConfig, SerialDeviceConfig, load_config, validate_activation
-from src.plugins.assets import inject_plugin_assets, resolve_plugin_asset
+from src.plugins.assets import (
+    inject_plugin_assets,
+    resolve_plugin_asset,
+    stamp_landing_page,
+)
 from src.plugins.loader import load_plugins
 from src.coordinator import PipelineCoordinator
 from src.log_format import print_banner, print_packet, setup_logging
@@ -618,6 +622,9 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
             html, config.dashboard.theme, themes_dir, plugin_themes_dir
         )
         html = inject_plugin_assets(html, [p.manifest for p in _loaded_plugins])
+        html = stamp_landing_page(
+            html, config.dashboard.landing_page, [p.manifest for p in _loaded_plugins]
+        )
         return HTMLResponse(
             bust_asset_urls(html),
             headers={"Cache-Control": "no-cache"},
@@ -1916,6 +1923,7 @@ def _init_routes(
         channel_hash_resolver=channel_hash_resolver,
         serial_sources=_find_serial_sources(coord),
         meshcore_sources=_find_meshcore_sources(coord),
+        loaded_plugins=_loaded_plugins,
     )
     mqtt_config_routes.init_routes(
         config=config,

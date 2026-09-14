@@ -1027,6 +1027,15 @@
                         </div>
                         <p class="auth-status" data-backup-status aria-live="polite"></p>
                     </article>
+                    <article class="auth-card landing-page-card" id="meshpoint-landing-page">
+                        <h3 class="auth-card__title">Landing page</h3>
+                        <p class="auth-card__hint">Which page opens with no page already selected — a fresh visit, or a bookmark to the bare dashboard URL. Applies to every visitor; there's no per-browser override.</p>
+                        <label class="cfg-field">
+                            <span class="cfg-field__label">Start on</span>
+                            <select class="cfg-field__input" data-landing-page-select disabled></select>
+                        </label>
+                        <p class="auth-status" data-landing-page-status aria-live="polite"></p>
+                    </article>
                     <article class="auth-card web-terminal-card" id="meshpoint-web-terminal" data-web-terminal-card hidden>
                         <h3 class="auth-card__title">Web terminal</h3>
                         <p class="auth-card__hint">A full shell on the device at <strong>Ops &rarr; Terminal</strong>. It can run <code>sudo</code>, so an admin session is effectively root while this is on &mdash; leave it off unless you actually use it. Takes effect after a restart.</p>

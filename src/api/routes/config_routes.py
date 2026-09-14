@@ -30,6 +30,8 @@ from src.api.routes import (
 from src.config import AppConfig, save_section_to_yaml
 from src.config_export import build_quick_deploy_export
 from src.models.device_identity import DeviceIdentity
+from src.plugins.loader import LoadedPlugin
+from src.plugins.manifest import landing_page_ids
 from src.radio.presets import (
     REGION_DEFAULTS,
     SUPPORTED_REGIONS,
@@ -50,6 +52,7 @@ _identity: DeviceIdentity | None = None
 _channel_hash_resolver = None
 _serial_sources: list = []
 _meshcore_sources: list = []
+_loaded_plugins: list[LoadedPlugin] = []
 
 
 def init_routes(
@@ -60,9 +63,10 @@ def init_routes(
     channel_hash_resolver=None,
     serial_sources: list | None = None,
     meshcore_sources: list | None = None,
+    loaded_plugins: list[LoadedPlugin] | None = None,
 ) -> None:
     global _config, _crypto, _tx_service, _identity, _channel_hash_resolver
-    global _serial_sources, _meshcore_sources
+    global _serial_sources, _meshcore_sources, _loaded_plugins
     _config = config
     _crypto = crypto
     _tx_service = tx_service
@@ -70,6 +74,11 @@ def init_routes(
     _channel_hash_resolver = channel_hash_resolver
     _serial_sources = serial_sources or []
     _meshcore_sources = meshcore_sources or []
+    _loaded_plugins = loaded_plugins or []
+
+
+def _landing_page_ids() -> set[str]:
+    return landing_page_ids([lp.manifest for lp in _loaded_plugins])
 
 
 def _refresh_channel_hash_map() -> None:
@@ -396,6 +405,7 @@ async def get_config(claims: SessionClaims = Depends(require_auth)):
             "web_terminal_enabled": _config.dashboard.web_terminal_enabled,
             "web_terminal_toggle": _config.dashboard.web_terminal_toggle,
             "map_tile_url": _config.dashboard.map_tile_url,
+            "landing_page": _config.dashboard.landing_page,
         },
         "duty_cycle": duty_info,
         "presets": all_presets_list(),
@@ -565,6 +575,7 @@ async def update_identity(
 class DashboardUpdate(BaseModel):
     web_terminal_enabled: Optional[bool] = None
     map_tile_url: Optional[str] = None
+    landing_page: Optional[str] = None
 
 
 @router.put("/dashboard")
@@ -587,7 +598,15 @@ async def update_dashboard(
 
     ``map_tile_url`` takes effect immediately -- every map re-fetches
     GET /api/config fresh each time it's created (frontend/js/
-    map_tile_source.js), nothing about it is cached at server startup."""
+    map_tile_source.js), nothing about it is cached at server startup.
+
+    ``landing_page`` -- which "top"-tier page loads with no hash in the
+    URL (see DashboardConfig.landing_page). Must be "dashboard" or a
+    currently-loaded "top"-category plugin's sidebar route
+    (:func:`_landing_page_ids`); a stale/unknown id is rejected here, and
+    server.serve_dashboard_root() re-validates it again at serve time in
+    case a plugin gets disabled after the fact. Takes effect on next page
+    load -- no restart."""
     if _config is None:
         raise HTTPException(503, "Config not loaded")
 
@@ -616,6 +635,13 @@ async def update_dashboard(
             )
         _config.dashboard.map_tile_url = url
         updates["map_tile_url"] = url
+
+    if req.landing_page is not None:
+        landing_page = req.landing_page.strip()
+        if landing_page not in _landing_page_ids():
+            raise HTTPException(400, f"Unknown landing page {landing_page!r}")
+        _config.dashboard.landing_page = landing_page
+        updates["landing_page"] = landing_page
 
     if not updates:
         return {"saved": True, "restart_required": False, "updates": {}}

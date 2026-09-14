@@ -53,11 +53,6 @@ meshcore:                 # MeshCore protocol settings
 
 capture:                  # what packet sources to read from
   sources: []
-  # Shows/hides the RTL-SDR ("Listener") sidebar page. True by default --
-  # unlike every other flag in this file, this one is opt-OUT, not opt-in:
-  # the page has always been shown regardless of whether a dongle is
-  # plugged in. Set false for a "bare minimum" dashboard with no RTL-SDR.
-  rtl_sdr_page_enabled: true
   # Single-stick Meshtastic USB (legacy). Ignored once capture.serial below
   # is non-empty.
   serial_port: null

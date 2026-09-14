@@ -94,6 +94,22 @@ KNOWN_SIDEBAR_CATEGORIES = frozenset({
     "top", "networks", "radio", "ops", "configuration", "settings",
 })
 
+
+def landing_page_ids(manifests: "list[PluginManifest]") -> set[str]:
+    """"dashboard" (the built-in) plus every "top"-category plugin's
+    ``[sidebar].route`` in *manifests* -- the valid values for
+    ``DashboardConfig.landing_page`` (which "top"-tier page loads with no
+    hash in the URL). Shared by ``config_routes.py`` (validating a PUT)
+    and ``server.py`` (stamping the configured value into the served
+    HTML), so both agree on what counts as a "top"-tier destination
+    without duplicating the category check."""
+    ids = {"dashboard"}
+    for m in manifests:
+        if m.sidebar is not None and m.sidebar.category == "top":
+            ids.add(m.sidebar.route)
+    return ids
+
+
 # A curated icon set for a sidebar page, keyed by name -- not arbitrary SVG
 # from a manifest (that's a real injection surface for a file some other
 # person authored). frontend/sidebar/sidebar_plugin_registry.js owns the

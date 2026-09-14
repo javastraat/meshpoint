@@ -369,6 +369,14 @@ class DashboardConfig:
     # plugins/themes/). Browsers that have never picked a theme use this;
     # a per-browser choice made in the theme toggle overrides it locally.
     theme: str = "dark"
+    # Which "top"-tier page (the built-in Dashboard's own sidebar tier --
+    # see plugins.manifest.KNOWN_SIDEBAR_CATEGORIES) loads with no hash in
+    # the URL. "dashboard" (the built-in) or a "top"-category plugin's
+    # [sidebar].route -- e.g. "reticulum-dashboard". Validated against
+    # currently-loaded "top" plugins in config_routes.py; an id that
+    # stops existing (plugin disabled/removed) is ignored at serve time,
+    # falling back to "dashboard".
+    landing_page: str = "dashboard"
     # Serve HTTPS instead of plain HTTP. Off by default (existing installs
     # keep working unchanged). The cert is a self-signed one meshpoint
     # generates and regenerates itself (src/tls_cert.py) -- there's no
