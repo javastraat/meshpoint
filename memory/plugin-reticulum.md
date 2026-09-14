@@ -1733,3 +1733,43 @@ longer accurate to say "no picker at all", just "no *general* picker".
 Verified: `node --check`, CSS comment-balance script 0, ruff clean,
 plugin-loader/manifest suite 70 passed / 6 skipped, no duplicate method
 definitions. **NOT committed, NOT yet verified live.**
+
+**Follow-up, same session: general "Browse" entry point (uncommitted).**
+User asked where a general (not-tied-to-a-peer) Browse button should go --
+next to "You: <hash>" at the top, or the Peers panel header next to
+search? Recommended the Peers panel header: the "You" line is identity/
+status display, not action territory, while Browse is fundamentally about
+the peers/nodes that panel already lists, and every row already has its
+own Browse button -- a general one in the same header reads as a natural
+escalation of something already familiar, not a new concept elsewhere.
+Flagged one real wrinkle before building: `open(hash, label)` always
+assumed a starting node and fetched immediately -- a general button has
+no peer to hand it, so it needed a genuine "empty" open state. Confirmed
+("yes please"), built:
+
+- `open(hash = null, label = null)` -- both now optional. Empty case:
+  title falls back to "Browse", `.pdm-modal__body` shows a placeholder
+  ("Type a node address above ... or pick a favourite") instead of
+  fetching, focus goes to the address input instead of the close button.
+  Non-empty case (peer row's own Browse button, or the drawer's) is
+  completely unchanged. `_favsEl`'s populate/disable logic already
+  worked unconditionally either way (just reads localStorage, not tied
+  to whether a node is loaded); `_backBtn`/`_fwdBtn`/`_reloadBtn`/
+  `_favBtn` already default to `disabled` in the static template HTML,
+  so the empty state needed no extra JS to *look* right, only to *not*
+  fetch. Typing an address or picking a favourite hands off to the
+  existing `_fetch()` flow unchanged (its own "Loading…" state
+  overwrites the empty-state placeholder naturally).
+- New `#rtd-browse-btn` (`.lw-link-btn`, same class the per-row inline
+  Browse buttons already use) in the Peers panel header, calling
+  `this._quickBrowse.open()` with no args.
+- Placement subtlety caught before shipping: `.panel__header` is
+  `justify-content: space-between` (core), so adding the button as a
+  THIRD direct child would've spread Peers/search/Browse evenly across
+  the row instead of keeping search+Browse grouped. New
+  `.rtd-peers-header-actions` wrapper holds both, so `.panel__header`
+  still only sees two children (the label and this group).
+
+Verified: `node --check`, CSS comment-balance script 0, ruff clean,
+plugin-loader/manifest suite 70 passed / 6 skipped. **NOT committed, NOT
+yet verified live.**

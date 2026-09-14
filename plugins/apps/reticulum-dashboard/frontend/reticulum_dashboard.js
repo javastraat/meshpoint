@@ -136,7 +136,12 @@ class ReticulumQuickBrowseModal {
         this._onKeyDown = this._onKeyDown.bind(this);
     }
 
-    open(hash, label) {
+    /** hash/label are both optional -- the header's general "Browse"
+     * button (not tied to any one peer) opens with neither, landing on
+     * an empty state instead of fetching immediately: address bar
+     * focused, favourites ready to pick from, nothing loaded yet. A
+     * peer row's own Browse button still passes both, same as before. */
+    open(hash = null, label = null) {
         this.close();
         this._history = [];
         this._historyIdx = -1;
@@ -172,9 +177,13 @@ class ReticulumQuickBrowseModal {
                        autocomplete="off" spellcheck="false" aria-label="Node address">
                 <button type="button" class="terminal-button" data-qb-go>Go</button>
             </div>
-            <div class="pdm-modal__body"></div>
+            <div class="pdm-modal__body">${hash ? '' : `
+                <p class="lw-panel__limit">
+                    Type a node address above (&lt;hash&gt;:/page/x.mu), or pick a favourite.
+                </p>
+            `}</div>
         `;
-        modal.querySelector('.pdm-modal__title').textContent = label || hash;
+        modal.querySelector('.pdm-modal__title').textContent = label || hash || 'Browse';
         modal.querySelector('.pdm-modal__close').addEventListener('click', () => this.close());
         modal.querySelector('.pdm-modal__body').addEventListener('click', (e) => {
             const a = e.target.closest('a[data-nomad-url]');
@@ -218,8 +227,12 @@ class ReticulumQuickBrowseModal {
         this._currentHash = hash;
         this._currentName = label || null;
         document.addEventListener('keydown', this._onKeyDown);
-        modal.querySelector('.pdm-modal__close').focus();
-        this._go(hash, '/page/index.mu');
+        if (hash) {
+            modal.querySelector('.pdm-modal__close').focus();
+            this._go(hash, '/page/index.mu');
+        } else {
+            this._addrEl.focus();
+        }
     }
 
     _syncFavBtn(isFav) {
@@ -461,9 +474,12 @@ class ReticulumDashboard {
                         <div class="panel panel--nodes">
                             <div class="panel__header">
                                 <span>Peers</span>
-                                <div class="node-search-wrap">
-                                    <input type="search" id="rtd-peer-search" class="node-search"
-                                           placeholder="Search..." autocomplete="off" spellcheck="false">
+                                <div class="rtd-peers-header-actions">
+                                    <div class="node-search-wrap">
+                                        <input type="search" id="rtd-peer-search" class="node-search"
+                                               placeholder="Search..." autocomplete="off" spellcheck="false">
+                                    </div>
+                                    <button type="button" class="lw-link-btn" id="rtd-browse-btn">Browse</button>
                                 </div>
                             </div>
                             <div class="panel__body" id="rtd-peers-list"></div>
@@ -510,6 +526,9 @@ class ReticulumDashboard {
             this._peerSearchQuery = e.target.value.trim().toLowerCase();
             this._renderPeersList();
         });
+        // General entry point, not tied to any one peer row -- opens on
+        // the modal's empty state (type an address, or pick a favourite).
+        this._q('#rtd-browse-btn')?.addEventListener('click', () => this._quickBrowse.open());
 
         this._syncBasemapBtn(this._basemapLight);
         this._q('#rtd-map-basemap-btn')?.addEventListener('click', () => this._toggleBasemap());
