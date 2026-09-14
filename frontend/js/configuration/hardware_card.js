@@ -110,22 +110,6 @@ class HardwareConfigCard {
                         <p class="cfg-status" data-button-status aria-live="polite"></p>
                     </form>
                 </article>
-                <article class="cfg-card">
-                    <header class="cfg-card__head">
-                        <h3 class="cfg-card__title">RTL-SDR Page</h3>
-                        <p class="cfg-card__hint">Shows or hides the RTL-SDR ("Listener") page in the sidebar. Doesn't require a dongle to be plugged in to leave this on — it's just a "bare minimum" declutter option for setups with no RTL-SDR at all. Takes effect after refreshing the page.</p>
-                    </header>
-                    <form class="cfg-form" data-rtlsdr-form>
-                        <label class="cfg-field cfg-field--toggle">
-                            <input type="checkbox" data-rtlsdr-enabled>
-                            <span class="cfg-field__label">Show RTL-SDR page</span>
-                        </label>
-                        <div class="cfg-card__actions">
-                            <button class="terminal-button terminal-button--primary" type="submit">Save</button>
-                        </div>
-                        <p class="cfg-status" data-rtlsdr-status aria-live="polite"></p>
-                    </form>
-                </article>
             </div>
         `;
         this._root.querySelector('[data-fan-form]')
@@ -134,8 +118,6 @@ class HardwareConfigCard {
             .addEventListener('submit', (e) => this._saveLed(e));
         this._root.querySelector('[data-button-form]')
             .addEventListener('submit', (e) => this._saveButton(e));
-        this._root.querySelector('[data-rtlsdr-form]')
-            .addEventListener('submit', (e) => this._saveRtlSdr(e));
     }
 
     render(config) {
@@ -143,7 +125,6 @@ class HardwareConfigCard {
         const fan = hw.fan || {};
         const led = hw.led || {};
         const button = hw.button || {};
-        const capture = (config && config.capture) || {};
 
         this._setChecked('[data-fan-enabled]', fan.enabled);
         this._setVal('[data-fan-pin]', fan.gpio_pin);
@@ -161,10 +142,6 @@ class HardwareConfigCard {
         this._setVal('[data-button-pin]', button.gpio_pin);
         this._setVal('[data-button-hold]', button.hold_time_s);
         this._setVal('[data-button-cooldown]', button.advert_cooldown_s);
-
-        // Opt-out default: treat anything but an explicit false as "shown",
-        // matching the backend's own rtl_sdr_page_enabled=True default.
-        this._setChecked('[data-rtlsdr-enabled]', capture.rtl_sdr_page_enabled !== false);
     }
 
     _setVal(sel, v) {
@@ -219,17 +196,6 @@ class HardwareConfigCard {
             advert_cooldown_s: Number(this._root.querySelector('[data-button-cooldown]').value),
         });
         this._finish(status, result, 'Button settings updated.');
-    }
-
-    async _saveRtlSdr(event) {
-        event.preventDefault();
-        const status = this._root.querySelector('[data-rtlsdr-status]');
-        status.dataset.kind = 'pending';
-        status.textContent = 'Saving…';
-        const result = await this._api.put('/api/config/hardware/rtl-sdr-page', {
-            enabled: this._root.querySelector('[data-rtlsdr-enabled]').checked,
-        });
-        this._finish(status, result, 'RTL-SDR page visibility updated — refresh the page to see the sidebar change.');
     }
 
     _finish(statusEl, result, restartMsg) {

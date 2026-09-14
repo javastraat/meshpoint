@@ -119,26 +119,5 @@ class UpdateButtonTest(HardwareConfigRoutesTestBase):
             routes.ButtonHardwareUpdate(hold_time_s=0.0)
 
 
-class UpdateRtlSdrPageTest(HardwareConfigRoutesTestBase):
-    def _put(self, **overrides):
-        req = routes.RtlSdrPageUpdate(**overrides)
-        with mock.patch.object(routes, "save_section_to_yaml") as mock_save:
-            result = _run(routes.update_rtl_sdr_page(req, _claims=self.claims, audit=self.audit))
-        return result, mock_save
-
-    def test_saves_without_requiring_restart(self):
-        result, mock_save = self._put(enabled=False)
-        self.assertTrue(result["saved"])
-        self.assertFalse(result["restart_required"])
-        self.assertFalse(self.config.capture.rtl_sdr_page_enabled)
-        mock_save.assert_called_once()
-        section, updates = mock_save.call_args[0]
-        self.assertEqual(section, "capture")
-        self.assertEqual(updates, {"rtl_sdr_page_enabled": False})
-
-    def test_default_is_enabled(self):
-        self.assertTrue(routes.RtlSdrPageUpdate().enabled)
-
-
 if __name__ == "__main__":
     unittest.main()

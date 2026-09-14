@@ -323,12 +323,6 @@ class CaptureConfig:
     meshcore_usb: list[MeshcoreUsbConfig] = field(
         default_factory=lambda: [MeshcoreUsbConfig()]
     )
-    # UI-visibility only -- nothing server-side reads this. The RTL-SDR
-    # ("Listener") sidebar page has always been shown unconditionally,
-    # unlike every other optional feature here, so this defaults to True
-    # (opt-out) instead of False (opt-in) to avoid silently hiding it for
-    # existing installs on upgrade. "Bare minimum" users flip it off.
-    rtl_sdr_page_enabled: bool = True
 
 
 @dataclass

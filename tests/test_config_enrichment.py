@@ -42,19 +42,6 @@ class EnrichConfigPayloadSerialTest(unittest.TestCase):
         self.assertIn("serial", enriched["capture"])
         self.assertIsInstance(enriched["capture"]["meshcore_usb"], list)
 
-    def test_rtl_sdr_page_enabled_defaults_true_and_is_enriched(self):
-        # Regression guard: this field is easy to add to CaptureConfig and
-        # forget to also add here, same class of gap the fan section_map
-        # bug hit once before -- the sidebar gating reads this straight
-        # from GET /api/config, so a missing key here silently hides the
-        # page for everyone despite the dataclass default being True.
-        cfg = AppConfig()
-        enriched = enrich_config_payload(cfg, {})
-        self.assertIs(enriched["capture"]["rtl_sdr_page_enabled"], True)
-        cfg.capture.rtl_sdr_page_enabled = False
-        enriched = enrich_config_payload(cfg, {})
-        self.assertIs(enriched["capture"]["rtl_sdr_page_enabled"], False)
-
 
 class EnrichConfigPayloadHardwareTest(unittest.TestCase):
     def test_defaults_are_enriched(self):

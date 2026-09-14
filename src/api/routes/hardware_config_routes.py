@@ -66,10 +66,6 @@ class ButtonHardwareUpdate(BaseModel):
     advert_cooldown_s: float = Field(30.0, ge=0.0)
 
 
-class RtlSdrPageUpdate(BaseModel):
-    enabled: bool = True
-
-
 @router.put("/fan")
 async def update_fan(
     req: FanHardwareUpdate,
@@ -153,32 +149,3 @@ async def update_button(
         "Button hardware config updated: enabled=%s gpio_pin=%s", req.enabled, req.gpio_pin,
     )
     return {"saved": True, "restart_required": True, "updates": updates}
-
-
-@router.put("/rtl-sdr-page")
-async def update_rtl_sdr_page(
-    req: RtlSdrPageUpdate,
-    _claims: SessionClaims = Depends(require_admin),
-    audit: AuditLogWriter = Depends(get_audit_writer),
-):
-    """UI-visibility only -- lives under capture.rtl_sdr_page_enabled, not
-    a hardware field, but grouped here with the other Peripherals-page
-    saves since that's where the checkbox lives. No restart needed: unlike
-    fan/led/button, nothing server-side reads this at startup -- only the
-    sidebar's own gating check does, on its next fetch of GET /api/config.
-    """
-    if _config is None:
-        raise HTTPException(503, "Config not loaded")
-
-    updates = req.model_dump()
-    with audit.timed_action(
-        user=_claims.subject, action="config.rtl_sdr_page_update", params=updates
-    ):
-        _config.capture.rtl_sdr_page_enabled = req.enabled
-        try:
-            save_section_to_yaml("capture", {"rtl_sdr_page_enabled": req.enabled})
-        except PermissionError as exc:
-            raise HTTPException(403, str(exc)) from exc
-
-    logger.info("RTL-SDR page visibility updated: enabled=%s", req.enabled)
-    return {"saved": True, "restart_required": False, "updates": updates}
