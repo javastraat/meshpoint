@@ -180,6 +180,7 @@ class NomadNode:
         return {
             "hosting": self._destination is not None,
             "name": self._name,
+            "hash": self._address_hex(),
             "pages": self._page_count(),
             "requests_served": self._requests_served,
             "last_announce_s_ago": (

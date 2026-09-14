@@ -1773,3 +1773,44 @@ no peer to hand it, so it needed a genuine "empty" open state. Confirmed
 Verified: `node --check`, CSS comment-balance script 0, ruff clean,
 plugin-loader/manifest suite 70 passed / 6 skipped. **NOT committed, NOT
 yet verified live.**
+
+**Follow-up, same session: the ACTUAL "show both" request, resolved
+(uncommitted).** After two rejected split-pane-browser proposals
+("nono") and an image that repeatedly failed to send (over size limit),
+user re-explained in plain words: they wanted their own identity hash
+AND their hosted NomadNet node's hash both visible/copyable on the
+Reticulum Dashboard, to eyeball whether the node is running -- NOT a
+two-arbitrary-nodes compare view at all. The earlier "techinc" hashes
+were just example data, not two nodes to browse side by side.
+
+Real gap found: `NomadNode.status()` (nomad_node.py) never included the
+node's own destination hash at all -- only `hosting`/`name`/`pages`/
+`requests_served`/`last_announce_s_ago`. The Reticulum Dashboard's "You"
+stat card was always showing the LXMF identity hash only, because that's
+literally the only hash the backend exposed -- there was nothing to show
+for the node even if the frontend had wanted to. A NomadNet node's
+destination hash is genuinely different from the identity's LXMF/delivery
+hash (different aspect namespace hashed separately, same identity/same
+box) -- confirmed against `_address_hex()` (`self._destination.hash.hex()`),
+already existed as a private helper, just never surfaced.
+
+- `nomad_node.py` `status()`: added `"hash": self._address_hex()`.
+- `test_nomad_node.py::test_status_shape`: +1 assertion (`st["hash"] ==
+  ""` in the not-hosting-yet state, matching `_address_hex()`'s own
+  documented pre-start fallback).
+- `reticulum_dashboard.js`: new 7th stat card "Nomad Node", `hidden`
+  by default -- only shown when `GET /api/reticulum/status`'s `node`
+  field is non-null (node hosting configured at all; same gate the main
+  Reticulum page's Pages tab uses). Shows the hash when `node.hosting`,
+  "Not hosting yet" for the window between "configured" and "destination
+  actually registered". No copy button added -- plain selectable text,
+  same as the existing "You" card already was.
+
+Verified: `node --check`, `ruff check` clean on both plugin dirs,
+`test_nomad_node.py` 35/35, full reticulum backend suite (minus the
+pydantic-gated config_routes file, same Mac constraint as before) 219
+passed / 35 skipped. **NOT committed, NOT yet verified live** -- worth
+Pi-checking specifically since this is the first change this session that
+touches the reticulum plugin's *backend* (everything else was frontend-
+only) -- confirm the hash actually shows and matches what `info.mu`/the
+main Reticulum page's own header line reports for the hosted node.

@@ -49,6 +49,9 @@ class TestNomadNode(unittest.TestCase):
         self.assertEqual(st["hosting"], False)
         self.assertEqual(st["name"], "PD2EMC Meshpoint")
         self.assertIn("requests_served", st)
+        # No destination yet (not started / no rns) -- _address_hex()'s own
+        # pre-start fallback, not a missing key.
+        self.assertEqual(st["hash"], "")
 
     def test_reload_pages_is_a_no_op_when_not_hosting(self) -> None:
         n = self._node()

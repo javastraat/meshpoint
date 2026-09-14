@@ -441,6 +441,10 @@ class ReticulumDashboard {
                         <div class="stat-card__label">You</div>
                         <div class="stat-card__value" id="rtd-own-address" style="font-size:0.75rem">--</div>
                     </div>
+                    <div class="stat-card" id="rtd-stat-nomad-card" hidden>
+                        <div class="stat-card__label">Nomad Node</div>
+                        <div class="stat-card__value" id="rtd-nomad-address" style="font-size:0.75rem">--</div>
+                    </div>
                 </section>
 
                 <div class="dashboard__main">
@@ -649,6 +653,18 @@ class ReticulumDashboard {
             const s = await r.json();
             this._setText('rtd-stat-status', s.running ? 'Running' : (s.available ? 'Stopped' : 'Unavailable'));
             this._setText('rtd-own-address', s.own_address || '--');
+            // A different destination hash from "You" above -- hosting a
+            // NomadNet node uses a separate aspect on the same identity,
+            // so it hashes differently even though it's the same box. Card
+            // only appears at all when node hosting is configured
+            // (s.node is null otherwise, same gate the Pages tab uses on
+            // the main Reticulum page); "Not hosting yet" covers the
+            // window between "configured" and "destination registered".
+            const nomadCard = this._q('#rtd-stat-nomad-card');
+            if (nomadCard) nomadCard.hidden = !s.node;
+            if (s.node) {
+                this._setText('rtd-nomad-address', s.node.hosting ? (s.node.hash || '--') : 'Not hosting yet');
+            }
         } catch (_) {}
     }
 
