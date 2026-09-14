@@ -1713,3 +1713,23 @@ Verified: `node --check` both `reticulum_nomad.js` and
 `reticulum.css` and `reticulum_dashboard.css`, `ruff check` clean on both
 plugin dirs, plugin-loader/manifest suite 70 passed / 6 skipped, no
 duplicate method definitions. **NOT committed, NOT yet verified live.**
+
+**Follow-up, same session: favourites-jump select (uncommitted).** User
+hit the exact gap flagged when the star was added: they could favourite a
+node from the quick-browse modal, saw it show up starred in the real
+Browse tab's node picker, but had no way to *select* a favourite from the
+dashboard's own modal -- the star alone was only half-useful. Confirmed
+("yes please") the compromise proposed: not the full node-picker+search
+(needs a fetch + filter box for a list that runs to hundreds), just a
+compact `<select data-qb-favs>` populated from `_rtdFavourites()` --
+choosing an entry calls `_go(hash, '/page/index.mu')` then resets to the
+"★ Favourites" placeholder (a jump menu, not a persistent selection).
+Rebuilt on `open()` and again every time the star button changes the list
+(`_renderFavsSelect()` called from both), so it never goes stale
+mid-session. New `.rtd-browse-toolbar__favs` CSS (compact width, matches
+the address bar's neighbourly sizing). Toolbar comment updated -- it's no
+longer accurate to say "no picker at all", just "no *general* picker".
+
+Verified: `node --check`, CSS comment-balance script 0, ruff clean,
+plugin-loader/manifest suite 70 passed / 6 skipped, no duplicate method
+definitions. **NOT committed, NOT yet verified live.**

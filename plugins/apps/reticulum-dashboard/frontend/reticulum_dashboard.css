@@ -159,18 +159,26 @@
     margin: 6px 0;
 }
 
-/* Quick-browse modal toolbar -- back/forward/reload/favourite + address
-   bar, mirrors the Browse tab's own .rt-nomad__bar "navigate" row
-   (reticulum.css). No node-picker/search here -- this modal always opens
-   scoped to one specific peer, no free node-switching, so there's
-   nothing for a picker to pick between (see memory/plugin-reticulum.md
-   for the "why not" reasoning). */
+/* Quick-browse modal toolbar -- back/forward/reload/favourites-jump/
+   favourite-toggle + address bar, mirrors the Browse tab's own
+   .rt-nomad__bar "navigate" row (reticulum.css). Still no *general*
+   node-picker/search here -- this modal always opens scoped to one
+   specific peer, no free browsing of every known node -- but a
+   favourites-only jump menu earns its place: it's a short, already-in-
+   memory list (no fetch, no filter box needed), and a star with nothing
+   to jump to from is only half-useful (see memory/plugin-reticulum.md). */
 .rtd-browse-toolbar {
     display: flex;
     align-items: center;
     gap: 0.4rem;
     padding: 0.5rem 1rem;
     border-bottom: 1px solid var(--border-subtle, #333);
+}
+.rtd-browse-toolbar__favs {
+    flex: 0 1 160px;
+    min-width: 0;
+    max-width: 180px;
+    text-overflow: ellipsis;
 }
 .rtd-browse-toolbar__addr {
     flex: 1 1 auto;

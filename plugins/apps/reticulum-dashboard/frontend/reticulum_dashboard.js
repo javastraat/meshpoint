@@ -162,6 +162,10 @@ class ReticulumQuickBrowseModal {
                 <button type="button" class="terminal-button" data-qb-back title="Back" disabled>&larr;</button>
                 <button type="button" class="terminal-button" data-qb-forward title="Forward" disabled>&rarr;</button>
                 <button type="button" class="terminal-button" data-qb-reload title="Reload" disabled>&#x21bb;</button>
+                <select class="cfg-field__input rtd-browse-toolbar__favs" data-qb-favs
+                        aria-label="Jump to a favourite node">
+                    <option value="">&#9733; Favourites</option>
+                </select>
                 <button type="button" class="terminal-button rt-nomad__fav" data-qb-fav
                         title="Favourite this node" disabled>&#9734;</button>
                 <input type="text" class="cfg-field__input rtd-browse-toolbar__addr" data-qb-addr
@@ -184,6 +188,7 @@ class ReticulumQuickBrowseModal {
         this._fwdBtn = modal.querySelector('[data-qb-forward]');
         this._reloadBtn = modal.querySelector('[data-qb-reload]');
         this._favBtn = modal.querySelector('[data-qb-fav]');
+        this._favsEl = modal.querySelector('[data-qb-favs]');
         modal.querySelector('[data-qb-go]').addEventListener('click', () => this._goFromAddr());
         this._addrEl.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') { e.preventDefault(); this._goFromAddr(); }
@@ -198,8 +203,15 @@ class ReticulumQuickBrowseModal {
             if (!this._currentHash) return;
             const nowOn = _rtdToggleFavourite(this._currentHash, this._currentName);
             this._syncFavBtn(nowOn);
+            this._renderFavsSelect();
+        });
+        this._favsEl.addEventListener('change', () => {
+            const chosen = this._favsEl.value;
+            this._favsEl.value = ''; // a jump menu, not a persistent selection -- always resets
+            if (chosen) this._go(chosen, '/page/index.mu');
         });
 
+        this._renderFavsSelect();
         overlay.appendChild(modal);
         document.body.appendChild(overlay);
         this._overlay = overlay;
@@ -216,6 +228,28 @@ class ReticulumQuickBrowseModal {
         this._favBtn.classList.toggle('rt-nomad__fav--on', !!isFav);
         this._favBtn.innerHTML = isFav ? '&#9733;' : '&#9734;';
         this._favBtn.title = isFav ? 'Remove from favourites' : 'Favourite this node';
+    }
+
+    /** The "jump to a favourite" select -- not a full node picker (no
+     * fetch, no search; a favourites list is naturally short), just a
+     * quick way to reach a starred node without leaving the modal or
+     * knowing its hash by heart. Rebuilt on open() and every time the
+     * star button changes the list, so it never goes stale mid-session. */
+    _renderFavsSelect() {
+        if (!this._favsEl) return;
+        const favs = _rtdFavourites();
+        this._favsEl.innerHTML = '';
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = '★ Favourites';
+        this._favsEl.appendChild(placeholder);
+        favs.forEach((f) => {
+            const opt = document.createElement('option');
+            opt.value = f.hash;
+            opt.textContent = f.name || `${f.hash.slice(0, 12)}…`;
+            this._favsEl.appendChild(opt);
+        });
+        this._favsEl.disabled = !favs.length;
     }
 
     _goFromAddr() {
