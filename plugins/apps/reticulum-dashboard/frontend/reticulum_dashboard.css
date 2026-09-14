@@ -131,3 +131,47 @@
     color: var(--text-muted, #888);
     white-space: nowrap;
 }
+
+/* ---- Quick-browse modal page content -- same dark "BBS terminal" look
+   as the Reticulum page's own Browse tab (.rt-nomad__page,
+   plugins/apps/reticulum/frontend/reticulum.css), copied rather than
+   reused for the same cross-plugin-asset reason as the telemetry-map
+   rules above. Scoped to .rtd-browse-modal rather than restyling
+   .pdm-modal__body directly -- that class is shared with
+   ReticulumAnnounceModal's plain key-value layout, which shouldn't
+   change. ---- */
+.rtd-browse-modal .pdm-modal__body {
+    background: var(--bg-elevated, #1a1a1a);
+    font-family: var(--font-mono, ui-monospace, "SF Mono", Menlo, monospace);
+    font-size: 13px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+.rtd-browse-modal .pdm-modal__body a {
+    color: var(--accent, #4ea1ff);
+    cursor: pointer;
+    text-decoration: underline;
+}
+.rtd-browse-modal .pdm-modal__body hr {
+    border: 0;
+    border-top: 1px solid var(--border, #444);
+    margin: 6px 0;
+}
+
+/* Quick-browse modal toolbar -- back/forward/reload + address bar,
+   mirrors the Browse tab's own .rt-nomad__bar layout minus the
+   node-picker/favourites/search pieces this modal doesn't have. */
+.rtd-browse-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.5rem 1rem;
+    border-bottom: 1px solid var(--border-subtle, #333);
+}
+.rtd-browse-toolbar__addr {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-family: var(--font-mono, ui-monospace, "SF Mono", Menlo, monospace);
+    font-size: 0.82rem;
+}

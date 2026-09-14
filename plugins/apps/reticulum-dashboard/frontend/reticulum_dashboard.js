@@ -81,16 +81,20 @@ const RTD_ASPECT_BADGES = {
 };
 
 /**
- * A single-page, read-only "quick view" for a NomadNet node -- not the
- * Reticulum page's own Browse tab (address bar, history back/forward,
- * node-picker dropdown, favourites, form-field submission, file
- * downloads). Deliberately smaller: one modal, current page only, click a
- * link to replace it in place. Reuses `.pdm-overlay`/`.pdm-modal--wide`
+ * A read-only "quick view" for a NomadNet node -- not the Reticulum
+ * page's own Browse tab (node-picker dropdown, favourites, form-field
+ * submission, file downloads). Deliberately smaller in that one way, but
+ * still a real little browser: address bar, back/forward/reload, click a
+ * link to navigate. Reuses `.pdm-overlay`/`.pdm-modal--wide`
  * (frontend/css/packet_detail_modal.css, core, already loaded globally --
- * the exact same chrome ReticulumAnnounceModal above uses) and
- * `window.MicronParser` (plugins/apps/reticulum/frontend/
- * reticulum_micron.js, guaranteed loaded since reticulum is a hard
- * `requires` of this plugin) -- no new CSS, no new dependency.
+ * the exact same chrome ReticulumAnnounceModal above uses),
+ * `window.MicronParser`, and the same dark "BBS terminal" page styling
+ * the Browse tab's own `.rt-nomad__page` uses (reticulum_dashboard.css's
+ * `.rtd-browse-modal .pdm-modal__body` rules -- copied, not reused, same
+ * cross-plugin-asset reason as the telemetry-map CSS above). Nav wiring
+ * mirrors reticulum_nomad.js's own `_go`/`_history_go`/`_splitAddr`
+ * almost exactly, just without its node-picker/favourites/form-field
+ * pieces.
  *
  * Local to this page (not exposed on window) -- it isn't a shape the
  * Reticulum page itself has any use for.
@@ -99,11 +103,16 @@ class ReticulumQuickBrowseModal {
     constructor() {
         this._overlay = null;
         this._currentHash = null;
+        this._history = []; // [{hash, path}], newest at the end
+        this._historyIdx = -1;
         this._onKeyDown = this._onKeyDown.bind(this);
     }
 
     open(hash, label) {
         this.close();
+        this._history = [];
+        this._historyIdx = -1;
+
         const overlay = document.createElement('div');
         overlay.className = 'pdm-overlay';
         overlay.setAttribute('role', 'dialog');
@@ -112,16 +121,23 @@ class ReticulumQuickBrowseModal {
         overlay.addEventListener('click', () => this.close());
 
         const modal = document.createElement('div');
-        modal.className = 'pdm-modal pdm-modal--wide';
+        modal.className = 'pdm-modal pdm-modal--wide rtd-browse-modal';
         modal.addEventListener('click', (e) => e.stopPropagation());
         modal.innerHTML = `
             <header class="pdm-modal__header">
                 <div>
                     <h2 class="pdm-modal__title"></h2>
-                    <div class="pdm-modal__meta"></div>
                 </div>
                 <button type="button" class="pdm-modal__close" aria-label="Close">&times;</button>
             </header>
+            <div class="rtd-browse-toolbar">
+                <button type="button" class="terminal-button" data-qb-back title="Back" disabled>&larr;</button>
+                <button type="button" class="terminal-button" data-qb-forward title="Forward" disabled>&rarr;</button>
+                <button type="button" class="terminal-button" data-qb-reload title="Reload" disabled>&#x21bb;</button>
+                <input type="text" class="cfg-field__input rtd-browse-toolbar__addr" data-qb-addr
+                       autocomplete="off" spellcheck="false" aria-label="Node address">
+                <button type="button" class="terminal-button" data-qb-go>Go</button>
+            </div>
             <div class="pdm-modal__body"></div>
         `;
         modal.querySelector('.pdm-modal__title').textContent = label || hash;
@@ -133,20 +149,54 @@ class ReticulumQuickBrowseModal {
             this._followLink(a);
         });
 
+        this._addrEl = modal.querySelector('[data-qb-addr]');
+        this._backBtn = modal.querySelector('[data-qb-back]');
+        this._fwdBtn = modal.querySelector('[data-qb-forward]');
+        this._reloadBtn = modal.querySelector('[data-qb-reload]');
+        modal.querySelector('[data-qb-go]').addEventListener('click', () => this._goFromAddr());
+        this._addrEl.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); this._goFromAddr(); }
+        });
+        this._backBtn.addEventListener('click', () => this._historyGo(-1));
+        this._fwdBtn.addEventListener('click', () => this._historyGo(1));
+        this._reloadBtn.addEventListener('click', () => {
+            const e = this._history[this._historyIdx];
+            if (e) this._fetch(e.hash, e.path, false);
+        });
+
         overlay.appendChild(modal);
         document.body.appendChild(overlay);
         this._overlay = overlay;
         this._currentHash = hash;
         document.addEventListener('keydown', this._onKeyDown);
         modal.querySelector('.pdm-modal__close').focus();
-        this._fetch(hash, '/page/index.mu');
+        this._go(hash, '/page/index.mu');
     }
 
-    async _fetch(hash, path) {
+    _goFromAddr() {
+        const raw = (this._addrEl?.value || '').trim();
+        if (!raw) return;
+        const { hash, path } = this._splitAddr(raw, this._currentHash);
+        if (!hash) return;
+        this._go(hash, path);
+    }
+
+    _go(hash, path) {
+        this._fetch(hash, path, true);
+    }
+
+    _historyGo(delta) {
+        const next = this._historyIdx + delta;
+        if (next < 0 || next >= this._history.length) return;
+        this._historyIdx = next;
+        const e = this._history[next];
+        this._fetch(e.hash, e.path, false);
+    }
+
+    async _fetch(hash, path, pushHistory) {
         if (!this._overlay) return;
-        const pathEl = this._overlay.querySelector('.pdm-modal__meta');
+        if (this._addrEl) this._addrEl.value = `${hash}:${path}`;
         const bodyEl = this._overlay.querySelector('.pdm-modal__body');
-        if (pathEl) pathEl.textContent = path;
         if (bodyEl) bodyEl.innerHTML = '<p class="lw-panel__limit">Loading…</p>';
         try {
             const r = await fetch('/api/reticulum/nomad/page', {
@@ -162,23 +212,37 @@ class ReticulumQuickBrowseModal {
                 return;
             }
             this._currentHash = hash;
-            if (!bodyEl) return;
-            bodyEl.textContent = '';
-            if (window.MicronParser) {
-                bodyEl.appendChild(new window.MicronParser(true).parseToHtml(data.content || ''));
-            } else {
-                bodyEl.textContent = data.content || ''; // parser missing -- show raw source
+            if (bodyEl) {
+                bodyEl.textContent = '';
+                if (window.MicronParser) {
+                    bodyEl.appendChild(new window.MicronParser(true).parseToHtml(data.content || ''));
+                } else {
+                    bodyEl.textContent = data.content || ''; // parser missing -- show raw source
+                }
             }
+            if (pushHistory) {
+                this._history = this._history.slice(0, this._historyIdx + 1);
+                this._history.push({ hash, path });
+                this._historyIdx = this._history.length - 1;
+            }
+            this._syncNav();
         } catch (e) {
             if (bodyEl) bodyEl.textContent = `Network error: ${e.message}`;
         }
     }
 
+    _syncNav() {
+        if (this._backBtn) this._backBtn.disabled = this._historyIdx <= 0;
+        if (this._fwdBtn) this._fwdBtn.disabled = this._historyIdx >= this._history.length - 1;
+        if (this._reloadBtn) this._reloadBtn.disabled = this._historyIdx < 0;
+    }
+
     /** Simplified version of reticulum_nomad.js's own _followLink/
-     * _splitAddr -- no history stack, no form-field submission (this
-     * modal is read-only-quick-view, not the full Browse tab), no
-     * `/file/` downloads. An external http(s) link still opens a normal
-     * browser tab rather than erroring on a non-Reticulum address. */
+     * _splitAddr -- no form-field submission (this modal is read-only,
+     * not the full Browse tab) and no `/file/` downloads; history
+     * back/forward/reload and the address bar otherwise work the same
+     * way. An external http(s) link still opens a normal browser tab
+     * rather than erroring on a non-Reticulum address. */
     _followLink(a) {
         let addr = (a.dataset.nomadUrl || '').split('`')[0]; // drop backtick form-vars, unsupported here
         addr = addr.replace(/^nomadnetwork:\/\//, '');
@@ -186,19 +250,21 @@ class ReticulumQuickBrowseModal {
             window.open(addr, '_blank', 'noopener');
             return;
         }
-        let hash = this._currentHash;
-        let path;
-        if (addr.startsWith(':')) {
-            path = addr.slice(1) || '/page/index.mu';
-        } else if (addr.startsWith('/')) {
-            path = addr;
-        } else {
-            const idx = addr.indexOf(':');
-            if (idx === -1) { hash = addr; path = '/page/index.mu'; }
-            else { hash = addr.slice(0, idx); path = addr.slice(idx + 1) || '/page/index.mu'; }
-        }
+        const { hash, path } = this._splitAddr(addr, this._currentHash);
         if (!hash || path.startsWith('/file/')) return;
-        this._fetch(hash, path);
+        this._go(hash, path);
+    }
+
+    /** "<hash>:/page/x.mu" -> {hash, path}. A bare "/page/x.mu" or
+     * ":/page/x.mu" resolves against the current node -- same shortcuts
+     * reticulum_nomad.js's own _splitAddr offers. */
+    _splitAddr(raw, currentHash) {
+        raw = raw.replace(/^nomadnetwork:\/\//, '');
+        if (raw.startsWith(':')) return { hash: currentHash || '', path: raw.slice(1) || '/page/index.mu' };
+        if (raw.startsWith('/')) return { hash: currentHash || '', path: raw };
+        const idx = raw.indexOf(':');
+        if (idx === -1) return { hash: raw, path: '/page/index.mu' };
+        return { hash: raw.slice(0, idx), path: raw.slice(idx + 1) || '/page/index.mu' };
     }
 
     close() {

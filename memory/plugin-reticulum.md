@@ -1613,3 +1613,32 @@ Verified: `node --check`, CSS comment-balance script 0, ruff clean,
 plugin-loader/manifest suite 70 passed / 6 skipped, no duplicate method
 definitions, no stale `rtd-map-fit-btn` references left. **NOT committed,
 NOT yet verified live.**
+
+**Follow-up, same session: quick-browse modal polish -- dark page
+styling + nav chrome (uncommitted, 2 asks).**
+
+1. "make it the same as the one on reticulum page it has ba[ck/lack]
+   background" -- ported the Browse tab's own dark "BBS terminal" page
+   styling (`.rt-nomad__page` in reticulum.css: `--bg-elevated`
+   background, monospace, `white-space: pre-wrap`, link/hr colours) into
+   `reticulum_dashboard.css` as `.rtd-browse-modal .pdm-modal__body`
+   (copied, same cross-plugin-asset reason as everything else this page
+   copies rather than links; scoped to the browse modal specifically,
+   not `.pdm-modal__body` generally, since that class is shared with
+   `ReticulumAnnounceModal`'s plain key-value layout).
+2. "can we have url forward back and reload also" -- walked the modal
+   back toward more of a real browser (still without the node-picker/
+   favourites/forms the full Browse tab has). Added a `.rtd-browse-toolbar`
+   row (back/forward/reload buttons + an editable address input + Go),
+   mirroring `reticulum_nomad.js`'s own `.rt-nomad__bar` almost exactly
+   minus the parts this modal doesn't need. `ReticulumQuickBrowseModal`
+   gained a real `_history`/`_historyIdx` stack and
+   `_go`/`_historyGo`/`_goFromAddr`/`_syncNav`, ported near-verbatim from
+   that file's own `_go`/`_history_go`/`_goFromAddr`/`_syncNav`
+   (`_followLink`/`_splitAddr` already existed from the first version,
+   `_followLink` now calls `_go()` instead of fetching directly, so link
+   clicks push history too).
+
+Verified: `node --check`, CSS comment-balance script 0, ruff clean,
+plugin-loader/manifest suite 70 passed / 6 skipped, no duplicate method
+definitions. **NOT committed, NOT yet verified live.**
