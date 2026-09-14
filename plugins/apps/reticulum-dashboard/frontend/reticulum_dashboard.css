@@ -17,9 +17,18 @@
  *     Reticulum page's own sortable/searchable Peers table)
  */
 
-/* ---- Telemetry map -- sized/framed by .panel/.map-container (core), not
-   here; this only adds the Leaflet popup re-skin the reticulum plugin's
-   own Telemetry tab map already has. ---- */
+/* ---- Telemetry map. Framed by .panel (core); .map-container only gives
+   overflow/min-height, not an actual height -- core's own map gets that
+   from the ID selector #map, not the class, so this page's differently-
+   ID'd div needs its own copy (same value #map uses: fill the panel, so
+   it stretches to match the Peers column's height like the real
+   Dashboard's NODE MAP does, not the fixed 300px the reticulum plugin's
+   own Telemetry tab map uses -- that one lives in a normal-scrolling
+   page, this one lives in the fixed-height panel shell). ---- */
+.rt-telemetry-map {
+    height: 100%;
+    width: 100%;
+}
 .rt-telemetry-map .leaflet-container { background: var(--bg, #111); }
 .rt-telemetry-map .leaflet-popup-content-wrapper {
     background: var(--bg-card, #1a1a1a);

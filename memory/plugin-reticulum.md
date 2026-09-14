@@ -1444,3 +1444,19 @@ committed, NOT yet re-verified live** -- this is a genuinely bigger
 rewrite than the previous two patches, waiting on the user's next
 hard-refresh to confirm the map/peers actually sit side-by-side now with
 the real Dashboard's own proven layout engine under it.
+
+**Follow-up, same session: map/peers columns not equal height
+(uncommitted).** After the full rebuild, grid split correctly (map left,
+peers right, confirmed live) but heights didn't match -- Peers grew tall
+with its own content, Telemetry Map stayed short. Cause: core's `#map {
+height: 100%; ... }` is an **ID selector**, not tied to `.map-container`
+(which only has `min-height:0;overflow:hidden`) -- this page's map div has
+a different id (`#rtd-telemetry-map`), so it never got that height rule
+and just sat at whatever height Leaflet happened to compute once, instead
+of stretching with the grid row the way `#map` does. Added `height:100%;
+width:100%` to `.rt-telemetry-map` directly in reticulum_dashboard.css
+(overrides the reticulum plugin's own Telemetry-tab version of that class,
+which deliberately uses a fixed 300px since it lives in a normal-scrolling
+page -- correctly different for this page's fixed-height shell context).
+Verified: comment-balance script still 0. **NOT committed, NOT yet
+re-verified live.**
