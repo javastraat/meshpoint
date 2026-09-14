@@ -114,28 +114,28 @@ class ReticulumDashboard {
             </section>
 
             <section class="rtd-grid">
-                <div class="panel rtd-map-panel">
-                    <div class="panel__header">
+                <div class="rtd-panel rtd-map-panel">
+                    <div class="rtd-panel__header">
                         <h3>Telemetry map</h3>
                         <p class="lw-panel__limit">
                             Peers that reported a location (Sideband-style
                             LXMF telemetry) -- most Reticulum peers don't.
                         </p>
                     </div>
-                    <div class="panel__body">
+                    <div class="rtd-panel__body">
                         <div id="rtd-telemetry-map" class="rt-telemetry-map" hidden></div>
                         <p class="lw-empty" id="rtd-telemetry-empty">
                             No located peers yet.
                         </p>
                     </div>
                 </div>
-                <div class="panel rtd-peers-panel">
-                    <div class="panel__header">
+                <div class="rtd-panel rtd-peers-panel">
+                    <div class="rtd-panel__header">
                         <h3>Peers</h3>
                         <input class="cfg-field__input" type="search" id="rtd-peer-search"
                                placeholder="Search name or hash" autocomplete="off">
                     </div>
-                    <div class="panel__body">
+                    <div class="rtd-panel__body">
                         <div class="rtd-peers-list" id="rtd-peers-list"></div>
                         <p class="lw-empty" id="rtd-peers-empty">
                             No Reticulum peers heard yet.
@@ -145,8 +145,8 @@ class ReticulumDashboard {
             </section>
 
             <section class="lw-section">
-                <div class="panel">
-                    <div class="panel__header">
+                <div class="rtd-panel">
+                    <div class="rtd-panel__header">
                         <h3>Live activity</h3>
                         <p class="lw-panel__limit">
                             Announces as they're heard, newest first -- full
@@ -154,7 +154,7 @@ class ReticulumDashboard {
                             Reticulum page.
                         </p>
                     </div>
-                    <div class="panel__body lw-table-wrap">
+                    <div class="rtd-panel__body lw-table-wrap">
                         <table class="lw-table lw-table--rt-announces">
                             <colgroup>
                                 <col class="col-time">
@@ -331,17 +331,46 @@ class ReticulumDashboard {
             if (empty) empty.style.display = '';
             return;
         }
+        const wasHidden = el.hidden;
         el.hidden = false;
         if (empty) empty.style.display = 'none';
 
         if (!this._teleMap) {
-            this._teleMap = L.map(el, { scrollWheelZoom: false });
-            L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>',
-                maxZoom: 19,
-            }).addTo(this._teleMap);
-            this._teleMarkers = L.layerGroup().addTo(this._teleMap);
+            // Leaflet reads the container's real size when the map is
+            // constructed. Measuring in the same synchronous tick as
+            // unhiding it can catch a stale (zero-size) layout -- the
+            // browser hasn't necessarily reflowed yet -- and Leaflet's
+            // absolutely-positioned panes then lay out against that bogus
+            // size, which visually reads as the map ballooning to cover
+            // the whole page instead of staying inside this ~300px box.
+            // requestAnimationFrame guarantees a real layout pass has
+            // happened for the just-unhidden container first.
+            requestAnimationFrame(() => this._initTelemetryMap(el, located));
+            return;
         }
+        this._updateTelemetryMarkers(located);
+        // Also true the first time an already-built map's container goes
+        // from hidden -> visible again (e.g. telemetry emptied out and
+        // came back) -- same stale-size risk as above.
+        if (wasHidden) requestAnimationFrame(() => this._teleMap && this._teleMap.invalidateSize());
+    }
+
+    _initTelemetryMap(el, located) {
+        if (this._teleMap || el.hidden) return; // a later call may have won the race, or telemetry emptied out again
+        this._teleMap = L.map(el, { scrollWheelZoom: false });
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>',
+            maxZoom: 19,
+        }).addTo(this._teleMap);
+        this._teleMarkers = L.layerGroup().addTo(this._teleMap);
+        this._updateTelemetryMarkers(located);
+        // Belt-and-braces: re-measure once more on the following frame in
+        // case the very first read still landed on a transitional layout
+        // (e.g. the .rtd-grid columns hadn't settled their widths yet).
+        requestAnimationFrame(() => this._teleMap && this._teleMap.invalidateSize());
+    }
+
+    _updateTelemetryMarkers(located) {
         this._teleMarkers.clearLayers();
         const bounds = [];
         located.forEach((t) => {
@@ -369,8 +398,6 @@ class ReticulumDashboard {
         });
         if (bounds.length === 1) this._teleMap.setView(bounds[0], 12);
         else this._teleMap.fitBounds(bounds, { padding: [30, 30], maxZoom: 13 });
-        // Container was hidden until now -- Leaflet needs a nudge to re-measure.
-        setTimeout(() => this._teleMap && this._teleMap.invalidateSize(), 60);
     }
 
     _onWsPeer() { this._loadPeers(); }

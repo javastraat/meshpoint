@@ -1296,3 +1296,47 @@ senders on the mesh — the "No located peers yet" empty state should show
 cleanly in that case, not a broken/blank map); WS-driven updates (new
 peer, new telemetry report, new announce) all reflect live without a
 manual refresh.
+
+**Follow-up, same session: real layout bug found live on the VM
+(uncommitted).** After the restart fixed the missing-stylesheet issue, user
+reported the layout still broke a beat after a correct-looking first paint
+-- "like it overwrites instead of showing it in the correct spot" (one
+panel visually overlapping/ballooning over the section below it).
+Root cause: `.rtd-map-panel`/`.rtd-peers-panel`/the ticker's wrapper all
+reused core's `.panel`/`.panel__header`/`.panel__body` (`dashboard.css:304`)
+-- that trio is built specifically for the core Dashboard's fixed-height
+flex shell (`.panel { height: 100%; overflow: hidden; display: flex; }`,
+meaningful only because `.dashboard`/`.dashboard__main` above it pin a real
+viewport-bound height). This page scrolls normally with no such ancestor,
+so `height: 100%` has nothing definite to resolve against -- inside a CSS
+grid item specifically, that's exactly the kind of situation where a
+browser can stretch the item to some much larger height than intended
+instead of falling back to content-sized `auto`, reading as one panel
+"overwriting" the one below it. Same general lesson as [[feedback_grep_shared_css_classes]]
+(grep a shared class's own rules before reusing it for a new purpose), this
+time on the giving end rather than the receiving end.
+
+Fix: stopped reusing `.panel`/`.panel__header`/`.panel__body` entirely.
+`reticulum_dashboard.css` gained `.rtd-panel`/`.rtd-panel__header`/
+`.rtd-panel__body` -- same visual look (bg-glass/border/radius/header
+typography), no fixed-height assumption. `reticulum_dashboard.js`'s markup
+updated to match (map panel, peers panel, ticker panel all three).
+Double-checked `.lw-table-wrap`/`.lw-panel__limit`/`.lw-empty` (still
+reused) for the same class of bug -- clean, no height assumption, matches
+that they already work fine in reticulum_panel.js's own normal-scrolling
+page context.
+
+Also (separate finding, same investigation): the VM's meshpoint hadn't
+picked up the CSS/`requires` manifest additions at all before the first
+restart the user did just now -- `_loaded_plugins` (`src/api/server.py`)
+is a module-level global set once in `create_app()`; a plugin.toml edit
+made after the process started (this whole `[frontend].styles` +
+`requires` addition) needs a `systemctl restart meshpoint` to actually
+take effect, same as any other plugin manifest change. Not a bug, just a
+real operational gotcha worth remembering for the rest of this feature's
+iteration -- expect to ask for another restart before the next round of
+live verification.
+
+Verified (Mac): `node --check`, manifest re-parses, `discover_plugins()`
+still finds 15, `ruff check` clean. **NOT committed.** Still waiting on the
+user's next restart + hard-refresh to confirm the actual fix live.

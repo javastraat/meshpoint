@@ -5,8 +5,17 @@
  * just link plugins/apps/reticulum/frontend/reticulum.css even though it
  * wants two things straight from it -- the telemetry-map + popup rules are
  * copied verbatim below (kept in sync by hand; small, stable, unlikely to
- * drift). Everything else reuses core's already-global panel/lw-*/stat-card
- * classes, so this file only holds what's genuinely new to this page.
+ * drift). Everything else reuses core's already-global lw-*/stat-card
+ * classes -- EXCEPT .panel/.panel__header/.panel__body (dashboard.css),
+ * deliberately NOT reused here: that trio is built for the core Dashboard's
+ * fixed-height flex shell (`.panel { height: 100%; overflow: hidden; }`,
+ * meaningful only because `.dashboard`/`.dashboard__main` above it pin a
+ * real viewport-bound height). This page scrolls normally with no such
+ * ancestor, so `height: 100%` has nothing definite to resolve against --
+ * inside a CSS grid item that let one panel balloon to cover the page
+ * instead of sizing to its content (found live, see memory/
+ * plugin-reticulum.md). .rtd-panel* below is a lightweight equivalent with
+ * the same look, no fixed-height assumption.
  */
 
 /* ---- Map + Peers side-by-side row, mirrors the core Dashboard's own
@@ -23,12 +32,35 @@
     .rtd-grid { grid-template-columns: 1fr; }
 }
 
-.rtd-map-panel .panel__body { padding: 0.75rem; }
+/* ---- Page-scoped panel look-alike (see file header note above for why
+   this isn't core's .panel/.panel__header/.panel__body). ---- */
+.rtd-panel {
+    background: var(--bg-glass);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+.rtd-panel__header {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+}
+.rtd-panel__header h3 {
+    margin: 0 0 2px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+}
+.rtd-panel__body { padding: 0.75rem; }
+
+.rtd-map-panel .rtd-panel__body { padding: 0.75rem; }
 
 /* ---- Peers list (right column) -- a lighter-weight readout than the
    Reticulum page's own sortable/searchable Peers table; this is a
    glanceable "who's around" list, full management stays on that page. */
-.rtd-peers-panel .panel__body {
+.rtd-peers-panel .rtd-panel__body {
     padding: 0.5rem 0.75rem 0.75rem;
     display: flex;
     flex-direction: column;
