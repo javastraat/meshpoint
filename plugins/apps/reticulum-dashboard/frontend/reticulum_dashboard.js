@@ -394,7 +394,13 @@ class ReticulumDashboard {
 
     _initTelemetryMap(el, located) {
         if (this._teleMap || el.hidden) return; // a later call may have won the race, or telemetry emptied out again
-        this._teleMap = L.map(el, { scrollWheelZoom: false });
+        // true, not the reticulum plugin's own Telemetry-tab false: that
+        // map is a small widget embedded in a normal-scrolling page (you
+        // don't want it hijacking page scroll), this map plays the core
+        // Dashboard's dominant NODE MAP role instead, which is
+        // scrollWheelZoom: true (node_map.js) -- same reasoning as every
+        // other "match the real thing" fix in this page's history.
+        this._teleMap = L.map(el, { scrollWheelZoom: true });
         const tileOpts = {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>',
             maxZoom: 19,

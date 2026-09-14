@@ -1502,3 +1502,12 @@ own ids.
 Verified: `node --check`, CSS comment-balance script still 0, manifest
 re-parses, `ruff check` clean, plugin-loader/manifest suite still
 70 passed / 6 skipped. **NOT committed, NOT yet verified live.**
+
+**Follow-up, same session: scroll-to-zoom (uncommitted, one-liner).** User:
+scrolling over the map didn't zoom, scrolled the page ~10px instead.
+Cause: `_initTelemetryMap` had `scrollWheelZoom: false`, copied from the
+reticulum plugin's own small embedded Telemetry-tab map (correct there --
+a widget in a normal-scrolling page shouldn't hijack scroll). This page's
+map plays the core Dashboard's dominant NODE MAP role instead, which is
+`scrollWheelZoom: true` (node_map.js) -- flipped to match. Verified:
+`node --check`. **NOT committed, NOT yet verified live.**
