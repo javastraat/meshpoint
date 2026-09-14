@@ -61,13 +61,17 @@ class TestWebTerminalToggleGate(unittest.TestCase):
         self.assertFalse(AppConfig().dashboard.web_terminal_toggle)
 
     def test_get_config_reports_toggle_state(self) -> None:
+        # Checks only the keys this test cares about, not the whole
+        # `dashboard` dict -- an exact-equality assertion here breaks every
+        # time an unrelated field is added to that config block (it already
+        # has twice: map_tile_url, then landing_page), which has nothing to
+        # do with what this test is actually verifying.
         r = self.client.get("/api/config")
         self.assertEqual(r.status_code, 200, r.text)
-        self.assertEqual(r.json()["dashboard"], {
-            "web_terminal_enabled": False,
-            "web_terminal_toggle": False,
-            "map_tile_url": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-        })
+        dashboard = r.json()["dashboard"]
+        self.assertEqual(dashboard["web_terminal_enabled"], False)
+        self.assertEqual(dashboard["web_terminal_toggle"], False)
+        self.assertEqual(dashboard["map_tile_url"], "https://tile.openstreetmap.org/{z}/{x}/{y}.png")
 
     def test_enable_refused_while_toggle_off(self) -> None:
         r = self.client.put("/api/config/dashboard", json={"web_terminal_enabled": True})
