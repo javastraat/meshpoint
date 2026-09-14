@@ -1871,3 +1871,83 @@ re-parses (`category: top`), `discover_plugins()` still finds 15,
 **NOT committed, NOT yet verified live** -- worth a specific live check
 that the item actually lands directly under Dashboard (not, say, above
 it or with a stray gap) once deployed.
+
+**Follow-up, same session: Reticulum Browser -- rBrowser feature-parity
+plugin, moved from community to bundled (uncommitted, new plugin +
+CHANGELOG bullet).** User: liked fr33n0w's rBrowser
+(github.com/fr33n0w/rBrowser), asked for a look at its license/features,
+then to build a Meshpoint plugin with its feature set. Confirmed MIT
+(verified the actual LICENSE file content directly, not just the README
+claim) -- permissive, but the two codebases are structurally
+incompatible to literally port between (rBrowser: one ~200KB Flask
+index.html + Python backend; Meshpoint plugin: a small ES6 class reading
+`/api/reticulum/nomad/*`) -- built as a clean-room feature-parity
+reimplementation instead of a code port, documented as such.
+
+**Scope, agreed before building ("tell me first" honored):** ported --
+node picker/search, address bar, back/forward/reload, favourites (shared
+list), Micron rendering, dark BBS-terminal page styling, all reusing
+proven patterns from reticulum_nomad.js / the reticulum-dashboard
+plugin's quick-browse modal. New for this plugin -- **multi-tab browsing**
+(the real architectural piece: each tab = its own `{hash, path, title,
+content, rawMode, history[], historyIdx}`; switching tabs never
+re-fetches, just redisplays cached state), a **raw/rendered view
+toggle**, and **keyboard shortcuts** (Ctrl/Cmd+T/W/R, Alt+←/→).
+Deliberately deferred (documented, not silently dropped): fingerprint
+identification (need to study rBrowser's actual verification model
+first) and a local search engine + page cache (a background-crawler-
+sized feature, its own service-seam plugin if built at all). Also
+skipped, matching the dashboard modal's own scope line: form-field
+submission, `/file/` downloads.
+
+**Built first in `meshpoint-plugins` (community repo) as "rbrowser",
+then moved into meshpoint core (bundled) as "reticulum-browser"** per a
+follow-up request. Along the way:
+- `make-repo-json.py` (meshpoint-plugins' catalog generator) gained
+  `requires` surfacing in generated entries, mirroring how it already
+  surfaces `hook_host` -- a genuine, permanent improvement to that script
+  independent of this plugin, kept even after the plugin itself moved out.
+- Rename: `rbrowser` -> `reticulum-browser` (folder, `name`, `[sidebar].route`,
+  file names, the `RBrowserPanel` class -> `ReticulumBrowserPanel`, sidebar
+  label "rBrowser" -> "Reticulum Browser"). Internal implementation-only
+  identifiers (`_rb*` functions, `.rb-*` CSS classes, `data-rb-*`
+  attributes) deliberately left alone -- invisible to users, renaming them
+  across two files was pure risk for zero benefit.
+- `locked = true` added (bundled-with-fork convention, matching
+  reticulum/reticulum-dashboard) -- wasn't set for the community version.
+- **Credit history, corrected mid-build:** first pass removed the
+  external GitHub link/big license block entirely (misread "remove the
+  stuff to the rnode github" as "strip all reference to the source").
+  User corrected: "leave the url in the plugin so we refer to him at
+  least" -- restored `[meta].homepage` pointing at
+  `github.com/fr33n0w/rBrowser` and kept a full Credit section (with the
+  same MIT-compliance framing already used for `reticulum_micron.js`'s
+  own ported-from-reticulum-meshchat credit) in the plugin's README.md.
+  Just dropped the in-UI "inspired by" link line from the page header
+  itself, keeping the credit in metadata/README rather than the live page.
+- **Self-containment, corrected mid-build:** first pass added
+  `"reticulum-browser"` to `frontend/css/lorawan.css`'s shared
+  `overflow-y:auto` selector list (now bundled in the same repo, so
+  technically reachable) -- user pushed back ("no why" / "we have it all
+  in the plugin"): a plugin shouldn't need a core-file edit just to
+  exist, even a bundled one. Reverted `lorawan.css` to its exact
+  committed state (confirmed via `git diff` -> empty); the plugin's own
+  CSS keeps a **local** `.section[data-section="reticulum-browser"] {
+  overflow-y: auto; }` rule instead, same self-contained pattern
+  `reticulum-dashboard` would have used had it needed one (it didn't --
+  fixed-height dashboard-shell page, different situation).
+
+Verified: `node --check`, CSS comment-balance script 0, manifest
+re-parses through meshpoint's REAL parser (`parse_manifest()`, not just
+eyeballed -- `requires: reticulum`, `locked: True`, `route:
+reticulum-browser`), `discover_plugins()` finds 16 (up from 15), `ruff
+check` clean, plugin-loader/manifest suite 70 passed / 6 skipped,
+`git diff frontend/css/lorawan.css` empty (confirms the revert landed
+clean). meshpoint-plugins' own `apps/rbrowser/` removed, its `repo.json`
+regenerated (3 plugins, rbrowser gone). CHANGELOG bullet added + parses
+(31 sections). **NOT committed, NOT yet verified live** -- first
+backend-adjacent plugin this session built without ever touching a
+running device at all (pure new-plugin add, no existing behavior to
+regress) -- still worth a real restart + smoke test (open a tab, browse
+a known node, confirm favourites sync with the other three surfaces)
+before calling it done.

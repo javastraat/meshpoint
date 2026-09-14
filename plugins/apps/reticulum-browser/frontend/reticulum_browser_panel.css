@@ -1,0 +1,155 @@
+/* Reticulum Browser -- own stylesheet.
+ *
+ * Kept entirely self-contained in this plugin, including its
+ * overflow-y:auto opt-out below (the base .section rule is
+ * overflow:hidden by default; every normal-scrolling page needs one) --
+ * deliberately a local rule scoped to this plugin's own data-section
+ * value rather than adding "reticulum-browser" to frontend/css/
+ * lorawan.css's shared selector list, even though this plugin is bundled
+ * in the same repo and could reach that file. A plugin shouldn't need a
+ * core-file edit just to exist.
+ *
+ * The favourite star and the page's dark "BBS terminal" look are
+ * likewise duplicated here rather than linked -- cross-plugin asset
+ * serving stays scoped per-plugin regardless of being bundled in the same
+ * repo (src/plugins/assets.py:resolve_plugin_asset only serves a
+ * plugin's own manifest-listed files), so reticulum.css's
+ * .rt-nomad__fav/.rt-nomad__page rules genuinely aren't reachable from
+ * here even though they're right there in the same checkout.
+ */
+.section[data-section="reticulum-browser"] {
+    overflow-y: auto;
+}
+
+/* ---- Toolbar: two rows, same "find a node" / "navigate" split as the
+   reticulum plugin's own Browse tab (.rt-nomad__bar-row--find/--nav). ---- */
+.rb-bar {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+.rb-bar-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+.rb-search { flex: 1 1 130px; min-width: 0; }
+.rb-nodes {
+    flex: 0 1 260px;
+    min-width: 0;
+    max-width: 300px;
+    text-overflow: ellipsis;
+}
+.rb-favs {
+    flex: 0 1 160px;
+    min-width: 0;
+    max-width: 180px;
+    text-overflow: ellipsis;
+}
+.rb-addr {
+    flex: 3 1 280px;
+    min-width: 0;
+    font-family: var(--font-mono, ui-monospace, "SF Mono", Menlo, monospace);
+    font-size: 13px;
+}
+.rb-bar-row .terminal-button { flex: 0 0 auto; }
+.rb-bar-row [data-rb-raw].is-active {
+    color: var(--accent-cyan, #06b6d4);
+    border-color: currentColor;
+}
+
+/* Favourite star -- copied from the reticulum plugin's own .rt-nomad__fav
+   (see file header note on why it can't just be linked). */
+.rt-nomad__fav {
+    font-size: 15px;
+    line-height: 1;
+    padding-inline: 9px;
+}
+.rt-nomad__fav--on { color: var(--accent-amber, #f5b942); border-color: currentColor; }
+.rt-nomad__fav:disabled { opacity: 0.4; }
+
+/* ---- Tab strip ---- */
+.rb-tabstrip {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--border, #333);
+    padding-bottom: 6px;
+}
+.rb-tab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 200px;
+    padding: 4px 6px 4px 10px;
+    border-radius: 6px 6px 0 0;
+    background: var(--bg-elevated, #1a1a1a);
+    border: 1px solid var(--border, #333);
+    border-bottom: none;
+    cursor: pointer;
+    font-size: 12px;
+}
+.rb-tab--active {
+    background: var(--bg-card, #222);
+    border-color: var(--accent-cyan, #06b6d4);
+    color: var(--text-primary, #eee);
+}
+.rb-tab__title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 140px;
+}
+.rb-tab__close {
+    background: none;
+    border: none;
+    color: var(--text-muted, #888);
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    padding: 0 2px;
+}
+.rb-tab__close:hover { color: var(--accent-red, #ef4444); }
+.rb-tab__new {
+    background: none;
+    border: 1px dashed var(--border, #333);
+    border-radius: 6px;
+    color: var(--text-muted, #888);
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    padding: 4px 10px;
+}
+.rb-tab__new:hover { color: var(--text-primary, #eee); border-color: var(--accent-cyan, #06b6d4); }
+
+/* ---- Page content -- same dark "BBS terminal" look as the reticulum
+   plugin's own Browse tab (.rt-nomad__page), copied for the same
+   cross-plugin-asset reason as the favourite star above. ---- */
+.rb-page {
+    border: 1px solid var(--border, #333);
+    border-radius: 6px;
+    padding: 14px 16px;
+    min-height: 300px;
+    max-height: 65vh;
+    overflow: auto;
+    background: var(--bg-elevated, #1a1a1a);
+    font-family: var(--font-mono, ui-monospace, "SF Mono", Menlo, monospace);
+    font-size: 13px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+.rb-page a {
+    color: var(--accent, #4ea1ff);
+    cursor: pointer;
+    text-decoration: underline;
+}
+.rb-page hr {
+    border: 0;
+    border-top: 1px solid var(--border, #444);
+    margin: 6px 0;
+}

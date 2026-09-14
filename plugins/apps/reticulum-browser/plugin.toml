@@ -1,0 +1,32 @@
+name = "reticulum-browser"
+version = "0.1.0"
+meshpoint_api = 1
+provides = ["sidebar"]    # a whole top-level sidebar page of its own --
+                           # no "routes": reads the reticulum plugin's
+                           # already-public /api/reticulum/nomad/* endpoints
+                           # instead of adding its own backend.
+locked = true  # shipped with this fork -- not user-installed, can't be deleted
+requires = "reticulum"    # not a [hook] -- this page doesn't attach to
+                           # reticulum's own page, it just has nothing to
+                           # browse without it running. Enforced server-side:
+                           # PUT /api/plugins/reticulum-browser refuses to
+                           # enable it until reticulum is enabled, and
+                           # disabling reticulum cascades to disable this
+                           # too (src/api/routes/plugin_routes.py).
+
+[frontend]
+scripts = ["frontend/reticulum_browser_panel.js"]
+styles = ["frontend/reticulum_browser_panel.css"]
+
+[sidebar]
+route = "reticulum-browser"
+label = "Reticulum Browser"
+category = "networks"
+icon = "reticulum"    # same glyph as the reticulum plugin's own nav item --
+                       # icon names are a shared curated set, not exclusive
+                       # to one plugin.
+
+[meta]
+description = "A full multi-tab NomadNet browser for Reticulum -- tabs, address bar, back/forward/reload, favourites (shared with the Reticulum page's own Browse tab and the Reticulum Dashboard's quick-browse modal), a raw/rendered view toggle, and keyboard shortcuts. Feature set inspired by fr33n0w's rBrowser (see homepage); this is a clean-room implementation for Meshpoint's own plugin architecture, not a code port -- full credit in README.md. Requires the reticulum plugin enabled."
+homepage = "https://github.com/fr33n0w/rBrowser"
+author = "Einstein PD2EMC"
