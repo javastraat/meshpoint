@@ -80,17 +80,155 @@ const RTD_ASPECT_BADGES = {
     'call.audio': 'mt-badge--routing',
 };
 
+/**
+ * A single-page, read-only "quick view" for a NomadNet node -- not the
+ * Reticulum page's own Browse tab (address bar, history back/forward,
+ * node-picker dropdown, favourites, form-field submission, file
+ * downloads). Deliberately smaller: one modal, current page only, click a
+ * link to replace it in place. Reuses `.pdm-overlay`/`.pdm-modal--wide`
+ * (frontend/css/packet_detail_modal.css, core, already loaded globally --
+ * the exact same chrome ReticulumAnnounceModal above uses) and
+ * `window.MicronParser` (plugins/apps/reticulum/frontend/
+ * reticulum_micron.js, guaranteed loaded since reticulum is a hard
+ * `requires` of this plugin) -- no new CSS, no new dependency.
+ *
+ * Local to this page (not exposed on window) -- it isn't a shape the
+ * Reticulum page itself has any use for.
+ */
+class ReticulumQuickBrowseModal {
+    constructor() {
+        this._overlay = null;
+        this._currentHash = null;
+        this._onKeyDown = this._onKeyDown.bind(this);
+    }
+
+    open(hash, label) {
+        this.close();
+        const overlay = document.createElement('div');
+        overlay.className = 'pdm-overlay';
+        overlay.setAttribute('role', 'dialog');
+        overlay.setAttribute('aria-modal', 'true');
+        overlay.setAttribute('aria-label', 'Browse node');
+        overlay.addEventListener('click', () => this.close());
+
+        const modal = document.createElement('div');
+        modal.className = 'pdm-modal pdm-modal--wide';
+        modal.addEventListener('click', (e) => e.stopPropagation());
+        modal.innerHTML = `
+            <header class="pdm-modal__header">
+                <div>
+                    <h2 class="pdm-modal__title"></h2>
+                    <div class="pdm-modal__meta"></div>
+                </div>
+                <button type="button" class="pdm-modal__close" aria-label="Close">&times;</button>
+            </header>
+            <div class="pdm-modal__body"></div>
+        `;
+        modal.querySelector('.pdm-modal__title').textContent = label || hash;
+        modal.querySelector('.pdm-modal__close').addEventListener('click', () => this.close());
+        modal.querySelector('.pdm-modal__body').addEventListener('click', (e) => {
+            const a = e.target.closest('a[data-nomad-url]');
+            if (!a) return;
+            e.preventDefault();
+            this._followLink(a);
+        });
+
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+        this._overlay = overlay;
+        this._currentHash = hash;
+        document.addEventListener('keydown', this._onKeyDown);
+        modal.querySelector('.pdm-modal__close').focus();
+        this._fetch(hash, '/page/index.mu');
+    }
+
+    async _fetch(hash, path) {
+        if (!this._overlay) return;
+        const pathEl = this._overlay.querySelector('.pdm-modal__meta');
+        const bodyEl = this._overlay.querySelector('.pdm-modal__body');
+        if (pathEl) pathEl.textContent = path;
+        if (bodyEl) bodyEl.innerHTML = '<p class="lw-panel__limit">Loading…</p>';
+        try {
+            const r = await fetch('/api/reticulum/nomad/page', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ destination_hash: hash, path, field_data: null }),
+            });
+            const data = await r.json().catch(() => ({}));
+            if (!this._overlay) return; // closed while the fetch was in flight
+            if (!r.ok || !data.ok) {
+                if (bodyEl) bodyEl.textContent = data.error || `Failed (HTTP ${r.status})`;
+                return;
+            }
+            this._currentHash = hash;
+            if (!bodyEl) return;
+            bodyEl.textContent = '';
+            if (window.MicronParser) {
+                bodyEl.appendChild(new window.MicronParser(true).parseToHtml(data.content || ''));
+            } else {
+                bodyEl.textContent = data.content || ''; // parser missing -- show raw source
+            }
+        } catch (e) {
+            if (bodyEl) bodyEl.textContent = `Network error: ${e.message}`;
+        }
+    }
+
+    /** Simplified version of reticulum_nomad.js's own _followLink/
+     * _splitAddr -- no history stack, no form-field submission (this
+     * modal is read-only-quick-view, not the full Browse tab), no
+     * `/file/` downloads. An external http(s) link still opens a normal
+     * browser tab rather than erroring on a non-Reticulum address. */
+    _followLink(a) {
+        let addr = (a.dataset.nomadUrl || '').split('`')[0]; // drop backtick form-vars, unsupported here
+        addr = addr.replace(/^nomadnetwork:\/\//, '');
+        if (/^https?:\/\//i.test(addr)) {
+            window.open(addr, '_blank', 'noopener');
+            return;
+        }
+        let hash = this._currentHash;
+        let path;
+        if (addr.startsWith(':')) {
+            path = addr.slice(1) || '/page/index.mu';
+        } else if (addr.startsWith('/')) {
+            path = addr;
+        } else {
+            const idx = addr.indexOf(':');
+            if (idx === -1) { hash = addr; path = '/page/index.mu'; }
+            else { hash = addr.slice(0, idx); path = addr.slice(idx + 1) || '/page/index.mu'; }
+        }
+        if (!hash || path.startsWith('/file/')) return;
+        this._fetch(hash, path);
+    }
+
+    close() {
+        if (this._overlay) {
+            this._overlay.remove();
+            this._overlay = null;
+        }
+        document.removeEventListener('keydown', this._onKeyDown);
+    }
+
+    _onKeyDown(e) {
+        if (e.key === 'Escape') this.close();
+    }
+}
+
 class ReticulumDashboard {
     constructor() {
         this._root = null;
         this._refreshTimer = null;
         this._peers = [];
         this._telemetry = [];
+        this._homeLat = null;
+        this._homeLon = null;
+        this._homeMarker = null;
         this._announces = []; // mirrors the ticker's DOM rows -- needed to
         // look up an entry on click (row click-through -> detail panels)
         this._peerSearchQuery = '';
         this._peerDrawer = null;
         this._announceModal = null;
+        this._quickBrowse = new ReticulumQuickBrowseModal();
         // Same localStorage key node_map.js's own basemap toggle uses --
         // deliberately shared, not a separate preference: "I like a light
         // map" is one setting the user expects to carry across every map
@@ -148,7 +286,7 @@ class ReticulumDashboard {
                                 Telemetry Map
                                 <div class="panel__header-actions">
                                     <button id="rtd-map-basemap-btn" class="map-expand-btn" type="button" title="Darken the map"></button>
-                                    <button id="rtd-map-fit-btn" class="map-expand-btn" type="button" title="Fit all located peers">
+                                    <button id="rtd-map-home-btn" class="map-expand-btn" type="button" title="Center on home">
                                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" aria-hidden="true">
                                             <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
                                             <polyline points="9 22 9 12 15 12 15 22"/>
@@ -224,7 +362,7 @@ class ReticulumDashboard {
 
         this._syncBasemapBtn(this._basemapLight);
         this._q('#rtd-map-basemap-btn')?.addEventListener('click', () => this._toggleBasemap());
-        this._q('#rtd-map-fit-btn')?.addEventListener('click', () => this._fitTelemetryBounds());
+        this._q('#rtd-map-home-btn')?.addEventListener('click', () => this._centerOnHome());
         this._q('#rtd-map-expand-btn')?.addEventListener('click', () => this._toggleExpand());
 
         // Same detail drawer/modal the Reticulum page's own Peers/Activity
@@ -239,6 +377,12 @@ class ReticulumDashboard {
         if (window.ReticulumAnnounceModal) this._announceModal = new window.ReticulumAnnounceModal();
 
         this._q('#rtd-peers-list')?.addEventListener('click', (e) => {
+            const browseBtn = e.target.closest('[data-browse]');
+            if (browseBtn) {
+                const peer = this._peers.find((p) => p.destination_hash === browseBtn.dataset.browse);
+                if (peer) this._quickBrowse.open(peer.destination_hash, peer.display_name);
+                return;
+            }
             const row = e.target.closest('[data-hash]');
             if (!row) return;
             const peer = this._peers.find((p) => p.destination_hash === row.dataset.hash);
@@ -255,15 +399,20 @@ class ReticulumDashboard {
     }
 
     /** Peer-row click -> the same right-side drawer the Reticulum page's
-     * own Peers tab opens. Read-only here -- no contact editing / browse /
-     * send-message actions, this page is a glanceable companion, not the
-     * full management page -- but "view announce" still pivots to this
-     * page's own announce modal, matching the real thing's cross-link. */
+     * own Peers tab opens. Read-only here -- no contact editing / send-
+     * message actions, this page is a glanceable companion, not the full
+     * management page -- but "view announce" and, for a nomadnetwork.node
+     * peer, "Browse" both still work, matching the real thing's
+     * cross-links (Browse opens this page's own quick-view modal, not
+     * the Reticulum page's full Browse tab). */
     _openPeerDrawer(peer) {
         if (!this._peerDrawer) return;
         const recent = this._announces.filter((a) => a.destination_hash === peer.destination_hash);
         this._peerDrawer.open(peer, recent, {
             onViewAnnounce: (entry) => this._openAnnounceModal(entry),
+            onBrowse: peer.aspect === 'nomadnetwork.node'
+                ? (hash) => this._quickBrowse.open(hash, peer.display_name)
+                : undefined,
         });
     }
 
@@ -301,8 +450,26 @@ class ReticulumDashboard {
     async _load() {
         await Promise.all([
             this._loadStatus(), this._loadPeers(), this._loadConversationCount(),
-            this._loadTickerSeed(), this._loadTelemetry(),
+            this._loadTickerSeed(), this._loadTelemetry(), this._loadHomeLocation(),
         ]);
+    }
+
+    /** The device's own configured location (Configuration -> Identity),
+     * same field node_map.js's centerOnHome() reads -- device-level, not
+     * RF-specific, so it applies here too even though Reticulum peers
+     * have no relation to it. Loaded once; a mid-session location change
+     * needs a page reload to pick up, same as every other page here. */
+    async _loadHomeLocation() {
+        if (this._homeLat != null) return;
+        try {
+            const r = await fetch('/api/device', { credentials: 'same-origin' });
+            if (!r.ok) return;
+            const device = await r.json();
+            if (device.latitude == null || device.longitude == null) return;
+            this._homeLat = device.latitude;
+            this._homeLon = device.longitude;
+            this._renderHomeMarker();
+        } catch (_) {}
     }
 
     async _loadStatus() {
@@ -401,7 +568,11 @@ class ReticulumDashboard {
         list.innerHTML = filtered.slice(0, RTD_PEER_LIST_LIMIT).map((p) => `
             <div class="rtd-peer-row" data-hash="${this._esc(p.destination_hash)}" title="${this._esc(p.destination_hash)}">
                 <span class="rtd-peer-row__name">${this._esc(p.display_name || p.destination_hash.slice(0, 12) + '…')}</span>
-                ${this._fmtAspect(p.aspect)}
+                ${this._fmtAspect(p.aspect)}${
+                    p.aspect === 'nomadnetwork.node'
+                        ? ` <button type="button" class="lw-link-btn" data-browse="${this._esc(p.destination_hash)}">Browse</button>`
+                        : ''
+                }
                 <span class="rtd-peer-row__time">${this._fmtTime(p.last_seen)}</span>
             </div>
         `).join('');
@@ -409,16 +580,22 @@ class ReticulumDashboard {
 
     // --- Telemetry map -----------------------------------------------------
 
-    /** Lightweight Leaflet map of telemetry peers that reported a location.
-     * Own markers only -- not the core dashboard's NodeMap (that's fed
-     * from the RF nodes table, which Reticulum telemetry peers aren't
-     * in). Ported from reticulum_panel.js's own Telemetry tab map. */
+    /** Lightweight Leaflet map of telemetry peers that reported a location,
+     * plus the device's own home location (see _renderHomeMarker). Own
+     * markers only -- not the core dashboard's NodeMap (that's fed from
+     * the RF nodes table, which Reticulum telemetry peers aren't in).
+     * Ported from reticulum_panel.js's own Telemetry tab map. */
     _renderTelemetryMap() {
         const el = this._q('#rtd-telemetry-map');
         const empty = this._q('#rtd-telemetry-empty');
         if (!el || typeof L === 'undefined') return;
         const located = this._telemetry.filter((t) => t.latitude != null && t.longitude != null);
-        if (!located.length) {
+        const hasHome = this._homeLat != null && this._homeLon != null;
+        // Show the map whenever there's ANYTHING to put on it -- located
+        // peers or just home -- not only when peers exist like before
+        // home was added; otherwise a box with no located peers yet never
+        // shows its own home pin at all.
+        if (!located.length && !hasHome) {
             el.hidden = true;
             if (empty) empty.style.display = '';
             return;
@@ -477,12 +654,47 @@ class ReticulumDashboard {
             }
         });
         this._teleMarkers = L.layerGroup().addTo(this._teleMap);
+        this._renderHomeMarker(); // in case home loaded before the map existed
         this._updateTelemetryMarkers(located);
+        // No peers to fit a view to -- start centered on home instead of
+        // Leaflet's own default (world view), if we have one.
+        if (!located.length) this._centerOnHome();
         // Belt-and-braces: re-measure once more on the following frame in
         // case the very first read still landed on a transitional layout
         // (e.g. the .dashboard__main grid columns hadn't settled their
         // widths yet).
         requestAnimationFrame(() => this._teleMap && this._teleMap.invalidateSize());
+    }
+
+    /** The device's own home location, on the map -- a distinct pin, kept
+     * on its own layer (not this._teleMarkers) so peer-marker refreshes
+     * never clear it. Safe to call before the map or the location exists
+     * yet; whichever of _loadHomeLocation()/_initTelemetryMap() finishes
+     * second is the one that actually adds it. */
+    _renderHomeMarker() {
+        if (!this._teleMap || this._homeLat == null || this._homeLon == null || this._homeMarker) return;
+        const icon = L.divIcon({
+            className: 'rtd-home-marker',
+            html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" '
+                + 'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+                + '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>'
+                + '<polyline points="9 22 9 12 15 12 15 22"/></svg>',
+            iconSize: [26, 26],
+            iconAnchor: [13, 13],
+        });
+        this._homeMarker = L.marker([this._homeLat, this._homeLon], { icon, zIndexOffset: 1000 })
+            .bindTooltip('Home', { direction: 'top', offset: [0, -12] })
+            .addTo(this._teleMap);
+    }
+
+    /** Map-header home button -- same "Center on home" the core
+     * Dashboard's NODE MAP offers (node_map.js's centerOnHome()), zoom
+     * level 14 to match. Home is a device-level setting (Configuration ->
+     * Identity), not RF-specific, so it applies here too even though
+     * Reticulum peers have no relation to it. */
+    _centerOnHome() {
+        if (!this._teleMap || this._homeLat == null || this._homeLon == null) return;
+        this._teleMap.setView([this._homeLat, this._homeLon], 14);
     }
 
     _updateTelemetryMarkers(located) {
@@ -514,10 +726,11 @@ class ReticulumDashboard {
         this._fitTelemetryBounds();
     }
 
-    /** Panel-header "fit" button -- also called after every marker
-     * refresh. Recomputes from this._telemetry rather than taking a
-     * parameter so the button always reflects the latest fetch/WS state,
-     * not whatever was current the last time markers were rebuilt. */
+    /** Auto-frames the view on every marker refresh (not a button --
+     * the panel-header home button does "center on home" instead, see
+     * _centerOnHome). Recomputes from this._telemetry rather than taking
+     * a parameter so it always reflects the latest fetch/WS state, not
+     * whatever was current the last time markers were rebuilt. */
     _fitTelemetryBounds() {
         if (!this._teleMap) return;
         const bounds = this._telemetry
@@ -528,9 +741,9 @@ class ReticulumDashboard {
         else this._teleMap.fitBounds(bounds, { padding: [30, 30], maxZoom: 13 });
     }
 
-    // --- Map header actions (basemap / fit / expand) -----------------------
+    // --- Map header actions (basemap / home / expand) -----------------------
     // Same behaviours as the core Dashboard's NODE MAP panel
-    // (frontend/js/app.js's mapBasemapBtn/mapExpandBtn wiring,
+    // (frontend/js/app.js's mapBasemapBtn/mapHomeBtn/mapExpandBtn wiring,
     // frontend/js/components/node_map.js's toggleBasemap/centerOnHome) --
     // reimplemented here rather than reused because node_map.js's own
     // versions are hardwired to the core map's specific #map id (both the
@@ -538,10 +751,7 @@ class ReticulumDashboard {
     // uses an unscoped `document.querySelector('.dashboard')` that would
     // grab whichever .dashboard comes first in the document, not
     // necessarily this page's own -- copying the *behaviour*, not the
-    // exact code, avoids both traps. "Fit all located peers" replaces
-    // "center on home": this page has no device lat/lon of its own to
-    // recenter on, but a one-click reset back to "see every dot" is the
-    // same kind of utility. No cluster-toggle button -- located telemetry
+    // exact code, avoids both traps. No cluster-toggle button -- located telemetry
     // peers are typically a small fraction of the peer roster, nowhere
     // near dense enough to need grouping the way RF nodes can be.
 

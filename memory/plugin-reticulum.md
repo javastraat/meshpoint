@@ -1554,3 +1554,62 @@ needed this time (unlike the CSS files earlier).
 Verified: `node --check`, comment-balance script 0, ruff clean,
 plugin-loader/manifest suite 70 passed / 6 skipped, no duplicate method
 definitions. **NOT committed, NOT yet verified live.**
+
+**Follow-up, same session: NomadNet quick-browse modal + home location
+(uncommitted).** Two asks in the same message, plus a follow-up.
+
+**1. Quick-browse modal.** User: a way to browse `nomadnetwork.node`
+peers from this page without the full Browse tab (address bar, history,
+node picker) -- "an inline modal" instead. New `ReticulumQuickBrowseModal`
+class (local to this file, not exposed on `window` -- nothing else needs
+it). Reuses `.pdm-overlay`/`.pdm-modal.pdm-modal--wide`
+(`frontend/css/packet_detail_modal.css`, core, already loaded -- the exact
+chrome `ReticulumAnnounceModal` above it already uses, confirmed by
+grepping which stylesheet actually defines those classes) and
+`window.MicronParser` (guaranteed loaded, `reticulum` is a hard
+`requires`) -- zero new CSS. `POST /api/reticulum/nomad/page` (same
+endpoint `reticulum_nomad.js`'s own `_fetch` uses) fetches `index.mu`;
+clicking a `data-nomad-url` link re-fetches + re-renders in place, no
+history stack. `_followLink`/address-splitting logic is a simplified
+port of `reticulum_nomad.js`'s own `_followLink`/`_splitAddr` (same
+`<hash>:/path` / `:/path` / `/path` shortcuts, external `https://` opens
+a new tab) -- **deliberately dropped**: form-field submission (backtick
+request-vars, `data-nomad-fields` inputs) and `/file/` downloads, both
+real complexity the full Browse tab has that a "quick view" doesn't need.
+Wired from two places: a `data-browse` button on `nomadnetwork.node` rows
+in the peers list (delegated click handler, checked before the
+row-click-opens-drawer path), and the peer drawer's own `onBrowse`
+callback (confirmed via grep that `ReticulumPeerDrawer` already
+conditionally renders a Browse button whenever `opts.onBrowse` is a
+function and the peer is `nomadnetwork.node` -- so passing it was all
+that was needed, no drawer changes).
+
+**2. Home location on the map.** User: show the device's configured home
+location, and make the map-header "home" button (previously repurposed as
+"fit all located peers", back when I'd reasoned home doesn't apply to a
+Reticulum-only page) actually center on it, matching `node_map.js`'s own
+`centerOnHome()`. Corrected that earlier reasoning -- home
+(`device.latitude`/`longitude`, Configuration -> Identity) is a
+device-level setting, not RF-specific, so it applies here regardless of
+data source. `_loadHomeLocation()` fetches `/api/device` once (same field
+names `centerOnHome()` reads); `_renderHomeMarker()` draws a distinct pin
+(new `.rtd-home-marker` divIcon, cyan circle + house glyph, own Leaflet
+layer so peer-marker refreshes never clear it -- the core map has no
+pin-drawing equivalent to port, `centerOnHome()` only recenters the view,
+so this part is new rather than a port) -- safe to call from either
+direction (home loads before the map exists, or the map inits before home
+is known), whichever finishes second actually adds it. `_renderTelemetryMap`'s
+old "hide if no located peers" gate widened to "hide only if no located
+peers AND no home" -- otherwise a box with a home location set but zero
+located telemetry peers yet would never show the map (or the home pin) at
+all. `_initTelemetryMap` falls back to `_centerOnHome()` for the initial
+view when there are no peers to fit bounds to. The header button
+(`#rtd-map-home-btn`, was `#rtd-map-fit-btn`) now calls `_centerOnHome()`;
+the old fit-bounds logic (`_fitTelemetryBounds`) stays but is auto-only
+now (still runs after every marker refresh to frame the peers), no longer
+button-triggered.
+
+Verified: `node --check`, CSS comment-balance script 0, ruff clean,
+plugin-loader/manifest suite 70 passed / 6 skipped, no duplicate method
+definitions, no stale `rtd-map-fit-btn` references left. **NOT committed,
+NOT yet verified live.**

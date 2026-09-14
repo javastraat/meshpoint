@@ -41,6 +41,25 @@
 .rt-telemetry-map.map--basemap-light .leaflet-tile-pane {
     filter: none !important;
 }
+
+/* Home marker (device's own configured location, see
+   ReticulumDashboard._renderHomeMarker) -- a distinct pin, deliberately
+   not one of the telemetry-peer markers so it reads as "this box", not
+   "a peer". No equivalent on the core Dashboard's own map to match --
+   its centerOnHome() only recenters the view, doesn't draw a pin -- so
+   this is new, not a port. */
+.rtd-home-marker {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--accent-cyan, #06b6d4);
+    color: var(--bg-primary, #0a0a0a);
+    box-shadow: 0 0 0 2px var(--bg-primary, #0a0a0a), 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+.rtd-home-marker svg { width: 15px; height: 15px; }
 .rt-telemetry-map .leaflet-popup-content-wrapper {
     background: var(--bg-card, #1a1a1a);
     color: var(--text-primary, #eee);
