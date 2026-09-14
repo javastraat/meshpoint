@@ -358,10 +358,26 @@ class ReticulumDashboard {
     _initTelemetryMap(el, located) {
         if (this._teleMap || el.hidden) return; // a later call may have won the race, or telemetry emptied out again
         this._teleMap = L.map(el, { scrollWheelZoom: false });
-        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        const tileOpts = {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>',
             maxZoom: 19,
-        }).addTo(this._teleMap);
+        };
+        // Same shared tile source as the Dashboard/Topology maps
+        // (Settings' "Dashboard map source" switch -- online OSM vs. an
+        // offline-map plugin collection) -- reads live, no restart needed,
+        // and this map follows it automatically rather than needing its
+        // own separate setting. Synchronous fallback layer first, swapped
+        // once the real source resolves: see map_tile_source.js's own
+        // comment on MAP_TILE_URL_FALLBACK -- a map with zero tile layers
+        // has no maxZoom yet, so anything that touches the map before the
+        // fetch resolves (fitBounds below) would throw.
+        let tileLayer = L.tileLayer(window.MAP_TILE_URL_FALLBACK, tileOpts).addTo(this._teleMap);
+        window.getMapTileUrl().then((url) => {
+            if (url && url !== window.MAP_TILE_URL_FALLBACK && this._teleMap) {
+                this._teleMap.removeLayer(tileLayer);
+                tileLayer = L.tileLayer(url, tileOpts).addTo(this._teleMap);
+            }
+        });
         this._teleMarkers = L.layerGroup().addTo(this._teleMap);
         this._updateTelemetryMarkers(located);
         // Belt-and-braces: re-measure once more on the following frame in

@@ -1340,3 +1340,44 @@ live verification.
 Verified (Mac): `node --check`, manifest re-parses, `discover_plugins()`
 still finds 15, `ruff check` clean. **NOT committed.** Still waiting on the
 user's next restart + hard-refresh to confirm the actual fix live.
+
+**Follow-up, same session: the REAL root cause of the layout mess
+(uncommitted).** After the `.rtd-panel` fix, user still saw a broken
+layout live (map/peers not side by side, content looking squeezed/
+overlapping) even though the CSS was verifiably loading (the new
+`.rtd-panel` header typography/border WAS visibly applying). Traced it to
+one level higher in the DOM than either previous fix: every plugin sidebar
+page's outer wrapper (`mountPluginSidebarPages()` in
+`sidebar_plugin_registry.js`) is `<section class="section"
+data-section="<routeId>">`, and the BASE `.section` rule
+(`dashboard.css:88`) is `overflow: hidden; display: flex; flex-direction:
+column;` -- clipped by default. Every *other* normal-scrolling content
+page opts out via a per-`data-section` override in `lorawan.css:6-10`
+(`.section[data-section="lorawan"], ..., .section[data-section=
+"reticulum"] { overflow-y: auto; }` -- this exact line has a comment in
+THIS memory file already, from the Phase 2a port: "KEEP the
+`.section[data-section="reticulum"]` line ... the plugin section still
+needs it"). `reticulum-dashboard` was never added to that list, so the
+page was stuck in the clipped, fixed-height default -- .rtd-grid's own
+CSS was correct the whole time, it just had a hostile containing block a
+level up. Fixed: added `.section[data-section="reticulum-dashboard"]` to
+that same lorawan.css selector list (one line, core file, same
+established pattern).
+
+**Also this batch: telemetry map now follows the shared "Dashboard map
+source" switch** (user request, referencing the existing Settings ->
+... offline-map toggle for the Dashboard/Topology maps). `_initTelemetryMap`
+now uses `window.MAP_TILE_URL_FALLBACK` + `window.getMapTileUrl()` from
+`frontend/js/map_tile_source.js` (core, globally loaded in index.html --
+no plugin script dependency needed) instead of a hardcoded public-OSM tile
+URL, mirroring `frontend/js/components/node_map.js`'s own sync-fallback-
+then-async-swap pattern exactly (a map needs a tile layer synchronously at
+construction or `fitBounds`/`setView` throws "no maxZoom specified" -- see
+that file's own comment). Reads live from `GET /api/config`, no restart
+needed, same as the Dashboard/Topology maps.
+
+Verified (Mac): `node --check`, ruff clean, plugin-loader/manifest suite
+70 passed / 6 skipped (subset run, faster iteration). **NOT committed.**
+Waiting on the user's next hard-refresh (no restart needed for this
+batch -- lorawan.css and both JS/CSS files are all read fresh per
+request) to confirm the overflow fix actually resolves the layout live.
