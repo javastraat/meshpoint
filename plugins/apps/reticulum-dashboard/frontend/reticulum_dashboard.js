@@ -87,6 +87,11 @@ class ReticulumDashboard {
         this._peers = [];
         this._telemetry = [];
         this._peerSearchQuery = '';
+        // Same localStorage key node_map.js's own basemap toggle uses --
+        // deliberately shared, not a separate preference: "I like a light
+        // map" is one setting the user expects to carry across every map
+        // in the app, not something to set twice.
+        this._basemapLight = this._loadBasemapPref();
         this._onWsAnnounce = this._onWsAnnounce.bind(this);
         this._onWsPeer = this._onWsPeer.bind(this);
         this._onWsTelemetry = this._onWsTelemetry.bind(this);
@@ -135,7 +140,19 @@ class ReticulumDashboard {
                 <div class="dashboard__main">
                     <section class="dashboard__map">
                         <div class="panel">
-                            <div class="panel__header">Telemetry Map</div>
+                            <div class="panel__header">
+                                Telemetry Map
+                                <div class="panel__header-actions">
+                                    <button id="rtd-map-basemap-btn" class="map-expand-btn" type="button" title="Darken the map"></button>
+                                    <button id="rtd-map-fit-btn" class="map-expand-btn" type="button" title="Fit all located peers">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" aria-hidden="true">
+                                            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                                            <polyline points="9 22 9 12 15 12 15 22"/>
+                                        </svg>
+                                    </button>
+                                    <button id="rtd-map-expand-btn" class="map-expand-btn" type="button" title="Expand map">⤢</button>
+                                </div>
+                            </div>
                             <div class="panel__body" style="position:relative">
                                 <div id="rtd-telemetry-map" class="rt-telemetry-map map-container" hidden></div>
                                 <p class="lw-empty" id="rtd-telemetry-empty">
@@ -200,6 +217,11 @@ class ReticulumDashboard {
             this._peerSearchQuery = e.target.value.trim().toLowerCase();
             this._renderPeersList();
         });
+
+        this._syncBasemapBtn(this._basemapLight);
+        this._q('#rtd-map-basemap-btn')?.addEventListener('click', () => this._toggleBasemap());
+        this._q('#rtd-map-fit-btn')?.addEventListener('click', () => this._fitTelemetryBounds());
+        this._q('#rtd-map-expand-btn')?.addEventListener('click', () => this._toggleExpand());
     }
 
     /** Called by the router (via registerSidebarPage) when the page becomes active. */
@@ -428,8 +450,82 @@ class ReticulumDashboard {
             L.marker([t.latitude, t.longitude]).bindPopup(popupHtml).addTo(this._teleMarkers);
             bounds.push([t.latitude, t.longitude]);
         });
+        this._fitTelemetryBounds();
+    }
+
+    /** Panel-header "fit" button -- also called after every marker
+     * refresh. Recomputes from this._telemetry rather than taking a
+     * parameter so the button always reflects the latest fetch/WS state,
+     * not whatever was current the last time markers were rebuilt. */
+    _fitTelemetryBounds() {
+        if (!this._teleMap) return;
+        const bounds = this._telemetry
+            .filter((t) => t.latitude != null && t.longitude != null)
+            .map((t) => [t.latitude, t.longitude]);
+        if (!bounds.length) return;
         if (bounds.length === 1) this._teleMap.setView(bounds[0], 12);
         else this._teleMap.fitBounds(bounds, { padding: [30, 30], maxZoom: 13 });
+    }
+
+    // --- Map header actions (basemap / fit / expand) -----------------------
+    // Same behaviours as the core Dashboard's NODE MAP panel
+    // (frontend/js/app.js's mapBasemapBtn/mapExpandBtn wiring,
+    // frontend/js/components/node_map.js's toggleBasemap/centerOnHome) --
+    // reimplemented here rather than reused because node_map.js's own
+    // versions are hardwired to the core map's specific #map id (both the
+    // CSS filter rules and the DOM lookups), and app.js's expand handler
+    // uses an unscoped `document.querySelector('.dashboard')` that would
+    // grab whichever .dashboard comes first in the document, not
+    // necessarily this page's own -- copying the *behaviour*, not the
+    // exact code, avoids both traps. "Fit all located peers" replaces
+    // "center on home": this page has no device lat/lon of its own to
+    // recenter on, but a one-click reset back to "see every dot" is the
+    // same kind of utility. No cluster-toggle button -- located telemetry
+    // peers are typically a small fraction of the peer roster, nowhere
+    // near dense enough to need grouping the way RF nodes can be.
+
+    _loadBasemapPref() {
+        try {
+            const v = localStorage.getItem('meshpoint.nodeMap.basemap');
+            if (v === 'light') return true;
+            if (v === 'dark') return false;
+        } catch (_) { /* fall through */ }
+        return document.documentElement.getAttribute('data-theme') === 'light';
+    }
+
+    _applyBasemap() {
+        const el = this._q('#rtd-telemetry-map');
+        if (!el) return;
+        el.classList.toggle('map--basemap-light', this._basemapLight);
+        el.classList.toggle('map--basemap-dark', !this._basemapLight);
+    }
+
+    _toggleBasemap() {
+        this._basemapLight = !this._basemapLight;
+        try {
+            localStorage.setItem('meshpoint.nodeMap.basemap', this._basemapLight ? 'light' : 'dark');
+        } catch (_) { /* best-effort */ }
+        this._syncBasemapBtn(this._basemapLight);
+    }
+
+    _syncBasemapBtn(light) {
+        this._applyBasemap();
+        const btn = this._q('#rtd-map-basemap-btn');
+        if (!btn) return;
+        btn.innerHTML = window.themeGlyph ? window.themeGlyph(light ? 'moon' : 'sun', 14) : '';
+        btn.title = light ? 'Darken the map' : 'Lighten the map';
+    }
+
+    _toggleExpand() {
+        const dash = this._q('.dashboard');
+        const btn = this._q('#rtd-map-expand-btn');
+        if (!dash) return;
+        const expanded = dash.classList.toggle('dashboard--map-expanded');
+        if (btn) {
+            btn.textContent = expanded ? '⤡' : '⤢';
+            btn.title = expanded ? 'Collapse map' : 'Expand map';
+        }
+        setTimeout(() => this._teleMap && this._teleMap.invalidateSize(), 50);
     }
 
     _onWsPeer() { this._loadPeers(); }

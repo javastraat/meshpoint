@@ -1460,3 +1460,45 @@ which deliberately uses a fixed 300px since it lives in a normal-scrolling
 page -- correctly different for this page's fixed-height shell context).
 Verified: comment-balance script still 0. **NOT committed, NOT yet
 re-verified live.**
+
+**Follow-up, same session: map header action buttons (uncommitted).**
+User: match the core Dashboard's NODE MAP header buttons (home/basemap/
+cluster/expand). Added 3 of the 4 to the Telemetry Map panel header:
+
+- **Basemap dark/light toggle** -- reimplemented (not reused) since
+  node_map.js's `toggleBasemap()`/`_applyBasemap()` and dashboard.css's
+  filter rules are hardwired to the core map's own `#map` id. New
+  `_loadBasemapPref()`/`_applyBasemap()`/`_toggleBasemap()`/
+  `_syncBasemapBtn()` on `ReticulumDashboard`, same behaviour, same
+  `window.themeGlyph` icon helper, and **deliberately the same
+  `meshpoint.nodeMap.basemap` localStorage key** -- one shared "I like a
+  light map" preference across every map in the app, not a second one to
+  set. CSS: `.rt-telemetry-map.map--basemap-dark/light .leaflet-tile-pane`
+  filter rules copied from `#map.map--basemap-dark/light` (same reason,
+  can't reuse an id-scoped rule).
+- **"Fit all located peers"** button, replacing "center on home" -- this
+  page has no device lat/lon to recenter on, but a one-click reset to "see
+  every dot" is the same kind of utility. Reused the exact home-icon SVG
+  for visual consistency; `_fitTelemetryBounds()` extracted out of
+  `_updateTelemetryMarkers()` so both the button and every marker refresh
+  share one implementation, recomputing from `this._telemetry` fresh each
+  time (not a stale closure).
+- **Expand** -- same `dashboard--map-expanded` class dashboard.css already
+  defines (a plain class-scoped rule, not id-scoped, so directly reusable)
+  toggled on `this._q('.dashboard')` -- root-scoped, deliberately NOT
+  `document.querySelector('.dashboard')` the way app.js's own handler
+  does it, which would ambiguously match whichever `.dashboard` comes
+  first in the whole document now that two pages have one.
+- **Not added: cluster toggle.** Located telemetry peers are typically a
+  small fraction of the full peer roster (most Reticulum peers report no
+  location at all) -- nowhere near dense enough to need grouping the way
+  RF nodes can be, and clustering needs a marker-cluster library dependency
+  this page doesn't otherwise need.
+
+New ids used throughout (`rtd-map-basemap-btn`/`rtd-map-fit-btn`/
+`rtd-map-expand-btn`) -- checked, no collision with the core buttons'
+own ids.
+
+Verified: `node --check`, CSS comment-balance script still 0, manifest
+re-parses, `ruff check` clean, plugin-loader/manifest suite still
+70 passed / 6 skipped. **NOT committed, NOT yet verified live.**
