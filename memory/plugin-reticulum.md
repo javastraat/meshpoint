@@ -1381,3 +1381,66 @@ Verified (Mac): `node --check`, ruff clean, plugin-loader/manifest suite
 Waiting on the user's next hard-refresh (no restart needed for this
 batch -- lorawan.css and both JS/CSS files are all read fresh per
 request) to confirm the overflow fix actually resolves the layout live.
+
+**Follow-up, same session: full rebuild on the REAL Dashboard markup
+(uncommitted).** Found the actual reason `.rtd-grid` never split into
+columns, and it was a genuinely silly one: this file's own CSS header
+comment contained the literal text "lw-*/stat-card" -- the `*` ending
+"lw-*" immediately followed by the `/` starting "/stat-card" forms an
+accidental `*/`, closing the block comment 11 lines early. Everything from
+there to the REAL intended `*/` (11 lines of prose) was then parsed as
+malformed CSS "code", which lost the parser's sync enough to also corrupt
+the very next real rule -- `.rtd-grid` itself, appearing right after.
+Confirmed via a small brace-balance script (comment `/*`/`*/` count: 5
+vs. 6, i.e. one orphaned closer). `.rtd-panel`'s styling, defined further
+down, happened to be past the corrupted region and parsed fine -- which is
+exactly why some of the page's custom CSS visibly worked while `.rtd-grid`
+silently didn't, the whole confusing split symptom this session chased
+across several turns.
+
+User, having watched multiple rounds of hand-rolled-CSS bugs (the
+`.panel{height:100%}` assumption, this comment bug): "cant you make a real
+copy of the dashboard a fix the data into it? so it is exact the same not
+thee cards orso?" -- right call, taken. Full rebuild:
+
+- `reticulum_dashboard.js` `mount()`: now the literal core Dashboard
+  markup from `frontend/index.html`'s own `data-section="dashboard"`
+  section -- `<main class="dashboard">` > `.dashboard__stats` (stat cards,
+  now 6: Status/Known Peers/People/Infrastructure/Conversations/**You**
+  [own address, was a separate header line before]) + `.dashboard__main`
+  (`.dashboard__map` > `.panel` "Telemetry Map" holding
+  `#rtd-telemetry-map.rt-telemetry-map.map-container`, `.dashboard__side`
+  > `.panel.panel--nodes` "Peers" with the real `.node-search`/
+  `.node-search-wrap` classes, `#rtd-peers-list` now *is* the
+  `.panel__body` directly -- core already gives it `flex:1;overflow:auto`
+  scrolling, no wrapper div needed) + `.dashboard__feed` > `.panel` "Live
+  Activity" (unchanged table). `_loadStatus()` simplified to match (own
+  address is now a plain stat-card value, no "You: " prefix needed since
+  the card label already says it).
+- `reticulum_dashboard.css`: gutted. Dropped `.rtd-grid`/`.rtd-panel*`/
+  `.rtd-peers-list` entirely (all now literal core classes/behaviour --
+  `.panel{height:100%}` now correctly resolves, because `.dashboard{height:
+  100%}` above it is the SAME fixed-height shell the core page uses, not
+  a normal-scrolling page pretending to have one). Kept: the telemetry-map
+  Leaflet popup re-skin (still page-specific, copied from reticulum.css)
+  and `.rtd-peer-row*` (the simple peer-row look, no equivalent core
+  component -- user's "not these cards" read as "don't reimplement
+  NodeCards, just match the panel layout", not "match every pixel of the
+  node card design too"). Also fixed the comment bug while rewriting.
+- `frontend/css/lorawan.css`: **reverted** the `data-section=
+  "reticulum-dashboard"` addition from the previous batch -- that
+  `overflow-y:auto` opt-out is for normal-scrolling pages; the real
+  Dashboard's own `data-section="dashboard"` deliberately does NOT have
+  it (confirmed: not in that selector list), because `.dashboard{height:
+  100%;overflow:hidden}` manages its own internal per-panel scrolling
+  instead. Adding both would have meant two nested, conflicting scroll
+  contexts.
+- `plugin.toml`: `[frontend].styles` comment updated to match.
+
+Verified: `node --check`; CSS comment-balance script now reports 0 (was
+-1); manifest re-parses, `discover_plugins()` still finds 15; `ruff check`
+clean; plugin-loader/manifest suite 70 passed / 6 skipped. **NOT
+committed, NOT yet re-verified live** -- this is a genuinely bigger
+rewrite than the previous two patches, waiting on the user's next
+hard-refresh to confirm the map/peers actually sit side-by-side now with
+the real Dashboard's own proven layout engine under it.

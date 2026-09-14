@@ -1,109 +1,25 @@
 /* Reticulum Dashboard -- own stylesheet.
  *
- * Cross-plugin asset isolation (src/plugins/assets.py:resolve_plugin_asset
- * only serves files a plugin's OWN manifest lists) means this page can't
- * just link plugins/apps/reticulum/frontend/reticulum.css even though it
- * wants two things straight from it -- the telemetry-map + popup rules are
- * copied verbatim below (kept in sync by hand; small, stable, unlikely to
- * drift). Everything else reuses core's already-global lw-*/stat-card
- * classes -- EXCEPT .panel/.panel__header/.panel__body (dashboard.css),
- * deliberately NOT reused here: that trio is built for the core Dashboard's
- * fixed-height flex shell (`.panel { height: 100%; overflow: hidden; }`,
- * meaningful only because `.dashboard`/`.dashboard__main` above it pin a
- * real viewport-bound height). This page scrolls normally with no such
- * ancestor, so `height: 100%` has nothing definite to resolve against --
- * inside a CSS grid item that let one panel balloon to cover the page
- * instead of sizing to its content (found live, see memory/
- * plugin-reticulum.md). .rtd-panel* below is a lightweight equivalent with
- * the same look, no fixed-height assumption.
+ * The page's structure/panels/stat-cards are the literal core Dashboard
+ * markup (main.dashboard, .dashboard__stats/.dashboard__main/
+ * .dashboard__map/.dashboard__side/.dashboard__feed, .panel/.panel__header/
+ * .panel__body -- all frontend/css/dashboard.css, loaded globally) -- see
+ * reticulum_dashboard.js's own header comment for why. Nothing to add for
+ * any of that here.
+ *
+ * What's left, genuinely specific to this page:
+ *   - the telemetry-map + its popup theming, copied verbatim from the
+ *     reticulum plugin's own reticulum.css (cross-plugin asset serving is
+ *     scoped per-plugin -- src/plugins/assets.py:resolve_plugin_asset only
+ *     serves a plugin's own manifest-listed files, so that file genuinely
+ *     can't be linked from here; kept in sync by hand, small and stable)
+ *   - the simple peer-row list on the right (a lighter readout than the
+ *     Reticulum page's own sortable/searchable Peers table)
  */
 
-/* ---- Map + Peers side-by-side row, mirrors the core Dashboard's own
-   .dashboard__main (2fr 1fr) -- but this page scrolls normally rather
-   than living in a fixed-height flex shell, so it just stacks under a
-   plain width breakpoint instead of that shell's overflow tricks. ---- */
-.rtd-grid {
-    display: grid;
-    grid-template-columns: 2fr 1fr;
-    gap: 0.5rem;
-    align-items: start;
-}
-@media (max-width: 900px) {
-    .rtd-grid { grid-template-columns: 1fr; }
-}
-
-/* ---- Page-scoped panel look-alike (see file header note above for why
-   this isn't core's .panel/.panel__header/.panel__body). ---- */
-.rtd-panel {
-    background: var(--bg-glass);
-    backdrop-filter: blur(12px);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    overflow: hidden;
-}
-.rtd-panel__header {
-    padding: 0.5rem 0.75rem;
-    border-bottom: 1px solid var(--border);
-}
-.rtd-panel__header h3 {
-    margin: 0 0 2px;
-    font-size: 0.7rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--text-muted);
-}
-.rtd-panel__body { padding: 0.75rem; }
-
-.rtd-map-panel .rtd-panel__body { padding: 0.75rem; }
-
-/* ---- Peers list (right column) -- a lighter-weight readout than the
-   Reticulum page's own sortable/searchable Peers table; this is a
-   glanceable "who's around" list, full management stays on that page. */
-.rtd-peers-panel .rtd-panel__body {
-    padding: 0.5rem 0.75rem 0.75rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-.rtd-peers-list {
-    max-height: 360px;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-}
-.rtd-peer-row {
-    display: flex;
-    align-items: baseline;
-    gap: 0.5rem;
-    padding: 0.35rem 0.15rem;
-    border-bottom: 1px solid var(--border, #2a2a2a);
-}
-.rtd-peer-row:last-child { border-bottom: none; }
-.rtd-peer-row__name {
-    flex: 1 1 auto;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 0.82rem;
-    color: var(--text-primary, #eee);
-}
-.rtd-peer-row__time {
-    flex: 0 0 auto;
-    font-size: 0.72rem;
-    color: var(--text-muted, #888);
-    white-space: nowrap;
-}
-
-/* ---- Telemetry map + its popup -- verbatim from the reticulum plugin's
-   own reticulum.css (see file header note above). ---- */
-.rt-telemetry-map {
-    height: 300px;
-    width: 100%;
-    border: 1px solid var(--border, #333);
-    border-radius: 6px;
-}
+/* ---- Telemetry map -- sized/framed by .panel/.map-container (core), not
+   here; this only adds the Leaflet popup re-skin the reticulum plugin's
+   own Telemetry tab map already has. ---- */
 .rt-telemetry-map .leaflet-container { background: var(--bg, #111); }
 .rt-telemetry-map .leaflet-popup-content-wrapper {
     background: var(--bg-card, #1a1a1a);
@@ -148,3 +64,29 @@
 }
 .rt-tele-popup__tag--open { color: var(--accent-green, #00e5a0); }
 .rt-tele-popup__tag--closed { color: var(--accent-red, #ef4444); }
+
+/* ---- Peers list (right column, #rtd-peers-list *is* the .panel__body --
+   core already gives it flex:1/overflow:auto scrolling). ---- */
+.rtd-peer-row {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    padding: 0.35rem 0.75rem;
+    border-bottom: 1px solid var(--border, #2a2a2a);
+}
+.rtd-peer-row:last-child { border-bottom: none; }
+.rtd-peer-row__name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.82rem;
+    color: var(--text-primary, #eee);
+}
+.rtd-peer-row__time {
+    flex: 0 0 auto;
+    font-size: 0.72rem;
+    color: var(--text-muted, #888);
+    white-space: nowrap;
+}

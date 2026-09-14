@@ -7,8 +7,7 @@
 .section[data-section="dapnet"],
 .section[data-section="meshtastic"],
 .section[data-section="meshcore"],
-.section[data-section="reticulum"],
-.section[data-section="reticulum-dashboard"] {
+.section[data-section="reticulum"] {
     overflow-y: auto;
 }
 

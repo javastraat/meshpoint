@@ -19,12 +19,14 @@ requires = "reticulum"  # not a [hook] -- this page doesn't attach to
 [frontend]
 scripts = ["frontend/reticulum_dashboard.js"]
 styles = ["frontend/reticulum_dashboard.css"]
-# Most of the look reuses core's stat-card / lw-* / panel / packet-row--new
-# classes (dashboard.css + lorawan.css), both loaded globally already --
-# same reuse the reticulum plugin's own page relies on. The one own
-# stylesheet holds the two-column map+peers grid and a copy of the
-# reticulum plugin's telemetry-map/popup rules (asset serving is scoped
-# per-plugin, so its reticulum.css isn't reachable from here).
+# The layout itself is the literal core Dashboard markup/classes
+# (main.dashboard, .dashboard__stats/.dashboard__main/.dashboard__map/
+# .dashboard__side/.dashboard__feed, .panel*, all dashboard.css, loaded
+# globally already) -- nothing needed here for that. The one own
+# stylesheet holds just what's genuinely page-specific: the peer-row list
+# styling and a copy of the reticulum plugin's telemetry-map/popup rules
+# (asset serving is scoped per-plugin, so its reticulum.css isn't
+# reachable from here).
 
 [sidebar]
 route = "reticulum-dashboard"

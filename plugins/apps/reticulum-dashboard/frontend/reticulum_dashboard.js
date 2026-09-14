@@ -11,12 +11,24 @@
  * packets); Reticulum deliberately produces zero packets in that
  * pipeline (see memory/plugin-reticulum.md), so piping its data into
  * those exact widgets would mean faking fields that don't exist. This
- * page instead mirrors the core Dashboard's own layout -- stat cards, a
- * map, a "nodes" list, a live table -- fed from Reticulum's own shape:
+ * page instead reuses the core Dashboard's OWN markup/classes verbatim
+ * (main.dashboard, .dashboard__stats/.dashboard__main/.dashboard__map/
+ * .dashboard__side/.dashboard__feed, .panel/.panel__header/.panel__body --
+ * see frontend/index.html's `data-section="dashboard"` section for the
+ * original) -- fed from Reticulum's own shape instead of RF's:
  *   - map          -> located telemetry peers (Sideband-style LXMF
  *                     telemetry frames with lat/lon), not RF nodes
- *   - nodes list   -> the peer roster (right column)
+ *   - "nodes" list -> the peer roster (right column)
  *   - live table   -> the announce ticker (bottom, full width)
+ *
+ * An earlier version of this page used its own hand-rolled .rtd-grid/
+ * .rtd-panel classes approximating the same look. That was the wrong
+ * call -- two real, separate bugs came out of the gap between "looks
+ * similar" and "is the real thing" (a `.panel{height:100%}` assumption
+ * needing the exact fixed-height shell only .dashboard provides, and
+ * a self-inflicted CSS comment bug that silently dropped the grid rule
+ * entirely -- see memory/plugin-reticulum.md). Reusing the actual classes
+ * removes that whole class of drift.
  *
  * Deliberately its own plugin (not a tab on the reticulum plugin's page):
  * the manifest only supports one [sidebar] entry per plugin, so a second
@@ -82,102 +94,106 @@ class ReticulumDashboard {
 
     mount(rootEl) {
         this._root = rootEl;
+        // Literal core Dashboard markup (main.dashboard > .dashboard__stats
+        // + .dashboard__main [.dashboard__map + .dashboard__side] +
+        // .dashboard__feed, .panel/.panel__header/.panel__body throughout)
+        // -- see this file's header comment for why: a hand-rolled
+        // approximation (.rtd-grid/.rtd-panel, an earlier version of this
+        // file) kept drifting from the real thing's sizing behaviour.
+        // Using the actual classes means this page gets the exact same
+        // fixed-height panel shell, internal scrolling, and column split
+        // the core Dashboard already has proven, for free.
         rootEl.innerHTML = `
-            <header class="lw-panel__head">
-                <h2 class="lw-panel__title">Reticulum Dashboard</h2>
-                <div class="lw-panel__actions">
-                    <span class="lw-panel__limit" id="rtd-own-address"></span>
-                </div>
-            </header>
+            <main class="dashboard">
+                <section class="dashboard__stats">
+                    <div class="stat-card">
+                        <div class="stat-card__label">Status</div>
+                        <div class="stat-card__value" id="rtd-stat-status">--</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card__label">Known Peers</div>
+                        <div class="stat-card__value" id="rtd-stat-peers">--</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card__label">People</div>
+                        <div class="stat-card__value" id="rtd-stat-people">--</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card__label">Infrastructure</div>
+                        <div class="stat-card__value" id="rtd-stat-infra">--</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card__label">Conversations</div>
+                        <div class="stat-card__value" id="rtd-stat-conversations">--</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card__label">You</div>
+                        <div class="stat-card__value" id="rtd-own-address" style="font-size:0.75rem">--</div>
+                    </div>
+                </section>
 
-            <section class="lw-stats" id="rtd-stats">
-                <div class="stat-card">
-                    <div class="stat-card__label">Status</div>
-                    <div class="stat-card__value" id="rtd-stat-status">--</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-card__label">Known Peers</div>
-                    <div class="stat-card__value" id="rtd-stat-peers">--</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-card__label">People</div>
-                    <div class="stat-card__value" id="rtd-stat-people">--</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-card__label">Infrastructure</div>
-                    <div class="stat-card__value" id="rtd-stat-infra">--</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-card__label">Conversations</div>
-                    <div class="stat-card__value" id="rtd-stat-conversations">--</div>
-                </div>
-            </section>
+                <div class="dashboard__main">
+                    <section class="dashboard__map">
+                        <div class="panel">
+                            <div class="panel__header">Telemetry Map</div>
+                            <div class="panel__body" style="position:relative">
+                                <div id="rtd-telemetry-map" class="rt-telemetry-map map-container" hidden></div>
+                                <p class="lw-empty" id="rtd-telemetry-empty">
+                                    No located peers yet -- most Reticulum
+                                    peers don't report one (Sideband-style
+                                    LXMF telemetry).
+                                </p>
+                            </div>
+                        </div>
+                    </section>
 
-            <section class="rtd-grid">
-                <div class="rtd-panel rtd-map-panel">
-                    <div class="rtd-panel__header">
-                        <h3>Telemetry map</h3>
-                        <p class="lw-panel__limit">
-                            Peers that reported a location (Sideband-style
-                            LXMF telemetry) -- most Reticulum peers don't.
-                        </p>
-                    </div>
-                    <div class="rtd-panel__body">
-                        <div id="rtd-telemetry-map" class="rt-telemetry-map" hidden></div>
-                        <p class="lw-empty" id="rtd-telemetry-empty">
-                            No located peers yet.
-                        </p>
-                    </div>
+                    <section class="dashboard__side">
+                        <div class="panel panel--nodes">
+                            <div class="panel__header">
+                                <span>Peers</span>
+                                <div class="node-search-wrap">
+                                    <input type="search" id="rtd-peer-search" class="node-search"
+                                           placeholder="Search..." autocomplete="off" spellcheck="false">
+                                </div>
+                            </div>
+                            <div class="panel__body" id="rtd-peers-list"></div>
+                            <p class="lw-empty" id="rtd-peers-empty" style="display:none">
+                                No Reticulum peers heard yet.
+                            </p>
+                        </div>
+                    </section>
                 </div>
-                <div class="rtd-panel rtd-peers-panel">
-                    <div class="rtd-panel__header">
-                        <h3>Peers</h3>
-                        <input class="cfg-field__input" type="search" id="rtd-peer-search"
-                               placeholder="Search name or hash" autocomplete="off">
-                    </div>
-                    <div class="rtd-panel__body">
-                        <div class="rtd-peers-list" id="rtd-peers-list"></div>
-                        <p class="lw-empty" id="rtd-peers-empty">
-                            No Reticulum peers heard yet.
-                        </p>
-                    </div>
-                </div>
-            </section>
 
-            <section class="lw-section">
-                <div class="rtd-panel">
-                    <div class="rtd-panel__header">
-                        <h3>Live activity</h3>
-                        <p class="lw-panel__limit">
-                            Announces as they're heard, newest first -- full
-                            history and peer management live on the
-                            Reticulum page.
-                        </p>
+                <section class="dashboard__feed">
+                    <div class="panel">
+                        <div class="panel__header">
+                            <span>Live Activity</span>
+                        </div>
+                        <div class="panel__body lw-table-wrap">
+                            <table class="lw-table lw-table--rt-announces">
+                                <colgroup>
+                                    <col class="col-time">
+                                    <col class="col-name">
+                                    <col class="col-id">
+                                    <col class="col-type">
+                                </colgroup>
+                                <thead>
+                                    <tr>
+                                        <th>Time</th>
+                                        <th>Display name</th>
+                                        <th>Destination</th>
+                                        <th>Aspect</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="rtd-ticker-tbody"></tbody>
+                            </table>
+                            <p class="lw-empty" id="rtd-ticker-empty">
+                                Waiting for the first announce…
+                            </p>
+                        </div>
                     </div>
-                    <div class="rtd-panel__body lw-table-wrap">
-                        <table class="lw-table lw-table--rt-announces">
-                            <colgroup>
-                                <col class="col-time">
-                                <col class="col-name">
-                                <col class="col-id">
-                                <col class="col-type">
-                            </colgroup>
-                            <thead>
-                                <tr>
-                                    <th>Time</th>
-                                    <th>Display name</th>
-                                    <th>Destination</th>
-                                    <th>Aspect</th>
-                                </tr>
-                            </thead>
-                            <tbody id="rtd-ticker-tbody"></tbody>
-                        </table>
-                        <p class="lw-empty" id="rtd-ticker-empty">
-                            Waiting for the first announce…
-                        </p>
-                    </div>
-                </div>
-            </section>
+                </section>
+            </main>
         `;
 
         this._q('#rtd-peer-search')?.addEventListener('input', (e) => {
@@ -219,8 +235,7 @@ class ReticulumDashboard {
             if (!r.ok) return;
             const s = await r.json();
             this._setText('rtd-stat-status', s.running ? 'Running' : (s.available ? 'Stopped' : 'Unavailable'));
-            const addrEl = this._q('#rtd-own-address');
-            if (addrEl) addrEl.textContent = s.own_address ? `You: ${s.own_address}` : '';
+            this._setText('rtd-own-address', s.own_address || '--');
         } catch (_) {}
     }
 
@@ -342,7 +357,7 @@ class ReticulumDashboard {
             // browser hasn't necessarily reflowed yet -- and Leaflet's
             // absolutely-positioned panes then lay out against that bogus
             // size, which visually reads as the map ballooning to cover
-            // the whole page instead of staying inside this ~300px box.
+            // the whole page instead of staying inside the map panel.
             // requestAnimationFrame guarantees a real layout pass has
             // happened for the just-unhidden container first.
             requestAnimationFrame(() => this._initTelemetryMap(el, located));
@@ -382,7 +397,8 @@ class ReticulumDashboard {
         this._updateTelemetryMarkers(located);
         // Belt-and-braces: re-measure once more on the following frame in
         // case the very first read still landed on a transitional layout
-        // (e.g. the .rtd-grid columns hadn't settled their widths yet).
+        // (e.g. the .dashboard__main grid columns hadn't settled their
+        // widths yet).
         requestAnimationFrame(() => this._teleMap && this._teleMap.invalidateSize());
     }
 
