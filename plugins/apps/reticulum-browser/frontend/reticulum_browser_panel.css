@@ -87,7 +87,12 @@
     max-width: 200px;
     padding: 4px 6px 4px 10px;
     border-radius: 6px 6px 0 0;
+    /* --bg-elevated has no light-theme value (see reticulum.css's
+       .rt-pages__src for the same note), so the text colour has to be
+       explicit too -- inheriting the themed text colour renders
+       dark-on-dark in light mode. */
     background: var(--bg-elevated, #1a1a1a);
+    color: #d7dae0;
     border: 1px solid var(--border, #333);
     border-bottom: none;
     cursor: pointer;

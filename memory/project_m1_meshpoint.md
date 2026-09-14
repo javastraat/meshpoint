@@ -13091,3 +13091,47 @@ Phase 3 (the real de-root, still open): `apply_finish.sh` / `post_update.sh`
 / `install.sh` live in the meshpoint-writable tree and are `sudo bash`-able
 → rewrite-then-sudo = root. Move them to `/usr/local/lib/meshpoint/`
 (root-owned, root-updated). Needs a root-side update component. = #3 phase 3.
+
+## Fix: Reticulum Browser tabs unreadable in light mode (2026-09-14)
+
+User report: "in the reticulum browser the light mode cant read the tabs
+in dark its ok" (scoped to the reticulum-browser plugin specifically).
+
+Root cause: `.rb-tab` (inactive tab,
+`plugins/apps/reticulum-browser/frontend/reticulum_browser_panel.css`)
+painted its background with `var(--bg-elevated, #1a1a1a)` but never set
+its own `color` — grepped every theme file
+(`frontend/themes/*/theme.css`, `plugins/themes/*/theme.css`,
+`frontend/css/dashboard.css`) and **`--bg-elevated` is defined nowhere**,
+so that background is *always* the `#1a1a1a` fallback regardless of
+theme. The title text then inherited the theme's normal `--text-primary`
+— light-colored in dark themes (looks fine by coincidence), dark navy
+(`#172033`) in the light theme → dark-on-near-black, invisible.
+
+`.rb-tab--active` doesn't have this bug (uses the properly-themed
+`--bg-card`/`--text-primary` pair, which both DO have real light-theme
+values). The same `--bg-elevated`-has-no-light-value trap is already
+documented and worked around in
+`plugins/apps/reticulum/frontend/reticulum.css` (`.rt-pages__src`,
+~line 312) — that comment is what confirmed the root cause instead of
+guessing.
+
+Checked whether `.rb-page` (the rendered BBS page body, same
+`--bg-elevated` background, also no explicit color) has the identical
+bug: no — the Micron parser
+(`plugins/apps/reticulum/frontend/reticulum_micron.js`) sets an explicit
+inline `fg` color on rendered content, so page text was never affected.
+Only the tab strip (plain JS-templated DOM, no inline colors) needed
+fixing.
+
+Fix: added `color: #d7dae0;` to `.rb-tab` (same explicit light-gray used
+by `.rt-pages__src` for the same reason) — one line, matches an existing
+codebase convention instead of inventing a new one.
+
+Also added the CHANGELOG bullet under `### v0.8.1` (current version per
+`src/version.py`, not "Unreleased" — matches the CLAUDE.md rule) and
+verified `ChangelogParser.parse_file` still parses the file after the
+edit.
+
+Not yet Pi-verified (pure CSS, low risk) — worth a quick look in an
+actual browser in light mode next session if it hasn't been checked.
