@@ -31,7 +31,11 @@ styles = ["frontend/reticulum_dashboard.css"]
 [sidebar]
 route = "reticulum-dashboard"
 label = "Reticulum Dashboard"
-category = "networks"
+category = "top"      # sits right under the built-in Dashboard item,
+                       # above "Networks" -- this page IS a dashboard, in
+                       # spirit if not in nav section, so it belongs at
+                       # that tier rather than filed alongside Messages/
+                       # Stats/Topology.
 icon = "reticulum"    # same glyph as the reticulum plugin's own nav item --
                        # icon names are a shared curated set, not exclusive
                        # to one plugin (see sidebar_plugin_registry.js).

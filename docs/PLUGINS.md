@@ -130,7 +130,7 @@ styles  = ["frontend/acars_panel.css"]    # optional
 [sidebar]                                 # required when "sidebar" in provides
 route = "hello-world"                     # url route id, bare slug [a-z0-9-]
 label = "Hello World"                     # sidebar link text
-category = "networks"                     # networks | radio | ops | configuration | settings
+category = "networks"                     # top | networks | radio | ops | configuration | settings
 icon = "plug"                             # optional, default "plug" -- see KNOWN_SIDEBAR_ICONS
 
 [hook]                                    # required when "hook" in provides
@@ -286,17 +286,21 @@ frontend script:
    [sidebar]
    route = "hello-world"     # -> #/hello-world
    label = "Hello World"     # sidebar link text
-   category = "networks"     # networks | radio | ops | configuration | settings
+   category = "networks"     # top | networks | radio | ops | configuration | settings
    icon = "message"          # optional, default "plug" -- see below
    ```
 
    `category` must be an *existing* sidebar section — you're placing your
-   page into one, not creating a new section. `networks`/`radio`/`ops` are
-   flat item runs (your page becomes a sibling of LoRaWAN, Radio, Terminal,
-   ...); `configuration`/`settings` are the two collapsible submenus, and
-   your route gets nested as `<category>/<route>` the same way the built-in
-   subitems are (e.g. `settings/plugins`) — so `category = "settings"` with
-   `route = "hello-world"` ends up at `#/settings/hello-world`.
+   page into one, not creating a new section. `top` is the odd one out:
+   it's not a section at all, it's the built-in Dashboard item's own tier,
+   above "Networks" — use it when your page *is* a dashboard in spirit
+   (reticulum-dashboard does this), not for anything that belongs filed
+   under a topic. `networks`/`radio`/`ops` are flat item runs (your page
+   becomes a sibling of LoRaWAN, Radio, Terminal, ...); `configuration`/
+   `settings` are the two collapsible submenus, and your route gets nested
+   as `<category>/<route>` the same way the built-in subitems are (e.g.
+   `settings/plugins`) — so `category = "settings"` with `route =
+   "hello-world"` ends up at `#/settings/hello-world`.
 
    `icon` picks from a small curated set in `frontend/sidebar/
    sidebar_plugin_registry.js`'s `_ICON_PATHS` (kept in sync with

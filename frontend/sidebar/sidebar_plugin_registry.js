@@ -25,6 +25,9 @@
  * route ids into the Router's allowedRoutes and wire show/hide.
  *
  * category placement mirrors the real sidebar sections in index.html:
+ *   "top" -- Dashboard's own tier, above "Networks" -- not a section at
+ *     all (no data-category header exists for it), so this is its own
+ *     special case in _findInsertionTarget() rather than a header lookup.
  *   "networks" / "radio" / "ops" -- flat item runs, identified by a
  *     data-category attribute on that section's <li class="sidebar__group-header">.
  *   "configuration" / "settings" -- the two collapsible submenus
@@ -125,6 +128,29 @@ window.MESHPOINT_SIDEBAR_PLUGINS = window.MESHPOINT_SIDEBAR_PLUGINS || [];
      * category's own anchor isn't in the DOM (shouldn't happen; every
      * KNOWN_SIDEBAR_CATEGORIES value has one in index.html). */
     function _findInsertionTarget(category) {
+        if (category === 'top') {
+            // Dashboard itself has no data-category header (it isn't a
+            // section, just a bare <li> above "Networks") -- so this is a
+            // special case rather than a header lookup like every other
+            // category below. Anchor on the Dashboard link, then walk
+            // forward the same way the header-based branch does, so a
+            // second "top" plugin appends after the first one instead of
+            // always landing directly under Dashboard and pushing earlier
+            // "top" plugins down.
+            const list = document.querySelector('.sidebar__nav .sidebar__list');
+            const dashLink = list && list.querySelector('a[data-route="dashboard"]');
+            const dashItem = dashLink && dashLink.closest('li');
+            if (!dashItem) return null;
+            let node = dashItem.nextElementSibling;
+            while (
+                node
+                && !node.classList.contains('sidebar__group-header')
+                && !node.classList.contains('sidebar__group')
+            ) {
+                node = node.nextElementSibling;
+            }
+            return { parent: list, before: node };
+        }
         if (_isNested(category)) {
             const sublist = document.querySelector(
                 `.sidebar__group[data-group="${category}"] .sidebar__sublist`,

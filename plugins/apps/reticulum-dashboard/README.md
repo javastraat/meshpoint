@@ -40,7 +40,9 @@ plugins:
     enabled: true
 ```
 
-Restart, then Networks → Reticulum Dashboard in the sidebar. Needs
+Restart, then "Reticulum Dashboard" in the sidebar, right under the
+built-in Dashboard (its `[sidebar].category = "top"` — the same tier
+Dashboard itself occupies, not filed under Networks). Needs
 `plugins.reticulum.enabled: true` too, or there's nothing to show.
 
 ## Layout

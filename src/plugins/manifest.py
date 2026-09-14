@@ -84,9 +84,14 @@ KNOWN_PROVIDES = frozenset({
 # under -- "networks"/"radio"/"ops" are flat item runs (LoRaWAN, Radio, the
 # Terminal link, ...); "configuration"/"settings" are the two collapsible
 # submenus, where a plugin's route is nested as "<category>/<route>" the
-# same way the built-in subitems are (e.g. "settings/plugins").
+# same way the built-in subitems are (e.g. "settings/plugins"); "top" sits
+# at the built-in Dashboard item's own tier -- above the "Networks" header,
+# not inside any section at all. Dashboard itself isn't a category (no
+# data-category header exists for it), so "top" is its own special case in
+# sidebar_plugin_registry.js's _findInsertionTarget() rather than looking
+# for a group header the way every other category does.
 KNOWN_SIDEBAR_CATEGORIES = frozenset({
-    "networks", "radio", "ops", "configuration", "settings",
+    "top", "networks", "radio", "ops", "configuration", "settings",
 })
 
 # A curated icon set for a sidebar page, keyed by name -- not arbitrary SVG

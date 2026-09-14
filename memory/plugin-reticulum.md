@@ -1838,3 +1838,36 @@ format for the stated "easy to copy" goal -- no bracket-trimming needed
 before pasting into an address bar or curl command. Verified: `node
 --check`, ruff clean. JS-only, hard refresh applies it, no restart
 needed.
+
+**Follow-up, same session: new "top" sidebar category (uncommitted,
+shared core plugin infra).** User: get Reticulum Dashboard out from under
+Networks, next to the built-in Dashboard itself. Confirmed no existing
+category did this -- Dashboard isn't a `KNOWN_SIDEBAR_CATEGORIES` value
+at all, it's a bare ungrouped `<li>` above the "Networks" header with no
+`data-category` marker, and `_findInsertionTarget()` only knew how to
+insert relative to a group header or a nested group. Built as a genuine
+new category (same weight/precedent as the earlier `requires` field
+generalization -- shared infra, not scoped to one plugin):
+
+- `src/plugins/manifest.py`: `KNOWN_SIDEBAR_CATEGORIES` gains `"top"`.
+- `sidebar_plugin_registry.js`: `_findInsertionTarget()` gets a new
+  branch for `category === 'top'` -- anchors on `a[data-route="dashboard"]`'s
+  `<li>` instead of a group header, then walks forward the *same* way
+  every other category does (stop at the first `.sidebar__group-header`/
+  `.sidebar__group`), so a second "top" plugin appends after the first
+  instead of always reinserting directly under Dashboard and reversing
+  order.
+- `reticulum-dashboard/plugin.toml`: `category = "networks"` -> `"top"`.
+- Docs: `PLUGINS.md`'s two `category = ...` examples + prose explanation
+  updated (`top | networks | radio | ops | configuration | settings`);
+  `reticulum-dashboard/README.md` and the CHANGELOG's own Reticulum
+  Dashboard bullet both had stale "Networks -> Reticulum Dashboard"
+  wording, fixed to describe the new placement.
+
+Verified: `node --check` on `sidebar_plugin_registry.js`, manifest
+re-parses (`category: top`), `discover_plugins()` still finds 15,
+`ruff check` clean, plugin-loader/manifest suite 70 passed / 6 skipped
+(no test pins the exact category set, so nothing else needed updating).
+**NOT committed, NOT yet verified live** -- worth a specific live check
+that the item actually lands directly under Dashboard (not, say, above
+it or with a stray gap) once deployed.
