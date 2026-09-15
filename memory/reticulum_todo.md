@@ -5,11 +5,25 @@ See `memory/plugin-reticulum.md` for implementation detail (dated sections,
 one per feature) and `memory/project_m1_meshpoint.md` for wider session
 context.
 
-Last updated 2026-09-09. Session builds: #1 Contacts, #2 Propagation
-client, #3 Telemetry publish (+location, +multi-collector), #4 Telemetry
-collect+map, Extra interfaces, UI padding pass. **Verification status
-table below** — #1, #3, #4 and multi-collector Pi-verified; only #2
-(propagation client) and extra interfaces still never run on the Pi.
+Last updated 2026-09-14. Session builds through 2026-09-09: #1 Contacts,
+#2 Propagation client, #3 Telemetry publish (+location, +multi-collector),
+#4 Telemetry collect+map, Extra interfaces, UI padding pass.
+**Verification status table below** — #1, #3, #4 and multi-collector
+Pi-verified; only #2 (propagation client) and extra interfaces still
+never run on the Pi.
+
+**Since then (2026-09-09 → 2026-09-14), two new companion plugins** — not
+part of the prioritized backlog below, a separate track: **Reticulum
+Dashboard** (`plugins/apps/reticulum-dashboard/`, a live standalone
+stat-cards + announce-ticker page for Reticulum-only boxes) and
+**Reticulum Browser** (`plugins/apps/reticulum-browser/`, a full
+multi-tab NomadNet browser, feature set inspired by fr33n0w/rBrowser —
+clean-room implementation, not a port). Both `requires = "reticulum"`,
+both `locked = true` (shipped with the fork). Full detail in the **Have**
+table and the **Done** log below. The prioritized Todo table right below
+this is unaffected by that work — none of it touches attachments/audio/
+paper-QR/group-chat/telemetry-sensors/PN-peering or the V1–V5
+Pi-verification items, which are all still exactly where they were.
 
 ---
 
@@ -298,6 +312,8 @@ things that have never touched the Pi: **propagation client (#2)** and
 | Ops | Dep check / setup / `meshpoint plugin check` | boot probe + on-demand + Run-setup modal |
 | Samples | `sample-pages/`, `sample-bbs-techinc/` | TechInc BBS carries real address + "Contact us" (IRC/Matrix/email/phone) |
 | Core (not this plugin) | RNode firmware flasher, Heltec-V4 node card | Configuration → Firmware |
+| Companion plugin | **Reticulum Dashboard** (`reticulum-dashboard`, 2026-09-14) | Standalone "top"-tier sidebar page (sits above Networks, next to the built-in Dashboard) for Reticulum-only boxes whose core Dashboard is otherwise empty (RF pipeline gets zero packets from Reticulum). Five stat cards (Status/Known Peers/People/Infrastructure/Conversations), a flashing real-time announce ticker, a live peer list, and a telemetry map of located peers built on the shared offline/online tile-source switch. Peer/activity rows open the same read-only detail drawer/popup the reticulum page uses. A NomadNet quick-browse modal (address bar, back/forward/reload, favourites shared with the Browse tab) for a lighter-weight browse than opening the full Reticulum Browser. `provides = ["sidebar"]` only — no backend of its own, reads the reticulum plugin's existing `/api/reticulum/*` + the shared dashboard WebSocket; `requires = "reticulum"` (enforced: can't enable without it, disabling reticulum cascades to disable this) |
+| Companion plugin | **Reticulum Browser** (`reticulum-browser`, 2026-09-14) | Full multi-tab NomadNet browser — Networks-section sidebar page. Open several nodes at once, each tab keeps its own address/history; node picker + search (same shape as the reticulum plugin's Browse tab); favourites share the *exact same* `localStorage` list as the Browse tab, Peers drawer, and Dashboard's quick-browse modal — star anywhere, starred everywhere; raw/rendered Micron view toggle; keyboard shortcuts (Ctrl/Cmd+T/W/R, Alt+←/→). Feature set/name inspired by fr33n0w/rBrowser (MIT) — a clean-room implementation against Meshpoint's own patterns, not a code port; full credit in its README. `provides = ["sidebar"]` only, reads the reticulum plugin's public `/api/reticulum/nomad/*`; `requires = "reticulum"`. **Explicitly NOT built yet** (its own README's "What's not here" section): fingerprint identification of remote hosts (rBrowser's verification model wasn't studied closely enough to build honestly); a local NomadNet search engine + page cache (would need its own `service`-seam backend, comparable in scope to a separate plugin); form-field submission on interactive `.mu` pages and `/file/...` downloads (covered by the reticulum plugin's own Browse tab if needed meanwhile) |
 
 ### Config keys (all in `plugins.reticulum.*`, all also on the Settings tab)
 
@@ -351,6 +367,9 @@ plugins:
 | ~~Low~~ | ~~**Interface manager UI**~~ | **BUILT 2026-09-09** — `extra_interfaces` (TCPClient/TCPServer/UDP), Settings-tab editor, dual validation, not Pi-tested. Chose structured over raw-textarea (bad config = rnsd won't start = all Reticulum down). Follow-up: more interface types (I2P needs i2pd; a 2nd RNode) if asked | — |
 | ~~Low~~ | ~~**Contacts / petnames**~~ | **BUILT 2026-09-09** (new-build #1) — see Done + Pi-verification list | — |
 | Low | **Paper messages / QR** | Sideband-style offline message export | Low–Med |
+| Low | **Reticulum Browser: remote-host fingerprint verification** | rBrowser has a model for this; ours doesn't yet | Unscoped — needs studying rBrowser's actual verification approach first, not just effort to build |
+| Low | **Reticulum Browser: local NomadNet search engine + page cache** | Background crawler + index of NomadNet pages | Needs its own `service`-seam backend (same capability LXMF's own service uses) + a real cache schema — comparable in scope to a whole separate plugin |
+| Low | **Reticulum Browser: form-field submission + `/file/...` downloads** | Interactive `.mu` page forms, file attachments | Low — the reticulum plugin's own Browse tab already covers both; only missing from the newer Browser plugin specifically |
 
 ### Future / only if there's a concrete need
 
@@ -374,6 +393,29 @@ plugins:
 
 ## Done (this backlog's completed items)
 
+- **2026-09-14** — Two new companion plugins, a separate track from this
+  backlog's prioritized items (see the **Have** table above for full
+  detail): **Reticulum Dashboard** (`plugins/apps/reticulum-dashboard/`)
+  — a standalone "top"-tier stat-cards + live peer list + announce
+  ticker + telemetry map page for Reticulum-only boxes, built on the
+  reticulum plugin's existing public API + the shared dashboard
+  WebSocket, no backend of its own; iterated through ~15 commits
+  (layout rebuilt onto the actual core Dashboard markup after a
+  hand-rolled approximation had real bugs, map sizing/scroll fixes, a
+  new "top" sidebar category created for it, a NomadNet quick-browse
+  modal with favourites). **Reticulum Browser**
+  (`plugins/apps/reticulum-browser/`) — a full multi-tab NomadNet
+  browser (tabs, address bar, back/forward/reload, shared favourites,
+  raw/rendered toggle, keyboard shortcuts), feature set inspired by
+  fr33n0w/rBrowser (MIT) but a clean-room implementation, not a port;
+  the reticulum plugin's Dashboard "Browse" actions now open this
+  plugin's full experience when it's installed, falling back to the
+  lighter quick-view modal otherwise. Both `requires = "reticulum"`
+  (enforced server-side, cascading disable) and `locked = true`
+  (shipped with the fork). Left explicitly unbuilt by Browser's own
+  README: remote-host fingerprint verification, a local NomadNet
+  search engine + page cache, and form-field/file-download submission
+  — now tracked in **Could build** above.
 - **2026-09-09** — Telemetry collector + map (new-build #4). Inbound
   `FIELD_TELEMETRY` decoded (`telemetry.decode_telemetry` +
   `_unpack_location`) into `backend/telemetry_store.py` (in-mem,
