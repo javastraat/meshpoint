@@ -7,6 +7,7 @@ MeshCore messages.
 
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -37,6 +38,7 @@ class Message:
     rssi: float | None = None
     snr: float | None = None
     rx_count: int = 1
+    attachments: list[dict] | None = None
 
     def to_dict(self) -> dict:
         d = {
@@ -56,6 +58,8 @@ class Message:
             d["rssi"] = round(self.rssi, 1)
         if self.snr is not None:
             d["snr"] = round(self.snr, 1)
+        if self.attachments:
+            d["attachments"] = self.attachments
         return d
 
 
@@ -98,16 +102,18 @@ class MessageRepository:
         channel: int = 0,
         packet_id: str = "",
         status: str = "sent",
+        attachments: list[dict] | None = None,
     ) -> int:
         """Record an outbound message. Returns the row ID."""
         now = datetime.now(timezone.utc).isoformat()
         cursor = await self._db.execute(
             """INSERT INTO messages
                (direction, text, node_id, node_name, protocol,
-                channel, timestamp, status, packet_id)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                channel, timestamp, status, packet_id, attachments)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             ("sent", text, node_id, node_name, protocol,
-             channel, now, status, packet_id),
+             channel, now, status, packet_id,
+             json.dumps(attachments) if attachments else None),
         )
         await self._db.commit()
         return cursor.lastrowid
@@ -123,6 +129,7 @@ class MessageRepository:
         direction: str = "received",
         rssi: float | None = None,
         snr: float | None = None,
+        attachments: list[dict] | None = None,
     ) -> tuple[int, bool]:
         """Record an inbound message. Returns (row_id, is_duplicate).
 
@@ -156,10 +163,11 @@ class MessageRepository:
         cursor = await self._db.execute(
             """INSERT INTO messages
                (direction, text, node_id, node_name, protocol,
-                channel, timestamp, status, packet_id, rssi, snr)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                channel, timestamp, status, packet_id, rssi, snr, attachments)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (direction, text, node_id, node_name, protocol,
-             channel, now, "delivered", packet_id, rssi, snr),
+             channel, now, "delivered", packet_id, rssi, snr,
+             json.dumps(attachments) if attachments else None),
         )
         await self._db.commit()
         return cursor.lastrowid, False
@@ -273,6 +281,13 @@ class MessageRepository:
 
     @staticmethod
     def _row_to_message(row: dict) -> Message:
+        raw_attachments = row.get("attachments")
+        attachments = None
+        if raw_attachments:
+            try:
+                attachments = json.loads(raw_attachments)
+            except (TypeError, ValueError):
+                attachments = None
         return Message(
             id=row["id"],
             direction=row["direction"],
@@ -287,6 +302,7 @@ class MessageRepository:
             rssi=row.get("rssi"),
             snr=row.get("snr"),
             rx_count=row.get("rx_count") or 1,
+            attachments=attachments,
         )
 
 

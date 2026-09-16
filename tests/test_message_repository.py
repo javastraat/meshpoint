@@ -143,6 +143,55 @@ class TestMessageRepository(unittest.TestCase):
         self.assertNotIn("rssi", d)
         self.assertNotIn("snr", d)
 
+    def test_message_to_dict_includes_attachments_when_present(self):
+        msg = Message(
+            id=1, direction="received", text="a pic",
+            node_id="n1", node_name="N", protocol="reticulum",
+            channel=0, timestamp="2026-01-01T00:00:00",
+            status="delivered", packet_id="P3",
+            attachments=[{"kind": "image", "id": "abc123", "mime": "image/jpeg", "size": 42}],
+        )
+        d = msg.to_dict()
+        self.assertEqual(d["attachments"], [
+            {"kind": "image", "id": "abc123", "mime": "image/jpeg", "size": 42},
+        ])
+
+    def test_message_to_dict_omits_attachments_when_absent(self):
+        msg = Message(
+            id=1, direction="sent", text="test",
+            node_id="n1", node_name="N", protocol="meshtastic",
+            channel=0, timestamp="2026-01-01T00:00:00",
+            status="sent", packet_id="P4",
+        )
+        self.assertNotIn("attachments", msg.to_dict())
+
+    def test_save_sent_attachments_round_trip(self):
+        attachments = [{"kind": "image", "id": "deadbeef", "mime": "image/png", "size": 99}]
+        row_id = _run(self.repo.save_sent(
+            text="here", node_id="n1", node_name="N",
+            protocol="reticulum", attachments=attachments,
+        ))
+        msgs = _run(self.repo.get_conversation("n1"))
+        self.assertEqual(len(msgs), 1)
+        self.assertEqual(msgs[0].id, row_id)
+        self.assertEqual(msgs[0].attachments, attachments)
+
+    def test_save_received_attachments_round_trip(self):
+        attachments = [{"kind": "image", "id": "feedface", "mime": "image/webp", "size": 7}]
+        _run(self.repo.save_received(
+            text="incoming pic", node_id="n2", node_name="N",
+            protocol="reticulum", attachments=attachments,
+        ))
+        msgs = _run(self.repo.get_conversation("n2"))
+        self.assertEqual(msgs[0].attachments, attachments)
+
+    def test_save_without_attachments_leaves_them_none(self):
+        _run(self.repo.save_sent(
+            text="plain", node_id="n3", node_name="N", protocol="meshtastic",
+        ))
+        msgs = _run(self.repo.get_conversation("n3"))
+        self.assertIsNone(msgs[0].attachments)
+
     def test_conversation_name_sticks_after_a_reply_with_no_sender_name(self):
         # A "keyed"/"unmapped"/"named" broadcast bucket (see F1/F2 in
         # the worklist) has no configured channel entry to fall back

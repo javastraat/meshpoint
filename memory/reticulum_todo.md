@@ -5,7 +5,10 @@ See `memory/plugin-reticulum.md` for implementation detail (dated sections,
 one per feature) and `memory/project_m1_meshpoint.md` for wider session
 context.
 
-Last updated 2026-09-14. Session builds through 2026-09-09: #1 Contacts,
+Last updated 2026-09-16 — item 1 (Attachments in Send, image-only) built
+same day, see **Done** below; two more items added to the Todo table
+(V6, 7 — see their Notes for what was flagged and why, both still
+open/unverified). Session builds through 2026-09-09: #1 Contacts,
 #2 Propagation client, #3 Telemetry publish (+location, +multi-collector),
 #4 Telemetry collect+map, Extra interfaces, UI padding pass.
 **Verification status table below** — #1, #3, #4 and multi-collector
@@ -34,7 +37,7 @@ for each build item is in **Could build — next up** further down.
 
 | # | Item | Type | Effort | Impact | Risk | Notes |
 |---|---|---|---|---|---|---|
-| 1 | **Attachments in Send** | build | Med | High | Low | Schema decided: JSON `attachments` col on the shared `messages` table + bytes on disk under `data/reticulum/attachments/<msg_id>/`. Send via `FIELD_IMAGE`/`FIELD_FILE_ATTACHMENTS`, ~5 MB cap, one contained core UI touch (attachment chip in the shared Messages renderer) |
+| ~~1~~ | ~~**Attachments in Send**~~ | build | Med | High | Low | **BUILT 2026-09-16** — image-only (deliberately, not `FIELD_FILE_ATTACHMENTS`; see "Could build" below for why). Not Pi-tested |
 | 2 | **Paper messages / QR** | build | Low–Med | Med | Low | Sideband-style offline message export; reuses the existing QR-export pattern |
 | 3 | **Audio calls** (`call.audio`) | build | Med–High | High | Med | Frontend-heavy: Codec2 WASM in browser, AudioWorklet mic, ring/answer/hangup UI. Pi is a byte-pipe bridge only. Full reference in `reticulum-meshchat` (`audio_call_manager.py` + `CallPage.vue`). Needs HTTPS (have it). Latency fine on TCP, marginal on LoRa |
 | 4 | **Group chat** (`RNS.Destination.GROUP`) | build | Med | Low | Med | Non-standard, no membership model, easy to half-build. Only on request |
@@ -45,9 +48,13 @@ for each build item is in **Could build — next up** further down.
 | V3 | **Verify: Contacts tab + peer-drawer additions** | verify | Low | Med | — | Inline-edit propagates name everywhere, add-from-hash + garbage rejected, Remove clears all surfaces; Send Message button pre-fills, favourite star syncs w/ Browse list, next-hop tooltip; light/dark |
 | V4 | **Verify: telemetry collect+map (#4) leftovers** | verify | Low | Med | — | `reticulum_telemetry` WS live-updates the tab w/o reload; a telemetry-only frame leaves no blank row in Messages |
 | V5 | **Verify: real-Sideband render** | verify | Low | Low | — | Telemetry frame is byte-exact vs `sense.py`; just never displayed in the actual Sideband app |
+| V6 | **Verify: inbound Reticulum messages trigger Settings→System's message notifications (toast/sound)** | verify | Low | Med | — | Flagged by user 2026-09-16. Likely already works and just needs confirming: `frontend/js/message_notifier.js`'s `_onMessage()` listens for the core `message_received` WS event with zero protocol filtering (any `direction:'received'` triggers it), and `lxmf_service.py`'s `_handle_inbound_message()` already fires that exact event (added 2026-09-08, alongside its own plugin-private `reticulum_message`) — so the wiring looks complete on paper, just never watched live with an inbound DM to confirm the toast/sound actually fire |
+| 7 | **Add Reticulum (and Pager) to the Messages page's protocol filter chips** | build | Low | Low–Med | Low | Flagged by user 2026-09-16 (screenshot: sidebar shows `RT` badges on Reticulum conversations, but the filter row above only offers All/MT/MC/★ Fav — no way to filter *to* Reticulum-only, or Pager-only). Root cause is just a missing button, not missing logic: `messaging_contacts.js`'s `setFilter(protocol)` already filters generically (`c.protocol === this._filter`), so it already works for any protocol string. The four chips are hardcoded in `frontend/js/messaging.js:49-53` (`data-filter="all"/"meshtastic"/"meshcore"/"fav"`) — add `<button class="msg-protocol-toggle__btn" data-filter="reticulum" role="tab" aria-selected="false">RT</button>` (and a `PAGER` one) alongside them. No backend change |
 
 **Suggested sequence:** 1 → (V1, V2 on the Pi) → 2 → 3, with V3·V4·V5 folded
-into the next Pi session and 4–6 left reactive.
+into the next Pi session and 4–6 left reactive. V6 and 7 are both quick
+(no design decisions pending) — worth folding into whichever session
+touches the Messages page or does the next Pi verification pass next.
 
 ---
 
@@ -358,7 +365,8 @@ plugins:
 
 | Prio | Feature | What it is | Effort / risk |
 |---|---|---|---|
-| Med | **Attachments in Send** | images / small files over `LXMF.FIELD_IMAGE` / `FIELD_FILE_ATTACHMENTS` | **UNBLOCKED 2026-09-09 — schema decision made, not built.** Approach: **nullable JSON `attachments` column on the shared `messages` table** (`ALTER TABLE messages ADD COLUMN attachments TEXT`, same guarded-migration pattern as rssi/snr + rx_count; NULL for every non-Reticulum msg). Column = JSON array of `{kind,name,size,path}`; **bytes on disk under `data/reticulum/attachments/<msg_id>/`, never in SQLite**. Send: `lxm.fields[FIELD_IMAGE]`/`FIELD_FILE_ATTACHMENTS` before `handle_outbound`. Inbound: write bytes + populate column. ~5 MB cap. One contained core UI touch: the shared Messages renderer shows an attachment chip/thumbnail when `attachments` non-empty (generic capability, not a Reticulum special-case). Rejected: a plugin-private `reticulum_attachments` table — attachments would then only show on the plugin's own Messages tab, not the shared cross-protocol page. Effort now: Med (send + inbound + the migration + the one UI block). |
+| ~~Med~~ | ~~**Attachments in Send**~~ | images over `LXMF.FIELD_IMAGE` | **BUILT 2026-09-16, image-only.** Nullable JSON `attachments` column on the shared `messages` table (guarded-added like rssi/snr/rx_count); each entry `{kind, id, mime, size}` — a random hex `id`, not the message row id (an outbound image is written to disk before `save_sent()` returns a row id at all, so a message-id-keyed path would need a second UPDATE; the random id works the same for both send and receive with no ordering dependency). Bytes live on disk (`data/reticulum/attachments/<id>.<ext>`, new `backend/attachments.py`), never in SQLite. Send tab gained an "Image (optional, max 5 MB)" file picker — base64 in the same JSON `POST /send` body (multipart would be marginally more efficient, but every other route in this plugin is plain JSON; kept consistent). `GET /api/reticulum/attachments/{id}` serves it back inline (no Content-Disposition), admin-auth-gated same as everything else, working as a plain `<img src>` because cookie session auth covers that. The shared `messaging_chat.js` (used by every protocol's chat view, not just Reticulum) renders a click-to-open thumbnail when `msg.attachments` is present — both bubble-render code paths (`_appendBubble` for a live new message, `_buildBubbleEl` for loading history) and the live `message_received` WS payload. **Decided image-only over also building `FIELD_FILE_ATTACHMENTS`** (general file attachments) after being asked directly — Sideband's own attachment story leans on images, it's the simplest to preview inline, and it keeps this at Med effort instead of pulling in MIME-type/arbitrary-file handling nobody's asked for; general files can follow later if there's real demand (tracked as the reopened item below). 19 new tests (11 `attachments.py`, 8 `lxmf_service.py`, all Mac-runnable via a hand-rolled `aiosqlite`-shim/direct-fake style, no real RNS/LXMF needed for any of them) + 5 `message_repository.py` round-trip tests. Not Pi-tested — an actual two-node image send/receive, and the shared Messages page rendering it live, both still need a real run. |
+| Low | **File attachments in Send** (`LXMF.FIELD_FILE_ATTACHMENTS`) | general (non-image) files, e.g. a PDF or a text file | Reopened 2026-09-16 as the deliberately-deferred half of "Attachments in Send" above — same storage/serving shape would mostly reuse `attachments.py`/`attachments` column, just a second `kind` value + a download-not-inline response (`Content-Disposition: attachment`) on the GET route, and a generic MIME-type allowlist instead of the image-only `_MIME_BY_TYPE` map. Only worth it if someone actually asks — images cover the common case. |
 | ~~Med~~ | ~~**Propagation node polish**~~ | **BUILT 2026-09-09** (new-build #2): outbound node + "Sync inbox" + live transfer state + auto-sync + a `reticulum_propagation_sync` WS event when any sync completes (2026-09-09). Untested on Pi. | — |
 | ~~Med~~ | ~~**Telemetry publish**~~ | **BUILT 2026-09-09** (new-build #3): time + temp + status-line frame, two-node verified. **+ SID_LOCATION added same day** — opt-in `telemetry_include_location`, coords from core's Configuration→GPS pin (`device.latitude/longitude`), no separate keys. Only follow-up left: structured processor/RAM/NVM sensors (nested `[[label,val],...]` — needs verifying against a real Sideband client; low value, INFO string already carries the numbers) | Low |
 | ~~Med~~ | ~~**Telemetry collector + map**~~ | **BUILT 2026-09-09** (new-build #4). Telemetry tab: table + own-Leaflet map (not the dashboard NodeMap — Reticulum telemetry peers aren't in the core `nodes` table; a standalone mini-map was the right call). Not Pi-tested yet. Possible follow-up: also feed into the dashboard map, but that needs core `nodes`-table integration — probably not worth it | — |
@@ -393,6 +401,19 @@ plugins:
 
 ## Done (this backlog's completed items)
 
+- **2026-09-16** — Attachments in Send, item 1, **image-only** (a deliberate
+  scope call, made when directly asked — see the "Could build" table
+  entry above for the full reasoning and file list; general file
+  attachments reopened as its own low-priority item). New `attachments`
+  JSON column on `messages` (guarded-added like rssi/snr/rx_count), new
+  `backend/attachments.py` (disk storage, random-hex-id addressed), Send
+  tab file picker (5 MB cap, base64 in the existing JSON POST), `GET
+  /api/reticulum/attachments/{id}`, and a thumbnail in the **shared**
+  `messaging_chat.js` (every protocol's chat view, not a Reticulum-only
+  change) with live-WS support. 24 new tests, all Mac-runnable, all
+  passing. Not Pi-tested. Same session also added two other Todo items
+  (V6, 7) the user flagged while reviewing a live Messages screenshot —
+  see their Notes in the prioritised table for what was found.
 - **2026-09-14** — Two new companion plugins, a separate track from this
   backlog's prioritized items (see the **Have** table above for full
   detail): **Reticulum Dashboard** (`plugins/apps/reticulum-dashboard/`)
@@ -485,10 +506,11 @@ plugins:
 ## Suggested order from here
 
 **See "Todo — prioritised (2026-09-09)" near the top of this file** — that
-table is the current answer. Short version: **Attachments in Send** →
-Pi-verify propagation client + extra interfaces → **Paper messages / QR**
-→ **Audio calls**; V3–V5 fold into the next Pi session; group chat /
-structured sensors / PN peering stay reactive.
+table is the current answer. Short version: **Attachments in Send** (now
+built, image-only, 2026-09-16) → Pi-verify propagation client + extra
+interfaces + V6 + item 7 → **Paper messages / QR** → **Audio calls**;
+V3–V5 fold into the next Pi session; group chat / structured sensors /
+PN peering / file attachments stay reactive.
 
 Note the earlier "needs audio hardware" concern on Audio calls was
 retracted 2026-09-09 — Codec2 runs in the browser, the Pi is only a

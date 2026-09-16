@@ -169,6 +169,16 @@ def contacts_path() -> str:
     return str(Path(_config["identity_path"]).parent / "contacts.json")
 
 
+def attachments_dir() -> str:
+    """Where Send-tab image attachments (FIELD_IMAGE) are written --
+    next to the identity / LXMF store, same reasoning as contacts_path()
+    above. The actual path join lives in attachments.py, shared with
+    LxmfService's own ``_attachments_dir()`` so the two can't drift."""
+    from . import attachments
+
+    return attachments.dir_from_identity_path(_config["identity_path"])
+
+
 def notify_url() -> str:
     return str(_config.get("notify_url") or "").strip()
 

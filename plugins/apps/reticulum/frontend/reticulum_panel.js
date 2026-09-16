@@ -326,6 +326,11 @@ class ReticulumPanel {
                                     <input class="cfg-field__input" type="text"
                                            id="rt-send-text" placeholder="Message text" required>
                                 </label>
+                                <label class="cfg-field">
+                                    <span class="cfg-field__label">Image (optional, max 5 MB)</span>
+                                    <input class="cfg-field__input" type="file" accept="image/*" id="rt-send-image">
+                                </label>
+                                <p class="cfg-status" id="rt-send-image-status" aria-live="polite"></p>
                                 <div class="cfg-card__actions">
                                     <button class="terminal-button terminal-button--primary"
                                             type="submit" id="rt-send-btn">Send message</button>
@@ -1165,12 +1170,42 @@ class ReticulumPanel {
     async _handleSend(event) {
         event.preventDefault();
         const status = this._q('#rt-send-status');
+        const imageStatus = this._q('#rt-send-image-status');
         const btn = this._q('#rt-send-btn');
         const peerEl = this._q('#rt-send-peer');
         const textEl = this._q('#rt-send-text');
+        const imageEl = this._q('#rt-send-image');
         const destination_hash = peerEl?.value || '';
         const text = (textEl?.value || '').trim();
         if (!destination_hash || !text) return;
+
+        const file = imageEl?.files?.[0] || null;
+        if (imageStatus) { imageStatus.dataset.kind = ''; imageStatus.textContent = ''; }
+        // Matches backend/attachments.py's MAX_IMAGE_BYTES -- checked
+        // here too so an oversized picture fails fast instead of base64
+        // -encoding several extra MB just to have the server reject it.
+        if (file && file.size > 5 * 1024 * 1024) {
+            if (imageStatus) {
+                imageStatus.dataset.kind = 'error';
+                imageStatus.textContent = `Image is ${(file.size / 1024 / 1024).toFixed(1)} MB, max 5 MB.`;
+            }
+            return;
+        }
+
+        let image_type = null;
+        let image_b64 = null;
+        if (file) {
+            try {
+                image_type = (file.type || '').replace('image/', '') || 'bin';
+                image_b64 = this._arrayBufferToBase64(await file.arrayBuffer());
+            } catch (_) {
+                if (imageStatus) {
+                    imageStatus.dataset.kind = 'error';
+                    imageStatus.textContent = 'Could not read the image file.';
+                }
+                return;
+            }
+        }
 
         btn.disabled = true;
         status.dataset.kind = 'pending';
@@ -1180,13 +1215,14 @@ class ReticulumPanel {
                 method: 'POST',
                 credentials: 'same-origin',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ destination_hash, text }),
+                body: JSON.stringify({ destination_hash, text, image_type, image_b64 }),
             });
             const result = await r.json().catch(() => ({}));
             if (r.ok) {
                 status.dataset.kind = 'success';
                 status.textContent = 'Sent.';
                 textEl.value = '';
+                if (imageEl) imageEl.value = '';
                 this._loadMessages();
             } else {
                 status.dataset.kind = 'error';
@@ -1198,6 +1234,19 @@ class ReticulumPanel {
         } finally {
             btn.disabled = false;
         }
+    }
+
+    /** Chunked to avoid a giant String.fromCharCode(...spread) call on a
+     * multi-MB image -- that blows the call-stack argument limit in some
+     * browsers well under the 5 MB cap this is used for. */
+    _arrayBufferToBase64(buffer) {
+        const bytes = new Uint8Array(buffer);
+        const chunkSize = 0x8000;
+        let binary = '';
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+            binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+        }
+        return btoa(binary);
     }
 
     _fmtAspect(aspect) {

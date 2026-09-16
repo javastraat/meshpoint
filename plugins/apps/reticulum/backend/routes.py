@@ -13,13 +13,18 @@ Read endpoints stay open to any authenticated viewer, same as core's
 
 from __future__ import annotations
 
+import base64
+import binascii
+
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
-from src.api.auth.dependencies import require_admin
+from src.api.auth.dependencies import require_admin, require_auth
 from src.api.auth.jwt_session import SessionClaims
 from src.storage.message_repository import MessageRepository
 
+from . import attachments as attachments_store
 from . import state
 from .contacts import ContactStore
 from .lxmf_service import LxmfService
@@ -137,6 +142,15 @@ async def reticulum_conversation(destination_hash: str, limit: int = 50):
 class SendRequest(BaseModel):
     destination_hash: str = Field(..., min_length=1)
     text: str = Field(..., min_length=1, max_length=10_000)
+    # Optional image attachment (Send tab "Attach image"). image_type is
+    # a bare extension-like string ("jpg"/"png"/"webp"), matching LXMF's
+    # own FIELD_IMAGE convention -- see backend/attachments.py. Base64,
+    # not multipart: every other route in this plugin is plain JSON, and
+    # the actual byte-size cap is enforced after decoding, against
+    # attachments.MAX_IMAGE_BYTES (this max_length is just a generous
+    # outer bound so an absurd payload 400s before base64-decoding it).
+    image_type: str | None = Field(None, max_length=8)
+    image_b64: str | None = Field(None, max_length=7_000_000)
 
 
 @router.post("/send")
@@ -145,13 +159,45 @@ async def reticulum_send(
 ):
     if _service is None:
         raise HTTPException(503, "Reticulum companion is disabled")
+    image: tuple[str, bytes] | None = None
+    if req.image_b64:
+        if not req.image_type:
+            raise HTTPException(400, "image_type is required alongside image_b64")
+        try:
+            image_bytes = base64.b64decode(req.image_b64, validate=True)
+        except (binascii.Error, ValueError):
+            raise HTTPException(400, "image_b64 is not valid base64")
+        if len(image_bytes) > attachments_store.MAX_IMAGE_BYTES:
+            raise HTTPException(
+                400,
+                f"Image too large ({len(image_bytes)} bytes, max "
+                f"{attachments_store.MAX_IMAGE_BYTES})",
+            )
+        image = (req.image_type, image_bytes)
     try:
-        row_id = await _service.send_message(req.destination_hash, req.text)
+        row_id = await _service.send_message(req.destination_hash, req.text, image=image)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
     except RuntimeError as exc:
         raise HTTPException(503, str(exc))
     return {"id": row_id, "status": "sent"}
+
+
+@router.get("/attachments/{attachment_id}")
+async def reticulum_attachment(
+    attachment_id: str, _claims: SessionClaims = Depends(require_auth),
+):
+    """Raw bytes for one Send-tab image attachment -- the URL a message's
+    `attachments[].id` (see Message.to_dict()) resolves against, loaded
+    directly as an `<img src>` by the shared Messages renderer. Inline,
+    not a download: no Content-Disposition, so the browser just displays
+    it. Cookie session auth covers a plain <img> tag the same way it
+    already covers the dashboard's own static assets."""
+    result = attachments_store.read_image(state.attachments_dir(), attachment_id)
+    if result is None:
+        raise HTTPException(404, "No such attachment")
+    image_bytes, mime = result
+    return Response(content=image_bytes, media_type=mime)
 
 
 @router.post("/announce")

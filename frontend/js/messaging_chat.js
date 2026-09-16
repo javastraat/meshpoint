@@ -274,14 +274,32 @@ class MessagingChat {
 
         const senderHtml = this._buildSenderHtml(msg);
         const signalHtml = this._buildSignalHtml(msg);
+        const attachmentHtml = this._buildAttachmentHtml(msg);
 
         bubble.innerHTML = `
             ${senderHtml}
+            ${attachmentHtml}
             <div class="msg-bubble__text">${this._esc(msg.text)}</div>
             <div class="msg-bubble__meta">${time}${statusText}${signalHtml}</div>
         `;
 
         this._messagesEl.appendChild(bubble);
+    }
+
+    /** Currently only Reticulum's Send-tab image attachments populate
+     * this (see plugins/apps/reticulum/backend/attachments.py) -- the
+     * `attachments` array shape is generic (`{kind, id, mime, size}`) so
+     * any future protocol/kind can reuse the same column without a
+     * migration, but only `kind: "image"` renders here today. */
+    _buildAttachmentHtml(msg) {
+        const list = Array.isArray(msg.attachments) ? msg.attachments : [];
+        const images = list.filter((a) => a && a.kind === 'image' && a.id);
+        if (!images.length) return '';
+        return images.map((a) => {
+            const url = `/api/reticulum/attachments/${encodeURIComponent(a.id)}`;
+            return `<img class="msg-bubble__attachment" src="${this._esc(url)}" `
+                + `alt="Attached image" loading="lazy" data-attachment-open="${this._esc(url)}">`;
+        }).join('');
     }
 
     _buildSenderHtml(msg) {
@@ -375,9 +393,15 @@ class MessagingChat {
         });
 
         this._messagesEl.addEventListener('click', (e) => {
-            const el = e.target.closest('.msg-bubble__sender[data-node-id]');
-            if (!el || !window.nodeDrawer) return;
-            window.nodeDrawer.open({ node_id: el.dataset.nodeId });
+            const senderEl = e.target.closest('.msg-bubble__sender[data-node-id]');
+            if (senderEl && window.nodeDrawer) {
+                window.nodeDrawer.open({ node_id: senderEl.dataset.nodeId });
+                return;
+            }
+            const attachmentEl = e.target.closest('[data-attachment-open]');
+            if (attachmentEl) {
+                window.open(attachmentEl.dataset.attachmentOpen, '_blank', 'noopener');
+            }
         });
     }
 
@@ -440,9 +464,11 @@ class MessagingChat {
             : '';
         const signalHtml = this._buildSignalHtml(msg);
         const senderHtml = this._buildSenderHtml(msg);
+        const attachmentHtml = this._buildAttachmentHtml(msg);
 
         bubble.innerHTML = `
             ${senderHtml}
+            ${attachmentHtml}
             <div class="msg-bubble__text">${this._esc(msg.text)}</div>
             <div class="msg-bubble__meta">${time}${signalHtml}</div>
         `;

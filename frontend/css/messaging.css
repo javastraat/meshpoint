@@ -709,6 +709,15 @@
 
 .msg-bubble__text { white-space: pre-wrap; }
 
+.msg-bubble__attachment {
+    display: block;
+    max-width: 240px;
+    max-height: 240px;
+    border-radius: 8px;
+    cursor: pointer;
+    margin-bottom: 6px;
+}
+
 .msg-bubble__meta {
     font-size: 10px;
     margin-top: 4px;

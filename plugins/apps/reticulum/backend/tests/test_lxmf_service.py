@@ -10,7 +10,9 @@ round trip is integration-level (needs rnsd) and lives on the Pi.
 from __future__ import annotations
 
 import asyncio
+import tempfile
 import unittest
+from pathlib import Path
 from unittest import mock
 
 from plugins.apps.reticulum.backend import lxmf_service
@@ -52,10 +54,16 @@ class _FakeWs:
 class _FakeMessageRepo:
     def __init__(self):
         self._next_id = 1
+        self.saved: list[dict] = []
 
-    async def save_received(self, *, text, node_id, node_name, protocol, packet_id):
+    async def save_received(self, *, text, node_id, node_name, protocol, packet_id,
+                             attachments=None):
         row_id = self._next_id
         self._next_id += 1
+        self.saved.append({
+            "text": text, "node_id": node_id, "node_name": node_name,
+            "protocol": protocol, "packet_id": packet_id, "attachments": attachments,
+        })
         return row_id, False
 
 
@@ -595,6 +603,111 @@ class TestInboundMessageBroadcast(unittest.TestCase):
         self.assertEqual(core_payload["direction"], "received")
         self.assertEqual(core_payload["text"], "hello")
         self.assertEqual(core_payload["node_id"], "aa" * 16)
+
+    def test_inbound_image_field_saved_and_included_in_both_broadcasts(self) -> None:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        svc = LxmfService(
+            display_name="Meshpoint",
+            reticulum_config_dir=tmp.name,
+            identity_path=str(Path(tmp.name) / "identity"),
+            lxmf_storage_dir=tmp.name,
+            message_repo=_FakeMessageRepo(),
+            peer_repo=_FakePeerRepo(),
+            ws_manager=_FakeWs(),
+        )
+        message = mock.Mock(
+            source_hash=b"\xaa" * 16, content=b"a pic", hash=b"\xbb" * 8,
+            fields={0x06: ["png", b"pngbytes"]},
+        )
+        with mock.patch.object(lxmf_service, "RNS") as mock_rns:
+            mock_rns.hexrep.return_value = "aa" * 16
+            asyncio.run(svc._handle_inbound_message(message))
+
+        # Persisted on the message row.
+        self.assertEqual(len(svc._message_repo.saved), 1)
+        saved_attachments = svc._message_repo.saved[0]["attachments"]
+        self.assertEqual(len(saved_attachments), 1)
+        self.assertEqual(saved_attachments[0]["kind"], "image")
+        self.assertEqual(saved_attachments[0]["mime"], "image/png")
+
+        # And on the live WS payload, so an open thread doesn't need a reload.
+        core_payload = next(d for k, d in svc._ws_manager.events if k == "message_received")
+        self.assertEqual(core_payload["attachments"], saved_attachments)
+
+        # The bytes actually landed on disk where routes.py's GET
+        # /attachments/{id} would look for them.
+        from plugins.apps.reticulum.backend import attachments as attachments_store
+        result = attachments_store.read_image(svc._attachments_dir(), saved_attachments[0]["id"])
+        self.assertEqual(result[0], b"pngbytes")
+
+
+class TestExtractInboundImage(unittest.TestCase):
+    """``_extract_inbound_image`` -- the FIELD_IMAGE half of an inbound
+    message, tested directly (no RNS mocking needed, just a fake
+    ``message.fields`` dict)."""
+
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+
+    def _svc(self) -> LxmfService:
+        return LxmfService(
+            display_name="Meshpoint",
+            reticulum_config_dir=self._tmp.name,
+            identity_path=str(Path(self._tmp.name) / "identity"),
+            lxmf_storage_dir=self._tmp.name,
+            message_repo=object(),
+            peer_repo=object(),
+            ws_manager=object(),
+        )
+
+    def test_none_without_a_fields_dict(self) -> None:
+        message = mock.Mock(fields=None)
+        self.assertIsNone(self._svc()._extract_inbound_image(message))
+
+    def test_none_without_an_image_field(self) -> None:
+        message = mock.Mock(fields={})
+        self.assertIsNone(self._svc()._extract_inbound_image(message))
+
+    def test_none_for_malformed_field_shape(self) -> None:
+        message = mock.Mock(fields={0x06: "not-a-pair"})
+        self.assertIsNone(self._svc()._extract_inbound_image(message))
+
+    def test_none_when_the_bytes_element_is_not_actually_bytes(self) -> None:
+        message = mock.Mock(fields={0x06: ["jpg", "not-bytes"]})
+        self.assertIsNone(self._svc()._extract_inbound_image(message))
+
+    def test_none_when_oversized(self) -> None:
+        big = b"x" * (lxmf_service.attachments_store.MAX_IMAGE_BYTES + 1)
+        message = mock.Mock(fields={0x06: ["jpg", big]})
+        self.assertIsNone(self._svc()._extract_inbound_image(message))
+
+    def test_saves_and_returns_a_descriptor_for_a_valid_image_field(self) -> None:
+        message = mock.Mock(fields={0x06: ["png", b"pngdata"]})
+        desc = self._svc()._extract_inbound_image(message)
+        self.assertIsNotNone(desc)
+        self.assertEqual(desc["kind"], "image")
+        self.assertEqual(desc["mime"], "image/png")
+        self.assertEqual(desc["size"], len(b"pngdata"))
+
+
+class TestSendMessageImageGuard(unittest.TestCase):
+    """The one branch of send_message()'s image path that's testable
+    without a full RNS/LXMF mock stack: the size cap, which is checked
+    (and raises) before any RNS/Identity/Destination calls happen."""
+
+    def test_oversized_image_rejected_before_any_rns_work(self) -> None:
+        svc = _make_service()
+        svc._router = mock.Mock()
+        svc._source = mock.Mock()
+        big = b"x" * (lxmf_service.attachments_store.MAX_IMAGE_BYTES + 1)
+        with mock.patch.object(lxmf_service, "RNS", mock.Mock()), \
+                mock.patch.object(lxmf_service, "LXMF", mock.Mock()):
+            with self.assertRaises(ValueError):
+                asyncio.run(svc.send_message("aa" * 16, "hi", image=("jpg", big)))
+        # Never got as far as resolving an identity / building a destination.
+        svc._router.handle_outbound.assert_not_called()
 
 
 class TestTalkback(unittest.TestCase):

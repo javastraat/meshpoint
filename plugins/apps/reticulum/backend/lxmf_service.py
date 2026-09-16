@@ -39,6 +39,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 from . import (
+    attachments as attachments_store,
     host_stats,
     notify,
     talkback,
@@ -786,6 +787,34 @@ class LxmfService:
             )
         return True
 
+    def _extract_inbound_image(self, message) -> Optional[dict]:
+        """If the inbound LXMF message carries a ``FIELD_IMAGE`` field
+        (``[image_type, image_bytes]``, Send tab attachments -- see
+        ``backend/attachments.py``), write it to disk and return the
+        descriptor to store on the message row. ``None`` if there's no
+        image field, or it's malformed/oversized -- logged and skipped
+        rather than raised, since there's no HTTP caller here to surface
+        an error to; the text half of the message still saves normally
+        either way."""
+        fields = getattr(message, "fields", None)
+        if not isinstance(fields, dict):
+            return None
+        raw = fields.get(getattr(LXMF, "FIELD_IMAGE", 0x06))
+        if not isinstance(raw, (list, tuple)) or len(raw) != 2:
+            return None
+        image_type, image_bytes = raw
+        if not isinstance(image_bytes, (bytes, bytearray)):
+            return None
+        if len(image_bytes) > attachments_store.MAX_IMAGE_BYTES:
+            logger.info(
+                "Inbound LXMF image from a peer exceeded %d bytes -- dropped, "
+                "text (if any) still saved", attachments_store.MAX_IMAGE_BYTES,
+            )
+            return None
+        return attachments_store.save_image(
+            self._attachments_dir(), str(image_type), bytes(image_bytes),
+        )
+
     async def _broadcast_telemetry_update(self, source_hex: str) -> None:
         entry = next(
             (e for e in self._telemetry_store.all() if e["destination_hash"] == source_hex),
@@ -818,9 +847,11 @@ class LxmfService:
             await self._broadcast_telemetry_update(source_hex)
             if not text.strip():
                 return
+        image_attachment = self._extract_inbound_image(message)
         row_id, is_duplicate = await self._message_repo.save_received(
             text=text, node_id=source_hex, node_name=name,
             protocol="reticulum", packet_id=packet_id,
+            attachments=[image_attachment] if image_attachment else None,
         )
         if is_duplicate:
             return
@@ -846,6 +877,7 @@ class LxmfService:
                 "protocol": "reticulum", "direction": "received",
                 "packet_id": packet_id, "source_id": source_hex,
                 "destination_id": own_hex,
+                "attachments": [image_attachment] if image_attachment else None,
             },
         )
         if self._notify_url:
@@ -892,14 +924,33 @@ class LxmfService:
         except Exception:  # noqa: BLE001 -- notification is best-effort
             logger.debug("inbound-message notification failed", exc_info=True)
 
-    async def send_message(self, destination_hash_hex: str, text: str) -> int:
-        """Sends a direct LXMF message. Raises ValueError if the
-        destination's identity still can't be resolved after actively
-        requesting its path (see below) -- the same real constraint
-        reticulum-meshchat's own UI has, just with a real attempt at
-        discovery first rather than failing on a cold local cache."""
+    def _attachments_dir(self) -> str:
+        return attachments_store.dir_from_identity_path(str(self._identity_path))
+
+    async def send_message(
+        self,
+        destination_hash_hex: str,
+        text: str,
+        image: tuple[str, bytes] | None = None,
+    ) -> int:
+        """Sends a direct LXMF message. *image*, if given, is
+        ``(image_type, image_bytes)`` -- ``image_type`` a bare
+        extension-like string ("jpg"/"png"/"webp", matching LXMF's
+        FIELD_IMAGE convention, not a full MIME type) -- attached via
+        ``LXMF.FIELD_IMAGE`` (Send tab image attachments, see
+        ``backend/attachments.py``). Raises ValueError if the destination's
+        identity still can't be resolved after actively requesting its
+        path (see below) -- the same real constraint reticulum-meshchat's
+        own UI has, just with a real attempt at discovery first rather
+        than failing on a cold local cache -- or if *image* exceeds
+        ``attachments.MAX_IMAGE_BYTES``."""
         if not self.available or self._router is None or self._source is None:
             raise RuntimeError("Reticulum service is not running")
+        if image is not None and len(image[1]) > attachments_store.MAX_IMAGE_BYTES:
+            raise ValueError(
+                f"Image too large ({len(image[1])} bytes, max "
+                f"{attachments_store.MAX_IMAGE_BYTES})"
+            )
 
         dest_hash = bytes.fromhex(destination_hash_hex)
         identity = RNS.Identity.recall(dest_hash)
@@ -935,6 +986,18 @@ class LxmfService:
         lxm = LXMF.LXMessage(
             destination, self._source, text, desired_method=LXMF.LXMessage.DIRECT,
         )
+        attachment_descriptors: list[dict] = []
+        if image is not None:
+            image_type, image_bytes = image
+            lxm.fields[getattr(LXMF, "FIELD_IMAGE", 0x06)] = [image_type, image_bytes]
+            # Our own copy for the Send tab's own thread to render --
+            # LXMF doesn't hand the sender a way to re-read what it just
+            # sent, so this is written independently of the wire send.
+            attachment_descriptors.append(
+                attachments_store.save_image(
+                    self._attachments_dir(), image_type, image_bytes,
+                )
+            )
         self._router.handle_outbound(lxm)
 
         peers = await self._peer_repo.list_peers()
@@ -944,7 +1007,7 @@ class LxmfService:
         )
         row_id = await self._message_repo.save_sent(
             text=text, node_id=destination_hash_hex, node_name=name,
-            protocol="reticulum",
+            protocol="reticulum", attachments=attachment_descriptors or None,
         )
         # No core protocol actually fires this today (messaging.js's own
         # 'message_sent' listener only ever touches the sidebar/contacts

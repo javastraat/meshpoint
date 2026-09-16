@@ -13225,3 +13225,76 @@ handler attached now loads with **zero** warnings logged, and
 `landing_page` (this session's other change, above) defaults correctly
 to `"dashboard"`. Not re-run through the actual CI/pytest suite (no
 fastapi on the Mac) -- should be confirmed green on the next CI run.
+
+## Reticulum: Attachments in Send, image-only (2026-09-16, same session)
+
+Picked up `memory/reticulum_todo.md` item 1 (backlog since 2026-09-09,
+schema already decided) after asking the user which of a few open ideas
+to pursue; they approved my recommendation to scope it to images only
+for the first pass (not also `FIELD_FILE_ATTACHMENTS`), reusing two
+patterns already proven elsewhere in this codebase rather than
+inventing new ones: `rssi`/`snr`/`rx_count`'s guarded `ALTER TABLE`
+migration on `messages` (`src/storage/database.py`), and
+`messaging_chat.js`'s existing per-message decorator hook (the
+`_signalBadge` pattern) as the slot for a new attachment chip. Full
+detail + file list in `memory/reticulum_todo.md`'s Done log
+(2026-09-16 entry) -- not duplicating it here, just the things worth
+knowing that aren't obvious from reading the code:
+
+- **Root-cause research before writing code:** pulled the real `lxmf`
+  1.1.1 source via `pip download` (no local vendored copy, and neither
+  `rns` nor `lxmf` are on this Mac) to get `FIELD_IMAGE`'s actual value
+  (`0x06`) rather than guessing a `getattr(..., default)` fallback --
+  same defensive pattern the existing `FIELD_TELEMETRY` code already
+  uses. Also read `reticulum-meshchat`'s `meshchat.py` +
+  `ConversationViewer.vue` to confirm the real wire convention:
+  `image_type` is a bare extension string (`file.type.replace("image/",
+  "")` client-side), not a full MIME type, and the image is sent
+  byte-for-byte with no client-side recompression. Matching that
+  exactly (rather than a similar-but-different shape) is what makes
+  this potentially interoperable with a real Sideband/meshchat peer,
+  not just self-consistent within meshpoint.
+- **Attachment addressing is a random hex id, not the message row id**
+  -- deliberate, not an oversight: an outbound image is written to disk
+  *before* `save_sent()` returns a row id (LXMF fields are built before
+  the DB insert happens at all), so id-by-message-row would need a
+  second UPDATE after the fact. A random id (`secrets.token_hex(16)`)
+  sidesteps the ordering problem entirely and works identically for
+  both the send and receive paths.
+- **Base64-in-JSON, not multipart**, for the upload -- every other route
+  in this plugin (`routes.py`, `nomad_routes.py`) is plain
+  `application/json`; multipart would be marginally more efficient but
+  break that consistency for one route. Client-side base64 encoding is
+  chunked (`0x8000`-byte blocks through `String.fromCharCode.apply`) --
+  a plain spread (`...bytes`) blows the call-stack argument limit in
+  some browsers on a multi-MB array, found by reasoning about the 5 MB
+  cap rather than by hitting it live.
+- **Tested without a real RNS/LXMF stack**, matching this plugin's
+  existing test-file convention (`test_lxmf_service.py`'s module
+  docstring: "tests for LxmfService that don't need a real RNS/LXMF
+  stack"): `_extract_inbound_image` and the size-guard in `send_message`
+  are tested directly against fake `message.fields` dicts / mocked
+  `RNS`/`LXMF` module globals, not a live Reticulum network. 24 new
+  tests total (11 `attachments.py`, 8 `lxmf_service.py`, 5
+  `message_repository.py`), all passing.
+- **`aiosqlite` isn't installed on this Mac either** (per this file's
+  own standing note) -- wrote a throwaway ~40-line async shim wrapping
+  stdlib `sqlite3` (not committed, lived in the scratchpad dir) to
+  actually run `test_message_repository.py` and
+  `test_database_migration.py` against a real in-memory SQLite DB and
+  confirm the new migration doesn't break the legacy-upgrade tests --
+  more convincing than reasoning about the SQL by eye alone. If this
+  need recurs, that shim is worth promoting into a real fixture instead
+  of re-writing it from scratch each time.
+- **Also touched while reading a live screenshot the user shared mid-
+  session:** added two more items to `memory/reticulum_todo.md` (V6:
+  verify inbound-message toast/sound notifications actually fire for
+  Reticulum -- traced the code and it looks like it should already
+  work, just never watched live; item 7: the Messages page's protocol
+  filter chips are missing an RT/Pager button even though the
+  underlying filter logic is already generic) -- flagged only, not
+  built, per the user's explicit ask.
+
+Not yet Pi-verified: an actual two-node image send/receive, and the
+shared Messages page rendering the thumbnail live on both ends of a
+real conversation.

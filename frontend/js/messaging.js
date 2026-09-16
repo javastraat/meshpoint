@@ -289,6 +289,7 @@ class MessagingPanel {
                 };
                 if (data.rssi != null) msg.rssi = data.rssi;
                 if (data.snr != null) msg.snr = data.snr;
+                if (data.attachments) msg.attachments = data.attachments;
                 this._chat.addMessage(msg);
 
                 // Server still has this row marked unread until the
