@@ -57,7 +57,7 @@ for each build item is in **Could build — next up** further down.
 | ~~V6~~ | ~~**Verify: inbound Reticulum messages trigger Settings→System's message notifications (toast/sound)**~~ | verify | Low | Med | — | **LIVE-VERIFIED 2026-09-16.** Flagged by user same day, confirmed same day: an inbound message produced a real popup/toast on the right side of the screen. Wiring was exactly as suspected — `message_notifier.js`'s protocol-agnostic `message_received` listener + `lxmf_service.py`'s existing fire of that event, no code change needed, just watching it happen live |
 | ~~7~~ | ~~**Add Reticulum (and Pager) to the Messages page's protocol filter chips**~~ | build | Low | Low–Med | Low | **BUILT 2026-09-16, in two passes, LIVE-VERIFIED same day.** Pass 1: added `data-filter="reticulum"` ("RT") and `data-filter="pager"` ("Pager") buttons alongside All/MT/MC/★ Fav in `frontend/js/messaging.js:49-55` + `flex-wrap` on `.msg-protocol-toggle` (`messaging.css`) so 6 buttons wrap instead of overflowing a narrow sidebar — user live-tested this on the Pi immediately and both screenshotted fine. Pass 2, same session: user pointed out a real gap — an empty "Pager" pill (no pager configured on that box) was a dead-end click ("No conversations yet"), but the fix couldn't be "just hide it," since disabling a protocol *with existing history* would then make those old chats look silently gone. Landed on OR-ing two signals per pill: **configured** (same signal the sidebar nav already uses to hide itself — `capture.sources` for MT/MC, `radio_pager.pager_enabled` for Pager, a `reticulum` entry in `window.MESHPOINT_SIDEBAR_PLUGINS` for RT) **or has any channel/conversation already** (new `MessagingContacts.protocolsInUse()`). A pill only disappears once both are false. New `MessagingPanel._updateProtocolPillVisibility()`, called after every conversations load (initial + each time the Messages page is revisited); falls back to the "All" filter if the currently-active pill gets hidden out from under it. Best-effort like `sidebar_controller.js`'s own `_applySourceGating()` — a failed config fetch just leaves every pill visible. **Confirmed live 2026-09-16** — pills behaved correctly in the same session V6 was verified. |
 
-| V7 | **Verify: Reticulum Browser form submission, file downloads, identity fingerprinting** | verify | Low | Med | — | **BUILT 2026-09-16, not yet Pi-tested.** Full step-by-step test plan below (§ "Test plan: V7") |
+| V7 | **Verify: Reticulum Browser form submission, file downloads, identity fingerprinting** | verify | Low | Med | — | **PARTIALLY LIVE-VERIFIED 2026-09-16** — fingerprint confirmed live on rakv2-meshpoint against the real TechInc NomadNet node: clicking "ID" showed the success toast and the node still browsed fine afterward. Also surfaced a real bug in the same session (see Done log): raw-mode view text was near-unreadable in dark mode, fixed. Form-field submission and file downloads still untested — rest of test plan below (§ "Test plan: V7") still applies |
 
 **Suggested sequence:** ~~1~~ → (V1, V2 on the Pi) → ~~2~~ → ~~3~~, with
 V3·V4·V5·V7 folded into the next Pi session and 4–6 left reactive. Items 1,
@@ -471,6 +471,15 @@ plugins:
 
 ## Done (this backlog's completed items)
 
+- **2026-09-16** — Fix: Reticulum Browser's raw-mode view was nearly
+  unreadable in dark mode. Found live by the user right after V7's
+  fingerprint test succeeded (screenshot: dark navy text on the `.rb-page`
+  box's near-black background). Same trap as the earlier `.rb-tab` /
+  `.rt-pages__src` bugs -- `--bg-elevated` has no light-theme value (always
+  the dark `#1a1a1a` fallback), and raw mode dumps `tab.content` as plain
+  `textContent` with no Micron inline colours to override an ambiguous
+  inherited text colour. Fixed with the same explicit `#d7dae0` used by
+  those two (`reticulum_browser_panel.css`'s `.rb-page`).
 - **2026-09-16** — Audio calls, item 3, **Stage 1 only (backend, no UI)**,
   same session as items 1/2/7, right after Paper messages. User picked
   the item, I explained it (verified against real reticulum-meshchat

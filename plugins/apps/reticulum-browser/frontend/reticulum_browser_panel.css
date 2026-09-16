@@ -142,6 +142,13 @@
     max-height: 65vh;
     overflow: auto;
     background: var(--bg-elevated, #1a1a1a);
+    /* Same trap as .rb-tab / .rt-pages__src: --bg-elevated has no
+       light-theme value (always the dark fallback), so the text colour
+       has to be explicit too. Raw mode dumps tab.content as plain
+       textContent with no Micron inline colours to override this --
+       inheriting the themed text colour rendered near-invisible
+       dark-on-dark in dark mode (confirmed live 2026-09-16). */
+    color: #d7dae0;
     font-family: var(--font-mono, ui-monospace, "SF Mono", Menlo, monospace);
     font-size: 13px;
     line-height: 1.5;

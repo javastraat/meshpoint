@@ -43,6 +43,11 @@
   carries your LXMF address -- useful for guestbook/registration-style
   `.mu` pages. New `POST /api/reticulum/nomad/fingerprint` route
   (`plugins/apps/reticulum/backend/nomad.py`'s `identify_link()`).
+- **Fix: Reticulum Browser's raw-mode page view was nearly unreadable in
+  dark mode.** `.rb-page` set a hardcoded dark background (`--bg-elevated`
+  has no light-theme value) but no explicit text colour, so raw mode's
+  plain-text dump rendered dark-on-dark. Same trap as the earlier
+  `.rb-tab`/`.rt-pages__src` fixes — same explicit light-gray colour applied.
 - **Browse now recognizes an already-installed theme.** A source's catalog
   view showed "Install" forever for a theme even after installing it —
   only app plugins were checked against what's actually on disk. Themes now
