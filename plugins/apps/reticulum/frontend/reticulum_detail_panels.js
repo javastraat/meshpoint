@@ -190,6 +190,7 @@ class ReticulumPeerDrawer {
         this._drawer = null;
         this._onViewAnnounce = null;
         this._openToken = 0;
+        this._paperMessageOpen = false;
     }
 
     /**
@@ -203,6 +204,7 @@ class ReticulumPeerDrawer {
         this._peer = peer;
         this._recentAnnounces = recentAnnounces || [];
         this._opts = opts;
+        this._paperMessageOpen = false;
         const token = ++this._openToken;
 
         const backdrop = document.createElement('div');
@@ -296,8 +298,14 @@ class ReticulumPeerDrawer {
         body.innerHTML = '';
 
         const canSend = peer.aspect === 'lxmf.delivery' && typeof opts.onSendMessage === 'function';
+        // Same gating as Send Message -- a paper message is a real LXMF
+        // send against this identity, just never handed to a transport
+        // interface, so whatever admits you to Send Message admits you
+        // here too. Deliberately reusing that signal rather than a
+        // separate opts flag -- one condition, one meaning.
+        const canPaper = canSend;
         const canBrowse = peer.aspect === 'nomadnetwork.node' && typeof opts.onBrowse === 'function';
-        if (canSend || canBrowse) {
+        if (canSend || canPaper || canBrowse) {
             const actions = document.createElement('div');
             actions.className = 'nd-actions';
             if (canSend) {
@@ -310,6 +318,17 @@ class ReticulumPeerDrawer {
                 });
                 actions.appendChild(sendBtn);
             }
+            if (canPaper) {
+                const paperBtn = document.createElement('button');
+                paperBtn.className = 'nd-action-btn';
+                paperBtn.textContent = 'Paper message';
+                paperBtn.setAttribute('aria-expanded', this._paperMessageOpen ? 'true' : 'false');
+                paperBtn.addEventListener('click', () => {
+                    this._paperMessageOpen = !this._paperMessageOpen;
+                    this._renderSections(link);
+                });
+                actions.appendChild(paperBtn);
+            }
             if (canBrowse) {
                 const browseBtn = document.createElement('button');
                 browseBtn.className = 'nd-action-btn nd-action-btn--primary';
@@ -321,6 +340,10 @@ class ReticulumPeerDrawer {
                 actions.appendChild(browseBtn);
             }
             body.appendChild(actions);
+        }
+
+        if (canPaper && this._paperMessageOpen) {
+            body.appendChild(this._buildPaperMessageSection(peer));
         }
 
         body.appendChild(_rtSection('Identity', [
@@ -472,6 +495,135 @@ class ReticulumPeerDrawer {
         section.appendChild(header);
         section.appendChild(content);
         return section;
+    }
+
+    /** "Paper message" inline section -- reuses the exact same fetch/QR
+     * mechanism as the Reticulum page's own Send-tab button
+     * (reticulum_panel.js's _handlePaperMessage()/_renderPaperResult()),
+     * just self-contained here so it works identically from *either*
+     * plugin's peer drawer (this file is shared -- window.ReticulumPeerDrawer
+     * -- with zero caller-side wiring needed beyond the same onSendMessage
+     * gate already required for the Send Message button above). No image
+     * support, same reasoning as the Send tab: a paper message needs to
+     * stay short enough to actually scan. window.QRCode is a globally
+     * loaded vendored script (frontend/index.html), not plugin-scoped, so
+     * it's available here regardless of which plugin opened this drawer. */
+    _buildPaperMessageSection(peer) {
+        const section = document.createElement('div');
+        section.className = 'nd-section';
+        section.innerHTML = `
+            <div class="nd-section__header">
+                <span class="nd-section__title">Paper message</span>
+                <span class="nd-section__arrow">▼</span>
+            </div>
+            <div class="nd-section__content">
+                <p class="cfg-field__hint">Packs a real encrypted LXMF message that's never
+                    transmitted -- only shown as a QR code (max 512 characters) to deliver by
+                    any means outside Reticulum (screen, print, another app). The recipient's
+                    own LXMF client scans it back in.</p>
+                <textarea class="cfg-field__input rt-paper-drawer__text" rows="3" maxlength="512"
+                          placeholder="Message text"></textarea>
+                <div class="cfg-card__actions">
+                    <button type="button" class="nd-action-btn nd-action-btn--primary rt-paper-drawer__generate">Generate</button>
+                </div>
+                <p class="cfg-status rt-paper-drawer__status" aria-live="polite"></p>
+                <div class="rt-paper-drawer__result" hidden>
+                    <div class="rt-paper-drawer__qr"></div>
+                    <textarea class="cfg-field__input rt-paper-drawer__uri" rows="3" readonly></textarea>
+                    <div class="cfg-card__actions">
+                        <button type="button" class="nd-action-btn rt-paper-drawer__copy">Copy URI</button>
+                        <button type="button" class="nd-action-btn rt-paper-drawer__print">Print</button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        const header = section.querySelector('.nd-section__header');
+        const content = section.querySelector('.nd-section__content');
+        header.addEventListener('click', () => {
+            const visible = content.style.display !== 'none';
+            content.style.display = visible ? 'none' : '';
+            header.querySelector('.nd-section__arrow').textContent = visible ? '▶' : '▼';
+        });
+
+        const textEl = section.querySelector('.rt-paper-drawer__text');
+        const genBtn = section.querySelector('.rt-paper-drawer__generate');
+        const statusEl = section.querySelector('.rt-paper-drawer__status');
+        const resultEl = section.querySelector('.rt-paper-drawer__result');
+        const qrHost = section.querySelector('.rt-paper-drawer__qr');
+        const uriEl = section.querySelector('.rt-paper-drawer__uri');
+
+        genBtn.addEventListener('click', async () => {
+            const text = textEl.value.trim();
+            if (!text) {
+                statusEl.dataset.kind = 'error';
+                statusEl.textContent = 'Enter a message first.';
+                return;
+            }
+            genBtn.disabled = true;
+            statusEl.dataset.kind = 'pending';
+            statusEl.textContent = 'Generating paper message…';
+            try {
+                const r = await fetch('/api/reticulum/paper', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ destination_hash: peer.destination_hash, text }),
+                });
+                const result = await r.json().catch(() => ({}));
+                if (r.ok) {
+                    statusEl.dataset.kind = 'success';
+                    statusEl.textContent = 'Paper message ready below.';
+                    this._renderPaperQr(qrHost, uriEl, resultEl, result.uri);
+                } else {
+                    statusEl.dataset.kind = 'error';
+                    statusEl.textContent = result.detail || 'Could not generate paper message.';
+                }
+            } catch (_) {
+                statusEl.dataset.kind = 'error';
+                statusEl.textContent = 'Could not generate paper message.';
+            } finally {
+                genBtn.disabled = false;
+            }
+        });
+
+        section.querySelector('.rt-paper-drawer__copy').addEventListener('click', async () => {
+            if (!uriEl.value) return;
+            try {
+                await navigator.clipboard.writeText(uriEl.value);
+            } catch (_) {
+                uriEl.select();
+                document.execCommand('copy');
+            }
+        });
+        section.querySelector('.rt-paper-drawer__print').addEventListener('click', () => window.print());
+
+        return section;
+    }
+
+    _renderPaperQr(qrHost, uriEl, resultEl, uri) {
+        if (!uri) return;
+        resultEl.hidden = false;
+        uriEl.value = uri;
+
+        if (typeof window.QRCode === 'undefined') {
+            qrHost.innerHTML = '<p class="cfg-field__hint">QR library unavailable -- use the URI text below.</p>';
+            return;
+        }
+        qrHost.innerHTML = '<canvas></canvas>';
+        const canvas = qrHost.querySelector('canvas');
+        const root = getComputedStyle(document.documentElement);
+        window.QRCode.toCanvas(canvas, uri, {
+            width: 220,
+            margin: 1,
+            color: {
+                dark: root.getPropertyValue('--text-primary').trim() || '#e2e8f0',
+                light: root.getPropertyValue('--bg-primary').trim() || '#0a0e17',
+            },
+        }).catch((e) => {
+            console.error('Paper message QR render failed:', e);
+            qrHost.innerHTML = '<p class="cfg-field__hint">QR render failed -- use the URI text below.</p>';
+        });
     }
 
     /** Re-point the drawer header's name/sub-line after a contact edit,

@@ -543,8 +543,12 @@
 
 .rt-amodal__view-peer { width: 100%; margin-top: 0.75rem; }
 
-/* ---- Paper message result (Send tab) ---- */
-.rt-paper-result {
+/* ---- Paper message result (Send tab, and the peer drawer's own
+   "Paper message" section -- reticulum_detail_panels.js's markup uses
+   .rt-paper-drawer__* class names instead of these, since it builds its
+   own DOM rather than reusing the Send tab's IDs, so both need covering
+   here). ---- */
+.rt-paper-result, .rt-paper-drawer__result {
     max-width: 480px;
     margin-top: 12px;
     border: 1px solid var(--border, #333);
@@ -552,13 +556,13 @@
     padding: 14px 16px;
     background: var(--bg-card, #162033);
 }
-.rt-paper-result__qr {
+.rt-paper-result__qr, .rt-paper-drawer__qr {
     display: flex;
     justify-content: center;
     margin: 10px 0;
 }
-.rt-paper-result__qr canvas { border-radius: 6px; }
-.rt-paper-result__uri {
+.rt-paper-result__qr canvas, .rt-paper-drawer__qr canvas { border-radius: 6px; }
+.rt-paper-result__uri, .rt-paper-drawer__uri {
     font-family: var(--font-mono, ui-monospace, "SF Mono", Menlo, monospace);
     font-size: 11px;
     resize: vertical;
@@ -571,15 +575,17 @@
    already goes through whatever printer the OS has configured. */
 @media print {
     body * { visibility: hidden; }
-    .rt-paper-result, .rt-paper-result * { visibility: visible; }
-    .rt-paper-result {
+    .rt-paper-result, .rt-paper-result *,
+    .rt-paper-drawer__result, .rt-paper-drawer__result * { visibility: visible; }
+    .rt-paper-result, .rt-paper-drawer__result {
         position: fixed;
         inset: 0;
         border: none;
         background: #fff;
         color: #000;
     }
-    .rt-paper-result__uri, #rt-paper-copy, #rt-paper-print, #rt-paper-close {
+    .rt-paper-result__uri, #rt-paper-copy, #rt-paper-print, #rt-paper-close,
+    .rt-paper-drawer__uri, .rt-paper-drawer__copy, .rt-paper-drawer__print {
         display: none;
     }
 }

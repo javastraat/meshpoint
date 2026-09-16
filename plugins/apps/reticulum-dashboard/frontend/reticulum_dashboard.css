@@ -211,3 +211,46 @@
     align-items: center;
     gap: 0.5rem;
 }
+
+/* Peer drawer's "Paper message" section (window.ReticulumPeerDrawer,
+   plugins/apps/reticulum/frontend/reticulum_detail_panels.js -- shared
+   with the full Reticulum page, whose own reticulum.css isn't reachable
+   from here, same cross-plugin-asset reason as everything else copied
+   in this file). Copied verbatim from reticulum.css's .rt-paper-result*
+   (the Send tab's own result panel), just under the drawer's own class
+   names since the drawer builds this section itself rather than reusing
+   the Send tab's DOM/IDs. */
+.rt-paper-drawer__result {
+    max-width: 480px;
+    margin-top: 12px;
+    border: 1px solid var(--border, #333);
+    border-radius: 8px;
+    padding: 14px 16px;
+    background: var(--bg-card, #162033);
+}
+.rt-paper-drawer__qr {
+    display: flex;
+    justify-content: center;
+    margin: 10px 0;
+}
+.rt-paper-drawer__qr canvas { border-radius: 6px; }
+.rt-paper-drawer__uri {
+    font-family: var(--font-mono, ui-monospace, "SF Mono", Menlo, monospace);
+    font-size: 11px;
+    resize: vertical;
+}
+
+@media print {
+    body * { visibility: hidden; }
+    .rt-paper-drawer__result, .rt-paper-drawer__result * { visibility: visible; }
+    .rt-paper-drawer__result {
+        position: fixed;
+        inset: 0;
+        border: none;
+        background: #fff;
+        color: #000;
+    }
+    .rt-paper-drawer__uri, .rt-paper-drawer__copy, .rt-paper-drawer__print {
+        display: none;
+    }
+}

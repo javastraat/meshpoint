@@ -13694,5 +13694,49 @@ already-open bubble. Fixed by building a `data:` URI from the same
 base64 payload as a local-only preview (`addOptimisticMessage()`'s new
 third arg, `msg._localPreviewUrl`, read by `_buildAttachmentHtml()`)
 -- the real server-backed thumbnail takes over once the conversation
-is reloaded/reopened, same as any other stored image. Not yet
-retested live.
+is reloaded/reopened, same as any other stored image. **Confirmed
+live**: user sent a real photo rakv2-meshpoint -> vm-meshpoint, showed
+correctly on both sides (own optimistic preview + the recipient's real
+thumbnail), attach icon behaving correctly in the compose bar.
+Follow-up: user reported audio quality still isn't great even with
+3200 + the new getUserMedia constraints ("verified not best audio yet
+very hard") -- likely partly inherent to Codec2 at any bitrate, not
+something more gain-tuning alone fixes; not investigated further this
+session. Separately confirmed the earlier TX-banner-on-RT-only-box fix
+is working ("2 confirmed its gone").
+
+**Built next: "Paper message" in the peer drawer, both plugins.** User
+asked for it next to "Send Message" (same right-side popup), explicitly
+flagging future intent to eventually hide/remove the Send and Messages
+tabs on the Reticulum page entirely -- so peer-drawer actions are meant
+to become the primary interaction surface, not a shortcut alongside a
+still-necessary tab. Investigated first: `/api/reticulum/paper` already
+takes plain `{destination_hash, text}` (512-char cap) and returns a URI
+to render via `window.QRCode` (loaded globally in `index.html`, not
+plugin-scoped) -- so this was almost entirely a drawer-widget UI job.
+Built entirely inside the SHARED `window.ReticulumPeerDrawer` widget
+(`reticulum_detail_panels.js`) rather than wiring each plugin
+separately: gated on the exact same signal as "Send Message"
+(`opts.onSendMessage` truthy -- admin + `lxmf.delivery` peer, same
+requirement, so reusing rather than adding a second flag), the button
+toggles an inline `.nd-section` with a textarea + Generate + QR/URI/
+copy/print, collapsible like the existing Contact section. Zero
+caller-side changes needed in either `reticulum_panel.js` or
+`reticulum_dashboard.js` -- both already pass `onSendMessage` when
+admin, so "Paper message" just appears alongside it.
+**Found and fixed a real, pre-existing gap while wiring this up**: the
+shared drawer's own custom classes (this file physically lives in the
+`reticulum` plugin) only ever had CSS in `reticulum.css` -- Reticulum
+Dashboard's plugin.toml already has a comment admitting it can't load
+that file ("asset serving is scoped per-plugin"), and had already
+duplicated the telemetry-map/popup rules it needed for exactly this
+reason. `.rt-activity-row` (Recent Activity rows) has had this same
+gap the whole time, just never visibly triggered since the dashboard's
+test peer had no announces to render a row for -- not fixed today,
+out of scope, but now on record. Fixed for the new Paper-message
+result panel specifically: `reticulum.css` now targets both
+`.rt-paper-result*` (Send tab) and `.rt-paper-drawer__*` (drawer)
+class names directly (including the print media query), and
+`reticulum_dashboard.css` got its own copy of the drawer-specific
+rules, matching that file's existing copy-don't-share convention.
+Not yet retested live.
