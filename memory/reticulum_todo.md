@@ -559,9 +559,26 @@ plugins:
   smoke test (which scans the actual `plugins/apps/` directory, not a
   fixture). No new Python tests for the plugin itself -- it has no
   backend beyond a no-op `register()`, everything testable lives in the
-  Stage 1 entry above. **Not Pi-tested, no live call ever attempted** --
-  this is genuinely the one thing this item still needs before it can be
-  called done-done.
+  Stage 1 entry above.
+  **Live-tested immediately, found 2 real bugs, both fixed same
+  session:** (1) the actual "Call button does nothing" cause -- a
+  stray `"` in the Call and Hang up `<button>` tags
+  (`data-rtcall-dial-btn">Call</button>` instead of
+  `data-rtcall-dial-btn>Call</button>`, leftover copy-paste residue)
+  broke the `querySelector('[data-rtcall-dial-btn]')` match, so the
+  click listener never attached to the real button at all -- no fetch
+  ever fired, no status message ever showed, exactly what the
+  screenshot showed. (2) why the empty "Hang up" box was visible
+  *before* any click too: `.rtcall__active`/`.rtcall__incoming` both
+  set `display: flex` unconditionally in the CSS -- author-stylesheet
+  rules always beat the browser's own `[hidden] { display: none }`
+  default regardless of selector specificity, so JS setting
+  `.hidden = true` was being silently overridden. Fixed with
+  `:not([hidden])` guards on both rules. No test coverage added for
+  either (pure rendering/DOM-selector bugs, not really unit-testable
+  without a real browser) -- caught only because the user tried it live
+  immediately, a good reminder that "the manifest parses and the tests
+  pass" is not the same bar as "a human clicked the button."
 - **2026-09-16** — Paper messages / QR, item 2, **export-only** (same
   session as items 1 and 7, immediately after finishing item 1 — user
   asked "what about 2, what is this exactly" since the backlog only had

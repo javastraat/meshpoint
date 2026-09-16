@@ -10,7 +10,12 @@
     gap: 12px;
 }
 
-.rtcall__incoming {
+/* :not([hidden]), not a bare .rtcall__incoming { display: flex } -- an
+   unconditional `display` here would win over the `hidden` attribute's
+   UA-stylesheet `display: none` (author styles beat UA styles on a
+   specificity tie), leaving this visible-but-empty even while JS sets
+   `.hidden = true`. Same fix on .rtcall__active below. */
+.rtcall__incoming:not([hidden]) {
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -34,7 +39,7 @@
     white-space: nowrap;
 }
 
-.rtcall__active {
+.rtcall__active:not([hidden]) {
     display: flex;
     flex-direction: column;
     gap: 8px;

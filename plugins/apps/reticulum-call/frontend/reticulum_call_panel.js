@@ -79,14 +79,14 @@ class ReticulumCallHookPanel {
                         </select>
                     </label>
                     <div class="cfg-card__actions">
-                        <button class="terminal-button terminal-button--primary" type="button" data-rtcall-dial-btn">Call</button>
+                        <button class="terminal-button terminal-button--primary" type="button" data-rtcall-dial-btn>Call</button>
                     </div>
                 </div>
                 <div class="rtcall__incoming" data-rtcall-incoming hidden></div>
                 <div class="rtcall__active" data-rtcall-active hidden>
                     <p class="rtcall__status" data-rtcall-status></p>
                     <div class="cfg-card__actions">
-                        <button class="terminal-button terminal-button--danger" type="button" data-rtcall-hangup-btn">Hang up</button>
+                        <button class="terminal-button terminal-button--danger" type="button" data-rtcall-hangup-btn>Hang up</button>
                     </div>
                 </div>
                 <p class="cfg-status" data-rtcall-msg aria-live="polite"></p>
