@@ -579,6 +579,27 @@ plugins:
   without a real browser) -- caught only because the user tried it live
   immediately, a good reminder that "the manifest parses and the tests
   pass" is not the same bar as "a human clicked the button."
+  **Same session, immediately after: added push-to-talk.** User asked
+  "isn't calling more like a PTT? on ratspeak etc its more a ptt" --
+  correct critique of the full-duplex "phone call" model this (and
+  reticulum-meshchat's own reference) both used: a poor fit for a
+  typically-half-duplex LoRa link that can't spare continuous
+  bidirectional audio. Key realization that made this cheap to add:
+  PTT vs. open-mic is a **purely local, sender-side choice** -- the
+  wire format doesn't change at all, a receiver just plays whatever
+  frames show up and can't tell whether the sender is streaming
+  continuously or only while a button's held. So both modes coexist
+  with zero protocol/backend changes, entirely in the existing hook
+  plugin's frontend: a `_pttActive` flag the AudioWorklet's onmessage
+  handler checks before encoding+sending each chunk (worklet keeps
+  running either way -- cheaper than pausing/resuming it, no
+  start-up glitch on the next press), a "Hold to Talk" button
+  (mouse+touch, with `document`-level release listeners so dragging
+  off the button while held doesn't leave the mic stuck open), and a
+  toggle to fall back to the old open-mic behavior for a hands-free
+  call over a link that can afford it. Defaults to PTT on (remembered
+  per-browser in localStorage) -- matches the actual use case and the
+  ham/mesh-radio mental model the user's question was grounded in.
 - **2026-09-16** — Paper messages / QR, item 2, **export-only** (same
   session as items 1 and 7, immediately after finishing item 1 — user
   asked "what about 2, what is this exactly" since the backlog only had

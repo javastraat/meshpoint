@@ -36,6 +36,19 @@
  * consent step at the protocol level. An "incoming call" here just
  * means a link connected; the only real choice the UI offers is
  * whether to open the audio bridge and actually join.
+ *
+ * Push-to-talk vs. open-mic: purely a local, sender-side choice --
+ * nothing about the wire format changes either way, since a receiver
+ * just plays whatever frames arrive and has no way to tell whether the
+ * sender is streaming continuously or only while a button's held.
+ * Defaults to PTT: full-duplex "phone call" semantics are a poor fit
+ * for what this is actually built for -- LoRa links are typically
+ * half-duplex anyway, continuous bidirectional audio burns bandwidth
+ * a constrained link doesn't have to spare, and PTT matches the mental
+ * model anyone coming from ham/mesh radio tooling already has. Open-mic
+ * stays available as a toggle for a hands-free conversation over a
+ * link that can actually afford it (the TCP backbone). Reticulum-
+ * meshchat's own CallPage.vue is open-mic-only, for reference.
  */
 
 const RT_CALL_MODES = window.ReticulumCallCodec.MODES;
@@ -43,6 +56,7 @@ const RT_CALL_DEFAULT_MODE = window.ReticulumCallCodec.DEFAULT_MODE;
 const RT_CALL_SAMPLE_RATE = 8000;
 const RT_CALL_WORKLET_URL = '/plugins/apps/reticulum-call/codec2/processor.js';
 const RT_CALL_WORKLET_NAME = 'reticulum-call-audio-processor';
+const RT_CALL_PTT_STORE_KEY = 'meshpoint.rtcall.pttMode';
 
 class ReticulumCallHookPanel {
     constructor() {
@@ -59,6 +73,24 @@ class ReticulumCallHookPanel {
         this._nextPlayTime = 0;
         this._incomingCalls = new Map(); // call_hash -> {node_id, node_name}
         this._wsUnsubscribe = null;
+        // Push-to-talk: whether mic audio actually gets encoded+sent right
+        // now. In open-mic mode this is just always true for the whole
+        // call. In PTT mode it tracks the Talk button being held.
+        this._pttMode = this._loadPttPref();
+        this._pttActive = false;
+    }
+
+    _loadPttPref() {
+        try {
+            const stored = localStorage.getItem(RT_CALL_PTT_STORE_KEY);
+            return stored === null ? true : stored === 'true'; // default: PTT on
+        } catch (_e) {
+            return true;
+        }
+    }
+
+    _savePttPref(value) {
+        try { localStorage.setItem(RT_CALL_PTT_STORE_KEY, String(value)); } catch (_e) {}
     }
 
     mount(rootEl) {
@@ -78,6 +110,15 @@ class ReticulumCallHookPanel {
                             ${RT_CALL_MODES.map((m) => `<option value="${m}" ${m === RT_CALL_DEFAULT_MODE ? 'selected' : ''}>${m}</option>`).join('')}
                         </select>
                     </label>
+                    <label class="cfg-field cfg-field--toggle">
+                        <input type="checkbox" data-rtcall-ptt-toggle ${this._pttMode ? 'checked' : ''}>
+                        <span class="cfg-field__label">Push-to-talk</span>
+                    </label>
+                    <p class="cfg-field__hint">
+                        Hold a Talk button to transmit, same as a radio -- better fit than an
+                        open mic for a constrained link. Turn off for a hands-free open-mic
+                        call instead (fine over the TCP backbone, not recommended over LoRa).
+                    </p>
                     <div class="cfg-card__actions">
                         <button class="terminal-button terminal-button--primary" type="button" data-rtcall-dial-btn>Call</button>
                     </div>
@@ -85,6 +126,8 @@ class ReticulumCallHookPanel {
                 <div class="rtcall__incoming" data-rtcall-incoming hidden></div>
                 <div class="rtcall__active" data-rtcall-active hidden>
                     <p class="rtcall__status" data-rtcall-status></p>
+                    <button class="terminal-button terminal-button--primary rtcall__talk-btn"
+                            type="button" data-rtcall-talk-btn hidden>Hold to Talk</button>
                     <div class="cfg-card__actions">
                         <button class="terminal-button terminal-button--danger" type="button" data-rtcall-hangup-btn>Hang up</button>
                     </div>
@@ -101,6 +144,8 @@ class ReticulumCallHookPanel {
 
         this._destEl = this._q('[data-rtcall-dest]');
         this._modeEl = this._q('[data-rtcall-mode]');
+        this._pttToggleEl = this._q('[data-rtcall-ptt-toggle]');
+        this._talkBtnEl = this._q('[data-rtcall-talk-btn]');
         this._dialSectionEl = this._q('[data-rtcall-dial]');
         this._incomingEl = this._q('[data-rtcall-incoming]');
         this._activeEl = this._q('[data-rtcall-active]');
@@ -109,6 +154,12 @@ class ReticulumCallHookPanel {
 
         this._q('[data-rtcall-dial-btn]')?.addEventListener('click', () => this._dial());
         this._q('[data-rtcall-hangup-btn]')?.addEventListener('click', () => this._hangup());
+        this._pttToggleEl?.addEventListener('change', () => {
+            this._pttMode = !!this._pttToggleEl.checked;
+            this._savePttPref(this._pttMode);
+            this._render();
+        });
+        this._wireTalkButton();
 
         if (window.concentratorWS && typeof window.concentratorWS.on === 'function') {
             this._wsUnsubscribe = window.concentratorWS.on(
@@ -122,6 +173,34 @@ class ReticulumCallHookPanel {
     show() {}
 
     hide() {}
+
+    /** Press-and-hold on the Talk button (mouse + touch). Also listens
+     * on `document` for the release, not just the button itself --
+     * a mouseup/touchend after the pointer has already left the button
+     * (dragged off while held) would otherwise never fire on the
+     * button and leave the mic stuck "on". */
+    _wireTalkButton() {
+        if (!this._talkBtnEl) return;
+        const press = (e) => {
+            e.preventDefault();
+            this._setPttActive(true);
+        };
+        const release = () => this._setPttActive(false);
+        this._talkBtnEl.addEventListener('mousedown', press);
+        this._talkBtnEl.addEventListener('touchstart', press, { passive: false });
+        document.addEventListener('mouseup', release);
+        document.addEventListener('touchend', release);
+        document.addEventListener('touchcancel', release);
+    }
+
+    _setPttActive(active) {
+        if (!this._pttMode || this._state !== 'in-call') return;
+        this._pttActive = active;
+        if (this._talkBtnEl) {
+            this._talkBtnEl.classList.toggle('rtcall__talk-btn--active', active);
+            this._talkBtnEl.textContent = active ? 'Talking…' : 'Hold to Talk';
+        }
+    }
 
     _q(sel) {
         return this._root ? this._root.querySelector(sel) : null;
@@ -203,6 +282,9 @@ class ReticulumCallHookPanel {
         this._callHash = callHash;
         this._isOutbound = isOutbound;
         this._state = 'in-call';
+        // Open-mic transmits from the moment the call connects; PTT
+        // starts silent until the Talk button is actually held.
+        this._pttActive = !this._pttMode;
         this._render();
         this._setMsg('pending', 'Connecting audio…');
 
@@ -252,6 +334,7 @@ class ReticulumCallHookPanel {
         this._stopAudio();
         this._callHash = null;
         this._state = 'idle';
+        this._pttActive = false;
         this._setMsg('', 'Call ended.');
         this._render();
         this._renderIncoming();
@@ -262,8 +345,13 @@ class ReticulumCallHookPanel {
         if (this._activeEl) this._activeEl.hidden = this._state !== 'in-call';
         if (this._statusEl) {
             this._statusEl.textContent = this._state === 'in-call'
-                ? `${this._isOutbound ? 'Calling' : 'In call'} — mode ${this._mode}`
+                ? `${this._isOutbound ? 'Calling' : 'In call'} — mode ${this._mode}${this._pttMode ? ' — PTT' : ' — open mic'}`
                 : '';
+        }
+        if (this._talkBtnEl) {
+            this._talkBtnEl.hidden = !(this._state === 'in-call' && this._pttMode);
+            this._talkBtnEl.classList.remove('rtcall__talk-btn--active');
+            this._talkBtnEl.textContent = 'Hold to Talk';
         }
         this._renderIncoming();
     }
@@ -286,6 +374,12 @@ class ReticulumCallHookPanel {
         if (!this._workletNode) return;
         this._workletNode.port.onmessage = async (event) => {
             if (!this._ws || this._ws.readyState !== WebSocket.OPEN) return;
+            // The worklet keeps running (and this handler keeps firing)
+            // for the whole call regardless of mode -- PTT just drops the
+            // chunk here instead of encoding+sending it, cheaper than
+            // trying to pause/resume the worklet itself and avoids any
+            // start-up glitch on the next press.
+            if (!this._pttActive) return;
             try {
                 const encoded = await window.ReticulumCallCodec.encode(this._mode, event.data);
                 if (this._ws && this._ws.readyState === WebSocket.OPEN) {

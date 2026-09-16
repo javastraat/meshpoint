@@ -54,3 +54,20 @@
     font-family: var(--font-mono, ui-monospace, "SF Mono", Menlo, monospace);
     font-size: 13px;
 }
+
+.rtcall__talk-btn {
+    padding: 18px;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-align: center;
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: none;
+}
+
+.rtcall__talk-btn--active {
+    background: var(--accent-green, #00e5a0);
+    color: #0a0e17;
+    box-shadow: 0 0 0 3px var(--overlay-weak, rgba(0, 229, 160, 0.25)) inset;
+}
