@@ -45,6 +45,9 @@ class TestStatusRadioBlock(unittest.TestCase):
             def propagation_client_status(self):
                 return None
 
+            def audio_call_status(self):
+                return None
+
         self._svc = _FakeService()
         routes.init_routes(self._svc, object())
         app = FastAPI()
