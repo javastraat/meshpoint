@@ -13656,3 +13656,43 @@ same `window.ReticulumPeerDrawer` class via a global reference
 supported option there. Contact/petname editing intentionally still
 absent here (this page never loaded that data) -- only Send Message
 was asked for. Not yet retested live.
+
+**Built (user approved after investigation): image-attach icon in the
+Messages page's compose bar, Reticulum threads only.** Investigated
+first before building, as asked -- found the backend (`/api/reticulum/
+send`) already accepts `image_type`/`image_b64` (plain base64 JSON,
+same shape the Reticulum plugin's own Send-tab picker already uses)
+and `messaging_chat.js` already renders attachment thumbnails for
+received/sent images, so this was purely a compose-bar UI job, no
+backend work. Added to `messaging_chat.js`: a paperclip icon + hidden
+file input + removable filename chip (5 MB cap, same chunked base64
+encode as the Send tab's own `_arrayBufferToBase64`), shown only when
+`convo.protocol === 'reticulum'` (`setConversation()`'s new
+`this._attachBtn.hidden = ...` line) -- MT/MC/Pager have no wire-level
+attachment mechanism, so hiding it there is correct, not a gap. Text
+still required alongside an image (matches the Send tab's own rule,
+and the backend's `SendRequest.text` already has `min_length=1`, so
+this wasn't a design choice made in isolation). `_handleSend()` is now
+async to encode before calling the send callback, which gained a third
+`image` arg threaded through `messaging.js`'s `_onSendMessage`/
+`_sendReticulumMessage`.
+**Caught two of my own new CSS bugs before shipping** (same class of
+issue found and fixed earlier this session for the Reticulum Call
+plugin): both the new `.msg-compose__attach` and `.msg-compose-
+attachment` chip used a bare unconditional `display` alongside a
+`hidden` attribute -- author CSS beats the UA `[hidden] {display:
+none}` on a specificity tie, so without `:not([hidden])` the attach
+icon would have shown for every protocol regardless of the JS setting
+it, and the chip would never have actually hidden. Fixed both before
+calling this done.
+**Also found and fixed a real gap while implementing**: the optimistic
+"sending..." bubble would have stayed text-only forever even with a
+real attachment -- `updateMessageStatus()` only ever touches the
+timestamp/status text, and the `message_sent` websocket event only
+updates the sidebar's conversation preview, never re-renders an
+already-open bubble. Fixed by building a `data:` URI from the same
+base64 payload as a local-only preview (`addOptimisticMessage()`'s new
+third arg, `msg._localPreviewUrl`, read by `_buildAttachmentHtml()`)
+-- the real server-backed thumbnail takes over once the conversation
+is reloaded/reopened, same as any other stored image. Not yet
+retested live.

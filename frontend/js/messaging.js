@@ -64,7 +64,7 @@ class MessagingPanel {
         const chatEl = document.getElementById('msg-chat-area');
 
         this._contacts = new MessagingContacts(listEl, (convo) => this._onConversationSelected(convo));
-        this._chat = new MessagingChat(chatEl, (text, convo) => this._onSendMessage(text, convo));
+        this._chat = new MessagingChat(chatEl, (text, convo, image) => this._onSendMessage(text, convo, image));
 
         document.getElementById('msg-new-btn').addEventListener('click', () => {
             this._contacts.openContactPicker();
@@ -197,7 +197,7 @@ class MessagingPanel {
             .then(() => this._syncSidebarBadge());
     }
 
-    async _onSendMessage(text, convo) {
+    async _onSendMessage(text, convo, image) {
         // Reticulum has a completely separate send path (LXMF over rnsd,
         // not a Meshtastic/MeshCore radio TX). It has its own dedicated
         // endpoint -- POST there directly rather than through
@@ -205,7 +205,7 @@ class MessagingPanel {
         // still special-cases protocol=='reticulum' too, as a fallback,
         // until the Reticulum-to-plugin cutover removes it.)
         if ((convo.protocol || '').toLowerCase() === 'reticulum') {
-            return this._sendReticulumMessage(text, convo);
+            return this._sendReticulumMessage(text, convo, image);
         }
 
         const isBroadcast = convo.is_broadcast || (convo.node_id || '').startsWith('broadcast:');
@@ -278,14 +278,25 @@ class MessagingPanel {
     /** Reticulum reply -- POST /api/reticulum/send ({destination_hash, text}),
      * which returns {id, status} on success or {detail} on error. Same
      * optimistic-bubble + status flow as the generic path above. */
-    async _sendReticulumMessage(text, convo) {
-        const tempMsg = this._chat.addOptimisticMessage(text, 'reticulum');
+    async _sendReticulumMessage(text, convo, image) {
+        // image is {image_type, image_b64} from the compose bar's attach
+        // icon (messaging_chat.js), or undefined -- same field names
+        // /api/reticulum/send already accepts from the Reticulum plugin's
+        // own Send-tab image picker, so the fetch body below just spreads
+        // it straight in. A data: URI built from the same base64 also
+        // doubles as the optimistic bubble's own local preview -- there's
+        // no server-assigned attachment id yet at this point (message_sent
+        // only updates the sidebar preview, never re-renders an open
+        // bubble), so without this the sender would never see their own
+        // just-sent image until reopening the conversation.
+        const previewUrl = image ? `data:image/${image.image_type};base64,${image.image_b64}` : null;
+        const tempMsg = this._chat.addOptimisticMessage(text, 'reticulum', previewUrl);
         try {
             const res = await fetch('/api/reticulum/send', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'same-origin',
-                body: JSON.stringify({ destination_hash: convo.node_id, text }),
+                body: JSON.stringify({ destination_hash: convo.node_id, text, ...(image || {}) }),
             });
             const result = await res.json().catch(() => ({}));
 

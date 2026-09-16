@@ -29,12 +29,14 @@ class MessagingChat {
         this._container.classList.add('msg-chat--empty');
         this._input.disabled = true;
         this._sendBtn.disabled = true;
+        this._clearAttachment();
     }
 
     setConversation(convo) {
         this._conversation = convo;
         this._messages = [];
         this._allLoaded = false;
+        this._clearAttachment();
 
         const name = convo.node_name || convo.node_id || '';
         const isChannel = (convo.node_id || '').startsWith('broadcast:');
@@ -95,6 +97,10 @@ class MessagingChat {
         this._messagesEl.innerHTML = '';
         this._lastDayKey = null;
         this._container.classList.remove('msg-chat--empty');
+        // Image attachments are an LXMF thing (FIELD_IMAGE) -- Meshtastic/
+        // MeshCore/Pager have no wire-level attachment mechanism at all,
+        // so the icon only makes sense, and only appears, for Reticulum.
+        this._attachBtn.hidden = convo.protocol !== 'reticulum';
         this._input.disabled = isUnmapped;
         this._sendBtn.disabled = isUnmapped;
         this._input.placeholder = isUnmapped
@@ -110,7 +116,7 @@ class MessagingChat {
         this._scrollToBottom();
     }
 
-    addOptimisticMessage(text, protocol) {
+    addOptimisticMessage(text, protocol, localPreviewUrl) {
         const msg = {
             id: Date.now(),
             direction: 'sent',
@@ -122,6 +128,10 @@ class MessagingChat {
             timestamp: new Date().toISOString(),
             status: 'sending...',
             packet_id: '',
+            // Client-only, never round-trips to/from the server -- see
+            // _buildAttachmentHtml's own comment on why this bubble needs
+            // its own preview instead of the real attachment id.
+            _localPreviewUrl: localPreviewUrl || null,
         };
         this.addMessage(msg);
         return msg;
@@ -292,6 +302,13 @@ class MessagingChat {
      * any future protocol/kind can reuse the same column without a
      * migration, but only `kind: "image"` renders here today. */
     _buildAttachmentHtml(msg) {
+        // The optimistic bubble for our own just-sent image (see
+        // _sendReticulumMessage's data: URI) has no server-assigned
+        // attachment id yet -- show the local preview until the real
+        // message data replaces it (see the class doc comment above).
+        if (msg._localPreviewUrl) {
+            return `<img class="msg-bubble__attachment" src="${this._esc(msg._localPreviewUrl)}" alt="Attached image">`;
+        }
         const list = Array.isArray(msg.attachments) ? msg.attachments : [];
         const images = list.filter((a) => a && a.kind === 'image' && a.id);
         if (!images.length) return '';
@@ -330,12 +347,73 @@ class MessagingChat {
         });
     }
 
-    _handleSend() {
+    async _handleSend() {
         const text = this._input.value.trim();
         if (!text || !this._conversation) return;
 
+        let image = null;
+        if (this._pendingImageFile) {
+            try {
+                const image_type = (this._pendingImageFile.type || '').replace('image/', '') || 'bin';
+                const image_b64 = this._arrayBufferToBase64(await this._pendingImageFile.arrayBuffer());
+                image = { image_type, image_b64 };
+            } catch (_) {
+                this._showAttachmentError('Could not read the image file.');
+                return;
+            }
+        }
+
         this._input.value = '';
-        this._onSend(text, this._conversation);
+        this._clearAttachment();
+        this._onSend(text, this._conversation, image);
+    }
+
+    /** Same 5 MB cap as backend/attachments.py's MAX_IMAGE_BYTES (see
+     * reticulum_panel.js's own Send-tab image picker) -- checked here
+     * too so an oversized picture fails fast instead of base64-encoding
+     * several extra MB just to have the server reject it. */
+    _onFilePicked() {
+        const file = this._fileInput.files?.[0] || null;
+        if (!file) return;
+        if (file.size > 5 * 1024 * 1024) {
+            this._showAttachmentError(`Image is ${(file.size / 1024 / 1024).toFixed(1)} MB, max 5 MB.`);
+            this._fileInput.value = '';
+            return;
+        }
+        this._pendingImageFile = file;
+        this._attachmentChip.classList.remove('msg-compose-attachment--error');
+        this._attachmentNameEl.textContent = file.name;
+        this._attachmentChip.hidden = false;
+    }
+
+    _showAttachmentError(text) {
+        this._pendingImageFile = null;
+        this._attachmentChip.classList.add('msg-compose-attachment--error');
+        this._attachmentNameEl.textContent = text;
+        this._attachmentChip.hidden = false;
+    }
+
+    _clearAttachment() {
+        this._pendingImageFile = null;
+        if (this._fileInput) this._fileInput.value = '';
+        if (this._attachmentChip) {
+            this._attachmentChip.hidden = true;
+            this._attachmentChip.classList.remove('msg-compose-attachment--error');
+        }
+    }
+
+    /** Same chunked encode reticulum_panel.js's own Send-tab image picker
+     * uses -- String.fromCharCode.apply on the whole buffer at once can
+     * blow the call stack on a large image, so this feeds it in 32 KB
+     * chunks instead. */
+    _arrayBufferToBase64(buffer) {
+        const bytes = new Uint8Array(buffer);
+        const chunkSize = 0x8000;
+        let binary = '';
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+            binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+        }
+        return btoa(binary);
     }
 
     _build() {
@@ -351,7 +429,17 @@ class MessagingChat {
                 <span class="msg-chat__connection-badge" title="Which USB companion/stick this contact was last heard through"></span>
             </div>
             <div class="msg-chat__messages"></div>
+            <div class="msg-compose-attachment" hidden>
+                <span class="msg-compose-attachment__name"></span>
+                <button type="button" class="msg-compose-attachment__remove" aria-label="Remove attachment">&times;</button>
+            </div>
             <div class="msg-compose">
+                <button class="msg-compose__attach" type="button" title="Attach image" aria-label="Attach image" hidden>
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M21.44 11.05l-9.19 9.19a5 5 0 01-7.07-7.07l9.19-9.19a3.5 3.5 0 014.95 4.95l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
+                    </svg>
+                </button>
+                <input class="msg-compose__file" type="file" accept="image/*" hidden />
                 <input class="msg-compose__input" placeholder="Type a message…" disabled maxlength="228" />
                 <button class="msg-compose__send" type="button" disabled>
                     <span class="msg-compose__send-label">Send</span>
@@ -368,8 +456,18 @@ class MessagingChat {
         this._messagesEl = this._container.querySelector('.msg-chat__messages');
         this._input = this._container.querySelector('.msg-compose__input');
         this._sendBtn = this._container.querySelector('.msg-compose__send');
+        this._attachBtn = this._container.querySelector('.msg-compose__attach');
+        this._fileInput = this._container.querySelector('.msg-compose__file');
+        this._attachmentChip = this._container.querySelector('.msg-compose-attachment');
+        this._attachmentNameEl = this._container.querySelector('.msg-compose-attachment__name');
+        this._pendingImageFile = null;
 
         this._renderEmptyState();
+
+        this._attachBtn.addEventListener('click', () => this._fileInput.click());
+        this._fileInput.addEventListener('change', () => this._onFilePicked());
+        this._attachmentChip.querySelector('.msg-compose-attachment__remove')
+            .addEventListener('click', () => this._clearAttachment());
 
         this._sendBtn.addEventListener('click', () => this._handleSend());
         this._input.addEventListener('keydown', (e) => {

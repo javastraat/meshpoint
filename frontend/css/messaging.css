@@ -872,6 +872,68 @@
     transform: translateY(-1px);
 }
 
+/* :not([hidden]), not a bare `display: inline-flex` -- an unconditional
+   `display` here would beat the `hidden` attribute's UA-stylesheet
+   `display: none` on a specificity tie (author styles always win),
+   showing this for Meshtastic/MeshCore threads too regardless of the
+   `.hidden = true` set in messaging_chat.js's setConversation(). Same
+   fix already needed once this session for the Reticulum Call plugin. */
+.msg-compose__attach:not([hidden]) {
+    appearance: none;
+    border: 1px solid var(--msg-border);
+    background: var(--scrim);
+    color: var(--msg-text-faint);
+    border-radius: 10px;
+    width: 38px;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: color 160ms ease, border-color 160ms ease;
+}
+
+.msg-compose__attach:hover {
+    color: var(--msg-text);
+    border-color: rgba(255, 184, 77, 0.5);
+}
+
+.msg-compose-attachment:not([hidden]) {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 18px;
+    padding: 6px 10px;
+    background: var(--scrim);
+    border: 1px solid var(--msg-border);
+    border-radius: 8px;
+    font-size: 12px;
+    color: var(--msg-text-faint);
+}
+
+.msg-compose-attachment--error {
+    border-color: rgba(255, 99, 99, 0.5);
+    color: #ff8080;
+}
+
+.msg-compose-attachment__name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.msg-compose-attachment__remove {
+    appearance: none;
+    border: none;
+    background: none;
+    color: inherit;
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 2px;
+}
+
 /* ── Contact picker modal ──────────────────────────────────────── */
 
 .msg-modal-overlay {
