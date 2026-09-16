@@ -705,6 +705,24 @@ plugins:
   physical machine** on purpose -- a working receive side would be
   audible immediately as their own voice echoing back, no second
   tester needed. Not yet retested after this fix.
+  **Separate bug found on mobile, not related to audio at all**: the
+  tab row (Peers/Activity/.../Call/Browse/Settings/Pages) couldn't be
+  scrolled far enough to actually reach Call on a narrow viewport --
+  only Peers through Messages reachable. Root cause is in **shared core
+  CSS, not this plugin**: `.lw-tabs` (`frontend/css/lorawan.css`,
+  reused verbatim by Meshtastic/MeshCore/LoRaWAN/Reticulum per the "W10
+  pilot" comment there) never set `min-width: 0` on itself -- a flex
+  item's default `min-width: auto` means "never shrink below my
+  content's natural width", which is exactly what let a wide tab row
+  blow out past the panel header instead of scrolling internally.
+  Reticulum just has enough tabs now (10, with Call the newest) to be
+  the first page to actually hit it -- every other `.lw-tabs` user
+  likely has the same latent bug, just never enough tabs to trigger it
+  visibly. Fixed with `min-width: 0` + `overflow-x: auto` +
+  `-webkit-overflow-scrolling: touch` on `.lw-tabs` itself, and
+  `flex: 0 0 auto` on `.lw-tab` so individual pills keep their natural
+  size instead of trying to shrink/wrap. Benefits every tabbed page,
+  not just Reticulum. Not yet retested.
 - **2026-09-16** — Paper messages / QR, item 2, **export-only** (same
   session as items 1 and 7, immediately after finishing item 1 — user
   asked "what about 2, what is this exactly" since the backlog only had

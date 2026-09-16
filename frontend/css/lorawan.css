@@ -423,9 +423,26 @@
 .lw-tabs {
     display: inline-flex;
     gap: 4px;
+    /* A flex item's default min-width is `auto` -- effectively "never
+       shrink below my content's natural width" -- which is exactly what
+       let a wide tab row blow out past the panel header on a narrow
+       viewport instead of scrolling internally, rather than clipping or
+       wrapping (confirmed live on mobile: Reticulum's own page, 10 tabs
+       including the reticulum-call plugin's new "Call" one, only the
+       first 4-5 reachable at all). min-width: 0 lets this flex item
+       actually shrink to the header's available width; overflow-x +
+       touch-scrolling then handles the rest by scrolling the row itself.
+       Shared by every .lw-tabs user (Meshtastic/MeshCore/LoRaWAN/
+       Reticulum, "W10 pilot" per the comment above) -- Reticulum just
+       has enough tabs to be the first page to actually hit this. */
+    min-width: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
 }
 
 .lw-tab {
+    flex: 0 0 auto;
     font: inherit;
     text-transform: inherit;
     letter-spacing: inherit;
