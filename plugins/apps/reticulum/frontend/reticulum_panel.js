@@ -552,8 +552,20 @@ class ReticulumPanel {
         else if (this._tab === 'contacts') this._renderContacts();
     }
 
-    /** Open the Browse tab pointed at a specific node (Peers-row "Browse" button). */
-    browseNode(destinationHash) {
+    /** Open a node's hosted page -- prefers the reticulum-browser plugin's
+     * full multi-tab experience when it's installed (feature-detected via
+     * window.reticulumBrowserPanel, same pattern reticulum_dashboard.js's
+     * own _openBrowse() already uses), falling back to this page's own
+     * embedded Browse tab otherwise. Previously always used the local
+     * tab regardless -- confirmed live 2026-09-16, opening Browse from a
+     * peer drawer (Peers or Contacts) landed on the local tab even with
+     * the full Browser plugin installed and enabled. */
+    browseNode(destinationHash, label = null) {
+        if (window.reticulumBrowserPanel) {
+            location.hash = '#/reticulum-browser';
+            window.reticulumBrowserPanel.openHash(destinationHash, label);
+            return;
+        }
         this._setTab('browse');
         if (this._nomadTab) this._nomadTab.openNode(destinationHash);
     }
@@ -594,7 +606,8 @@ class ReticulumPanel {
         if (!this._peerDrawer) return;
         const recent = this._announces.filter((a) => a.destination_hash === peer.destination_hash);
         this._peerDrawer.open(peer, recent, {
-            onBrowse: peer.aspect === 'nomadnetwork.node' ? (hash) => this.browseNode(hash) : undefined,
+            onBrowse: peer.aspect === 'nomadnetwork.node'
+                ? (hash) => this.browseNode(hash, peer.display_name) : undefined,
             onSendMessage: (peer.aspect === 'lxmf.delivery' && this._isAdmin)
                 ? (hash) => this.composeMessageTo(hash) : undefined,
             onViewAnnounce: (entry) => this._openAnnounceModal(entry),
@@ -1184,6 +1197,8 @@ class ReticulumPanel {
             const nb = (this._contacts[b].petname || '').toLowerCase();
             return na.localeCompare(nb);
         });
+        const exportBtn = this._q('#rt-contacts-export');
+        if (exportBtn) exportBtn.hidden = !hashes.length;
         if (!hashes.length) {
             list.innerHTML = '';
             if (empty) empty.style.display = '';
