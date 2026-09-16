@@ -19,19 +19,23 @@ const RT_BANDWIDTHS_HZ = [
     7800, 10400, 15600, 20800, 31250, 41700, 62500, 125000, 250000, 500000,
 ];
 
-// Per-browser only -- never sent to the server. Same key strings also
-// read directly by reticulum_panel.js (duplicated rather than shared as
-// a symbol, so neither file depends on the other's load order, just
-// kept in the same tab -> key shape there too); a custom event covers
-// same-tab live updates, since the native `storage` event only fires
-// in *other* tabs/windows, never the one that made the change.
-const RT_HIDE_TAB_KEYS = {
+// Per-browser only -- never sent to the server. Same key/event *strings*
+// also used directly by reticulum_panel.js, but under this file's own
+// symbol names -- both files are loaded as plain <script> tags into one
+// shared top-level scope (not ES modules), so two `const`s with the
+// *same name* would be a real SyntaxError there even though the values
+// only need to match, not the identifiers (confirmed live: this exact
+// collision on the first version of these two constants blanked the
+// whole Settings tab, since the second script to load failed to parse
+// at all). RT_ prefix kept for this file's own convention; SETTINGS_
+// disambiguates from reticulum_panel.js's own same-value constants.
+const RT_SETTINGS_HIDE_TAB_KEYS = {
     messages: 'meshpoint.reticulum.hideMessagesTab',
     send: 'meshpoint.reticulum.hideSendTab',
     browse: 'meshpoint.reticulum.hideBrowseTab',
     pages: 'meshpoint.reticulum.hidePagesTab',
 };
-const RT_HIDE_TABS_CHANGE_EVENT = 'meshpoint:reticulum-hide-tabs-changed';
+const RT_SETTINGS_HIDE_TABS_EVENT = 'meshpoint:reticulum-hide-tabs-changed';
 
 class ReticulumSettingsTab {
     constructor(el) {
@@ -462,7 +466,7 @@ class ReticulumSettingsTab {
         // Checked = shown; each tab defaults to hidden (unchecked) unless
         // localStorage already has an explicit "1" from a previous visit.
         this._el.querySelectorAll('[data-rt-hide-tab]').forEach((el) => {
-            const key = RT_HIDE_TAB_KEYS[el.dataset.rtHideTab];
+            const key = RT_SETTINGS_HIDE_TAB_KEYS[el.dataset.rtHideTab];
             try {
                 el.checked = localStorage.getItem(key) === '1';
             } catch (_e) { /* ignore -- defaults to unchecked/hidden */ }
@@ -470,7 +474,7 @@ class ReticulumSettingsTab {
                 try {
                     localStorage.setItem(key, el.checked ? '1' : '0');
                 } catch (_e) { /* ignore -- private browsing / storage disabled */ }
-                window.dispatchEvent(new Event(RT_HIDE_TABS_CHANGE_EVENT));
+                window.dispatchEvent(new Event(RT_SETTINGS_HIDE_TABS_EVENT));
             });
         });
 

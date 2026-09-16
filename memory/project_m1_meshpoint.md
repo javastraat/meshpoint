@@ -13820,3 +13820,26 @@ regardless, for consistency). The live-update event listener
 generically rather than hardcoding two tabs, and re-derives Pages'
 visibility through `_syncPagesTab()` itself rather than duplicating
 its hosting-check logic inline. Not yet retested live.
+
+**Regression, caught immediately from a screenshot: "settings tab is
+empty now."** Real bug, not a display glitch -- `reticulum_panel.js`
+and `reticulum_settings_tab.js` are loaded as plain `<script>` tags
+into one shared top-level scope (not ES modules), and both had just
+declared `const RT_HIDE_TAB_KEYS`/`const RT_HIDE_TABS_CHANGE_EVENT`
+with the *identical* name (only the values were supposed to match,
+per this plugin's established "duplicate the string, not the symbol"
+convention -- missed that the symbol name itself also needs to be
+unique, not just intentional). A same-name `const` redeclared in a
+shared scope is a hard SyntaxError, so the second script to load never
+executed at all -- `ReticulumSettingsTab` was simply never defined.
+`node --check` never would have caught this (validates one file in
+isolation); confirmed the actual bug AND the fix by concatenating both
+files into one `Function()` the way a browser actually would, then
+re-ran that across the whole Reticulum plugin family (dashboard, call)
+to rule out any other lurking collision. Fixed by renaming the
+Settings-tab copies to `RT_SETTINGS_HIDE_TAB_KEYS`/
+`RT_SETTINGS_HIDE_TABS_EVENT` -- same string values, distinct symbols.
+**Worth remembering**: any future per-browser constant duplicated
+across two of this plugin's own files needs a disambiguating prefix,
+not just a "same value, presumably fine" assumption -- this exact
+mistake is easy to repeat.
