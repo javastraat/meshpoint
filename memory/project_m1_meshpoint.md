@@ -13578,3 +13578,16 @@ mirroring `_openMessagingForNode()` exactly; resolves the peer's name
 the same way the drawer itself does (petname, then announced name,
 then the bare hash). The plugin's own Send tab is untouched and still
 usable directly. Not yet retested live.
+
+**Also fixed, from the user's own screenshot**: Reticulum Dashboard's
+Telemetry Map stuck showing "No located peers yet" despite a home
+location being configured (device Identity settings). Real bug, not
+a design gap: `_loadTelemetry()` and `_loadHomeLocation()` race in the
+same `Promise.all()` -- if telemetry resolves first with zero located
+peers, `_renderTelemetryMap()` bails and shows the placeholder
+*without ever creating the Leaflet map object at all*. Home resolving
+moments later only called `_renderHomeMarker()`, which no-ops with no
+map to attach to -- nothing then re-triggered map creation. Fixed by
+also calling `_renderTelemetryMap()` once home loads (idempotent
+either way: if the map already exists this is a no-op past the first
+check). Not yet retested live.

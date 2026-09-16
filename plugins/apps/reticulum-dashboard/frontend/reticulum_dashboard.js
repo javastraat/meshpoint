@@ -660,7 +660,19 @@ class ReticulumDashboard {
             if (device.latitude == null || device.longitude == null) return;
             this._homeLat = device.latitude;
             this._homeLon = device.longitude;
+            // _renderHomeMarker() alone only helps if the map already
+            // exists (e.g. located peers created it first) -- it no-ops
+            // otherwise. _loadTelemetry() and this fetch race in the same
+            // Promise.all(), and if telemetry resolves first with zero
+            // located peers, _renderTelemetryMap() shows the "no located
+            // peers" placeholder and returns *without* ever creating the
+            // map -- home arriving a moment later then had nothing to
+            // attach its marker to and the placeholder never went away.
+            // _renderTelemetryMap() re-checks hasHome and creates the map
+            // now if that's what was missing; _renderHomeMarker() stays
+            // for the case the map already exists and just needs the pin.
             this._renderHomeMarker();
+            this._renderTelemetryMap();
         } catch (_) {}
     }
 
