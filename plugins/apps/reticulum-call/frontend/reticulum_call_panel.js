@@ -168,6 +168,12 @@ class ReticulumCallHookPanel {
         }
 
         this._render();
+        // Surface the HTTPS requirement immediately on load, not only
+        // after Call/Join is clicked and fails -- most of the time this
+        // is a LAN-IP dashboard on plain HTTP, and it's better to know
+        // up front than to dial first and get a vague error.
+        const micError = this._micAvailabilityError();
+        if (micError) this._setMsg('error', micError);
     }
 
     show() {}
@@ -246,15 +252,45 @@ class ReticulumCallHookPanel {
     }
 
     async _joinIncoming(callHash) {
+        const micError = this._micAvailabilityError();
+        if (micError) {
+            this._setMsg('error', micError);
+            return;
+        }
         this._incomingCalls.delete(callHash);
         this._renderIncoming();
         await this._startCall(callHash, false);
+    }
+
+    /** Checked up front, before ever touching the backend -- getUserMedia
+     * is flatly unavailable outside a secure context (HTTPS, or
+     * localhost), which on a LAN-IP dashboard (the normal way to reach
+     * one of these) almost always means "this box doesn't have
+     * dashboard.tls_enabled on". Surfacing that immediately, in plain
+     * language, beats letting it fail deep inside _startAudio() with a
+     * generic permission-denied-looking error that doesn't explain why. */
+    _micAvailabilityError() {
+        if (window.isSecureContext === false) {
+            return 'Voice calls need HTTPS — this dashboard is on plain HTTP right now, '
+                + 'and browsers block microphone access outside a secure context. Set '
+                + 'dashboard.tls_enabled: true in config/local.yaml and restart, or open '
+                + 'this dashboard via localhost.';
+        }
+        if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
+            return 'No microphone access available in this browser on this page.';
+        }
+        return null;
     }
 
     async _dial() {
         const destination = (this._destEl?.value || '').trim();
         if (!destination) {
             this._setMsg('error', 'Enter a destination hash first.');
+            return;
+        }
+        const micError = this._micAvailabilityError();
+        if (micError) {
+            this._setMsg('error', micError);
             return;
         }
         this._mode = this._modeEl?.value || RT_CALL_DEFAULT_MODE;
@@ -293,10 +329,19 @@ class ReticulumCallHookPanel {
         } catch (e) {
             console.error('Reticulum call: could not start audio', e);
             this._setMsg('error', 'Microphone access failed — check browser permissions.');
-            this._endCallLocally();
+            // silent: keep the message above on screen -- _endCallLocally()'s
+            // own default "Call ended." would otherwise stomp it immediately,
+            // hiding the actual reason (this is what made an earlier failure
+            // here look like an unexplained instant hangup rather than a
+            // clear mic-access error). hangupServer: the Link was never
+            // actually used for anything -- tell the backend to tear it down
+            // rather than abandoning it, so the *other* side's incoming-call
+            // banner doesn't sit there pointing at a call nobody's joining.
+            this._endCallLocally({ silent: true, hangupServer: true });
             return;
         }
 
+        let wsHadError = false;
         const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
         const ws = new WebSocket(`${proto}//${location.host}/api/reticulum/call/${encodeURIComponent(callHash)}/audio`);
         ws.binaryType = 'arraybuffer';
@@ -308,9 +353,10 @@ class ReticulumCallHookPanel {
         };
         ws.onmessage = (event) => this._onAudioFrame(event.data);
         ws.onclose = () => {
-            if (this._callHash === callHash) this._endCallLocally();
+            if (this._callHash === callHash) this._endCallLocally({ silent: wsHadError });
         };
         ws.onerror = () => {
+            wsHadError = true;
             this._setMsg('error', 'Audio connection error.');
         };
     }
@@ -326,7 +372,13 @@ class ReticulumCallHookPanel {
         this._endCallLocally();
     }
 
-    _endCallLocally() {
+    _endCallLocally({ silent = false, hangupServer = false } = {}) {
+        if (hangupServer && this._callHash) {
+            const hash = this._callHash;
+            fetch(`/api/reticulum/call/${encodeURIComponent(hash)}/hangup`, {
+                method: 'POST', credentials: 'same-origin',
+            }).catch(() => {});
+        }
         if (this._ws) {
             try { this._ws.close(); } catch (_e) {}
             this._ws = null;
@@ -335,7 +387,7 @@ class ReticulumCallHookPanel {
         this._callHash = null;
         this._state = 'idle';
         this._pttActive = false;
-        this._setMsg('', 'Call ended.');
+        if (!silent) this._setMsg('', 'Call ended.');
         this._render();
         this._renderIncoming();
     }

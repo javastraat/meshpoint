@@ -600,6 +600,44 @@ plugins:
   call over a link that can afford it. Defaults to PTT on (remembered
   per-browser in localStorage) -- matches the actual use case and the
   ham/mesh-radio mental model the user's question was grounded in.
+  **Same session, first real live-test round: 2 bugs found and fixed.**
+  First attempt: "Could not establish a link to that destination" --
+  diagnosed (not guessed) from the exact error text: since path-finding
+  and identity resolution both clearly succeeded (a different message
+  would've fired otherwise) and LXMF messaging to the same peer already
+  worked, the only remaining explanation was that `call.audio` -- a
+  genuinely separate destination from `lxmf.delivery`, only registered
+  if `audio_calls_enabled` is on *and the service has been restarted
+  since* -- simply wasn't listening on the remote box yet. Confirmed
+  correct: user fixed the remote config, second attempt actually
+  reached the remote side (its incoming-call banner appeared).
+  **Second bug, worse: the call showed "Call ended." on the caller's
+  side almost immediately, before the receiver could click Join.**
+  Root cause was a real bug in this session's own code, not
+  configuration: `_endCallLocally()` unconditionally overwrote
+  `_msgEl` with "Call ended." -- so when `_startAudio()` (getUserMedia)
+  failed, the specific "Microphone access failed" message that had
+  *just* been set got immediately stomped by the generic one, hiding
+  the actual reason. And getUserMedia's real failure mode here is
+  almost certainly `window.isSecureContext === false` -- browsers
+  flatly refuse mic access outside HTTPS/localhost, and these boxes are
+  reached over a plain-HTTP LAN IP unless `dashboard.tls_enabled` is
+  explicitly on (config-file only, no Settings-tab toggle exists --
+  confirmed against `docs/CONFIGURATION.md` before writing the fix's
+  own error message, not guessed). Fixed three things: (1)
+  `_endCallLocally({silent, hangupServer})` -- `silent` stops the
+  "Call ended." overwrite when a more specific message was just shown
+  (also applied to the WS `onclose`-after-`onerror` case, same
+  overwrite bug); `hangupServer` tells the backend to actually tear
+  down the Link when the *local* side aborts before ever opening its
+  audio WS, so the far end's incoming-call banner doesn't sit pointing
+  at a call nobody's going to join. (2) A new `_micAvailabilityError()`
+  pre-flight check (`window.isSecureContext`, `navigator.mediaDevices`)
+  run *before* Call/Join ever touches the backend, with a plain-language
+  message naming the actual fix (`dashboard.tls_enabled: true` +
+  restart, or localhost). (3) Same check also runs once on tab mount,
+  so the HTTPS requirement shows up before the user even tries, not
+  only after a failed attempt. Not yet re-tested live after this fix.
 - **2026-09-16** — Paper messages / QR, item 2, **export-only** (same
   session as items 1 and 7, immediately after finishing item 1 — user
   asked "what about 2, what is this exactly" since the backlog only had
