@@ -382,6 +382,10 @@ class ReticulumDashboard {
     constructor() {
         this._root = null;
         this._refreshTimer = null;
+        // Same viewer-role gate reticulum_panel.js's own Send/Settings/etc.
+        // tabs use -- Send Message is a write action, this page otherwise
+        // has no admin-only surface at all so nothing else reads this yet.
+        this._isAdmin = window.meshpointIdentity?.role !== 'viewer';
         this._peers = [];
         this._telemetry = [];
         this._homeLat = null;
@@ -573,13 +577,15 @@ class ReticulumDashboard {
     }
 
     /** Peer-row click -> the same right-side drawer the Reticulum page's
-     * own Peers tab opens. Read-only here -- no contact editing / send-
-     * message actions, this page is a glanceable companion, not the full
-     * management page -- but "view announce" and, for a nomadnetwork.node
-     * peer, "Browse" both still work, matching the real thing's
-     * cross-links (Browse prefers the reticulum-browser plugin's full
-     * multi-tab browser when it's installed, this page's own quick-view
-     * modal otherwise -- see _openBrowse). */
+     * own Peers tab opens. No contact editing here -- this page never
+     * loaded contacts/petnames, that's still full-management-page-only --
+     * but "view announce", "Browse" for a nomadnetwork.node peer, and now
+     * "Send Message" (for an lxmf.delivery peer, admin only) all work,
+     * matching the real thing's cross-links (Browse prefers the
+     * reticulum-browser plugin's full multi-tab browser when it's
+     * installed, this page's own quick-view modal otherwise -- see
+     * _openBrowse; Send Message opens the same shared Messages-page
+     * thread reticulum_panel.js's own composeMessageTo() does). */
     _openPeerDrawer(peer) {
         if (!this._peerDrawer) return;
         const recent = this._announces.filter((a) => a.destination_hash === peer.destination_hash);
@@ -588,7 +594,32 @@ class ReticulumDashboard {
             onBrowse: peer.aspect === 'nomadnetwork.node'
                 ? (hash) => this._openBrowse(hash, peer.display_name)
                 : undefined,
+            onSendMessage: (peer.aspect === 'lxmf.delivery' && this._isAdmin)
+                ? (hash) => this.composeMessageTo(hash, peer.display_name)
+                : undefined,
         });
+    }
+
+    /** "Send Message" from the Peers drawer -- opens a live thread in
+     * core's own Messages page, same mechanism (and same reasoning) as
+     * reticulum_panel.js's own composeMessageTo(): messaging.js already
+     * fully supports protocol: 'reticulum' threads, this just needs to
+     * land there instead of nowhere (this page has no send UI of its
+     * own at all, unlike the full Reticulum page's Send tab). */
+    composeMessageTo(destinationHash, displayName) {
+        if (window.sidebar && window.sidebar._router) {
+            window.sidebar._router.navigate('messages');
+        } else if (location.hash !== '#/messages') {
+            location.hash = '#/messages';
+        }
+        setTimeout(() => {
+            window.messagingPanel?.openConversation({
+                node_id: destinationHash,
+                node_name: displayName || destinationHash,
+                protocol: 'reticulum',
+                is_broadcast: false,
+            });
+        }, 100);
     }
 
     /** Every "Browse" action on this page goes through here: if the

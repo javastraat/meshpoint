@@ -173,6 +173,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (window.messageNotifier && window.concentratorWS) {
         window.messageNotifier.init(window.concentratorWS);
     }
+    if (window.MessagesUnreadBadge) {
+        const messagesUnreadBadge = new MessagesUnreadBadge(window.concentratorWS);
+        messagesUnreadBadge.init();
+        window.messagesUnreadBadge = messagesUnreadBadge;
+    }
 
     new SignOutController('signout-btn').bind();
 

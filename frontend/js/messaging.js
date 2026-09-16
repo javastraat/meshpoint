@@ -426,9 +426,15 @@ class MessagingPanel {
         const mc = status.meshcore || {};
 
         if (!mt.enabled && !mc.connected) {
-            banner.style.display = 'block';
-            banner.className = 'msg-tx-banner msg-tx-banner--warn';
-            banner.innerHTML = 'TX not configured. <a href="#/configuration/transmit">Open Radio tab</a> to enable.';
+            this._shouldWarnNoTx().then((warn) => {
+                if (!warn) {
+                    banner.style.display = 'none';
+                    return;
+                }
+                banner.style.display = 'block';
+                banner.className = 'msg-tx-banner msg-tx-banner--warn';
+                banner.innerHTML = 'TX not configured. <a href="#/configuration/transmit">Open Radio tab</a> to enable.';
+            });
             return;
         }
 
@@ -440,6 +446,33 @@ class MessagingPanel {
         }
 
         banner.style.display = 'none';
+    }
+
+    /**
+     * Meshtastic/MeshCore TX only genuinely needs attention if the
+     * operator is actually using one of them -- a Reticulum-only box
+     * (no capture source configured, no MT/MC conversation history)
+     * has neither by design, and "TX not configured" there is simply
+     * wrong, not a warning worth showing. Confirmed live: vm-meshpoint
+     * (RT-only, no concentrator/companion at all) showed this on every
+     * Messages visit. Same signal _updateProtocolPillVisibility() already
+     * uses for pill visibility (capture.sources + protocolsInUse()) --
+     * reused here rather than invented separately. Fails toward warning
+     * (not silence) on a fetch error, matching this file's other
+     * best-effort config checks.
+     */
+    async _shouldWarnNoTx() {
+        const inUse = this._contacts ? this._contacts.protocolsInUse() : new Set();
+        if (inUse.has('meshtastic') || inUse.has('meshcore')) return true;
+        try {
+            const res = await fetch('/api/config', { credentials: 'same-origin' });
+            if (!res.ok) return true;
+            const cfg = await res.json();
+            const sources = new Set((cfg.capture && cfg.capture.sources) || []);
+            return sources.has('concentrator') || sources.has('serial') || sources.has('meshcore_usb');
+        } catch (_) {
+            return true;
+        }
     }
 
     /**

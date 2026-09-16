@@ -13591,3 +13591,68 @@ map to attach to -- nothing then re-triggered map creation. Fixed by
 also calling `_renderTelemetryMap()` once home loads (idempotent
 either way: if the map already exists this is a no-op past the first
 check). Not yet retested live.
+
+**Also fixed, user-reported**: Messages page's "TX not configured.
+Open Radio tab to enable." banner showing on vm-meshpoint even with
+Native TX enabled in Configuration -> Transmit. Real cause: that
+setting is the SX1302/native-radio TX config, entirely unrelated to
+Reticulum -- vm is RT-only, no concentrator/MeshCore companion at all,
+so `status.meshtastic.enabled`/`meshcore.connected` are correctly both
+false, and `_renderTxBanner()` in `messaging.js` fired the warning
+from just that, with no check for whether the box uses MT/MC at all.
+Fixed by gating on the same `capture.sources`/`protocolsInUse()`
+signal `_updateProtocolPillVisibility()` already uses to hide the
+MT/MC filter pills on this exact kind of box (new `_shouldWarnNoTx()`)
+-- stays silent unless MT or MC is actually in the picture. Not yet
+retested live.
+
+**Also investigated, not yet built**: user asked whether the sidebar
+"Messages" unread pill should also show globally (any page, not just
+after visiting Messages). Traced it: `#msg-unread-badge` lives in
+`index.html`'s persistent sidebar markup so it exists on every page,
+but only ever gets populated by `MessagingPanel._syncSidebarBadge()`,
+which only runs after `MessagingPanel.init()` has executed at least
+once -- and `init()` itself early-returns if `#messaging-panel` (the
+Messages route's own container) isn't in the current page's DOM, so a
+session that never visits Messages (directly or via composeMessageTo's
+new openConversation() call) never populates the badge at all, even
+with real unread DMs sitting server-side. `tab_title_telemetry.js`'s
+"(N) ..." title prefix reads the same element, so it's affected too.
+Confirmed this explains the exact screenshots: the rakv2 session
+showed the badge because the Send Message flow (this session's own
+earlier fix) had already triggered `openConversation()` -> `init()`;
+a fresh load landing straight on Reticulum Dashboard never had. Real
+fix would be a lightweight, page-independent badge sync (e.g. fetch
+`/api/messages/conversations`, sum non-broadcast `unread_count` per
+`getDmUnreadTotal()`'s own logic, called from app.js's global bootstrap
+next to `message_notifier.init()`, refreshed on `message_received`) --
+not implemented yet, this was diagnosis only.
+
+**Built the global badge fix (user said yes)**: new
+`frontend/sidebar/messages_unread_badge.js` (`MessagesUnreadBadge`,
+mirrors the existing sidebar-badge class shape --
+`SdrStatusBadge`/`RadioTxBadge`/`UpdateCheckBadge` -- though event-
+driven off `message_received` rather than polling), registered in
+`index.html` right after `update_check_badge.js`, instantiated in
+`app.js` next to `messageNotifier.init()`. Computes the exact same
+total `MessagingContacts.getDmUnreadTotal()` does (non-broadcast
+`unread_count` summed from `GET /api/messages/conversations`),
+independent of whether `MessagingPanel` has ever initialized. Not
+yet retested live.
+
+**Also fixed, user-reported**: Reticulum Dashboard's own peer drawer
+had no "Send Message" (or any write action) at all, unlike the full
+Reticulum page's Peers tab -- was a deliberate original scope choice
+("glanceable companion, not the full management page", per the old
+comment on `_openPeerDrawer()`), not a bug, but the user wants parity.
+Added: `_isAdmin` (same `window.meshpointIdentity.role !== 'viewer'`
+gate `reticulum_panel.js` uses) plus a `composeMessageTo()` doing the
+identical `#/messages` + `openConversation({protocol:'reticulum'})`
+dance as that file's own version, wired into the drawer's
+`onSendMessage` for `lxmf.delivery` peers when admin. No shared-widget
+change needed -- confirmed this dashboard already reuses the exact
+same `window.ReticulumPeerDrawer` class via a global reference
+(`requires = "reticulum"`), and `onSendMessage` was already a
+supported option there. Contact/petname editing intentionally still
+absent here (this page never loaded that data) -- only Send Message
+was asked for. Not yet retested live.
