@@ -40,6 +40,7 @@ from typing import TYPE_CHECKING, Optional
 
 from . import (
     attachments as attachments_store,
+    audio_call,
     host_stats,
     notify,
     talkback,
@@ -184,6 +185,7 @@ class LxmfService:
         propagation_cfg: Optional[dict] = None,
         talkback_enabled: bool = False,
         telemetry_cfg: Optional[dict] = None,
+        audio_calls_enabled: bool = False,
     ):
         self._display_name = display_name
         self._reticulum_config_dir = Path(reticulum_config_dir)
@@ -228,6 +230,13 @@ class LxmfService:
         self._source = None
         self._identity = None
         self._reticulum = None
+        # Voice calls (reticulum-call plugin's own backend hook -- see
+        # audio_call.py's module docstring for why the Pi side is this
+        # small). Off by default, same reasoning as node_enabled/
+        # propagation_enabled/telemetry_enabled -- an extra announced
+        # destination nobody asked for is just noise.
+        self._audio_calls_enabled = audio_calls_enabled
+        self._audio_call_manager: "audio_call.AudioCallManager | None" = None
         self._announce_log: deque = deque(maxlen=_ANNOUNCE_LOG_MAX)
         self._bg_tasks: set = set()
         self._pn_task: Optional[asyncio.Task] = None
@@ -337,6 +346,35 @@ class LxmfService:
             )
             await self._node.start()
 
+        if self._audio_calls_enabled:
+            self._audio_call_manager = audio_call.AudioCallManager(self._identity)
+            self._audio_call_manager.register_incoming_call_callback(self._on_incoming_call)
+            self._audio_call_manager.announce()
+
+    def _on_incoming_call(self, call: "audio_call.AudioCall") -> None:
+        """Runs on RNS's own callback thread (a Link-established callback,
+        not the asyncio loop) -- same threading situation as
+        _on_lxmf_message, same fix: hand the actual work to the loop
+        rather than touch asyncio state from here directly."""
+        if self._loop is not None:
+            asyncio.run_coroutine_threadsafe(
+                self._broadcast_incoming_call(call), self._loop,
+            )
+
+    async def _broadcast_incoming_call(self, call: "audio_call.AudioCall") -> None:
+        remote_identity = call.get_remote_identity()
+        source_hex = RNS.hexrep(remote_identity.hash, delimit=False) if remote_identity else ""
+        peers = await self._peer_repo.list_peers()
+        name = next(
+            (p.display_name for p in peers if p.destination_hash == source_hex), "",
+        )
+        await self._ws_manager.broadcast(
+            "reticulum_incoming_call",
+            {
+                "call_hash": call.link_hash_hex, "node_id": source_hex, "node_name": name,
+            },
+        )
+
     async def stop(self) -> None:
         # Neither RNS nor LXMF expose a clean per-client detach -- process
         # exit is how meshchat.py itself relies on state being flushed too.
@@ -352,11 +390,84 @@ class LxmfService:
         if self._node is not None:
             await self._node.stop()
             self._node = None
+        if self._audio_call_manager is not None:
+            self._audio_call_manager.hangup_all()
+            self._audio_call_manager = None
         self._router = None
         self._source = None
 
     def node_status(self) -> Optional[dict]:
         return self._node.status() if self._node is not None else None
+
+    # --- Voice calls (reticulum-call plugin's backend hook) -------------------
+
+    def audio_call_status(self) -> Optional[dict]:
+        """``None`` unless audio_calls_enabled -- the "call" section on
+        GET /api/reticulum/status only appears once the feature is on."""
+        if self._audio_call_manager is None:
+            return None
+        return {
+            "own_address": (
+                RNS.hexrep(self._audio_call_manager.receiver.destination.hash, delimit=False)
+                if RNS is not None else None
+            ),
+            "calls": self._calls_snapshot(),
+        }
+
+    def _calls_snapshot(self) -> list[dict]:
+        if self._audio_call_manager is None:
+            return []
+        out = []
+        for call in self._audio_call_manager.calls:
+            identity = call.get_remote_identity()
+            node_id = RNS.hexrep(identity.hash, delimit=False) if identity else ""
+            out.append({
+                "call_hash": call.link_hash_hex,
+                "is_outbound": call.is_outbound,
+                "is_active": call.is_active(),
+                "node_id": node_id,
+                "established_at": call.established_at,
+            })
+        return out
+
+    async def initiate_call(self, destination_hash_hex: str) -> dict:
+        """Establishes a call link to *destination_hash_hex* and returns
+        its snapshot dict (same shape as _calls_snapshot()'s entries).
+        Raises RuntimeError if audio calls aren't enabled/running, or
+        ValueError if no path/link could be established."""
+        if self._audio_call_manager is None:
+            raise RuntimeError("Audio calls are not enabled")
+        try:
+            call = await self._audio_call_manager.initiate(destination_hash_hex)
+        except audio_call.CallFailedException as exc:
+            raise ValueError(str(exc)) from exc
+        identity = call.get_remote_identity()
+        node_id = RNS.hexrep(identity.hash, delimit=False) if identity else destination_hash_hex
+        return {
+            "call_hash": call.link_hash_hex, "is_outbound": True,
+            "is_active": call.is_active(), "node_id": node_id,
+            "established_at": call.established_at,
+        }
+
+    def hangup_call(self, call_hash_hex: str) -> bool:
+        """Returns False if no such call exists (already hung up /
+        never existed) rather than raising -- hangup is idempotent from
+        the caller's point of view."""
+        if self._audio_call_manager is None:
+            return False
+        call = self._audio_call_manager.find_by_link_hash_hex(call_hash_hex)
+        if call is None:
+            return False
+        call.hangup()
+        return True
+
+    def get_call(self, call_hash_hex: str) -> Optional["audio_call.AudioCall"]:
+        """The live AudioCall for *call_hash_hex*, or None -- what the
+        WebSocket audio-bridge route (routes.py's own websocket handler,
+        not this module) looks up before forwarding bytes either way."""
+        if self._audio_call_manager is None:
+            return None
+        return self._audio_call_manager.find_by_link_hash_hex(call_hash_hex)
 
     # --- LXMF propagation node ------------------------------------------------
 

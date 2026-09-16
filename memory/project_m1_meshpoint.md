@@ -13375,3 +13375,41 @@ point of the feature), all passing.
 
 Both items, plus item 1 from the prior entry, are marked done in
 `memory/reticulum_todo.md`. Neither is Pi-verified yet.
+
+## Reticulum Audio calls -- Stage 1 (backend only), same session
+
+Full technical writeup lives in `memory/reticulum_todo.md`'s Done log
+(2026-09-16 entry, "Audio calls, item 3") -- this is just the session
+narrative. User picked item 3 off the todo next; asked me to explain it
+first (I verified the mechanism against the real reticulum-meshchat
+source on disk rather than trust the older, un-researched backlog
+notes). User then floated "maybe it should be a meshpoint-plugins app
+hook" -- talked through why the backend can't fully decouple the way
+Reticulum Dashboard/Browser did (a call needs a destination on the
+*same* RNS identity LxmfService already owns, not reachable from an
+isolated plugin process), landed on a hook plugin for the UI but the
+call-manager living in core regardless. User then said to put the new
+plugin in core's own `plugins/apps/` (not the separate `meshpoint-
+plugins` repo after all) as `reticulum-call`. Given the size (biggest
+item left, Med-High), asked whether to actually start building before
+committing real time -- got an explicit go-ahead, then proposed
+splitting into two stages (backend now, the actual WASM/UI-heavy
+plugin as its own checkpoint) and built Stage 1.
+
+One thing worth remembering for next time: while wiring the new
+WebSocket audio-bridge route, hit a real architecture gap -- a plugin
+router's automatic `Depends(require_auth)` (applied via `reg.
+add_router(router, public=False)`) doesn't work against a WebSocket
+connection (that dependency is typed for an HTTP `Request`, confirmed
+by how core's own dashboard `/ws` had to write a bespoke auth gate
+instead of reusing it). Fixed by registering the call router
+`public=True` and calling `src.api.auth.ws_guard.authenticate_websocket()`
+manually inside the handler, same as core does -- needed one small new
+export, `get_jwt_service()` in `src/api/auth/dependencies.py`, the only
+core-file change Stage 1 needed. Worth knowing if a future plugin ever
+wants its own WebSocket route: the `Depends(require_auth)` pattern
+every other route uses silently doesn't apply there.
+
+Stage 2 (the actual `reticulum-call` plugin -- Codec2 WASM vendoring,
+Call UI, mic/speaker) is intentionally not started. Not Pi-tested --
+nothing user-visible exists yet to test.

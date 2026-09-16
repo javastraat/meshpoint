@@ -129,6 +129,7 @@ class ReticulumUpdate(BaseModel):
     node_spaceapi_url: str = ""
     node_events_ical_url: str = ""
     talkback_enabled: bool = False
+    audio_calls_enabled: bool = False
     notify_url: str = ""
     propagation_enabled: bool = False
     propagation_storage_limit_mb: int = Field(250, ge=0, le=100_000)
@@ -274,6 +275,7 @@ async def update_reticulum(
         "node_spaceapi_url": req.node_spaceapi_url.strip(),
         "node_events_ical_url": req.node_events_ical_url.strip(),
         "talkback_enabled": req.talkback_enabled,
+        "audio_calls_enabled": req.audio_calls_enabled,
         "notify_url": req.notify_url.strip(),
         "propagation_enabled": req.propagation_enabled,
         "propagation_storage_limit_mb": req.propagation_storage_limit_mb,

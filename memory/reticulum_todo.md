@@ -7,9 +7,10 @@ context.
 
 Last updated 2026-09-16 — same session built item 1 (Attachments in
 Send, image-only, fully Pi-verified live), item 7 (Messages filter
-chips, in two passes), and item 2 (Paper messages / QR, export-only) —
-see **Done** below for all three. V6 also added to the Todo table,
-still open/unverified. Session builds through 2026-09-09: #1 Contacts,
+chips, in two passes), item 2 (Paper messages / QR, export-only), and
+item 3 **Stage 1 only** (Audio calls backend -- no UI yet, Stage 2 still
+open) — see **Done** below for all four. V6 also added to the Todo
+table, still open/unverified. Session builds through 2026-09-09: #1 Contacts,
 #2 Propagation client, #3 Telemetry publish (+location, +multi-collector),
 #4 Telemetry collect+map, Extra interfaces, UI padding pass.
 **Verification status table below** — #1, #3, #4 and multi-collector
@@ -40,7 +41,7 @@ for each build item is in **Could build — next up** further down.
 |---|---|---|---|---|---|---|
 | ~~1~~ | ~~**Attachments in Send**~~ | build | Med | High | Low | **BUILT + FULLY PI-VERIFIED 2026-09-16** — image-only (deliberately, not `FIELD_FILE_ATTACHMENTS`; see "Could build" below for why). Real two-node round trip confirmed between ti-meshpoint and rakv2-meshpoint |
 | ~~2~~ | ~~**Paper messages / QR**~~ | build | Low–Med | Med | Low | **BUILT 2026-09-16, export-only.** Read the real `LXMF.LXMessage.PAPER` mechanism from source before building (not guessed) — see Done log below for the full research + implementation writeup. Not Pi-tested |
-| 3 | **Audio calls** (`call.audio`) | build | Med–High | High | Med | Frontend-heavy: Codec2 WASM in browser, AudioWorklet mic, ring/answer/hangup UI. Pi is a byte-pipe bridge only. Full reference in `reticulum-meshchat` (`audio_call_manager.py` + `CallPage.vue`). Needs HTTPS (have it). Latency fine on TCP, marginal on LoRa |
+| 3 | **Audio calls** (`call.audio`) | build | Med–High | High | Med | **STAGE 1 (backend) BUILT 2026-09-16** — see Done log below. **STAGE 2 (the actual `reticulum-call` plugin: Codec2 WASM, mic/speaker, ring/answer UI) still to build**, deliberately checkpointed here before the big frontend port. Not Pi-tested (Stage 1 only, nothing user-visible yet). |
 | 4 | **Group chat** (`RNS.Destination.GROUP`) | build | Med | Low | Med | Non-standard, no membership model, easy to half-build. Only on request |
 | 5 | **Structured telemetry sensors** (`SID_PROCESSOR/RAM/NVM`) | build | Med | Low | Med | Nested `[[label,val]]` pack format needs a careful `sense.py` read + Sideband cross-check. Only worth it once a graphing collector exists |
 | 6 | **PN peering** (relay↔relay store sync) | build | Med | Low | Med | No reference impl (meshchat doesn't do it). Only matters for multi-relay setups |
@@ -373,7 +374,7 @@ plugins:
 | ~~Med~~ | ~~**Propagation node polish**~~ | **BUILT 2026-09-09** (new-build #2): outbound node + "Sync inbox" + live transfer state + auto-sync + a `reticulum_propagation_sync` WS event when any sync completes (2026-09-09). Untested on Pi. | — |
 | ~~Med~~ | ~~**Telemetry publish**~~ | **BUILT 2026-09-09** (new-build #3): time + temp + status-line frame, two-node verified. **+ SID_LOCATION added same day** — opt-in `telemetry_include_location`, coords from core's Configuration→GPS pin (`device.latitude/longitude`), no separate keys. Only follow-up left: structured processor/RAM/NVM sensors (nested `[[label,val],...]` — needs verifying against a real Sideband client; low value, INFO string already carries the numbers) | Low |
 | ~~Med~~ | ~~**Telemetry collector + map**~~ | **BUILT 2026-09-09** (new-build #4). Telemetry tab: table + own-Leaflet map (not the dashboard NodeMap — Reticulum telemetry peers aren't in the core `nodes` table; a standalone mini-map was the right call). Not Pi-tested yet. Possible follow-up: also feed into the dashboard map, but that needs core `nodes`-table integration — probably not worth it | — |
-| Med | **Audio calls** (`call.audio`) | browser-to-browser voice, Pi as bridge | **REASSESSED 2026-09-09 — NOT hardware-blocked.** reticulum-meshchat already does this: its `src/backend/audio_call_manager.py` `AudioCall` is a dumb byte pipe (`send_audio_packet` → `RNS.Packet(link, data).send()`), **Codec2 runs in the browser** (`codec2-emscripten` WASM), Pi is purely a browser-WS ↔ RNS-Link bridge — no mic/speaker/USB-adapter on the Pi. Build: (1) port `AudioCallManager`/`AudioCall`/`AudioCallReceiver` (~250 lines MIT) + `call.audio` announce + incoming-call WS event; (2) a WS route `/api/reticulum/call/{hash}/audio` = the byte pipe; (3) **frontend is the bulk** — Call panel (dial by hash, ring/answer/hangup), vendor the Codec2 WASM, mic via AudioWorklet, WebAudio playback (port meshchat's `CallPage.vue` + `codec2-microphone-recorder.js` + `MicrophoneRecorder.js`). Latency fine over TCP backbone, marginal over LoRa. Effort Med–High, frontend-heavy, full reference exists. **Mobile works too** — any browser reaching the dashboard (phone over LAN/Tailscale); needs HTTPS for `getUserMedia` (have it, self-signed cert accept required; iOS Safari fussier). Other end could be another meshpoint, reticulum-meshchat, or Sideband (if its audio wire format = meshchat's raw-Codec2-over-RNS-packet — verify). |
+| Med | **Audio calls** (`call.audio`) | browser-to-browser voice, Pi as bridge | **STAGE 1 (backend) BUILT 2026-09-16 — see Done log.** Architecture decided by direct discussion with the user (2026-09-16): the community-plugin-hook idea ("meshpoint-plugins app hook") got reconsidered mid-conversation into a **core-bundled plugin** at `plugins/apps/reticulum-call/`, same tier as `reticulum-browser`/`reticulum-dashboard` (`requires = "reticulum"`, `[hook] host = "reticulum"` to inject a Call tab into the existing Reticulum page rather than owning a whole sidebar page). Key realization that shaped the split: unlike Dashboard/Browser (pure HTTP-API consumers, fully decoupled), a call needs its own `"call"/"audio"` destination on the **exact same RNS identity** `LxmfService` already owns — that can't live in a fully separate/isolated plugin process, so the call-manager backend had to go in core's own `plugins/apps/reticulum/` regardless (small, ~235-line-equivalent, no heavy deps — fine to bundle), while the ~2.7 MB of Codec2 WASM + the actual call UI stays the separate hook plugin, opt-in, not shipped to every Reticulum install. **STAGE 2 (the reticulum-call plugin itself) still to build**: Call panel (dial by hash, incoming-call toast off the new `reticulum_incoming_call` WS event, ring/answer/hangup), vendor the Codec2 WASM (`c2enc.wasm`/`c2dec.wasm`/`sox.wasm` + glue JS, ~2.7 MB total, from `reticulum-meshchat`'s `codec2-emscripten/` — MIT, Liam Cottle), mic via AudioWorklet + `getUserMedia`, WebAudio playback, talking to Stage 1's new REST (`POST /call/initiate`, `POST /call/{hash}/hangup`) and WebSocket (`/call/{hash}/audio`) endpoints. Port meshchat's `CallPage.vue` (744 lines — bigger than the old "~250 lines" estimate, which was only ever the backend's size) + `codec2-microphone-recorder.js`. Real risk to test carefully, not assume away: `AudioCall.send_audio_packet()` silently drops any frame over `RNS.Link.MDU` — fine over TCP, tight over LoRa. Still unverified: real interop with an actual Sideband/meshchat peer (needs the exact same raw-Codec2-over-RNS-packet wire format). Needs HTTPS for `getUserMedia` (have it). |
 | Low | **Group chat** (`RNS.Destination.GROUP`) | experimental shared-key room, no membership mgmt | Medium — non-standard |
 | ~~Low~~ | ~~**Interface manager UI**~~ | **BUILT 2026-09-09** — `extra_interfaces` (TCPClient/TCPServer/UDP), Settings-tab editor, dual validation, not Pi-tested. Chose structured over raw-textarea (bad config = rnsd won't start = all Reticulum down). Follow-up: more interface types (I2P needs i2pd; a 2nd RNode) if asked | — |
 | ~~Low~~ | ~~**Contacts / petnames**~~ | **BUILT 2026-09-09** (new-build #1) — see Done + Pi-verification list | — |
@@ -404,6 +405,80 @@ plugins:
 
 ## Done (this backlog's completed items)
 
+- **2026-09-16** — Audio calls, item 3, **Stage 1 only (backend, no UI)**,
+  same session as items 1/2/7, right after Paper messages. User picked
+  the item, I explained it (verified against real reticulum-meshchat
+  source rather than the old notes' guesses), user asked "maybe it
+  should be a meshpoint-plugins app hook maybe?" -- talked through the
+  tradeoff (see the "Could build" table entry above for the full
+  reasoning) and landed on core-bundled `plugins/apps/reticulum-call/`
+  instead of the separate community repo, once user clarified mid-
+  conversation. Given the size (Med-High, the biggest item left), asked
+  before building and got an explicit go-ahead, then proposed and got
+  agreement on a two-stage split before starting.
+  **What got built (Stage 1):**
+  - New `backend/audio_call.py` -- `AudioCall`/`AudioCallManager`/
+    `AudioCallReceiver`, ported from reticulum-meshchat's
+    `audio_call_manager.py` (MIT, Liam Cottle -- credit belongs in the
+    Stage-2 plugin's own README too, same as reticulum-browser did for
+    fr33n0w/rBrowser). `AudioCall.send_audio_packet()` is genuinely one
+    line, `RNS.Packet(self.link, data).send()` -- no codec/audio
+    awareness anywhere in this file or anywhere else in the backend,
+    confirmed against the real source rather than assumed.
+  - Wired into `LxmfService`: new opt-in `audio_calls_enabled` (off by
+    default, same reasoning as node_enabled/propagation_enabled/
+    telemetry_enabled -- config plumbed through state.py →
+    config_routes.py's `ReticulumUpdate` → `__init__.py`'s
+    `LxmfService(...)` call, Settings tab gets a "Voice calls" toggle).
+    On start(), creates an `AudioCallManager(self._identity)` --
+    **the same identity object already backing LXMF delivery /
+    NomadNet hosting** (confirmed by reading `start()`: `self._identity
+    = RNS.Identity.from_file(...)`, a real `RNS.Identity`, distinct
+    from `self._source` which is LXMF's own delivery-destination
+    wrapper) -- a `"call"/"audio"` destination becomes a third sibling
+    aspect on one identity, same pattern `NomadNode` already uses.
+    Incoming calls broadcast a new `reticulum_incoming_call` WS event
+    (same RNS-callback-thread → `asyncio.run_coroutine_threadsafe` fix
+    used throughout this file for `_on_lxmf_message`).
+  - New `LxmfService` methods: `initiate_call()`, `hangup_call()`,
+    `get_call()`, `audio_call_status()` (None unless enabled, same
+    `GET /status` convention as `node_status()`/`propagation_status()`).
+  - New `backend/call_routes.py`: admin `POST /call/initiate` +
+    `POST /call/{hash}/hangup` (plain REST, same `Depends(require_admin)`
+    pattern as every other route), and the actual call --
+    `@router.websocket("/call/{hash}/audio")`, a pure byte-forwarder
+    between the browser's WS connection and `AudioCall.
+    send_audio_packet()`/its packet-listener callback.
+  - **Real architecture snag found and fixed, not glossed over**: a
+    plugin router registered `public=False` gets `Depends(require_auth)`
+    applied at the router level automatically -- but that dependency is
+    typed for an HTTP `Request`, and confirmed (by reading how core's
+    OWN dashboard `/ws` route is built) that it does **not** resolve
+    correctly against a WebSocket scope; core had to write its own
+    `_gate_ws_or_close`/`authenticate_websocket()` for exactly this
+    reason. Registered `call_routes.router` with `public=True` instead
+    (the REST routes keep their own explicit `Depends(require_admin)`,
+    unaffected) and added a small public `get_jwt_service()` accessor to
+    `src/api/auth/dependencies.py` (the only core-file change this
+    needed) so the websocket handler can call the same
+    `authenticate_websocket()` core's own `/ws` uses, replicating its
+    accept-before-close close-code sequencing (there's a whole comment
+    in server.py about a real bug from getting that order wrong).
+  - **Ringing/answer semantics deliberately NOT built at the RNS layer**
+    -- read reticulum-meshchat's actual `CallPage.vue` and confirmed
+    there's no ring/answer/decline protocol at all: an `RNS.Link`
+    reaches `ACTIVE` the moment the destination responds (no consent
+    step), and the UI's only real action is "Join Call" on any active
+    link. Meshpoint's Stage 2 can follow the identical simple model --
+    an incoming link shows up via the WS event, the user chooses
+    whether to open the audio bridge at all.
+  - 24 new tests (15 `test_audio_call.py` with a hand-rolled fake
+    `RNS.Link`, 9 `TestAudioCallIntegration` in `test_lxmf_service.py`),
+    all Mac-runnable, all passing.
+  **What's NOT built**: the entire user-facing half -- no Call UI, no
+  Codec2 WASM, no mic/speaker, nothing in the sidebar/Reticulum page at
+  all yet. See the "Could build" table entry above for exactly what
+  Stage 2 needs. Not Pi-tested (nothing to test live yet without a UI).
 - **2026-09-16** — Paper messages / QR, item 2, **export-only** (same
   session as items 1 and 7, immediately after finishing item 1 — user
   asked "what about 2, what is this exactly" since the backlog only had

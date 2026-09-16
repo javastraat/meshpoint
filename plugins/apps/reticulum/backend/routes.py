@@ -72,6 +72,7 @@ async def reticulum_status():
         "node": _service.node_status(),   # None unless hosting a NomadNet node
         "propagation": _service.propagation_status(),  # None unless running a local relay
         "propagation_client": _service.propagation_client_status(),  # None until the router exists
+        "audio_call": _service.audio_call_status(),  # None unless audio_calls_enabled
         "radio": {
             # what the topbar chip shows in its "freq" slot: the RNode
             # frequency when RF is configured, else the TCP backbone.

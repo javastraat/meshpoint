@@ -338,6 +338,20 @@ class ReticulumSettingsTab {
                                 </span>
                             </label>
                         </fieldset>
+                        <fieldset class="cfg-fieldset">
+                            <legend class="cfg-fieldset__legend">Voice calls</legend>
+                            <label class="cfg-field cfg-field--toggle">
+                                <input type="checkbox" data-rt-audio-calls-enabled>
+                                <span class="cfg-field__label">Announce a call destination</span>
+                            </label>
+                            <p class="cfg-field__hint">
+                                Adds a <code>call.audio</code> destination on this node's identity
+                                so peers can call it. This flag alone only turns on the backend
+                                byte-pipe — install and enable the <strong>reticulum-call</strong>
+                                plugin for an actual call UI (dial/ring/answer, Codec2 in the
+                                browser). Restart to apply.
+                            </p>
+                        </fieldset>
                         <div class="cfg-card__actions">
                             <button class="terminal-button terminal-button--primary" type="submit">
                                 Save Reticulum
@@ -396,6 +410,7 @@ class ReticulumSettingsTab {
         this._nodeSpaceapi = this._q('[data-rt-node-spaceapi]');
         this._nodeEvents = this._q('[data-rt-node-events]');
         this._talkbackEnabled = this._q('[data-rt-talkback-enabled]');
+        this._audioCallsEnabled = this._q('[data-rt-audio-calls-enabled]');
         this._notifyUrl = this._q('[data-rt-notify-url]');
         this._nodeStatusEl = this._q('[data-rt-node-status]');
         this._statusEl = this._q('[data-rt-status]');
@@ -584,6 +599,7 @@ class ReticulumSettingsTab {
         if (this._nodeSpaceapi) this._nodeSpaceapi.value = rt.node_spaceapi_url || '';
         if (this._nodeEvents) this._nodeEvents.value = rt.node_events_ical_url || '';
         if (this._talkbackEnabled) this._talkbackEnabled.checked = !!rt.talkback_enabled;
+        if (this._audioCallsEnabled) this._audioCallsEnabled.checked = !!rt.audio_calls_enabled;
         if (this._notifyUrl) this._notifyUrl.value = rt.notify_url || '';
         this._loadNodeStatus();
         if (this._rnodeEnabled) this._rnodeEnabled.checked = rt.rnode_enabled !== false;
@@ -855,6 +871,7 @@ class ReticulumSettingsTab {
             node_spaceapi_url: (this._nodeSpaceapi?.value || '').trim(),
             node_events_ical_url: (this._nodeEvents?.value || '').trim(),
             talkback_enabled: !!this._talkbackEnabled?.checked,
+            audio_calls_enabled: !!this._audioCallsEnabled?.checked,
             notify_url: (this._notifyUrl?.value || '').trim(),
             propagation_enabled: !!this._propEnabled?.checked,
             propagation_storage_limit_mb: Number(this._propStorage?.value) || 0,

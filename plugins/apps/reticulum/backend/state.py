@@ -116,6 +116,12 @@ _DEFAULTS: dict[str, Any] = {
     # config_routes.py's validator, since every command answers from data
     # only a hosted node caches.
     "talkback_enabled": False,
+    # Voice calls (reticulum-call plugin's backend hook -- see
+    # audio_call.py). Off by default -- an announced "call" destination
+    # nobody has a UI for is just noise. The plugin itself carries the
+    # actual call UI + Codec2 WASM; this flag alone does nothing without
+    # it installed and enabled too.
+    "audio_calls_enabled": False,
 }
 
 _config: dict[str, Any] = dict(_DEFAULTS)
@@ -177,6 +183,10 @@ def attachments_dir() -> str:
     from . import attachments
 
     return attachments.dir_from_identity_path(_config["identity_path"])
+
+
+def audio_calls_enabled() -> bool:
+    return bool(_config.get("audio_calls_enabled"))
 
 
 def notify_url() -> str:

@@ -793,6 +793,97 @@ class TestPaperMessage(unittest.TestCase):
                 asyncio.run(svc.paper_message("aa" * 16, "hi"))
 
 
+class TestAudioCallIntegration(unittest.TestCase):
+    """LxmfService's own thin call-management API -- initiate_call/
+    hangup_call/get_call/audio_call_status. The real RNS.Link mechanics
+    are audio_call.py's own concern (see test_audio_call.py); this only
+    checks LxmfService wires its manager correctly."""
+
+    def test_audio_call_status_none_when_disabled(self) -> None:
+        svc = _make_service()
+        self.assertIsNone(svc.audio_call_status())
+
+    def test_audio_call_status_shape_when_enabled(self) -> None:
+        svc = _make_service()
+        manager = mock.Mock()
+        manager.receiver.destination.hash = b"\xaa" * 16
+        manager.calls = []
+        svc._audio_call_manager = manager
+        with mock.patch.object(lxmf_service, "RNS") as mock_rns:
+            mock_rns.hexrep.side_effect = lambda h, delimit=False: h.hex()
+            status = svc.audio_call_status()
+        self.assertEqual(status["own_address"], "aa" * 16)
+        self.assertEqual(status["calls"], [])
+
+    def test_initiate_call_raises_runtime_error_when_not_enabled(self) -> None:
+        svc = _make_service()
+        with self.assertRaises(RuntimeError):
+            asyncio.run(svc.initiate_call("aa" * 16))
+
+    def test_initiate_call_wraps_call_failed_as_value_error(self) -> None:
+        svc = _make_service()
+        manager = mock.Mock()
+
+        async def _raise(*_a, **_kw):
+            raise lxmf_service.audio_call.CallFailedException("no path")
+
+        manager.initiate = _raise
+        svc._audio_call_manager = manager
+        with self.assertRaises(ValueError):
+            asyncio.run(svc.initiate_call("aa" * 16))
+
+    def test_initiate_call_returns_snapshot_on_success(self) -> None:
+        svc = _make_service()
+        manager = mock.Mock()
+        fake_call = mock.Mock()
+        fake_call.link_hash_hex = "deadbeef"
+        fake_call.is_active.return_value = True
+        fake_call.get_remote_identity.return_value = None
+        fake_call.established_at = 12345.0
+
+        async def _initiate(*_a, **_kw):
+            return fake_call
+
+        manager.initiate = _initiate
+        svc._audio_call_manager = manager
+
+        result = asyncio.run(svc.initiate_call("aa" * 16))
+        self.assertEqual(result["call_hash"], "deadbeef")
+        self.assertTrue(result["is_outbound"])
+        self.assertEqual(result["node_id"], "aa" * 16)  # falls back to the dialed hash
+
+    def test_hangup_call_false_when_not_enabled(self) -> None:
+        svc = _make_service()
+        self.assertFalse(svc.hangup_call("deadbeef"))
+
+    def test_hangup_call_false_when_no_such_call(self) -> None:
+        svc = _make_service()
+        manager = mock.Mock()
+        manager.find_by_link_hash_hex.return_value = None
+        svc._audio_call_manager = manager
+        self.assertFalse(svc.hangup_call("deadbeef"))
+
+    def test_hangup_call_true_and_hangs_up_when_found(self) -> None:
+        svc = _make_service()
+        manager = mock.Mock()
+        fake_call = mock.Mock()
+        manager.find_by_link_hash_hex.return_value = fake_call
+        svc._audio_call_manager = manager
+
+        self.assertTrue(svc.hangup_call("deadbeef"))
+        fake_call.hangup.assert_called_once()
+
+    def test_get_call_delegates_to_manager(self) -> None:
+        svc = _make_service()
+        self.assertIsNone(svc.get_call("deadbeef"))  # no manager at all
+
+        manager = mock.Mock()
+        fake_call = mock.Mock()
+        manager.find_by_link_hash_hex.return_value = fake_call
+        svc._audio_call_manager = manager
+        self.assertIs(svc.get_call("deadbeef"), fake_call)
+
+
 class TestTalkback(unittest.TestCase):
     """``_maybe_talkback`` is tested directly with plain source_hex/text
     strings, the same way ``_handle_announce`` is tested separately from

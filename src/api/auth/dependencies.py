@@ -49,6 +49,17 @@ def reset_auth() -> None:
     _jwt_service = None
 
 
+def get_jwt_service() -> JwtSessionService | None:
+    """The service ``init_auth()`` bound at boot -- the same instance
+    ``require_auth``/``require_admin`` verify tokens against. For a
+    WebSocket route (a plugin's own, or core's), which can't use those
+    as a plain ``Depends()`` (they're typed for an HTTP ``Request``, not
+    a ``WebSocket`` scope -- see ``src/api/auth/ws_guard.py``'s own
+    module docstring): call this to get the service, then
+    ``ws_guard.authenticate_websocket(websocket, get_jwt_service())``."""
+    return _jwt_service
+
+
 def _extract_token(request: Request, authorization: Optional[str]) -> str:
     cookie_token = request.cookies.get(SESSION_COOKIE_NAME)
     if cookie_token:
