@@ -668,6 +668,23 @@ plugins:
   audio_calls_enabled, insecure context, no mic hardware) had to be
   ruled out first because none of them could be checked without the
   user's own browser. Not yet re-tested again after this fix.
+  **Re-tested again: real progress.** The path-typo fix worked -- both
+  ends now show "Call connected.", PTT toggles the Talk button
+  correctly, no errors. But holding Talk and speaking produces no audio
+  on the far end at all, with nothing in the console either. Given the
+  actual chain here is long (mic -> AudioWorklet -> Codec2 encode -> WS
+  -> RNS.Packet -> the other node's RNS -> its own WS -> Codec2 decode
+  -> AudioBuffer playback) and a silent failure gives no clue which
+  link broke, added a live `TX N · RX N` packet counter to the status
+  line instead of guessing again -- `_txCount`/`_rxCount`, incremented
+  at the exact two points bytes actually leave/arrive the browser's own
+  WebSocket. Comparing both browsers' numbers side by side (both
+  testers have their own tab open simultaneously) should localize the
+  fault in one exchange: TX stuck at 0 while holding Talk = mic/encode
+  never even happens; TX climbing but the other side's RX at 0 = the
+  RNS packet isn't arriving or isn't being forwarded; both climbing
+  with still no sound = decode/playback specifically. Not yet
+  retested with the counter.
 - **2026-09-16** — Paper messages / QR, item 2, **export-only** (same
   session as items 1 and 7, immediately after finishing item 1 — user
   asked "what about 2, what is this exactly" since the backlog only had

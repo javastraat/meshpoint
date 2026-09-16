@@ -83,6 +83,12 @@ class ReticulumCallHookPanel {
         // call. In PTT mode it tracks the Talk button being held.
         this._pttMode = this._loadPttPref();
         this._pttActive = false;
+        // Encoded-chunk counters, shown live in the status line -- the
+        // fastest way to tell which half of a long pipe (mic -> encode ->
+        // WS -> RNS packet -> other side's RNS -> WS -> decode -> speaker)
+        // is actually broken when there's no error and just silence.
+        this._txCount = 0;
+        this._rxCount = 0;
     }
 
     _loadPttPref() {
@@ -326,6 +332,8 @@ class ReticulumCallHookPanel {
         // Open-mic transmits from the moment the call connects; PTT
         // starts silent until the Talk button is actually held.
         this._pttActive = !this._pttMode;
+        this._txCount = 0;
+        this._rxCount = 0;
         this._render();
         this._setMsg('pending', 'Connecting audio…');
 
@@ -406,17 +414,33 @@ class ReticulumCallHookPanel {
     _render() {
         if (this._dialSectionEl) this._dialSectionEl.hidden = this._state !== 'idle';
         if (this._activeEl) this._activeEl.hidden = this._state !== 'in-call';
-        if (this._statusEl) {
-            this._statusEl.textContent = this._state === 'in-call'
-                ? `${this._isOutbound ? 'Calling' : 'In call'} — mode ${this._mode}${this._pttMode ? ' — PTT' : ' — open mic'}`
-                : '';
-        }
+        this._updateStatusLine();
         if (this._talkBtnEl) {
             this._talkBtnEl.hidden = !(this._state === 'in-call' && this._pttMode);
             this._talkBtnEl.classList.remove('rtcall__talk-btn--active');
             this._talkBtnEl.textContent = 'Hold to Talk';
         }
         this._renderIncoming();
+    }
+
+    /** Cheap enough to call on every single TX/RX packet -- just the
+     * status line's text, none of the hidden/talk-button churn _render()
+     * also does. TX/RX counts are the fastest way to tell which half of
+     * mic -> encode -> WS -> RNS packet -> other side's RNS -> WS ->
+     * decode -> speaker is actually broken when there's silence with no
+     * error: TX stuck at 0 while holding Talk means encoding/sending
+     * never happens; TX climbing but the *other* side's RX staying at 0
+     * means the RNS packet never arrives or never gets forwarded; both
+     * climbing with still no sound means decode/playback itself. */
+    _updateStatusLine() {
+        if (!this._statusEl) return;
+        if (this._state !== 'in-call') {
+            this._statusEl.textContent = '';
+            return;
+        }
+        this._statusEl.textContent = `${this._isOutbound ? 'Calling' : 'In call'} — `
+            + `mode ${this._mode}${this._pttMode ? ' — PTT' : ' — open mic'} — `
+            + `TX ${this._txCount} · RX ${this._rxCount}`;
     }
 
     // ── Audio: mic capture -> Codec2 encode -> WS, and WS -> Codec2 decode -> playback ──
@@ -456,6 +480,8 @@ class ReticulumCallHookPanel {
                     framed[0] = modeIndex >= 0 ? modeIndex : 0;
                     framed.set(encoded, 1);
                     this._ws.send(framed);
+                    this._txCount += 1;
+                    this._updateStatusLine();
                 }
             } catch (e) {
                 console.error('Reticulum call: encode failed', e);
@@ -472,6 +498,8 @@ class ReticulumCallHookPanel {
             const encoded = bytes.subarray(1);
             const samples = await window.ReticulumCallCodec.decode(mode, encoded);
             this._playSamples(samples);
+            this._rxCount += 1;
+            this._updateStatusLine();
         } catch (e) {
             console.error('Reticulum call: decode failed', e);
         }
