@@ -13789,3 +13789,34 @@ that and "Restart rnsd" below, when it's actually instant. Added an
 explicit line to the hint instead of moving it: "Applies the instant
 you click it -- not part of Save Reticulum above, and no restart
 needed." Not yet retested live.
+
+**Then expanded significantly, two more follow-ups in a row.** (1)
+Extend the same hide-by-default treatment to Browse and Pages too, as
+FOUR independent checkboxes instead of one bundled switch, so turning
+Browse back on doesn't also bring back Send. (2) Move the whole
+section below "Restart rnsd" instead of just adding hint text, so it
+reads unambiguously as not part of the top settings at all.
+Implementation: flipped the checkbox semantics while doing this --
+"Hide the X tab" (checked=hidden, confusingly checked-by-default) became
+**"Show the X tab"** (checked=shown, unchecked-by-default), which reads
+far more naturally with "hidden unless you opt in." Storage encoding
+flipped to match: `'1'` = shown, absent/`'0'` = hidden (was the
+reverse). `reticulum_panel.js` gained `RT_HIDE_TAB_KEYS` (array of
+`{tab, key}`, replacing the single `_hideSendMessagesTabs` flag with
+`this._hiddenTabPrefs` keyed by tab name) and `reticulum_settings_tab.js`
+got the mirror-shape object version (`{messages, send, browse, pages}`)
+-- same key strings in both, duplicated rather than shared as symbols
+per the established reasoning. Pages needed special handling: it
+already had its own visibility gate (`_syncPagesTab(hosting)`, only
+shown when NomadNet hosting is active) layered *underneath* the old
+unconditional-hidden markup -- the new preference is now a second,
+independent gate ANDed with hosting (`visible = hosting &&
+!this._hiddenTabPrefs.pages`), so Pages stays hidden by default even
+for someone actively hosting, until they explicitly check "Show the
+Pages tab" (no drawer equivalent exists for page-authoring, unlike
+Send/Messages/Browse, but hidden-by-default was requested for all four
+regardless, for consistency). The live-update event listener
+(`meshpoint:reticulum-hide-tabs-changed`) now loops `RT_HIDE_TAB_KEYS`
+generically rather than hardcoding two tabs, and re-derives Pages'
+visibility through `_syncPagesTab()` itself rather than duplicating
+its hosting-check logic inline. Not yet retested live.

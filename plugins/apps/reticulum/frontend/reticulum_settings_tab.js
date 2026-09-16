@@ -19,13 +19,18 @@ const RT_BANDWIDTHS_HZ = [
     7800, 10400, 15600, 20800, 31250, 41700, 62500, 125000, 250000, 500000,
 ];
 
-// Per-browser only -- never sent to the server. Same key string also
+// Per-browser only -- never sent to the server. Same key strings also
 // read directly by reticulum_panel.js (duplicated rather than shared as
-// a symbol, so neither file depends on the other's load order); a
-// custom event covers same-tab live updates, since the native
-// `storage` event only fires in *other* tabs/windows, never the one
-// that made the change.
-const RT_HIDE_TABS_STORE_KEY = 'meshpoint.reticulum.hideSendMessagesTabs';
+// a symbol, so neither file depends on the other's load order, just
+// kept in the same tab -> key shape there too); a custom event covers
+// same-tab live updates, since the native `storage` event only fires
+// in *other* tabs/windows, never the one that made the change.
+const RT_HIDE_TAB_KEYS = {
+    messages: 'meshpoint.reticulum.hideMessagesTab',
+    send: 'meshpoint.reticulum.hideSendTab',
+    browse: 'meshpoint.reticulum.hideBrowseTab',
+    pages: 'meshpoint.reticulum.hidePagesTab',
+};
 const RT_HIDE_TABS_CHANGE_EVENT = 'meshpoint:reticulum-hide-tabs-changed';
 
 class ReticulumSettingsTab {
@@ -369,22 +374,6 @@ class ReticulumSettingsTab {
                         </div>
                         <p class="cfg-status" data-rt-status aria-live="polite"></p>
                     </form>
-                    <fieldset class="cfg-fieldset">
-                        <legend class="cfg-fieldset__legend">Browser preferences</legend>
-                        <label class="cfg-field cfg-field--toggle">
-                            <input type="checkbox" data-rt-hide-tabs>
-                            <span class="cfg-field__label">Hide the Messages &amp; Send tabs</span>
-                        </label>
-                        <p class="cfg-field__hint">
-                            The Peers drawer's Send Message/Paper message actions already cover
-                            composing — this just tucks the older tabs away. Saved in this
-                            browser only, not sent to the server, so it won't affect anyone
-                            else or any other device signed into this box. <strong>On (hidden)
-                            by default</strong> — uncheck to bring them back, e.g. for
-                            troubleshooting. <strong>Applies the instant you click it</strong> —
-                            not part of "Save Reticulum" above, and no restart needed.
-                        </p>
-                    </fieldset>
                     <div class="cfg-card__actions">
                         <button class="terminal-button" type="button" data-rt-restart-rnsd>
                             Restart rnsd
@@ -397,6 +386,34 @@ class ReticulumSettingsTab {
                         service restart (Settings → System).
                     </p>
                     <p class="cfg-status" data-rt-rnsd-status aria-live="polite"></p>
+                    <fieldset class="cfg-fieldset">
+                        <legend class="cfg-fieldset__legend">Browser preferences</legend>
+                        <p class="cfg-field__hint">
+                            Not part of Reticulum's own config above (nothing here is sent to
+                            the server) — each tab hides in <em>this browser only</em>, applies
+                            the instant you click it, and needs no Save or restart. The Peers
+                            drawer's Send Message/Paper message/Browse-this-node actions already
+                            cover what Messages/Send/Browse did, so all four are hidden by
+                            default — check any of them back on independently, e.g. for
+                            troubleshooting.
+                        </p>
+                        <label class="cfg-field cfg-field--toggle">
+                            <input type="checkbox" data-rt-hide-tab="messages">
+                            <span class="cfg-field__label">Show the Messages tab</span>
+                        </label>
+                        <label class="cfg-field cfg-field--toggle">
+                            <input type="checkbox" data-rt-hide-tab="send">
+                            <span class="cfg-field__label">Show the Send tab</span>
+                        </label>
+                        <label class="cfg-field cfg-field--toggle">
+                            <input type="checkbox" data-rt-hide-tab="browse">
+                            <span class="cfg-field__label">Show the Browse tab</span>
+                        </label>
+                        <label class="cfg-field cfg-field--toggle">
+                            <input type="checkbox" data-rt-hide-tab="pages">
+                            <span class="cfg-field__label">Show the Pages tab</span>
+                        </label>
+                    </fieldset>
                 </article>
             </div>
         `;
@@ -442,17 +459,19 @@ class ReticulumSettingsTab {
         this._statusEl = this._q('[data-rt-status]');
         this._rnsdStatusEl = this._q('[data-rt-rnsd-status]');
 
-        const hideTabsEl = this._q('[data-rt-hide-tabs]');
-        try {
-            // Hidden by default -- only an explicit "0" (unchecked at
-            // least once) turns them back on, e.g. for troubleshooting.
-            hideTabsEl.checked = localStorage.getItem(RT_HIDE_TABS_STORE_KEY) !== '0';
-        } catch (_e) { /* ignore -- defaults to checked/hidden */ }
-        hideTabsEl.addEventListener('change', () => {
+        // Checked = shown; each tab defaults to hidden (unchecked) unless
+        // localStorage already has an explicit "1" from a previous visit.
+        this._el.querySelectorAll('[data-rt-hide-tab]').forEach((el) => {
+            const key = RT_HIDE_TAB_KEYS[el.dataset.rtHideTab];
             try {
-                localStorage.setItem(RT_HIDE_TABS_STORE_KEY, hideTabsEl.checked ? '1' : '0');
-            } catch (_e) { /* ignore -- private browsing / storage disabled */ }
-            window.dispatchEvent(new Event(RT_HIDE_TABS_CHANGE_EVENT));
+                el.checked = localStorage.getItem(key) === '1';
+            } catch (_e) { /* ignore -- defaults to unchecked/hidden */ }
+            el.addEventListener('change', () => {
+                try {
+                    localStorage.setItem(key, el.checked ? '1' : '0');
+                } catch (_e) { /* ignore -- private browsing / storage disabled */ }
+                window.dispatchEvent(new Event(RT_HIDE_TABS_CHANGE_EVENT));
+            });
         });
 
         this._form.addEventListener('submit', (e) => this._onSubmit(e));

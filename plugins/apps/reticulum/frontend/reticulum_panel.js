@@ -22,6 +22,17 @@
  */
 
 const RT_TAB_STORE_KEY = 'meshpoint.rtTab';
+// Per-browser "hide this tab" preferences, one independent checkbox per
+// tab in Settings -- see that file's own comment on these same key
+// strings (duplicated, not shared as symbols, so neither file depends
+// on the other's load order) and RT_HIDE_TABS_CHANGE_EVENT below.
+const RT_HIDE_TAB_KEYS = [
+    { tab: 'messages', key: 'meshpoint.reticulum.hideMessagesTab' },
+    { tab: 'send', key: 'meshpoint.reticulum.hideSendTab' },
+    { tab: 'browse', key: 'meshpoint.reticulum.hideBrowseTab' },
+    { tab: 'pages', key: 'meshpoint.reticulum.hidePagesTab' },
+];
+const RT_HIDE_TABS_CHANGE_EVENT = 'meshpoint:reticulum-hide-tabs-changed';
 // The public Reticulum network's peer count grows unbounded (1000+ after a
 // few hours) -- rendering every row gets visibly heavy, so the Peers tab
 // shows only the most recent RT_PEER_LIMIT by default with a "Show all"
@@ -58,27 +69,34 @@ class ReticulumPanel {
         // info at all means show it) -- the real security boundary is
         // server-side (POST /api/reticulum/send already requires admin).
         this._isAdmin = window.meshpointIdentity?.role !== 'viewer';
-        // Per-browser preference, set from the Settings tab -- see that
-        // file's own comment on RT_HIDE_TABS_STORE_KEY/_CHANGE_EVENT for
-        // why the key string is duplicated here rather than shared as a
-        // symbol. The peer drawer's Send Message/Paper message actions
-        // cover what these two tabs did, so hidden by default; only an
-        // explicit "0" (unchecked at least once, e.g. for troubleshooting)
-        // brings them back.
-        this._hideSendMessagesTabs = true;
-        try {
-            this._hideSendMessagesTabs = localStorage.getItem('meshpoint.reticulum.hideSendMessagesTabs') !== '0';
-        } catch (_) { /* ignore -- defaults to hidden */ }
+        // Per-browser preferences, set from the Settings tab -- see that
+        // file's own comment on RT_HIDE_TAB_KEYS/_CHANGE_EVENT for why the
+        // key strings are duplicated here rather than shared as symbols.
+        // The peer drawer's Send Message/Paper message/Browse-this-node
+        // actions already cover what Messages/Send/Browse did, so all
+        // four (Pages included, for consistency) are hidden by default;
+        // only an explicit "1" (Settings tab's own "Show the X tab"
+        // checkbox, checked at least once -- e.g. for troubleshooting)
+        // brings a given tab back -- independently per tab, not as one
+        // bundled switch, so someone who only wants Browse back doesn't
+        // have to also bring back Send.
+        this._hiddenTabPrefs = RT_HIDE_TAB_KEYS.reduce((acc, { tab, key }) => {
+            let hidden = true;
+            try { hidden = localStorage.getItem(key) !== '1'; } catch (_) { /* defaults to hidden */ }
+            acc[tab] = hidden;
+            return acc;
+        }, {});
         let stored = null;
         try { stored = localStorage.getItem(RT_TAB_STORE_KEY); } catch (_) {}
         // 'pages' restores optimistically -- _syncPagesTab() bounces it
-        // back to 'peers' on the first /status if no node is hosting.
+        // back to 'peers' on the first /status if no node is hosting (or
+        // if the Pages tab itself is hidden by preference).
         // 'browse' is read-only (fetching another node's hosted page/file
         // over a Link, same risk class as reading messages) -- server-side
         // now allows any authed session (nomad_routes.py), so it isn't
         // gated behind _isAdmin here either. 'send'/'settings'/'pages'/
         // 'contacts' write or reconfigure this node, so those stay admin-only.
-        const hiddenTab = this._hideSendMessagesTabs && (stored === 'messages' || stored === 'send');
+        const hiddenTab = !!this._hiddenTabPrefs[stored];
         this._tab = (!hiddenTab && (['messages', 'announces', 'telemetry', 'browse'].includes(stored)
             || (['send', 'settings', 'pages', 'contacts'].includes(stored) && this._isAdmin)))
             ? stored : 'peers';
@@ -145,15 +163,15 @@ class ReticulumPanel {
                             <button class="lw-tab" type="button" role="tab"
                                     data-rt-tab="telemetry">Telemetry</button>
                             <button class="lw-tab" type="button" role="tab"
-                                    data-rt-tab="messages" ${this._hideSendMessagesTabs ? 'hidden' : ''}>Messages</button>
+                                    data-rt-tab="messages" ${this._hiddenTabPrefs.messages ? 'hidden' : ''}>Messages</button>
                             <button class="lw-tab" type="button" role="tab"
-                                    data-rt-tab="send" ${(this._isAdmin && !this._hideSendMessagesTabs) ? '' : 'hidden'}>Send</button>
+                                    data-rt-tab="send" ${(this._isAdmin && !this._hiddenTabPrefs.send) ? '' : 'hidden'}>Send</button>
                             <button class="lw-tab" type="button" role="tab"
                                     data-rt-tab="contacts" ${this._isAdmin ? '' : 'hidden'}>Contacts</button>
                             <button class="lw-tab" type="button" role="tab"
                                     data-rt-tab="call" ${this._isAdmin ? '' : 'hidden'}>Call</button>
                             <button class="lw-tab" type="button" role="tab"
-                                    data-rt-tab="browse">Browse</button>
+                                    data-rt-tab="browse" ${this._hiddenTabPrefs.browse ? 'hidden' : ''}>Browse</button>
                             <button class="lw-tab" type="button" role="tab"
                                     data-rt-tab="settings" ${this._isAdmin ? '' : 'hidden'}>Settings</button>
                             <button class="lw-tab" type="button" role="tab"
@@ -418,19 +436,27 @@ class ReticulumPanel {
         this._root.querySelectorAll('[data-rt-tab]').forEach((btn) => {
             btn.addEventListener('click', () => this._setTab(btn.dataset.rtTab));
         });
-        // Live-reflect the Settings tab's "Hide the Messages & Send tabs"
-        // toggle without a page reload -- both tabs live in this same
-        // mounted panel, so a checkbox change over on Settings wouldn't
-        // otherwise touch this header's already-rendered buttons.
-        window.addEventListener('meshpoint:reticulum-hide-tabs-changed', () => {
-            let hide = true;
-            try { hide = localStorage.getItem('meshpoint.reticulum.hideSendMessagesTabs') !== '0'; } catch (_) {}
-            this._hideSendMessagesTabs = hide;
+        // Live-reflect the Settings tab's per-tab "hide" checkboxes without
+        // a page reload -- all four tabs live in this same mounted panel,
+        // so a checkbox change over on Settings wouldn't otherwise touch
+        // this header's already-rendered buttons.
+        window.addEventListener(RT_HIDE_TABS_CHANGE_EVENT, () => {
+            RT_HIDE_TAB_KEYS.forEach(({ tab, key }) => {
+                let hide = true;
+                try { hide = localStorage.getItem(key) !== '1'; } catch (_) {}
+                this._hiddenTabPrefs[tab] = hide;
+            });
+            // 'pages' has its own extra gate (node hosting) -- let
+            // _syncPagesTab() re-derive it rather than duplicating that
+            // logic here.
+            this._syncPagesTab(this._isAdmin && !!this._nodeHosting);
             const messagesBtn = this._q('[data-rt-tab="messages"]');
             const sendBtn = this._q('[data-rt-tab="send"]');
-            if (messagesBtn) messagesBtn.hidden = hide;
-            if (sendBtn) sendBtn.hidden = hide || !this._isAdmin;
-            if (hide && (this._tab === 'messages' || this._tab === 'send')) this._setTab('peers');
+            const browseBtn = this._q('[data-rt-tab="browse"]');
+            if (messagesBtn) messagesBtn.hidden = this._hiddenTabPrefs.messages;
+            if (sendBtn) sendBtn.hidden = this._hiddenTabPrefs.send || !this._isAdmin;
+            if (browseBtn) browseBtn.hidden = this._hiddenTabPrefs.browse;
+            if (this._hiddenTabPrefs[this._tab]) this._setTab('peers');
         });
         const messageTbody = this._q('#rt-message-tbody');
         if (messageTbody) {
@@ -841,9 +867,10 @@ class ReticulumPanel {
      * and bounce off it if the node just stopped. */
     _syncPagesTab(hosting) {
         this._nodeHosting = hosting;
+        const visible = hosting && !this._hiddenTabPrefs.pages;
         const btn = this._root?.querySelector('[data-rt-tab="pages"]');
-        if (btn) btn.hidden = !hosting;
-        if (!hosting && this._tab === 'pages') this._setTab('peers');
+        if (btn) btn.hidden = !visible;
+        if (!visible && this._tab === 'pages') this._setTab('peers');
     }
 
     async _loadPeers() {
