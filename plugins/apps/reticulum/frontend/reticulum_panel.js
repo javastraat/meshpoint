@@ -291,9 +291,9 @@ class ReticulumPanel {
                     <div data-rt-view="contacts" hidden>
                         <div class="panel__body">
                             <p class="lw-panel__limit">
-                                Your own names for Reticulum destinations — shown across the
-                                Peers, Activity, Messages and Send views. Stored locally,
-                                never announced.
+                                Your own names for Reticulum destinations — click a contact to
+                                open the same drawer used everywhere else (edit, Send Message,
+                                Paper message, Browse). Stored locally, never announced.
                             </p>
                             <form class="rt-contact-add" id="rt-contact-add-form">
                                 <input class="cfg-field__input" type="text" id="rt-contact-add-hash"
@@ -303,31 +303,18 @@ class ReticulumPanel {
                                 <button class="terminal-button" type="submit">Add contact</button>
                                 <span class="cfg-status" id="rt-contact-add-status" aria-live="polite"></span>
                             </form>
-                            <div class="lw-table-wrap">
-                                <table class="lw-table lw-table--rt-contacts">
-                                    <colgroup>
-                                        <col class="col-cname">
-                                        <col class="col-cdest">
-                                        <col class="col-cnote">
-                                        <col class="col-cknown">
-                                        <col class="col-cactions">
-                                    </colgroup>
-                                    <thead>
-                                        <tr>
-                                            <th>Name</th>
-                                            <th>Destination</th>
-                                            <th>Note</th>
-                                            <th class="lw-c">Known</th>
-                                            <th class="lw-r">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="rt-contacts-tbody"></tbody>
-                                </table>
-                                <p class="lw-empty" id="rt-contacts-empty" style="display:none">
-                                    No contacts yet — add one above, or name a peer from its
-                                    drawer on the Peers tab.
-                                </p>
+                            <div class="cfg-card__actions rt-contacts-io">
+                                <button class="terminal-button" type="button" id="rt-contacts-export">Export</button>
+                                <button class="terminal-button" type="button" id="rt-contacts-import-btn">Import</button>
+                                <input class="rt-contacts-import-file" type="file" id="rt-contacts-import-file"
+                                       accept="application/json" hidden>
+                                <span class="cfg-status" id="rt-contacts-io-status" aria-live="polite"></span>
                             </div>
+                            <div class="rt-contacts-list" id="rt-contacts-list"></div>
+                            <p class="lw-empty" id="rt-contacts-empty" style="display:none">
+                                No contacts yet — add one above, or name a peer from its
+                                drawer on the Peers tab.
+                            </p>
                         </div>
                     </div>
                     <div data-rt-view="call" hidden>
@@ -497,18 +484,14 @@ class ReticulumPanel {
         });
 
         this._q('#rt-contact-add-form')?.addEventListener('submit', (e) => this._handleAddContact(e));
-        const contactsTbody = this._q('#rt-contacts-tbody');
-        if (contactsTbody) {
-            contactsTbody.addEventListener('click', (e) => {
-                const tr = e.target.closest('tr[data-rt-contact-hash]');
-                if (!tr) return;
-                const hash = tr.dataset.rtContactHash;
-                if (e.target.closest('[data-rt-contact-save]')) this._saveContactRow(tr, hash);
-                else if (e.target.closest('[data-rt-contact-remove]')) this._deleteContact(hash);
-                else if (e.target.closest('[data-rt-contact-send]')) this.composeMessageTo(hash);
-                else if (e.target.closest('[data-rt-contact-browse]')) this.browseNode(hash);
-            });
-        }
+        this._q('#rt-contacts-list')?.addEventListener('click', (e) => {
+            const row = e.target.closest('[data-rt-contact-hash]');
+            if (row) this._openContactDrawer(row.dataset.rtContactHash);
+        });
+        this._q('#rt-contacts-export')?.addEventListener('click', () => this._exportContacts());
+        const importFileEl = this._q('#rt-contacts-import-file');
+        this._q('#rt-contacts-import-btn')?.addEventListener('click', () => importFileEl?.click());
+        importFileEl?.addEventListener('change', () => this._importContacts(importFileEl));
 
         const sendPeerSearchEl = this._q('#rt-send-peer-search');
         const sendPeerSearchClearEl = this._q('#rt-send-peer-search-clear');
@@ -743,7 +726,11 @@ class ReticulumPanel {
         this._loadMessages();
     }
 
-    async _saveContact(hash, data) {
+    /** silent skips the per-call toast + full contacts reload/re-render
+     * -- needed by _importContacts(), which calls this once per entry;
+     * without it a bulk import would toast and fully reload the list
+     * after every single row instead of once at the end. */
+    async _saveContact(hash, data, { silent = false } = {}) {
         try {
             const r = await fetch(`/api/reticulum/contacts/${encodeURIComponent(hash)}`, {
                 method: 'PUT',
@@ -753,10 +740,14 @@ class ReticulumPanel {
             });
             if (!r.ok) {
                 const err = await r.json().catch(() => ({}));
-                this._toast(err.detail || 'Could not save contact.');
+                if (!silent) this._toast(err.detail || 'Could not save contact.');
                 return false;
             }
-        } catch (_) { this._toast('Could not save contact.'); return false; }
+        } catch (_) {
+            if (!silent) this._toast('Could not save contact.');
+            return false;
+        }
+        if (silent) return true;
         await this._loadContacts();
         this._refreshContactSurfaces();
         this._toast(data.petname ? 'Contact saved.' : 'Contact removed.');
@@ -1177,54 +1168,117 @@ class ReticulumPanel {
 
     // --- Contacts tab -----------------------------------------------------
 
+    /** A clickable list, not an editable table -- name/edit/note/trusted
+     * all live in the peer drawer already (same one Peers/Activity/
+     * Contacts share), so this only needs to render enough to identify
+     * each contact and open that drawer. Same hash-color avatar as the
+     * drawer's own header (_rtHashColor, reticulum_detail_panels.js's
+     * global, same shared-script-scope reasoning as everything else
+     * reused across these two files) for visual consistency. */
     _renderContacts() {
-        const tbody = this._q('#rt-contacts-tbody');
+        const list = this._q('#rt-contacts-list');
         const empty = this._q('#rt-contacts-empty');
-        if (!tbody) return;
+        if (!list) return;
         const hashes = Object.keys(this._contacts).sort((a, b) => {
             const na = (this._contacts[a].petname || '').toLowerCase();
             const nb = (this._contacts[b].petname || '').toLowerCase();
             return na.localeCompare(nb);
         });
         if (!hashes.length) {
-            tbody.innerHTML = '';
+            list.innerHTML = '';
             if (empty) empty.style.display = '';
             return;
         }
         if (empty) empty.style.display = 'none';
-        tbody.innerHTML = hashes.map((hash) => {
+        list.innerHTML = hashes.map((hash) => {
             const c = this._contacts[hash];
-            const peer = this._peers.find((p) => p.destination_hash === hash);
-            const announced = peer && peer.display_name && peer.display_name !== c.petname
-                ? ` <span class="rt-contact-announced">(announced: ${this._esc(peer.display_name)})</span>` : '';
-            const action = (peer && peer.aspect === 'nomadnetwork.node')
-                ? `<button type="button" class="lw-link-btn" data-rt-contact-browse>Browse</button>`
-                : `<button type="button" class="lw-link-btn" data-rt-contact-send>Send</button>`;
+            const name = c.petname || hash;
+            const initials = this._esc(name.slice(0, 2).toUpperCase());
+            const trustedBadge = c.trusted
+                ? '<span class="rt-contact-row__trusted" title="Known">&#10003;</span>' : '';
+            const noteHtml = c.note
+                ? `<span class="rt-contact-row__note">${this._esc(c.note)}</span>` : '';
             return `
-            <tr data-rt-contact-hash="${this._esc(hash)}">
-                <td><input class="cfg-field__input rt-contact-cell" type="text" maxlength="64"
-                           data-rt-contact-name value="${this._esc(c.petname || '')}">${announced}</td>
-                <td class="lw-id">${this._esc(hash)}</td>
-                <td><input class="cfg-field__input rt-contact-cell" type="text" maxlength="280"
-                           data-rt-contact-note placeholder="—" value="${this._esc(c.note || '')}"></td>
-                <td class="lw-c"><input type="checkbox" data-rt-contact-known ${c.trusted ? 'checked' : ''}></td>
-                <td class="lw-r rt-contact-actions">
-                    ${action}
-                    <button type="button" class="lw-link-btn" data-rt-contact-save>Save</button>
-                    <button type="button" class="lw-link-btn" data-rt-contact-remove>Remove</button>
-                </td>
-            </tr>`;
+            <button type="button" class="rt-contact-row" data-rt-contact-hash="${this._esc(hash)}">
+                <span class="nd-avatar" style="background:${_rtHashColor(hash)}">${initials}</span>
+                <span class="rt-contact-row__body">
+                    <span class="rt-contact-row__name">${this._esc(name)}${trustedBadge}</span>
+                    <span class="rt-contact-row__hash">${this._esc(hash)}</span>
+                    ${noteHtml}
+                </span>
+            </button>`;
         }).join('');
     }
 
-    async _saveContactRow(tr, hash) {
-        const petname = tr.querySelector('[data-rt-contact-name]')?.value.trim() || '';
-        if (!petname) { this._toast('A contact needs a name — use Remove to delete it.'); return; }
-        await this._saveContact(hash, {
-            petname,
-            note: tr.querySelector('[data-rt-contact-note]')?.value.trim() || '',
-            trusted: !!tr.querySelector('[data-rt-contact-known]')?.checked,
-        });
+    /** Opens the same peer drawer Peers/Activity use. A contact not
+     * currently in the known-peers roster (added by hand from a hash
+     * with no announce seen yet) gets a synthetic lxmf.delivery peer --
+     * same fallback assumption the old table's own Send-vs-Browse
+     * button already made for an unrosetered contact. */
+    _openContactDrawer(hash) {
+        const peer = this._peers.find((p) => p.destination_hash === hash) || {
+            destination_hash: hash, display_name: '', aspect: 'lxmf.delivery',
+            first_seen: null, last_seen: null,
+        };
+        this._openPeerDrawer(peer);
+    }
+
+    /** Downloads the exact GET /contacts response as a file -- no new
+     * backend route needed, this is already the full export shape. */
+    _exportContacts() {
+        const blob = new Blob([JSON.stringify(this._contacts, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `reticulum-contacts-${new Date().toISOString().slice(0, 10)}.json`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+    }
+
+    /** Imports by replaying each entry through the existing PUT
+     * /contacts/{hash} endpoint (via _saveContact) -- reuses the same
+     * validation the Add-contact form already relies on rather than
+     * adding a bulk-import route. Merges into the existing set (an
+     * imported hash overwrites that one contact, nothing else is
+     * touched); on a bad file, nothing partial is written since the
+     * shape is validated before any request goes out. */
+    async _importContacts(fileEl) {
+        const statusEl = this._q('#rt-contacts-io-status');
+        const file = fileEl.files?.[0] || null;
+        fileEl.value = '';
+        if (!file) return;
+        let data;
+        try {
+            data = JSON.parse(await file.text());
+        } catch (_) {
+            if (statusEl) { statusEl.dataset.kind = 'error'; statusEl.textContent = 'Not valid JSON.'; }
+            return;
+        }
+        const entries = Object.entries(data || {}).filter(
+            ([hash, c]) => /^[0-9a-f]{8,64}$/i.test(hash) && c && typeof c.petname === 'string' && c.petname.trim(),
+        );
+        if (!entries.length) {
+            if (statusEl) { statusEl.dataset.kind = 'error'; statusEl.textContent = 'No valid contacts found in that file.'; }
+            return;
+        }
+        if (statusEl) { statusEl.dataset.kind = 'pending'; statusEl.textContent = `Importing ${entries.length}…`; }
+        let ok = 0;
+        for (const [hash, c] of entries) {
+            const saved = await this._saveContact(hash.toLowerCase(), {
+                petname: c.petname.trim(), note: c.note || '', trusted: !!c.trusted,
+            }, { silent: true });
+            if (saved) ok += 1;
+        }
+        if (ok > 0) {
+            await this._loadContacts();
+            this._refreshContactSurfaces();
+        }
+        if (statusEl) {
+            statusEl.dataset.kind = ok === entries.length ? 'success' : 'error';
+            statusEl.textContent = `Imported ${ok} of ${entries.length}.`;
+        }
     }
 
     async _handleAddContact(event) {

@@ -13842,4 +13842,46 @@ Settings-tab copies to `RT_SETTINGS_HIDE_TAB_KEYS`/
 **Worth remembering**: any future per-browser constant duplicated
 across two of this plugin's own files needs a disambiguating prefix,
 not just a "same value, presumably fine" assumption -- this exact
-mistake is easy to repeat.
+mistake is easy to repeat. **Confirmed live**: user reported "settings
+page works" after the rename fix.
+
+**Next: Contacts tab -- export/import, and "make it nicer."**
+Investigated first, as asked. Export/import needed zero backend
+changes: `GET /contacts` already returns the exact export shape, and
+`PUT /contacts/{hash}` already validates one contact at a time, so
+import is just replaying entries through that same endpoint rather
+than a new bulk route. For "nicer," found the real opportunity: the
+old inline-editable table (own Name/Note/Known cells, separate Save/
+Remove/Send/Browse buttons per row) duplicated everything the peer
+drawer already does elsewhere (Contact editing, Send Message, Paper
+message, Browse) -- recommended collapsing it into a clickable list
+that opens that same drawer, rather than a coat-of-paint pass on the
+table. User approved both.
+Built: `_renderContacts()` now renders `.rt-contact-row` buttons
+(hash-colored avatar via `_rtHashColor()` -- a plain top-level
+*function* declaration in `reticulum_detail_panels.js`, safe to call
+cross-file in the shared script scope since function declarations
+don't collide the way `const` does, confirmed no existing clash first)
+instead of table rows; `_openContactDrawer(hash)` looks up the real
+peer object (accurate aspect/first_seen/last_seen) or falls back to a
+synthetic `lxmf.delivery` one for a contact never actually announced
+-- same fallback assumption the old table's own Send-vs-Browse button
+already made. Removed now-dead code: `_saveContactRow()`, the old
+table's own click-delegation block, and the matching dead CSS
+(`.lw-table--rt-contacts`, `.rt-contact-cell`, `.rt-contact-announced`,
+`.rt-contact-actions`), replaced with `.rt-contact-row*` rules reusing
+core's `.nd-avatar` for visual consistency with the drawer itself.
+`_exportContacts()`: client-side Blob download of `this._contacts`
+(already-loaded in-memory data, matches the GET response exactly).
+`_importContacts()`: parses the uploaded file, validates each entry's
+shape before any request goes out, then loops `_saveContact(hash,
+data, {silent: true})` -- added `silent` as a new option on that
+shared helper specifically for this, since without it a bulk import
+would toast and fully reload+re-render the whole contacts list after
+every single row instead of once at the end.
+**Verified**: re-ran the combined-scope collision simulation (same
+one that caught the `RT_HIDE_TAB_KEYS` regression) across the whole
+reticulum plugin family after these changes -- clean, no new
+collisions introduced. `node --check` clean on both edited files.
+Grepped for every removed table selector/method name to confirm no
+dangling references. Not yet retested live.
