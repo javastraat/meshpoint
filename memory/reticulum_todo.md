@@ -638,6 +638,36 @@ plugins:
   restart, or localhost). (3) Same check also runs once on tab mount,
   so the HTTPS requirement shows up before the user even tries, not
   only after a failed attempt. Not yet re-tested live after this fix.
+  **Re-tested: still failed, but the HTTPS/mic-permission guesses were
+  both wrong** -- user's actual browser console (`vm-meshpoint.local`,
+  HTTPS already on, mic permission already granted, confirmed via the
+  browser's own site-info panel before even asking me) showed the real
+  error: `AbortError: Failed to load worklet module script ... (HTTP
+  status: 404)` on `codec2/processor.js`. **The actual bug: a hardcoded
+  path typo.** `RT_CALL_WORKLET_URL` was
+  `/plugins/apps/reticulum-call/codec2/processor.js` -- missing the
+  `frontend/` segment every *other* vendored asset gets automatically
+  via its injected `<script src>` tag (`plugin_asset_url()` serves
+  whatever's declared in `plugin.toml`'s `frontend.scripts` verbatim,
+  `"frontend/..."` prefix included). `audioWorklet.addModule()` needs an
+  explicit URL string instead of an auto-injected tag, and that string
+  just didn't match. Fixed the one constant. **Also fixed the
+  misdiagnosis-inducing part**: the catch block's on-screen message
+  said "Microphone access failed — check browser permissions" for
+  *any* `_startAudio()` failure, regardless of which step inside it
+  actually failed (worklet loading vs. getUserMedia are very different
+  problems) -- now shows the browser's own `e.message`/`e.name`
+  directly, so a future failure states its real cause on screen
+  instead of sending the next debugging session down the same two
+  wrong paths (HTTPS, then mic hardware) this one went down before the
+  console output settled it. Lesson worth remembering: this whole
+  detour happened because nothing here could be live-tested from this
+  side at all (no browser, no mic, no real RNS stack) -- the actual bug
+  was a one-line path typo that a real page load would have caught
+  instantly, but three rounds of plausible-sounding hypotheses (remote
+  audio_calls_enabled, insecure context, no mic hardware) had to be
+  ruled out first because none of them could be checked without the
+  user's own browser. Not yet re-tested again after this fix.
 - **2026-09-16** — Paper messages / QR, item 2, **export-only** (same
   session as items 1 and 7, immediately after finishing item 1 — user
   asked "what about 2, what is this exactly" since the backlog only had

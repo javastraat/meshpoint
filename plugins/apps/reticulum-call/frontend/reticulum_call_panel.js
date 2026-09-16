@@ -54,7 +54,12 @@
 const RT_CALL_MODES = window.ReticulumCallCodec.MODES;
 const RT_CALL_DEFAULT_MODE = window.ReticulumCallCodec.DEFAULT_MODE;
 const RT_CALL_SAMPLE_RATE = 8000;
-const RT_CALL_WORKLET_URL = '/plugins/apps/reticulum-call/codec2/processor.js';
+// Every other vendored asset gets this exact path automatically via its
+// injected <script src> tag (plugin_asset_url() serves whatever's
+// declared in plugin.toml's frontend.scripts verbatim, "frontend/..."
+// prefix included) -- audioWorklet.addModule() needs an explicit URL
+// instead, and it has to match that same declared path or it 404s.
+const RT_CALL_WORKLET_URL = '/plugins/apps/reticulum-call/frontend/codec2/processor.js';
 const RT_CALL_WORKLET_NAME = 'reticulum-call-audio-processor';
 const RT_CALL_PTT_STORE_KEY = 'meshpoint.rtcall.pttMode';
 
@@ -328,7 +333,13 @@ class ReticulumCallHookPanel {
             await this._startAudio();
         } catch (e) {
             console.error('Reticulum call: could not start audio', e);
-            this._setMsg('error', 'Microphone access failed — check browser permissions.');
+            // _startAudio() can fail for more than one reason (loading the
+            // AudioWorklet module, getUserMedia itself, ...) -- guessing
+            // "check browser permissions" for all of them sent real
+            // debugging down a wrong path once already (a 404 on the
+            // worklet script read as a mic-permission problem). Show the
+            // browser's own reason instead of assuming which step failed.
+            this._setMsg('error', `Could not start audio: ${e && (e.message || e.name) || 'unknown error'}`);
             // silent: keep the message above on screen -- _endCallLocally()'s
             // own default "Call ended." would otherwise stomp it immediately,
             // hiding the actual reason (this is what made an earlier failure
