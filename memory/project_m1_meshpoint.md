@@ -13549,3 +13549,32 @@ interfaces) Pi verifications, is the natural next session's work --
 there's nothing left un-built in the reticulum backlog except
 reactive-only items (group chat, structured telemetry sensors, PN
 peering, general file attachments, paper-message import).
+
+**Live-testing side quest, same session**: two "Announce now" reports
+turned out not to be bugs. (1) After deploying the restart-scope fix,
+manually announcing right after a restart appeared to do nothing on
+the peer side even though the frontend's own toast confirmed the API
+call succeeded -- most likely RNS's own anti-flood cooldown (the
+periodic, hours-apart scheduled announce always gets through; a
+manual click minutes after a fresh startup announce for the same
+destination plausibly doesn't) -- waiting resolved it on retest, not
+a code fix. (2) A `call.audio` announce never showing up on the Peers
+tab is by design, not a bug: `_ROSTER_ASPECTS` deliberately excludes
+it from the peer roster (so the roster isn't padded with every
+Sideband/meshchat user who has calling on) -- it does show up in
+Activity, which is the tab to check instead.
+
+**Also fixed, user-reported UX inconsistency**: Reticulum's own
+"Send Message" (Peers drawer, Contacts row) opened this plugin's own
+one-off Send-tab form instead of a live thread in core's shared
+Messages page, unlike a Meshtastic/MeshCore node's own "Send Message"
+which already does the latter (`_openMessagingForNode()` in
+`frontend/js/app.js`). `messaging.js` already fully supports
+`protocol: 'reticulum'` threads today (Reticulum DMs already show up
+there tagged "RT") -- the button just wasn't landing on that page.
+Fixed `composeMessageTo()` in `reticulum_panel.js` to navigate to
+`#/messages` and call `window.messagingPanel.openConversation(...)`,
+mirroring `_openMessagingForNode()` exactly; resolves the peer's name
+the same way the drawer itself does (petname, then announced name,
+then the bare hash). The plugin's own Send tab is untouched and still
+usable directly. Not yet retested live.

@@ -523,20 +523,32 @@ class ReticulumPanel {
         if (this._nomadTab) this._nomadTab.openNode(destinationHash);
     }
 
-    /** Open the Send tab pre-filled with a specific peer (Peers-drawer
-     * "Send Message" button) -- clears any active search filter first so
-     * the target option is guaranteed visible/selectable. */
+    /** "Send Message" from a peer/contact (Peers-drawer or Contacts row) --
+     * opens a live thread in core's own Messages page, same as a Meshtastic/
+     * MeshCore node's "Send Message" already does (_openMessagingForNode()
+     * in app.js), rather than this plugin's own one-off Send-tab form.
+     * messaging.js already fully supports protocol: 'reticulum' threads
+     * (its own _sendReticulumMessage() path) -- Reticulum DMs already show
+     * up there tagged "RT" today, this just makes the peer-drawer button
+     * land on the same page instead of a separate compose form here. */
     composeMessageTo(destinationHash) {
-        this._sendPeerSearchQuery = '';
-        const searchEl = this._q('#rt-send-peer-search');
-        if (searchEl) searchEl.value = '';
-        const clearBtn = this._q('#rt-send-peer-search-clear');
-        if (clearBtn) clearBtn.hidden = true;
-        this._renderSendPeers();
-        this._setTab('send');
-        const select = this._q('#rt-send-peer');
-        if (select) select.value = destinationHash;
-        this._q('#rt-send-text')?.focus();
+        const petname = (this._contacts[destinationHash] || {}).petname || '';
+        const peer = this._peers.find((p) => p.destination_hash === destinationHash);
+        const name = petname || peer?.display_name || destinationHash;
+
+        if (window.sidebar && window.sidebar._router) {
+            window.sidebar._router.navigate('messages');
+        } else if (location.hash !== '#/messages') {
+            location.hash = '#/messages';
+        }
+        setTimeout(() => {
+            window.messagingPanel?.openConversation({
+                node_id: destinationHash,
+                node_name: name,
+                protocol: 'reticulum',
+                is_broadcast: false,
+            });
+        }, 100);
     }
 
     /** Peers-row click -> right-side drawer (reticulum_detail_panels.js).
