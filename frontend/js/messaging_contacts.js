@@ -220,6 +220,19 @@ class MessagingContacts {
         this.render();
     }
 
+    /** Every protocol with at least one channel or conversation right
+     * now -- used to keep a protocol filter pill visible even after its
+     * hardware/plugin is disabled, so old chats never look like they
+     * silently vanished (see messaging.js's _updateProtocolPillVisibility,
+     * which ORs this together with a live "is X currently configured"
+     * check). */
+    protocolsInUse() {
+        const set = new Set();
+        this._channels.forEach((c) => { if (c.protocol) set.add(c.protocol); });
+        this._conversations.forEach((c) => { if (c.protocol) set.add(c.protocol); });
+        return set;
+    }
+
     setActive(nodeId) {
         this._activeNodeId = nodeId;
         this._listEl.querySelectorAll('.msg-convo').forEach(el => {

@@ -106,6 +106,72 @@ class MessagingPanel {
     async _loadInitialConversations() {
         await this._contacts.load(this._monitorMode);
         this._syncSidebarBadge();
+        this._updateProtocolPillVisibility();
+    }
+
+    /** A protocol's filter pill (MT/MC/RT/Pager) shows if that protocol
+     * is currently configured (same signal the sidebar nav links use to
+     * hide themselves -- capture.sources for MT/MC, radio_pager.
+     * pager_enabled for Pager, a loaded sidebar plugin for RT) OR it
+     * already has at least one channel/conversation. The OR matters:
+     * gating on "configured" alone would make a protocol's pill (and,
+     * with it, the easy way to find those chats) disappear the moment
+     * you turn its hardware off, even though the messages are still
+     * sitting right there under "All" -- this way a pill only goes away
+     * once both the hardware is off AND its history is actually gone
+     * (conversation deleted). Best-effort like sidebar_controller.js's
+     * own _applySourceGating() -- a failed config fetch just leaves
+     * every pill at its default (visible) state. */
+    async _updateProtocolPillVisibility() {
+        const panel = document.getElementById('messaging-panel');
+        if (!panel || !this._contacts) return;
+
+        const inUse = this._contacts.protocolsInUse();
+        let configured = {};
+        try {
+            const res = await fetch('/api/config', { credentials: 'same-origin' });
+            if (res.ok) {
+                const cfg = await res.json();
+                const sources = new Set((cfg.capture && cfg.capture.sources) || []);
+                configured = {
+                    meshtastic: sources.has('concentrator') || sources.has('serial'),
+                    meshcore: sources.has('meshcore_usb'),
+                    pager: !!(cfg.radio_pager && cfg.radio_pager.pager_enabled),
+                    reticulum: (window.MESHPOINT_SIDEBAR_PLUGINS || [])
+                        .some((p) => p.route === 'reticulum'),
+                };
+            }
+        } catch (_) {
+            return; // best-effort -- leave every pill visible on a failed fetch
+        }
+
+        let activeHidden = false;
+        panel.querySelectorAll('.msg-protocol-toggle__btn[data-filter]').forEach((btn) => {
+            const proto = btn.dataset.filter;
+            if (proto === 'all' || proto === 'fav') return;
+            const visible = !!configured[proto] || inUse.has(proto);
+            btn.hidden = !visible;
+            if (!visible && btn.classList.contains('msg-protocol-toggle__btn--active')) {
+                activeHidden = true;
+            }
+        });
+
+        // The filter the user was on just got hidden out from under them
+        // (its protocol was disabled and it has no history at all) --
+        // fall back to "All" rather than leaving an invisible filter
+        // silently applied.
+        if (activeHidden) {
+            panel.querySelectorAll('.msg-protocol-toggle__btn').forEach((b) => {
+                b.classList.remove('msg-protocol-toggle__btn--active');
+                b.setAttribute('aria-selected', 'false');
+            });
+            const allBtn = panel.querySelector('.msg-protocol-toggle__btn[data-filter="all"]');
+            if (allBtn) {
+                allBtn.classList.add('msg-protocol-toggle__btn--active');
+                allBtn.setAttribute('aria-selected', 'true');
+            }
+            this._contacts.setFilter('all');
+        }
     }
 
     openConversation(convo) {
