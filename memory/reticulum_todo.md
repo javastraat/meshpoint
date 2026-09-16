@@ -5,10 +5,11 @@ See `memory/plugin-reticulum.md` for implementation detail (dated sections,
 one per feature) and `memory/project_m1_meshpoint.md` for wider session
 context.
 
-Last updated 2026-09-16 — item 1 (Attachments in Send, image-only) built
-same day, see **Done** below; two more items added to the Todo table
-(V6, 7 — see their Notes for what was flagged and why, both still
-open/unverified). Session builds through 2026-09-09: #1 Contacts,
+Last updated 2026-09-16 — same session built item 1 (Attachments in
+Send, image-only, fully Pi-verified live), item 7 (Messages filter
+chips, in two passes), and item 2 (Paper messages / QR, export-only) —
+see **Done** below for all three. V6 also added to the Todo table,
+still open/unverified. Session builds through 2026-09-09: #1 Contacts,
 #2 Propagation client, #3 Telemetry publish (+location, +multi-collector),
 #4 Telemetry collect+map, Extra interfaces, UI padding pass.
 **Verification status table below** — #1, #3, #4 and multi-collector
@@ -38,7 +39,7 @@ for each build item is in **Could build — next up** further down.
 | # | Item | Type | Effort | Impact | Risk | Notes |
 |---|---|---|---|---|---|---|
 | ~~1~~ | ~~**Attachments in Send**~~ | build | Med | High | Low | **BUILT + FULLY PI-VERIFIED 2026-09-16** — image-only (deliberately, not `FIELD_FILE_ATTACHMENTS`; see "Could build" below for why). Real two-node round trip confirmed between ti-meshpoint and rakv2-meshpoint |
-| 2 | **Paper messages / QR** | build | Low–Med | Med | Low | Sideband-style offline message export; reuses the existing QR-export pattern |
+| ~~2~~ | ~~**Paper messages / QR**~~ | build | Low–Med | Med | Low | **BUILT 2026-09-16, export-only.** Read the real `LXMF.LXMessage.PAPER` mechanism from source before building (not guessed) — see Done log below for the full research + implementation writeup. Not Pi-tested |
 | 3 | **Audio calls** (`call.audio`) | build | Med–High | High | Med | Frontend-heavy: Codec2 WASM in browser, AudioWorklet mic, ring/answer/hangup UI. Pi is a byte-pipe bridge only. Full reference in `reticulum-meshchat` (`audio_call_manager.py` + `CallPage.vue`). Needs HTTPS (have it). Latency fine on TCP, marginal on LoRa |
 | 4 | **Group chat** (`RNS.Destination.GROUP`) | build | Med | Low | Med | Non-standard, no membership model, easy to half-build. Only on request |
 | 5 | **Structured telemetry sensors** (`SID_PROCESSOR/RAM/NVM`) | build | Med | Low | Med | Nested `[[label,val]]` pack format needs a careful `sense.py` read + Sideband cross-check. Only worth it once a graphing collector exists |
@@ -51,10 +52,12 @@ for each build item is in **Could build — next up** further down.
 | V6 | **Verify: inbound Reticulum messages trigger Settings→System's message notifications (toast/sound)** | verify | Low | Med | — | Flagged by user 2026-09-16. Likely already works and just needs confirming: `frontend/js/message_notifier.js`'s `_onMessage()` listens for the core `message_received` WS event with zero protocol filtering (any `direction:'received'` triggers it), and `lxmf_service.py`'s `_handle_inbound_message()` already fires that exact event (added 2026-09-08, alongside its own plugin-private `reticulum_message`) — so the wiring looks complete on paper, just never watched live with an inbound DM to confirm the toast/sound actually fire |
 | ~~7~~ | ~~**Add Reticulum (and Pager) to the Messages page's protocol filter chips**~~ | build | Low | Low–Med | Low | **BUILT 2026-09-16, in two passes.** Pass 1: added `data-filter="reticulum"` ("RT") and `data-filter="pager"` ("Pager") buttons alongside All/MT/MC/★ Fav in `frontend/js/messaging.js:49-55` + `flex-wrap` on `.msg-protocol-toggle` (`messaging.css`) so 6 buttons wrap instead of overflowing a narrow sidebar — user live-tested this on the Pi immediately and both screenshotted fine. Pass 2, same session: user pointed out a real gap — an empty "Pager" pill (no pager configured on that box) was a dead-end click ("No conversations yet"), but the fix couldn't be "just hide it," since disabling a protocol *with existing history* would then make those old chats look silently gone. Landed on OR-ing two signals per pill: **configured** (same signal the sidebar nav already uses to hide itself — `capture.sources` for MT/MC, `radio_pager.pager_enabled` for Pager, a `reticulum` entry in `window.MESHPOINT_SIDEBAR_PLUGINS` for RT) **or has any channel/conversation already** (new `MessagingContacts.protocolsInUse()`). A pill only disappears once both are false. New `MessagingPanel._updateProtocolPillVisibility()`, called after every conversations load (initial + each time the Messages page is revisited); falls back to the "All" filter if the currently-active pill gets hidden out from under it. Best-effort like `sidebar_controller.js`'s own `_applySourceGating()` — a failed config fetch just leaves every pill visible. Not yet seen live in a real browser. |
 
-**Suggested sequence:** 1 → (V1, V2 on the Pi) → 2 → 3, with V3·V4·V5 folded
-into the next Pi session and 4–6 left reactive. V6 and 7 are both quick
-(no design decisions pending) — worth folding into whichever session
-touches the Messages page or does the next Pi verification pass next.
+**Suggested sequence:** ~~1~~ → (V1, V2 on the Pi) → ~~2~~ → 3, with V3·V4·V5
+folded into the next Pi session and 4–6 left reactive. Items 1, 2 and 7
+are all built now (V6 still just flagged, not verified) — **V1/V2 (Pi
+verification) are the natural next session**: both are quick, high-impact,
+and have simply never been run. #3 (Audio calls) is the next real build
+after that.
 
 ---
 
@@ -374,7 +377,7 @@ plugins:
 | Low | **Group chat** (`RNS.Destination.GROUP`) | experimental shared-key room, no membership mgmt | Medium — non-standard |
 | ~~Low~~ | ~~**Interface manager UI**~~ | **BUILT 2026-09-09** — `extra_interfaces` (TCPClient/TCPServer/UDP), Settings-tab editor, dual validation, not Pi-tested. Chose structured over raw-textarea (bad config = rnsd won't start = all Reticulum down). Follow-up: more interface types (I2P needs i2pd; a 2nd RNode) if asked | — |
 | ~~Low~~ | ~~**Contacts / petnames**~~ | **BUILT 2026-09-09** (new-build #1) — see Done + Pi-verification list | — |
-| Low | **Paper messages / QR** | Sideband-style offline message export | Low–Med |
+| ~~Low~~ | ~~**Paper messages / QR**~~ | Sideband-style offline message export | **BUILT 2026-09-16, export-only.** Real LXMF `PAPER` delivery method (0x05, confirmed from `pip download lxmf` source, not guessed) — a fully real end-to-end-encrypted message that's never handed to a transport interface, only exported as an `lxm://...` URI via `LXMessage.as_uri()` for the frontend to render as a QR. New `LxmfService.paper_message()` (factored `_resolve_identity()` out of `send_message()` so both share the same path-discovery retry logic), admin `POST /api/reticulum/paper`. Send tab gets a "Paper message" button (reuses the same Peer/Message fields, 512-char cap so the QR stays scannable — image attachments deliberately not supported here, would make the QR too dense) → a result panel with a QR (reusing Quick Deploy's own vendored `qrcode.min.js` + `<canvas>` pattern, zero new deps) + copyable URI text + a Print button (`@media print` isolates just the QR). Recorded in the thread with `status: "paper"` (the existing generic ` · <status>` meta-line suffix in `messaging_chat.js` already renders it, no frontend change needed for that part). **Import/scan-back-in deliberately not built** — user confirmed the intended receiver is a real phone running Sideband-class software, which already has its own camera-scan path; meshpoint (a browser dashboard) has no camera to scan with. 4 new Mac-runnable tests, all passing. Not Pi-tested. |
 | Low | **Reticulum Browser: remote-host fingerprint verification** | rBrowser has a model for this; ours doesn't yet | Unscoped — needs studying rBrowser's actual verification approach first, not just effort to build |
 | Low | **Reticulum Browser: local NomadNet search engine + page cache** | Background crawler + index of NomadNet pages | Needs its own `service`-seam backend (same capability LXMF's own service uses) + a real cache schema — comparable in scope to a whole separate plugin |
 | Low | **Reticulum Browser: form-field submission + `/file/...` downloads** | Interactive `.mu` page forms, file attachments | Low — the reticulum plugin's own Browse tab already covers both; only missing from the newer Browser plugin specifically |
@@ -401,6 +404,53 @@ plugins:
 
 ## Done (this backlog's completed items)
 
+- **2026-09-16** — Paper messages / QR, item 2, **export-only** (same
+  session as items 1 and 7, immediately after finishing item 1 — user
+  asked "what about 2, what is this exactly" since the backlog only had
+  a one-line description; researched the real mechanism from source
+  before building, rather than guessing from the name). **What it
+  actually is** (confirmed by cloning `markqvist/Sideband` and
+  `pip download`ing the real `lxmf` 1.1.1 source, not assumed): LXMF has
+  a fourth delivery method, `LXMessage.PAPER` (0x05) — a fully real,
+  fully end-to-end-encrypted message against the recipient's actual
+  identity that's never handed to any transport interface at all.
+  `LXMessage.as_uri()` base64-encodes the packed bytes into an
+  `lxm://...` URI; `.as_qr()` (Sideband-side, needs the Python `qrcode`
+  package) renders that as a QR image. Deliver the QR by any means
+  outside Reticulum — screen, print, another app, in person — and the
+  recipient's own LXMF client scans/pastes it back in; their key
+  decrypts it exactly like a normal received message.
+  **Built:** factored `_resolve_identity()` out of `send_message()`
+  (same path-discovery retry logic both `send_message` and the new
+  `paper_message()` need) into its own method — `paper_message()` builds
+  an `LXMessage(desired_method=LXMF.LXMessage.PAPER)`, calls
+  `lxm.as_uri()` (which self-packs + finalises, no `handle_outbound`/
+  router involvement whatsoever — the message is never transmitted),
+  records it in the shared conversation history with `status: "paper"`
+  (the existing generic ` · <status>` meta-line suffix in
+  `messaging_chat.js` already renders any non-"delivered"/"read" status,
+  free). Capped at 512 chars (tighter than the ~10,000-char normal-send
+  cap — every extra character makes the QR denser, and the packed LXMF
+  payload already carries real fixed overhead before user text even
+  starts) — deliberately no image-attachment support here for the same
+  density reason. Frontend: Send tab gets a **"Paper message"** button
+  (reuses the same Peer/Message fields as a real send) → a result panel
+  rendering the QR via the exact same vendored `qrcode.min.js` +
+  `<canvas>` pattern Configuration → Channels' Quick Deploy export
+  already uses (zero new dependencies) + the raw URI as copyable text +
+  a Print button (new `@media print` block isolates just the QR,
+  full-bleed, no dashboard chrome — works with the user's actual
+  receipt printer via the OS's own print dialog, no custom printer
+  integration built or needed). New admin `POST /api/reticulum/paper`.
+  **Deliberately export-only** — importing/scanning a paper message
+  *into* meshpoint isn't built. User confirmed the real intended
+  receiver is a phone running Sideband (or similar), which already has
+  its own camera-scan path; a browser dashboard has no camera to scan
+  with, so building an import/decode path here would serve a receiver
+  that doesn't really exist. 4 new tests (`TestPaperMessage`,
+  Mac-runnable, mocked RNS/LXMF), all passing — including one confirming
+  `_router.handle_outbound` is never called, the whole point of the
+  feature. Not Pi-tested.
 - **2026-09-16** — Attachments in Send, item 1, **image-only** (a deliberate
   scope call, made when directly asked — see the "Could build" table
   entry above for the full reasoning and file list; general file
@@ -515,11 +565,12 @@ plugins:
 ## Suggested order from here
 
 **See "Todo — prioritised (2026-09-09)" near the top of this file** — that
-table is the current answer. Short version: **Attachments in Send** (now
-built, image-only, 2026-09-16) → Pi-verify propagation client + extra
-interfaces + V6 + item 7 → **Paper messages / QR** → **Audio calls**;
-V3–V5 fold into the next Pi session; group chat / structured sensors /
-PN peering / file attachments stay reactive.
+table is the current answer. Short version: **Attachments in Send**,
+**Paper messages / QR**, and item 7 (filter chips) are all built now
+(2026-09-16) → Pi-verify propagation client + extra interfaces + V6 →
+**Audio calls**; V3–V5 fold into the next Pi session; group chat /
+structured sensors / PN peering / file attachments / paper-message
+import stay reactive.
 
 Note the earlier "needs audio hardware" concern on Audio calls was
 retracted 2026-09-09 — Codec2 runs in the browser, the Pi is only a

@@ -81,6 +81,14 @@ _PROPAGATION_ANNOUNCE_INTERVAL_S = 21600  # 6h -- re-announce the lxmf.propagati
 _PATH_REQUEST_RETRIES = 5
 _PATH_REQUEST_POLL_INTERVAL_S = 1.0
 
+# Tighter than the ~10,000-char cap on a normal send -- a paper message's
+# whole point is to be scannable off a phone camera (or printed small
+# enough for a receipt printer), and every extra character makes the QR
+# denser. The packed LXMF payload already carries real fixed overhead
+# (both hashes, the signature, msgpack framing) before any message text
+# even starts, so this stays well under what a QR could technically hold.
+_MAX_PAPER_MESSAGE_CHARS = 512
+
 # Talkback (backend/talkback.py) is inherently loop-safe (its replies never
 # start with a recognized command word, see that module's docstring), but a
 # per-sender cooldown is cheap defence in depth against any bug that would
@@ -927,6 +935,41 @@ class LxmfService:
     def _attachments_dir(self) -> str:
         return attachments_store.dir_from_identity_path(str(self._identity_path))
 
+    async def _resolve_identity(self, destination_hash_hex: str):
+        """The recipient's ``RNS.Identity`` for *destination_hash_hex*,
+        actively requesting its path if it's not already cached. Shared
+        by ``send_message`` and ``paper_message`` -- a paper message is
+        still a real end-to-end-encrypted LXMF message against the
+        recipient's actual identity, just never handed to a transport
+        interface, so it needs the same identity resolution a live send
+        does. Raises ValueError if nothing answers."""
+        dest_hash = bytes.fromhex(destination_hash_hex)
+        identity = RNS.Identity.recall(dest_hash)
+        if identity is None:
+            # Identity.recall() only finds destinations we've seen a real
+            # announce for -- a peer we only know about because a message
+            # arrived FROM them (a Link handshake) isn't necessarily in
+            # that same table yet, confirmed live: meshpoint received a
+            # message from a peer's fresh session and still couldn't
+            # recall() them seconds later to reply. request_path() asks
+            # the network (or, on a shared instance, effectively asks
+            # rnsd) to (re)announce that destination if it's reachable,
+            # same as reticulum-meshchat and other real RNS apps do
+            # before giving up -- not just a testing convenience, this
+            # is the correct way to handle a cold cache in production too.
+            RNS.Transport.request_path(dest_hash)
+            for _ in range(_PATH_REQUEST_RETRIES):
+                await asyncio.sleep(_PATH_REQUEST_POLL_INTERVAL_S)
+                identity = RNS.Identity.recall(dest_hash)
+                if identity is not None:
+                    break
+        if identity is None:
+            raise ValueError(
+                "Unknown destination -- requested its path but got no "
+                "response; this peer may be offline or has never announced"
+            )
+        return identity
+
     async def send_message(
         self,
         destination_hash_hex: str,
@@ -952,32 +995,7 @@ class LxmfService:
                 f"{attachments_store.MAX_IMAGE_BYTES})"
             )
 
-        dest_hash = bytes.fromhex(destination_hash_hex)
-        identity = RNS.Identity.recall(dest_hash)
-        if identity is None:
-            # Identity.recall() only finds destinations we've seen a real
-            # announce for -- a peer we only know about because a message
-            # arrived FROM them (a Link handshake) isn't necessarily in
-            # that same table yet, confirmed live: meshpoint received a
-            # message from a peer's fresh session and still couldn't
-            # recall() them seconds later to reply. request_path() asks
-            # the network (or, on a shared instance, effectively asks
-            # rnsd) to (re)announce that destination if it's reachable,
-            # same as reticulum-meshchat and other real RNS apps do
-            # before giving up -- not just a testing convenience, this
-            # is the correct way to handle a cold cache in production too.
-            RNS.Transport.request_path(dest_hash)
-            for _ in range(_PATH_REQUEST_RETRIES):
-                await asyncio.sleep(_PATH_REQUEST_POLL_INTERVAL_S)
-                identity = RNS.Identity.recall(dest_hash)
-                if identity is not None:
-                    break
-
-        if identity is None:
-            raise ValueError(
-                "Unknown destination -- requested its path but got no "
-                "response; this peer may be offline or has never announced"
-            )
+        identity = await self._resolve_identity(destination_hash_hex)
 
         destination = RNS.Destination(
             identity, RNS.Destination.OUT, RNS.Destination.SINGLE,
@@ -1026,6 +1044,67 @@ class LxmfService:
             },
         )
         return row_id
+
+    async def paper_message(self, destination_hash_hex: str, text: str) -> tuple[int, str]:
+        """Builds a real end-to-end-encrypted LXMF message against the
+        recipient's actual identity, using LXMF's fourth delivery method
+        (``LXMessage.PAPER``) -- but never hands it to a transport
+        interface at all. Returns ``(row_id, uri)`` where *uri* is an
+        ``lxm://...`` URI (``LXMessage.as_uri()``, base64 of the packed
+        message) for the caller to render as a QR code -- meant to be
+        shown/printed and delivered by any means outside Reticulum
+        entirely (in person, a photo shared over another app, an actual
+        printed receipt), then scanned back in by the recipient's own
+        LXMF-compatible client. The crypto doesn't care how the bytes
+        travelled -- their private key decrypts it exactly like a
+        normally-received message. Recorded in the shared conversation
+        history same as ``send_message()``, with ``status="paper"`` so
+        the thread shows it was never actually transmitted (the generic
+        `` · <status>`` suffix in messaging_chat.js's meta line already
+        renders any non-"delivered"/"read" status, no frontend change
+        needed for that part). Raises ValueError for an unresolvable
+        destination (see ``_resolve_identity``) or text over
+        ``_MAX_PAPER_MESSAGE_CHARS``."""
+        if not self.available or self._source is None:
+            raise RuntimeError("Reticulum service is not running")
+        if len(text) > _MAX_PAPER_MESSAGE_CHARS:
+            raise ValueError(
+                f"Paper message text too long ({len(text)} chars, max "
+                f"{_MAX_PAPER_MESSAGE_CHARS}) -- keep it short so the QR "
+                "code stays scannable"
+            )
+
+        identity = await self._resolve_identity(destination_hash_hex)
+
+        destination = RNS.Destination(
+            identity, RNS.Destination.OUT, RNS.Destination.SINGLE,
+            "lxmf", "delivery",
+        )
+        lxm = LXMF.LXMessage(
+            destination, self._source, text, desired_method=LXMF.LXMessage.PAPER,
+        )
+        # as_uri() packs the message and finalises it (determines transport
+        # encryption, marks it paper-generated) internally -- no router
+        # involvement at all, this message is never actually transmitted.
+        uri = lxm.as_uri()
+
+        peers = await self._peer_repo.list_peers()
+        name = next(
+            (p.display_name for p in peers
+             if p.destination_hash == destination_hash_hex), "",
+        )
+        row_id = await self._message_repo.save_sent(
+            text=text, node_id=destination_hash_hex, node_name=name,
+            protocol="reticulum", status="paper",
+        )
+        await self._ws_manager.broadcast(
+            "message_sent",
+            {
+                "text": text, "node_id": destination_hash_hex, "node_name": name,
+                "protocol": "reticulum", "direction": "sent",
+            },
+        )
+        return row_id, uri
 
     async def list_peers(self):
         return await self._peer_repo.list_peers()

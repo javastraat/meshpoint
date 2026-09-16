@@ -542,3 +542,44 @@
 .rt-tele-popup__tag--closed { color: var(--accent-red, #ef4444); }
 
 .rt-amodal__view-peer { width: 100%; margin-top: 0.75rem; }
+
+/* ---- Paper message result (Send tab) ---- */
+.rt-paper-result {
+    max-width: 480px;
+    margin-top: 12px;
+    border: 1px solid var(--border, #333);
+    border-radius: 8px;
+    padding: 14px 16px;
+    background: var(--bg-card, #162033);
+}
+.rt-paper-result__qr {
+    display: flex;
+    justify-content: center;
+    margin: 10px 0;
+}
+.rt-paper-result__qr canvas { border-radius: 6px; }
+.rt-paper-result__uri {
+    font-family: var(--font-mono, ui-monospace, "SF Mono", Menlo, monospace);
+    font-size: 11px;
+    resize: vertical;
+}
+
+/* Printing a paper message: just the QR + URI, full-bleed and large --
+   whatever's driving the print (a normal printer, a receipt printer via
+   the OS print dialog) gets a clean scannable code, not the dashboard
+   chrome around it. No custom printer integration -- window.print()
+   already goes through whatever printer the OS has configured. */
+@media print {
+    body * { visibility: hidden; }
+    .rt-paper-result, .rt-paper-result * { visibility: visible; }
+    .rt-paper-result {
+        position: fixed;
+        inset: 0;
+        border: none;
+        background: #fff;
+        color: #000;
+    }
+    .rt-paper-result__uri, #rt-paper-copy, #rt-paper-print, #rt-paper-close {
+        display: none;
+    }
+}

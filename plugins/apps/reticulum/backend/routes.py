@@ -200,6 +200,31 @@ async def reticulum_attachment(
     return Response(content=image_bytes, media_type=mime)
 
 
+class PaperMessageRequest(BaseModel):
+    destination_hash: str = Field(..., min_length=1)
+    text: str = Field(..., min_length=1, max_length=512)
+
+
+@router.post("/paper")
+async def reticulum_paper_message(
+    req: PaperMessageRequest, _claims: SessionClaims = Depends(require_admin),
+):
+    """Builds a Paper Message -- a real LXMF message that's never
+    transmitted, only exported as an `lxm://...` URI for the frontend to
+    render as a QR code (see `LxmfService.paper_message()`). For
+    delivering a message with zero live path between the two nodes at
+    all: the recipient's own LXMF client scans it back in."""
+    if _service is None:
+        raise HTTPException(503, "Reticulum companion is disabled")
+    try:
+        row_id, uri = await _service.paper_message(req.destination_hash, req.text)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    except RuntimeError as exc:
+        raise HTTPException(503, str(exc))
+    return {"id": row_id, "status": "paper", "uri": uri}
+
+
 @router.post("/announce")
 async def reticulum_announce(_claims: SessionClaims = Depends(require_admin)):
     if _service is None:

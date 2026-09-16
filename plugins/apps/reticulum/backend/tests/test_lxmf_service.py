@@ -55,6 +55,7 @@ class _FakeMessageRepo:
     def __init__(self):
         self._next_id = 1
         self.saved: list[dict] = []
+        self.sent: list[dict] = []
 
     async def save_received(self, *, text, node_id, node_name, protocol, packet_id,
                              attachments=None):
@@ -65,6 +66,16 @@ class _FakeMessageRepo:
             "protocol": protocol, "packet_id": packet_id, "attachments": attachments,
         })
         return row_id, False
+
+    async def save_sent(self, *, text, node_id, node_name, protocol,
+                         channel=0, packet_id="", status="sent", attachments=None):
+        row_id = self._next_id
+        self._next_id += 1
+        self.sent.append({
+            "text": text, "node_id": node_id, "node_name": node_name,
+            "protocol": protocol, "status": status, "attachments": attachments,
+        })
+        return row_id
 
 
 @unittest.skipIf(
@@ -708,6 +719,78 @@ class TestSendMessageImageGuard(unittest.TestCase):
                 asyncio.run(svc.send_message("aa" * 16, "hi", image=("jpg", big)))
         # Never got as far as resolving an identity / building a destination.
         svc._router.handle_outbound.assert_not_called()
+
+
+class TestPaperMessage(unittest.TestCase):
+    """paper_message() -- a real LXMF message built with the PAPER
+    delivery method and exported as an lxm://... URI, never handed to
+    the router/transport at all (unlike send_message())."""
+
+    def test_raises_runtime_error_when_not_running(self) -> None:
+        svc = _make_service()
+        with self.assertRaises(RuntimeError):
+            asyncio.run(svc.paper_message("aa" * 16, "hi"))
+
+    def test_oversized_text_rejected_before_any_rns_work(self) -> None:
+        svc = _make_service()
+        svc._source = mock.Mock()
+        too_long = "x" * (lxmf_service._MAX_PAPER_MESSAGE_CHARS + 1)
+        with mock.patch.object(lxmf_service, "RNS", mock.Mock()), \
+                mock.patch.object(lxmf_service, "LXMF", mock.Mock()) as mock_lxmf:
+            with self.assertRaises(ValueError):
+                asyncio.run(svc.paper_message("aa" * 16, too_long))
+        # Never got as far as constructing a message at all.
+        mock_lxmf.LXMessage.assert_not_called()
+
+    def test_builds_a_paper_message_and_never_transmits_it(self) -> None:
+        message_repo = _FakeMessageRepo()
+        ws_manager = _FakeWs()
+        svc = _make_service(
+            peer_repo=_FakePeerRepo(), message_repo=message_repo, ws_manager=ws_manager,
+        )
+        svc._router = mock.Mock()
+        svc._source = mock.Mock()
+
+        fake_lxm = mock.Mock()
+        fake_lxm.as_uri.return_value = "lxm://fake-paper-uri"
+
+        with mock.patch.object(lxmf_service, "RNS") as mock_rns, \
+                mock.patch.object(lxmf_service, "LXMF") as mock_lxmf:
+            mock_lxmf.LXMessage.return_value = fake_lxm
+            mock_lxmf.LXMessage.PAPER = "paper-method-sentinel"
+            mock_rns.Identity.recall.return_value = mock.Mock()
+            row_id, uri = asyncio.run(svc.paper_message("aa" * 16, "hi there"))
+
+        self.assertEqual(uri, "lxm://fake-paper-uri")
+        # Built with the PAPER method, not DIRECT.
+        self.assertEqual(
+            mock_lxmf.LXMessage.call_args.kwargs["desired_method"],
+            "paper-method-sentinel",
+        )
+        fake_lxm.as_uri.assert_called_once()
+        # The whole point: never handed to the router / actually sent.
+        svc._router.handle_outbound.assert_not_called()
+        # Recorded in history as a distinct status, not the normal "sent".
+        self.assertEqual(len(message_repo.sent), 1)
+        self.assertEqual(message_repo.sent[0]["status"], "paper")
+        self.assertEqual(message_repo.sent[0]["text"], "hi there")
+        self.assertEqual(row_id, message_repo._next_id - 1)
+        self.assertIn("message_sent", [e[0] for e in ws_manager.events])
+
+    def test_unresolvable_destination_raises_value_error(self) -> None:
+        svc = _make_service(message_repo=_FakeMessageRepo())
+        svc._source = mock.Mock()
+        # Skip the real retry delay (_PATH_REQUEST_RETRIES *
+        # _PATH_REQUEST_POLL_INTERVAL_S would otherwise really sleep) --
+        # the retry loop itself isn't what this test is checking, only
+        # that "never resolves" ends in ValueError.
+        with mock.patch.object(lxmf_service, "RNS") as mock_rns, \
+                mock.patch.object(lxmf_service, "LXMF", mock.Mock()), \
+                mock.patch.object(lxmf_service, "_PATH_REQUEST_RETRIES", 1), \
+                mock.patch.object(lxmf_service, "_PATH_REQUEST_POLL_INTERVAL_S", 0):
+            mock_rns.Identity.recall.return_value = None
+            with self.assertRaises(ValueError):
+                asyncio.run(svc.paper_message("aa" * 16, "hi"))
 
 
 class TestTalkback(unittest.TestCase):

@@ -13308,3 +13308,70 @@ base64 upload → `FIELD_IMAGE` over a live LXMF send → received +
 decoded on the other Pi → written to disk → served back via `GET
 /api/reticulum/attachments/{id}` → thumbnail in the shared
 `messaging_chat.js` view. Nothing left open on this item.
+
+## Messages filter chips (RT/Pager) + Reticulum Paper messages / QR (2026-09-16, same session, right after Attachments)
+
+Two more small builds, both from the reticulum backlog, both prompted
+by the user actively poking at the live Messages page after the
+Attachments work landed.
+
+**Messages filter chips**, in two passes. Pass 1: user pointed out the
+protocol filter row (All/MT/MC/★ Fav) had no button for Reticulum even
+though RT-badged conversations were sitting right there in the sidebar
+-- added `data-filter="reticulum"`/`"pager"` buttons, no JS logic
+change needed since `messaging_contacts.js`'s filtering was already
+generic per-protocol. Live-tested immediately, worked. Pass 2: user
+then screenshotted a dead-end "Pager" pill (no pager hardware on that
+box) landing on "No conversations yet", and asked whether a pill should
+only show when a protocol has a message. Talked through why pure
+message-existence gating is wrong on its own (disabling a protocol with
+*existing* history would make old chats look silently gone) and landed
+on OR-ing two signals instead: currently-configured (reusing the exact
+`data-requires-source`/`data-requires-config` signal the sidebar nav
+already uses to hide itself) OR has-any-history (new
+`MessagingContacts.protocolsInUse()`). New
+`MessagingPanel._updateProtocolPillVisibility()`, best-effort like
+`sidebar_controller.js`'s own `_applySourceGating()`.
+
+**Paper messages / QR**, export-only. User asked "what about 2, what is
+this exactly" -- the backlog only had a one-line guess-shaped
+description ("Sideband-style offline message export"), never actually
+researched. Rather than build from the name alone, cloned
+`markqvist/Sideband` and `pip download`ed the real `lxmf` 1.1.1 source
+to read the actual mechanism: LXMF has a fourth delivery method,
+`LXMessage.PAPER` (confirmed `0x05` from source), for a fully real,
+fully end-to-end-encrypted message that's simply never handed to a
+transport interface -- `as_uri()` base64-encodes the packed bytes into
+an `lxm://...` URI, `as_qr()` (Sideband-side) renders that as a QR. The
+recipient's own LXMF-compatible client scans/pastes it back in and
+decrypts it exactly like a normal receive. This grounding directly
+shaped two build decisions: (1) sending needed zero new dependencies --
+meshpoint already has a vendored JS QR *encoder* (`qrcode.min.js`,
+Configuration → Channels' own Quick Deploy export), so the QR renders
+client-side from a URI the backend hands back, same pattern reused
+verbatim; (2) receiving/scanning was flagged as a real gap (a browser
+dashboard has no camera), and when asked, the user confirmed the actual
+intended receiver is a phone running Sideband-class software, which
+already has its own scan path -- so building import-into-meshpoint would
+serve a receiver that doesn't exist. Decided export-only on that basis,
+not effort-avoidance. Also amused the user with "we have a receipt
+printer, maybe even print it for a real paper message" -- built a
+`@media print` block that isolates just the QR full-bleed when printed,
+so `window.print()` already produces a clean scannable printout on
+whatever printer the OS has configured, receipt printer included, with
+zero custom printer-integration code.
+
+Implementation: factored `_resolve_identity()` (the path-discovery
+retry loop) out of `send_message()` into its own method so
+`paper_message()` could reuse it rather than duplicate it. New admin
+`POST /api/reticulum/paper`, capped at 512 chars (tighter than the
+~10,000-char normal-send cap -- every character makes the QR denser),
+deliberately no image-attachment support for the same density reason.
+Recorded in the shared thread with `status: "paper"` -- free rendering
+via `messaging_chat.js`'s existing generic ` · <status>` suffix, no
+frontend change needed for that part. 4 new tests (mocked RNS/LXMF,
+including one confirming `handle_outbound` is never called -- the whole
+point of the feature), all passing.
+
+Both items, plus item 1 from the prior entry, are marked done in
+`memory/reticulum_todo.md`. Neither is Pi-verified yet.

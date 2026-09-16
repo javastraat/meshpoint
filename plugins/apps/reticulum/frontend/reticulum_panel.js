@@ -334,9 +334,25 @@ class ReticulumPanel {
                                 <div class="cfg-card__actions">
                                     <button class="terminal-button terminal-button--primary"
                                             type="submit" id="rt-send-btn">Send message</button>
+                                    <button class="terminal-button" type="button" id="rt-paper-btn"
+                                            title="Generate a scannable QR message with no live path needed -- see the hint below">Paper message</button>
                                 </div>
                                 <p class="cfg-status" id="rt-send-status" aria-live="polite"></p>
+                                <p class="cfg-field__hint">"Paper message" packs the current Peer + Message into a real encrypted LXMF message that's never transmitted -- only shown as a QR code (max 512 characters) to deliver by any means outside Reticulum (screen, print, another app). The recipient's own LXMF client scans it back in.</p>
                             </form>
+                            <div class="rt-paper-result" id="rt-paper-result" hidden>
+                                <h3 class="auth-card__title">Paper message</h3>
+                                <div class="rt-paper-result__qr" id="rt-paper-qr"></div>
+                                <label class="cfg-field">
+                                    <span class="cfg-field__label">Or share this URI directly</span>
+                                    <textarea class="cfg-field__input rt-paper-result__uri" id="rt-paper-uri" rows="3" readonly></textarea>
+                                </label>
+                                <div class="cfg-card__actions">
+                                    <button class="terminal-button" type="button" id="rt-paper-copy">Copy URI</button>
+                                    <button class="terminal-button" type="button" id="rt-paper-print">Print</button>
+                                    <button class="terminal-button" type="button" id="rt-paper-close">Close</button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -398,6 +414,13 @@ class ReticulumPanel {
             });
         }
         this._q('#rt-send-form')?.addEventListener('submit', (e) => this._handleSend(e));
+        this._q('#rt-paper-btn')?.addEventListener('click', () => this._handlePaperMessage());
+        this._q('#rt-paper-copy')?.addEventListener('click', () => this._copyPaperUri());
+        this._q('#rt-paper-print')?.addEventListener('click', () => window.print());
+        this._q('#rt-paper-close')?.addEventListener('click', () => {
+            const panel = this._q('#rt-paper-result');
+            if (panel) panel.hidden = true;
+        });
 
         this._q('#rt-contact-add-form')?.addEventListener('submit', (e) => this._handleAddContact(e));
         const contactsTbody = this._q('#rt-contacts-tbody');
@@ -1247,6 +1270,97 @@ class ReticulumPanel {
             binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
         }
         return btoa(binary);
+    }
+
+    /** "Paper message" button -- reuses the same Peer/Message fields as
+     * the real Send form, but POSTs to /paper instead of /send: the
+     * message is built and encrypted like normal but never transmitted,
+     * only returned as an lxm://... URI to render as a QR code (see
+     * backend/lxmf_service.py's paper_message() docstring for the full
+     * mechanism). No image support -- a paper message needs to stay
+     * short enough to actually scan. */
+    async _handlePaperMessage() {
+        const status = this._q('#rt-send-status');
+        const peerEl = this._q('#rt-send-peer');
+        const textEl = this._q('#rt-send-text');
+        const btn = this._q('#rt-paper-btn');
+        const destination_hash = peerEl?.value || '';
+        const text = (textEl?.value || '').trim();
+        if (!destination_hash || !text) {
+            // No native required-field validation for a plain button click
+            // (unlike the real Send submit) -- say so explicitly instead
+            // of silently doing nothing.
+            status.dataset.kind = 'error';
+            status.textContent = 'Pick a peer and enter a message first.';
+            return;
+        }
+
+        btn.disabled = true;
+        status.dataset.kind = 'pending';
+        status.textContent = 'Generating paper message…';
+        try {
+            const r = await fetch('/api/reticulum/paper', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ destination_hash, text }),
+            });
+            const result = await r.json().catch(() => ({}));
+            if (r.ok) {
+                status.dataset.kind = 'success';
+                status.textContent = 'Paper message ready below.';
+                this._renderPaperResult(result.uri);
+                this._loadMessages();
+            } else {
+                status.dataset.kind = 'error';
+                status.textContent = result.detail || 'Could not generate paper message.';
+            }
+        } catch (_) {
+            status.dataset.kind = 'error';
+            status.textContent = 'Could not generate paper message.';
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    _renderPaperResult(uri) {
+        const panel = this._q('#rt-paper-result');
+        const qrHost = this._q('#rt-paper-qr');
+        const uriEl = this._q('#rt-paper-uri');
+        if (!panel || !qrHost || !uriEl || !uri) return;
+
+        panel.hidden = false;
+        uriEl.value = uri;
+
+        if (typeof window.QRCode === 'undefined') {
+            qrHost.innerHTML = '<p class="cfg-field__hint">QR library unavailable -- use the URI text below.</p>';
+            return;
+        }
+        qrHost.innerHTML = '<canvas></canvas>';
+        const canvas = qrHost.querySelector('canvas');
+        const root = getComputedStyle(document.documentElement);
+        window.QRCode.toCanvas(canvas, uri, {
+            width: 260,
+            margin: 1,
+            color: {
+                dark: root.getPropertyValue('--text-primary').trim() || '#e2e8f0',
+                light: root.getPropertyValue('--bg-primary').trim() || '#0a0e17',
+            },
+        }).catch((e) => {
+            console.error('Paper message QR render failed:', e);
+            qrHost.innerHTML = '<p class="cfg-field__hint">QR render failed -- use the URI text below.</p>';
+        });
+    }
+
+    async _copyPaperUri() {
+        const uriEl = this._q('#rt-paper-uri');
+        if (!uriEl || !uriEl.value) return;
+        try {
+            await navigator.clipboard.writeText(uriEl.value);
+        } catch (_) {
+            uriEl.select();
+            document.execCommand('copy');
+        }
     }
 
     _fmtAspect(aspect) {
