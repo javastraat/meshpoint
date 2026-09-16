@@ -13295,6 +13295,16 @@ knowing that aren't obvious from reading the code:
   underlying filter logic is already generic) -- flagged only, not
   built, per the user's explicit ask.
 
-Not yet Pi-verified: an actual two-node image send/receive, and the
-shared Messages page rendering the thumbnail live on both ends of a
-real conversation.
+**Fully Pi-verified 2026-09-16, same session.** First a screenshot
+confirmed the Send tab's file picker renders correctly and a plain-text
+send shows up in the shared Messages sidebar with the `RT` badge; then
+the user actually attached an image (a screenshot of their own screen,
+sent as the attachment) between ti-meshpoint (192.168.4.4) and
+rakv2-meshpoint (192.168.4.3) -- it rendered as a correct inline
+thumbnail on **both** ends: the sender's own thread on ti-meshpoint and
+the recipient's thread on rakv2-meshpoint, no reload on either side.
+Confirms the whole chain end to end on real hardware: file picker →
+base64 upload → `FIELD_IMAGE` over a live LXMF send → received +
+decoded on the other Pi → written to disk → served back via `GET
+/api/reticulum/attachments/{id}` → thumbnail in the shared
+`messaging_chat.js` view. Nothing left open on this item.

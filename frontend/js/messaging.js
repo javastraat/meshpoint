@@ -50,6 +50,8 @@ class MessagingPanel {
                         <button class="msg-protocol-toggle__btn msg-protocol-toggle__btn--active" data-filter="all"        role="tab" aria-selected="true">All</button>
                         <button class="msg-protocol-toggle__btn"                                  data-filter="meshtastic" role="tab" aria-selected="false">MT</button>
                         <button class="msg-protocol-toggle__btn"                                  data-filter="meshcore"   role="tab" aria-selected="false">MC</button>
+                        <button class="msg-protocol-toggle__btn"                                  data-filter="reticulum"  role="tab" aria-selected="false">RT</button>
+                        <button class="msg-protocol-toggle__btn"                                  data-filter="pager"      role="tab" aria-selected="false">Pager</button>
                         <button class="msg-protocol-toggle__btn"                                  data-filter="fav"        role="tab" aria-selected="false" title="Favorited channels only">&#9733; Fav</button>
                     </div>
                     <div class="msg-sidebar__list" id="msg-convo-list"></div>
