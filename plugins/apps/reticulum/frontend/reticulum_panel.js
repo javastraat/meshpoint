@@ -139,6 +139,8 @@ class ReticulumPanel {
                             <button class="lw-tab" type="button" role="tab"
                                     data-rt-tab="contacts" ${this._isAdmin ? '' : 'hidden'}>Contacts</button>
                             <button class="lw-tab" type="button" role="tab"
+                                    data-rt-tab="call" ${this._isAdmin ? '' : 'hidden'}>Call</button>
+                            <button class="lw-tab" type="button" role="tab"
                                     data-rt-tab="browse">Browse</button>
                             <button class="lw-tab" type="button" role="tab"
                                     data-rt-tab="settings" ${this._isAdmin ? '' : 'hidden'}>Settings</button>
@@ -298,6 +300,15 @@ class ReticulumPanel {
                             </div>
                         </div>
                     </div>
+                    <div data-rt-view="call" hidden>
+                        <div class="panel__body">
+                            <p class="lw-panel__limit" data-rt-call-hint>
+                                Install and enable the <strong>reticulum-call</strong> plugin
+                                for voice calls over Reticulum (Settings → Plugins).
+                            </p>
+                            <div data-rt-call-hooks></div>
+                        </div>
+                    </div>
                     <div data-rt-view="settings" hidden>
                         <div class="panel__body" data-rt-settings-body></div>
                     </div>
@@ -377,6 +388,17 @@ class ReticulumPanel {
         if (window.ReticulumTelemetryModal) {
             this._telemetryModal = new window.ReticulumTelemetryModal();
         }
+
+        // "Call" tab content comes entirely from a hook plugin (e.g.
+        // reticulum-call) -- see frontend/sidebar/page_hook_registry.js.
+        // Costs nothing when none is installed: mountPageHooks() leaves
+        // this tab's static hint text untouched in that case.
+        this._callHooks = window.mountPageHooks
+            ? window.mountPageHooks('reticulum', this._q('[data-rt-call-hooks]'))
+            : { show() {}, hide() {} };
+        const hasCallHook = (window.MESHPOINT_PAGE_HOOKS || []).some((h) => h.host === 'reticulum');
+        const callHintEl = this._q('[data-rt-call-hint]');
+        if (callHintEl) callHintEl.hidden = hasCallHook;
 
         this._q('#rt-refresh-btn')?.addEventListener('click', () => this._load());
         this._q('#rt-announce-btn')?.addEventListener('click', () => this._handleAnnounce());
@@ -603,7 +625,7 @@ class ReticulumPanel {
     _q(sel) { return this._root ? this._root.querySelector(sel) : null; }
 
     _setTab(tab) {
-        if ((tab === 'send' || tab === 'settings' || tab === 'pages' || tab === 'contacts') && !this._isAdmin) return;
+        if ((tab === 'send' || tab === 'settings' || tab === 'pages' || tab === 'contacts' || tab === 'call') && !this._isAdmin) return;
         if (tab === 'pages' && !this._nodeHosting) return;
         if (tab === this._tab) return;
         this._tab = tab;
@@ -622,6 +644,10 @@ class ReticulumPanel {
         this._root.querySelectorAll('[data-rt-view]').forEach((el) => {
             el.hidden = el.dataset.rtView !== this._tab;
         });
+        if (this._callHooks) {
+            if (this._tab === 'call') this._callHooks.show();
+            else this._callHooks.hide();
+        }
     }
 
     async _load() {

@@ -90,6 +90,20 @@ def plugin_asset_tags(manifests: list[PluginManifest]) -> str:
             # app code runs, without depending on app.js constructing panels
             # lazily (a deferred script runs after app.js, so it would only
             # work while that stays true).
+            #
+            # Only an actual .js file gets tagged here -- `scripts` is also
+            # the only way a non-JS asset (e.g. a .wasm binary a vendored JS
+            # file fetches by relative URL at runtime) becomes servable at
+            # all via resolve_plugin_asset() below, which only allows a path
+            # already listed in frontend_scripts/frontend_styles. Without
+            # this filter every such asset would *also* get a literal
+            # <script src="foo.wasm">, which the browser tries to parse as
+            # JS and fails on -- harmless in that nothing else breaks, but a
+            # permanent, avoidable console error on every page load whether
+            # or not the asset is ever used. First hit: reticulum-call's
+            # vendored Codec2 WASM (c2enc.wasm/c2dec.wasm).
+            if not js.endswith(".js"):
+                continue
             tags.append(
                 f'<script src="{plugin_asset_url(m.name, js)}"></script>'
             )

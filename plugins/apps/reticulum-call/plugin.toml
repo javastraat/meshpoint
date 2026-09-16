@@ -1,0 +1,32 @@
+name = "reticulum-call"
+version = "0.1.0"
+meshpoint_api = 1
+provides = ["hook"]
+requires = "reticulum"    # needs the reticulum plugin's own page to hook
+                          # into, and its backend (backend/audio_call.py,
+                          # /api/reticulum/call/*) for the actual calling --
+                          # this plugin's own backend does nothing at all,
+                          # see backend/__init__.py.
+locked = true             # ships with the fork, same tier as
+                          # reticulum-browser/reticulum-dashboard
+
+[frontend]
+scripts = [
+    "frontend/codec2/c2enc.js",
+    "frontend/codec2/c2enc.wasm",
+    "frontend/codec2/c2dec.js",
+    "frontend/codec2/c2dec.wasm",
+    "frontend/codec2/processor.js",
+    "frontend/reticulum_call_codec.js",
+    "frontend/reticulum_call_panel.js",
+]
+styles = ["frontend/reticulum_call_panel.css"]
+
+[hook]
+host = "reticulum"    # target's [sidebar].route -- injects a "Call" tab
+                       # into the Reticulum page instead of owning a page
+
+[meta]
+description = "Voice calls over Reticulum -- a Call tab on the Reticulum page, Codec2 encoded, browser to browser. Backend byte-pipe lives in the reticulum plugin itself (same RNS identity as LXMF delivery); this plugin is the call UI + Codec2 WASM only."
+homepage = "https://github.com/KMX415/meshpoint"
+author = "Einstein PD2EMC"

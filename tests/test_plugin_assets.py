@@ -70,6 +70,28 @@ class TestInjectPluginAssets(unittest.TestCase):
         ])
         self.assertIn('/plugins/apps/hello-world/frontend/h.js', out)
 
+    def test_non_js_scripts_entry_is_not_script_tagged(self) -> None:
+        # A non-.js file in frontend.scripts (e.g. a .wasm binary a
+        # vendored JS file fetches by relative URL at runtime, first
+        # used by reticulum-call's Codec2 WASM) is still declared there
+        # -- it's the only way resolve_plugin_asset() will serve it at
+        # all -- but must not get a literal <script src="foo.wasm">,
+        # which the browser would try (and fail) to parse as JS on
+        # every page load whether or not the asset is ever used.
+        out = plugin_asset_tags([
+            _m("codec", scripts=("frontend/c.js", "frontend/c.wasm")),
+        ])
+        self.assertIn('<script src="/plugins/apps/codec/frontend/c.js"></script>', out)
+        self.assertNotIn("c.wasm", out)
+
+    def test_non_js_scripts_entry_is_still_resolvable(self) -> None:
+        m = _m("codec", scripts=("frontend/c.js", "frontend/c.wasm"))
+        with tempfile.TemporaryDirectory() as d:
+            m = PluginManifest(**{**m.__dict__, "path": Path(d)})
+            (Path(d) / "frontend").mkdir()
+            (Path(d) / "frontend" / "c.wasm").write_bytes(b"\0asm")
+            self.assertIsNotNone(resolve_plugin_asset([m], "codec", "frontend/c.wasm"))
+
 
 class TestSidebarDescriptorTags(unittest.TestCase):
     def _sidebar_plugin(self, **kw) -> PluginManifest:

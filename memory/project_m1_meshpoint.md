@@ -13413,3 +13413,62 @@ every other route uses silently doesn't apply there.
 Stage 2 (the actual `reticulum-call` plugin -- Codec2 WASM vendoring,
 Call UI, mic/speaker) is intentionally not started. Not Pi-tested --
 nothing user-visible exists yet to test.
+
+## Reticulum Call -- Stage 2 (the actual plugin), same session, no gap
+
+User committed Stage 1 as a checkpoint ("keep going we submitted so we
+have a backup point") and said to continue. Full technical detail is
+in `memory/reticulum_todo.md`'s Done log (2026-09-16, "Audio calls,
+item 3, Stage 2") -- this is the narrative.
+
+Read reticulum-meshchat's actual reference implementation closely
+before porting anything (the local checkout at
+`/Users/einstein/Software/reticulum-meshchat`) rather than working from
+guesses, and it paid off twice: found that its live-call audio pipeline
+round-trips every chunk through a second vendored WASM module (SOX,
+~650 KB) purely to strip a WAV header it only just added -- a no-op
+given the AudioWorklet already delivers audio at Codec2's required
+8 kHz -- so skipped it entirely (arithmetic instead of a WASM module),
+cutting the vendored footprint from an estimated ~2.7 MB down to a real
+~1.9 MB. Also confirmed there's no ring/answer/decline protocol at the
+RNS layer at all (a Link goes ACTIVE the instant the destination
+responds) -- so didn't invent one either, matching the reference's own
+"Join Call on any active link" simplicity.
+
+New plugin `plugins/apps/reticulum-call/` (hook into the Reticulum
+page's new "Call" tab -- had to add that tab + a `mountPageHooks()`
+call to core's own `reticulum_panel.js`, since nothing needed the hook
+seam there before). Deliberately deviated from the reference on wire
+framing (a plain 1-byte mode index + raw Codec2 bytes, not their
+protobuf-wrapped payload) to avoid vendoring a protobuf runtime --
+traded away guaranteed Sideband/reticulum-meshchat interop for that,
+stated plainly in the plugin's own README rather than left implicit.
+
+One real bug found and fixed in *core*, not the plugin, while wiring
+the vendored WASM up: `src/plugins/assets.py`'s `plugin_asset_tags()`
+blindly `<script>`-tagged every `frontend.scripts` entry regardless of
+file type. Harmless for every existing plugin (all plain JS), but the
+first plugin ever needing a non-JS asset servable via that route (a
+`.wasm` binary, since `resolve_plugin_asset()` only serves paths
+already listed in `frontend.scripts`/`styles`) would get a literal
+`<script src="foo.wasm">` -- browser tries to parse it as JS, fails,
+logs a console error, forever, on every page load whether or not the
+feature's ever used. Fixed with an extension check; 2 new tests in
+core's own `tests/test_plugin_assets.py` lock it in. Worth remembering:
+the plugin asset pipeline was built assuming JS+CSS only, and the first
+plugin needing a real binary asset exposed that.
+
+Verified the new plugin's manifest for real: not just a hand-check, ran
+it through the actual `parse_manifest()`/`plugin_asset_tags()`/
+`resolve_plugin_asset()` functions directly, and confirmed
+`tests/test_plugin_manifest.py::TestShippedPluginManifests` (which
+scans the real `plugins/apps/` directory, not a fixture) picks it up
+and parses it cleanly.
+
+**Both stages of Audio Calls are now built.** Nothing Pi-verified --
+no live two-node call has been attempted. That, plus the still-pending
+V1/V2 (propagation client, extra interfaces) Pi verifications, is the
+natural next session's work -- there's nothing left un-built in the
+reticulum backlog except reactive-only items (group chat, structured
+telemetry sensors, PN peering, general file attachments, paper-message
+import).

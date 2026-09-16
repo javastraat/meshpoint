@@ -1,0 +1,51 @@
+/* Reticulum Call -- the hook panel injected into the Reticulum page's
+ * "Call" tab. Reuses core's shared cfg-field/cfg-card__actions/
+ * terminal-button/cfg-status classes throughout; only the layout below
+ * is this plugin's own. */
+
+.rtcall {
+    max-width: 480px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.rtcall__incoming {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.rtcall__incoming-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border: 1px solid var(--accent-cyan, #06b6d4);
+    border-radius: 8px;
+    background: var(--overlay-weak, rgba(6, 182, 212, 0.08));
+}
+
+.rtcall__incoming-row span {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.rtcall__active {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 14px 16px;
+    border: 1px solid var(--border, #333);
+    border-radius: 8px;
+    background: var(--bg-card, #162033);
+}
+
+.rtcall__status {
+    margin: 0;
+    font-family: var(--font-mono, ui-monospace, "SF Mono", Menlo, monospace);
+    font-size: 13px;
+}

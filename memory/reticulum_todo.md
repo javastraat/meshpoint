@@ -8,9 +8,9 @@ context.
 Last updated 2026-09-16 — same session built item 1 (Attachments in
 Send, image-only, fully Pi-verified live), item 7 (Messages filter
 chips, in two passes), item 2 (Paper messages / QR, export-only), and
-item 3 **Stage 1 only** (Audio calls backend -- no UI yet, Stage 2 still
-open) — see **Done** below for all four. V6 also added to the Todo
-table, still open/unverified. Session builds through 2026-09-09: #1 Contacts,
+item 3 (Audio calls -- **both stages**, a new `reticulum-call` plugin,
+not yet Pi-verified) — see **Done** below for all four. V6 also added
+to the Todo table, still open/unverified. Session builds through 2026-09-09: #1 Contacts,
 #2 Propagation client, #3 Telemetry publish (+location, +multi-collector),
 #4 Telemetry collect+map, Extra interfaces, UI padding pass.
 **Verification status table below** — #1, #3, #4 and multi-collector
@@ -41,7 +41,7 @@ for each build item is in **Could build — next up** further down.
 |---|---|---|---|---|---|---|
 | ~~1~~ | ~~**Attachments in Send**~~ | build | Med | High | Low | **BUILT + FULLY PI-VERIFIED 2026-09-16** — image-only (deliberately, not `FIELD_FILE_ATTACHMENTS`; see "Could build" below for why). Real two-node round trip confirmed between ti-meshpoint and rakv2-meshpoint |
 | ~~2~~ | ~~**Paper messages / QR**~~ | build | Low–Med | Med | Low | **BUILT 2026-09-16, export-only.** Read the real `LXMF.LXMessage.PAPER` mechanism from source before building (not guessed) — see Done log below for the full research + implementation writeup. Not Pi-tested |
-| 3 | **Audio calls** (`call.audio`) | build | Med–High | High | Med | **STAGE 1 (backend) BUILT 2026-09-16** — see Done log below. **STAGE 2 (the actual `reticulum-call` plugin: Codec2 WASM, mic/speaker, ring/answer UI) still to build**, deliberately checkpointed here before the big frontend port. Not Pi-tested (Stage 1 only, nothing user-visible yet). |
+| ~~3~~ | ~~**Audio calls**~~ (`call.audio`) | build | Med–High | High | Med | **BOTH STAGES BUILT 2026-09-16** — see Done log below. New `plugins/apps/reticulum-call/` plugin (hook into the Reticulum page's new "Call" tab, ~1.9 MB vendored Codec2 WASM, no SOX needed after all — see Done log for why). Not Pi-tested / no live call ever attempted — the one thing this item still needs. |
 | 4 | **Group chat** (`RNS.Destination.GROUP`) | build | Med | Low | Med | Non-standard, no membership model, easy to half-build. Only on request |
 | 5 | **Structured telemetry sensors** (`SID_PROCESSOR/RAM/NVM`) | build | Med | Low | Med | Nested `[[label,val]]` pack format needs a careful `sense.py` read + Sideband cross-check. Only worth it once a graphing collector exists |
 | 6 | **PN peering** (relay↔relay store sync) | build | Med | Low | Med | No reference impl (meshchat doesn't do it). Only matters for multi-relay setups |
@@ -53,12 +53,13 @@ for each build item is in **Could build — next up** further down.
 | V6 | **Verify: inbound Reticulum messages trigger Settings→System's message notifications (toast/sound)** | verify | Low | Med | — | Flagged by user 2026-09-16. Likely already works and just needs confirming: `frontend/js/message_notifier.js`'s `_onMessage()` listens for the core `message_received` WS event with zero protocol filtering (any `direction:'received'` triggers it), and `lxmf_service.py`'s `_handle_inbound_message()` already fires that exact event (added 2026-09-08, alongside its own plugin-private `reticulum_message`) — so the wiring looks complete on paper, just never watched live with an inbound DM to confirm the toast/sound actually fire |
 | ~~7~~ | ~~**Add Reticulum (and Pager) to the Messages page's protocol filter chips**~~ | build | Low | Low–Med | Low | **BUILT 2026-09-16, in two passes.** Pass 1: added `data-filter="reticulum"` ("RT") and `data-filter="pager"` ("Pager") buttons alongside All/MT/MC/★ Fav in `frontend/js/messaging.js:49-55` + `flex-wrap` on `.msg-protocol-toggle` (`messaging.css`) so 6 buttons wrap instead of overflowing a narrow sidebar — user live-tested this on the Pi immediately and both screenshotted fine. Pass 2, same session: user pointed out a real gap — an empty "Pager" pill (no pager configured on that box) was a dead-end click ("No conversations yet"), but the fix couldn't be "just hide it," since disabling a protocol *with existing history* would then make those old chats look silently gone. Landed on OR-ing two signals per pill: **configured** (same signal the sidebar nav already uses to hide itself — `capture.sources` for MT/MC, `radio_pager.pager_enabled` for Pager, a `reticulum` entry in `window.MESHPOINT_SIDEBAR_PLUGINS` for RT) **or has any channel/conversation already** (new `MessagingContacts.protocolsInUse()`). A pill only disappears once both are false. New `MessagingPanel._updateProtocolPillVisibility()`, called after every conversations load (initial + each time the Messages page is revisited); falls back to the "All" filter if the currently-active pill gets hidden out from under it. Best-effort like `sidebar_controller.js`'s own `_applySourceGating()` — a failed config fetch just leaves every pill visible. Not yet seen live in a real browser. |
 
-**Suggested sequence:** ~~1~~ → (V1, V2 on the Pi) → ~~2~~ → 3, with V3·V4·V5
-folded into the next Pi session and 4–6 left reactive. Items 1, 2 and 7
-are all built now (V6 still just flagged, not verified) — **V1/V2 (Pi
-verification) are the natural next session**: both are quick, high-impact,
-and have simply never been run. #3 (Audio calls) is the next real build
-after that.
+**Suggested sequence:** ~~1~~ → (V1, V2 on the Pi) → ~~2~~ → ~~3~~, with
+V3·V4·V5 folded into the next Pi session and 4–6 left reactive. Items 1,
+2, 3 and 7 are all built now (V6 still just flagged, not verified) —
+**nothing left to build that's ahead of the Pi-verification backlog.**
+Next session should be entirely Pi-verification: V1/V2 first (quick,
+high-impact, never run), then a real two-node Audio Calls test (the
+biggest unverified item now), then V3–V6 as time allows.
 
 ---
 
@@ -374,7 +375,7 @@ plugins:
 | ~~Med~~ | ~~**Propagation node polish**~~ | **BUILT 2026-09-09** (new-build #2): outbound node + "Sync inbox" + live transfer state + auto-sync + a `reticulum_propagation_sync` WS event when any sync completes (2026-09-09). Untested on Pi. | — |
 | ~~Med~~ | ~~**Telemetry publish**~~ | **BUILT 2026-09-09** (new-build #3): time + temp + status-line frame, two-node verified. **+ SID_LOCATION added same day** — opt-in `telemetry_include_location`, coords from core's Configuration→GPS pin (`device.latitude/longitude`), no separate keys. Only follow-up left: structured processor/RAM/NVM sensors (nested `[[label,val],...]` — needs verifying against a real Sideband client; low value, INFO string already carries the numbers) | Low |
 | ~~Med~~ | ~~**Telemetry collector + map**~~ | **BUILT 2026-09-09** (new-build #4). Telemetry tab: table + own-Leaflet map (not the dashboard NodeMap — Reticulum telemetry peers aren't in the core `nodes` table; a standalone mini-map was the right call). Not Pi-tested yet. Possible follow-up: also feed into the dashboard map, but that needs core `nodes`-table integration — probably not worth it | — |
-| Med | **Audio calls** (`call.audio`) | browser-to-browser voice, Pi as bridge | **STAGE 1 (backend) BUILT 2026-09-16 — see Done log.** Architecture decided by direct discussion with the user (2026-09-16): the community-plugin-hook idea ("meshpoint-plugins app hook") got reconsidered mid-conversation into a **core-bundled plugin** at `plugins/apps/reticulum-call/`, same tier as `reticulum-browser`/`reticulum-dashboard` (`requires = "reticulum"`, `[hook] host = "reticulum"` to inject a Call tab into the existing Reticulum page rather than owning a whole sidebar page). Key realization that shaped the split: unlike Dashboard/Browser (pure HTTP-API consumers, fully decoupled), a call needs its own `"call"/"audio"` destination on the **exact same RNS identity** `LxmfService` already owns — that can't live in a fully separate/isolated plugin process, so the call-manager backend had to go in core's own `plugins/apps/reticulum/` regardless (small, ~235-line-equivalent, no heavy deps — fine to bundle), while the ~2.7 MB of Codec2 WASM + the actual call UI stays the separate hook plugin, opt-in, not shipped to every Reticulum install. **STAGE 2 (the reticulum-call plugin itself) still to build**: Call panel (dial by hash, incoming-call toast off the new `reticulum_incoming_call` WS event, ring/answer/hangup), vendor the Codec2 WASM (`c2enc.wasm`/`c2dec.wasm`/`sox.wasm` + glue JS, ~2.7 MB total, from `reticulum-meshchat`'s `codec2-emscripten/` — MIT, Liam Cottle), mic via AudioWorklet + `getUserMedia`, WebAudio playback, talking to Stage 1's new REST (`POST /call/initiate`, `POST /call/{hash}/hangup`) and WebSocket (`/call/{hash}/audio`) endpoints. Port meshchat's `CallPage.vue` (744 lines — bigger than the old "~250 lines" estimate, which was only ever the backend's size) + `codec2-microphone-recorder.js`. Real risk to test carefully, not assume away: `AudioCall.send_audio_packet()` silently drops any frame over `RNS.Link.MDU` — fine over TCP, tight over LoRa. Still unverified: real interop with an actual Sideband/meshchat peer (needs the exact same raw-Codec2-over-RNS-packet wire format). Needs HTTPS for `getUserMedia` (have it). |
+| ~~Med~~ | ~~**Audio calls**~~ (`call.audio`) | browser-to-browser voice, Pi as bridge | **BOTH STAGES BUILT 2026-09-16 — see Done log for the full writeup.** Architecture: `requires = "reticulum"` + `[hook] host = "reticulum"` (Call tab injected into the existing Reticulum page), backend in core (`plugins/apps/reticulum/backend/audio_call.py` + `call_routes.py`, since a call needs the exact same RNS identity `LxmfService` already owns), UI + Codec2 WASM in the separate `plugins/apps/reticulum-call/` plugin (opt-in, not shipped to every Reticulum install). One real deviation from reticulum-meshchat worth flagging if this ever gets revisited: skipped `sox.wasm` (~650 KB) entirely — its only real job in the reference's own encode/decode path is converting Float32 samples to/from headerless 16-bit PCM (a WAV-wrap-then-unwrap round trip), which is just arithmetic, not something that needs a WASM module; total vendored footprint came out to ~1.9 MB rather than the ~2.7 MB estimated before actually reading the reference's pipeline closely. Also deviated on wire framing (1 mode-index byte + raw Codec2 bytes, not reticulum-meshchat's protobuf `AudioCallPayload`) — meshpoint-to-meshpoint calls work, real Sideband/meshchat interop is NOT guaranteed and was never attempted. Real risk still worth testing carefully on the Pi, not assumed away: `AudioCall.send_audio_packet()` silently drops any frame over `RNS.Link.MDU` — fine over TCP, tight over LoRa. Not Pi-tested / no live call ever attempted. |
 | Low | **Group chat** (`RNS.Destination.GROUP`) | experimental shared-key room, no membership mgmt | Medium — non-standard |
 | ~~Low~~ | ~~**Interface manager UI**~~ | **BUILT 2026-09-09** — `extra_interfaces` (TCPClient/TCPServer/UDP), Settings-tab editor, dual validation, not Pi-tested. Chose structured over raw-textarea (bad config = rnsd won't start = all Reticulum down). Follow-up: more interface types (I2P needs i2pd; a 2nd RNode) if asked | — |
 | ~~Low~~ | ~~**Contacts / petnames**~~ | **BUILT 2026-09-09** (new-build #1) — see Done + Pi-verification list | — |
@@ -475,10 +476,92 @@ plugins:
   - 24 new tests (15 `test_audio_call.py` with a hand-rolled fake
     `RNS.Link`, 9 `TestAudioCallIntegration` in `test_lxmf_service.py`),
     all Mac-runnable, all passing.
-  **What's NOT built**: the entire user-facing half -- no Call UI, no
-  Codec2 WASM, no mic/speaker, nothing in the sidebar/Reticulum page at
-  all yet. See the "Could build" table entry above for exactly what
-  Stage 2 needs. Not Pi-tested (nothing to test live yet without a UI).
+  **What's NOT built** (at the time this Stage 1 entry was written):
+  the entire user-facing half -- no Call UI, no Codec2 WASM, no
+  mic/speaker, nothing in the sidebar/Reticulum page at all yet. **Now
+  built in the same session -- see the Stage 2 entry immediately
+  below.**
+- **2026-09-16** -- Audio calls, item 3, **Stage 2 (the actual UI + WASM)**,
+  same session, right after Stage 1, no gap -- user said "keep going we
+  submitted so we have a backup point" (Stage 1 had just been committed).
+  **New plugin `plugins/apps/reticulum-call/`** (hook into the Reticulum
+  page's new "Call" tab -- core's own `reticulum_panel.js` needed a small
+  change too: a `data-rt-view="call"` tab + calling
+  `window.mountPageHooks('reticulum', ...)` from its mount(), since
+  nothing called that before this plugin needed it to).
+  **Real findings from reading the reticulum-meshchat reference closely
+  before porting, not guessing from the old backlog notes:**
+  - `Codec2Lib.runEncode`/`runDecode` in the reference are literally a
+    "shell out to a CLI tool via WASM" pattern -- each call spins up a
+    *fresh* Emscripten module instance (`createC2Enc(module)`/
+    `createC2Dec(module)`), writes a virtual file, runs the whole
+    codec2 binary, reads a virtual file back. Ported the same shape
+    (no persistent streaming codec instance exists to port instead --
+    this genuinely is how reticulum-meshchat's own live calls work).
+  - The reference's own live-call encode path routes every audio chunk
+    through a WAV-wrap (`WavEncoder.encodeWAV`, pure JS) then
+    `Codec2Lib.audioFileToRaw()` -- a SECOND vendored WASM module,
+    `sox.wasm` (~650 KB) -- to strip the WAV header back off before
+    codec2 encoding. That SOX round trip's only real effect is
+    resampling, which is a no-op here: the AudioWorklet processor
+    already delivers 8 kHz samples, codec2's own required rate.
+    Skipped SOX entirely -- Float32 <-> 16-bit PCM directly (the exact
+    same arithmetic `WavEncoder.floatTo16BitPCM` already does, just
+    without ever writing a WAV header) gets the identical result with
+    one fewer full WASM module boot per audio chunk and ~650 KB less
+    vendored. Total footprint: **~1.9 MB**, not the ~2.7 MB estimated
+    before this was actually checked.
+  - For playback, skipped the reference's own `rawToWav` + 
+    `AudioContext.decodeAudioData()` round trip too -- `AudioContext.
+    createBuffer()` + `AudioBuffer.copyToChannel()` builds a playable
+    buffer directly from Float32 samples, no container format needed
+    at all for something that's already raw PCM in memory.
+  - **Deliberately skipped the reference's protobuf `AudioCallPayload`
+    wire wrapping** -- vendoring a protobuf runtime for a framing only
+    one other project uses wasn't worth it. Used one mode-index byte +
+    raw Codec2 bytes per frame instead. Consequence, stated plainly in
+    this plugin's own README: **not guaranteed to interoperate with a
+    real Sideband/reticulum-meshchat call** -- meshpoint-to-meshpoint
+    is the actual target, matching the old backlog notes' own
+    unresolved "verify" flag on this exact point.
+  - Confirmed (reading `CallPage.vue` itself) that reticulum-meshchat
+    has **no ring/answer/decline protocol at all** -- an `RNS.Link`
+    reaches `ACTIVE` the instant the destination responds, no consent
+    step; its own UI's only real action is "Join Call" on any active
+    link. Built the identical simple model: an incoming link fires the
+    Stage-1 `reticulum_incoming_call` WS event, shows as a banner, Join
+    opens the audio bridge or Ignore dismisses it -- no separate
+    signalling built or needed.
+  - Found and fixed a real, unrelated-until-now bug in the **core
+    plugin asset pipeline** while wiring the vendored WASM up:
+    `src/plugins/assets.py`'s `plugin_asset_tags()` blindly emitted a
+    literal `<script src="...">` for every `frontend.scripts` entry
+    regardless of file type -- harmless for every plugin so far (all
+    JS), but the first plugin shipping a non-JS asset (`.wasm`,
+    servable only by being listed in `frontend.scripts` at all) would
+    have gotten `<script src="c2enc.wasm">` on every page load, a
+    permanent benign-but-real console parse-error whether or not a
+    call ever happens. Fixed: only an actual `.js` entry gets
+    `<script>`-tagged now; everything else stays servable via
+    `resolve_plugin_asset()` (which still requires the entry be listed)
+    without being force-loaded as a script. 2 new tests in the core
+    `tests/test_plugin_assets.py` (not the reticulum plugin's own
+    suite) lock this in.
+  - `processor.js` (the AudioWorklet capture processor) gets the same
+    `<script>`-tag treatment as any other `.js` file (it IS one), which
+    would normally throw `ReferenceError: registerProcessor is not
+    defined` if executed on the main thread -- guarded its whole body
+    in `if (typeof registerProcessor !== 'undefined')` so an accidental
+    main-thread load is a silent no-op instead.
+  2 new tests in `tests/test_plugin_assets.py`, plus manual verification
+  the new plugin's manifest parses cleanly and is picked up correctly by
+  the real `tests/test_plugin_manifest.py::TestShippedPluginManifests`
+  smoke test (which scans the actual `plugins/apps/` directory, not a
+  fixture). No new Python tests for the plugin itself -- it has no
+  backend beyond a no-op `register()`, everything testable lives in the
+  Stage 1 entry above. **Not Pi-tested, no live call ever attempted** --
+  this is genuinely the one thing this item still needs before it can be
+  called done-done.
 - **2026-09-16** — Paper messages / QR, item 2, **export-only** (same
   session as items 1 and 7, immediately after finishing item 1 — user
   asked "what about 2, what is this exactly" since the backlog only had
@@ -641,11 +724,12 @@ plugins:
 
 **See "Todo — prioritised (2026-09-09)" near the top of this file** — that
 table is the current answer. Short version: **Attachments in Send**,
-**Paper messages / QR**, and item 7 (filter chips) are all built now
-(2026-09-16) → Pi-verify propagation client + extra interfaces + V6 →
-**Audio calls**; V3–V5 fold into the next Pi session; group chat /
-structured sensors / PN peering / file attachments / paper-message
-import stay reactive.
+**Paper messages / QR**, **Audio calls** (both stages), and item 7
+(filter chips) are all built now (2026-09-16) — **the entire backlog's
+"build" column is empty except group chat / structured sensors / PN
+peering / file attachments / paper-message import, all reactive-only.**
+Next session is pure Pi-verification: V1/V2 first, then a real
+two-node Audio Calls test, then V3–V6.
 
 Note the earlier "needs audio hardware" concern on Audio calls was
 retracted 2026-09-09 — Codec2 runs in the browser, the Pi is only a
