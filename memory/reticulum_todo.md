@@ -739,9 +739,29 @@ plugins:
   reached a given peer (or the peer's path to it went stale), there was
   no way to refresh it short of restarting the whole Reticulum service.
   Fixed: `announce()` now also calls `AudioCallManager.announce()` when
-  `audio_calls_enabled` is on. **Next step if the direction issue
-  persists**: hit "Announce now" on vm-meshpoint, then retry the
-  ti→vm call immediately after.
+  `audio_calls_enabled` is on.
+  **Follow-up from the user, more specific**: rt-only VM → any node,
+  no problem; a **multi-protocol** meshpoint (meshcore+lorawan+
+  meshtastic+reticulum together) never receives the call. Also: after
+  "Announce now" on that node, the Activity log shows `lxmf.delivery`
+  announces arriving from peers but nothing for NomadNet ("the node")
+  or `call.audio`. Found the real root cause while checking this:
+  `reticulum_settings_tab.js`'s "Voice calls" hint said only "Restart
+  to apply", sitting right next to the tab's only restart button,
+  "Restart rnsd" -- but `audio_calls_enabled` is read once at Meshpoint
+  startup when the plugin *service* is built (`__init__.py`'s `build()`,
+  called by `reg.add_service`), not by rnsd at all. Restarting rnsd
+  leaves `LxmfService._audio_call_manager` `None` forever, so the
+  destination never gets created, never announces, and never accepts
+  a Link -- while LXMF delivery keeps working fine (built earlier,
+  unaffected), making it look selectively broken rather than just
+  "never actually turned on". The `node_enabled` field right above it
+  already said "Meshpoint restart" correctly; "Voice calls" now says
+  the same. **This is very likely the actual root cause of the
+  ti-meshpoint vs vm-meshpoint asymmetry too**, not a stale-announce
+  issue -- fix: on the multi-protocol node, do a full Meshpoint
+  service restart (not just "Restart rnsd") after enabling "Announce a
+  call destination", then retry.
   Also from this round, both explicitly requested: default Codec2 mode
   changed 1200 → 3200 (`reticulum_call_codec.js` `DEFAULT_MODE`, was the
   lowest-bitrate/worst-quality option); `getUserMedia` now requests

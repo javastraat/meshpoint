@@ -349,7 +349,8 @@ class ReticulumSettingsTab {
                                 so peers can call it. This flag alone only turns on the backend
                                 byte-pipe — install and enable the <strong>reticulum-call</strong>
                                 plugin for an actual call UI (dial/ring/answer, Codec2 in the
-                                browser). Restart to apply.
+                                browser). Turning this on or off takes effect after the next
+                                Meshpoint restart — "Restart rnsd" below does not apply it.
                             </p>
                         </fieldset>
                         <div class="cfg-card__actions">

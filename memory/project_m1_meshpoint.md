@@ -13489,14 +13489,27 @@ out). While investigating, found a real gap and fixed it: the manual
 "Announce now" button never re-announced the `call.audio` destination
 (only LXMF delivery + NomadNet hosting), so a peer with a stale/missing
 path to it had no fix short of a full service restart. `announce()` in
-`lxmf_service.py` now also calls `AudioCallManager.announce()`. Not
-confirmed as *the* root cause yet -- next step is hitting "Announce
-now" on vm-meshpoint then immediately retrying the ti→vm call; if it
-still fails, the next thing to check is whether
-`plugins.reticulum.audio_calls_enabled` is actually still on and the
-service was actually restarted after enabling it on vm-meshpoint (the
-same class of bug as the very first "could not establish a link" found
-earlier in this saga, which was exactly that).
+`lxmf_service.py` now also calls `AudioCallManager.announce()`.
+
+User narrowed it further: an rt-only VM calling any node works fine;
+a **multi-protocol** meshpoint (meshcore+lorawan+meshtastic+reticulum
+together) never receives the call, and its own Activity log after
+"Announce now" shows `lxmf.delivery` announces from peers but nothing
+for NomadNet or `call.audio`. That pointed at the real root cause:
+`reticulum_settings_tab.js`'s "Voice calls" hint said just "Restart to
+apply", next to the tab's only restart button, "Restart rnsd" -- but
+`audio_calls_enabled` is read once when the plugin *service* is built
+at Meshpoint startup (`__init__.py`'s `build()`), not by rnsd. Restart
+rnsd and the call manager simply never gets constructed -- destination
+never created, never announces, never accepts a Link -- while LXMF
+delivery (built earlier, unrelated) keeps working, which is exactly
+why it looked selectively broken instead of "never actually on".
+`node_enabled` right above it already said "Meshpoint restart"
+correctly; "Voice calls" now matches. Most likely this is also the
+actual explanation for the earlier ti-meshpoint/vm-meshpoint asymmetry
+-- not a stale-announce issue at all. Next step: full Meshpoint
+restart (not "Restart rnsd") on the multi-protocol node after
+confirming "Announce a call destination" is checked, then retry.
 
 Also fixed same session, both explicitly requested: default Codec2
 mode 1200 → 3200 (was the lowest-bitrate/worst-quality option);
