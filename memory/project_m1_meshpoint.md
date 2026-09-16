@@ -13465,10 +13465,47 @@ it through the actual `parse_manifest()`/`plugin_asset_tags()`/
 scans the real `plugins/apps/` directory, not a fixture) picks it up
 and parses it cleanly.
 
-**Both stages of Audio Calls are now built.** Nothing Pi-verified --
-no live two-node call has been attempted. That, plus the still-pending
-V1/V2 (propagation client, extra interfaces) Pi verifications, is the
-natural next session's work -- there's nothing left un-built in the
-reticulum backlog except reactive-only items (group chat, structured
-telemetry sensors, PN peering, general file attachments, paper-message
-import).
+**Both stages of Audio Calls are now built, plus a third pass: push-to-
+talk (default on) alongside open-mic** -- purely a local sender-side
+gate on the worklet frame stream, no wire-protocol impact, matching how
+Sideband/reticulum-meshchat both handle it. Then a full live-debugging
+round on real hardware (ti-meshpoint Pi + vm-meshpoint VM), each bug
+found from the user's actual screenshots/console output rather than
+guessed: a stray quote breaking the dial button; `.rtcall__active`/
+`.rtcall__incoming` using bare `display: flex` losing to `[hidden]` on
+a CSS specificity tie; a worklet asset path missing its `frontend/`
+segment (404, only visible in the console, not the UI); and the big
+one -- TX/RX counters proved the whole pipeline worked end-to-end
+(link, WS, RNS delivery, decode) except final playback, which turned
+out to be the browser's autoplay policy leaving a freshly-created
+`AudioContext` suspended because "direct user gesture" got lost across
+an `await fetch()`. Fixed with an unconditional `.resume()`.
+
+Cross-device retest surfaced one more thing, not yet fully resolved:
+calling **works vm→ti but fails ti→vm** ("Could not establish a link to
+that destination" -- past path-find/identity-resolve, so the Link
+handshake to vm-meshpoint's `call.audio` destination itself is timing
+out). While investigating, found a real gap and fixed it: the manual
+"Announce now" button never re-announced the `call.audio` destination
+(only LXMF delivery + NomadNet hosting), so a peer with a stale/missing
+path to it had no fix short of a full service restart. `announce()` in
+`lxmf_service.py` now also calls `AudioCallManager.announce()`. Not
+confirmed as *the* root cause yet -- next step is hitting "Announce
+now" on vm-meshpoint then immediately retrying the ti→vm call; if it
+still fails, the next thing to check is whether
+`plugins.reticulum.audio_calls_enabled` is actually still on and the
+service was actually restarted after enabling it on vm-meshpoint (the
+same class of bug as the very first "could not establish a link" found
+earlier in this saga, which was exactly that).
+
+Also fixed same session, both explicitly requested: default Codec2
+mode 1200 → 3200 (was the lowest-bitrate/worst-quality option);
+`getUserMedia` now requests `autoGainControl`/`echoCancellation`/
+`noiseSuppression` (was raw unprocessed capture, reported as
+clipping/popping on a close-mic headset). Neither retested live yet.
+
+That, plus the still-pending V1/V2 (propagation client, extra
+interfaces) Pi verifications, is the natural next session's work --
+there's nothing left un-built in the reticulum backlog except
+reactive-only items (group chat, structured telemetry sensors, PN
+peering, general file attachments, paper-message import).

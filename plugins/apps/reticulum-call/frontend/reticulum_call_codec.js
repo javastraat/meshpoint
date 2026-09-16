@@ -25,7 +25,7 @@ class ReticulumCallCodec {
     // Same set CallPage.vue itself offers -- bitrate/quality tradeoffs
     // baked into codec2 itself, nothing to configure beyond picking one.
     static MODES = ['3200', '2400', '1600', '1400', '1300', '1200', '700C', '450', '450PWB'];
-    static DEFAULT_MODE = '1200';
+    static DEFAULT_MODE = '3200';
 
     static _floatTo16BitPCM(float32Samples) {
         const buffer = new ArrayBuffer(float32Samples.length * 2);

@@ -464,7 +464,14 @@ class ReticulumCallHookPanel {
         await this._audioCtx.resume();
         await this._audioCtx.audioWorklet.addModule(RT_CALL_WORKLET_URL);
         this._workletNode = new AudioWorkletNode(this._audioCtx, RT_CALL_WORKLET_NAME);
-        this._micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        // Plain `{ audio: true }` gets the browser's raw, unprocessed
+        // capture -- no level normalization, so a close-talking headset
+        // mic clips/pops. These three are standard MediaTrackConstraints
+        // every browser we target already implements; echoCancellation/
+        // noiseSuppression are free wins for a voice call regardless.
+        this._micStream = await navigator.mediaDevices.getUserMedia({
+            audio: { autoGainControl: true, echoCancellation: true, noiseSuppression: true },
+        });
         this._mediaStreamSource = this._audioCtx.createMediaStreamSource(this._micStream);
         this._mediaStreamSource.connect(this._workletNode);
         this._nextPlayTime = 0;

@@ -723,6 +723,31 @@ plugins:
   `flex: 0 0 auto` on `.lw-tab` so individual pills keep their natural
   size instead of trying to shrink/wrap. Benefits every tabbed page,
   not just Reticulum. Not yet retested.
+  **Cross-device retest (ti-meshpoint Pi + vm-meshpoint VM)**: audio
+  fix confirmed working one direction (vm-meshpoint calling into
+  ti-meshpoint connected and PTT audio was heard both ways). Reverse
+  direction (ti-meshpoint dialing vm-meshpoint's LXMF hash) failed with
+  "Could not establish a link to that destination" -- past the
+  path-find and identity-resolve stages (those have distinct error
+  strings), so specifically the Link handshake to vm-meshpoint's
+  `call.audio` destination timed out. Root cause not fully confirmed
+  (would need vm-meshpoint's own logs/`/api/reticulum/status` to be
+  sure), but a real gap was found and fixed while looking: `announce()`
+  (the manual "Announce now" button's backend) re-announced LXMF
+  delivery and NomadNet hosting but never the `call.audio` destination
+  -- so if the destination's original at-`start()` announce never
+  reached a given peer (or the peer's path to it went stale), there was
+  no way to refresh it short of restarting the whole Reticulum service.
+  Fixed: `announce()` now also calls `AudioCallManager.announce()` when
+  `audio_calls_enabled` is on. **Next step if the direction issue
+  persists**: hit "Announce now" on vm-meshpoint, then retry the
+  ti→vm call immediately after.
+  Also from this round, both explicitly requested: default Codec2 mode
+  changed 1200 → 3200 (`reticulum_call_codec.js` `DEFAULT_MODE`, was the
+  lowest-bitrate/worst-quality option); `getUserMedia` now requests
+  `autoGainControl`/`echoCancellation`/`noiseSuppression` instead of raw
+  capture, to address reported clipping/popping on a close-mic headset
+  (previously requested no processing at all). Neither yet retested live.
 - **2026-09-16** — Paper messages / QR, item 2, **export-only** (same
   session as items 1 and 7, immediately after finishing item 1 — user
   asked "what about 2, what is this exactly" since the backlog only had

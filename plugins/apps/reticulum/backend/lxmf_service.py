@@ -1316,3 +1316,11 @@ class LxmfService:
             self._node.announce()
         if self._pn_task is not None:
             self._announce_propagation()
+        if self._audio_call_manager is not None:
+            # third aspect on the same identity -- without this a peer
+            # whose path to our call.audio destination went stale (or
+            # was never learned in the first place) has no way to pick
+            # it back up short of a full service restart, even though
+            # "Announce" already exists as the user-facing fix for this
+            # exact failure mode on the other two destinations.
+            self._audio_call_manager.announce()
