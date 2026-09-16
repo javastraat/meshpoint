@@ -34,6 +34,15 @@
   Add-source form hides itself (no explanatory note, matching Web terminal
   above) while it's off; an already-configured source's Browse/Pin/Remove
   stay available regardless.
+- **Reticulum Browser gains form submission, file downloads, and identity
+  fingerprinting.** Ported the form-field-gathering and `/file/...`
+  download flow from the reticulum plugin's own Browse tab into the
+  multi-tab Reticulum Browser plugin. Also adds an "ID" toolbar button
+  that identifies your Reticulum identity to the current NomadNet node
+  over its Link, so that node's next form submission automatically
+  carries your LXMF address -- useful for guestbook/registration-style
+  `.mu` pages. New `POST /api/reticulum/nomad/fingerprint` route
+  (`plugins/apps/reticulum/backend/nomad.py`'s `identify_link()`).
 - **Browse now recognizes an already-installed theme.** A source's catalog
   view showed "Install" forever for a theme even after installing it —
   only app plugins were checked against what's actually on disk. Themes now

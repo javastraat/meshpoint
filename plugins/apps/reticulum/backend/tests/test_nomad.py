@@ -36,6 +36,71 @@ class TestNomadWithoutRns(unittest.TestCase):
         nomad.reset()
         self.assertEqual(nomad._links, {})
 
+    def test_identify_link_returns_an_error_result_not_an_exception(self) -> None:
+        ok, result = asyncio.run(nomad.identify_link("abcd1234", object()))
+        self.assertFalse(ok)
+        self.assertIn("Reticulum is not running", result)
+
+    def test_reset_clears_fingerprints_too(self) -> None:
+        nomad._fingerprints["deadbeef"] = "some-hash"
+        nomad.reset()
+        self.assertEqual(nomad._fingerprints, {})
+
+
+class TestFingerprintMergesIntoFieldData(unittest.TestCase):
+    """The `dest` merge in fetch_page() is plain dict logic, checkable
+    without RNS -- monkeypatch `_request` to capture what it was handed."""
+
+    def tearDown(self) -> None:
+        nomad.reset()
+
+    def test_no_fingerprint_leaves_field_data_untouched(self) -> None:
+        seen = {}
+
+        async def fake_request(dest_hash_hex, path, field_data):
+            seen["field_data"] = field_data
+            return "err", "stub"
+
+        original = nomad._request
+        nomad._request = fake_request
+        try:
+            asyncio.run(nomad.fetch_page("deadbeef", "/page/index.mu", {"field_x": "1"}))
+        finally:
+            nomad._request = original
+        self.assertEqual(seen["field_data"], {"field_x": "1"})
+
+    def test_cached_fingerprint_merges_in_as_dest(self) -> None:
+        nomad._fingerprints["deadbeef"] = "aabbcc"
+        seen = {}
+
+        async def fake_request(dest_hash_hex, path, field_data):
+            seen["field_data"] = field_data
+            return "err", "stub"
+
+        original = nomad._request
+        nomad._request = fake_request
+        try:
+            asyncio.run(nomad.fetch_page("deadbeef", "/page/index.mu", {"field_x": "1"}))
+        finally:
+            nomad._request = original
+        self.assertEqual(seen["field_data"], {"field_x": "1", "dest": "aabbcc"})
+
+    def test_cached_fingerprint_merges_in_even_with_no_other_field_data(self) -> None:
+        nomad._fingerprints["deadbeef"] = "aabbcc"
+        seen = {}
+
+        async def fake_request(dest_hash_hex, path, field_data):
+            seen["field_data"] = field_data
+            return "err", "stub"
+
+        original = nomad._request
+        nomad._request = fake_request
+        try:
+            asyncio.run(nomad.fetch_page("deadbeef", "/page/index.mu"))
+        finally:
+            nomad._request = original
+        self.assertEqual(seen["field_data"], {"dest": "aabbcc"})
+
 
 class TestNomadResultShape(unittest.TestCase):
     def test_defaults(self) -> None:

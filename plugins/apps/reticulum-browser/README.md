@@ -39,22 +39,29 @@ for `reticulum_micron.js`, ported from reticulum-meshchat, also MIT.)
   instead of the parsed rendering.
 - **Keyboard shortcuts** -- `Ctrl/Cmd+T` new tab, `Ctrl/Cmd+W` close tab,
   `Ctrl/Cmd+R` reload, `Alt+←`/`Alt+→` back/forward.
+- **Form-field submission** on interactive `.mu` pages, and `/file/...`
+  downloads -- ported from the reticulum plugin's own `reticulum_nomad.js`
+  (same `data-nomad-fields` gathering, same download-as-blob flow).
+- **Identity fingerprinting** -- an "ID" toolbar button identifies your
+  Reticulum identity to the current node over its `RNS.Link`
+  (`link.identify(...)`), then that node's *next* form submission
+  automatically carries your LXMF address as a `dest` field -- so
+  guestbook/registration-style NomadNet pages know who's submitting
+  without you typing an address in. Not host verification (rBrowser's own
+  "fingerprint" action, read from source, turned out to be identity
+  disclosure in this direction, not the other) -- see
+  `plugins/apps/reticulum/backend/nomad.py`'s `identify_link()` for the
+  full mechanism, which lives in the reticulum plugin since it needs that
+  plugin's own RNS identity.
 
 ## What's not here (yet)
 
-- **Fingerprint identification of remote hosts** -- rBrowser's exact
-  verification model for this wasn't studied closely enough yet to build
-  a Meshpoint equivalent honestly. A later addition, not forgotten.
 - **A local NomadNet search engine + page cache** -- this is a background
   crawler + index, not a browser-tab feature. It would need its own
   `service`-seam backend (the same plugin capability Reticulum's own LXMF
   service uses) and a real cache schema -- comparable in scope to a whole
   separate plugin, not something to bolt onto this one. Worth its own
   effort later if wanted.
-- Form-field submission on interactive `.mu` pages, and `/file/...`
-  downloads -- same scope line the reticulum-dashboard plugin's own
-  quick-browse modal already draws. The reticulum plugin's own Browse tab
-  covers both if you need them.
 
 ## Enable it
 

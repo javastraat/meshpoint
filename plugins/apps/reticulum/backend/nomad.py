@@ -41,6 +41,15 @@ except ImportError:  # not installed -- e.g. Mac dev environment
 # navigations on the same node instead of re-linking on every click.
 _links: dict = {}
 
+# Our own LXMF address (hex, no prettyhexrep wrapping), keyed by the node
+# we've identified ourselves to via identify_link() -- merged into every
+# later field_data for that destination so a guestbook/registration-style
+# `.mu` form on that node gets it without the visitor typing an address.
+# Ported in spirit from rBrowser's `link.fingerprint_data` (nomadnet.py,
+# MIT); kept per-destination rather than per-Link object since the value
+# itself (our own address) never changes across reconnects.
+_fingerprints: dict = {}
+
 # Defaults, overridable from plugins.reticulum.nomad_timeout_s (see
 # state.py) via set_timeouts() -- multi-hop LoRa paths need more headroom
 # than reticulum-meshchat's TCP-backbone-first 15s.
@@ -172,7 +181,12 @@ async def fetch_page(
     field_data: Optional[dict] = None,
 ) -> NomadResult:
     """Fetch one NomadNet page. ``field_data`` (optional) is a dict of
-    already-prefixed (``field_``/``var_``) form values."""
+    already-prefixed (``field_``/``var_``) form values -- ``dest`` (our
+    own LXMF address, unprefixed) is merged in automatically once
+    ``identify_link()`` has been called for this destination."""
+    fingerprint = _fingerprints.get(destination_hash_hex)
+    if fingerprint:
+        field_data = {**(field_data or {}), "dest": fingerprint}
     result = NomadResult(ok=False, destination_hash=destination_hash_hex, path=path)
     kind, payload = await _request(destination_hash_hex, path, field_data)
     if kind == "err":
@@ -231,6 +245,40 @@ async def fetch_file(destination_hash_hex: str, path: str) -> NomadResult:
     return result
 
 
+async def identify_link(destination_hash_hex: str, identity) -> tuple[bool, Optional[str]]:
+    """Identify our own Reticulum identity to a NomadNet node over its
+    Link -- mirrors rBrowser's ``send_fingerprint()``. Returns
+    ``(True, our_lxmf_hash_hex)`` on success, ``(False, error_message)``
+    otherwise. The resulting hash is remembered (see ``_fingerprints``
+    above) and merged into every later ``fetch_page()`` for this node."""
+    if not available():
+        return False, "Reticulum is not running (enable + set up the reticulum plugin)"
+    if identity is None:
+        return False, "No local Reticulum identity available yet"
+
+    try:
+        dest_hash = bytes.fromhex(destination_hash_hex)
+    except ValueError:
+        return False, "Invalid destination hash"
+
+    if not await _ensure_path(dest_hash):
+        return False, "No path to that node -- it may be offline or unreachable"
+
+    link = await _ensure_link(destination_hash_hex, dest_hash)
+    if link is None:
+        return False, "Could not establish a link to that node"
+
+    try:
+        link.identify(identity)
+        lxmf_hash_hex = RNS.Destination.hash(identity, "lxmf", "delivery").hex()
+    except Exception as exc:  # noqa: BLE001
+        return False, f"Identify failed: {exc}"
+
+    _fingerprints[destination_hash_hex] = lxmf_hash_hex
+    return True, lxmf_hash_hex
+
+
 def reset() -> None:
     """Drop the link cache (test helper / teardown)."""
     _links.clear()
+    _fingerprints.clear()

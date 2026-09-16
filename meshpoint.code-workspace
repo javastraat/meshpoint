@@ -19,6 +19,9 @@
 		{
 			"name": "basicstation-docker",
 			"path": "../basicstation-docker"
+		},
+		{
+			"path": "../rBrowser"
 		}
 	],
 	"settings": {}

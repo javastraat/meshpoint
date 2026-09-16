@@ -272,6 +272,13 @@ class LxmfService:
     def own_address(self) -> Optional[str]:
         return RNS.prettyhexrep(self._source.hash) if self._source else None
 
+    @property
+    def identity(self):
+        """The raw RNS Identity backing this service -- used by
+        `nomad.identify_link()` to identify us to a NomadNet node's Link
+        (`RNS.Link.identify()` needs the Identity object, not a hash)."""
+        return self._identity
+
     async def start(self) -> None:
         if not self.available:
             logger.warning(

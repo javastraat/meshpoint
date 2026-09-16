@@ -96,6 +96,8 @@ class _FakeLxmfService:
     """Just enough of LxmfService for nomad_nodes() -- an empty roster is
     fine, this class exists to prove auth passes, not to test peer data."""
 
+    identity = None
+
     async def list_peers(self):
         return []
 
@@ -153,6 +155,7 @@ class TestBrowseAuthGating(unittest.TestCase):
         # bit two unrelated tests there).
         self._orig_fetch_page = nomad.fetch_page
         self._orig_fetch_file = nomad.fetch_file
+        self._orig_identify_link = nomad.identify_link
 
         async def _fake_fetch_page(dest_hash, path="/page/index.mu", field_data=None):
             return nomad.NomadResult(ok=True, content="`!hi`!", destination_hash=dest_hash, path=path)
@@ -163,14 +166,19 @@ class TestBrowseAuthGating(unittest.TestCase):
                 destination_hash=dest_hash, path=path,
             )
 
+        async def _fake_identify_link(dest_hash, identity):
+            return True, "abc123"
+
         nomad.fetch_page = _fake_fetch_page
         nomad.fetch_file = _fake_fetch_file
+        nomad.identify_link = _fake_identify_link
 
     def tearDown(self) -> None:
         from plugins.apps.reticulum.backend import nomad, nomad_routes
 
         nomad.fetch_page = self._orig_fetch_page
         nomad.fetch_file = self._orig_fetch_file
+        nomad.identify_link = self._orig_identify_link
         nomad_routes.reset_routes()
         state.init({})
         self._tmp.cleanup()
@@ -212,6 +220,14 @@ class TestBrowseAuthGating(unittest.TestCase):
         })
         self.assertEqual(r.status_code, 200, r.text)
         self.assertEqual(r.content, b"x")
+
+    def test_viewer_can_send_a_fingerprint(self) -> None:
+        r = self._viewer_client().post("/api/reticulum/nomad/fingerprint", json={
+            "destination_hash": "ab" * 16,
+        })
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertTrue(r.json()["ok"])
+        self.assertEqual(r.json()["lxmf_hash"], "abc123")
 
     def test_viewer_is_refused_the_pages_tab(self) -> None:
         client = self._viewer_client()

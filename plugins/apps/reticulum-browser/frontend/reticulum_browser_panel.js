@@ -8,8 +8,12 @@
  * (_splitAddr/_followLink shape, the shared favourites list,
  * window.MicronParser rendering).
  *
+ * Form-field submission, `/file/...` downloads, and identity fingerprinting
+ * (ported from the reticulum plugin's own reticulum_nomad.js, plus a new
+ * `/api/reticulum/nomad/fingerprint` route -- see nomad.py/nomad_routes.py
+ * for the fingerprint mechanism itself) are all supported here too.
+ *
  * Deliberately NOT included (see README.md "What's not here"):
- *   - fingerprint identification of remote hosts (not built yet)
  *   - a local NomadNet search engine + page cache (a background crawler
  *     + index, not a browser-tab feature -- its own service-seam plugin
  *     if built at all, not bundled into this one)
@@ -92,10 +96,14 @@ class ReticulumBrowserPanel {
                     <button class="terminal-button" type="button" data-rb-go>Go</button>
                     <button class="terminal-button" type="button" data-rb-raw
                             title="Toggle raw/rendered view">{ }</button>
+                    <button class="terminal-button" type="button" data-rb-fingerprint
+                            title="Identify yourself to this node — your LXMF address will be included in its next form submission"
+                            disabled>ID</button>
                 </div>
             </div>
 
             <div class="rb-tabstrip" data-rb-tabstrip></div>
+            <p class="cfg-status" data-rb-status aria-live="polite"></p>
 
             <div class="rb-page" data-rb-page>
                 <p class="lw-empty">Pick a node above, or type an address
@@ -114,7 +122,9 @@ class ReticulumBrowserPanel {
         this._fwdBtn = this._q('[data-rb-forward]');
         this._reloadBtn = this._q('[data-rb-reload]');
         this._rawBtn = this._q('[data-rb-raw]');
+        this._fingerprintBtn = this._q('[data-rb-fingerprint]');
         this._tabstripEl = this._q('[data-rb-tabstrip]');
+        this._statusEl = this._q('[data-rb-status]');
         this._pageEl = this._q('[data-rb-page]');
 
         this._searchEl.addEventListener('input', (e) => {
@@ -145,6 +155,7 @@ class ReticulumBrowserPanel {
         this._fwdBtn.addEventListener('click', () => this._historyGo(1));
         this._reloadBtn.addEventListener('click', () => this._reload());
         this._rawBtn.addEventListener('click', () => this._toggleRaw());
+        this._fingerprintBtn.addEventListener('click', () => this._sendFingerprint());
         this._pageEl.addEventListener('click', (e) => {
             const a = e.target.closest('a[data-nomad-url]');
             if (!a) return;
@@ -183,6 +194,7 @@ class ReticulumBrowserPanel {
         const tab = {
             id: `rb${++_rbTabSeq}`, hash: null, path: null, title: 'New tab',
             content: null, rawMode: false, history: [], historyIdx: -1,
+            fingerprinted: false,
         };
         this._tabs.push(tab);
         this._activeTabId = tab.id;
@@ -241,6 +253,7 @@ class ReticulumBrowserPanel {
         this._reloadBtn.disabled = tab.historyIdx < 0;
         this._rawBtn.classList.toggle('is-active', tab.rawMode);
         this._syncFavBtn(tab.hash ? _rbIsFavourite(tab.hash) : false);
+        this._syncFingerprintBtn(tab);
         this._renderPage(tab);
     }
 
@@ -281,16 +294,16 @@ class ReticulumBrowserPanel {
         this._go(hash, path);
     }
 
-    _go(hash, path) {
+    _go(hash, path, fieldData) {
         const tab = this._activeTab();
-        if (tab) this._fetch(tab, hash, path, true);
+        if (tab) this._fetch(tab, hash, path, true, fieldData);
     }
 
     _reload() {
         const tab = this._activeTab();
         if (!tab) return;
         const e = tab.history[tab.historyIdx];
-        if (e) this._fetch(tab, e.hash, e.path, false);
+        if (e) this._fetch(tab, e.hash, e.path, false, e.field_data);
     }
 
     _historyGo(delta) {
@@ -300,32 +313,34 @@ class ReticulumBrowserPanel {
         if (next < 0 || next >= tab.history.length) return;
         tab.historyIdx = next;
         const e = tab.history[next];
-        this._fetch(tab, e.hash, e.path, false);
+        this._fetch(tab, e.hash, e.path, false, e.field_data);
     }
 
-    async _fetch(tab, hash, path, pushHistory) {
+    async _fetch(tab, hash, path, pushHistory, fieldData) {
         this._pageEl.innerHTML = '<p class="lw-empty">Loading…</p>';
         try {
             const r = await fetch('/api/reticulum/nomad/page', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'same-origin',
-                body: JSON.stringify({ destination_hash: hash, path, field_data: null }),
+                body: JSON.stringify({ destination_hash: hash, path, field_data: fieldData || null }),
             });
             const data = await r.json().catch(() => ({}));
             if (!r.ok || !data.ok) {
                 this._pageEl.textContent = data.error || `Failed (HTTP ${r.status})`;
                 return;
             }
+            const isNewNode = tab.hash !== hash;
             tab.hash = hash;
             tab.path = path;
             tab.content = data.content || '';
+            if (isNewNode) tab.fingerprinted = false;
             const known = this._nodes.find((n) => n.destination_hash === hash);
             const fav = _rbFavourites().find((f) => f.hash === hash);
             tab.title = fav?.name || known?.display_name || `${hash.slice(0, 8)}…`;
             if (pushHistory) {
                 tab.history = tab.history.slice(0, tab.historyIdx + 1);
-                tab.history.push({ hash, path });
+                tab.history.push({ hash, path, field_data: fieldData || null });
                 tab.historyIdx = tab.history.length - 1;
             }
             if (tab.id === this._activeTabId) this._renderActiveTab();
@@ -335,22 +350,122 @@ class ReticulumBrowserPanel {
         }
     }
 
-    /** Simplified from the reticulum plugin's own reticulum_nomad.js --
-     * no form-field submission, no /file/ downloads yet (same scope note
-     * as this plugin's README "what's not here" -- may follow later).
-     * An external http(s) link opens a normal browser tab. */
+    /** Ported from the reticulum plugin's own reticulum_nomad.js: gathers
+     * form fields a Micron link asks to submit (`data-nomad-fields`, set
+     * by window.MicronParser), routes `/file/...` links to a download
+     * instead of a page render, and opens external http(s) links in a
+     * normal browser tab. */
     _followLink(a) {
         const tab = this._activeTab();
         if (!tab) return;
-        let addr = (a.dataset.nomadUrl || '').split('`')[0];
-        addr = addr.replace(/^nomadnetwork:\/\//, '');
-        if (/^https?:\/\//i.test(addr)) {
-            window.open(addr, '_blank', 'noopener');
+        const rawUrl = a.dataset.nomadUrl || '';
+        let addrPart = rawUrl;
+        const varData = {};
+        const btick = rawUrl.indexOf('`');
+        if (btick !== -1) {
+            addrPart = rawUrl.slice(0, btick);
+            for (const pair of rawUrl.slice(btick + 1).split('|')) {
+                const eq = pair.indexOf('=');
+                if (eq !== -1) varData[`var_${pair.slice(0, eq)}`] = pair.slice(eq + 1);
+            }
+        }
+        addrPart = addrPart.replace(/^nomadnetwork:\/\//, '');
+        if (/^https?:\/\//i.test(addrPart)) {
+            window.open(addrPart, '_blank', 'noopener');
             return;
         }
-        const { hash, path } = this._splitAddr(addr, tab.hash);
-        if (!hash || path.startsWith('/file/')) return;
-        this._go(hash, path);
+
+        const { hash, path } = this._splitAddr(addrPart, tab.hash);
+        if (!hash) return;
+
+        if (path.startsWith('/file/')) {
+            this._downloadFile(hash, path);
+            return;
+        }
+
+        const fieldData = { ...varData };
+        const spec = a.dataset.nomadFields;
+        if (spec) {
+            const wantAll = spec === '*';
+            const wanted = wantAll ? null : new Set(spec.split('|'));
+            this._pageEl.querySelectorAll('input[name], select[name], textarea[name]').forEach((inp) => {
+                if (!wantAll && !wanted.has(inp.name)) return;
+                if ((inp.type === 'checkbox' || inp.type === 'radio') && !inp.checked) return;
+                fieldData[`field_${inp.name}`] = inp.value;
+            });
+        }
+        this._go(hash, path, Object.keys(fieldData).length ? fieldData : null);
+    }
+
+    async _downloadFile(hash, path) {
+        this._status('pending', `Downloading ${path.split('/').pop()}…`);
+        try {
+            const r = await fetch('/api/reticulum/nomad/file', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ destination_hash: hash, path }),
+            });
+            if (!r.ok) {
+                const err = await r.json().catch(() => ({}));
+                this._status('error', err.detail || `Download failed (HTTP ${r.status})`);
+                return;
+            }
+            const blob = await r.blob();
+            const cd = r.headers.get('Content-Disposition') || '';
+            const m = cd.match(/filename="?([^"]+)"?/);
+            const name = m ? m[1] : (path.split('/').pop() || 'downloaded_file');
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = name;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+            this._status('success', `Downloaded ${name}`);
+        } catch (e) {
+            this._status('error', `Download error: ${e.message}`);
+        }
+    }
+
+    async _sendFingerprint() {
+        const tab = this._activeTab();
+        if (!tab || !tab.hash) return;
+        this._status('pending', 'Identifying yourself to this node…');
+        try {
+            const r = await fetch('/api/reticulum/nomad/fingerprint', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ destination_hash: tab.hash }),
+            });
+            const data = await r.json().catch(() => ({}));
+            if (!r.ok || !data.ok) {
+                this._status('error', data.error || `Failed (HTTP ${r.status})`);
+                return;
+            }
+            tab.fingerprinted = true;
+            this._syncFingerprintBtn(tab);
+            this._status('success', 'Identified — your LXMF address will be included in this node’s next form submission');
+        } catch (e) {
+            this._status('error', `Network error: ${e.message}`);
+        }
+    }
+
+    _syncFingerprintBtn(tab) {
+        if (!this._fingerprintBtn) return;
+        this._fingerprintBtn.disabled = !tab || !tab.hash;
+        this._fingerprintBtn.classList.toggle('is-active', !!(tab && tab.fingerprinted));
+        this._fingerprintBtn.title = tab && tab.fingerprinted
+            ? 'Already identified to this node'
+            : 'Identify yourself to this node — your LXMF address will be included in its next form submission';
+    }
+
+    _status(kind, msg) {
+        if (!this._statusEl) return;
+        this._statusEl.dataset.kind = kind;
+        this._statusEl.textContent = msg;
     }
 
     _splitAddr(raw, currentHash) {

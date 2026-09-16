@@ -82,6 +82,26 @@ async def nomad_page(
     }
 
 
+class FingerprintRequest(BaseModel):
+    destination_hash: str = Field(..., min_length=1)
+
+
+@router.post("/fingerprint")
+async def nomad_fingerprint(
+    req: FingerprintRequest, _claims: SessionClaims = Depends(require_auth),
+):
+    """Identify our own Reticulum identity to a NomadNet node over its
+    Link -- some `.mu` pages (guestbooks, registration forms) read the
+    resulting LXMF address from a form submission to know who's visiting.
+    Ported in spirit from rBrowser's fingerprint action (see backend/nomad.py
+    for the full explanation); a fetch failure is a 200 with `ok: false`,
+    matching the `/page` route's convention."""
+    if _service is None:
+        raise HTTPException(503, "Reticulum companion is disabled")
+    ok, result = await nomad.identify_link(req.destination_hash, _service.identity)
+    return {"ok": ok, "lxmf_hash": result if ok else None, "error": None if ok else result}
+
+
 class FileRequest(BaseModel):
     destination_hash: str = Field(..., min_length=1)
     path: str = Field(..., min_length=1)
