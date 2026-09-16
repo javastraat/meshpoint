@@ -57,14 +57,73 @@ for each build item is in **Could build — next up** further down.
 | ~~V6~~ | ~~**Verify: inbound Reticulum messages trigger Settings→System's message notifications (toast/sound)**~~ | verify | Low | Med | — | **LIVE-VERIFIED 2026-09-16.** Flagged by user same day, confirmed same day: an inbound message produced a real popup/toast on the right side of the screen. Wiring was exactly as suspected — `message_notifier.js`'s protocol-agnostic `message_received` listener + `lxmf_service.py`'s existing fire of that event, no code change needed, just watching it happen live |
 | ~~7~~ | ~~**Add Reticulum (and Pager) to the Messages page's protocol filter chips**~~ | build | Low | Low–Med | Low | **BUILT 2026-09-16, in two passes, LIVE-VERIFIED same day.** Pass 1: added `data-filter="reticulum"` ("RT") and `data-filter="pager"` ("Pager") buttons alongside All/MT/MC/★ Fav in `frontend/js/messaging.js:49-55` + `flex-wrap` on `.msg-protocol-toggle` (`messaging.css`) so 6 buttons wrap instead of overflowing a narrow sidebar — user live-tested this on the Pi immediately and both screenshotted fine. Pass 2, same session: user pointed out a real gap — an empty "Pager" pill (no pager configured on that box) was a dead-end click ("No conversations yet"), but the fix couldn't be "just hide it," since disabling a protocol *with existing history* would then make those old chats look silently gone. Landed on OR-ing two signals per pill: **configured** (same signal the sidebar nav already uses to hide itself — `capture.sources` for MT/MC, `radio_pager.pager_enabled` for Pager, a `reticulum` entry in `window.MESHPOINT_SIDEBAR_PLUGINS` for RT) **or has any channel/conversation already** (new `MessagingContacts.protocolsInUse()`). A pill only disappears once both are false. New `MessagingPanel._updateProtocolPillVisibility()`, called after every conversations load (initial + each time the Messages page is revisited); falls back to the "All" filter if the currently-active pill gets hidden out from under it. Best-effort like `sidebar_controller.js`'s own `_applySourceGating()` — a failed config fetch just leaves every pill visible. **Confirmed live 2026-09-16** — pills behaved correctly in the same session V6 was verified. |
 
+| V7 | **Verify: Reticulum Browser form submission, file downloads, identity fingerprinting** | verify | Low | Med | — | **BUILT 2026-09-16, not yet Pi-tested.** Full step-by-step test plan below (§ "Test plan: V7") |
+
 **Suggested sequence:** ~~1~~ → (V1, V2 on the Pi) → ~~2~~ → ~~3~~, with
-V3·V4·V5 folded into the next Pi session and 4–6 left reactive. Items 1,
+V3·V4·V5·V7 folded into the next Pi session and 4–6 left reactive. Items 1,
 2, 3, 7, and V6 are now all built/verified —
 **nothing left to build that's ahead of the Pi-verification backlog.**
 Next session should be entirely Pi-verification: V1/V2 first (quick,
 high-impact, never run), then a real two-node Audio Calls re-test (the
 mode-3200 + mic-quality tweaks made since the one verified call), then
-V3–V5 as time allows.
+V3–V5 and V7 as time allows.
+
+### Test plan: V7 (Reticulum Browser form/file/fingerprint)
+
+Needs the Pi — none of this runs on the Mac dev environment (no rns/lxmf
+there). Written 2026-09-16 alongside the build.
+
+**1. Deploy the change**
+
+```bash
+cd /opt/meshpoint   # or wherever your checkout lives on the Pi
+git pull
+sudo systemctl restart meshpoint
+```
+
+**2. File download — fully self-testable**
+
+Your own node can serve this, no external node needed:
+- Settings → Reticulum → Pages tab → put a small file at `files/test.txt`
+  under your `node_pages_dir` (or just drop one on disk with
+  `sudo -u meshpoint sh -c 'echo hello > /opt/meshpoint/data/reticulum/pages/files/test.txt'`,
+  adjust the path to your real `pages_dir`).
+- Edit `index.mu` to add a link: `` [Download test`:/file/test.txt] ``
+- Open Reticulum Browser, browse to your own node's address, click the
+  link → should download `test.txt` via the browser's normal download flow.
+
+**3. Form fields + fingerprint — verify via DevTools Network tab**
+
+Your own node's Pages tab serves static files and won't echo submitted
+values back (pre-existing, not something this change touched), so the
+cleanest check is watching what Reticulum Browser actually sends:
+
+- Add to `index.mu`:
+  ```
+  Your name: `<yourname`>
+
+  [Submit`:/page/index.mu`yourname]
+  ```
+- Open Reticulum Browser → your node → open your browser's DevTools →
+  Network tab, filter for `nomad/page`.
+- Type something in the field, click Submit → inspect the POST request
+  body, confirm `field_yourname` carries the value you typed.
+- Click the toolbar's "ID" button first, then Submit again → confirm the
+  same POST body now also carries a `"dest": "<hex>"` entry — that's the
+  fingerprint merge working.
+
+**4. Gold-standard test, if you know one**
+
+If there's a real NomadNet node on the mesh with an actual
+guestbook/registration form (not one you control), submitting through
+Reticulum Browser and seeing it accepted is the strongest end-to-end
+proof — that validates against independent server code, not just your own.
+
+**5. Quick regression pass**
+
+Multi-tab browsing, back/forward, favourites, raw/rendered toggle —
+nothing in this change should affect them, but worth a quick click-through
+since `_fetch`'s signature changed.
 
 ---
 
