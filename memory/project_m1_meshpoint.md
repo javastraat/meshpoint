@@ -13739,4 +13739,46 @@ result panel specifically: `reticulum.css` now targets both
 class names directly (including the print media query), and
 `reticulum_dashboard.css` got its own copy of the drawer-specific
 rules, matching that file's existing copy-don't-share convention.
-Not yet retested live.
+**Confirmed live on both plugins**: user opened a peer on
+rakv2-meshpoint's own Reticulum page, generated a paper message, QR +
+URI rendered correctly, buttons laid out right -- then confirmed the
+exact same thing on Reticulum Dashboard's own peer drawer too, styling
+intact there as well (the duplicated CSS fix for that page landed
+correctly).
+
+**Next: asked to hide (not remove) the Messages/Send tabs on the
+Reticulum page**, then asked two follow-ups mid-decision: whether a
+localStorage-only Settings toggle (default off) was a good idea, and
+separately whether it's actually safe to just remove them outright.
+Checked before answering: the Send tab's peer `<select>` sources from
+the exact same `this._peers` roster the Peers tab already shows (no
+free-text hash entry -- it can't reach a peer the drawer couldn't also
+reach), and the plugin's own "Messages" tab is a read-only summary
+table (mark-as-read only, no reply, no thread view) over the *same*
+`/api/messages/conversations` endpoint core's shared Messages page
+already renders with full reply/image support -- so nothing is
+functionally lost either way. Told the user that, but built the
+toggle rather than deleting anything, matching their own "don't remove
+it yet" -- same practical effect (tabs disappear from view) while
+staying trivially reversible with zero code removed.
+Built as they proposed: `data-rt-hide-tabs` checkbox in a new "Browser
+preferences" fieldset (`reticulum_settings_tab.js`, deliberately
+outside the `<form>`/"Save Reticulum" flow -- it's `localStorage` only,
+key `meshpoint.reticulum.hideSendMessagesTabs`, never PUT to the
+server). `reticulum_panel.js` reads the same key string (duplicated,
+not shared as a symbol, so neither file depends on the other's load
+order) to hide the two tab buttons and to exclude them from the
+tab-restore-on-reload logic; a new `meshpoint:reticulum-hide-tabs-
+changed` custom event makes the toggle apply live without a reload
+(the native `storage` event only fires in *other* tabs/windows, never
+the one that made the change).
+**Follow-up, same message thread**: user corrected the default --
+since this is a hide toggle, it should be hidden *by default*, with
+turning it back on (unchecking) reserved for troubleshooters. Flipped
+both reads (`reticulum_settings_tab.js`'s checkbox init,
+`reticulum_panel.js`'s constructor + its live-update listener) from
+"true only if explicitly '1'" to "true unless explicitly '0'" -- a
+never-set key (everyone's actual state right now, since this shipped
+today) now means hidden, and the one existing write path (the
+checkbox's own change handler, writes '1'/'0') is unchanged. Updated
+the Settings hint text to say so. Not yet retested live.

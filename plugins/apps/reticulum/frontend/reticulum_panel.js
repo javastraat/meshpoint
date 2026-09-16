@@ -58,6 +58,17 @@ class ReticulumPanel {
         // info at all means show it) -- the real security boundary is
         // server-side (POST /api/reticulum/send already requires admin).
         this._isAdmin = window.meshpointIdentity?.role !== 'viewer';
+        // Per-browser preference, set from the Settings tab -- see that
+        // file's own comment on RT_HIDE_TABS_STORE_KEY/_CHANGE_EVENT for
+        // why the key string is duplicated here rather than shared as a
+        // symbol. The peer drawer's Send Message/Paper message actions
+        // cover what these two tabs did, so hidden by default; only an
+        // explicit "0" (unchecked at least once, e.g. for troubleshooting)
+        // brings them back.
+        this._hideSendMessagesTabs = true;
+        try {
+            this._hideSendMessagesTabs = localStorage.getItem('meshpoint.reticulum.hideSendMessagesTabs') !== '0';
+        } catch (_) { /* ignore -- defaults to hidden */ }
         let stored = null;
         try { stored = localStorage.getItem(RT_TAB_STORE_KEY); } catch (_) {}
         // 'pages' restores optimistically -- _syncPagesTab() bounces it
@@ -67,8 +78,9 @@ class ReticulumPanel {
         // now allows any authed session (nomad_routes.py), so it isn't
         // gated behind _isAdmin here either. 'send'/'settings'/'pages'/
         // 'contacts' write or reconfigure this node, so those stay admin-only.
-        this._tab = (['messages', 'announces', 'telemetry', 'browse'].includes(stored)
-            || (['send', 'settings', 'pages', 'contacts'].includes(stored) && this._isAdmin))
+        const hiddenTab = this._hideSendMessagesTabs && (stored === 'messages' || stored === 'send');
+        this._tab = (!hiddenTab && (['messages', 'announces', 'telemetry', 'browse'].includes(stored)
+            || (['send', 'settings', 'pages', 'contacts'].includes(stored) && this._isAdmin)))
             ? stored : 'peers';
         this._settingsTab = null;
         this._nomadTab = null;
@@ -133,9 +145,9 @@ class ReticulumPanel {
                             <button class="lw-tab" type="button" role="tab"
                                     data-rt-tab="telemetry">Telemetry</button>
                             <button class="lw-tab" type="button" role="tab"
-                                    data-rt-tab="messages">Messages</button>
+                                    data-rt-tab="messages" ${this._hideSendMessagesTabs ? 'hidden' : ''}>Messages</button>
                             <button class="lw-tab" type="button" role="tab"
-                                    data-rt-tab="send" ${this._isAdmin ? '' : 'hidden'}>Send</button>
+                                    data-rt-tab="send" ${(this._isAdmin && !this._hideSendMessagesTabs) ? '' : 'hidden'}>Send</button>
                             <button class="lw-tab" type="button" role="tab"
                                     data-rt-tab="contacts" ${this._isAdmin ? '' : 'hidden'}>Contacts</button>
                             <button class="lw-tab" type="button" role="tab"
@@ -405,6 +417,20 @@ class ReticulumPanel {
         this._q('#rt-sync-btn')?.addEventListener('click', () => this._handleSync());
         this._root.querySelectorAll('[data-rt-tab]').forEach((btn) => {
             btn.addEventListener('click', () => this._setTab(btn.dataset.rtTab));
+        });
+        // Live-reflect the Settings tab's "Hide the Messages & Send tabs"
+        // toggle without a page reload -- both tabs live in this same
+        // mounted panel, so a checkbox change over on Settings wouldn't
+        // otherwise touch this header's already-rendered buttons.
+        window.addEventListener('meshpoint:reticulum-hide-tabs-changed', () => {
+            let hide = true;
+            try { hide = localStorage.getItem('meshpoint.reticulum.hideSendMessagesTabs') !== '0'; } catch (_) {}
+            this._hideSendMessagesTabs = hide;
+            const messagesBtn = this._q('[data-rt-tab="messages"]');
+            const sendBtn = this._q('[data-rt-tab="send"]');
+            if (messagesBtn) messagesBtn.hidden = hide;
+            if (sendBtn) sendBtn.hidden = hide || !this._isAdmin;
+            if (hide && (this._tab === 'messages' || this._tab === 'send')) this._setTab('peers');
         });
         const messageTbody = this._q('#rt-message-tbody');
         if (messageTbody) {

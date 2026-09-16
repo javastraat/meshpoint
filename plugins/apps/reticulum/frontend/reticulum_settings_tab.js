@@ -19,6 +19,15 @@ const RT_BANDWIDTHS_HZ = [
     7800, 10400, 15600, 20800, 31250, 41700, 62500, 125000, 250000, 500000,
 ];
 
+// Per-browser only -- never sent to the server. Same key string also
+// read directly by reticulum_panel.js (duplicated rather than shared as
+// a symbol, so neither file depends on the other's load order); a
+// custom event covers same-tab live updates, since the native
+// `storage` event only fires in *other* tabs/windows, never the one
+// that made the change.
+const RT_HIDE_TABS_STORE_KEY = 'meshpoint.reticulum.hideSendMessagesTabs';
+const RT_HIDE_TABS_CHANGE_EVENT = 'meshpoint:reticulum-hide-tabs-changed';
+
 class ReticulumSettingsTab {
     constructor(el) {
         this._el = el;
@@ -360,6 +369,21 @@ class ReticulumSettingsTab {
                         </div>
                         <p class="cfg-status" data-rt-status aria-live="polite"></p>
                     </form>
+                    <fieldset class="cfg-fieldset">
+                        <legend class="cfg-fieldset__legend">Browser preferences</legend>
+                        <label class="cfg-field cfg-field--toggle">
+                            <input type="checkbox" data-rt-hide-tabs>
+                            <span class="cfg-field__label">Hide the Messages &amp; Send tabs</span>
+                        </label>
+                        <p class="cfg-field__hint">
+                            The Peers drawer's Send Message/Paper message actions already cover
+                            composing — this just tucks the older tabs away. Saved in this
+                            browser only, not sent to the server, so it won't affect anyone
+                            else or any other device signed into this box. <strong>On (hidden)
+                            by default</strong> — uncheck to bring them back, e.g. for
+                            troubleshooting.
+                        </p>
+                    </fieldset>
                     <div class="cfg-card__actions">
                         <button class="terminal-button" type="button" data-rt-restart-rnsd>
                             Restart rnsd
@@ -416,6 +440,19 @@ class ReticulumSettingsTab {
         this._nodeStatusEl = this._q('[data-rt-node-status]');
         this._statusEl = this._q('[data-rt-status]');
         this._rnsdStatusEl = this._q('[data-rt-rnsd-status]');
+
+        const hideTabsEl = this._q('[data-rt-hide-tabs]');
+        try {
+            // Hidden by default -- only an explicit "0" (unchecked at
+            // least once) turns them back on, e.g. for troubleshooting.
+            hideTabsEl.checked = localStorage.getItem(RT_HIDE_TABS_STORE_KEY) !== '0';
+        } catch (_e) { /* ignore -- defaults to checked/hidden */ }
+        hideTabsEl.addEventListener('change', () => {
+            try {
+                localStorage.setItem(RT_HIDE_TABS_STORE_KEY, hideTabsEl.checked ? '1' : '0');
+            } catch (_e) { /* ignore -- private browsing / storage disabled */ }
+            window.dispatchEvent(new Event(RT_HIDE_TABS_CHANGE_EVENT));
+        });
 
         this._form.addEventListener('submit', (e) => this._onSubmit(e));
         this._frequency.addEventListener('input', () => this._renderFrequencyHint());
