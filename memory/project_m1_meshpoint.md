@@ -13781,4 +13781,11 @@ both reads (`reticulum_settings_tab.js`'s checkbox init,
 never-set key (everyone's actual state right now, since this shipped
 today) now means hidden, and the one existing write path (the
 checkbox's own change handler, writes '1'/'0') is unchanged. Updated
-the Settings hint text to say so. Not yet retested live.
+the Settings hint text to say so.
+**Follow-up**: user flagged the fieldset's placement reads confusingly
+-- it sits right after "Save Reticulum" (the actual form's submit
+button), making it look like a third click-to-apply action alongside
+that and "Restart rnsd" below, when it's actually instant. Added an
+explicit line to the hint instead of moving it: "Applies the instant
+you click it -- not part of Save Reticulum above, and no restart
+needed." Not yet retested live.

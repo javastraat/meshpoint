@@ -381,7 +381,8 @@ class ReticulumSettingsTab {
                             browser only, not sent to the server, so it won't affect anyone
                             else or any other device signed into this box. <strong>On (hidden)
                             by default</strong> — uncheck to bring them back, e.g. for
-                            troubleshooting.
+                            troubleshooting. <strong>Applies the instant you click it</strong> —
+                            not part of "Save Reticulum" above, and no restart needed.
                         </p>
                     </fieldset>
                     <div class="cfg-card__actions">
