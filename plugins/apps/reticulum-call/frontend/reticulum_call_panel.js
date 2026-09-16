@@ -449,6 +449,19 @@ class ReticulumCallHookPanel {
         this._audioCtx = new (window.AudioContext || window.webkitAudioContext)({
             sampleRate: RT_CALL_SAMPLE_RATE,
         });
+        // Browsers create a new AudioContext suspended unless it's
+        // resumed in direct response to a user gesture -- and "direct"
+        // can be lost across an `await` (Join/Call both await a fetch
+        // before ever reaching here), so this isn't guaranteed to have
+        // happened automatically. A suspended context accepts every
+        // Web Audio API call without error -- createBuffer(),
+        // AudioBufferSourceNode.start(), all of it -- it just never
+        // actually produces sound, which is exactly "TX and RX both
+        // climb, decode never throws, still total silence" (confirmed
+        // live: 5 sent, 5 received, nothing audible). resume() is a
+        // no-op if the context is already running, so this is safe to
+        // call unconditionally rather than checking .state first.
+        await this._audioCtx.resume();
         await this._audioCtx.audioWorklet.addModule(RT_CALL_WORKLET_URL);
         this._workletNode = new AudioWorkletNode(this._audioCtx, RT_CALL_WORKLET_NAME);
         this._micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -507,6 +520,12 @@ class ReticulumCallHookPanel {
 
     _playSamples(samples) {
         if (!this._audioCtx || samples.length === 0) return;
+        // Belt-and-braces: some browsers re-suspend an AudioContext on
+        // tab backgrounding / power-saving. Not awaited -- this
+        // particular chunk may still be silent, but resume() is async
+        // and there's nothing worth blocking the audio graph on here;
+        // the next chunk plays normally once it completes.
+        if (this._audioCtx.state === 'suspended') this._audioCtx.resume().catch(() => {});
         const buffer = this._audioCtx.createBuffer(1, samples.length, RT_CALL_SAMPLE_RATE);
         buffer.copyToChannel(samples, 0);
         const source = this._audioCtx.createBufferSource();

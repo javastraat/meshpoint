@@ -683,8 +683,28 @@ plugins:
   fault in one exchange: TX stuck at 0 while holding Talk = mic/encode
   never even happens; TX climbing but the other side's RX at 0 = the
   RNS packet isn't arriving or isn't being forwarded; both climbing
-  with still no sound = decode/playback specifically. Not yet
-  retested with the counter.
+  with still no sound = decode/playback specifically.
+  **Retested with the counter -- genuinely useful result: TX 5 · RX 5
+  on both sides, zero console errors, still total silence.** That
+  actually confirms the entire pipeline works end to end (mic, encode,
+  WS, RNS packet delivery, the other node's RNS, its WS, decode) --
+  the break is specifically the last step, turning decoded samples
+  into audible sound. Diagnosed as a well-known Web Audio gotcha, not
+  guessed: browsers create a new `AudioContext` **suspended** unless
+  it's resumed in direct response to a user gesture, and "direct" can
+  be lost across an `await` -- both Call and Join `await` a `fetch()`
+  before ever reaching `_startAudio()`. A suspended context accepts
+  every Web Audio call without error (`createBuffer()`,
+  `AudioBufferSourceNode.start()`, all of it) and just never produces
+  sound -- exactly the observed symptom. Fixed with an unconditional
+  `await this._audioCtx.resume()` right after creating the context
+  (a no-op if already running, so safe regardless of whether the
+  gesture was actually lost) plus a defensive re-resume in
+  `_playSamples()` for browsers that re-suspend a context on tab
+  backgrounding. User confirmed testing both sides from the **same
+  physical machine** on purpose -- a working receive side would be
+  audible immediately as their own voice echoing back, no second
+  tester needed. Not yet retested after this fix.
 - **2026-09-16** — Paper messages / QR, item 2, **export-only** (same
   session as items 1 and 7, immediately after finishing item 1 — user
   asked "what about 2, what is this exactly" since the backlog only had
