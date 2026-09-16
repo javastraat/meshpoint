@@ -762,6 +762,50 @@ plugins:
   issue -- fix: on the multi-protocol node, do a full Meshpoint
   service restart (not just "Restart rnsd") after enabling "Announce a
   call destination", then retry.
+  **Update -- restart-scope wasn't the whole story.** User confirmed
+  "Announce a call destination" is on on both nodes, and
+  `GET /api/reticulum/status` on both showed `audio_call.own_address`
+  populated on both (managers genuinely exist on both ends) -- ruled
+  that theory out. Dug into each node's own `audio_call.calls` list in
+  that same payload instead: vm's had **40 outbound entries, all to
+  ti, zero inbound** (ti has never once reached vm); ti's had
+  **exactly 1 entry, inbound, from vm**, call_hash matching vm's last
+  outbound entry exactly -- both sides logged the same real call.
+  `initiate()` only appends to `calls` *after* reaching ACTIVE, so vm's
+  40 failed-then-eventually-one-worked history is invisible except as
+  timeout errors; ti's outbound attempts toward vm have never once
+  reached ACTIVE at all.
+  Checked `GET /api/reticulum/peers/{hash}/link` (this plugin's own
+  next-hop/path diagnostic, `peer_link_info()`) on ti for vm's
+  `call.audio` hash: `has_path: false`, `identity_resolved: false`,
+  `announces_this_session: 0` -- **at rest, no call in progress** --
+  ti has never once seen vm's call.audio destination announced, this
+  whole session. Root cause: `call.audio` only ever announced once, at
+  `start()` (plus the manual click, fixed above) -- unlike
+  `lxmf.delivery`, which stays discoverable across a large public mesh
+  (ti alone knows 11547 peers) because every *other* Sideband/meshchat/
+  meshpoint node keeps re-announcing its own delivery destination
+  constantly, warming everyone's path tables as a side effect. A
+  one-shot call.audio announce from a backbone-only leaf node (vm)
+  competing against that background noise can plausibly just never
+  reach a given peer, however long any single attempt waits -- network
+  position (leaf vs. well-connected relay -- ti's own `reticulum_peers`
+  count is ~2x vm's) likely matters here more than RF-vs-backbone
+  specifically, though both may play a part.
+  User asked whether "having more networks" (mt/mc/DAPNET pager) on ti
+  is itself the cause -- checked and no: those are separate radios/
+  threads that never touch RNS's own `Transport` path table, and the
+  diagnostic above is purely Reticulum-layer, so that theory doesn't
+  hold up against the evidence actually collected.
+  **Fix**: periodic `call.audio` re-announce, every 30 min while
+  `audio_calls_enabled` (`_CALL_ANNOUNCE_INTERVAL_S` in
+  `lxmf_service.py`, new `_audio_call_announce_loop()` task started in
+  `start()`, cancelled in `stop()`) -- same pattern `nomad_node.py`'s
+  `_announce_loop()`/`announce_interval_s` already uses for the
+  NomadNet destination, just shorter (call reachability matters in
+  the moment, not eventually). Not yet retested live -- needs ~30+ min
+  after a restart (or a manual "Announce now") for the next scheduled
+  announce to go out and propagate before retrying ti -> vm.
   Also from this round, both explicitly requested: default Codec2 mode
   changed 1200 → 3200 (`reticulum_call_codec.js` `DEFAULT_MODE`, was the
   lowest-bitrate/worst-quality option); `getUserMedia` now requests

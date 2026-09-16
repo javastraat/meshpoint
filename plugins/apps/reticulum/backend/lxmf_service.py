@@ -74,6 +74,17 @@ _ANNOUNCE_ASPECTS = (*_ROSTER_ASPECTS, "call.audio")
 _ANNOUNCE_LOG_MAX = 200  # in-memory ring buffer behind GET /api/reticulum/announces
 _PROPAGATION_ANNOUNCE_INTERVAL_S = 21600  # 6h -- re-announce the lxmf.propagation dest
 
+# call.audio only ever announced once, at start() (plus on-demand via
+# "Announce now") -- fine for lxmf.delivery, which gets kept warm across
+# the mesh by frequent re-announces from every other Sideband/meshchat/
+# meshpoint node doing the same, but call.audio is comparatively cold:
+# confirmed live, a backbone-only leaf node's one-shot announce never
+# reached a well-connected multi-interface peer even after 40 outbound
+# call attempts from the *other* direction kept the reverse path warm.
+# Shorter than the propagation interval above since call reachability
+# matters in the moment, not just eventually.
+_CALL_ANNOUNCE_INTERVAL_S = 1800  # 30m
+
 # Total wait budget for a cold-cache path request in send_message():
 # 5 x 1s = 5s. Long enough for a same-network shared-instance response
 # (confirmed live these resolve in well under a second once the master
@@ -237,6 +248,7 @@ class LxmfService:
         # destination nobody asked for is just noise.
         self._audio_calls_enabled = audio_calls_enabled
         self._audio_call_manager: "audio_call.AudioCallManager | None" = None
+        self._audio_call_announce_task: Optional[asyncio.Task] = None
         self._announce_log: deque = deque(maxlen=_ANNOUNCE_LOG_MAX)
         self._bg_tasks: set = set()
         self._pn_task: Optional[asyncio.Task] = None
@@ -350,6 +362,16 @@ class LxmfService:
             self._audio_call_manager = audio_call.AudioCallManager(self._identity)
             self._audio_call_manager.register_incoming_call_callback(self._on_incoming_call)
             self._audio_call_manager.announce()
+            if self._loop is not None:
+                self._audio_call_announce_task = self._loop.create_task(
+                    self._audio_call_announce_loop()
+                )
+
+    async def _audio_call_announce_loop(self) -> None:
+        while True:
+            await asyncio.sleep(_CALL_ANNOUNCE_INTERVAL_S)
+            if self._audio_call_manager is not None:
+                self._audio_call_manager.announce()
 
     def _on_incoming_call(self, call: "audio_call.AudioCall") -> None:
         """Runs on RNS's own callback thread (a Link-established callback,
@@ -390,6 +412,9 @@ class LxmfService:
         if self._node is not None:
             await self._node.stop()
             self._node = None
+        if self._audio_call_announce_task is not None:
+            self._audio_call_announce_task.cancel()
+            self._audio_call_announce_task = None
         if self._audio_call_manager is not None:
             self._audio_call_manager.hangup_all()
             self._audio_call_manager = None

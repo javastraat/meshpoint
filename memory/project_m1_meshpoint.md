@@ -13511,6 +13511,33 @@ actual explanation for the earlier ti-meshpoint/vm-meshpoint asymmetry
 restart (not "Restart rnsd") on the multi-protocol node after
 confirming "Announce a call destination" is checked, then retry.
 
+**Update -- that wasn't the whole story.** User confirmed the toggle
+is on on both nodes; `/api/reticulum/status` confirmed both managers
+genuinely exist (`audio_call.own_address` populated on both). Real
+signal came from each node's own `audio_call.calls` history in that
+payload: vm's showed 40 outbound attempts to ti, zero inbound ever;
+ti's showed exactly one entry, inbound from vm, matching call_hash --
+so vm->ti has worked at least once, ti->vm has never once succeeded.
+`GET /api/reticulum/peers/{hash}/link` (this plugin's own next-hop
+diagnostic) on ti for vm's call.audio hash, checked at rest with no
+call running, came back `has_path: false`, `identity_resolved: false`,
+`announces_this_session: 0` -- ti has never once seen that destination
+announced. Root cause: `call.audio` was only ever announced once, at
+service start (plus the manual-click fix above) -- `lxmf.delivery`
+stays discoverable across the mesh only because *every other node* on
+it keeps re-announcing its own, which incidentally keeps everyone's
+path tables warm; a one-shot announce from a backbone-only leaf (vm)
+competing against that has no such help and can plausibly never reach
+a given peer. User asked whether ti simply having more protocols
+(meshtastic/meshcore/DAPNET pager) running alongside is the cause --
+checked, and no: those never touch RNS's own Transport path table,
+and the diagnostic evidence is purely Reticulum-layer. Fix: a periodic
+call.audio re-announce every 30 minutes (`_CALL_ANNOUNCE_INTERVAL_S`,
+new `_audio_call_announce_loop()` in `lxmf_service.py`), mirroring the
+NomadNet node's existing `announce_interval_s` pattern. Not yet
+retested -- needs ~30+ min post-restart for the first scheduled
+announce to actually fire and propagate.
+
 Also fixed same session, both explicitly requested: default Codec2
 mode 1200 → 3200 (was the lowest-bitrate/worst-quality option);
 `getUserMedia` now requests `autoGainControl`/`echoCancellation`/
