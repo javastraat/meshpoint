@@ -129,14 +129,20 @@
   }
 
   h1.headline {
-    font-family: var(--mono);
-    font-weight: 700;
+    /* Sans, not mono, for full-sentence headlines -- a monospace font
+       gives every space the same fixed cell-width as a letter, which
+       reads as an oddly wide gap around short words ("a", "of") once
+       the font is this big. Mono still carries the eyebrows/stats/
+       version numbers, where its technical-readout feel actually earns
+       its keep. */
+    font-family: var(--sans);
+    font-weight: 800;
     font-size: clamp(2.1rem, 5vw, 3.6rem);
-    line-height: 1.05;
-    letter-spacing: -0.01em;
+    line-height: 1.08;
+    letter-spacing: -0.02em;
     margin: 0 0 18px;
     text-wrap: balance;
-    max-width: 15ch;
+    max-width: 46ch;
   }
   h1.headline .accent { color: var(--accent); }
   h1.headline .accent2 { color: var(--accent-2); }
@@ -437,7 +443,7 @@
   <section class="slide title-slide" data-active="true">
     <div class="slide-inner">
     <div class="wordmark">MESHPOINT</div>
-    <p class="title-tagline">An open-source Meshtastic base station that turns a $40 retired crypto-miner board into a six-network mesh radio dashboard — no phone app, no cloud required.</p>
+    <p class="title-tagline">An open-source Meshtastic base station that turns a retired crypto-miner board into a six-network mesh radio dashboard — no phone app, no cloud required.</p>
     <div class="title-meta">
       <span>EINSTEIN</span>
       <span>TECHINC</span>
@@ -551,9 +557,9 @@
     <h1 class="headline">What we've <span class="accent">added on top.</span></h1>
     <p class="lede">Running as a fork tuned for a SenseCap M1 and a browser radio receiver — tracking upstream, shipping a real second layer alongside it.</p>
     <ul class="mesh-list">
-      <li><b>A whole plugin platform, not just plugins</b> <span class="dim">— built the extensibility itself: 18 plugins (the RTL-SDR family, DAPNET, Reticulum), a community plugin-source installer, and 18 drop-in themes with a live builder. Turned one app into a platform.</span></li>
-      <li><b>Reticulum grown into a full ecosystem</b> <span class="dim">— from messaging to real-time voice calls, photo and paper-QR messages, a multi-tab NomadNet browser with forms/downloads/identity fingerprinting, propagation relaying, and telemetry.</span></li>
-      <li><b>Field-ops hardware tooling + hardening</b> <span class="dim">— flash Meshtastic/MeshCore/pager firmware straight from the dashboard, RF spectrum scanning working on the SenseCap M1 specifically (upstream marks it unavailable on that board), MeshCore repeater monitoring, offline maps, and filesystem-only security opt-ins closing real self-escalation gaps.</span></li>
+      <li><b>A whole plugin platform, not just plugins</b> <span class="dim">— 18 plugins, a community plugin-source installer, 18 themes with a live builder. One app, turned into a platform.</span></li>
+      <li><b>Reticulum grown into a full ecosystem</b> <span class="dim">— voice calls, photo and paper-QR messages, a multi-tab NomadNet browser, propagation relaying, telemetry.</span></li>
+      <li><b>Field-ops hardware tooling + hardening</b> <span class="dim">— firmware flashing from the dashboard, RF scanning on the SenseCap M1 (upstream marks it unavailable there), repeater monitoring, offline maps, filesystem-only security opt-ins.</span></li>
     </ul>
   </div>
   </section>
