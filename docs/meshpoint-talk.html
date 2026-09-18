@@ -1,0 +1,781 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meshpoint</title>
+<style>
+  /* Palette matched 1:1 to meshradar.io's own landing.css tokens --
+     meshradar.io is dark-only (no light theme), so this deck commits to
+     the same single dark identity rather than keeping its own toggle. */
+  :root {
+    --bg: #070b14;
+    --bg-elevated: #162033;
+    --bg-panel: #0f1729;
+    --text: #e2e8f0;
+    --text-dim: #94a3b8;
+    --text-faint: #64748b;
+    --accent: #00e5a0;
+    --accent-soft: #00e5a022;
+    --accent-2: #f59e0b;
+    --border: #233049;
+    --border-strong: #34456b;
+    --mono: "JetBrains Mono", "Fira Code", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    height: 100%;
+    overflow: hidden;
+  }
+  ::selection { background: var(--accent-soft); color: var(--text); }
+
+  body {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+
+  /* ---- status bar : mimics the product's own topbar chip language ---- */
+  .statusbar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 28px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-panel);
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    color: var(--text-dim);
+    z-index: 5;
+  }
+  .statusbar__left { display: flex; align-items: center; gap: 14px; }
+  .statusbar__mark { color: var(--text); font-weight: 700; letter-spacing: 0.02em; }
+  .statusbar__dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+  .statusbar__pill {
+    border: 1px solid var(--border-strong);
+    border-radius: 3px;
+    padding: 2px 7px;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-dim);
+  }
+  .statusbar__count { font-variant-numeric: tabular-nums; color: var(--text-faint); }
+
+  /* ---- slide stage ---- */
+  .stage {
+    position: relative;
+    flex: 1 1 auto;
+    overflow: hidden;
+  }
+  .slide {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 6vh 9vw;
+    opacity: 0;
+    transform: translateY(14px);
+    transition: opacity 0.45s ease, transform 0.45s ease;
+    pointer-events: none;
+    /* A short browser window (or a slide with a longer list, like the
+       pitch slide's 3 bullets) can be taller than the viewport --
+       overflow-y here lets it scroll instead of silently clipping past
+       the statusbar/navbar. justify-content:center would still clip the
+       TOP half of the overflow even with scroll enabled (a well-known
+       flexbox quirk: centered overflow is only reachable on one side) --
+       so centering lives on .slide-inner's margin:auto instead, which
+       degrades to a normal top-anchored, fully-scrollable block when
+       content doesn't fit. */
+    overflow-y: auto;
+  }
+  .slide-inner {
+    margin: auto 0;
+    width: 100%;
+  }
+  .slide[data-active="true"] {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .slide { transition: opacity 0.15s linear; transform: none !important; }
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .eyebrow::before {
+    content: "";
+    width: 18px;
+    height: 1px;
+    background: var(--accent);
+  }
+
+  h1.headline {
+    font-family: var(--mono);
+    font-weight: 700;
+    font-size: clamp(2.1rem, 5vw, 3.6rem);
+    line-height: 1.05;
+    letter-spacing: -0.01em;
+    margin: 0 0 18px;
+    text-wrap: balance;
+    max-width: 15ch;
+  }
+  h1.headline .accent { color: var(--accent); }
+  h1.headline .accent2 { color: var(--accent-2); }
+
+  .lede {
+    font-size: clamp(1.05rem, 1.6vw, 1.3rem);
+    line-height: 1.55;
+    color: var(--text-dim);
+    max-width: 62ch;
+    margin: 0 0 6px;
+  }
+
+  .body-copy {
+    font-size: 1rem;
+    line-height: 1.65;
+    color: var(--text-dim);
+    max-width: 58ch;
+  }
+
+  /* mesh-node bullet list -- replaces generic bullets with the product's
+     own visual language (a node dot + connecting stem) */
+  ul.mesh-list {
+    list-style: none;
+    margin: 26px 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    max-width: 62ch;
+  }
+  ul.mesh-list li {
+    position: relative;
+    padding-left: 26px;
+    font-size: 1.02rem;
+    line-height: 1.55;
+    color: var(--text);
+  }
+  ul.mesh-list li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 7px;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  ul.mesh-list li b { color: var(--text); font-weight: 650; }
+  ul.mesh-list li .dim { color: var(--text-dim); }
+
+  .stat-row {
+    display: flex;
+    gap: 34px;
+    margin-top: 30px;
+    flex-wrap: wrap;
+  }
+  .stat {
+    font-family: var(--mono);
+  }
+  .stat__num {
+    font-size: clamp(1.6rem, 3vw, 2.3rem);
+    font-weight: 700;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  .stat__label {
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin-top: 6px;
+  }
+
+  /* comparison table */
+  .cmp {
+    margin-top: 28px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    max-width: 640px;
+    background: var(--bg-elevated);
+  }
+  .cmp-row {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr 1fr;
+    border-bottom: 1px solid var(--border);
+  }
+  .cmp-row:last-child { border-bottom: none; }
+  .cmp-row > div { padding: 11px 16px; font-size: 0.92rem; }
+  .cmp-row.head > div {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    background: var(--bg-panel);
+  }
+  .cmp-row > div:first-child { color: var(--text-dim); }
+  .cmp-row > div:nth-child(2) { color: var(--text-faint); }
+  .cmp-row > div:nth-child(3) { color: var(--text); font-weight: 550; }
+
+  /* band pills -- echoes the real topbar's protocol chips */
+  .band-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 30px;
+    max-width: 720px;
+  }
+  .band-pill {
+    font-family: var(--mono);
+    border: 1px solid var(--border-strong);
+    border-radius: 5px;
+    padding: 10px 16px;
+    background: var(--bg-elevated);
+  }
+  .band-pill__name { font-size: 12px; font-weight: 700; letter-spacing: 0.04em; color: var(--text); }
+  .band-pill__freq { font-size: 12px; color: var(--accent); font-variant-numeric: tabular-nums; margin-top: 3px; }
+  .band-pill--optional {
+    border-style: dashed;
+    border-color: var(--border);
+  }
+  .band-pill--optional .band-pill__freq { color: var(--accent-2); }
+  .band-pill__tag {
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    color: var(--text-faint);
+    margin-top: 2px;
+  }
+
+  /* two-column feature grid */
+  .feat-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px 40px;
+    margin-top: 28px;
+    max-width: 780px;
+  }
+  .feat {
+    border-left: 2px solid var(--border-strong);
+    padding-left: 16px;
+  }
+  .feat__title { font-family: var(--mono); font-size: 0.88rem; font-weight: 700; color: var(--text); }
+  .feat__desc { font-size: 0.9rem; color: var(--text-dim); margin-top: 5px; line-height: 1.5; }
+
+  canvas#timeline { display: block; margin-top: 34px; }
+
+  .content-split {
+    display: grid;
+    grid-template-columns: 1.1fr 0.9fr;
+    gap: 4vw;
+    align-items: center;
+  }
+  @media (max-width: 900px) {
+    .content-split { grid-template-columns: 1fr; }
+  }
+
+  /* title slide */
+  .wordmark {
+    font-family: var(--mono);
+    font-weight: 700;
+    font-size: clamp(3.4rem, 9vw, 6.4rem);
+    letter-spacing: -0.02em;
+    line-height: 1;
+    color: var(--text);
+  }
+  .title-tagline {
+    font-size: clamp(1.05rem, 1.8vw, 1.4rem);
+    color: var(--text-dim);
+    margin-top: 18px;
+    max-width: 46ch;
+    line-height: 1.5;
+  }
+  .title-meta {
+    margin-top: 40px;
+    display: flex;
+    gap: 28px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-faint);
+    letter-spacing: 0.05em;
+  }
+
+  /* closing slide */
+  .closing-links {
+    display: flex;
+    gap: 30px;
+    margin-top: 28px;
+    flex-wrap: wrap;
+  }
+  .closing-links a {
+    font-family: var(--mono);
+    font-size: 0.95rem;
+    color: var(--accent);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+  }
+  .closing-links a:hover, .closing-links a:focus-visible { border-bottom-color: var(--accent); }
+
+  /* ---- nav chrome ---- */
+  .navzone {
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 14%;
+    z-index: 3;
+    cursor: pointer;
+    background: transparent;
+    border: none;
+  }
+  .navzone--prev { left: 0; }
+  .navzone--next { right: 0; }
+  .navzone:focus-visible { outline: 2px solid var(--accent); outline-offset: -4px; }
+
+  .navbar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    padding: 16px;
+    border-top: 1px solid var(--border);
+    background: var(--bg-panel);
+    z-index: 5;
+  }
+  .navdot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    border: none;
+    background: var(--border-strong);
+    cursor: pointer;
+    padding: 0;
+    transition: background 0.2s, transform 0.2s;
+  }
+  .navdot:hover { transform: scale(1.3); }
+  .navdot[aria-current="true"] {
+    background: var(--accent);
+    box-shadow: 0 0 6px var(--accent);
+  }
+  .navdot:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .arrowbtn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 4;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-strong);
+    color: var(--text-dim);
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 16px;
+    opacity: 0.55;
+    transition: opacity 0.2s, color 0.2s, border-color 0.2s;
+  }
+  .arrowbtn:hover { opacity: 1; color: var(--accent); border-color: var(--accent); }
+  .arrowbtn--prev { left: 18px; }
+  .arrowbtn--next { right: 18px; }
+
+  /* print: stack every slide for a PDF/handout export */
+  @media print {
+    html, body { height: auto; overflow: visible; }
+    .navzone, .arrowbtn, .navbar { display: none !important; }
+    .stage { position: static; height: auto; }
+    .slide {
+      position: static;
+      opacity: 1 !important;
+      transform: none !important;
+      pointer-events: auto !important;
+      page-break-after: always;
+      min-height: 90vh;
+      padding: 40px 6vw;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="statusbar">
+  <div class="statusbar__left">
+    <span class="statusbar__dot" aria-hidden="true"></span>
+    <span class="statusbar__mark">MESHPOINT</span>
+    <span class="statusbar__pill">v0.8.1</span>
+  </div>
+  <div class="statusbar__count"><span id="slideNo">01</span> / <span id="slideTotal">12</span></div>
+</div>
+
+<div class="stage" id="stage">
+
+  <section class="slide title-slide" data-active="true">
+    <div class="slide-inner">
+    <div class="wordmark">MESHPOINT</div>
+    <p class="title-tagline">An open-source Meshtastic base station that turns a $40 retired crypto-miner board into a six-network mesh radio dashboard — no phone app, no cloud required.</p>
+    <div class="title-meta">
+      <span>EINSTEIN</span>
+      <span>TECHINC</span>
+      <span>AGPL-3.0</span>
+    </div>
+  </div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-inner">
+    <p class="eyebrow">What it is</p>
+    <h1 class="headline">Everything a repeater <span class="accent">sees</span>, from a browser tab.</h1>
+    <p class="lede">Most mesh nodes only know their own traffic. Meshpoint pairs a real LoRa concentrator with a full web dashboard — so you get every packet in range, native TX/RX, and a chat UI that needs nothing installed on your phone.</p>
+    <ul class="mesh-list">
+      <li><b>Observer, not just participant</b> <span class="dim">— sees everything in range, not only what's addressed to it.</span></li>
+      <li><b>Native transmit</b> <span class="dim">— same sync word and encryption as the mesh, so nodes see it as a regular participant.</span></li>
+      <li><b>Runs on retired hardware</b> <span class="dim">— Helium miner boards nobody wanted anymore.</span></li>
+    </ul>
+  </div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-inner">
+    <p class="eyebrow">Origin story</p>
+    <h1 class="headline">Built by <span class="accent">KMX415</span>, out of Helium's leftovers.</h1>
+    <div class="content-split">
+      <div>
+        <p class="body-copy">When Helium's IoT mining network didn't pan out, it left a huge surplus of SX1302/SX1303 LoRa concentrator hardware — RAK Hotspot V2s, SenseCap M1s — sitting on eBay for $30–60. <b style="color:var(--text)">KMX415</b> saw a repurposing opportunity: that hardware could run a proper Meshtastic base station instead of gathering dust.</p>
+        <p class="body-copy" style="margin-top:14px;">Meshpoint started as exactly that — a way to point retired mining boards at a mesh network instead of a blockchain.</p>
+      </div>
+      <div class="stat-row" style="margin-top:0; flex-direction:column; gap:22px;">
+        <div class="stat"><div class="stat__num">Mar 9</div><div class="stat__label">Initial release, 2026</div></div>
+        <div class="stat"><div class="stat__num">$30–60</div><div class="stat__label">Retired miner, on eBay</div></div>
+      </div>
+    </div>
+  </div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-inner">
+    <p class="eyebrow">Six months, in commits</p>
+    <h1 class="headline">v0.5 to v0.8.1 <span class="accent">— and counting.</span></h1>
+    <p class="lede">From multi-region frequency support to a full plugin ecosystem, in under six months of near-daily shipping.</p>
+    <canvas id="timeline" width="1000" height="170"></canvas>
+  </div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-inner">
+    <p class="eyebrow">Fork vs. upstream</p>
+    <h1 class="headline">1,077 commits <span class="accent">ahead</span>, zero behind.</h1>
+    <p class="lede">Still tracking upstream in full — nothing from KMX415/meshpoint is missing here, it's a strict superset.</p>
+    <div class="cmp">
+      <div class="cmp-row head"><div>&nbsp;</div><div>KMX415/meshpoint</div><div>This fork</div></div>
+      <div class="cmp-row"><div>Latest version</div><div>v0.7.9</div><div>v0.8.1</div></div>
+      <div class="cmp-row"><div>Total commits</div><div>526</div><div>1,603</div></div>
+      <div class="cmp-row"><div>Last commit</div><div>Sep 13</div><div>Sep 16</div></div>
+      <div class="cmp-row"><div>Behind the other</div><div>1,077 commits</div><div>0 commits</div></div>
+    </div>
+  </div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-inner">
+    <p class="eyebrow">Standard node vs. Meshpoint</p>
+    <h1 class="headline">Same mesh, <span class="accent">wider view.</span></h1>
+    <div class="cmp">
+      <div class="cmp-row head"><div>&nbsp;</div><div>Standard node</div><div>Meshpoint</div></div>
+      <div class="cmp-row"><div>Radio</div><div>Single transceiver</div><div>SX1302 concentrator (RX + TX)</div></div>
+      <div class="cmp-row"><div>Role</div><div>Participant</div><div>Observer + participant</div></div>
+      <div class="cmp-row"><div>Packet visibility</div><div>Own traffic</div><div>Everything in range</div></div>
+      <div class="cmp-row"><div>Messaging</div><div>Phone app only</div><div>Full chat, any browser</div></div>
+      <div class="cmp-row"><div>Storage</div><div>None</div><div>SQLite with retention</div></div>
+    </div>
+  </div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-inner">
+    <p class="eyebrow">One device, six networks</p>
+    <h1 class="headline">Captured <span class="accent">simultaneously.</span></h1>
+    <p class="lede">One SX1302 handles LoRaWAN + Meshtastic 868 natively; USB companions extend coverage to MeshCore and 433&nbsp;MHz — plus Reticulum/LXMF running alongside over its own shared radio instance.</p>
+    <div class="band-grid">
+      <div class="band-pill"><div class="band-pill__name">LoRaWAN</div><div class="band-pill__freq">868 MHz</div></div>
+      <div class="band-pill"><div class="band-pill__name">Meshtastic</div><div class="band-pill__freq">868 MHz</div></div>
+      <div class="band-pill"><div class="band-pill__name">MeshCore</div><div class="band-pill__freq">868 MHz</div></div>
+      <div class="band-pill"><div class="band-pill__name">MeshCore</div><div class="band-pill__freq">433 MHz</div></div>
+      <div class="band-pill"><div class="band-pill__name">Meshtastic</div><div class="band-pill__freq">433 MHz</div></div>
+      <div class="band-pill"><div class="band-pill__name">Reticulum</div><div class="band-pill__freq">LXMF / RNS</div></div>
+      <div class="band-pill band-pill--optional"><div class="band-pill__name">Pager</div><div class="band-pill__freq">SX1302 ch9</div><div class="band-pill__tag">OPT-IN · EXPERIMENTAL</div></div>
+    </div>
+  </div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-inner">
+    <p class="eyebrow">The plugin ecosystem</p>
+    <h1 class="headline">18 plugins. <span class="accent2">One browser tab.</span></h1>
+    <div class="feat-grid">
+      <div class="feat"><div class="feat__title">RTL-SDR family</div><div class="feat__desc">FM/airband/marine radio, ACARS, ADS-B flight tracking, DAB+, and three pager decoders — one $15 dongle.</div></div>
+      <div class="feat"><div class="feat__title">Reticulum / LXMF</div><div class="feat__desc">Encrypted mesh messaging, voice calls over Codec2, a NomadNet browser, paper-QR messages.</div></div>
+      <div class="feat"><div class="feat__title">DAPNET &amp; emergency pager</div><div class="feat__desc">Real amateur paging network bridge, plus an experimental two-way LoRa pager project.</div></div>
+      <div class="feat"><div class="feat__title">18 themes</div><div class="feat__desc">From high-contrast to Dracula — community-contributed, drop-in, no code change.</div></div>
+    </div>
+  </div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-inner">
+    <p class="eyebrow">This deployment</p>
+    <h1 class="headline">What we've <span class="accent">added on top.</span></h1>
+    <p class="lede">Running as a fork tuned for a SenseCap M1 and a browser radio receiver — tracking upstream, shipping a real second layer alongside it.</p>
+    <ul class="mesh-list">
+      <li><b>A whole plugin platform, not just plugins</b> <span class="dim">— built the extensibility itself: 18 plugins (the RTL-SDR family, DAPNET, Reticulum), a community plugin-source installer, and 18 drop-in themes with a live builder. Turned one app into a platform.</span></li>
+      <li><b>Reticulum grown into a full ecosystem</b> <span class="dim">— from messaging to real-time voice calls, photo and paper-QR messages, a multi-tab NomadNet browser with forms/downloads/identity fingerprinting, propagation relaying, and telemetry.</span></li>
+      <li><b>Field-ops hardware tooling + hardening</b> <span class="dim">— flash Meshtastic/MeshCore/pager firmware straight from the dashboard, RF spectrum scanning working on the SenseCap M1 specifically (upstream marks it unavailable on that board), MeshCore repeater monitoring, offline maps, and filesystem-only security opt-ins closing real self-escalation gaps.</span></li>
+    </ul>
+  </div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-inner">
+    <p class="eyebrow">Where we're going</p>
+    <h1 class="headline">The next <span class="accent">nodes on the graph.</span></h1>
+    <div class="feat-grid">
+      <div class="feat"><div class="feat__title">Group chat</div><div class="feat__desc">Shared-key rooms over Reticulum, beyond one-to-one messaging.</div></div>
+      <div class="feat"><div class="feat__title">Structured telemetry</div><div class="feat__desc">Real CPU/RAM/disk gauges instead of a free-text status line.</div></div>
+      <div class="feat"><div class="feat__title">Relay-to-relay sync</div><div class="feat__desc">Propagation nodes sharing held messages with each other, for store redundancy.</div></div>
+      <div class="feat"><div class="feat__title">File attachments in Send</div><div class="feat__desc">PDFs and general files over LXMF, alongside the image attachments already there.</div></div>
+      <div class="feat"><div class="feat__title">A growing community catalog</div><div class="feat__desc">Core stays KMX415's; this fork adds its own layer; anyone can publish plugins and themes to meshpoint-plugins and install straight from GitHub via Settings → Plugins.</div></div>
+    </div>
+  </div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-inner">
+    <p class="eyebrow">Get involved</p>
+    <h1 class="headline">Open source. <span class="accent">Open mesh.</span></h1>
+    <p class="lede">Open source, AGPL-3.0. Contributions welcome — come say hi on Discord.</p>
+    <div class="closing-links">
+      <a href="https://discord.gg/BnhSeFXVY8" target="_blank" rel="noopener">Discord →</a>
+      <a href="https://github.com/KMX415/meshpoint" target="_blank" rel="noopener">github.com/KMX415/meshpoint →</a>
+      <a href="https://meshradar.io" target="_blank" rel="noopener">meshradar.io →</a>
+    </div>
+  </div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-inner">
+    <p class="eyebrow">Thank you</p>
+    <h1 class="headline">Questions<span class="accent">?</span></h1>
+    <p class="lede">Built by KMX415, for the mesh community.</p>
+  </div>
+  </section>
+
+</div>
+
+<div class="navbar" id="navbar"></div>
+
+<script>
+(function () {
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  const total = slides.length;
+  let idx = 0;
+
+  document.getElementById('slideTotal').textContent = String(total).padStart(2, '0');
+  const slideNoEl = document.getElementById('slideNo');
+  const navbar = document.getElementById('navbar');
+
+  const dots = slides.map((_, i) => {
+    const b = document.createElement('button');
+    b.className = 'navdot';
+    b.setAttribute('aria-label', 'Go to slide ' + (i + 1));
+    b.addEventListener('click', () => go(i));
+    navbar.appendChild(b);
+    return b;
+  });
+
+  function render() {
+    slides.forEach((s, i) => s.setAttribute('data-active', i === idx ? 'true' : 'false'));
+    dots.forEach((d, i) => d.setAttribute('aria-current', i === idx ? 'true' : 'false'));
+    slideNoEl.textContent = String(idx + 1).padStart(2, '0');
+  }
+
+  function go(i) {
+    idx = Math.max(0, Math.min(total - 1, i));
+    render();
+  }
+  function next() { go(idx + 1); }
+  function prev() { go(idx - 1); }
+
+  const stage = document.getElementById('stage');
+
+  const prevZone = document.createElement('button');
+  prevZone.className = 'navzone navzone--prev';
+  prevZone.setAttribute('aria-label', 'Previous slide');
+  prevZone.addEventListener('click', prev);
+  stage.appendChild(prevZone);
+
+  const nextZone = document.createElement('button');
+  nextZone.className = 'navzone navzone--next';
+  nextZone.setAttribute('aria-label', 'Next slide');
+  nextZone.addEventListener('click', next);
+  stage.appendChild(nextZone);
+
+  const prevArrow = document.createElement('button');
+  prevArrow.className = 'arrowbtn arrowbtn--prev';
+  prevArrow.textContent = '‹';
+  prevArrow.setAttribute('aria-label', 'Previous slide');
+  prevArrow.addEventListener('click', prev);
+  stage.appendChild(prevArrow);
+
+  const nextArrow = document.createElement('button');
+  nextArrow.className = 'arrowbtn arrowbtn--next';
+  nextArrow.textContent = '›';
+  nextArrow.setAttribute('aria-label', 'Next slide');
+  nextArrow.addEventListener('click', next);
+  stage.appendChild(nextArrow);
+
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') { e.preventDefault(); next(); }
+    else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); prev(); }
+    else if (e.key === 'Home') { e.preventDefault(); go(0); }
+    else if (e.key === 'End') { e.preventDefault(); go(total - 1); }
+  });
+
+  let touchX = null;
+  stage.addEventListener('touchstart', (e) => { touchX = e.touches[0].clientX; }, { passive: true });
+  stage.addEventListener('touchend', (e) => {
+    if (touchX === null) return;
+    const dx = e.changedTouches[0].clientX - touchX;
+    if (Math.abs(dx) > 50) { dx < 0 ? next() : prev(); }
+    touchX = null;
+  }, { passive: true });
+
+  render();
+
+  // ---- version timeline canvas: real milestones, not decoration ----
+  const canvas = document.getElementById('timeline');
+  if (canvas) {
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const cssW = canvas.clientWidth || 1000;
+    const cssH = 170;
+    canvas.width = cssW * dpr;
+    canvas.height = cssH * dpr;
+    canvas.style.width = cssW + 'px';
+    canvas.style.height = cssH + 'px';
+    ctx.scale(dpr, dpr);
+
+    const milestones = [
+      { v: 'v0.5.0', d: 'Mar 29', c: 89 },
+      { v: 'v0.6.0', d: 'Apr 10', c: 133 },
+      { v: 'v0.7.0', d: 'Apr 28', c: 178 },
+      { v: 'v0.7.6', d: 'Jun 5', c: 402 },
+      { v: 'v0.7.8', d: 'Jul 31', c: 977 },
+      { v: 'v0.8.0', d: 'Aug 5', c: 1069 },
+      { v: 'v0.8.1', d: 'Sep 16', c: 1603, current: true },
+    ];
+
+    const styles = getComputedStyle(document.documentElement);
+    const accent = styles.getPropertyValue('--accent').trim() || '#43d9a3';
+    const border = styles.getPropertyValue('--border-strong').trim() || '#354740';
+    const textFaint = styles.getPropertyValue('--text-faint').trim() || '#5e6d65';
+    const textMain = styles.getPropertyValue('--text').trim() || '#eef2ee';
+
+    const marginX = 30;
+    const lineY = 60;
+    const n = milestones.length;
+    const step = (cssW - marginX * 2) / (n - 1);
+
+    function draw() {
+      ctx.clearRect(0, 0, cssW, cssH);
+
+      // base line
+      ctx.strokeStyle = border;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(marginX, lineY);
+      ctx.lineTo(cssW - marginX, lineY);
+      ctx.stroke();
+
+      // progress line up to current
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(marginX, lineY);
+      ctx.lineTo(cssW - marginX, lineY);
+      ctx.stroke();
+
+      milestones.forEach((m, i) => {
+        const x = marginX + step * i;
+        // Centered text on the first/last node spills off-canvas (half
+        // the label width has nowhere to go past the margin) -- anchor
+        // edge labels inward instead, only the middle ones stay centered.
+        const align = i === 0 ? 'left' : (i === n - 1 ? 'right' : 'center');
+        ctx.beginPath();
+        ctx.arc(x, lineY, m.current ? 7 : 5, 0, Math.PI * 2);
+        ctx.fillStyle = m.current ? accent : (styles.getPropertyValue('--bg-elevated').trim() || '#121a17');
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = accent;
+        ctx.stroke();
+
+        if (m.current) {
+          ctx.beginPath();
+          ctx.arc(x, lineY, 13, 0, Math.PI * 2);
+          ctx.strokeStyle = accent;
+          ctx.globalAlpha = 0.35;
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+        }
+
+        ctx.font = '700 12px ' + (styles.getPropertyValue('--mono').trim() || 'monospace');
+        ctx.fillStyle = m.current ? accent : textMain;
+        ctx.textAlign = align;
+        ctx.fillText(m.v, x, lineY - 20);
+
+        ctx.font = '10px ' + (styles.getPropertyValue('--mono').trim() || 'monospace');
+        ctx.fillStyle = textFaint;
+        ctx.fillText(m.d, x, lineY + 26);
+
+        ctx.font = '700 10px ' + (styles.getPropertyValue('--mono').trim() || 'monospace');
+        ctx.fillStyle = m.current ? accent : textFaint;
+        ctx.fillText(m.c.toLocaleString() + ' commits', x, lineY + 44);
+      });
+    }
+    draw();
+    window.addEventListener('resize', () => {
+      const w = canvas.clientWidth || 1000;
+      canvas.width = w * dpr;
+      canvas.style.width = w + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      draw();
+    });
+  }
+})();
+</script>
+</body>
+</html>

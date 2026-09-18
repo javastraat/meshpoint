@@ -447,7 +447,51 @@ plugins:
 | ~~Low~~ | ~~**Reticulum Browser: identity fingerprinting for NomadNet forms**~~ | **BUILT 2026-09-16**, same session as the re-scoping (user added rBrowser's own source to the workspace at `/Users/einstein/Software/rBrowser` to read it first). New `identify_link()` in the reticulum plugin's `backend/nomad.py` (`link.identify(identity)` + `RNS.Destination.hash(identity, "lxmf", "delivery")`, cached per-destination, auto-merged into `fetch_page()`'s `field_data` as `dest`), new `POST /api/reticulum/nomad/fingerprint` route (`require_auth`, same tier as `/page`/`/file`), new `LxmfService.identity` property. Frontend: an "ID" toolbar button in Reticulum Browser. 7 new Mac-runnable tests (`test_nomad.py`, `test_nomad_routes.py`), all passing via python3.11. Not Pi-tested — needs a real NomadNet node with a form to confirm the `dest` field actually lands on submission | — |
 | ~~Low~~ | ~~**Reticulum Browser: form-field submission + `/file/...` downloads**~~ | **BUILT 2026-09-16**, same session — ported directly from the reticulum plugin's own `reticulum_nomad.js` (`_followLink`'s `data-nomad-fields` gathering + `_downloadFile`'s blob-download flow) into `reticulum_browser_panel.js`. The backend (`nomad.py`'s `fetch_page`/`fetch_file`) already supported both generically, so this needed zero backend changes — confirming the effort estimate from the "re-scoped" pass above. Not Pi-tested | — |
 | Low | **Reticulum Browser: local NomadNet search engine + page cache** | Background crawler + index of NomadNet pages | Needs its own `service`-seam backend (same capability LXMF's own service uses) + a real cache schema — comparable in scope to a whole separate plugin |
-| Low | **Hook the shared Messages page for Reticulum instead of core branching on protocol name** | `messaging.js`/`messaging_chat.js` (core, shared by all 4 protocols) special-case `protocol === 'reticulum'` directly for send routing, image attachments, and the TX-not-configured banner gate — `messaging.js`'s own comment on `_sendReticulumMessage()` already calls this "a fallback... until the Reticulum-to-plugin cutover removes it", a cutover that's never actually happened. 2026-09-16's Send-Message-to-Messages-page fix, image-attach icon, and TX-banner fix all added *more* core-side branching rather than moving it out. A real fix would be a hook seam (like `registerPageHook`/`mountPageHooks` for the Reticulum page's own tabs) letting the plugin own its send/attach/render logic instead. Not attempted — this is a real architecture change (new hook contract + migrating working cross-protocol code across the boundary), bigger than any single fix so far, and risks regressing MT/MC/Pager sends in the process. Flagged by the user, deliberately deferred rather than built. |
+| Low | **Hook the shared Messages page for Reticulum instead of core branching on protocol name** | `messaging.js`/`messaging_chat.js` (core, shared by all 4 protocols) special-case `protocol === 'reticulum'` directly for send routing, image attachments, and the TX-not-configured banner gate — `messaging.js`'s own comment on `_sendReticulumMessage()` already calls this "a fallback... until the Reticulum-to-plugin cutover removes it", a cutover that's never actually happened. 2026-09-16's Send-Message-to-Messages-page fix, image-attach icon, and TX-banner fix all added *more* core-side branching rather than moving it out. Not attempted — real architecture change, deliberately deferred. **Scoped 2026-09-17** — see § "Scoping: Messages page hook seam" below for the 4-piece breakdown and why the real cost is verification, not the code itself |
+
+### Scoping: Messages page hook seam (2026-09-17)
+
+What it would actually take to stop `messaging.js`/`messaging_chat.js`
+hardcoding `protocol === 'reticulum'`, scoped without building it:
+
+**1. Design a hook contract.** Something like
+`window.registerMessageProtocol(name, { send(text, convo, image),
+isConfigured() })` that a plugin calls once at page load to register
+itself. This doesn't exist today — the only "hook" mechanism in the
+codebase (`plugin.toml`'s `[hook] host = "..."`) is for injecting a whole
+extra tab into another plugin's page (how Reticulum Call adds its Call
+tab), not for intercepting one function call inside a shared component.
+Would be new, built from scratch.
+
+**2. Refactor `_onSendMessage`** (`messaging.js:200`) to check that
+registry before falling into its hardcoded `if (protocol === 'reticulum')`
+branch — delegate to the registered handler if one exists, otherwise keep
+the current generic `/api/messages/send` path for MT/MC/Pager.
+
+**3. Move the Reticulum-specific logic out.** `_sendReticulumMessage`
+(`messaging.js:281-327`) isn't trivial — it builds the
+`POST /api/reticulum/send` body, maps the `image_type`/`image_b64`
+attachment fields (a different shape than MT/MC's), and constructs a local
+`data:` URI preview so the sender sees their own just-sent image
+immediately. All of that needs to move into a new small file in the
+reticulum plugin's own frontend.
+
+**4. A second, smaller branch needs migrating too** — the "TX not
+configured" banner (`messaging.js` ~420-460) has its own Reticulum-specific
+exemption baked in: a Reticulum-only box (no MT/MC configured) shouldn't
+show the MT/MC "not configured" warning. That check would need to become
+"does this box have *any* registered send protocol" instead of hardcoding
+Reticulum's name.
+
+**The real cost is verification, not the code.** There's no JS test
+framework anywhere in this repo — everything frontend is manually verified
+on a device. This refactor touches the *one* file every protocol's send
+path shares, so testing it isn't "test Reticulum" — it's a full regression
+pass on MT, MC, Pager, *and* Reticulum sends (text and image) on a real
+box, since a mistake here could silently break someone else's protocol
+while only looking at Reticulum. That's why this stays Low priority and
+deliberately deferred — the code itself is maybe a day's work, but the
+blast radius if something's missed is the whole Messages page.
 
 ### Future / only if there's a concrete need
 
