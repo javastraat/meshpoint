@@ -1844,9 +1844,16 @@ def _init_routes(
     message_repo: MessageRepository | None = None,
     channel_hash_resolver=None,
 ) -> None:
+    plugin_configuration_routes = [
+        loaded.manifest.sidebar.route
+        for loaded in _loaded_plugins
+        if loaded.manifest.sidebar is not None
+        and loaded.manifest.sidebar.category == "configuration"
+    ]
     identity_routes.init_routes(
         identity, auth_subsystem.service,
         web_terminal_enabled=config.dashboard.web_terminal_enabled,
+        plugin_configuration_routes=plugin_configuration_routes,
     )
     network_mapper = NetworkMapper(coord.node_repo)
     signal_analyzer = SignalAnalyzer(coord.packet_repo)

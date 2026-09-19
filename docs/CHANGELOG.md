@@ -26,6 +26,19 @@
 
 #### Plugins
 
+- **Fix: a plugin's own `[sidebar] category = "configuration"` page was
+  unreachable for every role, admins included.** The frontend's route
+  guard requires a literal `"configuration.<route>"` entry in
+  `available_sections` to allow navigation, but that list was a static,
+  core-only set with no way for a plugin to add itself to it — every
+  existing plugin sidestepped this by using a different category
+  (`networks`/`radio`/`ops`), so it went unnoticed until the community
+  `oled-display` plugin became the first to actually use `configuration`.
+  `identity_routes.init_routes()` now takes the loaded plugins'
+  configuration-category routes (computed in `server.py` from
+  `_loaded_plugins`) and folds them into the admin section list —
+  viewers still get none of them, same policy as every core
+  `configuration.*` entry.
 - **Plugin sources are off by default, filesystem-only to turn on.** Settings
   → Plugins → "Add source" (and installing from an already-added one) now
   403s until `plugin_sources_enabled: true` is hand-set in `config/local.yaml`

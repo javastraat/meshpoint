@@ -82,36 +82,59 @@ _VIEWER_SECTIONS: tuple[str, ...] = (
 
 
 _web_terminal_enabled: bool = True
+_plugin_configuration_sections: tuple[str, ...] = ()
 
 
 def init_routes(
     identity: DeviceIdentity,
     auth_service: AuthService,
     web_terminal_enabled: bool = True,
+    plugin_configuration_routes: list[str] | None = None,
 ) -> None:
     """Bind device identity + auth service used by the handler.
 
     *web_terminal_enabled* mirrors ``dashboard.web_terminal_enabled`` --
     when off, ``"terminal"`` is dropped from ``available_sections`` so the
     sidebar hides the Terminal nav item (the route itself also 403s, see
-    ``terminal_routes``)."""
-    global _identity, _auth_service, _web_terminal_enabled
+    ``terminal_routes``).
+
+    *plugin_configuration_routes* is every loaded plugin's own
+    ``[sidebar] route`` where ``category = "configuration"`` (computed by
+    ``server.py`` from ``_loaded_plugins``, the only place that already
+    has the manifests). ``_ADMIN_SECTIONS`` is a static list of the
+    *core* configuration subpages -- a plugin choosing the
+    ``configuration`` category has no way to add itself to it, so the
+    frontend's route guard (``app.js``'s ``_buildRouteGuard``, which
+    requires a literal ``"configuration.<route>"`` entry to allow
+    navigation) blocks the page for every role, admins included. This is
+    what actually wires a plugin's own configuration-category page into
+    that check, instead of every such plugin needing to avoid the
+    category entirely."""
+    global _identity, _auth_service, _web_terminal_enabled, _plugin_configuration_sections
     _identity = identity
     _auth_service = auth_service
     _web_terminal_enabled = web_terminal_enabled
+    _plugin_configuration_sections = tuple(
+        f"configuration.{route}" for route in (plugin_configuration_routes or [])
+    )
 
 
 def reset_routes() -> None:
     """Test helper: clear module-level state between cases."""
-    global _identity, _auth_service, _web_terminal_enabled
+    global _identity, _auth_service, _web_terminal_enabled, _plugin_configuration_sections
     _identity = None
     _auth_service = None
     _web_terminal_enabled = True
+    _plugin_configuration_sections = ()
 
 
 def _sections_for(role: str) -> list[str]:
     if role == ROLE_ADMIN:
-        sections = list(_ADMIN_SECTIONS)
+        # Plugin-provided configuration.* entries are admin-only, same as
+        # every core one above -- viewers get none of _ADMIN_SECTIONS'
+        # configuration.* entries either, so a plugin's own settings page
+        # follows that same existing policy rather than inventing a new one.
+        sections = list(_ADMIN_SECTIONS) + list(_plugin_configuration_sections)
     elif role == ROLE_VIEWER:
         sections = list(_VIEWER_SECTIONS)
     else:

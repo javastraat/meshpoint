@@ -31,6 +31,7 @@ _SECRET = "identity-test-secret-" + "k" * 16
 
 def _build_client(
     *, with_password: bool = False, web_terminal_enabled: bool = True,
+    plugin_configuration_routes: list[str] | None = None,
 ) -> tuple[TestClient, WebAuthConfig, JwtSessionService]:
     cfg = WebAuthConfig()
     if with_password:
@@ -57,6 +58,7 @@ def _build_client(
     )
     identity_routes.init_routes(
         identity, auth_service, web_terminal_enabled=web_terminal_enabled,
+        plugin_configuration_routes=plugin_configuration_routes,
     )
     app = FastAPI()
     app.include_router(identity_routes.router)
@@ -99,6 +101,35 @@ class TestIdentityEndpoint(unittest.TestCase):
         sections = set(body["available_sections"] or [])
         self.assertIn("settings.dangerous", sections)
         self.assertIn("terminal", sections)
+
+    def test_plugin_configuration_route_surfaces_for_admin(self) -> None:
+        """Regression for the oled-display plugin bug (2026-09-19): a
+        plugin's own [sidebar] category = "configuration" page was
+        unreachable for EVERY role, admins included, because
+        _ADMIN_SECTIONS is a static list with no way for a plugin to add
+        itself to it -- the frontend route guard needs a literal
+        "configuration.<route>" entry to allow navigation."""
+        client, _cfg, jwt = _build_client(
+            with_password=True, plugin_configuration_routes=["oled-display"],
+        )
+        client.cookies.set("meshpoint_session", jwt.issue("admin", "admin"))
+        body = client.get("/api/identity").json()
+        sections = set(body["available_sections"] or [])
+        self.assertIn("configuration.oled-display", sections)
+        # a core section must still be present -- confirms the plugin
+        # list is additive, not a replacement of _ADMIN_SECTIONS
+        self.assertIn("configuration.gps", sections)
+
+    def test_plugin_configuration_route_absent_for_viewer(self) -> None:
+        """Same policy as every core configuration.* entry: viewers get
+        none of them, plugin-provided or not."""
+        client, _cfg, jwt = _build_client(
+            with_password=True, plugin_configuration_routes=["oled-display"],
+        )
+        client.cookies.set("meshpoint_session", jwt.issue("viewer", "viewer"))
+        body = client.get("/api/identity").json()
+        sections = set(body["available_sections"] or [])
+        self.assertNotIn("configuration.oled-display", sections)
 
     def test_viewer_session_omits_admin_only_sections(self) -> None:
         client, _cfg, jwt = _build_client(with_password=True)
