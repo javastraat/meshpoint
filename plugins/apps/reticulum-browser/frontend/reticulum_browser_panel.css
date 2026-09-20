@@ -60,6 +60,16 @@
     border-color: currentColor;
 }
 
+/* "This node also runs Meshpoint" badge -- blue on purpose, distinct
+   from the raw-toggle's cyan and the fingerprint button's default
+   styling, so it reads as its own kind of signal at a glance. */
+.rb-meshpoint-badge {
+    color: var(--accent-blue, #3b82f6);
+    border-color: currentColor;
+    font-size: 15px;
+    line-height: 1;
+}
+
 /* Favourite star -- copied from the reticulum plugin's own .rt-nomad__fav
    (see file header note on why it can't just be linked). */
 .rt-nomad__fav {

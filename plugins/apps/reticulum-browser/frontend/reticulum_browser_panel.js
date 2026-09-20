@@ -94,6 +94,8 @@ class ReticulumBrowserPanel {
                            placeholder="&lt;hash&gt;:/page/x.mu  —  or  :/page/info.mu on the current node"
                            autocomplete="off" spellcheck="false" aria-label="Node address">
                     <button class="terminal-button" type="button" data-rb-go>Go</button>
+                    <button class="terminal-button rb-meshpoint-badge" type="button" data-rb-meshpoint
+                            title="This node also runs Meshpoint — click to view its info.mu" hidden>&#9432;</button>
                     <button class="terminal-button" type="button" data-rb-raw
                             title="Toggle raw/rendered view">{ }</button>
                     <button class="terminal-button" type="button" data-rb-fingerprint
@@ -123,6 +125,7 @@ class ReticulumBrowserPanel {
         this._reloadBtn = this._q('[data-rb-reload]');
         this._rawBtn = this._q('[data-rb-raw]');
         this._fingerprintBtn = this._q('[data-rb-fingerprint]');
+        this._meshpointBtn = this._q('[data-rb-meshpoint]');
         this._tabstripEl = this._q('[data-rb-tabstrip]');
         this._statusEl = this._q('[data-rb-status]');
         this._pageEl = this._q('[data-rb-page]');
@@ -148,6 +151,10 @@ class ReticulumBrowserPanel {
             this._renderFavsSelect();
         });
         this._q('[data-rb-go]').addEventListener('click', () => this._goFromAddr());
+        this._meshpointBtn.addEventListener('click', () => {
+            const tab = this._activeTab();
+            if (tab && tab.hash) this._go(tab.hash, '/page/info.mu');
+        });
         this._addrEl.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') { e.preventDefault(); this._goFromAddr(); }
         });
@@ -194,7 +201,7 @@ class ReticulumBrowserPanel {
         const tab = {
             id: `rb${++_rbTabSeq}`, hash: null, path: null, title: 'New tab',
             content: null, rawMode: false, history: [], historyIdx: -1,
-            fingerprinted: false,
+            fingerprinted: false, meshpointDetected: null,
         };
         this._tabs.push(tab);
         this._activeTabId = tab.id;
@@ -254,6 +261,7 @@ class ReticulumBrowserPanel {
         this._rawBtn.classList.toggle('is-active', tab.rawMode);
         this._syncFavBtn(tab.hash ? _rbIsFavourite(tab.hash) : false);
         this._syncFingerprintBtn(tab);
+        this._syncMeshpointBtn(tab);
         this._renderPage(tab);
     }
 
@@ -334,7 +342,11 @@ class ReticulumBrowserPanel {
             tab.hash = hash;
             tab.path = path;
             tab.content = data.content || '';
-            if (isNewNode) tab.fingerprinted = false;
+            if (isNewNode) {
+                tab.fingerprinted = false;
+                tab.meshpointDetected = null;
+                this._checkMeshpointInfo(tab, hash);
+            }
             const known = this._nodes.find((n) => n.destination_hash === hash);
             const fav = _rbFavourites().find((f) => f.hash === hash);
             tab.title = fav?.name || known?.display_name || `${hash.slice(0, 8)}…`;
@@ -451,6 +463,41 @@ class ReticulumBrowserPanel {
         } catch (e) {
             this._status('error', `Network error: ${e.message}`);
         }
+    }
+
+    /** Silent background probe, fired once per node-change (see _fetch()'s
+     * isNewNode branch) -- fetches /page/info.mu over the SAME already-
+     * established Link the page load just used (cheap, no extra visible
+     * round trip) and checks for the literal "Meshpoint node" text
+     * nomad_node.py's _serve_info() always emits (`` `ca Meshpoint
+     * node`a `` in its Micron source -- unconditional and never
+     * overridable by an operator's own pages, so this is a reliable
+     * signature, not just "any node that happens to have an info.mu").
+     * Best-effort and silent on purpose: a node without Meshpoint simply
+     * won't have this page, which is the normal, expected case, not an
+     * error worth surfacing. */
+    async _checkMeshpointInfo(tab, hash) {
+        try {
+            const r = await fetch('/api/reticulum/nomad/page', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ destination_hash: hash, path: '/page/info.mu', field_data: null }),
+            });
+            const data = await r.json().catch(() => ({}));
+            const detected = !!(r.ok && data.ok && (data.content || '').includes('Meshpoint node'));
+            if (tab.hash !== hash) return; // navigated elsewhere in this tab while the check was in flight
+            tab.meshpointDetected = detected;
+        } catch (_) {
+            if (tab.hash === hash) tab.meshpointDetected = false;
+        }
+        if (tab.id === this._activeTabId) this._syncMeshpointBtn(tab);
+    }
+
+    _syncMeshpointBtn(tab) {
+        if (!this._meshpointBtn) return;
+        const detected = !!(tab && tab.meshpointDetected);
+        this._meshpointBtn.hidden = !detected;
     }
 
     _syncFingerprintBtn(tab) {

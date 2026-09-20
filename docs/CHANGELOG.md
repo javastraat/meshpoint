@@ -26,6 +26,12 @@
 
 #### Plugins
 
+- **Reticulum Browser spots sibling Meshpoints.** A blue ⓘ badge appears
+  in the toolbar whenever the NomadNet node you're browsing also serves
+  `/page/info.mu` -- checked silently in the background right after a
+  page loads (one extra fetch over the already-open Link), matching the
+  literal "Meshpoint node" text every Meshpoint-hosted node's info page
+  always carries. Click it to jump straight there.
 - **Fix: a plugin's own `[sidebar] category = "configuration"` page was
   unreachable for every role, admins included.** The frontend's route
   guard requires a literal `"configuration.<route>"` entry in

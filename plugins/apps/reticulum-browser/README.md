@@ -53,6 +53,17 @@ for `reticulum_micron.js`, ported from reticulum-meshchat, also MIT.)
   `plugins/apps/reticulum/backend/nomad.py`'s `identify_link()` for the
   full mechanism, which lives in the reticulum plugin since it needs that
   plugin's own RNS identity.
+- **"This node also runs Meshpoint" badge** -- a blue ⓘ button appears
+  between Go and the raw/rendered toggle whenever the node you're
+  browsing also serves `/page/info.mu`. Checked silently in the
+  background right after a page loads (one extra fetch over the same
+  already-open Link, no visible delay), matching against the literal
+  "Meshpoint node" text `nomad_node.py`'s own `_serve_info()` always
+  emits there -- unconditional and never overridable by an operator's
+  own pages, so it's a reliable signature rather than just "any node
+  that happens to have an info.mu". Click it to jump straight to that
+  page. Per-tab, silent when absent (the normal case for any non-
+  Meshpoint NomadNet node).
 
 ## What's not here (yet)
 
