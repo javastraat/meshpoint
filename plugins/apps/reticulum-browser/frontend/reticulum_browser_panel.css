@@ -62,7 +62,17 @@
 
 /* "This node also runs Meshpoint" badge -- blue on purpose, distinct
    from the raw-toggle's cyan and the fingerprint button's default
-   styling, so it reads as its own kind of signal at a glance. */
+   styling, so it reads as its own kind of signal at a glance.
+
+   .terminal-button sets `display: inline-flex` -- an author-stylesheet
+   rule, which always beats the browser's native `[hidden] { display:
+   none }` UA rule regardless of matching specificity -- so the `hidden`
+   attribute alone does nothing here without this override (same trap
+   already hit and fixed elsewhere in this codebase for exactly this
+   button/[hidden] combination). */
+.rb-meshpoint-badge[hidden] {
+    display: none;
+}
 .rb-meshpoint-badge {
     color: var(--accent-blue, #3b82f6);
     border-color: currentColor;
