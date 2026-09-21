@@ -13885,3 +13885,58 @@ reticulum plugin family after these changes -- clean, no new
 collisions introduced. `node --check` clean on both edited files.
 Grepped for every removed table selector/method name to confirm no
 dangling references. Not yet retested live.
+
+**Cortex X3 board (a new carrier, distinct from SenseCap M1/RAK V2) --
+concentrator won't survive a `systemctl restart`, only a real reboot.**
+Same session also nailed down this board's LED (GPIO 27) and button
+(GPIO 23) via `test_gpio_hardware.py`'s new `led-scan` mode + a
+per-board `--exclude` override (both already committed, plus a
+SenseCap M1 / Cortex X3 preset picker on Configuration -> Peripherals).
+
+Concentrator symptom: `lgw_start()` fails with "Failed to set
+SX1250_0 in STANDBY_RC mode" / "failed to setup radio 0". Ruled out,
+in order: (1) power -- `vcgencmd get_throttled` came back `0x50000`
+(under-voltage + throttling *has occurred since boot*) while the box
+was powered through a USB hub; moving to a direct-into-Pi supply fixed
+it once, but it recurred on a later plain `systemctl restart` even
+with a 2A supply (under Pi4's own 3A recommendation, worth retesting
+with a genuine 3A supply, not yet done); (2) reset pulse timing --
+bumped `CONCENTRATOR_RESET_HOLD_SEC` to 1.0s via a systemd drop-in,
+no change. The one really solid, repeated signal: **`sudo reboot`
+always recovers it; `sudo systemctl restart meshpoint` never does**,
+even right after a clean boot. That points at the reset GPIO itself
+being wrong for this board, not power or timing -- a full reboot
+resets the kernel's own SPI/GPIO state regardless of which pin
+`reset_concentrator.sh` toggles, so it "works" even if 17/25 aren't
+this board's real reset line at all; a soft restart only ever toggles
+whatever pin the code is told to, which does nothing on an unconnected
+pin.
+
+Fixed one real bug surfaced by this: `SX1302Wrapper.reset()`
+(`src/hal/sx1302_wrapper.py`) was hardcoded to `[17, 25]` regardless of
+environment, while `scripts/reset_concentrator.sh`'s ExecStartPre/
+ExecStopPost already read a `RESET_GPIO` env var override -- so setting
+that var for the shell script alone would NOT have been a clean test,
+since Meshpoint's own redundant in-app reset (called from
+`ConcentratorCaptureSource.start()`/`restart_pipeline()`) would still
+hit 17/25 right after. Now both read the same `RESET_GPIO` (space-
+separated GPIO list), so ONE env var drives both consistently. Compiled
+clean; not yet tested on the actual board with a real candidate pin --
+nothing is written down anywhere (checked docs/, memory/, git log) for
+what the Cortex X3's true concentrator reset GPIO actually is. Next
+step when picking this back up: identify it (schematic if the user can
+find one from wherever the board was sourced, else empirical testing
+one candidate at a time via `RESET_GPIO=<pin>` + a plain
+`systemctl restart` -- NOT a reboot, since reboot masks the very thing
+being tested) and confirm the concentrator survives several restarts
+in a row once set correctly.
+
+Side effect of all the forced restarts/reboots during this diagnosis:
+Reticulum's LXMF ratchet file corrupted (`InsufficientDataException`,
+truncated by an abrupt kill mid-write) **twice** on this same box this
+session -- both times fixed the same way (`systemctl stop`, `mv` the
+`.ratchets` file aside, `systemctl start`, then hit Announce). Not a
+new bug each time, just a predictable consequence of how many abrupt
+kills this troubleshooting needed; should stop recurring once the
+concentrator issue is actually resolved and the box isn't being
+force-restarted every few minutes.

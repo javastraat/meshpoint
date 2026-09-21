@@ -162,8 +162,25 @@ class SX1302Wrapper:
         """Toggle the concentrator reset pins (required before lgw_start).
 
         Different carrier boards route SX1302 reset to different GPIOs
-        (pin 17 or 25). Both are toggled by default since asserting
-        reset on an unconnected pin is harmless.
+        (pin 17 or 25 on every board confirmed so far). Both are toggled
+        by default since asserting reset on an unconnected pin is
+        harmless -- but on a board where NEITHER is the real reset line,
+        that "harmless" default means this call is a no-op: the chip
+        never actually resets, so whatever internal state a soft
+        restart left it in persists, while a real reboot still "fixes"
+        it (a fresh kernel/SPI/GPIO state recovers it by other means
+        entirely, independent of this toggle ever hitting the right
+        pin). If a board recovers reliably from `sudo reboot` but not
+        from `systemctl restart meshpoint`, an unconfirmed reset pin
+        (not reset timing) is the first thing to suspect.
+
+        Override with the same ``RESET_GPIO`` environment variable
+        ``scripts/reset_concentrator.sh``'s ExecStartPre/ExecStopPost
+        already reads (space-separated GPIO numbers) so ONE setting
+        drives both the systemd-level reset and this in-app fallback
+        consistently -- setting it only for the shell script would
+        leave this call still hitting the hardcoded [17, 25] right
+        after, undoing any test of a different candidate pin.
         Delegated to systemd ExecStartPre for root access;
         this method is a best-effort fallback via pinctrl subprocess.
 
@@ -175,7 +192,18 @@ class SX1302Wrapper:
         import time
 
         if gpio_pins is None:
-            gpio_pins = [17, 25]
+            env_pins = os.environ.get("RESET_GPIO")
+            if env_pins:
+                try:
+                    gpio_pins = [int(p) for p in env_pins.split()]
+                except ValueError:
+                    logger.warning(
+                        "RESET_GPIO=%r not parseable as space-separated "
+                        "integers -- falling back to [17, 25]", env_pins,
+                    )
+                    gpio_pins = [17, 25]
+            else:
+                gpio_pins = [17, 25]
 
         hold = float(os.environ.get("CONCENTRATOR_RESET_HOLD_SEC", "0.1"))
 
