@@ -108,6 +108,63 @@ Models **G290** (SX1302) are expected to match; **G285** is untested in this
 guide. Do not confuse with **Nebra Indoor Rock Pi 4** units that ship **SX1301**
 concentrators (not supported).
 
+### COTX X3 Helium Miner notes
+
+A repurposed Helium miner: standard **Raspberry Pi 4** baseboard, a custom
+LoRaWAN HAT (SX1302-class concentrator), and a front-panel status
+display/button board — same general shape as RAK V2/SenseCap M1, but wired
+to different GPIOs for almost everything non-RF. Meshpoint does **not**
+auto-detect this layout as its own carrier type (shows as generic SX1302/Pi
+during setup), and the concentrator won't start reliably without one manual
+override.
+
+**Concentrator reset pin is GPIO 22, not the RAK V2/SenseCap M1 default of
+17/25.** Symptom without the override: `lgw_start()` fails with `Failed to
+set SX1250_0 in STANDBY_RC mode` / `failed to setup radio 0` on every
+`sudo systemctl restart meshpoint` — while a full `sudo reboot` "works", but
+only because it resets the kernel's own SPI/GPIO state by other means, not
+because the GPIO toggle happened to hit the right pin. Fix — add to the
+service with `sudo systemctl edit meshpoint`:
+
+```ini
+[Service]
+Environment=RESET_GPIO=22
+```
+
+(`RESET_GPIO` is read by both `scripts/reset_concentrator.sh`'s systemd
+hooks and `SX1302Wrapper.reset()`'s in-app fallback, so this one setting
+covers both.) Confirmed live across several consecutive plain restarts.
+
+**Front-panel button is GPIO 23, front LED is GPIO 27** — found with
+`scripts/test_gpio_hardware.py`'s `button-scan`/`led-scan` modes (the
+`led-scan` mode and a per-board `--exclude` override were added specifically
+because of this board). Both wired up successfully via Configuration →
+Peripherals, which now also offers a **Cortex X3** preset button alongside
+SenseCap M1's to prefill these two. The fan pin hasn't been found yet.
+
+**Power:** the supply used on the unit tested was only rated 2 A into the
+Pi's own USB-C port — under the Raspberry Pi Foundation's 3 A recommendation
+for a Pi 4, made worse by the concentrator's own current draw right at
+radio-init. `vcgencmd get_throttled` confirmed an under-voltage event
+(`0x50000`) on this exact setup. Use a genuine 5V/3A+ supply, wired directly
+into the Pi — not through a USB hub/passthrough, which added its own voltage
+drop on top and was enough on its own to reproduce the failure.
+
+| | COTX X3 Helium Miner |
+|---|---|
+| **Host** | Pi 4 (SD) |
+| **Concentrator** | SX1302-class (onboard) |
+| **TX support** | Yes (confirmed live) |
+| **Reset GPIO** | **22** (not 17/25 — needs `RESET_GPIO=22` override) |
+| **Front LED GPIO** | 27 |
+| **Front button GPIO** | 23 |
+| **Plug-and-play `install.sh`** | No (manual `RESET_GPIO` override required) |
+| **PSU** | Verify 5V/3A+, direct into the Pi — a 2A supply/hub caused under-voltage on the unit tested |
+
+Everything else about this board (carrier crypto chip, exact concentrator
+part number, boot storage, price) is unconfirmed — this section only
+documents what's actually been verified against a real unit.
+
 ---
 
 ## Experimental: WisMesh Node (RAK6421 HAT)

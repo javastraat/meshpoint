@@ -77,6 +77,28 @@ sensitive to reset timing than standard RAK Pi HATs.
    (or in addition to) a power-enable line. Using it as a separate "power GPIO"
    in custom reset sequences can hold the chip in reset.
 
+4. **Reset pin isn't 17 or 25 at all** (a different carrier board entirely):
+
+   The clearest sign is `sudo reboot` reliably fixing it but a plain
+   `sudo systemctl restart meshpoint` never does, even right after a boot
+   that just worked — a real reboot resets the kernel's own SPI/GPIO state
+   regardless of which pin gets toggled, so it "works" independently of
+   whether the GPIO reset ever hit the right pin. Confirmed on a **COTX X3
+   Helium Miner** repurposed as a Meshpoint (see the Hardware Matrix's own
+   COTX X3 notes): its reset line is GPIO **22**, not 17/25. Override with:
+
+   ```ini
+   Environment=RESET_GPIO=22
+   ```
+
+   (substitute your board's actual pin — space-separated for more than one).
+   This one setting drives both the systemd-level reset
+   (`scripts/reset_concentrator.sh`) and Meshpoint's own in-app fallback
+   (`SX1302Wrapper.reset()`), so a candidate pin gets a clean, consistent
+   test. If you don't have documentation for your board's reset line, try
+   candidates one at a time with a plain `systemctl restart` (not a reboot,
+   which would mask the very thing you're testing).
+
 After making changes, do a full physical power cycle (unplug 15–20 s) before testing.
 
 ### Database errors after update
