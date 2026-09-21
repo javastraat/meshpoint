@@ -14062,3 +14062,94 @@ source at the P100's actual GPS wiring -- in particular whether
 `/dev/ttyAMA0` needs the Pi's serial console disabled first
 (`raspi-config` -> Interface Options -> Serial Port) since the console
 and a UART GPS module can't share the port.
+
+**Live UART GPS verification on the actual P100: connects cleanly, zero
+NMEA bytes so far -- root cause narrowed to a missing GPS-enable GPIO
+sequence, IN PROGRESS.** `scripts/install.sh` had already handled the
+console-vs-GPS-UART conflict (`do_serial_hw 0` / `do_serial_cons 1`)
+and the `dialout` group membership before this round even started, so
+none of that needed touching. Confirmed via `ls -l /dev/serial0` that
+`serial0 -> ttyAMA0` on this board -- i.e. GPIO14/15's primary header
+UART is the full PL011, not the mini-UART -- which also settles a
+side theory the user found while reading ("if Bluetooth is enabled,
+GPS falls back to /dev/ttyS0"): moot here, this is Pi4-class hardware
+(confirmed separately below) where BT doesn't contend for ttyAMA0 the
+way it does on Pi3/Zero.
+
+`sudo stty -F /dev/serial0 9600 raw -echo; sudo timeout 10 cat
+/dev/serial0 | strings` produced **zero output** even with the
+external GPS antenna outdoors with clear sky -- a real negative
+result (wrong baud or console contention would still leak some
+printable noise; dead silence for 10s straight means no bytes are
+reaching the pin at all, not "fix not acquired yet"). Same failure
+class as the reset-pin mystery: the generic "GPIO14/15 UART0" spec
+the user read online never mentioned any enable/power step.
+
+Went back to the two real vendor firmware repos that cracked the
+reset-pin case and found the missing piece:
+`piscesminer/Firmware-script-p100`'s `latest/init.sh` (raw:
+`raw.githubusercontent.com/piscesminer/Firmware-script-p100/master/latest/init.sh`)
+has an explicit `#GPS init` block, run before anything else at boot,
+that drives three GPIO pins high via legacy sysfs, one at a time with
+1s gaps and no reset/pulse -- just set-and-leave-high:
+```
+echo 12 > .../gpio12/value   (after export + direction=out)
+sleep 1
+echo 20 > .../gpio20/value
+sleep 1
+echo 16 > .../gpio16/value
+```
+Almost certainly a GPS module power/enable sequence nothing else in
+either repo or the generic docs mentions. Separately,
+`NebraLtd/helium-pisces`'s `balena.yml` confirms `defaultDeviceType:
+raspberrypi4-64` (real Pi4/CM4 confirmation, not a guess) and its
+`docker-compose.yml`/`config.txt` reveal Nebra's own official Pisces
+P100 firmware has **zero GPS-related containers or boot config at
+all** -- no `enable_uart`, no GPS service -- meaning Nebra-brand units
+likely never read onboard GPS in software at all (probably rely on
+manual/app-based Helium location assertion instead), which is
+consistent with GPIO12/16/20 never getting toggled unless you're
+running piscesminer's alternate firmware instead of Nebra's.
+
+Next step (not yet run): toggle GPIO 12, 20, 16 high via `gpiozero`
+(already a Meshpoint dependency, so no new install needed) from the
+Pi's own venv, then repeat the raw `cat /dev/serial0` test to see if
+bytes start flowing. If confirmed, this GPIO-enable step needs to get
+folded into `UartSource.start()` (or a systemd `ExecStartPre`,
+matching the concentrator reset's own pattern) rather than left as a
+manual one-off -- undecided yet which, pending confirmation the
+theory is even right.
+
+**CI caught a real regression from the UART GPS rewrite above, fixed
+same session.** `tests/test_location_static_uart_sources.py::TestUartSource
+::test_status_is_unavailable_with_explanatory_error` failed in GitHub
+Actions (2221 passed, 1 failed) because the rewritten `get_status()`'s
+"not connected" error message dropped the old stub's "switch to
+static or gpsd" guidance that this pre-existing test asserted on --
+never grepped `tests/` for existing `UartSource` coverage before
+rewriting the file, which is exactly the kind of thing that should
+happen before, not after, a CI round-trip (user: "remember to always
+make sure ci tests pass when we change code in core" -- saved as
+[[feedback_verify_ci_before_done]] in the auto-memory system). Fixed
+by having the not-connected branch always append the static/gpsd
+pointer regardless of whether there's a real captured exception or
+just the generic default message. Also found and fixed the same
+staleness in `tests/test_gps_routes.py`'s
+`test_uart_source_accepted_as_placeholder` (renamed, since uart is no
+longer a placeholder) and added real coverage that didn't exist
+before for the actual new behavor: NMEA GGA/GSA parsing correctness
+(`test_gga_and_gsa_sentences_combine_into_one_fix`, textbook Wikipedia
+example sentences), no-fix-doesn't-clear-existing-fix, and
+`uart_device`/`baud` actually persisting through `PUT /api/config/gps`
+(mirroring the existing gpsd persistence test). `test_gps_routes.py`
+itself can't be executed on the Mac at all (`fastapi` isn't installed
+under any local Python, confirmed by direct check) -- verified by
+hand-tracing the new assertions against the route logic line by line
+instead. Full local verification: 37/37 passed across every
+locally-runnable test file touched by this change-set
+(`test_location_static_uart_sources.py`, `test_location_config.py`,
+`test_location_factory.py`, `test_mesh_position_resolver.py`);
+`test_coordinator_location.py` and `test_gps_routes.py` can't collect
+locally at all (missing `aiosqlite`/`fastapi` respectively -- a
+pre-existing Mac environment gap, not a regression, confirmed by
+isolating the exact ModuleNotFoundError on an unrelated file too).

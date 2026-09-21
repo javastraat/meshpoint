@@ -235,7 +235,7 @@ class TestUpdateGpsRoute(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("source must be one of", response.json()["detail"])
 
-    def test_uart_source_accepted_as_placeholder(self) -> None:
+    def test_uart_source_switch_requires_restart(self) -> None:
         response = self.client.put(
             "/api/config/gps",
             json={"source": "uart"},
@@ -244,6 +244,43 @@ class TestUpdateGpsRoute(unittest.TestCase):
         body = response.json()
         self.assertEqual(body["gps"]["source"], "uart")
         self.assertTrue(body["restart_required"])
+
+    def test_uart_source_persists_device_and_baud(self) -> None:
+        response = self.client.put(
+            "/api/config/gps",
+            json={
+                "source": "uart",
+                "uart_device": "/dev/serial0",
+                "baud": 4800,
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertTrue(body["saved"])
+        self.assertEqual(body["gps"]["source"], "uart")
+        self.assertEqual(body["gps"]["uart_device"], "/dev/serial0")
+        self.assertEqual(body["gps"]["uart_baud"], 4800)
+        self.assertEqual(self.config.location.uart_device, "/dev/serial0")
+        self.assertEqual(self.config.location.uart_baud, 4800)
+
+    def test_uart_partial_update_only_persists_changed_fields(self) -> None:
+        # Pre-existing uart source at the default device. Bumping only
+        # the baud rate, mirroring the equivalent gpsd partial-update test.
+        self.config.location.source = "uart"
+        self.config.location.uart_device = "/dev/ttyAMA0"
+        self.config.location.uart_baud = 9600
+
+        response = self.client.put(
+            "/api/config/gps",
+            json={"source": "uart", "baud": 38400},
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertTrue(body["saved"])
+        self.assertFalse(body["restart_required"])  # source did not change
+        self.assertEqual(self.config.location.uart_baud, 38400)
+        # Device path untouched
+        self.assertEqual(self.config.location.uart_device, "/dev/ttyAMA0")
 
     def test_gpsd_partial_update_only_persists_changed_fields(self) -> None:
         # Pre-existing gpsd source with default localhost. Bumping

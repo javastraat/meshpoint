@@ -107,6 +107,7 @@ class UartSource(LocationSource):
                 device=device,
                 last_update=self._last_update,
             )
+        detail = self._last_error or f"not connected to {self._device}"
         return GpsStatus(
             source="uart",
             available=False,
@@ -114,7 +115,10 @@ class UartSource(LocationSource):
             satellites=None,
             device=None,
             last_update=self._last_update,
-            error=self._last_error or f"Not connected to {self._device}",
+            error=(
+                f"{detail}. Switch to 'static' or 'gpsd' under "
+                "Configuration -> GPS if this UART GPS isn't wired up."
+            ),
         )
 
     async def _run_reader_loop(self) -> None:

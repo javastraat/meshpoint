@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
 import unittest
 
 from src.config import DeviceConfig
 from src.hal.location.static_source import StaticSource
-from src.hal.location.uart_source import UartSource
+from src.hal.location.uart_source import UartSource, _nmea_to_decimal
 
 
 class TestStaticSource(unittest.IsolatedAsyncioTestCase):
@@ -75,12 +76,21 @@ class TestStaticSource(unittest.IsolatedAsyncioTestCase):
 
 
 class TestUartSource(unittest.IsolatedAsyncioTestCase):
-    """``UartSource`` is a placeholder; surfaces an explanatory error."""
+    """``UartSource`` reads NMEA GGA/GSA off a real serial device.
+
+    These tests exercise the sentence parser directly (no serial I/O
+    involved) plus the connect-failure path against a device path that
+    cannot exist, which is the only server-independent way to test the
+    reader loop's error handling without real UART hardware.
+    """
 
     async def test_status_is_unavailable_with_explanatory_error(self) -> None:
-        source = UartSource()
+        source = UartSource(device="/dev/does-not-exist-in-ci")
         await source.start()
         try:
+            # Give the reader task a chance to actually attempt (and
+            # fail) opening the port -- start() only schedules it.
+            await asyncio.sleep(0.2)
             status = source.get_status()
             self.assertEqual(status.source, "uart")
             self.assertFalse(status.available)
@@ -94,6 +104,48 @@ class TestUartSource(unittest.IsolatedAsyncioTestCase):
     async def test_source_name_is_stable(self) -> None:
         source = UartSource()
         self.assertEqual(source.source_name, "uart")
+
+    async def test_stop_before_start_is_a_noop(self) -> None:
+        source = UartSource()
+        await source.stop()  # must not raise
+
+    def test_gga_and_gsa_sentences_combine_into_one_fix(self) -> None:
+        """The textbook Wikipedia GGA/GSA example sentences, decoded."""
+        source = UartSource()
+
+        source._handle_gga("$GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*47")
+        fix = source._latest_fix
+        self.assertIsNotNone(fix)
+        self.assertAlmostEqual(fix.latitude, 48.1173, places=3)
+        self.assertAlmostEqual(fix.longitude, 11.516667, places=3)
+        self.assertAlmostEqual(fix.altitude_m, 545.4)
+        # No GSA seen yet -- a valid GGA fix implies at least 2D.
+        self.assertEqual(fix.mode, 2)
+        self.assertIsNone(fix.hdop)
+
+        source._handle_gsa("$GPGSA,A,3,04,05,,09,12,,,24,,,,,2.5,1.3,2.1*39")
+        fix = source._latest_fix
+        self.assertEqual(fix.mode, 3)
+        self.assertAlmostEqual(fix.pdop, 2.5)
+        self.assertAlmostEqual(fix.hdop, 1.3)
+        self.assertAlmostEqual(fix.vdop, 2.1)
+        # Position from the earlier GGA must survive the GSA merge.
+        self.assertAlmostEqual(fix.latitude, 48.1173, places=3)
+
+    def test_no_fix_gga_does_not_clear_an_existing_fix(self) -> None:
+        source = UartSource()
+        source._handle_gga("$GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*47")
+        self.assertIsNotNone(source._latest_fix)
+
+        source._handle_gga("$GPGGA,123521,,,,,0,00,,,,,,,*66")
+        self.assertIsNotNone(source._latest_fix)
+        self.assertAlmostEqual(source._latest_fix.latitude, 48.1173, places=3)
+
+    def test_nmea_to_decimal_handles_hemisphere_and_blank_input(self) -> None:
+        self.assertAlmostEqual(_nmea_to_decimal("4807.038", "N"), 48.1173, places=4)
+        self.assertLess(_nmea_to_decimal("4807.038", "S"), 0)
+        self.assertIsNone(_nmea_to_decimal("", "N"))
+        self.assertIsNone(_nmea_to_decimal("4807.038", ""))
 
 
 if __name__ == "__main__":
