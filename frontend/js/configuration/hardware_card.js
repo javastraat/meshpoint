@@ -8,6 +8,19 @@
  * + NodeInfoConfigCard stacked on one page).
  */
 
+// GPIO pins per carrier board, confirmed live via scripts/test_gpio_hardware.py
+// (button-scan/fan-scan/led-scan), not guessed. `null` = not confirmed on
+// that board yet -- the preset leaves that one field alone rather than
+// filling in a number nobody's actually verified. SenseCap M1's are also
+// this app's built-in defaults (FanConfig/LedConfig/ButtonConfig in
+// src/config.py); Cortex X3 uses a different pin for each of the three,
+// which is exactly why this needs to be a per-board table, not one shared
+// set of defaults.
+const HARDWARE_BOARD_PRESETS = {
+    sensecap_m1: { label: 'SenseCap M1', fan: 13, led: 22, button: 27 },
+    cortex_x3: { label: 'Cortex X3', fan: null, led: 27, button: 23 },
+};
+
 class HardwareConfigCard {
     constructor(api) {
         this._api = api;
@@ -18,6 +31,17 @@ class HardwareConfigCard {
         this._root = root;
         this._root.innerHTML = `
             <div class="cfg-section" data-hw-root>
+                <article class="cfg-card">
+                    <header class="cfg-card__head">
+                        <h3 class="cfg-card__title">Board preset</h3>
+                        <p class="cfg-card__hint">Prefill the GPIO pins below for a known carrier board -- review, then Save each card that applies.</p>
+                    </header>
+                    <div class="cfg-card__actions">
+                        <button class="terminal-button" type="button" data-hw-preset-btn="sensecap_m1">SenseCap M1</button>
+                        <button class="terminal-button" type="button" data-hw-preset-btn="cortex_x3">Cortex X3</button>
+                    </div>
+                    <p class="cfg-status" data-hw-preset-note aria-live="polite"></p>
+                </article>
                 <article class="cfg-card">
                     <header class="cfg-card__head">
                         <h3 class="cfg-card__title">Fan</h3>
@@ -118,6 +142,36 @@ class HardwareConfigCard {
             .addEventListener('submit', (e) => this._saveLed(e));
         this._root.querySelector('[data-button-form]')
             .addEventListener('submit', (e) => this._saveButton(e));
+        this._root.querySelectorAll('[data-hw-preset-btn]').forEach((btn) => {
+            btn.addEventListener('click', () => this._applyPreset(btn.dataset.hwPresetBtn));
+        });
+    }
+
+    _applyPreset(name) {
+        const preset = HARDWARE_BOARD_PRESETS[name];
+        if (!preset) return;
+
+        if (preset.fan != null) {
+            this._setVal('[data-fan-pin]', preset.fan);
+            this._setChecked('[data-fan-enabled]', true);
+        }
+        if (preset.led != null) {
+            this._setVal('[data-led-pin]', preset.led);
+            this._setChecked('[data-led-enabled]', true);
+        }
+        if (preset.button != null) {
+            this._setVal('[data-button-pin]', preset.button);
+            this._setChecked('[data-button-enabled]', true);
+        }
+
+        const note = this._root.querySelector('[data-hw-preset-note]');
+        const missing = ['fan', 'led', 'button'].filter((k) => preset[k] == null);
+        note.dataset.kind = missing.length ? 'pending' : 'success';
+        note.textContent = missing.length
+            ? `${preset.label}: filled in the confirmed pins below. ${missing.join('/')} pin not confirmed on this board yet -- ` +
+              `run scripts/test_gpio_hardware.py's *-scan modes on the device to find it, then set it manually. ` +
+              `Review and Save each card.`
+            : `${preset.label}: filled in the pins below -- review and Save each card.`;
     }
 
     render(config) {

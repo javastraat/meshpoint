@@ -12,10 +12,11 @@ see below): LED = GPIO 22, button = GPIO 27, fan = GPIO 13. (Initial
 guesses of button=13/fan=14 were wrong -- 13 is actually the fan.)
 
 Other carriers do NOT necessarily share these -- confirmed different on
-a Cortex X3, where the front button turned out to be GPIO 23, not the
-M1's 27. Re-derive per board with the *-scan modes below rather than
-assuming the defaults; RESERVED_PINS/SCAN_CANDIDATES are the M1's
-picture of "what's already spoken for", not a universal one.
+a Cortex X3: front button = GPIO 23 (not the M1's 27), front LED = GPIO 27
+(the M1's button pin, not its LED) -- fan pin still unconfirmed there.
+Re-derive per board with the *-scan modes below rather than assuming the
+defaults; RESERVED_PINS/SCAN_CANDIDATES are the M1's picture of "what's
+already spoken for", not a universal one.
 
 `button-scan`/`fan-scan`/`led-scan` sweep a whole batch of candidate pins
 at once, useful whenever this needs re-deriving on different hardware:
@@ -36,11 +37,12 @@ the SenseCap M1: SPI0 (7-11, the concentrator's bus -- confirmed by
 chip + temp sensor), the HAT ID EEPROM pins (0-1), the concentrator
 reset lines (17, 25, from reset_concentrator.sh), GPIO 22 (the M1's LED)
 and GPIO 27 (the M1's button). On a board where those last two aren't
-actually the LED/button (e.g. the Cortex X3), pass --exclude to override
-which pins get skipped -- e.g. once the X3's button was confirmed on 23,
-re-scanning for its LED needs 23 excluded instead of 22/27:
+actually the LED/button (e.g. the Cortex X3, where it's the other way
+around -- button=23, LED=27), pass --exclude to override which pins get
+skipped -- e.g. re-scanning the X3 for its still-unconfirmed fan pin
+needs its own known pins (23, 27) excluded instead of the M1's (22, 27):
 
-    python3 test_gpio_hardware.py led-scan --exclude 0,1,2,3,7,8,9,10,11,13,17,23,25
+    python3 test_gpio_hardware.py fan-scan --exclude 0,1,2,3,7,8,9,10,11,17,23,25,27
 
 Usage:
     python3 test_gpio_hardware.py led
