@@ -725,6 +725,7 @@ location:
   gpsd_port: 2947              # gpsd TCP port
   uart_device: "/dev/ttyAMA0"  # serial device path (only when source=uart)
   uart_baud: 9600              # serial baud rate (only when source=uart)
+  uart_enable_gpios: []        # GPIO pins to drive high before reading (board-specific, see below)
   update_interval_seconds: 5   # how often the coordinator polls the source
   min_fix_quality: 1           # minimum NMEA fix quality (1=2D, 3=3D)
 ```
@@ -845,6 +846,32 @@ For headless / yaml-only setup, set `location.source: "uart"` (plus
 `uart_device`/`uart_baud` if not using the defaults) in `local.yaml`
 and restart the service.
 
+**Pisces P100 note:** this board power-gates its onboard GPS behind
+three GPIO lines that nothing in the generic wiring docs mentions --
+confirmed against the vendor's own firmware
+(`piscesminer/Firmware-script-p100`'s `init.sh`, which drives them
+high once at boot before anything reads the UART). Without this, the
+port opens fine but zero NMEA bytes ever arrive. Set:
+
+```yaml
+location:
+  source: "uart"
+  uart_enable_gpios: [12, 20, 16]
+```
+
+Order matters (matches the vendor sequence, 1s apart) but no other
+board needs this key at all -- leave it as `[]` (the default) unless
+you've confirmed your board needs an equivalent enable sequence.
+
+If NMEA sentences arrive (check with `sudo journalctl -u meshpoint -f
+| grep -i "uart gps"`, or the raw `stty`/`cat` method in
+[Troubleshooting](TROUBLESHOOTING.md)) but the fix mode stays "no
+fix" and you see a `$GPTXT,...,ANTENNA OPEN` sentence in a raw serial
+capture, that's the receiver's own antenna-supervisor circuit, not a
+config problem -- check the GPS antenna is on the correct RF connector
+(easy to mix up on a repurposed board with several), fully seated, and
+is an **active** (powered) antenna if the module expects one.
+
 ### Receiver compatibility
 
 | Receiver | Protocol | Tested |
@@ -852,7 +879,8 @@ and restart the service.
 | u-blox 7 USB stick | USB CDC ACM, NMEA + UBX | yes (RAK V2 .141) |
 | u-blox 8 USB stick | USB CDC ACM, NMEA + UBX | yes |
 | VFAN ublox 7 USB puck | USB CDC ACM, NMEA + UBX | yes |
-| RAK Pi HAT / Pisces P100 onboard GPS via UART (`/dev/ttyAMA0`) | NMEA over UART | `source: uart` |
+| RAK Pi HAT onboard GPS via UART (`/dev/ttyAMA0`) | NMEA over UART | `source: uart` |
+| Pisces P100 onboard GPS via UART (`/dev/ttyAMA0`, needs `uart_enable_gpios: [12, 20, 16]`) | NMEA over UART (GPS + GLONASS) | yes -- confirmed live, sentences parse correctly; antenna connectivity pending on this unit |
 
 Other USB receivers should work as long as `gpsd` recognizes the
 device's VID. If `cgps` shows data but the dashboard does not,
@@ -1800,6 +1828,7 @@ location:              # GPS / location source
   gpsd_port: 2947
   uart_device: "/dev/ttyAMA0"
   uart_baud: 9600
+  uart_enable_gpios: []
   update_interval_seconds: 5
   min_fix_quality: 1
 

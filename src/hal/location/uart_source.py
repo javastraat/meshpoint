@@ -40,11 +40,30 @@ _READ_TIMEOUT_SECONDS = 2.0
 
 
 class UartSource(LocationSource):
-    """Direct on-board UART GPS (RAK Pi HAT ZOE-M8Q and similar)."""
+    """Direct on-board UART GPS (RAK Pi HAT ZOE-M8Q and similar).
 
-    def __init__(self, device: str = "/dev/ttyAMA0", baud: int = 9600) -> None:
+    Some carrier boards (confirmed: Pisces P100) power-gate the GPS
+    module behind one or more GPIO lines that nothing in generic Pi
+    HAT documentation mentions -- the vendor's own firmware
+    (piscesminer/Firmware-script-p100's ``init.sh``) drives them high
+    once at boot and never touches them again. ``enable_gpios`` lets a
+    board preset replicate that: each pin is driven high in order,
+    with a 1s gap between (matching the vendor sequence), before the
+    serial port is opened. Empty by default -- a no-op for boards
+    (RAK Pi HAT and friends) that don't need it.
+    """
+
+    def __init__(
+        self,
+        device: str = "/dev/ttyAMA0",
+        baud: int = 9600,
+        enable_gpios: Optional[list[int]] = None,
+    ) -> None:
         self._device = device
         self._baud = baud
+        self._enable_gpios = list(enable_gpios) if enable_gpios else []
+        self._enable_gpio_devices: list = []
+        self._enable_gpios_attempted = False
         self._task: Optional[asyncio.Task] = None
         self._stop_event = asyncio.Event()
 
@@ -69,6 +88,34 @@ class UartSource(LocationSource):
         self._stop_event.clear()
         self._task = asyncio.create_task(self._run_reader_loop(), name="uart-gps-reader")
         logger.info("UART GPS location source: reading %s @ %d baud", self._device, self._baud)
+
+    async def _maybe_drive_enable_gpios_once(self) -> None:
+        """No-op when there's nothing configured (RAK Pi HAT and other
+        boards that don't power-gate their GPS), or once this has
+        already run once for this instance -- a failed attempt still
+        counts as "tried" (even one that fails before driving a single
+        pin) so a broken enable sequence doesn't retry on every
+        reconnect."""
+        if not self._enable_gpios or self._enable_gpios_attempted:
+            return
+        self._enable_gpios_attempted = True
+        try:
+            await self._drive_enable_gpios()
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            self._last_error = f"Enable GPIO sequence failed: {exc}"
+            logger.warning(self._last_error)
+
+    async def _drive_enable_gpios(self) -> None:
+        from gpiozero import OutputDevice
+
+        for pin in self._enable_gpios:
+            device = OutputDevice(pin)
+            device.on()
+            self._enable_gpio_devices.append(device)  # kept alive for the process lifetime
+            logger.info("UART GPS: drove enable GPIO %d high", pin)
+            await asyncio.sleep(1.0)
 
     async def stop(self) -> None:
         self._stop_event.set()
@@ -127,6 +174,7 @@ class UartSource(LocationSource):
         flat delay instead of exponential backoff (a local UART device
         either exists or doesn't; there's no remote peer whose load a
         backoff would be protecting)."""
+        await self._maybe_drive_enable_gpios_once()
         while not self._stop_event.is_set():
             try:
                 await asyncio.to_thread(self._blocking_read_session)

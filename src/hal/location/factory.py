@@ -42,6 +42,7 @@ def build_location_source(
         return UartSource(
             device=location_config.uart_device,
             baud=location_config.uart_baud,
+            enable_gpios=location_config.uart_enable_gpios,
         )
 
     logger.warning(

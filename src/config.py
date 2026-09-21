@@ -564,6 +564,15 @@ class LocationConfig:
     ``"uart"``. ``/dev/ttyAMA0`` is the Pi's primary hardware UART
     (GPIO 14/15); most NMEA GPS modules default to 9600 baud.
 
+    ``uart_enable_gpios`` is an escape hatch for boards that power-gate
+    their onboard GPS behind GPIO lines nothing else documents --
+    confirmed on the Pisces P100, whose own vendor firmware
+    (piscesminer/Firmware-script-p100) drives GPIO 12, 20, and 16 high
+    once at boot, 1s apart, before anything reads the UART. Empty by
+    default (no-op) for boards, like the RAK Pi HAT, that don't need
+    it. Each pin is driven high in list order with a 1s gap, matching
+    the vendor sequence, and left high for the life of the process.
+
     ``update_interval_seconds`` is the period the coordinator wakes up
     to poll the active source. Static is effectively idle. gpsd and
     uart both read whatever fix is already cached by their own
@@ -581,6 +590,7 @@ class LocationConfig:
     gpsd_port: int = 2947
     uart_device: str = "/dev/ttyAMA0"
     uart_baud: int = 9600
+    uart_enable_gpios: list[int] = field(default_factory=list)
     update_interval_seconds: int = 5
     min_fix_quality: int = 1
 

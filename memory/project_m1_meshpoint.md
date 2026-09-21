@@ -14153,3 +14153,62 @@ locally-runnable test file touched by this change-set
 locally at all (missing `aiosqlite`/`fastapi` respectively -- a
 pre-existing Mac environment gap, not a regression, confirmed by
 isolating the exact ModuleNotFoundError on an unrelated file too).
+
+**GPS-enable-GPIO theory CONFIRMED live on the P100 -- and coded into
+the real implementation, not left as a manual workaround.** User ran
+the `gpiozero` one-liner driving GPIO 12/20/16 high, then the raw
+`cat /dev/serial0` test: real multi-constellation NMEA started
+flowing immediately (`$GNGGA`/`$GNGSA` x2 for GPS+GLONASS,
+`$GPGSV`/`$GLGSV`, `$GNRMC`/`$GNVTG`/`$GNZDA`) -- confirming both the
+enable-GPIO theory AND (via `serial0 -> ttyAMA0` checked earlier) that
+the Bluetooth/mini-UART swap theory the user separately read about was
+never the issue on this Pi4-class board. Checked the parser against
+these exact real sentences by hand (not just the earlier textbook
+example): correctly handles the extra NMEA 4.10 "GNSS system ID"
+trailing field modern multi-constellation GSA sentences append after
+VDOP (19 comma-separated fields instead of the classic 18 -- verified
+the hardcoded field indices 15/16/17 for PDOP/HDOP/VDOP still land
+right since the new field is appended, not inserted), no changes
+needed.
+
+Also surfaced a real, separate hardware issue on THIS unit:
+`$GPTXT,01,01,01,ANTENNA OPEN*25` -- the u-blox chip's own
+antenna-supervisor diagnostic, meaning no current draw detected on
+the antenna feed line. Software/GPIO side is fully proven at this
+point; remaining blocker is physical (wrong RF connector on a
+multi-connector repurposed board, a not-fully-seated connector, or a
+passive antenna where the chip wants an active/powered one) --
+outside what I can debug remotely, told the user what to physically
+check.
+
+Folded the confirmed fix into the codebase rather than leaving it a
+manual one-off: new `LocationConfig.uart_enable_gpios: list[int] = []`
+(empty/no-op default, so RAK Pi HAT and any other UART-GPS board are
+unaffected), threaded through `factory.py` into a new
+`UartSource(enable_gpios=...)` param. Deliberately did NOT block
+`start()` on it -- refactored so the actual GPIO-driving (which takes
+~1s per pin, matching the vendor's own timing) happens inside the
+background reader task's `_maybe_drive_enable_gpios_once()` (called
+once per instance, guarded by a real `_enable_gpios_attempted` flag so
+a total, before-any-pin failure doesn't retry forever on every 5s
+reconnect cycle -- an actual bug caught and fixed by tracing the guard
+logic before shipping it, not just by testing the happy path).
+`gpiozero` import stays lazy/local to the one method that needs it,
+same convention as the `import serial` in this same file, so this
+module keeps importing cleanly on the Mac and in CI without either
+package installed. Tested via `sys.modules['gpiozero'] = ...` stub
+injection (this repo's established Mac-side pattern for Pi-only
+hardware libs, same idea as the `aiosqlite` stub convention) -- pin
+order, one-shot-only guard, and failure-is-captured-not-raised all
+covered; the "3 real pins, 1s apart" test genuinely takes the 3
+seconds rather than mocking `asyncio.sleep`, traded off deliberately
+for correctness/safety over speed. Documented in
+`docs/CONFIGURATION.md` (new yaml key, a P100-specific how-to block,
+and a receiver-compatibility table row noting "confirmed live" vs.
+"antenna connectivity pending") and `docs/CHANGELOG.md`. Still
+outstanding: the antenna fix itself (user's side, physical), and
+whether to also wire this into the Peripherals board-preset button
+pattern that COTX X3/P100-reset-GPIO already use (deferred --
+mid-troubleshooting wasn't the moment for UI polish; worth doing once
+the antenna issue is resolved and the P100's GPS is confirmed steady
+end to end).

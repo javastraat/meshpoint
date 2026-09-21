@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import sys
+import types
 import unittest
 
 from src.config import DeviceConfig
@@ -146,6 +148,57 @@ class TestUartSource(unittest.IsolatedAsyncioTestCase):
         self.assertLess(_nmea_to_decimal("4807.038", "S"), 0)
         self.assertIsNone(_nmea_to_decimal("", "N"))
         self.assertIsNone(_nmea_to_decimal("4807.038", ""))
+
+    async def test_enable_gpios_driven_high_in_order(self) -> None:
+        """Confirmed-real-hardware need: the Pisces P100 power-gates its
+        onboard GPS behind GPIO 12/20/16 (piscesminer/Firmware-script-p100's
+        own boot init.sh). gpiozero isn't installed in this test
+        environment (Pi-only hardware lib), so it's stubbed via
+        sys.modules the same way this repo already stubs aiosqlite for
+        Mac-side testing."""
+        calls = []
+
+        class _FakeOutputDevice:
+            def __init__(self, pin: int) -> None:
+                self.pin = pin
+
+            def on(self) -> None:
+                calls.append(self.pin)
+
+        fake_gpiozero = types.ModuleType("gpiozero")
+        fake_gpiozero.OutputDevice = _FakeOutputDevice
+        sys.modules["gpiozero"] = fake_gpiozero
+        try:
+            source = UartSource(enable_gpios=[12, 20, 16])
+            await source._drive_enable_gpios()
+        finally:
+            del sys.modules["gpiozero"]
+
+        self.assertEqual(calls, [12, 20, 16])
+        self.assertEqual(len(source._enable_gpio_devices), 3)
+
+    async def test_no_enable_gpios_is_a_noop(self) -> None:
+        # Default -- boards like the RAK Pi HAT that don't need this.
+        source = UartSource()
+        self.assertEqual(source._enable_gpios, [])
+        # Must not attempt to import gpiozero at all when the list is empty.
+        await source._maybe_drive_enable_gpios_once()
+
+    async def test_enable_gpios_only_attempted_once(self) -> None:
+        source = UartSource(enable_gpios=[12])
+        source._enable_gpios_attempted = True  # simulate "already tried"
+        # No gpiozero stub installed -- if the guard were wrong, this
+        # would raise ModuleNotFoundError instead of skipping cleanly.
+        await source._maybe_drive_enable_gpios_once()
+
+    async def test_enable_gpio_failure_is_captured_not_raised(self) -> None:
+        # gpiozero deliberately left unstubbed -- ModuleNotFoundError
+        # inside _drive_enable_gpios must be caught, not propagated,
+        # so one broken enable sequence doesn't crash the reader loop.
+        source = UartSource(enable_gpios=[12])
+        await source._maybe_drive_enable_gpios_once()
+        self.assertIn("Enable GPIO sequence failed", source._last_error)
+        self.assertTrue(source._enable_gpios_attempted)
 
 
 if __name__ == "__main__":
