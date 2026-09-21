@@ -60,7 +60,7 @@ For deeper hardware comparison see [Hardware Matrix](HARDWARE-MATRIX.md).
 
 ## I already have a Pi 4. Can I just buy a concentrator?
 
-Yes. See [README > Option C: Build Your Own](../README.md#option-c-build-your-own-85).
+Yes. See [README > Option F: Build Your Own](../README.md#option-f-build-your-own-85).
 A RAK2287 module + RAK Pi HAT + antenna runs about $50 on eBay. Total cost
 with a Pi you already own is in the $50-90 range. Assembly is straightforward:
 seat the RAK2287 on the HAT, mount the HAT on the Pi GPIO header, attach

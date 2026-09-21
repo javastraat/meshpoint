@@ -227,7 +227,43 @@ Raspbian Lite to eMMC once over USB using a CM4 carrier board and Raspberry Pi `
 
 > **Step-by-step:** [Syncrobit Chameleon guide](docs/SYNCROBIT-CHAMELEON.md) and [Hardware Matrix](docs/HARDWARE-MATRIX.md).
 
-### Option D: Build Your Own (~$85)
+### Option D: COTX X3 Helium Miner (repurposed)
+
+A **COTX X3** Helium miner: standard Raspberry Pi 4 baseboard, a custom
+LoRaWAN HAT (SX1302-class concentrator), and a front-panel status
+display/button board — repurposed to run Meshpoint instead of its
+original Helium firmware. Not auto-detected as its own carrier type
+(shows as generic SX1302/Pi during setup); needs one manual systemd
+override for the concentrator to survive anything but a full reboot.
+That override is a one-time fix, not an ongoing hassle — set it once
+and the box restarts normally from then on.
+
+Community-validated (September 2026): concentrator reset is GPIO **22**,
+not the RAK V2/SenseCap M1 default of 17/25; front button is GPIO 23,
+front LED is GPIO 27 (both wired up via Configuration → Peripherals'
+**COTX X3** preset). Verify the power supply is a genuine 5V/3A+ direct
+into the Pi — a 2A supply/hub caused under-voltage on the unit tested.
+
+> **Details:** [Hardware Matrix](docs/HARDWARE-MATRIX.md#cotx-x3-helium-miner-notes).
+
+### Option E: Pisces P100 (PoE outdoor, repurposed)
+
+A **Pisces P100**: a PoE-powered outdoor LoRaWAN gateway in a sealed
+waterproof enclosure, built around a Pi 4 and a custom SX1302-class
+concentrator board — repurposed from its original Balena-based Helium
+miner firmware. Same "needs a manual reset-GPIO override, once" situation
+as the COTX X3, just a different pin and a different underlying board.
+
+Community-validated (September 2026): concentrator reset is GPIO **23**,
+found via a systematic sweep (`scripts/test_concentrator_reset.py`) after
+every other candidate — including several from the vendor's own real
+firmware repos — failed. PoE power confirmed clean; this was purely a
+wrong-pin issue, not power or a deeper kernel/SPI problem (a plain
+`sudo reboot` alone did **not** fix it either — only the correct pin did).
+
+> **Details:** [Hardware Matrix](docs/HARDWARE-MATRIX.md#pisces-p100-helium-miner-notes).
+
+### Option F: Build Your Own (~$85)
 
 | Component | Price |
 |-----------|-------|
@@ -241,15 +277,15 @@ Raspbian Lite to eMMC once over USB using a CM4 carrier board and Raspberry Pi `
 
 **Assembly:** Seat the RAK2287 on the Pi HAT, mount the HAT on the Pi GPIO header, connect the antenna. Always connect the antenna before powering on.
 
-### Option E: WisMesh Node (RAK6421 HAT, experimental)
+### Option G: WisMesh Node (RAK6421 HAT, experimental)
 
-The [RAK WisMesh Pi Node](https://store.rakwireless.com/products/wismesh-pi-node) is a Pi HAT with a **WisBlock SX1262** LoRa module. Meshpoint drives RF through **meshtasticd** (Portduino), not the SX1302 concentrator path used by Options A–D.
+The [RAK WisMesh Pi Node](https://store.rakwireless.com/products/wismesh-pi-node) is a Pi HAT with a **WisBlock SX1262** LoRa module. Meshpoint drives RF through **meshtasticd** (Portduino), not the SX1302 concentrator path used by Options A–F.
 
 **Status:** User-facing docs are on **`main`** now. The installer, dashboard, and capture bridge are on branch **`feat/wismesh-hat`** until they ship in **v0.7.6**.
 
 > **Guides:** [WisMesh branch overview](docs/plans/WISMESH-BRANCH.md), [Gateway ↔ Node migration](docs/MIGRATE-GATEWAY-TO-NODE.md), [Hardware Matrix](docs/HARDWARE-MATRIX.md#wismesh-node-rak6421-hat-experimental).
 
-### Option F: Bobcat Miner 300 (~$15-40 used, community path)
+### Option H: Bobcat Miner 300 (~$15-40 used, community path)
 
 Retired **Bobcat Miner 300** units (models **G290** / **G295** reported) bundle a
 **Rockchip RK3566** host, **64 GB eMMC**, and an onboard **SX1302** concentrator.
