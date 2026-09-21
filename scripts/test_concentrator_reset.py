@@ -101,8 +101,15 @@ def _run_attempt(pins: list[int], mode: str, spi_path: str) -> tuple[bool, str]:
     ]
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
     ok = result.returncode == 0
-    tail = (result.stdout + result.stderr).strip().splitlines()
-    detail = tail[-1] if tail else "(no output)"
+    # Look specifically for this script's own "RESULT: ..." sentinel line,
+    # not just whatever happens to print last -- the underlying C library
+    # (libloragw) writes its own diagnostic lines straight to stdout/stderr
+    # via printf(), on a different buffering path than Python's print(),
+    # so a naive "last line of combined output" can pick up one of ITS
+    # lines instead of this script's actual verdict.
+    lines = (result.stdout + result.stderr).strip().splitlines()
+    result_lines = [ln for ln in lines if ln.startswith("RESULT:")]
+    detail = result_lines[-1] if result_lines else (lines[-1] if lines else "(no output)")
     return ok, detail
 
 
@@ -117,6 +124,7 @@ def _worker(pins: list[int], mode: str, spi_path: str) -> int:
 
     wrapper = SX1302Wrapper(spi_path=spi_path)
     try:
+        wrapper.load()
         if mode == "enable":
             _hold_high(pins)
             wrapper.reset()  # default [17, 25] pulse, same as always
@@ -124,10 +132,16 @@ def _worker(pins: list[int], mode: str, spi_path: str) -> int:
             os.environ["RESET_GPIO"] = " ".join(str(p) for p in pins)
             wrapper.reset()
 
-        wrapper.load()
+        # Exact production order (server.py's _inject_tx_gain_into_source /
+        # _start_with_tx_gain): configure BEFORE start, set_syncword AFTER --
+        # set_syncword does raw lgw_reg_w() register writes that are
+        # meaningless (and only ever logged as a swallowed warning, never
+        # raised) before lgw_start() has actually run. Getting this order
+        # wrong doesn't crash anything, it just makes every attempt look
+        # identical in the log regardless of whether start() truly worked.
         wrapper.configure(ConcentratorChannelPlan.eu868_lorawan())
-        wrapper.set_syncword(0x2B)
         wrapper.start()
+        wrapper.set_syncword(0x2B)
     except Exception as exc:  # noqa: BLE001
         print(f"RESULT: FAIL: {type(exc).__name__}: {exc}")
         return 1
