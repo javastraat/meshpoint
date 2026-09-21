@@ -132,6 +132,30 @@ class GpsConfigCard {
                         </p>
                     </fieldset>
 
+                    <fieldset class="cfg-fieldset" data-uart-fields hidden>
+                        <legend class="cfg-fieldset__legend">UART GPS</legend>
+                        <div class="cfg-row">
+                            <label class="cfg-field">
+                                <span class="cfg-field__label">Serial device</span>
+                                <input class="cfg-field__input" type="text"
+                                       data-uart-device placeholder="/dev/ttyAMA0">
+                            </label>
+                            <label class="cfg-field cfg-field--narrow">
+                                <span class="cfg-field__label">Baud</span>
+                                <input class="cfg-field__input" type="number"
+                                       min="9600" max="921600"
+                                       data-uart-baud placeholder="9600">
+                            </label>
+                        </div>
+                        <p class="cfg-field__hint">
+                            On-board GPS wired directly to the Pi's hardware
+                            UART (GPIO 14/15) instead of USB -- common on
+                            RAK Pi HAT and Pisces P100 boards. No skyplot
+                            detail on this source; position, altitude, and
+                            DOP are all live.
+                        </p>
+                    </fieldset>
+
                     <fieldset class="cfg-fieldset" data-mesh-position-fields>
                         <legend class="cfg-fieldset__legend">Mesh position broadcasts</legend>
                         <p class="cfg-field__hint">
@@ -186,8 +210,12 @@ class GpsConfigCard {
         this._gpsdInterval = this._root.querySelector('[data-gpsd-interval]');
         this._gpsdQuality = this._root.querySelector('[data-gpsd-quality]');
 
+        this._uartDevice = this._root.querySelector('[data-uart-device]');
+        this._uartBaud = this._root.querySelector('[data-uart-baud]');
+
         this._staticFields = this._root.querySelector('[data-static-fields]');
         this._gpsdFields = this._root.querySelector('[data-gpsd-fields]');
+        this._uartFields = this._root.querySelector('[data-uart-fields]');
         this._meshLiveChip = this._root.querySelector('[data-mesh-live-chip]');
         this._meshPrecisionWrap = this._root.querySelector('[data-mesh-precision-wrap]');
         this._meshPrecision = this._root.querySelector('[data-mesh-precision]');
@@ -232,6 +260,9 @@ class GpsConfigCard {
         if (this._gpsdQuality && location.min_fix_quality) {
             this._gpsdQuality.value = String(location.min_fix_quality);
         }
+
+        if (this._uartDevice && location.uart_device) this._uartDevice.value = location.uart_device;
+        if (this._uartBaud && location.uart_baud) this._uartBaud.value = location.uart_baud;
 
         const position = (config && config.transmit && config.transmit.position) || {};
         const meshSource = (position.coordinate_source || 'static').toLowerCase();
@@ -297,10 +328,10 @@ class GpsConfigCard {
     }
 
     _showFieldsetForSource(source) {
-        if (!this._staticFields || !this._gpsdFields) return;
-        const isGpsd = source === 'gpsd';
+        if (!this._staticFields || !this._gpsdFields || !this._uartFields) return;
         this._staticFields.hidden = false;
-        this._gpsdFields.hidden = !isGpsd;
+        this._gpsdFields.hidden = source !== 'gpsd';
+        this._uartFields.hidden = source !== 'uart';
     }
 
     _updateSourceHint(source) {
@@ -312,9 +343,10 @@ class GpsConfigCard {
                 + 'to the daemon.';
         } else if (source === 'uart') {
             this._sourceHint.textContent =
-                'Reserved for the on-board RAK Pi HAT GPS module. Not yet '
-                + 'wired in v0.7.5; falls back to the static coordinates '
-                + 'on save.';
+                'Live fixes read directly off the Pi\'s hardware UART -- '
+                + 'for boards like the RAK Pi HAT or Pisces P100 that wire '
+                + 'GPS to GPIO 14/15 instead of USB. Switching to UART '
+                + 'requires a service restart.';
         } else {
             this._sourceHint.textContent =
                 'Coordinates are entered manually and stay fixed until '
@@ -324,7 +356,7 @@ class GpsConfigCard {
 
     _restartPolling(source) {
         this._stopPolling();
-        const interval = source === 'gpsd' ? 2000 : 30000;
+        const interval = (source === 'gpsd' || source === 'uart') ? 2000 : 30000;
         this._pollOnce();
         this._timer = window.setInterval(() => this._pollOnce(), interval);
     }
@@ -383,6 +415,11 @@ class GpsConfigCard {
             if (intervalRaw) payload.update_interval_seconds = Number(intervalRaw);
             const qualityRaw = this._gpsdQuality.value;
             if (qualityRaw) payload.min_fix_quality = Number(qualityRaw);
+        } else if (source === 'uart') {
+            const device = this._uartDevice.value.trim();
+            if (device) payload.uart_device = device;
+            const baudRaw = this._uartBaud.value.trim();
+            if (baudRaw) payload.baud = Number(baudRaw);
         }
 
         const gpsResult = await this._api.put('/api/config/gps', payload);

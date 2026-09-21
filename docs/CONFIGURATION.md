@@ -720,11 +720,13 @@ reaching that call.
 
 ```yaml
 location:
-  source: "static"           # static | gpsd | uart
-  gpsd_host: "127.0.0.1"     # gpsd TCP host (only when source=gpsd)
-  gpsd_port: 2947            # gpsd TCP port
-  update_interval_seconds: 5 # how often the coordinator polls the source
-  min_fix_quality: 1         # minimum NMEA fix quality (1=2D, 3=3D)
+  source: "static"             # static | gpsd | uart
+  gpsd_host: "127.0.0.1"       # gpsd TCP host (only when source=gpsd)
+  gpsd_port: 2947              # gpsd TCP port
+  uart_device: "/dev/ttyAMA0"  # serial device path (only when source=uart)
+  uart_baud: 9600              # serial baud rate (only when source=uart)
+  update_interval_seconds: 5   # how often the coordinator polls the source
+  min_fix_quality: 1           # minimum NMEA fix quality (1=2D, 3=3D)
 ```
 
 `location.source` selects where the Meshpoint reads **live GPS fixes**
@@ -739,7 +741,7 @@ coordinates and mesh position settings hot-reload from the dashboard.
 |---|---|
 | `static` (default) | No live GPS hardware. Registered coordinates live in `device.*` only. Skyplot shows the static pin. |
 | `gpsd` | Reads live fixes from the system `gpsd` daemon over TCP (`127.0.0.1:2947`). Recommended for any USB GPS receiver (u-blox 7, u-blox 8, VFAN puck, generic CDC ACM sticks). Skyplot and stats update from the live fix. |
-| `uart` | Reserved for direct-serial reads from a Pi HAT GPS (e.g. RAK 7248). Currently a placeholder; falls back to static and surfaces an explanatory error in the dashboard. |
+| `uart` | Reads live NMEA (GGA + GSA) directly off an on-board GPS wired to the Pi's hardware UART instead of USB -- RAK Pi HAT, Pisces P100, and similar boards. Position, altitude, fix mode, and DOP all update live; skyplot stays empty (GSV not parsed). |
 
 ### Mesh position broadcasts (LoRa / Meshtastic app map)
 
@@ -820,6 +822,29 @@ For headless / yaml-only setup add the section above to
 `local.yaml` and restart the service. Verify with `cgps` (shipped
 in `gpsd-clients`) or `gpsmon`.
 
+### Using UART (on-board GPS)
+
+For boards that wire GPS straight to the Pi's hardware UART (GPIO 14
+TX / GPIO 15 RX) instead of USB -- the RAK Pi HAT and the Pisces P100
+both do this:
+
+1. Confirm nothing else owns the UART. The Pi's serial console must be
+   disabled (`sudo raspi-config` → Interface Options → Serial Port →
+   login shell **No**, hardware serial **Yes**) or the GPS module and
+   the console will fight over `/dev/ttyAMA0`.
+2. Open **Configuration → GPS**. Switch **Source** to **UART**. Leave
+   **Serial device** at `/dev/ttyAMA0` and **Baud** at `9600` unless
+   your board's documentation says otherwise, then **Save**. Switching
+   the source requires a service restart.
+3. Watch the **GPS** card. Position, altitude, and the fix-mode lamp
+   update live once the receiver acquires. The skyplot stays empty on
+   this source (per-satellite detail needs GSV sentences, which aren't
+   parsed) -- use the coordinate/DOP readout instead to confirm a fix.
+
+For headless / yaml-only setup, set `location.source: "uart"` (plus
+`uart_device`/`uart_baud` if not using the defaults) in `local.yaml`
+and restart the service.
+
 ### Receiver compatibility
 
 | Receiver | Protocol | Tested |
@@ -827,7 +852,7 @@ in `gpsd-clients`) or `gpsmon`.
 | u-blox 7 USB stick | USB CDC ACM, NMEA + UBX | yes (RAK V2 .141) |
 | u-blox 8 USB stick | USB CDC ACM, NMEA + UBX | yes |
 | VFAN ublox 7 USB puck | USB CDC ACM, NMEA + UBX | yes |
-| RAK 7248 onboard u-blox via UART (`/dev/ttyAMA0`) | NMEA over UART | placeholder (`source: uart`, not yet wired) |
+| RAK Pi HAT / Pisces P100 onboard GPS via UART (`/dev/ttyAMA0`) | NMEA over UART | `source: uart` |
 
 Other USB receivers should work as long as `gpsd` recognizes the
 device's VID. If `cgps` shows data but the dashboard does not,
@@ -1773,6 +1798,8 @@ location:              # GPS / location source
   source: "static"            # static | gpsd | uart
   gpsd_host: "127.0.0.1"
   gpsd_port: 2947
+  uart_device: "/dev/ttyAMA0"
+  uart_baud: 9600
   update_interval_seconds: 5
   min_fix_quality: 1
 

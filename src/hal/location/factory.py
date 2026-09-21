@@ -39,7 +39,10 @@ def build_location_source(
             min_fix_quality=location_config.min_fix_quality,
         )
     if source == "uart":
-        return UartSource()
+        return UartSource(
+            device=location_config.uart_device,
+            baud=location_config.uart_baud,
+        )
 
     logger.warning(
         "Unknown location.source=%r in config -- falling back to static",

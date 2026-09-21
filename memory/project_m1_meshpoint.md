@@ -14000,3 +14000,65 @@ multiple consecutive plain `systemctl restart` cycles afterward
 (`RESET_GPIO=23` via the usual `systemctl edit meshpoint` drop-in).
 Documented in HARDWARE-MATRIX.md's new "Pisces P100" section,
 TROUBLESHOOTING.md, and README's auto-detect line, same treatment as the COTX X3 board before it.
+
+**UART GPS source implemented for real (was a stub since v0.7.5). DONE,
+Mac-side; live verification on the Pi still pending.** Triggered by the
+user reading that the Pisces P100's GPS module wires straight to the
+Pi's hardware UART0 (GPIO14 TX / GPIO15 RX) and noticing the
+Configuration -> GPS page's `uart` source still said "reserved... not
+yet wired... falls back to static." Root cause: `src/hal/location/
+uart_source.py` was always a no-op stub, and the one prior attempt at
+this (`src/hal/gps_reader.py`, v0.4.x-era, never wired into the
+runtime) had a real bug of its own -- it called
+`asyncio.open_connection(uart_path, baud)`, which is the TCP client
+API, not a serial API, so it would always fail and silently fall
+through to a `pyserial`-based blocking fallback loop that also was
+never actually invoked from anywhere live.
+
+Rewrote `UartSource` from scratch following `GpsdSource`'s own
+async-reader-task/cached-state shape: a background `asyncio.Task` runs
+`asyncio.to_thread()`-wrapped blocking `pyserial` reads (mirrors
+`SerialCaptureSource`'s existing pattern for the same blocking-I/O
+problem), parses GGA (position/altitude/fix-quality) and GSA (2D/3D
+mode + PDOP/HDOP/VDOP) sentences, and self-heals with a flat 5s
+reconnect delay on any failure (device missing, permission denied,
+receiver silence). Deliberately does NOT parse GSV (skyplot detail) --
+that's multiple sentences per report cycle needing accumulation, a
+different parsing shape from GGA/GSA's one-sentence-one-update, and
+skipping it keeps this a complete, honestly-scoped MVP (real position
++ altitude + fix mode + DOP, just no skyplot dots) rather than a
+half-finished stub.
+
+Wired end to end: `LocationConfig` gained `uart_device` (default
+`/dev/ttyAMA0`) and `uart_baud` (default `9600`) in `src/config.py`;
+`factory.py` passes them through; `GpsUpdate` pydantic model gained
+`uart_device` (the existing `baud`/`timeout_seconds` fields were
+already forward-compat stubs from before this work -- `timeout_seconds`
+is still unused, intentionally left out of scope here); the `else: #
+uart` branch in `device_config_routes.py`'s `update_gps()` now actually
+persists device/baud changes, mirroring the `gpsd` branch exactly; the
+GPS card (`gps_card.js`) got a new UART fieldset (device path + baud
+inputs), show/hide wiring, an updated hint string (replacing the exact
+"not yet wired in v0.7.5" text the user quoted), fast 2s polling
+(matching gpsd instead of the old 30s static-only cadence), and a
+submit-payload branch. Added `pyserial>=3.5` explicitly to
+`requirements.txt` (was only ever a transitive dep via `meshtastic`
+before). Deleted the dead `src/hal/gps_reader.py` stub now that the
+real implementation lives in `uart_source.py` and nothing referenced
+the old file.
+
+Verified on the Mac only (no live UART hardware here) via hand-run
+scripts, not pytest: parser correctness against the textbook Wikipedia
+GGA/GSA example sentences (lat/lon/altitude/mode/DOP all matched, a
+no-fix GGA correctly leaves the previous good fix in place rather than
+zeroing it), and the `start()`/`stop()` lifecycle against a
+nonexistent device path (fails cleanly, records the real
+`SerialException`, cancels cleanly on `stop()`). `pyserial` happens to
+already be installed in the Mac's system Python, so these were real
+imports of the actual module, not stubs. `LocationConfig` +
+`build_location_source()` wiring double-checked by hand too. Still
+need: real hardware verification on the Pi once the user points a UART
+source at the P100's actual GPS wiring -- in particular whether
+`/dev/ttyAMA0` needs the Pi's serial console disabled first
+(`raspi-config` -> Interface Options -> Serial Port) since the console
+and a UART GPS module can't share the port.

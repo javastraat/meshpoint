@@ -74,8 +74,9 @@ class GpsUpdate(BaseModel):
     * ``gpsd`` -- live position from a running gpsd daemon (defaults to
       127.0.0.1:2947). The ``location:`` section of ``local.yaml`` holds
       the connection details and update cadence.
-    * ``uart`` -- placeholder for the on-board RAK Pi HAT GPS module.
-      Not yet wired in v0.7.5; falls back to static.
+    * ``uart`` -- live position read directly off an on-board UART GPS
+      module (RAK Pi HAT, Pisces P100, and similar boards). ``location:``
+      holds the serial device path and baud rate.
     """
 
     source: str = "static"
@@ -88,7 +89,8 @@ class GpsUpdate(BaseModel):
     gpsd_port: Optional[int] = Field(None, ge=1, le=65535)
     update_interval_seconds: Optional[int] = Field(None, ge=1, le=300)
     min_fix_quality: Optional[int] = Field(None, ge=1, le=3)
-    # uart-mode fields (kept for forward-compat; not yet wired)
+    # uart-mode fields
+    uart_device: Optional[str] = Field(None, min_length=1, max_length=255)
     baud: Optional[int] = Field(None, ge=9600, le=921600)
     timeout_seconds: Optional[int] = Field(None, ge=1, le=3600)
     # Meshtastic POSITION on the LoRa mesh (not Meshradar upstream pin).
@@ -240,6 +242,20 @@ async def update_gps(
         if source_changed:
             location.source = "uart"
             location_updates["source"] = "uart"
+        if req.uart_device is not None and req.uart_device != location.uart_device:
+            location.uart_device = req.uart_device
+            location_updates["uart_device"] = req.uart_device
+        if req.baud is not None and req.baud != location.uart_baud:
+            location.uart_baud = req.baud
+            location_updates["uart_baud"] = req.baud
+        if req.latitude is not None and req.longitude is not None:
+            device.latitude = req.latitude
+            device.longitude = req.longitude
+            device_updates["latitude"] = req.latitude
+            device_updates["longitude"] = req.longitude
+            if req.altitude is not None:
+                device.altitude = req.altitude
+                device_updates["altitude"] = req.altitude
 
     if req.source == "static" and pos.coordinate_source == "live":
         pos.coordinate_source = "static"
@@ -317,6 +333,8 @@ async def update_gps(
             "altitude": device.altitude,
             "gpsd_host": location.gpsd_host,
             "gpsd_port": location.gpsd_port,
+            "uart_device": location.uart_device,
+            "uart_baud": location.uart_baud,
             "update_interval_seconds": location.update_interval_seconds,
             "min_fix_quality": location.min_fix_quality,
             "mesh_coordinate_source": pos.coordinate_source,

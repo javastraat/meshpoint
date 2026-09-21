@@ -551,30 +551,36 @@ class LocationConfig:
                            live fixes (skyplot, optional mesh POSITION).
                            Does not change ``device.{lat,lon,alt}`` (Meshradar
                            pin). Auto-installed by ``scripts/install.sh``.
-        - ``"uart"``     : reserved for direct on-board UART NMEA reading
-                           (RAK Pi HAT GPS). Plumbing exists in
-                           ``src.hal.gps_reader`` but is not wired into
-                           the runtime yet; treated as ``static`` until
-                           the source is implemented.
+        - ``"uart"``     : read NMEA (GGA/GSA) directly off an on-board
+                           UART GPS module (RAK Pi HAT, Pisces P100, and
+                           similar boards that wire GPS to the Pi's
+                           serial pins instead of a USB gpsd device).
 
     ``gpsd_host`` / ``gpsd_port`` default to gpsd's well-known
     localhost socket. Override only when running gpsd on a peer
     device on the LAN.
 
+    ``uart_device`` / ``uart_baud`` are only used when ``source`` is
+    ``"uart"``. ``/dev/ttyAMA0`` is the Pi's primary hardware UART
+    (GPIO 14/15); most NMEA GPS modules default to 9600 baud.
+
     ``update_interval_seconds`` is the period the coordinator wakes up
-    to poll the active source. Static is effectively idle. gpsd reads
-    the latest TPV report each cycle (the daemon batches device data
-    on its side, so this is cheap).
+    to poll the active source. Static is effectively idle. gpsd and
+    uart both read whatever fix is already cached by their own
+    background reader (a socket read from the gpsd daemon, or the
+    latest parsed NMEA sentence for uart), so this is cheap either way.
 
     ``min_fix_quality`` filters noisy fixes: ``0`` accepts anything
-    gpsd publishes (including no-fix), ``1`` requires a 2D fix, ``2``
-    requires a 3D fix. Default is ``1`` so the dashboard never moves
-    based on a no-fix TPV.
+    the source publishes (including no-fix), ``1`` requires a 2D fix,
+    ``2`` requires a 3D fix. Default is ``1`` so the dashboard never
+    moves based on a no-fix report.
     """
 
     source: str = "static"
     gpsd_host: str = "127.0.0.1"
     gpsd_port: int = 2947
+    uart_device: str = "/dev/ttyAMA0"
+    uart_baud: int = 9600
     update_interval_seconds: int = 5
     min_fix_quality: int = 1
 
