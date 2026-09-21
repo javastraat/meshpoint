@@ -13,12 +13,12 @@
 // that board yet -- the preset leaves that one field alone rather than
 // filling in a number nobody's actually verified. SenseCap M1's are also
 // this app's built-in defaults (FanConfig/LedConfig/ButtonConfig in
-// src/config.py); Cortex X3 uses a different pin for each of the three,
-// which is exactly why this needs to be a per-board table, not one shared
-// set of defaults.
+// src/config.py); the COTX X3 uses a different pin for each of the
+// three, which is exactly why this needs to be a per-board table, not
+// one shared set of defaults.
 const HARDWARE_BOARD_PRESETS = {
     sensecap_m1: { label: 'SenseCap M1', fan: 13, led: 22, button: 27 },
-    cortex_x3: { label: 'Cortex X3', fan: null, led: 27, button: 23 },
+    cotx_x3: { label: 'COTX X3', fan: null, led: 27, button: 23 },
 };
 
 class HardwareConfigCard {
@@ -38,7 +38,7 @@ class HardwareConfigCard {
                     </header>
                     <div class="cfg-card__actions">
                         <button class="terminal-button" type="button" data-hw-preset-btn="sensecap_m1">SenseCap M1</button>
-                        <button class="terminal-button" type="button" data-hw-preset-btn="cortex_x3">Cortex X3</button>
+                        <button class="terminal-button" type="button" data-hw-preset-btn="cotx_x3">COTX X3</button>
                     </div>
                     <p class="cfg-status" data-hw-preset-note aria-live="polite"></p>
                 </article>

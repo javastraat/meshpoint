@@ -269,7 +269,8 @@ apt-get install -y -qq \
     libpulse-dev \
     libx11-dev \
     build-essential \
-    pipx
+    pipx \
+    dialog 
 
 # ── 2. Enable SPI ─────────────────────────────────────────────────
 

@@ -139,7 +139,7 @@ covers both.) Confirmed live across several consecutive plain restarts.
 `scripts/test_gpio_hardware.py`'s `button-scan`/`led-scan` modes (the
 `led-scan` mode and a per-board `--exclude` override were added specifically
 because of this board). Both wired up successfully via Configuration →
-Peripherals, which now also offers a **Cortex X3** preset button alongside
+Peripherals, which now also offers a **COTX X3** preset button alongside
 SenseCap M1's to prefill these two. The fan pin hasn't been found yet.
 
 **Power:** the supply used on the unit tested was only rated 2 A into the
