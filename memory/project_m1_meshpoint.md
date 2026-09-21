@@ -13940,3 +13940,63 @@ new bug each time, just a predictable consequence of how many abrupt
 kills this troubleshooting needed; should stop recurring once the
 concentrator issue is actually resolved and the box isn't being
 force-restarted every few minutes.
+
+**Pisces P100 (PoE outdoor Helium miner, repurposed) -- concentrator
+reset pin is GPIO 23. RESOLVED.** Same symptom class as the earlier
+Cortex/COTX X3 investigation (`lgw_start()` failing with "Failed to
+set SX1250_0 in STANDBY_RC mode"), much longer to crack: every
+secondhand/AI-generated pin guess across several rounds (reset=25,
+power-enable=22, SPI-speed, reset=17+power-enable=18, SX1261-reset=5)
+failed when actually tested, including ones a Google-AI-style source
+gave with a confident, detailed-sounding rationale each time -- worth
+remembering this pattern generalizes past just this one board: treat
+generated hardware pin/config specifics as untested claims, always
+verify empirically, and get suspicious fast when a source revises its
+own earlier claim (power-enable 22 -> 18) with no acknowledgment.
+
+What actually worked: found real vendor firmware repos
+(github.com/piscesminer/Firmware-script-p100,
+github.com/NebraLtd/helium-pisces) the user located, mined them for
+real init scripts (`latest/init.sh`, per-hardware-revision
+`PacketForward/Config/V{1,2,3}/global_conf.json.sx1250.*`) -- concrete
+but still didn't directly name the reset pin (global_conf.json never
+carries it for this HAL; it's set via a separate reset script/env, and
+the real one wasn't findable in either repo). Confirmed `spidev0.0` is
+right (matches Nebra's own config), and their `dtoverlay=spi0-1cs`
+explained why `/dev/spidev0.1` existed on this box at all (default
+dual-CS overlay) -- tested freeing GPIO7 via that overlay too, also
+wrong.
+
+What actually cracked it: wrote `scripts/test_concentrator_reset.py`,
+a systematic sweep that drives the REAL `SX1302Wrapper` bring-up
+sequence (not a reimplementation) and tests every untried GPIO TWICE
+back-to-back with zero power cycle in between -- the only test that
+means anything for this bug, since almost any pin "works" once right
+after a real power-up (confirmed: a full PoE unplug/replug came up
+clean on the stock [17,25] pins; the very next plain `systemctl
+restart` on the same powered-up hardware failed the same way it
+always had). A `sudo reboot` (no power cut) was also tried and still
+failed on the wrong pin -- important negative result, since it means
+"does a reboot fix it" is NOT a reliable way to tell "wrong pin" apart
+from "genuine power/hardware fault" (written into
+docs/TROUBLESHOOTING.md's reset-pin section as a correction to the
+COTX X3 write-up's implication that it was).
+
+First script run had a real bug that produced a false PASS on GPIO23:
+called `wrapper.set_syncword()` BEFORE `wrapper.start()` (real
+production order in server.py's `_start_with_tx_gain` is
+load->reset->configure->start->set_syncword->set_tx_syncword) --
+set_syncword's register write silently logs-and-continues on failure
+rather than raising, so calling it too early just produces noise, not
+a real signal, and the result-detection additionally picked "last line
+of combined stdout+stderr" rather than this script's own "RESULT: ..."
+sentinel, which could grab one of libloragw's own printf lines instead
+(different buffering path than Python's print()). Fixed both; re-ran
+the corrected sweep across all 18 non-reserved GPIOs (0-27 minus
+SPI0/I2C1/UART/EEPROM) including everything already tried by hand --
+GPIO 23 was the ONLY one to survive both attempts, every other pin
+failed outright on the first. Confirmed live in the real app across
+multiple consecutive plain `systemctl restart` cycles afterward
+(`RESET_GPIO=23` via the usual `systemctl edit meshpoint` drop-in).
+Documented in HARDWARE-MATRIX.md's new "Pisces P100" section,
+TROUBLESHOOTING.md, and README's auto-detect line, same treatment as the COTX X3 board before it.

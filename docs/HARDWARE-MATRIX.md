@@ -165,6 +165,55 @@ Everything else about this board (carrier crypto chip, exact concentrator
 part number, boot storage, price) is unconfirmed — this section only
 documents what's actually been verified against a real unit.
 
+### Pisces P100 (Helium miner) notes
+
+A PoE-powered outdoor LoRaWAN gateway: Pi 4 + a custom SX1302-class
+concentrator board, sealed in a waterproof enclosure with the Pi's header
+covered by the PoE and LoRa daughterboards. Originally sold running the
+vendor's own Balena-based Helium miner firmware ([piscesminer/
+Firmware-script-p100](https://github.com/piscesminer/Firmware-script-p100),
+[NebraLtd/helium-pisces](https://github.com/NebraLtd/helium-pisces)) — this
+is about repurposing one to run Meshpoint instead.
+
+**Concentrator reset pin is GPIO 23, not the default 17/25 pair.**
+Symptom without the override: `lgw_start()` fails with `Failed to set
+SX1250_0 in STANDBY_RC mode` on every restart. Confirmed via a systematic
+sweep (see `scripts/test_concentrator_reset.py`) of every GPIO not already
+claimed by SPI0/I2C1/UART, each tested twice back-to-back with no power
+cycle in between (the only test that actually catches this class of bug —
+a single-shot test passes on nearly any pin right after a real power-up).
+Of 18 candidates tested, only GPIO 23 survived both attempts; every other
+pin — including 17, 18, 20, 22, 25, and the real vendor firmware's own
+GPS-init pins (12, 16, 20) — failed outright. Fix, via `sudo systemctl edit
+meshpoint`:
+
+```ini
+[Service]
+Environment=RESET_GPIO=23
+```
+
+Confirmed live across multiple consecutive plain `systemctl restart`
+cycles, no power cycle needed.
+
+**Two things ruled out along the way, worth knowing if this ever recurs
+on a similar unit:** a real hardware under-voltage/power issue (PoE is
+clean, `vcgencmd get_throttled` reads `0x0`), and a kernel/SPI-driver-level
+issue (a full `sudo reboot` — far more thorough than any GPIO toggle —
+still failed on the wrong pin, so this was never about needing a deeper
+reinit, just the correct pin).
+
+| | Pisces P100 |
+|---|---|
+| **Host** | Pi 4, PoE-powered |
+| **Concentrator** | SX1302-class (onboard) |
+| **TX support** | Yes (confirmed live) |
+| **Reset GPIO** | **23** (not 17/25 — needs `RESET_GPIO=23` override) |
+| **Plug-and-play `install.sh`** | No (manual `RESET_GPIO` override required) |
+| **Enclosure** | Sealed, waterproof outdoor unit; Pi header not accessible without disassembly |
+
+Front LED/button GPIOs, carrier crypto chip, and boot storage are
+unconfirmed — this section only documents what's actually been verified.
+
 ---
 
 ## Experimental: WisMesh Node (RAK6421 HAT)

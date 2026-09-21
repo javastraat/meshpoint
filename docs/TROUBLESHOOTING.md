@@ -79,25 +79,38 @@ sensitive to reset timing than standard RAK Pi HATs.
 
 4. **Reset pin isn't 17 or 25 at all** (a different carrier board entirely):
 
-   The clearest sign is `sudo reboot` reliably fixing it but a plain
-   `sudo systemctl restart meshpoint` never does, even right after a boot
-   that just worked — a real reboot resets the kernel's own SPI/GPIO state
-   regardless of which pin gets toggled, so it "works" independently of
-   whether the GPIO reset ever hit the right pin. Confirmed on a **COTX X3
-   Helium Miner** repurposed as a Meshpoint (see the Hardware Matrix's own
-   COTX X3 notes): its reset line is GPIO **22**, not 17/25. Override with:
+   A `sudo reboot` reliably fixing it while a plain `sudo systemctl restart
+   meshpoint` never does is a strong hint — a real reboot resets the
+   kernel's own SPI/GPIO state regardless of which pin gets toggled, so it
+   can "work" independently of whether the GPIO reset ever hit the right
+   pin. Confirmed on a **COTX X3 Helium Miner** repurposed as a Meshpoint
+   (see the Hardware Matrix's own COTX X3 notes): its reset line is GPIO
+   **22**, not 17/25.
+
+   **But a failed reboot does NOT rule this out** — confirmed on a
+   **Pisces P100** (see its own Hardware Matrix notes): even `sudo reboot`
+   failed there on the wrong pin, yet the real problem was still just the
+   wrong reset pin (GPIO **23**), not a deeper power/kernel issue. Don't
+   use reboot-vs-restart behavior alone to decide whether this is worth
+   pursuing — if you have several unclaimed GPIOs to try and no
+   documentation for the board, `scripts/test_concentrator_reset.py` (added
+   for the Pisces P100 investigation) sweeps candidates properly: it drives
+   the real `SX1302Wrapper` bring-up sequence Meshpoint itself uses, and
+   tests each candidate TWICE back-to-back with no power cycle in between
+   — the only test that actually catches this bug, since almost any pin
+   "works" once, right after a real power-up.
+
+   Once you have a candidate, override with:
 
    ```ini
-   Environment=RESET_GPIO=22
+   Environment=RESET_GPIO=23
    ```
 
    (substitute your board's actual pin — space-separated for more than one).
    This one setting drives both the systemd-level reset
    (`scripts/reset_concentrator.sh`) and Meshpoint's own in-app fallback
    (`SX1302Wrapper.reset()`), so a candidate pin gets a clean, consistent
-   test. If you don't have documentation for your board's reset line, try
-   candidates one at a time with a plain `systemctl restart` (not a reboot,
-   which would mask the very thing you're testing).
+   test.
 
 After making changes, do a full physical power cycle (unplug 15–20 s) before testing.
 
