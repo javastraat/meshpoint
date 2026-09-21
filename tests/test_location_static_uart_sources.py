@@ -134,6 +134,39 @@ class TestUartSource(unittest.IsolatedAsyncioTestCase):
         # Position from the earlier GGA must survive the GSA merge.
         self.assertAlmostEqual(fix.latitude, 48.1173, places=3)
 
+    def test_real_p100_no_fix_capture_surfaces_diagnostics(self) -> None:
+        """Real sentences captured off the Pisces P100's onboard receiver
+        (GPS+GLONASS, no fix, antenna disconnected) -- exercises the
+        multi-constellation GSA's extra NMEA 4.10 system-ID field (19
+        comma fields instead of the textbook 18) and the $TXT
+        diagnostic surfacing through get_status()."""
+        source = UartSource()
+        source._connected = True
+
+        for sentence in (
+            "$GNGGA,,,,,,0,00,25.5,,,,,,*64",
+            "$GNGLL,,,,,,V,N*7A",
+            "$GNGSA,A,1,,,,,,,,,,,,,25.5,25.5,25.5,1*01",
+            "$GNGSA,A,1,,,,,,,,,,,,,25.5,25.5,25.5,2*02",
+            "$GPGSV,1,1,00,0*65",
+            "$GLGSV,1,1,00,0*79",
+            "$GNRMC,,V,,,,,,,,,,N,V*37",
+            "$GNVTG,,,,,,,,,N*2E",
+            "$GNZDA,,,,,,*56",
+            "$GPTXT,01,01,01,ANTENNA OPEN*25",
+        ):
+            source._handle_sentence(sentence)
+
+        self.assertIsNone(source._latest_fix)  # genuinely no fix
+        self.assertEqual(source._sats_used, 0)
+        self.assertEqual(source._last_txt, "ANTENNA OPEN")
+
+        status = source.get_status()
+        self.assertTrue(status.available)
+        self.assertIsNone(status.fix)
+        self.assertIn("0 satellites", status.error)
+        self.assertIn("ANTENNA OPEN", status.error)
+
     def test_no_fix_gga_does_not_clear_an_existing_fix(self) -> None:
         source = UartSource()
         source._handle_gga("$GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*47")

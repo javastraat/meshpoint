@@ -15,6 +15,13 @@ mesh POSITION broadcasts; the skyplot just stays empty here, same as
 it does for ``StaticSource``. Worth adding later if someone wants the
 skyplot on UART specifically, not required for the source to be real.
 
+Also tracks ``$--TXT`` receiver-status text (e.g. u-blox's "ANTENNA
+OPEN") and GGA's satellite-used count even while there's no fix, and
+surfaces both through ``GpsStatus.error`` -- so "connected, receiving
+real sentences, just no usable fix yet" is visibly different on the
+dashboard from "nothing is arriving at all," which otherwise look
+identical.
+
 Runs pyserial's blocking API in a background thread via
 ``asyncio.to_thread`` rather than adding ``pyserial-asyncio`` as a
 second serial dependency -- a 1 Hz NMEA stream has no need for a true
@@ -77,6 +84,11 @@ class UartSource(LocationSource):
         # answer "2D or 3D" on its own.
         self._mode = 1
         self._dop: dict[str, float] = {}
+        # Visible even with no fix, so "connected but nothing usable
+        # yet" (real signal, just no satellites) doesn't look
+        # identical to "nothing arriving at all" on the dashboard.
+        self._sats_used: Optional[int] = None
+        self._last_txt: Optional[str] = None
 
     @property
     def source_name(self) -> str:
@@ -145,7 +157,17 @@ class UartSource(LocationSource):
         if self._connected:
             # Connected but no fix decoded yet -- still "available" so
             # the GPS card can show "WAITING FOR FIX" rather than
-            # treating a cold-starting receiver as an error.
+            # treating a cold-starting receiver as an error. Surface
+            # whatever we've actually decoded (satellites used, the
+            # receiver's own $TXT diagnostics) through the existing
+            # error slot so "receiving real sentences, just no fix"
+            # is visibly different from "nothing arriving at all" --
+            # without this, both look identical on the dashboard.
+            detail_bits = []
+            if self._sats_used is not None:
+                detail_bits.append(f"{self._sats_used} satellites in the fix")
+            if self._last_txt:
+                detail_bits.append(f'receiver says "{self._last_txt}"')
             return GpsStatus(
                 source="uart",
                 available=True,
@@ -153,6 +175,7 @@ class UartSource(LocationSource):
                 satellites=None,
                 device=device,
                 last_update=self._last_update,
+                error=f"No fix yet ({', '.join(detail_bits)})." if detail_bits else None,
             )
         detail = self._last_error or f"not connected to {self._device}"
         return GpsStatus(
@@ -224,8 +247,20 @@ class UartSource(LocationSource):
             self._handle_gga(sentence)
         elif sentence.startswith(("$GPGSA", "$GNGSA")):
             self._handle_gsa(sentence)
+        elif len(sentence) >= 6 and sentence[3:6] == "TXT":
+            self._handle_txt(sentence)
         # Every other sentence (RMC, VTG, GSV, ...) is intentionally
         # ignored -- see module docstring on why GGA+GSA is enough.
+
+    def _handle_txt(self, sentence: str) -> None:
+        """``$--TXT,total,num,severity,message*cs`` -- receiver-status
+        text (e.g. u-blox's "ANTENNA OPEN"/"ANTENNA SHORT"). Not part
+        of a fix at all, but genuinely useful as a live diagnostic
+        when there's no fix to show otherwise."""
+        parts = sentence.split(",")
+        if len(parts) < 5:
+            return
+        self._last_txt = parts[4].split("*")[0].strip()
 
     def _handle_gga(self, sentence: str) -> None:
         parts = sentence.split(",")
@@ -235,6 +270,10 @@ class UartSource(LocationSource):
             fix_quality = int(parts[6]) if parts[6] else 0
         except ValueError:
             fix_quality = 0
+        try:
+            self._sats_used = int(parts[7]) if parts[7] else 0
+        except ValueError:
+            pass
         self._last_update = datetime.now(timezone.utc)
         if fix_quality == 0:
             # No fix on this sentence -- keep whatever fix we already

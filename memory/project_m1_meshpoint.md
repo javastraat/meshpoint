@@ -14212,3 +14212,34 @@ pattern that COTX X3/P100-reset-GPIO already use (deferred --
 mid-troubleshooting wasn't the moment for UI polish; worth doing once
 the antenna issue is resolved and the P100's GPS is confirmed steady
 end to end).
+
+**Dashboard visibility gap closed: "connected, no fix" now looks
+different from "nothing arriving at all."** User's real confusion
+after the GPIO fix: the raw terminal capture clearly showed live NMEA
+flowing, but the GPS card just kept showing "WAITING" with no way to
+tell if it was actually receiving anything. Root cause wasn't a bug --
+"WAITING" was technically correct (fix_quality=0, 00 sats, real
+antenna fault) -- but `get_status()`'s "connected, no fix yet" branch
+returned the exact same shape regardless of whether zero bytes or a
+thousand no-fix sentences had been received, so there was no way to
+tell "dead" from "alive but no signal" from the dashboard alone.
+Found `frontend/js/configuration/gps_stats_column.js` already renders
+`status.error` unconditionally into a visible `data-error` line
+regardless of `available` -- so the fix needed zero frontend changes,
+purely backend: `UartSource` now also parses GGA's satellite-used
+count (field 7, tracked even on fix_quality=0 sentences) and `$--TXT`
+receiver-status text (u-blox's "ANTENNA OPEN"/etc, a real diagnostic
+sentence type, not something invented -- confirmed from the user's
+own P100 capture) into `self._sats_used`/`self._last_txt`, and
+`get_status()`'s no-fix branch now builds an `error` string like `No
+fix yet (0 satellites in the fix, receiver says "ANTENNA OPEN").`
+whenever there's anything real to report, `None` otherwise (so a
+truly cold, nothing-yet-received state still shows plain "WAITING"
+with no misleading extra text). Added
+`test_real_p100_no_fix_capture_surfaces_diagnostics` in
+`tests/test_location_static_uart_sources.py` using the user's own
+captured sentences verbatim as the test fixture -- 18/18 passing
+locally. Also confirmed by hand-checking the multi-constellation GSA's
+extra NMEA 4.10 field doesn't break anything (already verified once
+before, re-confirmed here against the exact real capture rather than
+a synthetic one).
