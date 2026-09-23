@@ -170,6 +170,18 @@ Serial multi-stick, Updates UX, native MQTT MapReport, and operator polish on `m
 
 ### v0.8.1 (August 2026)
 
+- **Fix: card/panel hover highlight silently did nothing in Light, Sunlight,
+  and High Contrast themes, on every page.** Each of those three themes
+  force-overrides `.stat-card`/`.panel`/`.r-card`'s resting border color
+  with `!important` (needed so cards get a visible edge against a light
+  background, instead of relying on dark theme's glow-only separation) —
+  but with no matching `!important` on the existing `:hover` rules, that
+  override also permanently pinned the border color, so hovering never
+  changed anything. Dark theme was never affected (no such override
+  exists there), which is why it looked like only dark "lit up" on hover.
+  Added the missing `:hover` variants (still `!important`, still using
+  each theme's own accent-cyan/accent-green/border-glow tokens) to all
+  three theme files.
 - **UART GPS is real now, not a placeholder.** `location.source: uart`
   connects directly to an on-board GPS wired to the Pi's hardware UART
   (GPIO 14/15) instead of USB — the RAK Pi HAT and Pisces P100 boards

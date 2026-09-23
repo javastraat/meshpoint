@@ -31,6 +31,20 @@ html[data-theme="high-contrast"] .r-card {
         0 4px 14px rgba(0, 0, 0, 0.7) !important;
 }
 
+/* Same !important-vs-:hover clash as the light/sunlight themes --
+ * restore the hover highlight these selectors force-override at rest. */
+html[data-theme="high-contrast"] .stat-card:hover,
+html[data-theme="high-contrast"] .stat-card--system:hover {
+    border-color: var(--accent-cyan) !important;
+}
+html[data-theme="high-contrast"] .stat-card--relay:hover {
+    border-color: var(--accent-green) !important;
+}
+html[data-theme="high-contrast"] .panel:hover,
+html[data-theme="high-contrast"] .r-card:hover {
+    border-color: var(--border-glow) !important;
+}
+
 html[data-theme="high-contrast"] .since-line,
 html[data-theme="high-contrast"] .keymap__panel,
 html[data-theme="high-contrast"] .cmd-palette__panel {

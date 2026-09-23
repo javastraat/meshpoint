@@ -103,6 +103,22 @@ html[data-theme="light"] .cmd-palette__panel {
     box-shadow: 0 1px 3px rgba(23, 32, 51, 0.08) !important;
 }
 
+/* The !important edge above outranks dashboard.css/radio.css's own
+ * :hover border-color rules (same property, lower specificity without
+ * !important), which silently killed the hover highlight on every
+ * card/panel in light theme. Restore it explicitly per hover variant. */
+html[data-theme="light"] .stat-card:hover,
+html[data-theme="light"] .stat-card--system:hover {
+    border-color: var(--accent-cyan) !important;
+}
+html[data-theme="light"] .stat-card--relay:hover {
+    border-color: var(--accent-green) !important;
+}
+html[data-theme="light"] .panel:hover,
+html[data-theme="light"] .r-card:hover {
+    border-color: var(--border-glow) !important;
+}
+
 /* Faint accent-tint gradients baked into card backgrounds -- a
  * near-invisible touch on dark, a visible green/blue/cyan wash on
  * white. Flatten to the plain card surface so rows of cards read as

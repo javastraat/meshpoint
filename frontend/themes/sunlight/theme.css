@@ -27,6 +27,20 @@ html[data-theme="sunlight"] .r-card {
     border-color: rgba(0, 245, 255, 0.3) !important;
 }
 
+/* Same !important-vs-:hover clash as the light theme -- restore the
+ * hover highlight these selectors force-override at rest. */
+html[data-theme="sunlight"] .stat-card:hover,
+html[data-theme="sunlight"] .stat-card--system:hover {
+    border-color: var(--accent-cyan) !important;
+}
+html[data-theme="sunlight"] .stat-card--relay:hover {
+    border-color: var(--accent-green) !important;
+}
+html[data-theme="sunlight"] .panel:hover,
+html[data-theme="sunlight"] .r-card:hover {
+    border-color: var(--border-glow) !important;
+}
+
 html[data-theme="sunlight"] .stat-card__value,
 html[data-theme="sunlight"] .r-readout-grid dd {
     text-shadow: 0 0 10px rgba(0, 245, 255, 0.35);
