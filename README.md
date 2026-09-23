@@ -168,6 +168,7 @@ Community-validated (September 2026): concentrator reset is GPIO **22**,
 not the RAK V2/SenseCap M1 default of 17/25; front button is GPIO 23,
 front LED is GPIO 27 (both wired up via Configuration → Peripherals'
 **COTX X3** preset). 
+
 <img src="cotx.png" width="360" alt="Cotex X3">
 
 > **Details:** [Hardware Matrix](docs/HARDWARE-MATRIX.md#cotx-x3-helium-miner-notes).
@@ -184,6 +185,8 @@ Community-validated (September 2026): concentrator reset is GPIO **23**,
 found via a systematic sweep (`scripts/test_concentrator_reset.py`) after
 every other candidate — including several from the vendor's own real
 firmware repos — failed.
+
+<img src="p100.png" width="360" alt="Pisces P100">
 
 > **Details:** [Hardware Matrix](docs/HARDWARE-MATRIX.md#pisces-p100-helium-miner-notes).
 
