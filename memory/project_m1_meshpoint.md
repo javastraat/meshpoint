@@ -14335,3 +14335,39 @@ taking the user's word for it):
    [[feedback_grep_shared_css_classes]]'s broader lesson (grep before
    declaring a cross-file rename/move complete, not just at the one
    spot you edited).
+
+**Update-reload UX, round 2: the readiness fix was correct but didn't
+change the FEEL of the reload.** User tested the `waitForServiceRecovery`
+uptime-check fix live and reported "it still the same feeling" with
+screenshots showing the exact same disconnect-then-reconnect flash as
+before. Root cause of why the earlier fix wasn't enough: it strengthens
+HTTP readiness (`/api/device/status` uptime drop/dwell) before
+reloading, but a fresh page's own WebSocket connection is a SEPARATE
+subsystem that can still lag a beat behind HTTP coming back up -- so
+the reloaded page's first `/ws` attempt can still fail even once my
+fix decides the service is "ready". That failure feeds a completely
+different, previously-undiscovered piece of UI:
+`frontend/js/reconnect_storyboard.js`'s top-right pill (`#reconnect-
+storyboard`), unrelated to `update_progress_view.js` -- a page reload
+tears down and rebuilds the whole JS environment, so this pill's
+"first-ever connect, don't show anything" logic doesn't help; its
+`_onDisconnected()` unconditionally sets `_wasOnline=true` and labels
+ANY disconnect "Reconnecting...", including a first-attempt failure
+on a page that was never connected to begin with.
+
+Fixed by giving this pill context it structurally can't have on its
+own: `update_panel_controller.js` now writes a `sessionStorage` flag
+(`meshpoint:justUpdated`, timestamped) right before the post-update
+`location.reload()` -- the one thing that survives the JS teardown a
+reload causes. The pill consumes it (read + immediately delete, so it
+can't leak into a later unrelated reconnect) on the FIRST
+disconnect/connect cycle only, showing "Restarting..." / "Restarted."
+instead of "Reconnecting..." / "Reconnected." for that one cycle, then
+reverts to normal wording for anything after. Traced through the
+"first attempt succeeds immediately, no disconnect at all" case too --
+that path also needed to consume-and-discard a pending flag (added a
+second call site) so it couldn't wrongly attach to some unrelated
+reconnect 10 minutes later in the same tab. No JS test infra exists in
+this repo (confirmed again), verified via `node --check` plus a full
+manual trace of all three observed scenarios (fails-then-recovers,
+succeeds-immediately, later-unrelated-reconnect).

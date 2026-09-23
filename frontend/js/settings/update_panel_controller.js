@@ -636,6 +636,7 @@ class UpdatePanelController {
                 await this._loadInstallStatus();
                 const online = await this.progressView?.waitForServiceRecovery();
                 if (online) {
+                    this._markJustUpdated();
                     window.setTimeout(() => window.location.reload(), 800);
                 }
             } else {
@@ -672,6 +673,7 @@ class UpdatePanelController {
             // Apply may have succeeded; rollback is written before git fetch.
             await this._loadInstallStatus();
             this._syncRollbackButton();
+            this._markJustUpdated();
             window.setTimeout(() => window.location.reload(), 800);
             return;
         }
@@ -681,6 +683,20 @@ class UpdatePanelController {
             log: [],
         });
         this._setStatus('error', 'Connection lost during update. Check SSH or try again.');
+    }
+
+    /**
+     * Flags this reload as update-caused so the reconnect pill
+     * (reconnect_storyboard.js) can say "Restarting..." instead of
+     * "Reconnecting..." for the first connection cycle on the fresh
+     * page -- a reload alone can't carry that context, since the
+     * whole JS environment (including this controller) gets torn
+     * down and rebuilt from scratch; sessionStorage is what survives.
+     */
+    _markJustUpdated() {
+        try {
+            sessionStorage.setItem('meshpoint:justUpdated', String(Date.now()));
+        } catch (_e) { /* storage disabled -- pill just says the generic text */ }
     }
 
     _normalizeChannelId(channelId) {

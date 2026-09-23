@@ -7,6 +7,19 @@
  *   "Resyncing telemetry" -> "rooms" -> "nodes" -> "messages" -> "ready"
  * on reconnect, then fades out.
  *
+ * A full page reload after applying an update tears down and rebuilds
+ * this whole JS environment, so a fresh instance starts with no idea
+ * the disconnect it's about to see is expected -- the very first
+ * WebSocket attempt on the reloaded page can still fail even once the
+ * server is answering plain HTTP again (its WS-serving subsystem can
+ * lag a beat behind), and this pill would otherwise label that
+ * "Reconnecting...", which reads as "something's wrong" rather than
+ * "we just restarted, hang on". `update_panel_controller.js` leaves a
+ * `sessionStorage` flag right before triggering that reload -- the
+ * only thing that survives the JS teardown -- and this class checks
+ * it once, on the very next disconnect/connect cycle, for calmer
+ * wording ("Restarting..." / "Restarted.").
+ *
  * Single responsibility: own the pill DOM and choreograph the
  * stage transitions. Listens to dashboardWs connect/disconnect
  * events; never touches transport itself.
@@ -19,6 +32,9 @@ class ReconnectStoryboard {
         { label: 'Ready.', delay: 1100 },
     ];
 
+    static JUST_UPDATED_KEY = 'meshpoint:justUpdated';
+    static JUST_UPDATED_MAX_AGE_MS = 120000; // stale flag guard, e.g. a crashed reload
+
     constructor(dashboardWs) {
         this._ws = dashboardWs;
         this._root = null;
@@ -26,6 +42,7 @@ class ReconnectStoryboard {
         this._dotEl = null;
         this._wasOnline = false;
         this._timer = null;
+        this._isUpdateRestart = false;
     }
 
     mount() {
@@ -52,21 +69,48 @@ class ReconnectStoryboard {
     }
 
     _onDisconnected() {
+        const wasFirstAttempt = !this._wasOnline;
         this._wasOnline = true;
         this._show();
-        this._setStage('reconnecting', 'Reconnecting...');
+        // Only worth checking on the very first disconnect this page
+        // instance sees -- a later real reconnect (e.g. a network
+        // blip minutes into the session) should read as an ordinary
+        // reconnect, not borrow update wording from a stale flag.
+        if (wasFirstAttempt) {
+            this._isUpdateRestart = this._consumeJustUpdatedFlag();
+        }
+        this._setStage(
+            'reconnecting',
+            this._isUpdateRestart ? 'Restarting...' : 'Reconnecting...',
+        );
     }
 
     _onConnected() {
         if (!this._wasOnline) {
-            // First-ever connect. No storyboard, just hide.
+            // First-ever connect, no disconnect ever seen -- no
+            // storyboard, just hide. Still consume a pending flag so
+            // it can't attach to some later, unrelated reconnect.
             this._wasOnline = true;
+            this._consumeJustUpdatedFlag();
             this._hide();
             return;
         }
         this._show();
-        this._setStage('syncing', 'Reconnected.');
+        this._setStage('syncing', this._isUpdateRestart ? 'Restarted.' : 'Reconnected.');
+        this._isUpdateRestart = false;
         this._stepThroughStages(0);
+    }
+
+    _consumeJustUpdatedFlag() {
+        try {
+            const raw = sessionStorage.getItem(ReconnectStoryboard.JUST_UPDATED_KEY);
+            if (!raw) return false;
+            sessionStorage.removeItem(ReconnectStoryboard.JUST_UPDATED_KEY);
+            const age = Date.now() - parseInt(raw, 10);
+            return Number.isFinite(age) && age >= 0 && age < ReconnectStoryboard.JUST_UPDATED_MAX_AGE_MS;
+        } catch (_e) {
+            return false;
+        }
     }
 
     _stepThroughStages(index) {
