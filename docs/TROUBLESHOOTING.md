@@ -114,6 +114,102 @@ sensitive to reset timing than standard RAK Pi HATs.
 
 After making changes, do a full physical power cycle (unplug 15–20 s) before testing.
 
+### UART GPS reports "ANTENNA OPEN" despite a physically connected antenna
+
+Applies to boards where `location.source: uart` reads an onboard GPS
+module directly (see [Configuration → Using UART](CONFIGURATION.md#using-uart-on-board-gps)),
+confirmed on a **Pisces P100** (GreenPalm "Bothum V4.3" carrier board,
+GPS wired to a dedicated GPS-In SMA connector, separate from the LoRa
+and BLE antenna ports).
+
+**Symptom**
+
+The GPS card shows a live connection and real NMEA sentences (correct
+GGA/GSA/GLL/RMC, sometimes multi-constellation GPS+GLONASS), but never
+gets a fix, and a raw serial capture shows:
+
+```
+$GPTXT,01,01,01,ANTENNA OPEN*25
+```
+
+repeating on every report cycle — with a real, correctly-seated
+antenna physically connected, ruling out the obvious "wrong port" or
+"not plugged in" explanations.
+
+**What this message actually means**
+
+It's the GNSS chip's own antenna-supervisor diagnostic: the chip
+watches for DC current draw on the antenna feed line to confirm
+something is connected, and reports "open" when it sees none. This
+sentence is emitted autonomously by the chip itself — it needs no
+host-side configuration to appear, so a stock vendor firmware that
+never even reads the GPS UART (Helium miner firmware only asserts
+location once via the phone app; it never has a live-GPS feature at
+all) would never surface this, even though the chip has likely been
+reporting it since the unit left the factory. Meshpoint's UART GPS
+source may be the first thing that's ever actually listened to this
+port.
+
+**Diagnosis that rules this in, in order (all confirmed on the P100
+case above)**
+
+1. Confirm bytes are actually arriving at all first (rules out a
+   silent connection):
+   ```bash
+   sudo systemctl stop meshpoint
+   sudo stty -F /dev/serial0 9600 raw -echo
+   sudo timeout 10 cat /dev/serial0 | strings | head -20
+   sudo systemctl start meshpoint
+   ```
+   If this shows real `$GxGGA`/`$GxGSA`/etc sentences (even all-empty,
+   no-fix ones) plus the `ANTENNA OPEN` line, the receiver is alive
+   and talking — the fault is specifically the antenna sense circuit,
+   not the UART link, GPIO enable sequence, or `UartSource` parsing
+   (all already working correctly at this point).
+2. **Measure DC voltage on the antenna connector's center pin**
+   (antenna unscrewed, multimeter on DC volts, black probe to any
+   ground point, red probe to the center pin) — the decisive test:
+   - **~3.3V or ~5V present**: the board is actively supplying
+     bias-tee power. If "open" persists, the fault is in the antenna
+     or its cable specifically (open circuit, bad crimp/solder) —
+     try a different antenna.
+   - **~0V**: the board is not supplying any bias-tee power on that
+     line **at all** — confirmed on the P100. No antenna, active or
+     passive, stock or spare, can fix this on its own; the problem is
+     upstream of the antenna.
+3. If 0V: rule out software/firmware config before assuming a
+   hardware limitation.
+   - Sending a UBX-MON-VER poll (`b5 62 0a 04 00 00 0e 34`) over the
+     same serial link is a safe, read-only "identify yourself" that
+     every genuine u-blox chip answers. On the P100 it came back with
+     a valid **UBX-ACK-NAK** (`b5 62 05 00 02 00 0a 04 15 3e`) —
+     correctly-framed UBX communication, but an explicit rejection of
+     a command real u-blox silicon always supports. That's a strong
+     sign of a non-genuine/partial-UBX-implementation GNSS chip, which
+     means standard u-blox `CFG-ANT` documentation can't be trusted to
+     apply here, and guessing at a config command risks the chip
+     silently ignoring it.
+   - A GPIO sweep of every unused Pi header pin (driving each high
+     individually, in isolation, while watching the same multimeter
+     reading) came back clean on the P100 — none of them affect the
+     antenna line. This also confirms the antenna bias-tee is a
+     **separate circuit from the module-power GPIOs** (see the reset
+     pin section above and `docs/HARDWARE-MATRIX.md`'s Pisces P100
+     notes for GPIO 12/20/16 — those get the GNSS chip talking at
+     all, but don't touch the antenna line).
+
+**Where this leaves it, if you hit the same wall**
+
+If a voltage/UBX/GPIO investigation like the above comes back clean
+(bias line stays at 0V, no GPIO moves it, the chip rejects standard
+UBX identification), this is genuinely past what's reverse-engineerable
+without the board's real schematic — likely an I2C-controlled power
+sequencer, a switch internal to the LoRaWAN/GNSS combo module itself,
+or a physical jumper/solder bridge that isn't populated by default.
+Contact the board vendor/reseller directly with the specific evidence
+above (they can usually answer in one message with the real
+schematic in hand) rather than continuing to guess blind.
+
 ### Database errors after update
 
 If logs show `sqlite3.OperationalError: table nodes has no column named <column>`:

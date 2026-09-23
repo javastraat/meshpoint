@@ -14408,3 +14408,83 @@ design looked correct on paper and traced cleanly through three
 scenarios by hand, but the actual live behavior (WS reconnecting too
 fast to ever visibly fail) wasn't something a static code trace would
 surface; needed the user's real multi-attempt test to catch it.
+
+**Pisces P100 GPS antenna: "ANTENNA OPEN" investigation exhausted every
+remotely-diagnosable avenue, ended unresolved -- vendor question now,
+not a code question.** Picking back up from the earlier GPIO-enable
+win (GPIO 12/16/20 gets the GNSS chip talking, real NMEA confirmed
+flowing) -- the remaining blocker turned out to be much deeper than
+"check the antenna," despite that being the obvious first guess.
+
+User opened the case and sent a real photo: the carrier board's own
+silkscreen says **"GreenPalm Smart Gateway Bothum V4.3"** -- not
+"Pisces" anywhere on the PCB itself, confirming "Pisces P100" is a
+reseller brand on a GreenPalm reference design. Found GreenPalm's own
+public datasheet for the LoRaWAN module on it (GPML9931-PX,
+greenpalmiot.com) -- zero mentions of GPS in 14 pages, confirming GPS
+is a separate chip on the carrier board, not part of that module.
+Found zero public documentation for "Bothum" anywhere (GreenPalm's own
+site, GitHub) -- pure internal reference-design silkscreen, no public
+trail at all, unlike Pisces/Nebra's own real firmware repos.
+
+Ruled out, in order, each with a real live test rather than guessing:
+1. Wrong antenna type (passive vs active) -- moot once user confirmed
+   it's GreenPalm's own stock antenna for this exact port.
+2. Loose/mismatched connector (the classic SMA-vs-RP-SMA gotcha) --
+   user fully unscrewed and reseated, checked for a solid stop. No
+   change.
+3. **Multimeter DC voltage on the antenna connector's center pin,
+   antenna removed: 0V.** Decisive -- the board supplies NO bias-tee
+   power on that line at all, so no antenna (any type, stock or
+   spare) could ever fix this on its own. This reframed the entire
+   problem: not an antenna question, a "why doesn't this line get
+   power" question.
+4. Checked whether EITHER vendor firmware repo (piscesminer's OR
+   Nebra's) ever configures/enables a GPS antenna at all, across
+   every version folder in piscesminer's repo (0.20 through 0.63) --
+   consistently just the same 3 GPIOs (12/16/20) for module power,
+   never anything GPS-antenna-specific, and Nebra's `gateway-rs`
+   config/update script has zero GPS references of any kind. Root
+   cause of why neither repo has this documented: Helium mining only
+   asserts location ONCE via the phone app; neither firmware has ever
+   needed a live GPS feed, so neither ever needed to solve this.
+   Meshpoint's UART GPS source is very likely the first thing that's
+   ever actually opened this port and listened.
+5. Sent a UBX-MON-VER poll (`b5 62 0a 04 00 00 0e 34`, a universally-
+   supported "identify yourself" on real u-blox silicon) directly over
+   the serial link, service stopped first to avoid port contention.
+   Got back a **valid, correctly-checksummed UBX-ACK-NAK**
+   (`b5 62 05 00 02 00 0a 04 15 3e`) -- decoded by hand: class 0x05/id
+   0x00 (ACK-NAK), NAKing class 0x0A/id 0x04 (MON-VER) specifically.
+   Real signal: this chip speaks UBX framing correctly (proves binary
+   protocol communication works at all) but explicitly rejects a
+   command that's essentially universal on genuine u-blox parts --
+   strong evidence this is a non-genuine/partial-UBX-implementation
+   GNSS chip, meaning standard u-blox `CFG-ANT` register documentation
+   can't be trusted to apply, and sending a guessed config command
+   risked being silently ignored rather than actually fixing anything.
+6. Wrote `~/antenna_sweep.py` (gpiozero, one candidate pin at a time,
+   `input()`-paced so the user could watch a multimeter live) covering
+   every GPIO not already claimed by SPI0/I2C1/UART0/EEPROM-ID/known
+   pins (12,16,20,23) -- 13 candidates, each driven high in isolation
+   then back low before the next. Clean negative across all of them:
+   the antenna bias-tee is confirmed NOT controlled by any Pi GPIO at
+   all.
+
+Given all of that, this is now genuinely past what's reverse-
+engineerable without GreenPalm's real schematic -- remaining
+candidates (I2C-controlled power sequencer given there's already an
+I2C-attached ATECC608-style crypto chip on this board per the vendor's
+own `ecc://i2c-0:96` config; a switch internal to the LoRaWAN/GNSS
+combo module itself; an unpopulated jumper/solder bridge) are pure
+speculation without more evidence. Wrote up the full diagnostic trail
+in `docs/TROUBLESHOOTING.md` (new "UART GPS reports 'ANTENNA OPEN'"
+section, referenced from `docs/CONFIGURATION.md`'s "Using UART"
+section) and extended `docs/HARDWARE-MATRIX.md`'s Pisces P100 table
+with a GPS antenna bias-tee row -- both so this doesn't need
+re-diagnosing from scratch if it recurs, and so the evidence trail is
+ready to hand to GreenPalm/reseller support (drafted a concise support-
+ticket-ready summary of steps 3/4/5/6 above for the user to send).
+Genuinely open item: whether GreenPalm's support can identify the real
+enable mechanism, or whether this board simply doesn't support active
+antenna sensing as shipped.

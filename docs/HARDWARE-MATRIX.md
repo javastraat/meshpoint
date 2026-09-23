@@ -202,12 +202,37 @@ issue (a full `sudo reboot` — far more thorough than any GPIO toggle —
 still failed on the wrong pin, so this was never about needing a deeper
 reinit, just the correct pin).
 
+**Onboard GPS: module powers on fine (GPIO 12/16/20, see above), but the
+antenna line reads 0V — likely no software fix exists.** Carrier board is
+branded "GreenPalm Smart Gateway Bothum V4.3" (a rebrand — no relation to
+the piscesminer/Nebra firmware repos, which is exactly why they don't
+mention it: that firmware only asserts location once via the Helium app
+and never reads live GPS at all). With `location.source: uart`, real NMEA
+flows correctly (GGA/GSA/GLL/RMC, GPS+GLONASS) but never gets a fix —
+`$GPTXT,01,01,01,ANTENNA OPEN` repeats on every cycle despite a genuine,
+correctly-seated antenna on the dedicated GPS-In SMA connector. Full
+diagnosis in `docs/TROUBLESHOOTING.md`'s ["ANTENNA OPEN" section](TROUBLESHOOTING.md#uart-gps-reports-antenna-open-despite-a-physically-connected-antenna);
+short version: multimeter on the antenna connector's center pin (antenna
+removed) reads a flat 0V — the board never supplies bias-tee power on
+that line at all, so no antenna (active, passive, stock, or spare) can
+fix this on its own. A GPIO sweep of every unused Pi header pin doesn't
+move it either (bias-tee is evidently not Pi-GPIO-controlled), and the
+GNSS chip NAKs a standard UBX-MON-VER identify poll — correctly-framed
+UBX communication, but a rejection of a command real u-blox silicon
+always answers, meaning it's likely a non-genuine/partial-UBX chip whose
+real `CFG-ANT` behavior can't be assumed from standard docs. Left as an
+open question for the vendor (possible I2C-controlled power sequencer,
+a switch internal to the LoRaWAN/GNSS combo module, or an unpopulated
+jumper) rather than guessed at further.
+
 | | Pisces P100 |
 |---|---|
 | **Host** | Pi 4, PoE-powered |
 | **Concentrator** | SX1302-class (onboard) |
 | **TX support** | Yes (confirmed live) |
 | **Reset GPIO** | **23** (not 17/25 — needs `RESET_GPIO=23` override) |
+| **GPS module power** | GPIO 12, 16, 20 (`uart_enable_gpios`) — vendor firmware's own undocumented boot sequence |
+| **GPS antenna bias-tee** | Unresolved — 0V on the antenna line, not Pi-GPIO-controlled; see notes above |
 | **Plug-and-play `install.sh`** | No (manual `RESET_GPIO` override required) |
 | **Enclosure** | Sealed, waterproof outdoor unit; Pi header not accessible without disassembly |
 
