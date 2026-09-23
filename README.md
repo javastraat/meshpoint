@@ -168,6 +168,7 @@ Community-validated (September 2026): concentrator reset is GPIO **22**,
 not the RAK V2/SenseCap M1 default of 17/25; front button is GPIO 23,
 front LED is GPIO 27 (both wired up via Configuration → Peripherals'
 **COTX X3** preset). 
+<img src="cotex.png" width="360" alt="RAK7248 Hotspot V2">
 
 > **Details:** [Hardware Matrix](docs/HARDWARE-MATRIX.md#cotx-x3-helium-miner-notes).
 
