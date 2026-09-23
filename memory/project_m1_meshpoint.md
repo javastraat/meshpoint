@@ -14261,3 +14261,38 @@ blocked the same value from the UI too. Good example of
 [[feedback_verify_ci_before_done]] paying off from the other
 direction: a test written for rigor (non-default values) surfaced a
 real bug CI then caught before it reached the user.
+
+**Fixed a real UX bug in the update-apply reload flow, user-reported
+from real update runs (not the GPS work).** User's description: apply
+update -> "Applied to X" -> page reloads -> topbar connection pills
+show stale green briefly -> suddenly flip to Reconnecting -> recover a
+few seconds later. Traced to `update_progress_view.js`'s
+`waitForServiceRecovery()`: it reloaded the page the moment ANY 200
+came back from `GET /api/identity`, but `systemctl restart` gives no
+clean stop/start signal to the frontend -- the still-dying OLD process
+can answer that first poll just as easily as the new one, and even
+once the new process's HTTP layer is up, background subsystems
+(coordinator, hardware handshakes) can still be catching up. Fixed by
+switching the poll target to `GET /api/device/status` (also
+unauthenticated, confirmed by checking the route has no
+`Depends(require_admin)` anywhere) which exposes `uptime_seconds`
+measured from `_start_time` (reset in `device.py`'s own
+`init_routes()`, so it's a true per-process-boot signal, immune to
+"git already pulled the new commit" false positives that a
+version/commit-based check would have had) -- now requires either an
+observed DROP in that value from the first baseline reading (proof of
+a fresh boot, since uptime can only increase within one process) or a
+minimum 6s dwell time of consistent 200s as a fallback for the rare
+case the very first poll already caught the new process. No JS test
+infra exists in this repo at all (confirmed: no `*.test.js`, no root
+`package.json`) so verification was `node --check` (syntax only) plus
+careful manual trace of both call sites
+(`update_panel_controller.js:637,668`) -- both call with the old
+signature, all new params have defaults, fully backward compatible.
+
+Found but did NOT fix (flagged to the user instead of unilaterally
+expanding scope): `backup_restore_card.js` has its own private
+`_waitForServiceRecovery()` with the exact same bug (polls
+`/api/identity`, reloads on the first 200) for the restore-from-backup
+flow. Same fix would apply if the user wants it -- not touched since
+they only asked about the update flow specifically.

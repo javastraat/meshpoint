@@ -225,7 +225,34 @@ class UpdateProgressView {
         }
     }
 
-    async waitForServiceRecovery({ timeoutMs = 180000, intervalMs = 2000 } = {}) {
+    /**
+     * Polls until the *new* process is actually serving, not just
+     * until *something* answers HTTP again.
+     *
+     * `systemctl restart` doesn't give the frontend a clean
+     * stopped/started signal to watch -- the old process can keep
+     * answering requests for a moment during its own shutdown, and
+     * even once the new one is up, its background subsystems (the
+     * coordinator, hardware handshakes) can still be catching up
+     * after the HTTP layer already responds. Trusting the very first
+     * 200 (the old behavior) reloads too early: the fresh page loads
+     * against a server that's about to die or isn't fully warmed up
+     * yet, so its own WebSocket connects, then drops, then reconnects
+     * a few seconds later -- a confusing flash the user sees as
+     * "looked fine, then suddenly disconnected."
+     *
+     * `/api/device/status` is unauthenticated (same as `/api/identity`,
+     * which this used to poll) and carries `uptime_seconds`, measured
+     * from this *process's* own start time -- it can only ever
+     * increase within one process, so a drop from the first value we
+     * saw is unambiguous proof of a fresh boot, not the old process
+     * still limping along. That's the strong signal. As a fallback
+     * for the rare case our very first poll already caught the new
+     * process (so there's no drop to observe), also accept a minimum
+     * dwell time of real, consistent 200s -- long enough in practice
+     * for the old process to have actually exited.
+     */
+    async waitForServiceRecovery({ timeoutMs = 180000, intervalMs = 2000, minDwellMs = 6000 } = {}) {
         if (!this.root) return false;
         this.root.dataset.state = 'reconnecting';
         const hint = this.root.querySelector('.update-progress__hint');
@@ -233,20 +260,33 @@ class UpdateProgressView {
             hint.textContent = 'Meshpoint is restarting. Reconnecting to the dashboard…';
         }
         this._appendTerminalLine('Waiting for dashboard to come back online…', 'info');
-        const deadline = Date.now() + timeoutMs;
+        const waitStarted = Date.now();
+        const deadline = waitStarted + timeoutMs;
+        let baselineUptime = null;
         while (Date.now() < deadline) {
             try {
-                const response = await fetch('/api/identity', {
+                const response = await fetch('/api/device/status', {
                     credentials: 'same-origin',
                     cache: 'no-store',
                 });
                 if (response.ok) {
-                    this.root.dataset.state = 'online';
-                    if (hint) {
-                        hint.textContent = 'Dashboard is back online. Reloading to pick up the new version.';
+                    const body = await response.json().catch(() => null);
+                    const uptime = (body && typeof body.uptime_seconds === 'number')
+                        ? body.uptime_seconds
+                        : null;
+                    if (baselineUptime === null && uptime !== null) {
+                        baselineUptime = uptime; // may still be the dying old process
                     }
-                    this._appendTerminalLine('Dashboard online — reloading page.', 'info');
-                    return true;
+                    const freshBoot = uptime !== null && baselineUptime !== null && uptime < baselineUptime;
+                    const dwelledLongEnough = (Date.now() - waitStarted) >= minDwellMs;
+                    if (freshBoot || dwelledLongEnough) {
+                        this.root.dataset.state = 'online';
+                        if (hint) {
+                            hint.textContent = 'Dashboard is back online. Reloading to pick up the new version.';
+                        }
+                        this._appendTerminalLine('Dashboard online — reloading page.', 'info');
+                        return true;
+                    }
                 }
             } catch (_e) { /* service restart drops the connection */ }
             await new Promise((resolve) => setTimeout(resolve, intervalMs));

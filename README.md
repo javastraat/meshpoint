@@ -227,7 +227,7 @@ Raspbian Lite to eMMC once over USB using a CM4 carrier board and Raspberry Pi `
 
 > **Step-by-step:** [Syncrobit Chameleon guide](docs/SYNCROBIT-CHAMELEON.md) and [Hardware Matrix](docs/HARDWARE-MATRIX.md).
 
-### Option D: COTX X3 Helium Miner (repurposed)
+### Option D: COTX X3 Helium Miner (~$50)
 
 A **COTX X3** Helium miner: standard Raspberry Pi 4 baseboard, a custom
 LoRaWAN HAT (SX1302-class concentrator), and a front-panel status
@@ -245,7 +245,7 @@ front LED is GPIO 27 (both wired up via Configuration → Peripherals'
 
 > **Details:** [Hardware Matrix](docs/HARDWARE-MATRIX.md#cotx-x3-helium-miner-notes).
 
-### Option E: Pisces P100 (PoE outdoor, repurposed)
+### Option E: Pisces P100 (PoE outdoor, ~$75-100)
 
 A **Pisces P100**: a PoE-powered outdoor LoRaWAN gateway in a sealed
 waterproof enclosure, built around a Pi 4 and a custom SX1302-class

@@ -170,6 +170,19 @@ Serial multi-stick, Updates UX, native MQTT MapReport, and operator polish on `m
 
 ### v0.8.1 (August 2026)
 
+- **Fix: applying an update could reload the dashboard before the restarted
+  service was actually ready, causing a confusing "looks fine, then suddenly
+  disconnects" flash right after reload.** The post-apply wait only checked
+  that *something* answered `GET /api/identity` with 200 before reloading —
+  but `systemctl restart` gives no clean stop/start signal, so the still-dying
+  old process could answer that first poll just as easily as the new one,
+  and even the new process's HTTP layer can come up before its background
+  subsystems (coordinator, hardware handshakes) are fully warmed up. Now
+  polls `/api/device/status` (also unauthenticated) and requires either an
+  observed drop in that process's own `uptime_seconds` — proof of a fresh
+  boot, since it can only increase within one process — or a minimum 6s of
+  consistently-online dwell time before reloading, so the fresh page loads
+  against a server that's genuinely ready instead of racing its restart.
 - **Fix: card/panel hover highlight silently did nothing in Light, Sunlight,
   and High Contrast themes, on every page.** Each of those three themes
   force-overrides `.stat-card`/`.panel`/`.r-card`'s resting border color
