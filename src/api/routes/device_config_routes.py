@@ -91,7 +91,7 @@ class GpsUpdate(BaseModel):
     min_fix_quality: Optional[int] = Field(None, ge=1, le=3)
     # uart-mode fields
     uart_device: Optional[str] = Field(None, min_length=1, max_length=255)
-    baud: Optional[int] = Field(None, ge=9600, le=921600)
+    baud: Optional[int] = Field(None, ge=4800, le=921600)
     timeout_seconds: Optional[int] = Field(None, ge=1, le=3600)
     # Meshtastic POSITION on the LoRa mesh (not Meshradar upstream pin).
     mesh_coordinate_source: Optional[str] = None

@@ -14243,3 +14243,21 @@ locally. Also confirmed by hand-checking the multi-constellation GSA's
 extra NMEA 4.10 field doesn't break anything (already verified once
 before, re-confirmed here against the exact real capture rather than
 a synthetic one).
+
+**Second CI catch, this one a real product bug: `GpsUpdate.baud`'s
+`ge=9600` floor rejected the standard 4800 baud NMEA rate.** My own
+`test_uart_source_persists_device_and_baud` test (added earlier this
+session) used 4800 to be deliberately different from the 9600
+default, for rigor -- and CI came back 422 Unprocessable Entity,
+catching a real bug rather than a test bug: `baud`'s lower bound was
+inherited unchanged from when this field was just a forward-compat
+stub, before real UART support existed, and 9600 was never a
+principled floor -- 4800 is the original NMEA 0183 standard rate and
+plenty of real modules still use it. Fixed the constraint (`ge=4800`)
+in `src/api/routes/device_config_routes.py` and the matching HTML
+`min="9600"` on the frontend's baud input
+(`frontend/js/configuration/gps_card.js`) that would have silently
+blocked the same value from the UI too. Good example of
+[[feedback_verify_ci_before_done]] paying off from the other
+direction: a test written for rigor (non-default values) surfaced a
+real bug CI then caught before it reached the user.

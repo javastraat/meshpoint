@@ -241,8 +241,7 @@ and the box restarts normally from then on.
 Community-validated (September 2026): concentrator reset is GPIO **22**,
 not the RAK V2/SenseCap M1 default of 17/25; front button is GPIO 23,
 front LED is GPIO 27 (both wired up via Configuration → Peripherals'
-**COTX X3** preset). Verify the power supply is a genuine 5V/3A+ direct
-into the Pi — a 2A supply/hub caused under-voltage on the unit tested.
+**COTX X3** preset). 
 
 > **Details:** [Hardware Matrix](docs/HARDWARE-MATRIX.md#cotx-x3-helium-miner-notes).
 
@@ -257,9 +256,7 @@ as the COTX X3, just a different pin and a different underlying board.
 Community-validated (September 2026): concentrator reset is GPIO **23**,
 found via a systematic sweep (`scripts/test_concentrator_reset.py`) after
 every other candidate — including several from the vendor's own real
-firmware repos — failed. PoE power confirmed clean; this was purely a
-wrong-pin issue, not power or a deeper kernel/SPI problem (a plain
-`sudo reboot` alone did **not** fix it either — only the correct pin did).
+firmware repos — failed.
 
 > **Details:** [Hardware Matrix](docs/HARDWARE-MATRIX.md#pisces-p100-helium-miner-notes).
 

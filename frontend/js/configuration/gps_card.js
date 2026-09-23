@@ -143,7 +143,7 @@ class GpsConfigCard {
                             <label class="cfg-field cfg-field--narrow">
                                 <span class="cfg-field__label">Baud</span>
                                 <input class="cfg-field__input" type="number"
-                                       min="9600" max="921600"
+                                       min="4800" max="921600"
                                        data-uart-baud placeholder="9600">
                             </label>
                         </div>
