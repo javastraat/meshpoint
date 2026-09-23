@@ -8,17 +8,18 @@
  * on reconnect, then fades out.
  *
  * A full page reload after applying an update tears down and rebuilds
- * this whole JS environment, so a fresh instance starts with no idea
- * the disconnect it's about to see is expected -- the very first
- * WebSocket attempt on the reloaded page can still fail even once the
- * server is answering plain HTTP again (its WS-serving subsystem can
- * lag a beat behind), and this pill would otherwise label that
- * "Reconnecting...", which reads as "something's wrong" rather than
- * "we just restarted, hang on". `update_panel_controller.js` leaves a
- * `sessionStorage` flag right before triggering that reload -- the
- * only thing that survives the JS teardown -- and this class checks
- * it once, on the very next disconnect/connect cycle, for calmer
- * wording ("Restarting..." / "Restarted.").
+ * this whole JS environment, so a fresh instance has no memory of why
+ * it's about to see a disconnect (if it even does -- the reload only
+ * happens once the backend is confirmed HTTP-ready, so the fresh
+ * page's first WebSocket attempt often just succeeds cleanly with no
+ * visible hiccup at all). Waiting for a `disconnected` event to relabel
+ * is the wrong trigger: `update_panel_controller.js` leaves a
+ * `sessionStorage` flag right before triggering that reload -- the one
+ * thing that survives the JS teardown -- and `init()` checks it
+ * proactively, showing "Restarting..." immediately regardless of
+ * whether a disconnect ever actually fires, clearing to "Restarted."
+ * (or just fading out, if the connection was already fine) once the
+ * WebSocket confirms it either way.
  *
  * Single responsibility: own the pill DOM and choreograph the
  * stage transitions. Listens to dashboardWs connect/disconnect
@@ -66,6 +67,16 @@ class ReconnectStoryboard {
         if (!this._ws) return;
         this._ws.on('connected', () => this._onConnected());
         this._ws.on('disconnected', () => this._onDisconnected());
+        // Proactive: don't wait for a disconnect event that may never
+        // come. If we just reloaded because of an update, say so the
+        // instant this page exists, then let whatever the WebSocket
+        // actually does (connects clean, or stumbles first) resolve it.
+        if (this._consumeJustUpdatedFlag()) {
+            this._isUpdateRestart = true;
+            this._wasOnline = true; // so _onConnected takes the resync-stages branch
+            this._show();
+            this._setStage('reconnecting', 'Restarting...');
+        }
     }
 
     _onDisconnected() {
@@ -76,7 +87,10 @@ class ReconnectStoryboard {
         // instance sees -- a later real reconnect (e.g. a network
         // blip minutes into the session) should read as an ordinary
         // reconnect, not borrow update wording from a stale flag.
-        if (wasFirstAttempt) {
+        // (Usually already consumed and primed by init() above; this
+        // is the fallback for whatever timing gap lets a disconnect
+        // fire before init() got to check.)
+        if (wasFirstAttempt && !this._isUpdateRestart) {
             this._isUpdateRestart = this._consumeJustUpdatedFlag();
         }
         this._setStage(

@@ -14371,3 +14371,40 @@ reconnect 10 minutes later in the same tab. No JS test infra exists in
 this repo (confirmed again), verified via `node --check` plus a full
 manual trace of all three observed scenarios (fails-then-recovers,
 succeeds-immediately, later-unrelated-reconnect).
+
+**Round 3, same feature: round 2's fix was reactive, user needed
+proactive.** Tested live -- "i dont see any restarting tried three
+[times] ... multible [hard refreshes] ... when it says applied to
+main it should just show rebooting pill orso like i aked in my first
+qe." Real design mistake, not a bug in the code I wrote: round 2 only
+relabeled the pill's wording IF a WebSocket `disconnected` event
+happened to fire after reload. But round 2's OWN earlier fix
+(`waitForServiceRecovery`'s uptime-drop-or-dwell check) apparently
+works well enough now that the fresh page's first WS attempt often
+just succeeds cleanly with zero visible disconnect -- meaning the
+exact trigger round 2 depended on frequently never fires at all,
+so the pill never appears. The two fixes were quietly undermining
+each other: the better the readiness check got, the less often the
+reactive relabel had anything to react to.
+
+Real fix: made `ReconnectStoryboard.init()` check the
+`sessionStorage` flag PROACTIVELY and show "Restarting..." immediately
+on load, unconditionally, before the WebSocket even attempts to
+connect (confirmed via `app.js`: `story.init()` at line 160 runs well
+before `concentratorWS.connect()` at line 292, so the pill is already
+up by the time any connection attempt starts). `_onConnected()`
+resolves it to "Restarted." + the existing resync-stage sequence
+either way -- whether the WS connected clean on the first try or
+needed a retry first, both paths converge on the same priming
+(`_wasOnline=true` set in `init()` itself now, not only in
+`_onDisconnected()` as before). Kept the old reactive check in
+`_onDisconnected()` too, guarded so it only fires if `init()` somehow
+didn't already prime it (`!this._isUpdateRestart`) -- cheap defensive
+fallback for whatever timing gap might exist, costs nothing since
+`_consumeJustUpdatedFlag()` is idempotent (returns false once already
+removed). This is the kind of thing that's obvious in hindsight but
+easy to miss without live testing on the real device -- the first
+design looked correct on paper and traced cleanly through three
+scenarios by hand, but the actual live behavior (WS reconnecting too
+fast to ever visibly fail) wasn't something a static code trace would
+surface; needed the user's real multi-attempt test to catch it.

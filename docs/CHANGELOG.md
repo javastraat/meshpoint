@@ -170,17 +170,19 @@ Serial multi-stick, Updates UX, native MQTT MapReport, and operator polish on `m
 
 ### v0.8.1 (August 2026)
 
-- **The reconnect pill says "Restarting..." instead of "Reconnecting..." right
-  after an update.** Even with the readiness fix below, a freshly-reloaded
-  page's very first WebSocket attempt can still fail for a moment — the
-  server's WS-serving subsystem can lag a beat behind plain HTTP coming back
-  up — and the top-right pill had no way to know that disconnect was expected,
-  so it read as "something's wrong" instead of "we just restarted." The update
+- **The top-right reconnect pill now proactively shows "Restarting..." the
+  moment the post-update page reload lands**, instead of only relabeling
+  itself if a WebSocket hiccup happens to occur. With the readiness fix below
+  in place, the fresh page's first WebSocket attempt often just succeeds
+  cleanly with no visible disconnect at all — so waiting for one to relabel
+  meant the pill frequently never appeared, even though the whole point was
+  to reassure the user during a restart they explicitly triggered. The update
   flow now leaves a short-lived flag (`sessionStorage`, since a page reload
   tears down and rebuilds the whole JS environment) right before reloading;
-  the pill checks it once, on the very next disconnect/reconnect cycle only,
-  for calmer wording ("Restarting..." / "Restarted.") before falling back to
-  its normal "Reconnecting..." for any later, unrelated blip.
+  the pill checks it immediately on load and shows "Restarting..." regardless
+  of what the connection does next, resolving to "Restarted." (clean connect)
+  or the same after a retry, then falls back to its normal "Reconnecting..."
+  for any later, unrelated blip.
 - **Fix: applying an update could reload the dashboard before the restarted
   service was actually ready, causing a confusing "looks fine, then suddenly
   disconnects" flash right after reload.** The post-apply wait only checked
