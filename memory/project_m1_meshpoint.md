@@ -14296,3 +14296,42 @@ expanding scope): `backup_restore_card.js` has its own private
 `/api/identity`, reloads on the first 200) for the restore-from-backup
 flow. Same fix would apply if the user wants it -- not touched since
 they only asked about the update flow specifically.
+
+**README restructure: moved the 84-line "What's Different in This
+Fork" section out to its own file, refreshed the stale Architecture
+diagram.** User's own framing: "the readme is so long even maybe move
+it to its own md file, now users have no idea what the hell is going
+on with that massive whats different block haha." Two separate asks,
+both confirmed by reading the actual file before acting (not just
+taking the user's word for it):
+
+1. Architecture diagram (the ASCII box diagram) only ever showed the
+   original core pipeline (LoRaWAN/Meshtastic/MeshCore/RTL-SDR
+   listener + Meshradar) -- zero mention of Reticulum, the plugin
+   system, DAPNET, RF-Env companion, or any RTL-SDR decoder plugin.
+   Confirmed stale by direct comparison against what "What's
+   Different" already documented in prose. Added a second, separate
+   diagram box right after the original ("Meshpoint plugins
+   (opt-in)") rather than editing the first's precise box-drawing
+   alignment in place -- generated with a small throwaway Python
+   script that pads each line to a common width, since hand-typing
+   Unicode box-drawing characters risks silent misalignment that's
+   easy to miss on read-back but obvious once rendered.
+2. Moved the full "What's Different" content verbatim to new
+   `docs/WHATS-DIFFERENT.md`, replaced it in the README with a
+   3-sentence teaser + link. Content move via `sed -n` line-range
+   delete after a `cp` backup, not the Edit tool -- an 80-line
+   old_string match for a single Edit call was impractical, and
+   sed's line-addressed delete is exact where large-block string
+   matching risks a near-miss. First pass left the removed block's
+   trailing `## Features` header duplicated (my Edit only swapped the
+   opening paragraph, not the full old block) -- caught by grep before
+   moving on, fixed with a second sed delete once the true post-edit
+   line numbers were re-checked (never trust line numbers from before
+   your own edit). Also found and fixed 6 same-page `(#plugins)` anchor
+   links in the README that broke the moment the `<a id="plugins">`
+   anchor moved with the content -- grepped for the literal anchor
+   pattern across the repo before calling it done, per
+   [[feedback_grep_shared_css_classes]]'s broader lesson (grep before
+   declaring a cross-file rename/move complete, not just at the one
+   spot you edited).
