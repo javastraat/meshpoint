@@ -72,6 +72,11 @@
   only app plugins were checked against what's actually on disk. Themes now
   show "installed"/"Reinstall" too, and flag an update the same way apps do
   when a later install recorded a newer version.
+- **Fix: "Community presets…" dropdown was always empty.** The installers'
+  `rsync --exclude='data'` skipped every directory named `data`, including
+  `frontend/data/`, so `plugin_sources.json` never reached the device and
+  the dropdown only showed its placeholder. The exclude is now anchored
+  (`/data`) so it only protects the runtime `data/` directory at the top level.
 
 #### Docs
 

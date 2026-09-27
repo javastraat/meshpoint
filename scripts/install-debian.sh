@@ -360,7 +360,7 @@ rsync -a --exclude='venv' \
          --exclude='__pycache__' \
          --exclude='cdk.out' \
          --exclude='cloud/build' \
-         --exclude='data' \
+         --exclude='/data' \
          --exclude='*.pyc' \
          "${SCRIPT_DIR}/" "$MESHPOINT_DIR/"
 
