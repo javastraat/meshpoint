@@ -14518,3 +14518,52 @@ the causal claim wasn't actually isolated/verified. Softened the
 script's comments and the plugin's README to recommend the reboot
 (safe, low-cost, matches the one real tested sequence) without
 asserting the specific unverified mechanism as fact.
+
+**bluetooth-scanner setup: full chain of real errors on the actual
+device, resolved end-to-end, confirmed working (31 devices scanned
+live).** Each fix only revealed the NEXT real blocker rather than the
+whole problem at once -- textbook layered-failure debugging, worth the
+full trail:
+1. `BleakDBusError: Failed to activate service 'org.bluez': timed
+   out` -- bluetoothd unreachable at all. Root cause: `pi-bluetooth`
+   was never installed (plain `bluez` alone leaves `hciconfig`
+   reporting "no such device"). Fixed by adding it to setup.sh.
+2. An inert `#dtoverlay=disable-bt` line found in this device's own
+   config.txt (leftover from the earlier GPS/UART investigation) --
+   not actually the blocker here since it was already commented out,
+   but added a real, permanent check+fix to setup.sh for it anyway
+   since an ACTIVE version would be invisible to every package-level
+   check and silently break this plugin.
+3. `BleakBluetoothNotAvailableError: No powered Bluetooth adapters
+   found (POWERED_OFF)` -- bluetoothd reachable now, but BlueZ's own
+   adapter power state off. Tried `bluetoothctl power on` by hand --
+   failed with generic `org.bluez.Error.Failed`.
+4. Real diagnostics (`rfkill list bluetooth`, `hciconfig -a`,
+   `journalctl -u bluetooth`) requested and returned actual evidence
+   rather than guessing further: `Soft blocked: yes`, and bluetoothd's
+   own journal showing `Failed to set mode: Failed (0x03)` at the
+   exact moments `power on` was attempted -- direct proof rfkill was
+   the real, sole blocker (hci0 itself was fine: real BD address,
+   correctly UART-attached, meaning pi-bluetooth's own wiring had
+   worked correctly all along).
+5. Root cause: setup.sh's `rfkill unblock` line existed but had never
+   actually been *executed* on this device yet -- the user tested
+   `bluetoothctl power on` by hand rather than re-running the updated
+   setup.sh a second time, so the unblock step genuinely never ran.
+   Not a bug in the unblock logic itself, just hadn't been exercised.
+6. Re-ran the real `meshpoint plugin setup bluetooth-scanner` --
+   rfkill correctly unblocked (`Soft blocked: no` confirmed after),
+   but hit one more harmless race: `org.bluez.Error.Busy` on the
+   power-on step, immediately after the unblock -- BlueZ auto-powers
+   an adapter itself right after noticing an rfkill state change, and
+   the script's own explicit `bluetoothctl power on` landed at the
+   same moment and collided. Added a 2s `sleep` between the unblock
+   and the explicit power-on to avoid the race producing a confusing
+   (if harmless) error message for the next person.
+7. **Confirmed fully working**: Start scan on the real dashboard found
+   31 real nearby BLE devices.
+
+User is now testing the complete setup.sh flow on a genuinely fresh
+node to confirm the whole chain (bluez -> pi-bluetooth -> reboot ->
+config.txt check -> rfkill unblock -> power on -> bleak) works
+end-to-end without needing any of this manual back-and-forth again.
