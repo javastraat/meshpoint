@@ -14488,3 +14488,33 @@ ticket-ready summary of steps 3/4/5/6 above for the user to send).
 Genuinely open item: whether GreenPalm's support can identify the real
 enable mechanism, or whether this board simply doesn't support active
 antenna sensing as shipped.
+
+**P100's `/boot/firmware/config.txt` still carries an inert leftover
+from that same GPS investigation, worth knowing about if it ever
+surfaces again:**
+```
+# Meshpoint: free primary UART for GPS
+#dtoverlay=disable-bt
+```
+Commented out (the `#` before `dtoverlay`), so currently a no-op --
+consistent with the earlier finding that this Pi4-class board's
+`serial0 -> ttyAMA0` mapping already gives GPS the full UART without
+needing Bluetooth disabled at all. Flagging this explicitly because
+it's a live landmine: if anyone (me or the user) later "cleans up"
+that GPS work by uncommenting this line, it would disable the onboard
+Bluetooth adapter entirely and break the bluetooth-scanner community
+plugin (meshpoint-plugins repo) that got built on this same device
+afterward. Leave it commented out.
+
+Also worth noting for calibrating confidence going forward: the user
+corrected an over-confident claim I made while writing that plugin's
+`setup.sh` -- I'd asserted installing `pi-bluetooth` specifically
+requires a reboot before `hci0` exists (citing `hciuart.service`
+binding at boot as the mechanism), based on the user's own real shell
+history showing a working install-then-reboot sequence. But that same
+history's reboot ALSO happened to pick up this exact config.txt edit
+around the same time -- a genuine confound I didn't account for, so
+the causal claim wasn't actually isolated/verified. Softened the
+script's comments and the plugin's README to recommend the reboot
+(safe, low-cost, matches the one real tested sequence) without
+asserting the specific unverified mechanism as fact.
