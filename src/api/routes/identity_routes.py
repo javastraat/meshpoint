@@ -49,6 +49,7 @@ _ADMIN_SECTIONS: tuple[str, ...] = (
     "terminal",
     "configuration.identity",
     "configuration.radio",
+    "configuration.concentrator",
     "configuration.channels",
     "configuration.meshcore",
     "configuration.serial",

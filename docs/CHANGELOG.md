@@ -269,7 +269,14 @@
   `<section>`/skeleton and sidebar `<li>`, registered in `app.js`'s
   `allowedRoutes` and command palette). `radio_advanced_card.js`/
   `radio_pager_card.js`'s own header comments updated to describe their
-  new home.
+  new home. **Fixed a real bug caught live**: the new route was denied
+  with "Admin access required" even for an actual admin session --
+  `src/api/routes/identity_routes.py`'s `_ADMIN_SECTIONS` is a hardcoded
+  allowlist every `configuration.*` route needs a matching entry in
+  (feeds `available_sections` on the session identity, which
+  `app.js`'s client-side route guard checks); `"configuration.
+  concentrator"` was never added when the route was, so even an admin's
+  own `available_sections` didn't include it. Added the missing entry.
 
 #### Plugins
 

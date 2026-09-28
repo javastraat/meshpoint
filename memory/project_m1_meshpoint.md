@@ -16854,3 +16854,53 @@ sections, clean) after replacing the earlier (now-wrong) changelog
 bullet outright rather than layering a correction on top of an
 inaccurate description. Not yet live-confirmed on the Pi.
 
+**Real bug found live, same session, right after the Concentrator
+split shipped: "it says admin req but i am admin."** Terse report, no
+screenshot -- had to actually trace it rather than assume a Pi-sync lag
+again (the default suspicion most of this session, and right most of
+the time, but not this time). Checked both moved cards
+(`radio_advanced_card.js`/`radio_pager_card.js`) and
+`configuration_panel.js` first -- neither references "admin" at all,
+ruling out a card-level check. Found the real mechanism in
+`frontend/js/app.js`: `_buildRouteGuard(identity)` computes
+`requiredSection('configuration/concentrator')` ->
+`"configuration.concentrator"`, checks it against
+`identity.available_sections` (from `GET /api/identity`), and calls
+`onDenied: _toastAdminRequired()` -- "Admin access required — the
+viewer role is read-only" -- on a miss, *regardless of the caller's
+actual role*, since the check is purely "is this literal string present
+in the list," not "what role am I." Root cause:
+`src/api/routes/identity_routes.py`'s `_ADMIN_SECTIONS` is a hardcoded
+tuple every `configuration.*` route needs its own literal entry in
+(`_sections_for(role)` returns `_ADMIN_SECTIONS + plugin sections` for
+admin) -- added the NEW frontend route (`configuration/concentrator`)
+to the sidebar/router/mount-branch in the prior fix, but never added a
+matching `"configuration.concentrator"` string here, so even a genuine
+admin session's own `available_sections` never included it. One-line
+fix: added `"configuration.concentrator"` right after
+`"configuration.radio"` in the tuple. Checked
+`tests/test_identity_route.py` before considering it safe -- its
+existing assertions are all `assertIn`/`assertNotIn` on specific
+strings, not length/equality checks against the whole tuple, so a new
+entry can't break any of them; couldn't actually run the suite locally
+(`ModuleNotFoundError: fastapi`, same standing Mac limitation).
+
+**Lesson worth generalizing**: this session's default hypothesis for
+"looks broken but code looks right" has correctly been "Pi hasn't
+synced yet" every time so far -- but this is the one time it wasn't
+that. The actual tell that it was a real bug: the SPECIFIC route just
+invented this session (`configuration/concentrator`) failing while
+every pre-existing route works fine points at something route-specific
+just added, not a generic staleness/caching issue -- worth checking
+for a missing-registration bug in exactly this shape (a route added on
+the frontend with a corresponding backend allowlist/registration
+forgotten) before reflexively asking about sync status again.
+
+Verified: `python3 -c "import ast; ast.parse(...)"` on
+`identity_routes.py` (clean), `grep` confirming the new tuple entry
+landed exactly once in the right position,
+`ChangelogParser.parse_file()` re-parse (31 sections, clean) after
+folding this into the same still-uncommitted Concentrator-split bullet.
+Not yet live-confirmed on the Pi -- this is the fix Einstein's next
+sync/restart should actually resolve.
+
