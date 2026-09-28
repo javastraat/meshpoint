@@ -16501,3 +16501,6 @@ as the natural next targets for this same consistency pass rather than
 done unprompted, matching this session's established "one page at a
 time, confirm before moving on" rhythm even though the *goal* is now
 explicitly stated as "make everything consistent."
+
+last commit had wrong description
+
