@@ -139,6 +139,55 @@ class TestEnsureCert(unittest.TestCase):
         cert = x509.load_pem_x509_certificate(self.cert_path.read_bytes())
         self.assertIsNotNone(cert)
 
+    def test_subject_name_fields(self) -> None:
+        with self._fixed_sans(["127.0.0.1"], ["localhost"]):
+            tls_cert.ensure_cert(str(self.cert_path), str(self.key_path))
+        cert = x509.load_pem_x509_certificate(self.cert_path.read_bytes())
+        attrs = {a.oid: a.value for a in cert.subject}
+        from cryptography.x509.oid import NameOID
+        self.assertEqual(attrs[NameOID.COMMON_NAME], "meshpoint")
+        self.assertEqual(attrs[NameOID.ORGANIZATION_NAME], "Meshpoint")
+        self.assertEqual(attrs[NameOID.LOCALITY_NAME], "Earth")
+        self.assertEqual(
+            attrs[NameOID.ORGANIZATIONAL_UNIT_NAME],
+            "https://github.com/KMX415/meshpoint",
+        )
+        # Self-signed: issuer must equal subject.
+        self.assertEqual(cert.issuer, cert.subject)
+
+
+class TestRegenerate(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.cert_path = Path(self.tmp.name) / "tls" / "cert.pem"
+        self.key_path = Path(self.tmp.name) / "tls" / "key.pem"
+
+    def tearDown(self) -> None:
+        self.tmp.cleanup()
+
+    def test_generates_when_nothing_exists(self) -> None:
+        ips, dns_names = tls_cert.regenerate(str(self.cert_path), str(self.key_path))
+        self.assertTrue(self.cert_path.is_file())
+        self.assertTrue(self.key_path.is_file())
+        self.assertIn("127.0.0.1", ips)
+        self.assertIn("localhost", dns_names)
+
+    def test_forces_a_new_cert_even_when_addresses_are_unchanged(self) -> None:
+        # Unlike ensure_cert(), this must not skip regeneration just
+        # because the SAN list would come out the same -- the whole
+        # point is forcing a fresh cert on demand (e.g. to pick up a
+        # subject-name-only change ensure_cert()'s SAN diff would never
+        # notice on its own).
+        fixed_sans = mock.patch.object(
+            tls_cert, "collect_san_entries", return_value=(["127.0.0.1"], ["localhost"]),
+        )
+        with fixed_sans:
+            tls_cert.regenerate(str(self.cert_path), str(self.key_path))
+            first_key_bytes = self.key_path.read_bytes()
+            tls_cert.regenerate(str(self.cert_path), str(self.key_path))
+            second_key_bytes = self.key_path.read_bytes()
+        self.assertNotEqual(first_key_bytes, second_key_bytes)
+
 
 if __name__ == "__main__":
     unittest.main()

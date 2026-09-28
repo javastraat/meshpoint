@@ -4,6 +4,16 @@
 
 #### Dashboard
 
+- **The self-signed HTTPS cert now has Organization, Locality, and
+  Organizational Unit set** (`O=Meshpoint`, `L=Earth`,
+  `OU=https://github.com/KMX415/meshpoint` -- credit to the upstream
+  project) alongside the existing `CN=meshpoint` -- purely cosmetic, no
+  effect on browser trust (still self-signed, still shows the expected
+  warning). New `meshpoint tls-regenerate` CLI command
+  force-regenerates the cert/key on demand, restart to apply -- useful
+  for picking up this kind of subject-name-only change, since the
+  automatic startup check only diffs the SAN address list, not the
+  subject name.
 - **Local map tiles.** OSM raster with a dark invert filter, replacing
   CARTO Dark Matter after anonymous CARTO raster requests started
   returning an API-key watermark.

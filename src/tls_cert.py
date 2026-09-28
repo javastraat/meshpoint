@@ -118,7 +118,20 @@ def _generate(
     cert_path: Path, key_path: Path, ips: list[str], dns_names: list[str],
 ) -> None:
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "meshpoint")])
+    name = x509.Name([
+        x509.NameAttribute(NameOID.COMMON_NAME, "meshpoint"),
+        x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Meshpoint"),
+        # There's no real answer for a LAN device's locality -- it's
+        # wherever the box physically is, which this code has no way to
+        # know. Rather than guess or leave it blank, own the honesty of
+        # that with the one locality that's always technically correct.
+        x509.NameAttribute(NameOID.LOCALITY_NAME, "Earth"),
+        # Credit to the original upstream project this fork is built on --
+        # OU has no real semantic fit for a URL, but it's free text and
+        # visible on a cert viewer's General tab without digging into
+        # a Details/SAN view.
+        x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, "https://github.com/KMX415/meshpoint"),
+    ])
     now = datetime.datetime.now(datetime.timezone.utc)
     cert = (
         x509.CertificateBuilder()
@@ -170,3 +183,17 @@ def ensure_cert(cert_path_str: str, key_path_str: str) -> None:
             return  # already covers everything we're reachable at
 
     _generate(cert_path, key_path, wanted_ips, wanted_dns)
+
+
+def regenerate(cert_path_str: str, key_path_str: str) -> tuple[list[str], list[str]]:
+    """Force a fresh cert unconditionally -- unlike :func:`ensure_cert`,
+    doesn't compare against what's already on disk first. For
+    ``meshpoint tls-regenerate``: picking up a subject-name field change
+    (e.g. Organization) that a SAN-only diff would never notice on its
+    own, or just letting an operator force a clean cert without deleting
+    files by hand. Returns the (ips, dns_names) baked into the new cert.
+    A running service still needs a restart to pick it up -- this only
+    writes the files."""
+    ips, dns_names = collect_san_entries()
+    _generate(Path(cert_path_str), Path(key_path_str), ips, dns_names)
+    return ips, dns_names

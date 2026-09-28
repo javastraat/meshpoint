@@ -66,6 +66,17 @@ def cmd_version(_args: argparse.Namespace) -> None:
     print(f"  Meshpoint v{VERSION}")
 
 
+def cmd_tls_regenerate(_args: argparse.Namespace) -> None:
+    from src.config import load_config
+    from src.tls_cert import regenerate
+
+    dashboard = load_config().dashboard
+    ips, dns_names = regenerate(dashboard.tls_cert_path, dashboard.tls_key_path)
+    print(f"  Regenerated {dashboard.tls_cert_path}")
+    print(f"  SANs: {', '.join([*ips, *dns_names])}")
+    print("  Restart to apply: meshpoint restart")
+
+
 def cmd_plugin(args: argparse.Namespace) -> None:
     from src.cli.plugin_command import (
         run_plugin_check,
@@ -122,6 +133,12 @@ def main() -> None:
 
     sub.add_parser("version", help="Print version information")
 
+    sub.add_parser(
+        "tls-regenerate",
+        help="Force-regenerate the dashboard's self-signed HTTPS cert "
+             "(picks up address/subject-name changes; restart to apply)",
+    )
+
     plugin_parser = sub.add_parser(
         "plugin", help="Manage app plugins (list, check deps, install deps)",
     )
@@ -174,6 +191,7 @@ def main() -> None:
         "meshcore-radio": cmd_meshcore_radio,
         "reset-password": cmd_reset_password,
         "version": cmd_version,
+        "tls-regenerate": cmd_tls_regenerate,
         "plugin": cmd_plugin,
     }
 

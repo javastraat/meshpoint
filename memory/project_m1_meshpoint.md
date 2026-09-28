@@ -15298,3 +15298,114 @@ safer-process option first) and a CHANGELOG bullet under a new
 `#### Hardware` subsection (none of the existing Unreleased
 subsections -- Dashboard/Plugins/Docs -- fit a hardware diagnostic
 script).
+
+**Firefox-redirect-loop investigation + a small feature: cert
+Organization/Locality fields + meshpoint tls-regenerate.** Einstein
+had TLS enabled on one node, disabled it, and Firefox kept redirecting
+to :8443 on its own (another browser worked fine on :8080 the whole
+time). Investigated `src/serve.py` before answering: confirmed the
+plain-HTTP redirect-to-HTTPS listener is fully gated behind
+`dashboard.tls_enabled` (returns `None` from `_tls_files()` immediately
+when off, `main()` then runs plain HTTP only, no redirect app at all)
+-- and confirmed Meshpoint never sends a `Strict-Transport-Security`
+header anywhere (grepped for it, zero hits), ruling out HSTS as the
+mechanism. Combined with "works in another browser" this pointed
+cleanly at Firefox caching the old `308` "permanent redirect" response
+client-side, independent of the server. Diagnosis confirmed correct by
+Einstein ("its my browser").
+
+Gave the standard Firefox fix (`about:preferences#privacy` -> Clear
+Data -> Cached Web Content -> full restart) -- first attempt at the
+address bar. Einstein tried `chrome://preferences/#privacy` instead
+(Chrome's scheme, not Firefox's `about:`) and got a not-found error --
+simple correction, not a real bug on either side.
+
+Along the way Einstein noticed the self-signed cert's Organization/OU
+showed `<Not Part Of Certificate>` in Firefox's cert viewer and asked
+if more fields could be added, plus wanted an easy way to force a
+regenerate. Read `src/tls_cert.py` fully before answering: confirmed
+the SAN-handling (every reachable IP/hostname, auto-regenerated on
+drift) is already solid -- what's actually threadbare is the *subject
+name*, which only ever set `CN=meshpoint`, nothing else. Also
+important: found `ensure_cert()`'s regen check only diffs the SAN list
+against what's on disk, never the subject-name fields -- so a
+subject-name-only code change (like adding Organization) would never
+retroactively apply to an already-generated cert, only new ones. Said
+this plainly before implementing, since it directly answered "how do
+I actually see this take effect."
+
+Also checked before proposing a UI button: `dashboard.tls_enabled`
+has NO API route or frontend surface at all right now (grepped
+src/api/routes/*.py and frontend/ -- zero hits beyond config.py/
+serve.py/tls_cert.py themselves) -- it's a hand-edit-local.yaml-and-
+restart-only setting, no Settings page exists to extend. Given that,
+a CLI command matching the existing `meshpoint plugin setup`/
+`reset-password` pattern (`src/cli/main.py`) was the right-sized
+answer, not building a whole new settings page for one button.
+
+Implemented: `O=Meshpoint` added to the cert subject
+(`src/tls_cert.py`) -- Einstein confirmed wanting Organization, then
+separately, playfully, proposed `L=Earth` for Locality mid-conversation
+("locality = Earth?:)") since there's no real answer for a LAN
+device's physical locality -- added it verbatim, framed in the code
+comment as owning that honestly rather than guessing or leaving it
+blank, matching the light tone of the ask while still being a
+genuinely defensible technical justification (X.509 Locality is
+free-text, no validation requires it map to a real place). Added a new
+public `regenerate()` function to `tls_cert.py` (unconditional --
+unlike `ensure_cert()`, doesn't skip based on the SAN diff, since the
+whole point is forcing a fresh cert on demand) and wired
+`meshpoint tls-regenerate` into the CLI dispatcher, printing the new
+SAN list plus a "restart to apply" reminder (matches the pattern of
+every other cert-affecting change in this codebase needing a restart --
+did not auto-restart the service, consistent with how `plugin setup`
+also stops short of auto-restarting and leaves that as an explicit
+separate step).
+
+Verified thoroughly on the Mac since this code has zero Pi/hardware
+dependency (pure `cryptography` + argparse, unlike almost everything
+else this session): ran `regenerate()` directly against a tempdir and
+confirmed all three subject fields present via a real
+`x509.load_pem_x509_certificate` read; ran the actual CLI command for
+real (`python3.11 -m src.cli.main tls-regenerate`) end-to-end against
+the repo's real (gitignored) `data/tls/` path and confirmed the
+printed output, then cleaned up the generated files and confirmed
+`git status` showed nothing (data/ is gitignored, so this was safe to
+actually execute for real rather than only unit-test). Added real test
+coverage: a subject-name-fields test in the existing `TestEnsureCert`
+class, plus a new `TestRegenerate` class (generates-from-nothing, and
+the "forces a new cert even when addresses are unchanged" case that
+specifically guards the property that made this function worth adding
+in the first place -- `ensure_cert()` would have no-op'd on unchanged
+SANs, `regenerate()` must not). 15/15 pass.
+
+Docs: extended the existing `tls_enabled` section in
+`docs/CONFIGURATION.md` with the new subject-name fields, the
+`tls-regenerate` command, and -- since it was fresh from actually
+debugging it this conversation -- a dedicated troubleshooting note for
+the exact Firefox-cached-redirect symptom Einstein just hit, so the
+next person (or future Einstein) hitting this doesn't have to
+re-derive the HSTS-vs-cached-redirect distinction from scratch.
+CHANGELOG bullet under the existing `#### Dashboard` subsection.
+
+**Follow-up in the same TLS-cert thread: added OU with a credit link
+to upstream.** Asked Einstein directly which of two real options they
+wanted before implementing anything (a SAN URI entry -- the technically
+correct X.509 place for a URL, shows under Details -- vs. stuffing it
+into Organizational Unit as free text -- not semantically a URL field,
+but visible right on the General tab without digging into Details).
+Einstein picked OU, and specifically wanted it pointed at KMX415's
+upstream repo (`https://github.com/KMX415/meshpoint`) rather than this
+fork's own -- matches the project's own existing convention of
+crediting upstream explicitly (README's own "customized fork of
+upstream KMX415/meshpoint" framing, `docs/WHATS-DIFFERENT.md`'s
+opening line). Added `NameOID.ORGANIZATIONAL_UNIT_NAME` to the same
+subject-name list as the Organization/Locality fields from the
+previous turn, updated the existing `test_subject_name_fields` test to
+assert it too (15/15 still pass), updated the CONFIGURATION.md subject
+line and CHANGELOG bullet from the same conversation to mention all
+three fields together rather than leaving them split across two
+separate half-accurate entries. Re-verified end-to-end the same way as
+before -- direct `regenerate()` call against a tempdir confirming the
+real parsed cert, plus a real `meshpoint tls-regenerate` CLI run
+against the repo's own gitignored `data/tls/`, cleaned up after.
