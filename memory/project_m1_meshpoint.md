@@ -16219,3 +16219,104 @@ Offline Maps, Hello World Github, vs. the newer shared "list page"
 style). Asked Einstein whether to scope a full pass (`EnterPlanMode`)
 or start with just OLED as a smaller trial -- not yet answered as of
 this entry, don't assume which direction before checking back.
+
+**Real theme bug found doing the "one by one" page review Einstein
+asked for, same session (2026-09-28) -- Reticulum Browser (pass),
+Settings/System (real bug, root-caused and fixed).** Einstein wanted
+to go through the still-flagged pages individually rather than a big
+batch. Reticulum Browser: read the full 626-line JS + 187-line CSS --
+already uses `.lw-panel__head`, `.cfg-field__input`, `.terminal-button`,
+`.lw-empty` throughout, no reinvented styling, its custom `.rb-bar`/
+`.rb-tabstrip` toolbar has no existing shared equivalent to reuse
+anyway (no other page has an address-bar+tabs UI). Verdict: pass, no
+change.
+
+Settings/System (`data-section="settings/dangerous"`, sidebar label
+"System"): Einstein sent a screenshot showing a plain white background,
+black text, and unstyled-looking native radio/checkbox controls --
+strikingly different from every other page screenshotted this session
+(all dark theme). First hypothesis: this was simply the Light theme
+being actively selected (confirmed real and well-built by reading
+`frontend/themes/light/theme.css` -- a whole "first light-polarity
+theme" tokenization pass, not a stub), and asked Einstein to confirm by
+switching back to Dark and re-checking, rather than assuming a page bug
+from one screenshot.
+
+Einstein came back with three more screenshots that settled it
+properly: LoRaWAN (light theme) and a Configuration/MeshCore subtab
+(light theme) both rendered correctly -- proper cards, proper button
+styling, confirming the theme SYSTEM itself works. Then "and here in
+dark, settings is different" with System AND an Updates screenshot,
+both in Dark theme -- System showed the *exact same* symptom in Dark
+too (floating "Backup and restore"/"Landing page" headings with no
+visible card boundary around them, while the "TEMPERATURE"/"DISTANCE"
+fieldsets nested inside them DID show a visible border), while Updates
+(different container class) rendered with clearly visible bordered
+boxes in the same screenshot. Since the symptom persisted in BOTH
+themes, that ruled out "just a missed light-theme conversion" and
+pointed at something more basic: a scoping bug, not a color bug. Then
+"also themes page is different" with a Themes screenshot showing the
+identical floating-heading-no-card-boundary pattern on "Default theme"/
+"Theme builder".
+
+**Root cause, confirmed by reading `frontend/css/settings.css` and
+`frontend/index.html` together**: `.auth-card`'s background/border/
+radius, and every `.auth-status`/`.auth-form` input's colors
+(`--auth-card-bg`, `--auth-card-border`, `--auth-card-radius`,
+`--auth-input-bg`, `--auth-input-border`, `--auth-accent`,
+`--auth-danger`, `--auth-success`) were CSS custom properties defined
+*only* inside `.auth-panel`'s own rule (settings.css:6-19, pre-fix).
+`.auth-card` is reused by four different pages' markup
+(`grep 'class="auth-card'` across index.html), but only ONE of their
+root containers actually carries the `.auth-panel` class:
+`#settings-auth-panel` (Settings → Auth). The other three --
+`#settings-themes-panel` (`.theme-editor`), `#settings-dangerous-panel`
+(`.dangerous-panel`, "System"), `#settings-plugins-panel`
+(`.plugins-panel`) -- use `.auth-card` without ever being `.auth-panel`
+themselves, so every one of those custom properties was simply
+undefined in their scope, in every theme -- not a color/theme problem
+at all, a class-scoping one. (Plugins wasn't screenshotted this round
+but has the identical shape -- two `<article class="auth-card">` uses,
+same missing ancestor -- fixed proactively rather than waiting for a
+fourth screenshot to prove it.)
+
+**Fix, `frontend/css/settings.css`**: hoisted the whole `--auth-*`
+token block from `.auth-panel`'s scope to `:root`, so `.auth-card`
+(and anything reading these tokens) works correctly regardless of
+which page/container it's nested in -- rather than the alternative of
+adding `.auth-panel` as a second class to the other three containers,
+which risked double-applying `.auth-panel`'s OWN `padding`/`height`/
+`overflow-y` rules on top of each page's already-correct equivalent
+(`.theme-editor`/`.dangerous-panel`/`.plugins-panel` each already set
+these themselves) -- exactly the double-padding bug class from earlier
+in this same session, avoided here by only hoisting the *token*
+declarations, not the whole class. While auditing the values: found
+`--auth-card-bg`/`--auth-card-border` were EXACT numeric duplicates of
+`--overlay-weak`/`--hairline` (dashboard.css) in dark mode (both
+`rgba(255,255,255,0.04)`/`rgba(255,255,255,0.08)`) -- meaning even
+after fixing the scoping bug, these would've *still* been wrong in
+Light theme specifically, since `--overlay-weak`/`--hairline` DO have a
+proper light-theme override (`frontend/themes/light/theme.css:45,48`)
+that `--auth-card-bg`/`--auth-card-border` never received of their own.
+Aliased `--auth-card-bg`→`var(--overlay-weak)`,
+`--auth-card-border`→`var(--hairline)` (and the input-background pair
+the same way, since `.cfg-field__input` -- configuration.css -- already
+uses that exact same pair, confirming it's the established convention)
+instead of writing a redundant light-theme override from scratch. Left
+`--auth-danger`/`--auth-success` as their own bespoke hex
+(`#ff6b6b`/`#44d39a`) rather than aliasing to `--accent-red`/
+`--accent-green` -- checked, they're close but NOT identical shades
+(`#ef4444`/`#00e5a0` dark-theme), a deliberate distinct choice for this
+UI, not a stray duplicate worth collapsing; they already read fine
+unthemed on either background so didn't need the alias treatment the
+card/input pair needed.
+
+Verified: CSS brace-balance on `settings.css` (293/293),
+`ChangelogParser.parse_file()` re-parse (31 sections, clean). Not
+visually re-confirmed against a live browser -- same standing caveat as
+every layout fix this session -- but this one is unusually high-
+confidence since the root cause (undefined custom property, confirmed
+by literally grepping every `.auth-card`-using container's class list
+against every place `.auth-panel` is actually declared) isn't a guess
+from a screenshot, it's a structural fact about the markup/CSS that
+doesn't depend on rendering to be true.

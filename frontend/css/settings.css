@@ -3,15 +3,38 @@
    the section's cards. Card behaviour (forms, validation) lives in
    the matching JS controllers under frontend/js/settings/. */
 
-.auth-panel {
-    --auth-card-bg: rgba(255, 255, 255, 0.04);
-    --auth-card-border: rgba(255, 255, 255, 0.08);
+/* These `--auth-*` tokens used to live scoped to `.auth-panel` alone --
+   fine as long as `.auth-card`/`.auth-status`/`.auth-form` only ever
+   appeared inside an element with that exact class. They don't: Themes
+   (`.theme-editor`), System (`.dangerous-panel`), and Plugins
+   (`.plugins-panel`) all reuse `.auth-card` for their own sections
+   without also being `.auth-panel` -- so every card on those three
+   pages rendered with an undefined background/border (confirmed live,
+   both themes: the card text/fieldsets showed, but the card's own
+   boundary was invisible). Hoisted to `:root` so any page can use
+   `.auth-card`/`.auth-status`/etc. correctly regardless of its own
+   container class -- `--auth-card-bg`/`--auth-card-border`/
+   `--auth-input-bg`/`--auth-input-border` are aliased to the already
+   properly light-themed `--overlay-weak`/`--hairline` (dashboard.css)
+   rather than kept as their own separate copies, since their dark
+   values were already numerically identical to those tokens'; this
+   also gives them the light-theme override they were never given
+   directly. `--auth-danger`/`--auth-success` keep their own bespoke
+   hex (deliberately not `--accent-red`/`--accent-green` -- close but
+   not the same shade, a real distinct choice for this UI, not a stray
+   duplicate) since they read fine unthemed on either background. */
+:root {
+    --auth-card-bg: var(--overlay-weak);
+    --auth-card-border: var(--hairline);
     --auth-card-radius: 14px;
-    --auth-input-bg: rgba(255, 255, 255, 0.05);
-    --auth-input-border: rgba(255, 255, 255, 0.1);
+    --auth-input-bg: var(--overlay-weak);
+    --auth-input-border: var(--hairline);
     --auth-accent: var(--brand-amber);
     --auth-danger: #ff6b6b;
     --auth-success: #44d39a;
+}
+
+.auth-panel {
     color: var(--text-primary);
     padding: 24px clamp(16px, 3vw, 32px);
     overflow-y: auto;

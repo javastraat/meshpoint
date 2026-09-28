@@ -105,6 +105,34 @@
   -- different page types (dense overview vs. list-with-table vs.
   form-heavy settings) reading with different visual weight is
   intentional, not an inconsistency to stamp out.
+- **Fix: card boundaries were invisible on Settings → Themes, Settings →
+  System, and Settings → Plugins, in both Light and Dark theme.** Every
+  card on those three pages (`<article class="auth-card">` -- "Default
+  theme," "Display units," "Backup and restore," the plugin browse/
+  source cards, ...) showed its title/text/fieldsets fine but had no
+  visible background or border around itself, confirmed live in both
+  themes from screenshots. Root cause: `.auth-card`'s background/border/
+  radius, plus every `.auth-status`/`.auth-form` input's colors, were
+  CSS custom properties (`--auth-card-bg`, `--auth-card-border`, ...)
+  defined only on `.auth-panel` -- correct for Settings → Auth, which
+  carries that class, but `.auth-card` is also reused by Settings →
+  Themes (`.theme-editor`), Settings → System (`.dangerous-panel`), and
+  Settings → Plugins (`.plugins-panel`), none of which are `.auth-panel`
+  too -- so every one of those tokens was simply undefined there, in
+  every theme, not a light/dark-specific gap. Hoisted the whole token
+  set to `:root` (`frontend/css/settings.css`) so any page can use
+  `.auth-card`/`.auth-status`/etc. correctly regardless of its own
+  container class. While there, `--auth-card-bg`/`--auth-card-border`/
+  `--auth-input-bg`/`--auth-input-border` turned out to be exact
+  numeric duplicates of the already-theme-aware `--overlay-weak`/
+  `--hairline` (dashboard.css) in dark mode, just never given a light-
+  theme override of their own -- aliased them to those tokens instead
+  of keeping separate copies, which also fixes what would otherwise
+  have been a second, light-theme-only near-invisible-card bug on top
+  of the scoping one. `--auth-danger`/`--auth-success` kept their own
+  distinct hex values (not aliased to `--accent-red`/`--accent-green`
+  -- a deliberately different, close-but-not-identical shade for this
+  UI) since they already read correctly unthemed on either background.
 
 #### Plugins
 
