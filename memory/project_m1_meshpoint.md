@@ -15067,3 +15067,53 @@ separately from the plugin move since Einstein may want them as
 distinct commits (the CI fix is arguably a bugfix on top of the
 already-committed RTL-SDR/dapnet moves, not part of the new reticulum
 work).
+
+**Real UI bug found by Einstein actually looking at the live Pi
+dashboard, not by more code reading -- fixed same session.** Einstein
+screenshotted Settings -> Plugins -> catalog on the real deployed
+device (cotx-meshpoint.local) after the reticulum-family moves and
+noticed reticulum-call showed correctly nested under reticulum
+("Hooks into: reticulum") but reticulum-browser and
+reticulum-dashboard rendered as flat, unindented standalone rows with
+no dependency hint at all, despite both declaring
+`requires = "reticulum"`.
+
+Root cause, confirmed by reading the actual code rather than
+guessing: `repo.json` already carries `requires` correctly for both
+(confirmed via direct `python3 -c "json.load(...)"` inspection) --
+`make-repo-json.py`'s own comment even says the field was added
+"so a browse catalog can show 'requires: X' before install." But
+`frontend/js/settings/plugins_panel_controller.js`'s
+`_orderCatalogApps()` (nesting/indentation) and `_catalogRowHtml()`
+(the dependency note) only ever checked `p.hook_host` -- never
+`p.requires` -- so a `requires`-only plugin with no `[hook]` silently
+got neither treatment. Confirmed this was catalog-browse-only, not a
+backend/data gap: the INSTALLED-plugins list (`_groupedPlugins()`)
+already nests both relationship types correctly, because its backend
+endpoint (`_dependency_target()` in `plugin_routes.py`) resolves
+`[hook].host` and plain `requires` into one unified `dependency`
+field -- only the pre-install browse view's frontend never got wired
+up to the `requires` half of that same intent.
+
+This had simply never been visible before: `reticulum-call` was the
+only `requires`/`[hook]`-bearing catalog plugin that existed until
+this session's reticulum-family moves added the first `requires`-only
+(no `[hook]`) ones. Not something any of today's moves broke -- a
+latent gap in core's frontend that this session's new catalog content
+was the first thing to actually exercise.
+
+Fix: both functions now compute `p.hook_host || p.requires` as the
+dependency host, so a `requires`-only plugin nests under its host the
+same way a hook does; the row note shows "Requires: `<id>`" to
+visually distinguish it from "Hooks into: `<id>`" (a hook literally
+injects into the host's page; `requires` just needs it enabled).
+Verified the exact logic with a standalone `node -e` simulation using
+the real reticulum/reticulum-call/reticulum-browser/
+reticulum-dashboard/bluetooth-scanner shapes (reticulum groups with
+all three nested/dependent, bluetooth-scanner stays standalone) rather
+than trusting the diff alone -- no JS test suite exists for this file
+to run instead, and the Mac's fastapi/aiosqlite gap rules out spinning
+up the real dashboard here per the established testing convention;
+Einstein will see it live on the next deploy. CHANGELOG bullet added
+under the same `#### Plugins` subsection, `node --check` confirmed
+syntax.

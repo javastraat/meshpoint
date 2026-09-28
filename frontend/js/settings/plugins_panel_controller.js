@@ -451,19 +451,24 @@ class PluginsPanelController {
         catEl.innerHTML = headerHtml + appsHtml + themesHtml;
     }
 
-    /** Reorders a catalog's ``plugins`` array so a "hook" app whose
-     * [hook].host is another app IN THIS SAME CATALOG sits right after that
+    /** Reorders a catalog's ``plugins`` array so an app that declares a
+     * dependency on another app IN THIS SAME CATALOG -- either a "hook"'s
+     * [hook].host, or a plain top-level `requires` -- sits right after that
      * host, marked for indentation -- same "belongs to" grouping the
-     * installed-plugins list already does (see _groupedPlugins()). A hook
-     * whose host isn't in this catalog (built into core, or a different
-     * source) just renders standalone -- there's nothing to nest it under. */
+     * installed-plugins list already does (see _groupedPlugins(), which
+     * resolves both the same way via the backend's `dependency` field). A
+     * dependency whose host isn't in this catalog (built into core, or a
+     * different source) just renders standalone -- there's nothing to nest
+     * it under. */
     _orderCatalogApps(apps) {
         const byId = new Set(apps.map((p) => p.id));
+        const depHostOf = (p) => p.hook_host || p.requires || null;
         const childrenOf = new Map();
         apps.forEach((p) => {
-            if (p.hook_host && p.hook_host !== p.id && byId.has(p.hook_host)) {
-                if (!childrenOf.has(p.hook_host)) childrenOf.set(p.hook_host, []);
-                childrenOf.get(p.hook_host).push(p);
+            const host = depHostOf(p);
+            if (host && host !== p.id && byId.has(host)) {
+                if (!childrenOf.has(host)) childrenOf.set(host, []);
+                childrenOf.get(host).push(p);
             }
         });
         const nested = new Set([...childrenOf.values()].flat().map((p) => p.id));
@@ -509,7 +514,9 @@ class PluginsPanelController {
         const setupNote = p.has_setup
             ? '<p class="plugin-row__deps">⚙ Runs a setup script after install</p>' : '';
         const hookNote = p.hook_host
-            ? `<p class="plugin-row__dep">Hooks into: <code>${this._escape(p.hook_host)}</code></p>` : '';
+            ? `<p class="plugin-row__dep">Hooks into: <code>${this._escape(p.hook_host)}</code></p>`
+            : p.requires
+                ? `<p class="plugin-row__dep">Requires: <code>${this._escape(p.requires)}</code></p>` : '';
         const rowClass = dependent ? ' class="plugin-row--dependent"' : (grouped ? ' class="plugin-row--host"' : '');
         return `<tr${rowClass}>
             <td><span class="plugin-row__name">${this._escape(p.id)}</span>

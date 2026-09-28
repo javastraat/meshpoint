@@ -26,6 +26,20 @@
 
 #### Plugins
 
+- **Fix: a plugin source's browse catalog never showed a plain `requires`
+  dependency, only a `[hook]` one.** `reticulum-browser` and
+  `reticulum-dashboard` (both `requires = "reticulum"`, no `[hook]`)
+  rendered as ordinary standalone rows with no indication they need
+  Reticulum installed first -- `make-repo-json.py` already put
+  `requires` in `repo.json` for exactly this (its own comment says so),
+  but `plugins_panel_controller.js`'s catalog rendering only ever
+  checked `hook_host`. Once installed they already nested correctly in
+  the installed-plugins list (that view resolves both the same way via
+  the backend's `dependency` field) -- this was a browse-catalog-only
+  display gap. `_orderCatalogApps()` and the row's dependency note now
+  check `requires` too, showing "Requires: `<id>`" (vs. "Hooks into:
+  `<id>`" for a real hook) and nesting the row under its host the same
+  way.
 - **Reticulum itself moved out of core, into the community
   [meshpoint-plugins](https://github.com/javastraat/meshpoint-plugins)
   repo.** Install it from Settings → Plugins like any other community
