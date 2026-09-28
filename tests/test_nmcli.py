@@ -153,6 +153,26 @@ class TestWifiConnect(unittest.TestCase):
         self.assertEqual(rc, 4)
         self.assertIn("Secrets were required", out)
 
+    def test_empty_password_omits_the_password_argument_entirely(self) -> None:
+        # Regression guard for a real bug: passing an *empty* password
+        # ("password", "") made nmcli build a malformed security block
+        # ("802-11-wireless-security.key-mgmt: property is missing")
+        # instead of reusing an already-saved network's real stored
+        # credentials or connecting outright to a genuinely open one --
+        # confirmed live, reconnecting to an already-known secured
+        # network with no new password typed.
+        with _patched(b"Device 'wlan0' successfully activated", 0) as spawn:
+            asyncio.run(nmcli.wifi_connect("KnownNet", ""))
+        args, _kwargs = spawn.call_args
+        self.assertEqual(args, ("sudo", "nmcli", "device", "wifi", "connect", "KnownNet"))
+        self.assertNotIn("password", args)
+
+    def test_password_defaults_to_empty_when_omitted(self) -> None:
+        with _patched(b"", 0) as spawn:
+            asyncio.run(nmcli.wifi_connect("KnownNet"))
+        args, _kwargs = spawn.call_args
+        self.assertEqual(args, ("sudo", "nmcli", "device", "wifi", "connect", "KnownNet"))
+
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()

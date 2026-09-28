@@ -120,9 +120,24 @@ async def wifi_status() -> dict | None:
     return None
 
 
-async def wifi_connect(ssid: str, password: str) -> tuple[int, str]:
+async def wifi_connect(ssid: str, password: str = "") -> tuple[int, str]:
     """Connect to ``ssid``. Returns ``(returncode, output)`` -- 0 means
     connected, anything else is nmcli's real error text (bad password,
     out of range, ...), with the previous connection (if any) left
-    untouched either way."""
-    return await _run_nmcli("device", "wifi", "connect", ssid, "password", password)
+    untouched either way.
+
+    An empty ``password`` omits the ``password`` argument entirely
+    rather than passing an empty string -- confirmed live (real error:
+    "802-11-wireless-security.key-mgmt: property is missing") that
+    nmcli treats an *explicit* empty password as "build a connection
+    profile with this (invalid, blank) PSK" rather than "no password
+    given". Passing no `password` arg at all instead makes nmcli either
+    reuse an already-saved profile's real stored credentials (the
+    "reconnect to a known network without retyping the password" case)
+    or connect outright if the network is genuinely open -- both of
+    which a *blank* password was actually trying to mean.
+    """
+    args = ["device", "wifi", "connect", ssid]
+    if password:
+        args += ["password", password]
+    return await _run_nmcli(*args)

@@ -78,7 +78,16 @@
   itself blocks until it knows the real outcome, and a failure leaves
   whatever was connected before untouched, with `nmcli`'s own real
   error text surfaced on the page rather than hidden behind a generic
-  message.
+  message. Confirmed live, and fixed a real bug found doing so:
+  reconnecting to an already-known network with no new password typed
+  failed with `802-11-wireless-security.key-mgmt: property is missing`
+  -- passing an *empty* password to `nmcli device wifi connect` makes
+  it try to build a connection profile with a blank (invalid) PSK,
+  rather than reusing an already-saved network's real stored
+  credentials or connecting outright to a genuinely open one, which is
+  what a blank password on this page is actually meant to request. An
+  empty password now omits the `password` argument to `nmcli`
+  entirely instead of passing `""`.
 - **Fix: a plugin source's browse catalog never showed a plain `requires`
   dependency, only a `[hook]` one -- two bugs, not one.**
   `reticulum-browser` and `reticulum-dashboard` (both

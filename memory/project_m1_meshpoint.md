@@ -15669,3 +15669,56 @@ have to re-derive it from the code. `python3.11 -m py_compile` +
 108 combined tests pass across the touched core test files. Not
 committed -- same two-repo, incremental-commit convention as every
 other pass this session.
+
+**raspberry-network went live on the real Pi within the same
+conversation, and Einstein found a real bug immediately by actually
+using it -- exactly the kind of live verification this whole session
+kept flagging as impossible to do locally.** Scan worked, connecting
+to a genuinely new network ("my wifi") worked -- but reconnecting to
+"TechInc" (already the active connection, shown with an "(connected)"
+badge and a "Reconnect" button in the UI, per the live screenshot)
+failed with a real nmcli error: `802-11-wireless-security.key-mgmt:
+property is missing`.
+
+Root cause, reasoned through from nmcli's real documented behavior
+(couldn't run real nmcli locally to confirm interactively, but the
+error message itself is specific enough to diagnose directly): the
+user left the password field blank when reconnecting to an
+already-known network (reasonable -- why retype a password NetworkManager
+already has saved?), and the frontend/backend sent that blank field
+through as a literal empty string -- `nmcli device wifi connect TechInc
+password ""`. nmcli treats an *explicit* empty password as "build a
+new connection profile with this blank PSK," not as "no password
+given" -- for a WPA2/WPA3 network that's an invalid security
+configuration, and nmcli's own error surfaces as the more obscure
+key-mgmt message rather than a clear "password required" one. What an
+empty field was actually meant to request -- reuse the already-saved
+credentials, or connect outright if the network is genuinely open --
+only happens when the `password` argument is omitted from the argv
+entirely, not passed as `""`.
+
+Fix: `wifi_connect()` now conditionally omits the `password` arg from
+the nmcli call when the password string is empty, instead of always
+passing it. Confirmed the existing sudoers wildcard
+(`/usr/bin/nmcli device wifi connect *`) already covers both the
+shorter and longer argv shapes without needing a change -- sudoers'
+`*` is a real glob, matches a shorter trailing string as fine as a
+longer one. Added two new regression tests (empty-password-omits-the-
+arg, password-defaults-to-empty-when-omitted) -- 17/17 pass now. Also
+added a small, genuinely necessary UI hint next to the password field
+("Leave blank to reconnect... or to join an open network") since this
+behavior is real but non-obvious -- the exact confusion that produced
+the bug report in the first place. Updated the plugin's own README and
+core's CHANGELOG bullet in place (folded into the same still-uncommitted
+entry from earlier this conversation, not a new separate bullet, since
+this is the same unreleased feature, not a separate committed fix
+being amended).
+
+This is a good concrete example of why the plan's "cannot be verified
+on the Mac, needs the real Pi" section existed and wasn't just
+boilerplate -- the exact failure mode (empty password vs. omitted
+argument) is not something any amount of local reasoning or mocked
+testing would have caught, since the mocks by construction only verify
+argv construction against what I already believed nmcli's behavior to
+be, not nmcli's actual behavior. Live testing surfaced a real gap in
+that belief within minutes of the feature actually running.
