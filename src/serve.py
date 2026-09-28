@@ -72,13 +72,17 @@ def _tls_files() -> tuple[str, str, int] | None:
     try:
         from src.config import load_config
 
-        dashboard = load_config().dashboard
+        config = load_config()
+        dashboard = config.dashboard
         if not dashboard.tls_enabled:
             return None
 
         from src.tls_cert import ensure_cert
 
-        ensure_cert(dashboard.tls_cert_path, dashboard.tls_key_path)
+        ensure_cert(
+            dashboard.tls_cert_path, dashboard.tls_key_path,
+            config.device.device_name,
+        )
         return dashboard.tls_key_path, dashboard.tls_cert_path, int(dashboard.tls_port)
     except Exception:
         logger.exception(

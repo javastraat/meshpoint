@@ -70,9 +70,14 @@ def cmd_tls_regenerate(_args: argparse.Namespace) -> None:
     from src.config import load_config
     from src.tls_cert import regenerate
 
-    dashboard = load_config().dashboard
-    ips, dns_names = regenerate(dashboard.tls_cert_path, dashboard.tls_key_path)
+    config = load_config()
+    dashboard = config.dashboard
+    ips, dns_names = regenerate(
+        dashboard.tls_cert_path, dashboard.tls_key_path,
+        config.device.device_name,
+    )
     print(f"  Regenerated {dashboard.tls_cert_path}")
+    print(f"  Issued to: {config.device.device_name!r}")
     print(f"  SANs: {', '.join([*ips, *dns_names])}")
     print("  Restart to apply: meshpoint restart")
 

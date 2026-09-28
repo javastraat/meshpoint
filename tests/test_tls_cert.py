@@ -57,29 +57,35 @@ class TestEnsureCert(unittest.TestCase):
     def tearDown(self) -> None:
         self.tmp.cleanup()
 
+    DEVICE_NAME = "my-meshpoint"
+
     def _fixed_sans(self, ips, dns_names):
         return mock.patch.object(
             tls_cert, "collect_san_entries", return_value=(ips, dns_names),
         )
 
+    def _ensure(self, ips=("127.0.0.1",), dns_names=("localhost",), device_name=None):
+        with self._fixed_sans(list(ips), list(dns_names)):
+            tls_cert.ensure_cert(
+                str(self.cert_path), str(self.key_path),
+                self.DEVICE_NAME if device_name is None else device_name,
+            )
+
     def test_generates_cert_and_key_when_none_exist(self) -> None:
-        with self._fixed_sans(["127.0.0.1", "192.168.4.3"], ["localhost", "sensecap"]):
-            tls_cert.ensure_cert(str(self.cert_path), str(self.key_path))
+        self._ensure(["127.0.0.1", "192.168.4.3"], ["localhost", "sensecap"])
         self.assertTrue(self.cert_path.is_file())
         self.assertTrue(self.key_path.is_file())
 
     def test_key_file_is_not_world_or_group_readable(self) -> None:
-        with self._fixed_sans(["127.0.0.1"], ["localhost"]):
-            tls_cert.ensure_cert(str(self.cert_path), str(self.key_path))
+        self._ensure()
         mode = stat.S_IMODE(self.key_path.stat().st_mode)
         self.assertEqual(mode, 0o600)
 
     def test_cert_san_matches_requested_addresses(self) -> None:
-        with self._fixed_sans(
+        self._ensure(
             ["127.0.0.1", "192.168.4.3", "100.101.102.103"],
             ["localhost", "sensecap", "sensecap.local"],
-        ):
-            tls_cert.ensure_cert(str(self.cert_path), str(self.key_path))
+        )
         cert = x509.load_pem_x509_certificate(self.cert_path.read_bytes())
         san = cert.extensions.get_extension_for_class(x509.SubjectAlternativeName).value
         ips = [str(ip) for ip in san.get_values_for_type(x509.IPAddress)]
@@ -87,23 +93,20 @@ class TestEnsureCert(unittest.TestCase):
         self.assertEqual(set(ips), {"127.0.0.1", "192.168.4.3", "100.101.102.103"})
         self.assertEqual(set(dns_names), {"localhost", "sensecap", "sensecap.local"})
 
-    def test_does_not_regenerate_when_addresses_unchanged(self) -> None:
-        with self._fixed_sans(["127.0.0.1"], ["localhost"]):
-            tls_cert.ensure_cert(str(self.cert_path), str(self.key_path))
-            first_key_bytes = self.key_path.read_bytes()
-            tls_cert.ensure_cert(str(self.cert_path), str(self.key_path))
-            second_key_bytes = self.key_path.read_bytes()
+    def test_does_not_regenerate_when_nothing_changed(self) -> None:
+        self._ensure()
+        first_key_bytes = self.key_path.read_bytes()
+        self._ensure()
+        second_key_bytes = self.key_path.read_bytes()
         # A fresh key is generated every call to _generate() -- if the
         # bytes are identical, the second ensure_cert() call was a no-op.
         self.assertEqual(first_key_bytes, second_key_bytes)
 
     def test_regenerates_when_an_ip_is_added(self) -> None:
-        with self._fixed_sans(["127.0.0.1"], ["localhost"]):
-            tls_cert.ensure_cert(str(self.cert_path), str(self.key_path))
-            first_key_bytes = self.key_path.read_bytes()
-        with self._fixed_sans(["127.0.0.1", "192.168.4.3"], ["localhost"]):
-            tls_cert.ensure_cert(str(self.cert_path), str(self.key_path))
-            second_key_bytes = self.key_path.read_bytes()
+        self._ensure(["127.0.0.1"], ["localhost"])
+        first_key_bytes = self.key_path.read_bytes()
+        self._ensure(["127.0.0.1", "192.168.4.3"], ["localhost"])
+        second_key_bytes = self.key_path.read_bytes()
         self.assertNotEqual(first_key_bytes, second_key_bytes)
         cert = x509.load_pem_x509_certificate(self.cert_path.read_bytes())
         san = cert.extensions.get_extension_for_class(x509.SubjectAlternativeName).value
@@ -111,39 +114,57 @@ class TestEnsureCert(unittest.TestCase):
         self.assertIn("192.168.4.3", ips)
 
     def test_regenerates_when_a_hostname_changes(self) -> None:
-        with self._fixed_sans(["127.0.0.1"], ["localhost", "sensecap"]):
-            tls_cert.ensure_cert(str(self.cert_path), str(self.key_path))
-            first_key_bytes = self.key_path.read_bytes()
-        with self._fixed_sans(["127.0.0.1"], ["localhost", "sensecap2"]):
-            tls_cert.ensure_cert(str(self.cert_path), str(self.key_path))
-            second_key_bytes = self.key_path.read_bytes()
+        self._ensure(["127.0.0.1"], ["localhost", "sensecap"])
+        first_key_bytes = self.key_path.read_bytes()
+        self._ensure(["127.0.0.1"], ["localhost", "sensecap2"])
+        second_key_bytes = self.key_path.read_bytes()
         self.assertNotEqual(first_key_bytes, second_key_bytes)
+
+    def test_regenerates_when_device_name_changes(self) -> None:
+        # The subject CN tracks device.device_name -- a rename must be
+        # picked up the same way an IP/hostname drift is, not left stale
+        # until some unrelated address change happens to trigger a regen.
+        self._ensure(device_name="old-name")
+        first_key_bytes = self.key_path.read_bytes()
+        self._ensure(device_name="new-name")
+        second_key_bytes = self.key_path.read_bytes()
+        self.assertNotEqual(first_key_bytes, second_key_bytes)
+        cert = x509.load_pem_x509_certificate(self.cert_path.read_bytes())
+        cn = cert.subject.get_attributes_for_oid(x509.NameOID.COMMON_NAME)[0].value
+        self.assertEqual(cn, "new-name")
 
     def test_regenerates_when_key_file_missing_but_cert_present(self) -> None:
         # An operator (or a backup/restore) could plausibly copy the cert
         # without the key, or the key could be deleted independently --
         # a cert with no matching key is useless to uvicorn, so this must
         # not be treated as "already up to date".
-        with self._fixed_sans(["127.0.0.1"], ["localhost"]):
-            tls_cert.ensure_cert(str(self.cert_path), str(self.key_path))
+        self._ensure()
         self.key_path.unlink()
-        with self._fixed_sans(["127.0.0.1"], ["localhost"]):
-            tls_cert.ensure_cert(str(self.cert_path), str(self.key_path))
+        self._ensure()
         self.assertTrue(self.key_path.is_file())
 
     def test_corrupt_existing_cert_triggers_regeneration(self) -> None:
         self.cert_path.parent.mkdir(parents=True, exist_ok=True)
         self.cert_path.write_bytes(b"not a real certificate")
-        with self._fixed_sans(["127.0.0.1"], ["localhost"]):
-            tls_cert.ensure_cert(str(self.cert_path), str(self.key_path))
+        self._ensure()
         cert = x509.load_pem_x509_certificate(self.cert_path.read_bytes())
         self.assertIsNotNone(cert)
 
-    def test_subject_name_fields(self) -> None:
-        with self._fixed_sans(["127.0.0.1"], ["localhost"]):
-            tls_cert.ensure_cert(str(self.cert_path), str(self.key_path))
+    def test_subject_is_just_the_device_name(self) -> None:
+        # "Issued To" should read as the specific device, not repeat the
+        # generic "meshpoint"/Organization/Locality/OU block that belongs
+        # on the issuer side -- see test_issuer_name_fields below.
+        self._ensure(device_name="attic-node")
         cert = x509.load_pem_x509_certificate(self.cert_path.read_bytes())
-        attrs = {a.oid: a.value for a in cert.subject}
+        attrs = list(cert.subject)
+        self.assertEqual(len(attrs), 1)
+        self.assertEqual(attrs[0].oid, x509.NameOID.COMMON_NAME)
+        self.assertEqual(attrs[0].value, "attic-node")
+
+    def test_issuer_name_fields(self) -> None:
+        self._ensure()
+        cert = x509.load_pem_x509_certificate(self.cert_path.read_bytes())
+        attrs = {a.oid: a.value for a in cert.issuer}
         from cryptography.x509.oid import NameOID
         self.assertEqual(attrs[NameOID.COMMON_NAME], "meshpoint")
         self.assertEqual(attrs[NameOID.ORGANIZATION_NAME], "Meshpoint")
@@ -152,8 +173,14 @@ class TestEnsureCert(unittest.TestCase):
             attrs[NameOID.ORGANIZATIONAL_UNIT_NAME],
             "https://github.com/KMX415/meshpoint",
         )
-        # Self-signed: issuer must equal subject.
-        self.assertEqual(cert.issuer, cert.subject)
+
+    def test_issuer_and_subject_differ(self) -> None:
+        # Still self-signed in the cryptographic sense (signed by its own
+        # embedded key) -- diverging the DN strings is purely cosmetic and
+        # doesn't change how any browser treats it.
+        self._ensure(device_name="attic-node")
+        cert = x509.load_pem_x509_certificate(self.cert_path.read_bytes())
+        self.assertNotEqual(cert.issuer, cert.subject)
 
 
 class TestRegenerate(unittest.TestCase):
@@ -166,27 +193,35 @@ class TestRegenerate(unittest.TestCase):
         self.tmp.cleanup()
 
     def test_generates_when_nothing_exists(self) -> None:
-        ips, dns_names = tls_cert.regenerate(str(self.cert_path), str(self.key_path))
+        ips, dns_names = tls_cert.regenerate(
+            str(self.cert_path), str(self.key_path), "my-meshpoint",
+        )
         self.assertTrue(self.cert_path.is_file())
         self.assertTrue(self.key_path.is_file())
         self.assertIn("127.0.0.1", ips)
         self.assertIn("localhost", dns_names)
 
-    def test_forces_a_new_cert_even_when_addresses_are_unchanged(self) -> None:
+    def test_forces_a_new_cert_even_when_nothing_changed(self) -> None:
         # Unlike ensure_cert(), this must not skip regeneration just
-        # because the SAN list would come out the same -- the whole
-        # point is forcing a fresh cert on demand (e.g. to pick up a
-        # subject-name-only change ensure_cert()'s SAN diff would never
-        # notice on its own).
+        # because the SAN list and device name would come out the same --
+        # the whole point is forcing a fresh cert on demand (e.g. to pick
+        # up a fixed-issuer-field change like Organization, which no diff
+        # check watches at all).
         fixed_sans = mock.patch.object(
             tls_cert, "collect_san_entries", return_value=(["127.0.0.1"], ["localhost"]),
         )
         with fixed_sans:
-            tls_cert.regenerate(str(self.cert_path), str(self.key_path))
+            tls_cert.regenerate(str(self.cert_path), str(self.key_path), "my-meshpoint")
             first_key_bytes = self.key_path.read_bytes()
-            tls_cert.regenerate(str(self.cert_path), str(self.key_path))
+            tls_cert.regenerate(str(self.cert_path), str(self.key_path), "my-meshpoint")
             second_key_bytes = self.key_path.read_bytes()
         self.assertNotEqual(first_key_bytes, second_key_bytes)
+
+    def test_subject_cn_is_the_given_device_name(self) -> None:
+        tls_cert.regenerate(str(self.cert_path), str(self.key_path), "attic-node")
+        cert = x509.load_pem_x509_certificate(self.cert_path.read_bytes())
+        cn = cert.subject.get_attributes_for_oid(x509.NameOID.COMMON_NAME)[0].value
+        self.assertEqual(cn, "attic-node")
 
 
 if __name__ == "__main__":

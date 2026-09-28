@@ -15409,3 +15409,56 @@ separate half-accurate entries. Re-verified end-to-end the same way as
 before -- direct `regenerate()` call against a tempdir confirming the
 real parsed cert, plus a real `meshpoint tls-regenerate` CLI run
 against the repo's own gitignored `data/tls/`, cleaned up after.
+
+**Same TLS-cert thread, final iteration: split Issued To vs Issued By
+("cert is from us for him").** Einstein confirmed going ahead with
+`device.device_name` as the subject CN, framed as "user sees the cert
+is from us for him." Implemented the split as: Issuer stays the fixed
+full identity block (CN=meshpoint, O=Meshpoint, L=Earth, OU=github
+credit link -- pulled out into a module-level `_ISSUER_NAME` constant
+since it no longer varies per-call), Subject becomes just
+`CN=<device_name>` alone -- deliberately minimal, not repeating the
+issuer's O/L/OU, so the "from us, to you" framing reads cleanly instead
+of the subject restating the same generic block.
+
+Went back and fixed the staleness gap I'd flagged as a caveat in my
+own recommendation *before* Einstein even said yes -- rather than ship
+a known footgun I'd just described out loud, extended the auto-regen
+diff check (new `_existing_subject_cn()` helper, mirroring
+`_existing_san_entries()`) so a `device_name` change now triggers the
+same automatic cert regen an IP/hostname drift already did, not just
+a passive "this diff check won't help you" warning in a docstring.
+Confirmed this makes `tls-regenerate`'s own docstring partially
+inaccurate too (its "picks up a subject-name-only change" framing had
+been about Organization *and* the subject CN together -- now only the
+fixed issuer fields like Organization genuinely need it, since
+device_name has its own real diff check) -- updated that docstring
+alongside the code change rather than leaving it half-true.
+
+Confirmed explicitly, since it's the one thing that could make this a
+bad idea rather than just cosmetic: diverging issuer/subject DN
+strings does NOT change what "self-signed" means cryptographically
+(that's about the signature matching the embedded public key, not
+whether the two name fields happen to read the same) -- browsers treat
+it identically either way, same expected warning. Verified for real,
+not just reasoned about: ran `meshpoint tls-regenerate` for real
+against the actual local.yaml on this Mac and read the real device
+name straight out of a real parsed cert -- turned out to be "PD2EMC
+Meshpoint" (this repo's own real configured `device.device_name`, not
+a synthetic test value), confirming the whole plumbing end-to-end
+against real config data, not just mocks.
+
+Updated call sites (`src/serve.py::_tls_files()`, `src/cli/main.py::
+cmd_tls_regenerate`) to thread `config.device.device_name` through --
+both previously only loaded `config.dashboard`, needed the full config
+object now. Rewrote the test suite's `TestEnsureCert`/`TestRegenerate`
+classes to pass `device_name` everywhere (added a small `_ensure()`
+helper to avoid repeating the boilerplate across every test after the
+signature grew a third required arg), split the old combined
+"subject_name_fields" test into `test_subject_is_just_the_device_name`
++ `test_issuer_name_fields` (they're testing two different DN objects
+now, conflating them in one test would've hidden exactly the kind of
+regression -- subject accidentally inheriting issuer fields, or vice
+versa -- this whole feature exists to prevent) + a new
+`test_regenerates_when_device_name_changes` +
+`test_issuer_and_subject_differ`. 19/19 pass.

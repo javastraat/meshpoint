@@ -14,6 +14,14 @@ SAN list means a *second*, more confusing browser warning ("certificate
 doesn't match this address") stacked on top of the expected
 self-signed-cert one.
 
+The subject Common Name is ``device.device_name`` (Settings' own
+"what is this box called" field) -- so a cert viewer reads "Issued To:
+<your device's name>", not the generic "meshpoint" string every cert
+used to show regardless of which device it was. Issuer stays the fixed
+"meshpoint" identity ("Issued By: us"). Same drift-triggers-regen
+treatment applies: renaming the device is watched the same way an IP
+or hostname change is.
+
 Browsers still show that expected "this certificate is self-signed"
 warning on first visit to each address -- that's inherent to not having
 a real CA, not a bug here.
@@ -114,29 +122,60 @@ def _existing_san_entries(cert_path: Path) -> tuple[list[str], list[str]] | None
         return None
 
 
+def _existing_subject_cn(cert_path: Path) -> str | None:
+    """The subject Common Name already baked into the cert on disk, or
+    ``None`` if there's no cert yet or it can't be read -- same
+    read-failure-means-regenerate reasoning as :func:`_existing_san_entries`."""
+    if not cert_path.is_file():
+        return None
+    try:
+        cert = x509.load_pem_x509_certificate(cert_path.read_bytes())
+        attrs = cert.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
+        return str(attrs[0].value) if attrs else None
+    except Exception:
+        logger.debug(
+            "could not read existing TLS cert %s; will regenerate",
+            cert_path,
+            exc_info=True,
+        )
+        return None
+
+
+_ISSUER_NAME = x509.Name([
+    x509.NameAttribute(NameOID.COMMON_NAME, "meshpoint"),
+    x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Meshpoint"),
+    # There's no real answer for a LAN device's locality -- it's
+    # wherever the box physically is, which this code has no way to
+    # know. Rather than guess or leave it blank, own the honesty of
+    # that with the one locality that's always technically correct.
+    x509.NameAttribute(NameOID.LOCALITY_NAME, "Earth"),
+    # Credit to the original upstream project this fork is built on --
+    # OU has no real semantic fit for a URL, but it's free text and
+    # visible on a cert viewer's General tab without digging into
+    # a Details/SAN view.
+    x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, "https://github.com/KMX415/meshpoint"),
+])
+
+
 def _generate(
     cert_path: Path, key_path: Path, ips: list[str], dns_names: list[str],
+    device_name: str,
 ) -> None:
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    name = x509.Name([
-        x509.NameAttribute(NameOID.COMMON_NAME, "meshpoint"),
-        x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Meshpoint"),
-        # There's no real answer for a LAN device's locality -- it's
-        # wherever the box physically is, which this code has no way to
-        # know. Rather than guess or leave it blank, own the honesty of
-        # that with the one locality that's always technically correct.
-        x509.NameAttribute(NameOID.LOCALITY_NAME, "Earth"),
-        # Credit to the original upstream project this fork is built on --
-        # OU has no real semantic fit for a URL, but it's free text and
-        # visible on a cert viewer's General tab without digging into
-        # a Details/SAN view.
-        x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, "https://github.com/KMX415/meshpoint"),
-    ])
+    # Issuer stays the fixed "meshpoint" identity (the software that
+    # issued this cert); subject is the specific device it was issued
+    # to -- so a cert viewer reads as "issued by us, to you" instead of
+    # both sides saying the same generic "meshpoint". Diverging the two
+    # doesn't affect self-signedness in the cryptographic sense (that's
+    # about the signature matching the embedded public key, not the
+    # subject/issuer strings matching each other) -- browsers still
+    # treat it exactly the same, same expected warning either way.
+    subject_name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, device_name)])
     now = datetime.datetime.now(datetime.timezone.utc)
     cert = (
         x509.CertificateBuilder()
-        .subject_name(name)
-        .issuer_name(name)
+        .subject_name(subject_name)
+        .issuer_name(_ISSUER_NAME)
         .public_key(key.public_key())
         .serial_number(x509.random_serial_number())
         # Backdated slightly so a cert generated seconds ago isn't
@@ -160,40 +199,50 @@ def _generate(
     )
     key_path.chmod(0o600)
     logger.info(
-        "Generated self-signed TLS cert %s (SANs: %s)",
+        "Generated self-signed TLS cert %s for %r (SANs: %s)",
         cert_path,
+        device_name,
         ", ".join([*ips, *dns_names]),
     )
 
 
-def ensure_cert(cert_path_str: str, key_path_str: str) -> None:
+def ensure_cert(cert_path_str: str, key_path_str: str, device_name: str) -> None:
     """Called once at startup when ``dashboard.tls_enabled`` is true.
     Generates a cert if none exists yet, or regenerates it if the set
-    of addresses this box is reachable at has drifted from what's
-    already baked in."""
+    of addresses this box is reachable at -- or the configured device
+    name baked into the subject CN -- has drifted from what's already
+    baked in."""
     cert_path = Path(cert_path_str)
     key_path = Path(key_path_str)
 
     wanted_ips, wanted_dns = collect_san_entries()
-    existing = _existing_san_entries(cert_path)
+    existing_sans = _existing_san_entries(cert_path)
+    existing_cn = _existing_subject_cn(cert_path)
 
-    if existing is not None and key_path.is_file():
-        existing_ips, existing_dns = existing
-        if set(existing_ips) == set(wanted_ips) and set(existing_dns) == set(wanted_dns):
-            return  # already covers everything we're reachable at
+    if existing_sans is not None and key_path.is_file():
+        existing_ips, existing_dns = existing_sans
+        if (
+            set(existing_ips) == set(wanted_ips)
+            and set(existing_dns) == set(wanted_dns)
+            and existing_cn == device_name
+        ):
+            return  # already covers everything we're reachable at, as the right device
 
-    _generate(cert_path, key_path, wanted_ips, wanted_dns)
+    _generate(cert_path, key_path, wanted_ips, wanted_dns, device_name)
 
 
-def regenerate(cert_path_str: str, key_path_str: str) -> tuple[list[str], list[str]]:
+def regenerate(
+    cert_path_str: str, key_path_str: str, device_name: str,
+) -> tuple[list[str], list[str]]:
     """Force a fresh cert unconditionally -- unlike :func:`ensure_cert`,
     doesn't compare against what's already on disk first. For
-    ``meshpoint tls-regenerate``: picking up a subject-name field change
-    (e.g. Organization) that a SAN-only diff would never notice on its
-    own, or just letting an operator force a clean cert without deleting
-    files by hand. Returns the (ips, dns_names) baked into the new cert.
-    A running service still needs a restart to pick it up -- this only
-    writes the files."""
+    ``meshpoint tls-regenerate``: picking up a fixed-issuer-field change
+    (e.g. Organization) that no diff check watches at all -- those live
+    in the constant ``_ISSUER_NAME``, not derived from anything
+    comparable on disk -- or just letting an operator force a clean cert
+    without deleting files by hand. Returns the (ips, dns_names) baked
+    into the new cert. A running service still needs a restart to pick
+    it up -- this only writes the files."""
     ips, dns_names = collect_san_entries()
-    _generate(Path(cert_path_str), Path(key_path_str), ips, dns_names)
+    _generate(Path(cert_path_str), Path(key_path_str), ips, dns_names, device_name)
     return ips, dns_names

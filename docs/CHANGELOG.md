@@ -4,16 +4,19 @@
 
 #### Dashboard
 
-- **The self-signed HTTPS cert now has Organization, Locality, and
-  Organizational Unit set** (`O=Meshpoint`, `L=Earth`,
-  `OU=https://github.com/KMX415/meshpoint` -- credit to the upstream
-  project) alongside the existing `CN=meshpoint` -- purely cosmetic, no
-  effect on browser trust (still self-signed, still shows the expected
-  warning). New `meshpoint tls-regenerate` CLI command
-  force-regenerates the cert/key on demand, restart to apply -- useful
-  for picking up this kind of subject-name-only change, since the
-  automatic startup check only diffs the SAN address list, not the
-  subject name.
+- **The self-signed HTTPS cert now reads "issued by us, to you"
+  instead of "meshpoint" on both sides.** Issuer (fixed): `CN=meshpoint`,
+  `O=Meshpoint`, `L=Earth`, `OU=https://github.com/KMX415/meshpoint`
+  (credit to the upstream project). Subject: just
+  `CN=<device.device_name>` -- the specific device the cert belongs to.
+  Purely cosmetic, no effect on browser trust (still self-signed by the
+  same embedded key either way, still shows the expected warning) --
+  diverging the two DN strings doesn't change what "self-signed" means
+  cryptographically. Renaming the device now also triggers the same
+  automatic cert regeneration an IP/hostname drift already did. New
+  `meshpoint tls-regenerate` CLI command force-regenerates the cert/key
+  on demand, restart to apply -- useful for picking up a fixed-issuer-
+  field change, since nothing watches those for drift.
 - **Local map tiles.** OSM raster with a dark invert filter, replacing
   CARTO Dark Matter after anonymous CARTO raster requests started
   returning an API-key watermark.
