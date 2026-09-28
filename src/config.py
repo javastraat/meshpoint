@@ -72,9 +72,10 @@ class RadioConfig:
     sx1261_spi_path: str = ""
     # Emergency pager project: enables the concentrator's dedicated FSK
     # channel (ch9), independent hardware from every LoRa channel above.
-    # There's no real pager protocol/firmware yet, so this only proves
-    # reception works. Default off: nothing should start listening on a
-    # new channel without an explicit opt-in.
+    # Still internal/experimental, but confirmed working end-to-end on
+    # real hardware (extra/pager_client.ino, a Heltec V3) as of 2026-08
+    # -- see emergency_pager_routes.py. Default off: nothing should start
+    # listening on a new channel without an explicit opt-in.
     pager_enabled: bool = False
     # Defaults match the values chosen for the ETSI EU868 "sub-band P"
     # high-power window (869.40-869.65 MHz) -- see concentrator_source.py

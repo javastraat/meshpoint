@@ -3,9 +3,11 @@
  *
  * Emergency pager project: lets the concentrator's dedicated FSK channel
  * (ch9 -- independent hardware from every LoRa channel, its own sync
- * word) be tuned without hand-editing local.yaml. Still internal --
- * there's no real pager protocol/firmware yet, this only controls
- * reception. Always requires a restart; nothing here is hot-reloadable.
+ * word) be tuned without hand-editing local.yaml. Still internal/
+ * experimental, but confirmed working end-to-end on real hardware
+ * (extra/pager_client.ino, a Heltec V3) as of 2026-08 -- see
+ * src/api/routes/emergency_pager_routes.py. Always requires a restart;
+ * nothing here is hot-reloadable.
  */
 
 class RadioPagerConfigCard {
@@ -22,11 +24,13 @@ class RadioPagerConfigCard {
                     <h3 class="cfg-card__title">Radio (pager)</h3>
                     <p class="cfg-card__hint">
                         Emergency pager project, ch9 (FSK) -- internal/experimental,
-                        firmware exists (extra/pager_client) but hasn't been flashed or
-                        tested on real hardware yet. Frequency must stay inside the
-                        ETSI EU868 "sub-band P" high-power window (869.40-869.65 MHz)
-                        and close enough to RF1's anchor for this hardware to actually
-                        tune to it (validated on save).
+                        but confirmed working end-to-end on real hardware
+                        (extra/pager_client, a Heltec V3) as of 2026-08. Frequency
+                        must stay close enough to RF1's anchor in your configured
+                        region for this hardware to actually tune to it (validated
+                        on save) -- the default (869.4625 MHz) sits in ETSI EU868's
+                        "sub-band P" high-power window; a US915 (or other region)
+                        setup validates against that region's own anchor instead.
                     </p>
                 </header>
                 <form class="cfg-form" data-radio-pager-form>

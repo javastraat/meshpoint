@@ -16690,3 +16690,95 @@ load effect right after restart, not something worth chasing further.
 Verified: `node --check` on the controller (clean),
 `ChangelogParser.parse_file()` re-parse (31 sections, clean).
 
+**Live-confirmed on the Pi**: Einstein confirmed the loading placeholder
+shows then the five action cards come up as expected -- working as
+intended.
+
+**Stale docs finding: emergency pager project's "not tested on real
+hardware yet" claim, same session.** Einstein pasted the exact
+Configuration -> Radio -> Radio (pager) hint text and asked "is that
+correct?" -- a good instinct to check, since the live topbar was
+showing an active `PAGER ● 2041152 · 869.4625 MHz` badge at the time,
+which doesn't square with "hasn't been flashed... yet." Confirmed
+stale by cross-referencing `src/api/routes/emergency_pager_routes.py`'s
+own header comment, which already correctly says "confirmed working
+end-to-end on real hardware (extra/pager_client.ino, a Heltec V3) as of
+2026-08" -- matches this session's own much-earlier memory of the
+pager firmware work (WiFi/OTA port, waiting on a Heltec V3 arriving
+2026-08-04) actually having been completed and tested afterward,
+apparently without every OTHER reference to it getting updated at the
+same time. Grepped for the stale phrase across the whole repo and found
+three more copies nobody had touched: `radio_pager_card.js` (module
+comment + the actual on-page hint text the user quoted),
+`system_config_routes.py`'s `update_radio_pager()` docstring, and
+`src/config.py`'s `pager_enabled` field comment. Fixed all four to
+match `emergency_pager_routes.py`'s accurate framing; re-grepped
+afterward to confirm zero remaining hits anywhere in `frontend/`/`src/`.
+Pure docs/comment fix, no behavior change -- `pager_enabled` still
+defaults to `false`, nothing about the actual gating logic touched.
+
+Verified: `node --check` on `radio_pager_card.js`, `ast.parse()` on
+both touched Python files, `ChangelogParser.parse_file()` re-parse (31
+sections, clean).
+
+**Follow-up questions on the same pager text, same session, that turned
+into a real sidebar reorganization.** Einstein asked "why so eu if a
+user has a us version?" about the hint text's EU868 sub-band P
+frequency claim -- checked `update_radio_pager()`
+(`system_config_routes.py:489-515`) and confirmed the ACTUAL validation
+is region-aware (`ConcentratorChannelPlan.from_radio_config(region=
+radio.region, ...)`, checks the pager frequency is within
+`_PAGER_MAX_IF_OFFSET_HZ` (1 MHz) of RF1/RF0's anchor for *whichever*
+region is configured) -- the EU868 869.40-869.65 MHz range mentioned in
+the hint text is only the *default* value's own reasoning, not an
+enforced universal rule. Was mid-way through fixing this when Einstein
+interrupted with a bigger, better question: pasted the whole rendered
+Radio (advanced) + Radio (pager) card text and asked "do they belong
+here in radio?" then, sharper: "under meshtasttic it feels wrong."
+
+Checked `frontend/index.html`'s sidebar structure
+(`data-route="configuration/radio"` sits right after "Identity" inside
+the "Meshtastic" group-header block, alongside Identity/Channels/
+Transmit). Agreed with Einstein's instinct and went further, proposing
+the whole Radio/Radio(advanced)/Radio(pager) trio -- not just the pager
+card -- doesn't belong under "Meshtastic" at all, since all three
+configure the concentrator's own shared hardware (frequency/SF/BW,
+spectral scan, ch9), and Meshtastic is only one of several protocols
+riding on that same hardware; the "Meshtastic" grouping looks like a
+historical artifact from when Meshtastic was the only supported
+protocol, not an accurate categorization. Used `AskUserQuestion` to
+offer options (new dedicated Pager subtab vs. recategorize the whole
+Radio subtab vs. plan first) -- Einstein came back with their own
+synthesis, asking me directly: "maybe both in hardware - concentrator ?
+what do you think new page under hardware setcion in configuration ?"
+-- agreed this was the more coherent answer than my own original
+options.
+
+**Implementation turned out trivially safe once actually checked**: the
+sidebar's group headers (`<li class="sidebar__group-header">`) are
+purely positional/presentational in one flat `<ul>` -- no JS maps a
+route to a category, `configuration_panel.js`'s `_mountSection('radio')`
+keys purely off the route string, `app.js`'s `allowedRoutes` array and
+command-palette entries (`['configuration/radio', 'Go to Configuration
+· Radio', 'Configuration']`) are also flat/unordered. So the whole fix
+was relocating one `<li>` (three lines) from right after "Identity" in
+the Meshtastic block to right before "GPS" in the Hardware block --
+zero route changes, zero JS logic changes, zero deep-link breakage.
+Verified via `grep -c` that exactly one `configuration/radio` sidebar
+link still exists post-move (not duplicated, not orphaned), and an
+`<li>` open/close tag-balance check across the whole file (39/39).
+
+Also finished the EU/US hint-text fix from before the interruption:
+reworded `radio_pager_card.js`'s on-page text to state 869.4625 MHz is
+only the EU868-region *default*, and that a US915 (or other region)
+setup validates against that region's own RF anchor instead --
+matching what `update_radio_pager()` actually does. Checked
+`config.py`'s own `pager_frequency_mhz` comment while there -- already
+correctly framed as "defaults match..." rather than a universal claim,
+so left untouched.
+
+Verified: `node --check` on `radio_pager_card.js`,
+`ChangelogParser.parse_file()` re-parse (31 sections, clean). Not yet
+live-confirmed on the Pi (sidebar reorder is low-risk but still
+genuinely untested rendering, unlike the pure-text pager fix).
+

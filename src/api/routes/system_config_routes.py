@@ -463,10 +463,12 @@ async def update_radio_pager(
 ):
     """Emergency pager project: concentrator ch9 (FSK) settings.
 
-    Still internal/experimental -- no real pager protocol/firmware exists
-    yet, this only lets the RX side be tuned without editing local.yaml
-    by hand. Always requires a restart: none of this is hot-reloadable,
-    same as radio/advanced's spectral_scan_interval_seconds/sx1261_spi_path.
+    Still internal/experimental, but confirmed working end-to-end on real
+    hardware (extra/pager_client.ino, a Heltec V3) as of 2026-08 -- see
+    emergency_pager_routes.py. This lets the RX side be tuned without
+    editing local.yaml by hand. Always requires a restart: none of this
+    is hot-reloadable, same as radio/advanced's
+    spectral_scan_interval_seconds/sx1261_spi_path.
     """
     if _config is None:
         raise HTTPException(503, "Config not loaded")

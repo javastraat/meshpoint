@@ -231,6 +231,39 @@
   being missing rather than just loading. The endpoint itself is a
   trivial in-memory lookup with no fix needed there; this is purely
   the missing loading-state UX.
+- **Docs: fixed a stale "hasn't been flashed or tested on real hardware
+  yet" claim about the emergency pager project (ch9/FSK), in four
+  places.** `frontend/js/configuration/radio_pager_card.js` (both its
+  module comment and the on-page hint text under Configuration → Radio
+  → Radio (pager)), `src/api/routes/system_config_routes.py`'s
+  `update_radio_pager()` docstring, and `src/config.py`'s
+  `pager_enabled` comment all still said no real firmware existed yet.
+  `src/api/routes/emergency_pager_routes.py`'s own header comment
+  already correctly says this was "confirmed working end-to-end on real
+  hardware (extra/pager_client.ino, a Heltec V3) as of 2026-08" -- the
+  other four just never got updated when that happened. All four now
+  match. Also fixed a second, related inaccuracy in the same on-page
+  hint text: it stated the ETSI EU868 "sub-band P" window
+  (869.40-869.65 MHz) as if it were a hard, universal requirement --
+  the actual backend check (`update_radio_pager()`) validates the
+  frequency against RF1's real anchor for whatever `radio.region` is
+  currently configured, so a US915 (or other region) setup is validated
+  against that region's own anchor, not against EU868 at all. Reworded
+  to make clear 869.4625 MHz is only the *default*, chosen for EU868,
+  not a rule every region's hardware is held to.
+- **Configuration → Radio moved from the "Meshtastic" sidebar group to
+  "Hardware."** It (plus Radio (advanced) and Radio (pager)) configures
+  the concentrator's own shared RF hardware -- frequency/SF/BW,
+  spectral scan, the independent ch9 FSK pager channel -- none of which
+  is Meshtastic-protocol-specific; Meshtastic is just one of several
+  protocols that happens to ride on that same hardware. Filing it under
+  a "Meshtastic" heading implied otherwise, most visibly for the pager
+  card, which has nothing to do with Meshtastic at all. Purely a
+  sidebar-position change -- one `<li>` relocated in `index.html`, right
+  before GPS in the Hardware group; the route (`#/configuration/radio`),
+  `configuration_panel.js`'s mounting logic, and every other reference
+  are all keyed by route/section id, not sidebar position, so nothing
+  else needed to change.
 
 #### Plugins
 
