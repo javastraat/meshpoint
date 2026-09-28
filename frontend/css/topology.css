@@ -1,11 +1,21 @@
 /* Topology page (topology_tab.js): force-directed mesh graph. */
 
+/* Every other list/graph page (LoRaWAN, Meshtastic, Reticulum, ...)
+   opens with `.lw-panel__head`'s 20px top padding (lorawan.css) before
+   its title. This page skips a page-level title and puts "Mesh
+   Topology" straight in the panel's own toolbar header instead, which
+   only had `.panel__header`'s base 8px -- reading flush against the
+   topbar by comparison. Bumping just this header's own top padding
+   (not the outer `.topo-panel`/`.panel` box, which the canvas resize
+   logic in topology_tab.js measures) closes that gap without touching
+   the graph's own sizing math. */
 .topo-panel .panel__header--tabs {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
     flex-wrap: wrap;
+    padding-top: 20px;
 }
 
 .topo-chips {

@@ -15936,3 +15936,240 @@ CHANGELOG bullet extended in place again (same still-uncommitted entry
 covering this plugin's whole arc), README/plugin.toml description
 updated for the new tab + endpoint, `repo.json` regenerated (still 20
 plugins -- no new plugin added, this was a same-plugin restructure).
+
+**Two follow-up UI fixes after live-testing the tabs on the real Pi
+(same still-uncommitted plugin), 2026-09-28.** Einstein's own framing:
+"the warning can you place it under the scanlist please so top is the
+same in wifi and ethernet, also we have multiple dns ips now the go
+ooutside the card have a look also in ethernet."
+
+1. **Warning banner moved from page-level to inside the panel.** It
+   used to sit above the WiFi tab's stat cards (page-level sibling,
+   `.rn-warning` with the clamp-based margin shared with `.rn-error`/
+   `.rn-success`) while the Network tab had no such banner above its
+   own stat cards -- meaning the two tabs' top sections didn't visually
+   match. Moved the warning `<p>` into the panel, right after the scan
+   table's `.panel__body.lw-table-wrap` and right before
+   `.rn-connect-form.panel__body`, so now *both* tabs start identically
+   (page title -> stat cards -> tab bar) with nothing else above the
+   cards. This is the exact same alignment-convention class of bug
+   flagged as a standing habit two entries up, applied correctly this
+   time on the first attempt: since the element moved *inside* the
+   panel, its CSS switched from the page-level `clamp(16px, 3vw, 32px)`
+   margin to the `.lsn-panel-body`-style `margin: 12px 0.75rem 0`
+   already used by `.rn-note`/`.rn-connect-form` in the same file --
+   verified this was the right convention by reading the file's own
+   prior art rather than reusing the old rule verbatim in a new
+   position.
+2. **DNS stat card text overflowing its card border, both tabs.**
+   `.stat-card__value` (`frontend/css/dashboard.css`) is
+   `white-space: nowrap` globally -- fine for a single IP, not for the
+   multi-address DNS list `wifi_status()`/`ethernet_status()` can now
+   return (joined with `', '` in the frontend). Fixed with a new scoped
+   class, `.rn-stat-value--wrap` (`white-space: normal; word-break:
+   break-word;`), added alongside `stat-card__value` on just the two
+   DNS value elements (`data-current-dns`, `data-eth-dns`) -- not a
+   change to the shared global class, which every other stat card on
+   every other plugin's page still depends on staying single-line.
+
+Verified: `node --check` on the JS (clean), CSS brace-balance check
+(14/14), and `ChangelogParser.parse_file()` re-parse of the whole
+CHANGELOG (31 sections, still clean) after folding both fixes into the
+same still-uncommitted `raspberry-network` bullet. Frontend-only change
+-- `tests/test_nmcli.py` untouched, not re-run for this specific fix
+(nothing in it could regress from a CSS/markup-only change).
+
+**Cross-page alignment bug: `bluetooth-scanner` and `raspberry-network`
+both sat visibly further right than LoRaWAN/Reticulum, plus a latent
+scroll-clipping risk -- found from a live screenshot comparison,
+2026-09-28.** Einstein compared three screenshots (LoRaWAN, Bluetooth
+Scanner, WiFi & Network) side by side and flagged: "why is bluetooth
+and wifi page not the same start etc as the lorawan page now they look
+totaly different the start point of cards etc th scan list," then
+confirmed after seeing a Reticulum screenshot too: "rt also looks
+correct, but ble and wifi are different" -- correctly narrowing the bug
+to specifically these two community plugins, not a general layout
+regression.
+
+Root cause, found by reading the actual CSS rather than eyeballing
+pixel offsets: both plugins wrap their markup in core's `.plugin-page`
+class (`frontend/css/dashboard.css` -- `padding: 24px clamp(16px, 3vw,
+32px)`, an opt-in "free padding/typography for a minimal plugin that
+doesn't need its own CSS file," per its own doc comment) *while also*
+using the "real" `lorawan.css` page structure (`.lw-panel__head`,
+itself `padding: 20px clamp(16px, 3vw, 32px) 12px`) -- the same
+horizontal clamp inset applied twice, stacking to ~2x a core page's
+single inset. Confirmed by reading how core's own pages (LoRaWAN,
+Reticulum, Meshtastic, MeshCore) mount: `frontend/index.html` renders
+them into a bare `<div id="X-panel"></div>` inside `<section
+class="section" data-section="X">` -- no `.plugin-page` wrapper at all
+-- and `lorawan.css` explicitly opts each of those five
+`.section[data-section="..."]` selectors into `overflow-y: auto`
+(since `.section` itself is `overflow: hidden` by design,
+`dashboard.css`). `frontend/sidebar/sidebar_plugin_registry.js` mounts
+every plugin sidebar page into the exact same bare `class="section"`
+element (`panel.mount(section)`) -- so a plugin adopting the real
+`lw-panel__head` structure should follow the identical convention, not
+also reach for `.plugin-page`. This is the *third* time this session a
+double-applied clamp-padding bug has appeared in this codebase (see the
+two entries above on the WiFi/Network tabs restructure) -- same root
+cause pattern each time: two independently-correct CSS conventions
+composing badly when nested, only catchable by tracing the real DOM/
+CSS chain rather than assuming a class "just works" in a new context.
+
+Fix, applied to both plugins identically: dropped `plugin-page` from
+the wrapping `<div>` in `bluetooth_scanner.js`/`raspberry_network.js`
+(kept each plugin's own scoping class, `bts-page`/`rn-page`, since
+neither CSS file's other selectors depended on `.plugin-page` itself --
+verified via `grep`), and added each plugin's own
+`.section[data-section="bluetooth-scanner"]`/
+`.section[data-section="raspberry-network"] { overflow-y: auto; }` rule
+to its own CSS file, matching `lorawan.css`'s exact convention for its
+five sections rather than inventing a new one. Also checked every
+`<p>` tag in both files before removing `.plugin-page` (which also
+supplied fallback `<p>` margin/color/font-size) -- all six already have
+their own explicit styled class (`bts-error`, `lw-empty`, `rn-error`,
+`rn-success`, `rn-warning`, `rn-note`), so nothing relied on the
+fallback.
+
+**Checked blast radius before touching anything else**: four other
+community plugins also use `.plugin-page` (`offline-map`,
+`oled-display`, `hello-world-github`, `rtlsdr`) -- grepped each for
+`lw-panel__head`/`lw-stats`/`lw-section` and confirmed none of them use
+that structure at all, meaning they're the *intended* minimal-plugin
+use case `.plugin-page` was actually built for and don't have this bug.
+Left all four untouched rather than reflexively "fixing" every
+`.plugin-page` usage in the repo.
+
+Verified: `node --check` on both JS files (clean), CSS brace-balance
+check on both CSS files (bts: 13/13, rn: 15/15), and
+`ChangelogParser.parse_file()` re-parse of the whole CHANGELOG (31
+sections, still clean) with a new bullet added for this fix (separate
+from the `raspberry-network` feature bullet, since this fix spans two
+different plugins). Cannot be visually confirmed without the real
+browser Einstein is using -- reasoning is grounded in reading the
+actual padding values and DOM-mount code, not a guess from pixel
+comparison alone, but the live screenshot should be re-checked once
+this ships to confirm the visual fix matches what the CSS math
+predicts.
+
+**Full site-wide top-of-page spacing audit, same session (2026-09-28),
+started from the same "bluetooth/wifi look different from lorawan"
+report above.** After the raspberry-network/bluetooth-scanner fix,
+Einstein sent screenshots of Dashboard and Topology and asked more
+broadly: "qe what about topology also check all pages, advise me
+dashboard has a small space and other pages have none or a bigger one
+reticulum bluetooth network etc whats the best way?" Given the breadth
+(every page in the app, not one plugin), used an Explore subagent
+rather than grepping it myself -- came back with a complete table of
+every `data-section`'s top-of-content CSS convention and value,
+file:line for each. Gave a recommendation (keep the three existing
+tiers -- 8px `.dashboard` for dense overviews, 20px `.lw-panel__head`
+for list/table pages, 24px `.plugin-page`/custom for forms/settings --
+rather than forcing one universal value, since they map to genuinely
+different page types) and flagged Topology as the one page structurally
+in the wrong tier for its type. Einstein confirmed: "yes please," then
+separately asked "what about the topology page and the reticulum
+browser page?" mid-implementation.
+
+**The audit surfaced three real bugs, not just style inconsistency --
+same double-applied-class root cause as the bluetooth-scanner/
+raspberry-network fix, just not yet found there:**
+
+1. **Stats** (`data-section="stats"`): 48px instead of 24px.
+   `frontend/index.html`'s static host `<div id="stats-panel"
+   class="stats-panel">` already carried the real content class: this
+   was the div `stats_tab.js`'s `_buildLayout()` reads via
+   `document.getElementById(containerId)`, so its `<div
+   class="stats-panel">` line 72 output landed *inside* an ancestor
+   that already had the same class -- the exact same "class nested in
+   itself" shape as the `.plugin-page` + `.lw-panel__head` bug, minus
+   the second convention involved (just one class, applied twice via
+   two different DOM levels).
+2. **RF Environment** (`data-section="rf"`, "Hardware" in the sidebar):
+   40px instead of 20px, identical shape -- `#rf-panel` kept
+   `class="rf-panel"` in `index.html` while `rf_tab.js` rendered
+   another `<div class="rf-panel">` inside it.
+3. **Every Configuration subtab (12) + Settings → Storage**: 56px
+   instead of 24px. Each static host div in `index.html`
+   (`cfg-identity-panel`, `cfg-radio-panel`, ... `settings-storage-panel`)
+   is seeded with `class="section__placeholder"` (a real, intentional
+   class -- dashboard.css's `.section__placeholder`, 32px padding, meant
+   for the "Skeleton; controls land alongside this section" static
+   placeholder text shown before JS ever runs). `configuration_panel.js`'s
+   `_mountSection()` clears `host.innerHTML` on first real mount at all
+   13 call sites but never called `host.classList.remove(...)` --
+   `configuration.css`'s own `[data-section^="configuration/"]` rule
+   (24px) then stacked on top of that still-present 32px forever after.
+
+**Fixes applied, all verified with `node --check`/CSS brace-balance
+before considering done:**
+- Stats/RF: dropped `class="stats-panel"`/`class="rf-panel"` from the
+  two static host divs in `frontend/index.html` -- now matches every
+  other core page's convention of an unclassed host div (`#lorawan-panel`
+  etc.), where the page's own JS supplies the real wrapper class exactly
+  once. Confirmed `.stats-panel__loading`/RF's shared loading-text class
+  has its own self-contained `padding: 4rem` (stats.css), so the
+  pre-mount "Loading..." state doesn't regress from losing the host's
+  padding.
+- Configuration + Settings·Storage: added a `_mountHost(id)` helper to
+  `configuration_panel.js` (`document.getElementById` +
+  `classList.remove('section__placeholder')` together, returns the
+  element) and routed all 13 `document.getElementById('cfg-*-panel')`/
+  `document.getElementById('settings-storage-panel')` call sites through
+  it via a small Python script (safer than 13 near-identical manual
+  Edits -- asserted each id string appears exactly once before replacing,
+  so a typo would have raised instead of silently no-op'ing). Settings →
+  Storage needed one more piece: `configuration.css`'s
+  `[data-section^="configuration/"]` selector doesn't match
+  `settings/storage` (different route prefix), so it had *never* gotten
+  that 24px outer padding at all -- only the now-removed 32px placeholder
+  class was providing any padding. Extended that selector (and its
+  480px-width media-query sibling) to also match
+  `[data-section="settings/storage"]` explicitly, with a comment
+  explaining why Storage's rule lives in `configuration.css` and not
+  `settings.css` (its mount logic already lives in
+  `configuration_panel.js`, per that file's own header comment -- "kept
+  on this same panel/route prefix regardless").
+- Topology: **deliberately did not touch the outer `.topo-panel`/
+  `.panel`/`#topology-panel` box model.** Investigated first -- Topology
+  has no page-level title/stat-cards like LoRaWAN; "Mesh Topology" sits
+  directly in the panel's own in-panel toolbar header
+  (`.panel__header--tabs`, base 8px padding from `.panel__header`,
+  dashboard.css), because the whole page is one full-bleed graph/map
+  canvas, not a title+table layout. `topology_tab.js`'s canvas-resize
+  logic almost certainly measures that panel's real box dimensions
+  (couldn't verify without a live browser), so restructuring the outer
+  container the way Stats/RF needed felt like a real risk for a cosmetic
+  fix. Instead bumped just `.topo-panel .panel__header--tabs`'s own
+  `padding-top` to 20px (topology.css) -- closes the visual gap to match
+  other list/graph pages without touching anything the resize math
+  depends on. This is a narrower, lower-confidence fix than the others
+  and worth an explicit re-check against the live Pi once it ships,
+  unlike the class-removal fixes which are straightforwardly correct
+  from reading the CSS alone.
+- Reticulum Browser: checked on request (Einstein's specific follow-up
+  question) -- already uses `.lw-panel__head` directly, no
+  `.plugin-page` wrapper, no bug, no change made. Same convention
+  Reticulum itself uses (the page Einstein confirmed "also looks
+  correct" earlier in this same investigation).
+
+**Deliberately left alone**: Dashboard/Reticulum Dashboard's 8px
+`.dashboard` padding, and the 24px tier shared by Settings ·
+Updates/Themes/Auth/Dangerous/Plugins, Offline Maps, OLED Display,
+RTL-SDR, Hello World Github, and the Radio/"Hardware" page -- these are
+each single-applied, correctly matching their own page-type convention,
+and forcing every page to one identical top-padding value would erase a
+real, intentional distinction between "dense overview," "list page with
+a table," and "settings/form page" that already existed as three
+consistent tiers before this session, not two correct ones plus random
+noise.
+
+Verified: `node --check` on `configuration_panel.js` (clean), CSS
+brace-balance checks on `configuration.css`/`topology.css` (130/130,
+36/36), `ChangelogParser.parse_file()` re-parse of the whole CHANGELOG
+(31 sections, still clean) with a new bullet covering this whole audit.
+Cannot be visually confirmed without Einstein's real browser -- same
+caveat as the bluetooth-scanner/raspberry-network alignment fix above;
+worth a fresh screenshot comparison once this ships, especially for the
+lower-confidence Topology header change.

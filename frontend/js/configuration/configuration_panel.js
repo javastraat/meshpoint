@@ -53,12 +53,22 @@ class ConfigurationPanel {
         }
     }
 
+    /** getElementById plus dropping the static skeleton's
+     * `section__placeholder` class (index.html) -- every subsection host
+     * still has it until first mount, and it stacks its own 32px padding
+     * on top of whatever the real mounted content brings. */
+    _mountHost(id) {
+        const el = document.getElementById(id);
+        if (el) el.classList.remove('section__placeholder');
+        return el;
+    }
+
     _mountSection(section) {
         if (this._mounted.has(section)) return;
         const api = this._buildApi();
 
         if (section === 'identity' && window.IdentityConfigCard) {
-            const host = document.getElementById('cfg-identity-panel');
+            const host = this._mountHost('cfg-identity-panel');
             if (host) {
                 host.innerHTML = '';
                 const card = new window.IdentityConfigCard(api);
@@ -66,7 +76,7 @@ class ConfigurationPanel {
                 this._cards.set('identity', card);
             }
         } else if (section === 'radio' && window.RadioConfigEditCard) {
-            const host = document.getElementById('cfg-radio-panel');
+            const host = this._mountHost('cfg-radio-panel');
             if (host) {
                 host.innerHTML = `
                     <div class="cfg-section">
@@ -119,7 +129,7 @@ class ConfigurationPanel {
                 }
             }
         } else if (section === 'channels') {
-            const host = document.getElementById('cfg-channels-panel');
+            const host = this._mountHost('cfg-channels-panel');
             if (host) {
                 host.innerHTML = `
                     <div class="cfg-section">
@@ -141,7 +151,7 @@ class ConfigurationPanel {
                 }
             }
         } else if (section === 'meshcore' && window.MeshcoreConfigCard) {
-            const host = document.getElementById('cfg-meshcore-panel');
+            const host = this._mountHost('cfg-meshcore-panel');
             if (host) {
                 host.innerHTML = '';
                 const card = new window.MeshcoreConfigCard(api);
@@ -149,7 +159,7 @@ class ConfigurationPanel {
                 this._cards.set('meshcore', card);
             }
         } else if (section === 'serial' && window.SerialConfigCard) {
-            const host = document.getElementById('cfg-serial-panel');
+            const host = this._mountHost('cfg-serial-panel');
             if (host) {
                 host.innerHTML = '';
                 const card = new window.SerialConfigCard(api);
@@ -157,7 +167,7 @@ class ConfigurationPanel {
                 this._cards.set('serial', card);
             }
         } else if (section === 'firmware') {
-            const host = document.getElementById('cfg-firmware-panel');
+            const host = this._mountHost('cfg-firmware-panel');
             if (host) {
                 host.innerHTML = `
                     <div class="cfg-section">
@@ -207,7 +217,7 @@ class ConfigurationPanel {
                 }
             }
         } else if (section === 'transmit' && window.TransmitConfigCard) {
-            const host = document.getElementById('cfg-transmit-panel');
+            const host = this._mountHost('cfg-transmit-panel');
             if (host) {
                 host.innerHTML = '';
                 const card = new window.TransmitConfigCard(api);
@@ -215,7 +225,7 @@ class ConfigurationPanel {
                 this._cards.set('transmit', card);
             }
         } else if (section === 'mqtt' && window.MqttConfigCard) {
-            const host = document.getElementById('cfg-mqtt-panel');
+            const host = this._mountHost('cfg-mqtt-panel');
             if (host) {
                 host.innerHTML = '';
                 const card = new window.MqttConfigCard(api);
@@ -223,7 +233,7 @@ class ConfigurationPanel {
                 this._cards.set('mqtt', card);
             }
         } else if (section === 'gps' && window.GpsConfigCard) {
-            const host = document.getElementById('cfg-gps-panel');
+            const host = this._mountHost('cfg-gps-panel');
             if (host) {
                 host.innerHTML = `
                     <div class="cfg-section">
@@ -252,7 +262,7 @@ class ConfigurationPanel {
                 }
             }
         } else if (section === 'storage' && window.StorageConfigCard) {
-            const host = document.getElementById('settings-storage-panel');
+            const host = this._mountHost('settings-storage-panel');
             if (host) {
                 host.innerHTML = '';
                 const card = new window.StorageConfigCard(api);
@@ -260,7 +270,7 @@ class ConfigurationPanel {
                 this._cards.set('storage', card);
             }
         } else if (section === 'peripherals' && window.HardwareConfigCard) {
-            const host = document.getElementById('cfg-peripherals-panel');
+            const host = this._mountHost('cfg-peripherals-panel');
             if (host) {
                 host.innerHTML = '';
                 const card = new window.HardwareConfigCard(api);
@@ -268,7 +278,7 @@ class ConfigurationPanel {
                 this._cards.set('peripherals', card);
             }
         } else if (section === 'repeater-poll' && window.RepeaterPollConfigCard) {
-            const host = document.getElementById('cfg-repeater-poll-panel');
+            const host = this._mountHost('cfg-repeater-poll-panel');
             if (host) {
                 host.innerHTML = '';
                 const card = new window.RepeaterPollConfigCard(api);
@@ -276,7 +286,7 @@ class ConfigurationPanel {
                 this._cards.set('repeater-poll', card);
             }
         } else if (section === 'metrics' && window.MetricsConfigCard) {
-            const host = document.getElementById('cfg-metrics-panel');
+            const host = this._mountHost('cfg-metrics-panel');
             if (host) {
                 host.innerHTML = '';
                 const card = new window.MetricsConfigCard(api);

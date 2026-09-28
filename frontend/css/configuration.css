@@ -5,7 +5,11 @@
    Transmit / MQTT / GPS; the existing radio_*.css continues to
    style the migrated radio cards. */
 
-[data-section^="configuration/"] {
+/* "Storage" is mounted by this same panel (configuration_panel.js) but
+   lives under the Settings sidebar group/route, not Configuration --
+   included here rather than duplicating this rule under settings.css. */
+[data-section^="configuration/"],
+[data-section="settings/storage"] {
     color: var(--text-primary);
     overflow-y: auto;
     padding: 24px clamp(16px, 3vw, 32px);
@@ -823,7 +827,8 @@ select.cfg-field__input option:checked {
    it. Tightens both paddings and lifts the 340px cap so fields (and the
    card itself) actually use the available phone width. */
 @media (max-width: 480px) {
-    [data-section^="configuration/"] {
+    [data-section^="configuration/"],
+    [data-section="settings/storage"] {
         padding: 16px 12px;
     }
     .cfg-card {

@@ -53,6 +53,47 @@
   hijacked admin session could previously enable the terminal and
   self-trigger a restart via two ordinary admin-audited API calls, no
   filesystem access needed.
+- **Fix: several pages' content sat noticeably further from the topbar
+  than others, and Stats/RF Environment/every Configuration subtab had
+  their top padding silently doubled.** Found while comparing
+  screenshots of Dashboard, Topology, Bluetooth Scanner, and WiFi &
+  Network side by side. A full audit of every page's top-of-content
+  spacing turned up three real double-applied-padding bugs, on top of
+  the community-plugin one fixed earlier this session (see
+  `raspberry-network`/`bluetooth-scanner` above): **Stats** (48px
+  instead of 24px) and **RF Environment** (40px instead of 20px) both
+  had their real content class (`.stats-panel`/`.rf-panel`) applied
+  twice -- once on the static host `<div>` in `index.html`, again on
+  the div the page's own JS renders inside it on first load. Fixed by
+  dropping the class from the static host, matching how every other
+  page's host div is unclassed and lets its own JS supply the real
+  wrapper. **Every Configuration subtab** (Identity, Radio, Channels,
+  MeshCore, Serial, Firmware, Transmit, MQTT, GPS, Peripherals,
+  Repeater Poll, Metrics) plus **Settings → Storage** had 56px instead
+  of 24px: their static host divs keep a `section__placeholder`
+  skeleton class (32px padding, meant only for the "Loading..." text
+  shown before the real card mounts) forever, because
+  `configuration_panel.js`'s mount routines clear `innerHTML` but never
+  touched `classList`. New `_mountHost()` helper does both together,
+  used at all 13 call sites. Settings → Storage specifically had no
+  matching outer padding rule at all (`configuration.css`'s
+  `[data-section^="configuration/"]` selector doesn't match its
+  `settings/storage` route), so removing the stale class alone
+  would've left it flush -- added it to that same selector instead
+  of inventing a separate rule, since Storage's mount logic already
+  lives in this same file. Also bumped **Topology**'s in-panel toolbar
+  header (`padding-top: 20px`, was 8px) to visually match every other
+  list/graph page's `.lw-panel__head` convention, without touching the
+  outer panel's own box model -- `topology_tab.js`'s canvas resize
+  logic measures that, and changing it without a live browser to
+  verify against felt like the wrong place to take a risk for a
+  cosmetic fix. Checked Reticulum Browser too (the user's specific
+  comparison point) -- already correct, `.lw-panel__head` throughout,
+  no change needed. Dashboard's own tighter 8px top padding and
+  Settings/RTL-SDR/Offline Maps/OLED's 24px are unchanged, deliberately
+  -- different page types (dense overview vs. list-with-table vs.
+  form-heavy settings) reading with different visual weight is
+  intentional, not an inconsistency to stamp out.
 
 #### Plugins
 
@@ -117,7 +158,37 @@
   is for independently-installable plugins sharing one page; WiFi and
   Ethernet are two views of one "network settings" concern, always
   shipped together, nothing gained by splitting into two plugin folders
-  just for a tabbar.
+  just for a tabbar. The permanent "changing WiFi here can disconnect
+  this dashboard" warning now sits below the scan results table (inside
+  the panel, using the same inset as the connect form below it) instead
+  of above the stat cards, so the WiFi and Network tabs' top sections
+  line up identically -- page title, then stat cards, then the tab bar,
+  on both. The DNS stat card (both tabs) now wraps instead of
+  overflowing past its own card border when a device reports more than
+  one DNS address -- `.stat-card__value` is `white-space: nowrap`
+  globally, so this plugin adds its own scoped override class rather
+  than touching the shared one.
+- **Fix: `bluetooth-scanner` and `raspberry-network` pages sat visibly
+  further right than LoRaWAN/Reticulum/every other core page, and
+  their content could get clipped instead of scrolling.** Both wrapped
+  their markup in core's generic `.plugin-page` class (dashboard.css --
+  free padding/typography for a minimal plugin that doesn't need its
+  own CSS) while *also* using the "real" `lorawan.css` page structure
+  (`.lw-panel__head`/`.lw-stats`/`.lw-section`), which carries its own
+  matching `clamp(16px, 3vw, 32px)` side padding -- applying the same
+  horizontal inset twice. Every core page using that real structure
+  (LoRaWAN, Reticulum, Meshtastic, MeshCore) skips `.plugin-page`
+  entirely and gets the inset once, from `.lw-panel__head` alone.
+  Dropped `.plugin-page` from both plugins' markup; since `.section`
+  defaults to `overflow: hidden` and `.plugin-page` was also silently
+  supplying this page's only scroll behavior, each plugin's own CSS now
+  opts its `.section[data-section="..."]` into `overflow-y: auto`
+  directly, the same way `lorawan.css` already does for its own five
+  sections. Confirmed via `grep` that the other four plugins using
+  `.plugin-page` (`offline-map`, `oled-display`, `hello-world-github`,
+  `rtlsdr`) are genuinely minimal pages that never adopted the
+  `lw-panel__head` structure, so they don't have this bug and were left
+  untouched.
 - **Fix: a plugin source's browse catalog never showed a plain `requires`
   dependency, only a `[hook]` one -- two bugs, not one.**
   `reticulum-browser` and `reticulum-dashboard` (both
