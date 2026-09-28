@@ -32,6 +32,18 @@ def _patched(out: bytes, rc: int = 0):
     )
 
 
+def _patched_sequence(*results: tuple[bytes, int]):
+    """Like _patched(), but each successive create_subprocess_exec call
+    gets the next (out, rc) pair -- for functions that shell out more
+    than once (wifi_connect's delete-then-connect, wifi_status's
+    status-then-device-show)."""
+    procs = [_FakeProc(out, rc) for out, rc in results]
+    return mock.patch.object(
+        nmcli.asyncio, "create_subprocess_exec",
+        new=mock.AsyncMock(side_effect=procs),
+    )
+
+
 class TestRunNmcli(unittest.TestCase):
     def test_builds_sudo_nmcli_argv_and_returns_rc_and_text(self) -> None:
         with _patched(b"  connected\n", 0) as spawn:
@@ -111,21 +123,30 @@ class TestWifiScan(unittest.TestCase):
 
 
 class TestWifiStatus(unittest.TestCase):
-    def test_finds_the_wifi_device_among_others(self) -> None:
-        out = "eth0:ethernet:connected:Wired\nwlan0:wifi:connected:HomeNet\n"
-        with _patched(out.encode()):
-            status = asyncio.run(nmcli.wifi_status())
-        self.assertEqual(
-            status, {"device": "wlan0", "state": "connected", "connection": "HomeNet"},
-        )
+    _IP4_OUT = "IP4.ADDRESS[1]:192.168.4.50/24\nIP4.GATEWAY:192.168.4.1\nIP4.DNS[1]:192.168.4.1\nIP4.DNS[2]:8.8.8.8\n"
 
-    def test_disconnected_wifi_has_no_connection_name(self) -> None:
-        out = "wlan0:wifi:disconnected:\n"
-        with _patched(out.encode()):
+    def test_finds_the_wifi_device_among_others(self) -> None:
+        status_out = "eth0:ethernet:connected:Wired\nwlan0:wifi:connected:HomeNet\n"
+        with _patched_sequence((status_out.encode(), 0), (self._IP4_OUT.encode(), 0)) as spawn:
             status = asyncio.run(nmcli.wifi_status())
-        self.assertEqual(
-            status, {"device": "wlan0", "state": "disconnected", "connection": None},
-        )
+        self.assertEqual(status, {
+            "device": "wlan0", "state": "connected", "connection": "HomeNet",
+            "address": "192.168.4.50/24", "gateway": "192.168.4.1",
+            "dns": ["192.168.4.1", "8.8.8.8"],
+        })
+        # The device-show call must use the device the status query
+        # found ("wlan0"), never something client-supplied.
+        calls = [c.args for c in spawn.call_args_list]
+        self.assertEqual(calls[1][-1], "wlan0")
+
+    def test_disconnected_wifi_has_no_connection_name_or_ip4_info(self) -> None:
+        status_out = "wlan0:wifi:disconnected:\n"
+        with _patched_sequence((status_out.encode(), 0), (b"", 0)):
+            status = asyncio.run(nmcli.wifi_status())
+        self.assertEqual(status, {
+            "device": "wlan0", "state": "disconnected", "connection": None,
+            "address": None, "gateway": None, "dns": [],
+        })
 
     def test_no_wifi_device_at_all_returns_none(self) -> None:
         out = "eth0:ethernet:connected:Wired\n"
@@ -134,19 +155,34 @@ class TestWifiStatus(unittest.TestCase):
         self.assertIsNone(status)
 
 
-class TestWifiConnect(unittest.TestCase):
-    def _patched_sequence(self, *results: tuple[bytes, int]):
-        """Like _patched(), but each successive create_subprocess_exec
-        call gets the next (out, rc) pair -- for asserting the delete
-        and connect calls' results are handled independently."""
-        procs = [_FakeProc(out, rc) for out, rc in results]
-        return mock.patch.object(
-            nmcli.asyncio, "create_subprocess_exec",
-            new=mock.AsyncMock(side_effect=procs),
+class TestIp4Info(unittest.TestCase):
+    def test_parses_address_gateway_and_multiple_dns_servers(self) -> None:
+        out = "IP4.ADDRESS[1]:10.0.0.5/24\nIP4.GATEWAY:10.0.0.1\nIP4.DNS[1]:10.0.0.1\nIP4.DNS[2]:1.1.1.1\n"
+        with _patched(out.encode()):
+            info = asyncio.run(nmcli._ip4_info("wlan0"))
+        self.assertEqual(info, {
+            "address": "10.0.0.5/24", "gateway": "10.0.0.1", "dns": ["10.0.0.1", "1.1.1.1"],
+        })
+
+    def test_not_connected_gives_empty_info_not_an_error(self) -> None:
+        with _patched(b""):
+            info = asyncio.run(nmcli._ip4_info("wlan0"))
+        self.assertEqual(info, {"address": None, "gateway": None, "dns": []})
+
+    def test_uses_the_real_device_show_argv(self) -> None:
+        with _patched(b"") as spawn:
+            asyncio.run(nmcli._ip4_info("wlan0"))
+        args, _kwargs = spawn.call_args
+        self.assertEqual(
+            args,
+            ("sudo", "nmcli", "-t", "-f", "IP4.ADDRESS,IP4.GATEWAY,IP4.DNS",
+             "device", "show", "wlan0"),
         )
 
+
+class TestWifiConnect(unittest.TestCase):
     def test_builds_the_real_connect_argv_after_deleting_any_stale_profile(self) -> None:
-        with self._patched_sequence(
+        with _patched_sequence(
             (b"", 0),  # connection delete
             (b"Device 'wlan0' successfully activated", 0),  # device wifi connect
         ) as spawn:
@@ -162,7 +198,7 @@ class TestWifiConnect(unittest.TestCase):
     def test_delete_failing_does_not_block_the_connect_attempt(self) -> None:
         # "unknown connection" (nothing to delete -- first-ever attempt
         # at this SSID) is the common case, not an error to propagate.
-        with self._patched_sequence(
+        with _patched_sequence(
             (b"Error: unknown connection 'HomeNet'.", 1),
             (b"Device 'wlan0' successfully activated", 0),
         ):
@@ -172,7 +208,7 @@ class TestWifiConnect(unittest.TestCase):
         self.assertIn("successfully activated", out)
 
     def test_failure_is_passed_through_not_raised(self) -> None:
-        with self._patched_sequence(
+        with _patched_sequence(
             (b"", 0),
             (b"Error: Secrets were required, but not provided.", 4),
         ):

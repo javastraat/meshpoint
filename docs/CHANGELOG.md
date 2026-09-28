@@ -96,7 +96,17 @@
   password gets updated. A non-empty password now deletes any existing
   profile of that name first, guaranteeing a clean one every time real
   credentials are actually supplied (never done on the empty-password
-  path, which explicitly wants to keep what's already saved).
+  path, which explicitly wants to keep what's already saved). Status
+  now also shows IP address, gateway, and DNS, not just connection
+  name/state -- new `nmcli -t -f IP4.ADDRESS,IP4.GATEWAY,IP4.DNS
+  device show <device>` query, matching sudoers grant, device name
+  always server-determined (whatever the status query itself just
+  found), never client-supplied. Also fixed the top stat cards'
+  horizontal alignment -- they used a plain vertical margin instead of
+  matching `.lw-panel__head`'s own `clamp(16px, 3vw, 32px)` side inset
+  (the same convention `bluetooth-scanner`'s `.bts-stats`/`.bts-error`
+  already establish), so they sat flush left instead of lining up with
+  the page title above them.
 - **Fix: a plugin source's browse catalog never showed a plain `requires`
   dependency, only a `[hook]` one -- two bugs, not one.**
   `reticulum-browser` and `reticulum-dashboard` (both

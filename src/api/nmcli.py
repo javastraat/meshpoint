@@ -101,10 +101,45 @@ async def wifi_scan() -> list[dict]:
     return networks
 
 
+_IP4_FIELDS = "IP4.ADDRESS,IP4.GATEWAY,IP4.DNS"
+
+
+async def _ip4_info(device: str) -> dict:
+    """IPv4 address/gateway/DNS for *device*: ``{address, gateway,
+    dns}`` -- ``address``/``gateway`` are ``None`` and ``dns`` is ``[]``
+    when not connected (nmcli just returns those fields empty, not an
+    error). Deliberately not run through ``_split_terse_line`` -- unlike
+    the fixed-field queries above, ``nmcli device show``'s terse output
+    is ``key:value`` per line with a *variable* number of lines for a
+    multi-valued property (``IP4.DNS[1]``, ``IP4.DNS[2]``, ...), so
+    parsing has to group by (de-indexed) key instead of assuming a
+    fixed field count. A plain first-colon split is safe here
+    specifically because IPv4 addresses/CIDR never contain a literal
+    ``:`` themselves, unlike the SSID field elsewhere in this module.
+    """
+    _rc, out = await _run_nmcli("-t", "-f", _IP4_FIELDS, "device", "show", device)
+    address = None
+    gateway = None
+    dns: list[str] = []
+    for line in out.splitlines():
+        key, sep, value = line.partition(":")
+        if not sep:
+            continue
+        if key.startswith("IP4.ADDRESS"):
+            address = value or address
+        elif key == "IP4.GATEWAY":
+            gateway = value or None
+        elif key.startswith("IP4.DNS") and value:
+            dns.append(value)
+    return {"address": address, "gateway": gateway, "dns": dns}
+
+
 async def wifi_status() -> dict | None:
-    """The wifi device's current state: ``{device, state, connection}``,
-    or ``None`` if this box has no wifi device at all (Ethernet-only
-    carriers, or wifi disabled in raspi-config)."""
+    """The wifi device's current state and IPv4 config: ``{device,
+    state, connection, address, gateway, dns}``, or ``None`` if this box
+    has no wifi device at all (Ethernet-only carriers, or wifi disabled
+    in raspi-config). ``address``/``gateway``/``dns`` are empty when not
+    connected."""
     _rc, out = await _run_nmcli("-t", "-f", _STATUS_FIELDS, "device", "status")
     for line in out.splitlines():
         if not line.strip():
@@ -112,10 +147,12 @@ async def wifi_status() -> dict | None:
         device, dev_type, state, connection = _split_terse_line(line, 4)
         if dev_type != "wifi":
             continue
+        ip4 = await _ip4_info(device)
         return {
             "device": device,
             "state": state,
             "connection": connection or None,
+            **ip4,
         }
     return None
 

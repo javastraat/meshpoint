@@ -39,6 +39,10 @@ meshpoint ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart rnsd
 # to try a failing one.
 meshpoint ALL=(ALL) NOPASSWD: /usr/bin/nmcli -t -f SSID\,SIGNAL\,SECURITY\,IN-USE device wifi list --rescan yes
 meshpoint ALL=(ALL) NOPASSWD: /usr/bin/nmcli -t -f DEVICE\,TYPE\,STATE\,CONNECTION device status
+# Device name is wildcarded (varies by hardware, e.g. wlan0) but is
+# never client-supplied -- always whatever the status query above just
+# found, not user input.
+meshpoint ALL=(ALL) NOPASSWD: /usr/bin/nmcli -t -f IP4.ADDRESS\,IP4.GATEWAY\,IP4.DNS device show *
 meshpoint ALL=(ALL) NOPASSWD: /usr/bin/nmcli device wifi connect *
 # Deletes a stale connection profile right before recreating it with a
 # real password -- see wifi_connect()'s own docstring. Only ever the

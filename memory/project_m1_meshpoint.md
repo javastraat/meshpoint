@@ -15773,3 +15773,72 @@ every remaining live-testing round on this plugin: nothing here can be
 verified with certainty from the Mac, so present fixes as the best
 available reasoning plus a named fallback hypothesis, not as
 guaranteed resolutions.
+
+**Same plugin, two more real polish rounds once it was confirmed
+working: card alignment, and IP/Gateway/DNS info.** Einstein compared
+a screenshot of raspberry-network's top stat cards against
+bluetooth-scanner's and asked for them to be "nice aligned" like that
+one, plus asked for more info cards (IP/gateway/DNS) -- ending with
+"what do you think, more info?".
+
+Found the actual CSS bug by reading bluetooth-scanner's own CSS file
+directly rather than guessing at spacing values: `.bts-stats` uses
+`padding: 4px clamp(16px, 3vw, 32px) 16px` (no margin) specifically so
+its left edge matches `.lw-panel__head`'s own identical
+`clamp(16px, 3vw, 32px)` horizontal inset -- both nested inside
+`.plugin-page`, which has its own separate padding again, so the
+alignment that matters is between siblings sharing the same clamp
+value, not against the outer page edge. My first draft used a plain
+`margin: 0.75rem 0` (zero horizontal component), which put the stat
+cards flush against `.plugin-page`'s edge while the title above (with
+`.lw-panel__head`'s extra inset) sat further right -- a real,
+visible misalignment, not a cosmetic nitpick. Fixed by matching
+`.bts-stats`'s exact rule, and applied the same clamp-based horizontal
+margin consistently across every other top-level element on the page
+(`.rn-warning`, `.rn-error`, `.rn-success`, `.rn-connect-form`) that
+had the same "plain vertical margin only" bug, confirmed against
+`.bts-error`'s own matching convention (`margin: 0 clamp(16px, 3vw,
+32px)`) rather than inventing a new one.
+
+IP/Gateway/DNS: extended `wifi_status()` (`src/api/nmcli.py`) to also
+query `nmcli -t -f IP4.ADDRESS,IP4.GATEWAY,IP4.DNS device show
+<device>` once the wifi device is known, via a new `_ip4_info()`
+helper. Real design point worth remembering: `nmcli device show`'s
+terse output has a genuinely different shape from every other query
+this module uses -- `key:value` per line with a *variable* number of
+lines for a multi-valued property (`IP4.DNS[1]`, `IP4.DNS[2]`, ...),
+not a fixed field count -- so it couldn't reuse `_split_terse_line`
+(built for exactly-N-fields-per-line queries) and needed its own
+group-by-de-indexed-key parsing instead. Confirmed it's still safe to
+use a plain first-colon split here specifically because IPv4
+addresses/CIDR notation never contain a literal `:` themselves (unlike
+SSIDs, which do need the full escape-aware splitter elsewhere in this
+file) -- a deliberate, documented exception to the module's own
+escaping discipline, not an oversight.
+
+Device name for the `device show` call is always whatever the status
+query itself just found (e.g. "wlan0"), never taken from the client/
+request -- worth being explicit about in both the sudoers comment and
+the code, matching this module's existing discipline of treating SSID/
+password (real Pydantic-validated user input, for connect) differently
+from a device name (server-determined, never trusted from the client)
+even though both end up in a wildcarded sudoers line for the same
+underlying practical reason (device names and SSIDs both vary, but
+only one of the two is actually attacker-controlled).
+
+New sudoers grant: `/usr/bin/nmcli -t -f IP4.ADDRESS\,IP4.GATEWAY\,
+IP4.DNS device show *` (commas escaped again, same `visudo -cf`-caught
+lesson from the very first sudoers edit this session -- ran the check
+again this time as a matter of course rather than needing to
+rediscover the gotcha). Added a dedicated `TestIp4Info` test class
+(parses multiple DNS servers correctly, not-connected gives empty info
+without erroring, real argv shape) plus updated `TestWifiStatus`'s
+existing tests for the now-two-call sequence (status query, then
+device-show) using the shared `_patched_sequence` helper -- promoted
+that helper from a `TestWifiConnect`-local method to module level
+since it's now needed by both test classes, rather than duplicating it
+a second time. 21/21 pass. CHANGELOG bullet extended in place again
+(same still-uncommitted entry from earlier in this conversation, now
+covering the whole feature's full arc: build, two live-bug fixes,
+alignment fix, and the new IP/gateway/DNS addition, rather than
+fragmenting one feature's story across many separate bullets).
