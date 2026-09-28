@@ -16504,3 +16504,189 @@ explicitly stated as "make everything consistent."
 
 last commit had wrong description
 
+**OLED Display's Settings card split into two, same session, right
+after landing (Einstein confirmed via screenshot it looked "better" but
+"the settings part looks horrible").** Couldn't see the screenshot
+directly at first -- this session had accumulated enough images that
+the chat upload started rejecting anything over 2000px, and Einstein's
+2032px-wide screenshots kept failing silently on his end too. Worked
+around it once Einstein said "its in the data dir": found the actual
+PNG at `data/Screenshot *.png` (the live device's own `data/` folder,
+apparently used as a shared drop point), but even `Read`-ing it
+directly still hit the same rejection -- tried resizing via PIL
+(`im.thumbnail(...)`) down to 1900px, then 1000px, saved to the session
+scratchpad, still rejected both times. Concluded this is a hard,
+size-independent cap tied to total images already in this long
+session's context, not something fixable by shrinking the file
+further -- gave up trying to view it directly and reasoned from the
+report + the actual CSS grid math instead.
+
+**Diagnosis, without ever seeing the pixels**: the single "Settings"
+card (8 fields) sits in a 2-item `.cfg-section--grid` next to Live
+preview. With only two grid items on a wide screen, `auto-fit
+minmax(320px,1fr)` gives Settings an enormous column (~900px+) --
+`.cfg-row`'s own `auto-fit minmax(160px,1fr)` then spreads all 5 narrow
+fields into one very wide single row, with the long labels ("Boot logo
+duration (seconds, 0 = skip it)") wrapping over a lone 140px input and
+lots of dead space between columns. This is structurally different
+from Peripherals' Fan card, which sits in a 4-card grid and so never
+gets a column wide enough to trigger this. First fix attempt: capped
+`[data-oled-form] { max-width: 520px }` to force the same density
+Peripherals has regardless of actual column width -- correct reasoning,
+but superseded almost immediately by Einstein's own better idea.
+
+Einstein proposed the real fix directly, pasting the flat field list
+and asking: "can we maybe make the settings 2 cards one for the
+hardware one for the settings ?" -- splitting `by concern` (physical
+wiring vs. behavior) rather than just capping width. Grouped: **Hardware**
+(I2C address, Controller) and **Settings** (Display enabled, Blank
+after/Refresh interval/Boot logo duration, Rotate screens, Seconds per
+page). Backend (`/api/oled-display/settings`, one `PUT` for everything)
+wasn't worth splitting just for this, so kept both cards inside ONE
+`<form data-oled-form>` -- `_save()`/`_loadSettings()` untouched, still
+read/write the same flat set of `data-oled-*` fields regardless of
+which card visually contains them. Used `display: contents` on the
+form (`.oled-settings-form` class) so the form itself doesn't become a
+grid cell and break Live preview/Hardware/Settings out of sharing one
+`.cfg-section--grid` row -- a form element with `display:contents`
+still submits/validates normally, it just stops generating its own box,
+letting its children (the two `.cfg-card`s) participate directly in the
+parent grid as if the form wrapper weren't there at all. Removed the
+`max-width:520px` cap from the first attempt -- no longer needed once
+each card is naturally narrower with fewer fields.
+
+**Hit a real, self-inflicted JS syntax bug while adding an explanatory
+comment**: wrote an HTML comment inside the template literal using
+markdown-style backticks around `type="submit"` for emphasis --
+`` `type="submit"` `` -- not realizing a literal backtick *inside* a
+JS template literal string closes it early, regardless of being inside
+an HTML `<!-- -->` comment (HTML comment syntax has no special meaning
+to the JS parser; only the backtick does). `node --check` caught it
+immediately (`Unexpected identifier 'type'`) -- fixed by dropping the
+backticks from the comment text entirely. Worth remembering as a
+category, not just this one instance: **never use backtick-quoting for
+inline code emphasis inside a JS template-literal string**, HTML
+comment or not -- plain text or single/double quotes only.
+
+Final ask, after confirming the split fixed the spacing: "can u also
+add a save button in the settings card of the oled page?" then,
+immediately correcting: "sorry i mean in the hardware card" -- wanted a
+*second* Save button, one per card, matching Peripherals' "every card
+has its own button" convention, even though functionally there's still
+only one combined save underneath. Added a second `type="submit"`
+button to the Hardware card (same classes as Settings' own) -- since
+both live inside the one shared form, either button submits everything;
+added a code comment explaining this explicitly so it doesn't read as
+an accidental duplicate save action to a future reader.
+
+Verified: `node --check` (clean, after the backtick fix), HTML tag
+balance re-confirmed after each edit (div/article/header/form/label/
+button all matched), CSS brace-balance on the plugin's own CSS file,
+`ChangelogParser.parse_file()` re-parse (31 sections, clean) after
+folding the whole arc into the same still-uncommitted OLED changelog
+bullet from the entry above, rather than layering a separate one for
+each iteration.
+
+**Live-confirmed on the Pi, 2026-09-28**: Einstein confirmed the
+Peripherals `.cfg-section--grid` fix and the OLED Hardware/Settings
+split both render correctly in the actual browser ("6 is done" -- item
+#6 on the session todo list, "Live confirmation of the Peripherals/OLED
+grid+split fixes"). Both were reasoned through from CSS alone (image
+uploads kept failing all session, see the entry above) -- this closes
+that gap with real verification evidence, not just code-level
+confidence. Remaining open items unchanged: backup encryption
+(security backlog #8), the three still-untouched community plugins
+(offline-map/hello-world-github/rtlsdr), and the not-yet-checked
+Configuration -> Firmware page.
+
+**Consistency pass items #2-4 done, same session, right after Einstein
+confirmed #6 live.** Asked to keep going ("#2-4 sounds perfect if you
+can"). Read all three plugins fully before touching anything:
+
+- **offline-map**: same shape of bug as OLED -- bare `<h2>`/`<p>` title,
+  bespoke `.om-card`/`.om-card__title`/`.om-card__actions`/`.om-form`.
+  One genuinely interesting finding: `.om-card` already referenced
+  `var(--auth-card-bg)`/`var(--auth-card-border)`/`var(--auth-card-radius)`
+  directly (its own CSS comment even said so -- "reuse the app's own
+  ... tokens") -- meaning it had almost certainly been hit by the exact
+  same undefined-custom-property bug fixed earlier this session for
+  Themes/System/Plugins (those tokens were `.auth-panel`-scoped before
+  being hoisted to `:root`), and got fixed FOR FREE the moment that
+  hoist landed, without this plugin's own code ever being touched.
+  Confirmed only after the fact by reading its CSS, not something
+  checked proactively when the original `:root` hoist was done --
+  worth remembering that fix's blast radius was larger than the three
+  pages it was written for. Rebuilt anyway to the real `.cfg-card`
+  classes (not just correctly-themed-by-accident) for true consistency,
+  matching OLED's precedent exactly: title to `.lw-panel__head`, three
+  cards (Downloader/Dashboard map source/Settings) into
+  `.cfg-section--grid`, `.om-form`'s custom grid dropped in favor of
+  `.cfg-row` -- but only for the four genuinely-narrow numeric fields
+  (port/max workers/rate limit/max retries); the three path fields
+  (maps directory/presets directory/log file) deliberately kept full
+  width outside the row, since a filesystem path can run long in a way
+  a GPIO pin number never does -- a judgment call OLED's fields didn't
+  need to make (everything there really was narrow).
+- **rtlsdr**: NOT a settings/cards page at all -- it's the bare host
+  shell every RTL-SDR plugin (Radio, DAB+, P2000, POCSAG, RTL433, ACARS,
+  ADS-B) hook-mounts its own tab into via `window.registerPageHook()`.
+  Nothing to restructure card-wise; only the title moved to
+  `.lw-panel__head`/`.lw-panel__title`. Caught and fixed a real mistake
+  in my *own* first-draft edit before it shipped: wrapped the existing
+  empty-state text in a second `<p class="rtlsdr-empty">` around what
+  was already `<p>No RTL-SDR plugins enabled...</p>` -- invalid nested
+  `<p>` (browsers auto-close the outer one, silently mangling the
+  intended structure). Fixed by putting the class directly on the
+  original tag instead, and used the app's own existing `.lw-empty`
+  class (the same one Bluetooth Scanner's "No devices seen yet." uses)
+  rather than inventing `.rtlsdr-empty` for what's the exact same kind
+  of message.
+- **hello-world-github deliberately skipped**, explained rather than
+  silently done or silently left out: its own header comment literally
+  says it's "the minimal reference plugin for the 'sidebar' seam" --
+  the architecture's own teaching example for how to build the simplest
+  possible plugin page. Re-skinning it to match every real feature page
+  would actively work against that documented purpose -- a real
+  exception, not an oversight, and told Einstein why rather than
+  quietly matching or quietly skipping without explanation.
+
+Verified: `node --check` on both touched JS files, HTML tag balance on
+offline-map's (div 6/6, article 3/3, header 4/4, form 1/1, label 8/8),
+CSS brace-balance on both plugins' CSS (offline-map 3/3, rtlsdr 2/2),
+`grep` confirming no dangling `.om-card`/`.om-page`/`.om-form`/
+`.plugin-page` references left in either plugin folder,
+`ChangelogParser.parse_file()` re-parse (31 sections, clean).
+
+Remaining open items after this: backup encryption (security backlog
+#8) and the not-yet-checked Configuration -> Firmware page (7 stacked
+firmware-update cards, flagged earlier as a plausible candidate for the
+same grid treatment, never confirmed either way).
+
+**Separate small fix, same session: Settings -> System's "Service
+actions" list showed a blank gap on load, "especially after a restart
+of meshpoint."** Einstein asked what was up with it. Checked the
+backend (`src/api/routes/dangerous_routes.py`'s `GET
+/api/dangerous/actions` -- trivial in-memory `registry.to_payload()`,
+no I/O) and the JS boot sequence (`frontend/js/app.js`'s
+`_bootDangerousPanel()` fires `controller.refresh()`/
+`backupCard.refresh()` in parallel, not sequentially) -- nothing
+backend-side is actually slow by design. Real cause: `.dangerous-panel
+__list` (`frontend/index.html`) started as a genuinely empty `<div>`,
+no placeholder at all, unlike every sibling card which shows something
+from the static markup immediately -- so ANY fetch delay read as
+"missing" rather than "loading." Einstein confirmed this diagnosis
+directly and added the "especially after a restart" detail, which
+points at real (if unavoidable) system load right after a restart --
+every capture-source subprocess starting up and competing for the Pi's
+CPU/IO at once -- rather than a bug in this endpoint specifically.
+
+Fix: `data-dangerous-status` now starts with static "Loading…" text
+(`index.html`) instead of empty; `dangerous_panel_controller.js`'s
+`refresh()` clears it (`this._setStatus('', '')`) right after
+`_render()` succeeds. Small, low-risk, purely a perceived-responsiveness
+fix -- doesn't touch the actual fetch timing, which is a real system-
+load effect right after restart, not something worth chasing further.
+
+Verified: `node --check` on the controller (clean),
+`ChangelogParser.parse_file()` re-parse (31 sections, clean).
+

@@ -46,6 +46,7 @@ class DangerousPanelController {
             const body = await response.json();
             this._actions = body.actions || [];
             this._render();
+            this._setStatus('', '');
         } catch (_e) {
             this._setStatus('error', 'Network error loading actions.');
         }

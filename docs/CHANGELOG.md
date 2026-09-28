@@ -168,22 +168,69 @@
   minimal plugin with no CSS of its own) and its own `.oled-card` class
   for "Live preview"/"Settings" -- visibly different from every other
   settings-shaped page. Title now uses `.lw-panel__head`/
-  `.lw-panel__title` like every other plugin page; the two cards now
-  use the real shared `.cfg-card`/`.cfg-card__head`/`.cfg-form`, and
-  their fields get the same `.cfg-row`/`.cfg-field--narrow` treatment
-  Peripherals' cards just got above -- I2C address/blank timeout/
-  refresh interval/boot logo duration/rotate-seconds now flow into
-  columns instead of each taking a full row, and the two checkboxes
-  switched to the real `.cfg-field--toggle` markup instead of nesting a
-  checkbox inside a label's text span (worked by accident via normal
-  inline flow, wasn't actually using the shared toggle convention).
-  Dropped the old form's `max-width: 360px` cap, which would have
-  fought `.cfg-row`'s own column sizing the same way stale per-card
-  width caps did on the System page fix above. `.oled-preview`'s
-  hardcoded-black styling (the real physical screen, deliberately not
-  themed) is unchanged, as is `.oled-card`'s already-fixed `--bg-card`
-  token usage -- neither was broken, just no longer needed once the
-  card itself is `.cfg-card`.
+  `.lw-panel__title` like every other plugin page. The old single
+  eight-field "Settings" card is now two: **Hardware** (I2C address,
+  controller -- physical wiring, set once per board) and **Settings**
+  (on/off, timing, rotation -- everything behavioural), matching how
+  Peripherals itself splits Fan/LED/Button into separate cards instead
+  of one giant form, and incidentally fixing a real spacing problem the
+  single-card version had -- sitting in a 2-item grid next to Live
+  preview gave it a much wider column than Peripherals' own cards ever
+  get, so `.cfg-row`'s auto-fit spread every narrow field into one wide
+  row with long labels wrapping over lone 140px inputs. Both cards
+  still submit together as one `PUT /api/oled-display/settings` call
+  (`_save()` unchanged) -- kept in a single `<form>` wrapping both
+  `.cfg-card`s rather than splitting the backend, with `display:
+  contents` on the form so it doesn't become its own grid cell and
+  break the three cards out of the shared row; each card gets its own
+  `type="submit"` Save button (either one saves everything) so every
+  card visually has an action, matching every other multi-card page.
+  Fields get the same `.cfg-row`/`.cfg-field--narrow` treatment
+  Peripherals' cards just got above, and the two checkboxes switched to
+  the real `.cfg-field--toggle` markup instead of nesting a checkbox
+  inside a label's text span (worked by accident via normal inline
+  flow, wasn't actually using the shared toggle convention).
+  `.oled-preview`'s hardcoded-black styling (the real physical screen,
+  deliberately not themed) is unchanged, as is `.oled-card`'s
+  already-fixed `--bg-card` token usage -- neither was broken, just no
+  longer needed once the cards are `.cfg-card`.
+- **Offline Maps and RTL-SDR get the same page-chrome consistency pass
+  as OLED Display above.** Offline Maps had the same shape of bespoke
+  styling -- bare `<h2>`/`<p>` title, an `.om-card` class that already
+  happened to reuse the `--auth-card-*` tokens (fixed to `:root` above)
+  rather than the real `.cfg-card`/`.cfg-card__head`, and its own
+  `.om-form` grid instead of `.cfg-row`. Switched all three to the real
+  shared classes; its "Downloader"/"Dashboard map source"/"Settings"
+  cards now sit in the same `.cfg-section--grid` Peripherals/OLED use,
+  and the Settings card's four narrow numeric fields (port/max
+  workers/rate limit/max retries) flow into a `.cfg-row` ahead of the
+  three full-width path fields (maps/presets directory, log file) --
+  paths stay full width on purpose, unlike a GPIO pin they can
+  genuinely run long. RTL-SDR is a bare host shell other plugins (Radio,
+  DAB+, P2000, ...) inject their own hook tabs into -- no cards/settings
+  of its own to restructure, so only its title moved to
+  `.lw-panel__head`/`.lw-panel__title`; while there, fixed an invalid
+  nested `<p>` a naive version of this same edit would have introduced
+  (the existing empty-state text is itself already a `<p>`), giving it
+  the shared `.lw-empty` class instead of wrapping it in a second one.
+  Both pages' `.plugin-page`-supplied scroll behavior replaced with the
+  same explicit `.section[data-section="..."] { overflow-y: auto }`
+  opt-in used everywhere else this pass touched. **`hello-world-github`
+  deliberately left alone** -- its own header comment states it's "the
+  minimal reference plugin for the sidebar seam," used as the
+  architecture's own teaching example; re-skinning it to match every
+  real feature page would work against its actual documented purpose.
+- **Settings → System's "Service actions" cards now show "Loading…"
+  instead of a blank gap while they fetch.** Every sibling card
+  (Display units, Backup and restore, Landing page) shows *something*
+  immediately from the static page markup; the Service actions list
+  started as a genuinely empty `<div>` with no placeholder at all, so
+  any delay in `GET /api/dangerous/actions` -- most noticeable right
+  after a restart, when every capture-source subprocess is starting up
+  and competing for the Pi's CPU/IO at once -- read as the section
+  being missing rather than just loading. The endpoint itself is a
+  trivial in-memory lookup with no fix needed there; this is purely
+  the missing loading-state UX.
 
 #### Plugins
 
