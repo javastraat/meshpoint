@@ -16320,3 +16320,40 @@ by literally grepping every `.auth-card`-using container's class list
 against every place `.auth-panel` is actually declared) isn't a guess
 from a screenshot, it's a structural fact about the markup/CSS that
 doesn't depend on rendering to be true.
+
+**Follow-up, same session, right after the card-border fix landed**:
+Einstein sent a live screenshot confirming the borders now show, then
+asked for the layout itself to improve -- "on the system settings page
+can you make the 3 cards better now they are under eachother and
+dashboard ever full wide screen." Each of System's four cards (Display
+units/Backup and restore/Landing page/Web terminal) was a plain block
+child of `.dangerous-panel` (no flex/grid wrapper at all), so they
+stacked one per row at full content width regardless of how short their
+content was. Wrapped all four in `.auth-panel__grid`
+(`display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr));
+gap:18px`) -- the exact same responsive grid Settings → Auth already
+uses for its own five differently-sized cards, reused rather than
+reinvented (`frontend/index.html`, wrapping div added around the four
+`<article class="auth-card...">` blocks).
+
+Had to clean up two now-stale rules while doing this: `.meshpoint-
+display-card`/`.backup-restore-card` each had their own `margin-bottom:
+8px` (existing card-to-card spacing for the old stacked layout, now
+redundant against the grid's own `gap:18px`) and `max-width: 520px`/
+`640px` (a readability cap appropriate for a full-width single column,
+now fighting the grid's own `minmax(320px,1fr)` column sizing -- would
+have produced a narrower-than-its-column card with dead space beside
+it). Removed both properties from `frontend/css/settings.css` rather
+than leave them to silently conflict -- same "two independently-correct
+rules composing badly once nested/combined" pattern flagged as a
+standing habit multiple times earlier this session, caught this time by
+checking for existing per-card CSS before assuming the wrap alone was
+sufficient, not after.
+
+Verified: CSS brace-balance on `settings.css` (291/291), HTML tag
+balance for the touched `data-section="settings/dangerous"` block (div
+4/4, article 4/4 -- confirmed no accidental unclosed tag from the
+manual wrapper insertion), `ChangelogParser.parse_file()` re-parse (31
+sections, clean). Same live-verification caveat as the rest of this
+session's layout work -- grounded in reading the real CSS rules
+involved, not yet re-confirmed against a fresh screenshot.

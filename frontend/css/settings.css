@@ -1053,15 +1053,13 @@ select.update-field__input option:checked {
     border-top: 1px solid var(--hairline);
 }
 
-.meshpoint-display-card {
-    margin-bottom: 8px;
-    max-width: 520px;
-}
-
-.backup-restore-card {
-    margin-bottom: 8px;
-    max-width: 640px;
-}
+/* Both used to carry their own `margin-bottom`/`max-width` -- spacing
+   and a readable cap on width for a single-column stacked layout. Now
+   that these cards (plus Landing page/Web terminal) sit inside
+   `.auth-panel__grid` alongside the rest, the grid's own `gap` and
+   `minmax(320px, 1fr)` column tracks handle both, and the old
+   per-card values would've fought the grid instead (double-applied
+   spacing, and a fixed width narrower than its actual column). */
 
 .backup-card__warning {
     margin: 0 0 10px;

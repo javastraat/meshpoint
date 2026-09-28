@@ -133,6 +133,19 @@
   distinct hex values (not aliased to `--accent-red`/`--accent-green`
   -- a deliberately different, close-but-not-identical shade for this
   UI) since they already read correctly unthemed on either background.
+- **Settings → System's cards now flow into a responsive grid instead
+  of stacking full-width, one per row.** With borders now visible
+  (above), the "Display units"/"Backup and restore"/"Landing page"/
+  "Web terminal" cards took up the whole content width each on a wide
+  screen even though most of them are short and narrow. Wrapped them
+  in `.auth-panel__grid` -- the exact same responsive grid
+  (`repeat(auto-fit, minmax(320px, 1fr))`) Settings → Auth already uses
+  for its own five cards -- rather than inventing a new layout. Removed
+  `.meshpoint-display-card`/`.backup-restore-card`'s old `margin-bottom`/
+  `max-width` rules, which were doing this page's spacing and width-
+  capping job in the old single-column layout and would've fought the
+  grid's own `gap`/column tracks otherwise (double-applied spacing, and
+  a fixed width narrower than the column actually available).
 
 #### Plugins
 
