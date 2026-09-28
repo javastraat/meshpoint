@@ -51,9 +51,11 @@ class TopologyTab {
     _build() {
         this._built = true;
         this.root.innerHTML = `
+            <header class="lw-panel__head topo-page__head">
+                <h2 class="lw-panel__title">Topology</h2>
+            </header>
             <div class="panel topo-panel">
                 <div class="panel__header panel__header--tabs">
-                    <h2>Mesh Topology</h2>
                     <div class="lw-tabs" data-topo-modes>
                         <button class="lw-tab" data-mode="graph">Graph</button>
                         <button class="lw-tab" data-mode="map">Map</button>

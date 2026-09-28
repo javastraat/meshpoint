@@ -16173,3 +16173,49 @@ Cannot be visually confirmed without Einstein's real browser -- same
 caveat as the bluetooth-scanner/raspberry-network alignment fix above;
 worth a fresh screenshot comparison once this ships, especially for the
 lower-confidence Topology header change.
+
+**Topology's padding-only fix superseded by a real title bar, same
+session, right after shipping the above.** Einstein reported the
+padding bump wasn't enough: "oled page is still different and topology
+also also the settings system is still totaly different wierd is that
+old design?" Investigated `_resize()` (`topology_tab.js:394-404`) before
+committing to a bigger change -- it reads `wrap.clientWidth/clientHeight`
+live via `getBoundingClientRect`-style DOM measurement at call time, and
+`.topo-canvas-wrap`'s own height is a fixed `min(65vh, 640px)`
+(topology.css), not a percentage inherited from any ancestor. That
+means the earlier caution (don't touch the outer panel box, the resize
+logic might depend on it) was overcautious -- there's no percentage
+chain to break. Replaced the padding hack with a real
+`<header class="lw-panel__head topo-page__head"><h2 class="lw-panel__title">Topology</h2></header>`
+above `.panel.topo-panel` (removed the old bare `<h2>Mesh Topology</h2>`
+that lived inside `.panel__header--tabs`, which was actually rendering
+as a small uppercase caption -- `.panel__header`'s own
+`font-size:0.7rem; text-transform:uppercase`, meant for a sub-panel
+label like Bluetooth Scanner's "Devices", not a page title -- that's
+the real reason it read "different," not just the top gap). New
+`.topo-page__head { padding-left:0; padding-right:0; }` override drops
+the usual `clamp()` side inset `.lw-panel__head` normally gets,
+deliberately: `.topo-panel` has never had a `.lw-section`-style side
+margin (full-bleed by design, screen space matters for a mesh graph),
+so an indented title above a flush-edge panel would've been a new
+mismatch, not a fix. CHANGELOG's Topology bullet rewritten to match
+(the earlier "padding-top: 20px, deliberately didn't touch the box
+model" description was accurate for what shipped a few minutes earlier
+but no longer describes the real code). Verified: `node --check` on
+`topology_tab.js`, CSS brace-balance on `topology.css` (37/37),
+`ChangelogParser` re-parse (31 sections, clean).
+
+**Separately diagnosed, not yet fixed**: Einstein's same message also
+flagged OLED Display and Settings -> System ("the settings system") as
+still visually different -- confirmed by reading `oled_display_panel.js`
+(bare `<h2>`/`<p>`, `.plugin-page` fallback styling, custom `.oled-card`
+class) and `settings.css`'s `.dangerous-panel__head` (title + subtitle
+line, `.auth-card` styling) against the `.lw-panel__head` + stat-cards +
+`.panel`/table convention LoRaWAN/Reticulum/Bluetooth/now-Topology all
+share. This is real and bigger than a padding fix -- two genuinely
+different eras/conventions in the codebase (an older generic
+"plugin-page/form" style used by OLED, all of Settings, RTL-SDR,
+Offline Maps, Hello World Github, vs. the newer shared "list page"
+style). Asked Einstein whether to scope a full pass (`EnterPlanMode`)
+or start with just OLED as a smaller trial -- not yet answered as of
+this entry, don't assume which direction before checking back.

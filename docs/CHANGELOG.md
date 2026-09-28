@@ -81,14 +81,25 @@
   `settings/storage` route), so removing the stale class alone
   would've left it flush -- added it to that same selector instead
   of inventing a separate rule, since Storage's mount logic already
-  lives in this same file. Also bumped **Topology**'s in-panel toolbar
-  header (`padding-top: 20px`, was 8px) to visually match every other
-  list/graph page's `.lw-panel__head` convention, without touching the
-  outer panel's own box model -- `topology_tab.js`'s canvas resize
-  logic measures that, and changing it without a live browser to
-  verify against felt like the wrong place to take a risk for a
-  cosmetic fix. Checked Reticulum Browser too (the user's specific
-  comparison point) -- already correct, `.lw-panel__head` throughout,
+  lives in this same file. **Topology** now also gets a real page title
+  (`<header class="lw-panel__head">`, "Topology") above the graph panel,
+  matching every other list/graph page, instead of the small uppercase
+  toolbar caption ("MESH TOPOLOGY" inside `.panel__header--tabs") it
+  had before -- that toolbar label is meant for a sub-panel caption
+  like Bluetooth Scanner's "Devices", not a page title, and read
+  noticeably smaller/plainer once placed side by side with LoRaWAN/
+  Reticulum's real titles. Safe to add without touching the graph's own
+  sizing: `.topo-canvas-wrap`'s height is a fixed `min(65vh, 640px)`,
+  not inherited from the panel's own box, so `topology_tab.js`'s
+  `_resize()` (reads the wrap's actual `clientWidth`/`clientHeight` at
+  call time) just sees whatever space is left, no hardcoded assumption
+  to break. The new title skips the usual `clamp()` side inset other
+  page titles get, though -- the graph panel itself has always sat
+  edge-to-edge with no side margin (deliberate, screen space matters
+  for a mesh diagram), so an indented title above a flush-edge panel
+  would've been its own new mismatch. Checked Reticulum Browser too
+  (the user's specific comparison point) -- already correct,
+  `.lw-panel__head` throughout,
   no change needed. Dashboard's own tighter 8px top padding and
   Settings/RTL-SDR/Offline Maps/OLED's 24px are unchanged, deliberately
   -- different page types (dense overview vs. list-with-table vs.

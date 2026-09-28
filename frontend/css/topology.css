@@ -1,21 +1,27 @@
 /* Topology page (topology_tab.js): force-directed mesh graph. */
 
-/* Every other list/graph page (LoRaWAN, Meshtastic, Reticulum, ...)
-   opens with `.lw-panel__head`'s 20px top padding (lorawan.css) before
-   its title. This page skips a page-level title and puts "Mesh
-   Topology" straight in the panel's own toolbar header instead, which
-   only had `.panel__header`'s base 8px -- reading flush against the
-   topbar by comparison. Bumping just this header's own top padding
-   (not the outer `.topo-panel`/`.panel` box, which the canvas resize
-   logic in topology_tab.js measures) closes that gap without touching
-   the graph's own sizing math. */
+/* Real page title now, matching every other list/graph page's
+   `.lw-panel__head` (lorawan.css) -- confirmed safe to add without
+   disturbing the canvas: `.topo-canvas-wrap`'s height is a fixed
+   `min(65vh, 640px)` (below), not a percentage of any ancestor's box,
+   so `_resize()` (topology_tab.js, reads `wrap.clientWidth/Height` at
+   call time) just sees whatever's actually left over -- no hardcoded
+   assumption to break. Unlike `.lw-panel__head` elsewhere, this one
+   drops the horizontal `clamp()` inset: the graph panel itself has
+   always been edge-to-edge (no `.lw-section` wrapper, deliberately --
+   screen space matters for a mesh diagram), so an indented title above
+   a flush-edge panel would read as its own new misalignment. */
+.topo-page__head {
+    padding-left: 0;
+    padding-right: 0;
+}
+
 .topo-panel .panel__header--tabs {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
     flex-wrap: wrap;
-    padding-top: 20px;
 }
 
 .topo-chips {
