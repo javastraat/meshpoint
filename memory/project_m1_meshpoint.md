@@ -15203,3 +15203,98 @@ half-accurate entry standing, and added a separate new bullet for the
 commits-API-size fix since it's a distinct, unrelated bug that just
 happened to surface in the same conversation. Both still under the
 same `#### Plugins` subsection, changelog still parses (31 sections).
+
+**New topic, unrelated to the plugin-move work: built
+scripts/probe_sx1261.py after a long, honest back-and-forth about
+whether/how to identify SX1261 (spectral-scan) reachability on a RAK
+V2 board without opening the case.** Einstein saw the RF Environment
+page's "Hardware histogram not available... forcing this setting can
+crash the whole concentrator" message and asked for a way to check
+first.
+
+Investigated the vendor HAL bindings (`src/hal/sx1302_wrapper.py`,
+`sx1302_signatures.py`) before proposing anything: confirmed there is
+NO lower-level standalone "just check SX1261" function exposed --
+`lgw_sx1261_setconf` only stages a config struct, the real hardware
+handshake (`sx1261_check_status`, the thing that can actually fail)
+happens only inside the shared `lgw_start()` call that also brings up
+the whole concentrator's RX/TX. So no probe can be made risk-free --
+said so plainly before writing anything, consistent with this
+session's own working practice of leading with outage risk before any
+experimental change to the live Pi.
+
+Went through a real identification chain first, trying to avoid the
+risky probe if possible: WM1302/WM1303 module vs. carrier-board wiring
+distinction (found `docs/HARDWARE-MATRIX.md` states SenseCap M1 uses
+WM1303/SX1303, while `docs/CONFIGURATION.md` elsewhere says WM1302 --
+a real, unresolved discrepancy between the two docs I flagged but
+didn't chase down or fix, out of scope for this thread), the existing
+`src/cli/hardware_detect.py` I2C-signature auto-detect (real, safe,
+already in the repo -- ran it live: came back "RAK2287 + Raspberry Pi
+4"), then had to walk back my own over-reading of that result once I
+actually checked the code: `_HARDWARE_DESCRIPTIONS[CARRIER_RAK]` is
+just a hardcoded DEFAULT label for "not SenseCap M1's specific I2C
+signature" -- the detector never reads the EEPROM's actual
+vendor/product string, so "RAK2287" wasn't a verified identification
+at all, just an unearned-sounding default. Tried reading the real
+EEPROM content next (`/proc/device-tree/hat/*` -- empty;
+`i2cdump -y 1 0x50` -- all "XX" = every byte unreadable;
+`i2ctransfer -y 1 w2@0x50 ...` -- I/O error even as root) -- concluded
+this specific chip doesn't behave like a normal readable EEPROM at all
+and called that path a genuine dead end rather than continuing to
+guess at I2C protocols, redirecting to the two higher-value zero-risk
+options (physical label, purchase record) before finally writing the
+risky probe script once Einstein confirmed those hadn't panned out.
+
+Found `scripts/test_concentrator_reset.py` already exists -- a closely
+related, same-author precedent for exactly this kind of "deliberately
+risky one-shot HAL test, packaged as a standalone script" pattern.
+Read it fully before writing my own rather than reinventing conventions
+from scratch: caught two things from it I'd gotten wrong/missed in my
+own first draft -- (1) `sys.path.insert(0, REPO_ROOT)` is required
+(hit the exact `ModuleNotFoundError` myself when I first ran my
+script without it, confirming the need rather than assuming), and (2)
+the correct real-world invocation is
+`sudo /opt/meshpoint/venv/bin/python3 scripts/<name>.py` (root, the
+service's own venv, not system python3) -- my first draft's docstring
+had a plain `python3 scripts/probe_sx1261.py` example, which would
+have failed on `import yaml` before ever reaching the HAL code, since
+system Python doesn't have the venv's dependencies. Fixed both before
+calling it done.
+
+`scripts/probe_sx1261.py`: reuses the real `src.config.load_config()`,
+`ConcentratorChannelPlan.from_radio_config()`, and `SX1302Wrapper`
+rather than a hand-rolled test, so a pass/fail reflects what the real
+service would actually do (same philosophy the sibling script states
+explicitly in its own docstring). Refuses to run unless
+`systemctl is-active meshpoint` confirms the service is stopped
+(`--force` to override, but defaults safe -- including when systemctl
+itself can't be reached, e.g. missing or an unknown unit state, always
+treated as "can't confirm stopped" rather than assuming the best
+case). Never touches `config/local.yaml`. Distinguishes a genuine
+"libloragw missing" setup problem (a separate try/except around just
+`.load()`) from an actual SX1261-reachability verdict (the
+reset/configure/start sequence), so the failure message doesn't
+mislabel an unrelated install problem as a hardware verdict about
+SX1261 specifically -- caught this distinction by actually running the
+script for real on the Mac with `--force` and reading its own output
+critically rather than just trusting the code review.
+
+Verified as much as the Mac allows: `py_compile`, and two real runs
+(`--force` on the Mac reaches all the way through config-loading and
+channel-plan-building before failing at the expected, Pi-only point --
+missing `libloragw.so` -- confirming the whole path up to the actual
+hardware call is sound; default run with no `--force` correctly
+refuses since there's no `systemctl` on the Mac, exercising the exact
+safe-by-default path a real accidental double-run would hit). Can't
+verify the actual SX1261 hardware branch itself without the real Pi,
+same fundamental limitation as everything hardware-dependent this
+session -- Einstein runs it for real when ready.
+
+Docs: added a pointer to the script from `docs/CONFIGURATION.md`'s
+existing "Opting in to true spectral scan" section (right before the
+config-file instructions, so anyone reading that section sees the
+safer-process option first) and a CHANGELOG bullet under a new
+`#### Hardware` subsection (none of the existing Unreleased
+subsections -- Dashboard/Plugins/Docs -- fit a hardware diagnostic
+script).

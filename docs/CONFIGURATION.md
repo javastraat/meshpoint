@@ -95,6 +95,8 @@ The dashboard's sidebar shows a live noise-floor reading. There are two ways the
 
 **Default behaviour (works everywhere):** `sx1261_spi_path` is empty, so the service skips the SX1261 init entirely and derives the noise floor from packet metadata — specifically a rolling minimum of `RSSI − SNR` across recently-decoded frames. This is a *loose upper bound* on the true noise floor (it tracks the quietest signal we managed to demodulate), but on a normally-operating link it converges to within a few dB of the real ambient floor and is good enough to spot RF interference, broken antennas, or unusually noisy bands.
 
+**Not sure if your board can do this at all?** `scripts/probe_sx1261.py` tests reachability without editing `config/local.yaml` — same underlying risk as setting the config directly (see the warning below), but as a one-shot isolated script with the service already stopped, so there's no live capture to interrupt and nothing to remember to revert if it fails. See the script's own docstring for exact usage.
+
 **Opting in to true spectral scan:** if you have a board that exposes the SX1261 directly to the Pi (the Semtech reference kit is the common case), add this to `config/local.yaml`:
 
 ```yaml

@@ -171,6 +171,20 @@
   the dropdown only showed its placeholder. The exclude is now anchored
   (`/data`) so it only protects the runtime `data/` directory at the top level.
 
+#### Hardware
+
+- **New `scripts/probe_sx1261.py`** -- tests whether a carrier's SX1261
+  companion chip is reachable at a given SPI path without editing
+  `config/local.yaml`. Reuses the exact config/channel-plan/HAL wrapper
+  the real service uses, so a pass/fail here reflects what the service
+  would actually do. Carries the same real risk `sx1261_spi_path`
+  always has (documented above, under "Opting in to true spectral
+  scan") -- an unreachable SX1261 aborts `lgw_start()` entirely, not
+  just spectral scan -- this just avoids touching the config file and
+  runs as an isolated one-shot with the service already stopped first
+  (which it checks for and refuses to skip without `--force`), so
+  there's no live capture to interrupt during the test.
+
 #### Docs
 
 - **Bobcat 300 capture yaml.** Step 5 now uses `capture.concentrator_spi_device`
