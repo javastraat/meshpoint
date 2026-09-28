@@ -15117,3 +15117,89 @@ up the real dashboard here per the established testing convention;
 Einstein will see it live on the next deploy. CHANGELOG bullet added
 under the same `#### Plugins` subsection, `node --check` confirmed
 syntax.
+
+**The "Requires:" fix from earlier this session was incomplete --
+Einstein caught it by actually looking at the live Pi, not by trusting
+my earlier claim, and that was the right call.** Sequence worth
+recording since it's a real "verify past a symptom that looks
+resolved" lesson.
+
+I'd fixed `plugins_panel_controller.js` to check `p.requires` in
+addition to `p.hook_host`, tested the pure logic with a `node -e`
+simulation against realistic data shapes, and reported it fixed.
+Einstein deployed it for real (committed, pushed, applied via the
+dashboard's own Updates page -- confirmed the Pi was genuinely running
+that exact commit, `bce8ed8f`) and it STILL didn't show, even after a
+hard refresh and a reboot. My first hypothesis (stale deploy) was
+wrong -- checked and the deploy was real. My second hypothesis (pinned
+plugin source serving stale repo.json) was also wrong -- checked
+GitHub's live `repo.json` directly via curl, `requires` was correctly
+present in the raw file for both plugins.
+
+That ruled out the two most likely explanations and forced a proper
+look at the actual request path end-to-end rather than re-guessing --
+found the REAL second half of the bug: `src/plugins/sources.py`'s
+`_entry()` function is a server-side catalog VALIDATOR that
+re-parses/re-normalizes any fetched `repo.json` before returning it to
+the browser (deliberately, so a source's catalog can't smuggle
+arbitrary fields through). It builds its output dict as an explicit
+whitelist of known fields, and `requires` was never added to that
+whitelist when `hook_host` was -- so even though the raw GitHub file
+had `requires: "reticulum"`, this backend function silently dropped it
+on every single request, meaning the frontend fix I'd made was 100%
+correct but had zero data to act on, ever. Confirmed by literally
+calling `parse_catalog()` against the real fetched bytes from GitHub's
+raw URL in a one-off script -- before the fix: `requires` missing from
+every entry; after adding the matching `if kind != "theme" and
+requires: entry["requires"] = requires` block (mirroring `hook_host`'s
+exact existing pattern), re-ran the same live fetch and got `requires:
+"reticulum"` correctly on reticulum-browser/-call/-dashboard.
+
+Added real test coverage this time (missing before, for `hook_host`
+too, not just `requires` -- `tests/test_plugin_sources.py::TestCatalog`
+had zero tests of this field-preservation behavior at all): a
+round-trip test for both `hook_host` and `requires` surviving
+`_entry()`, an absent-when-not-given test, and an
+invalid-value-is-dropped-not-rejected test (matching hook_host's
+existing tolerance). 21/21 pass, including a final live end-to-end
+check (`resolve_commit`-adjacent -- see below -- and `parse_catalog`
+directly against the real GitHub bytes) rather than only trusting
+mocks.
+
+**Separate, unrelated bug found in the same investigation window:**
+Einstein tried the Pin button on the meshpoint-plugins source and got
+`https://api.github.com/repos/javastraat/meshpoint-plugins/commits/main
+is larger than 524288 bytes`. Root cause: `resolve_commit()` (used by
+Pin, and by the "will update to" preview) called GitHub's
+*single*-commit endpoint (`/commits/<ref>`), which embeds a full
+unified diff for every changed file -- and several of this session's
+own plugin-move commits (91, 68, 104 files) are large enough that the
+JSON response blew past the existing 512 KB fetch cap (measured: 970
+KB for real, against `javastraat/meshpoint-plugins`'s current HEAD).
+`resolve_commit()` only ever reads `sha`/`commit.message`/
+`commit.author.date`/`html_url` -- none of which need the diff data at
+all. Fixed by switching to GitHub's *list*-commits endpoint
+(`?sha=<ref>&per_page=1`) instead, which returns the identical fields
+at ~4 KB regardless of how large the commit itself is (measured against
+the same real repo to confirm before touching code, not just
+theorizing). Existing mocked tests updated for the new list-shaped
+response, plus a new regression-guard test asserting the URL is the
+list form and explicitly NOT `/commits/<ref>` (singular), an
+empty-list-is-an-error test, and confirmed against the real live
+GitHub API end-to-end (`resolve_commit()` called for real against
+`javastraat/meshpoint-plugins`'s actual current HEAD -- the exact call
+that had been failing for Einstein -- now resolves cleanly).
+
+Answered Einstein's direct question ("do we need this pin?") along the
+way: yes, resolving a ref to a concrete SHA is the entire mechanism
+the Pin feature depends on (pinning literally means freezing to a
+resolved SHA instead of a moving branch name) -- the fix was making
+that resolution ask GitHub for less data, not removing the feature.
+
+CHANGELOG: rewrote the earlier "Requires: dependency" bullet to
+correctly describe both halves of that bug (frontend AND backend, not
+just frontend as I'd first written it) rather than leaving a
+half-accurate entry standing, and added a separate new bullet for the
+commits-API-size fix since it's a distinct, unrelated bug that just
+happened to surface in the same conversation. Both still under the
+same `#### Plugins` subsection, changelog still parses (31 sections).

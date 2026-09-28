@@ -12,6 +12,7 @@ from src.plugins import sources as _sources_mod
 from src.plugins.sources import (
     PluginSourceError,
     catalog_raw_url,
+    commits_api_url,
     normalise_ref,
     parse_catalog,
     parse_github_url,
@@ -74,14 +75,18 @@ class TestUrlParsing(unittest.TestCase):
 
 
 class TestResolveCommit(unittest.TestCase):
-    _COMMIT_JSON = json.dumps({
+    # The *list*-commits endpoint's shape (an array), not the single-commit
+    # endpoint's -- see commits_api_url()'s docstring for why: the
+    # single-commit endpoint embeds a full diff per file and blows past
+    # the fetch size cap on anything but a tiny commit.
+    _COMMIT_JSON = json.dumps([{
         "sha": "9abcdef012345678901234567890123456789abc",
         "html_url": "https://github.com/o/r/commit/9abcdef",
         "commit": {
             "message": "fix: the thing\n\nlonger body",
             "author": {"date": "2026-09-09T12:00:00Z"},
         },
-    }).encode()
+    }]).encode()
 
     def test_parses_github_commit_json(self) -> None:
         with mock.patch.object(_sources_mod, "_http_get", return_value=self._COMMIT_JSON):
@@ -96,9 +101,27 @@ class TestResolveCommit(unittest.TestCase):
             with self.assertRaises(PluginSourceError):
                 resolve_commit("https://github.com/o/r", "nope")
 
+    def test_empty_list_is_an_error(self) -> None:
+        # A ref GitHub genuinely knows nothing about, e.g. a typo'd branch.
+        with mock.patch.object(_sources_mod, "_http_get", return_value=b"[]"):
+            with self.assertRaises(PluginSourceError):
+                resolve_commit("https://github.com/o/r", "nope")
+
     def test_rejects_non_github(self) -> None:
         with self.assertRaises(PluginSourceError):
             resolve_commit("https://gitlab.com/o/r", "main")
+
+    def test_uses_the_list_endpoint_not_the_single_commit_one(self) -> None:
+        # Regression guard for the real bug: /commits/<ref> (singular)
+        # embeds a full diff per changed file and blew past the fetch size
+        # cap on an ordinary multi-file commit. Must stay the list form
+        # (?sha=<ref>&per_page=1), which returns the same fields without it.
+        url = commits_api_url("javastraat", "meshpoint-plugins", "main")
+        self.assertEqual(
+            url,
+            "https://api.github.com/repos/javastraat/meshpoint-plugins/commits?sha=main&per_page=1",
+        )
+        self.assertNotIn("/commits/main", url)
 
 
 _GOOD = {
@@ -129,6 +152,32 @@ class TestCatalog(unittest.TestCase):
         self.assertEqual(cat["plugins"][0]["id"], "hello-world-github")
         self.assertTrue(cat["plugins"][0]["compatible"])
         self.assertEqual(cat["themes"][0]["id"], "midnight")
+
+    def test_hook_host_and_requires_survive_parsing(self) -> None:
+        # Both are optional catalog-display hints; _entry() must not
+        # silently drop either one (requires was dropped for a while --
+        # present in repo.json, stripped on the way to the browser, so the
+        # UI never had the data it needed to show a "Requires: x" note or
+        # nest the row under its host).
+        doc = json.loads(json.dumps(_GOOD))
+        doc["plugins"][0]["hook_host"] = "some-host"
+        doc["plugins"][0]["requires"] = "some-other-plugin"
+        cat = self._parse(doc)
+        self.assertEqual(cat["plugins"][0]["hook_host"], "some-host")
+        self.assertEqual(cat["plugins"][0]["requires"], "some-other-plugin")
+
+    def test_hook_host_and_requires_absent_when_not_given(self) -> None:
+        cat = self._parse(_GOOD)
+        self.assertNotIn("hook_host", cat["plugins"][0])
+        self.assertNotIn("requires", cat["plugins"][0])
+
+    def test_invalid_requires_is_dropped_not_rejected(self) -> None:
+        # Same tolerance as hook_host: a malformed value just means no
+        # grouping hint, not a rejected catalog.
+        doc = json.loads(json.dumps(_GOOD))
+        doc["plugins"][0]["requires"] = "Not A Slug"
+        cat = self._parse(doc)
+        self.assertNotIn("requires", cat["plugins"][0])
 
     def test_wrong_repo_version(self) -> None:
         with self.assertRaises(PluginSourceError):

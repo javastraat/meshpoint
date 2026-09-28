@@ -27,19 +27,38 @@
 #### Plugins
 
 - **Fix: a plugin source's browse catalog never showed a plain `requires`
-  dependency, only a `[hook]` one.** `reticulum-browser` and
-  `reticulum-dashboard` (both `requires = "reticulum"`, no `[hook]`)
-  rendered as ordinary standalone rows with no indication they need
-  Reticulum installed first -- `make-repo-json.py` already put
-  `requires` in `repo.json` for exactly this (its own comment says so),
-  but `plugins_panel_controller.js`'s catalog rendering only ever
-  checked `hook_host`. Once installed they already nested correctly in
-  the installed-plugins list (that view resolves both the same way via
-  the backend's `dependency` field) -- this was a browse-catalog-only
-  display gap. `_orderCatalogApps()` and the row's dependency note now
-  check `requires` too, showing "Requires: `<id>`" (vs. "Hooks into:
-  `<id>`" for a real hook) and nesting the row under its host the same
-  way.
+  dependency, only a `[hook]` one -- two bugs, not one.**
+  `reticulum-browser` and `reticulum-dashboard` (both
+  `requires = "reticulum"`, no `[hook]`) rendered as ordinary standalone
+  rows with no indication they need Reticulum installed first. First
+  bug: `src/plugins/sources.py`'s server-side catalog validator
+  (`_entry()`) only ever preserved `hook_host` when re-validating a
+  fetched `repo.json` -- `requires` was silently stripped before the
+  catalog JSON ever reached the browser, even though
+  `make-repo-json.py` already put it in `repo.json` for exactly this
+  purpose (its own comment says so). Second bug, found while checking
+  why the fix for the first one still didn't show up live:
+  `plugins_panel_controller.js`'s catalog rendering also only ever
+  checked `hook_host`. Both fixed -- `_entry()` now preserves `requires`
+  the same way it preserves `hook_host`, and `_orderCatalogApps()` +
+  the row's dependency note check it too, showing "Requires: `<id>`"
+  (vs. "Hooks into: `<id>`" for a real hook) and nesting the row under
+  its host the same way. (Once installed, both plugins already nested
+  correctly in the installed-plugins list -- that view resolves both
+  relationship types the same way via the backend's `dependency` field;
+  this was purely a browse-catalog-before-install gap.)
+- **Fix: pinning a plugin source could fail with "... is larger than
+  524288 bytes" on an ordinary commit.** Resolving a source's ref to a
+  concrete commit (used by the Pin action, and to show "will update to")
+  hit GitHub's *single*-commit API (`/commits/<ref>`), which embeds a
+  full unified diff for every file the commit touched -- a real
+  multi-file commit (moving several plugins' worth of files at once)
+  easily produces a response past the 512 KB fetch cap; hit this for
+  real against a 91-file commit (970 KB). Only `sha`/`commit.message`/
+  `commit.author.date`/`html_url` were ever read from it. Switched to
+  the *list*-commits endpoint (`?sha=<ref>&per_page=1`) instead --
+  identical fields, without the diff payload, a few KB regardless of
+  the commit's real size.
 - **Reticulum itself moved out of core, into the community
   [meshpoint-plugins](https://github.com/javastraat/meshpoint-plugins)
   repo.** Install it from Settings → Plugins like any other community

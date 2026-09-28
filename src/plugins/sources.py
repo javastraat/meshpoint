@@ -23,9 +23,12 @@ Repo manifest shape (``repo.json`` at the repo root)::
           "version": "0.1.0", "meshpoint_api": 1, "provides": ["service"],
           "description": "...", "author": "...", "homepage": "...",
           "has_setup": false,                   # metadata beyond id/kind/path
-          "hook_host": "some-other-plugin" }    # optional -- only for a
+          "hook_host": "some-other-plugin",     # optional -- only for a
                                                  # "hook" plugin; its target's
                                                  # own [sidebar].route
+          "requires": "some-other-plugin" }     # optional -- plain top-level
+                                                 # `requires` (not a hook);
+                                                 # another plugin's *name*
       ],                                         # mirrors each plugin.toml
       "themes": [
         { "id": "dracula", "kind": "theme", "path": "themes/dracula",
@@ -40,6 +43,7 @@ import json
 import logging
 import re
 import urllib.request
+from urllib.parse import quote
 
 from src.plugins.manifest import PLUGIN_API_VERSION
 
@@ -120,7 +124,17 @@ def tarball_url(owner: str, repo: str, ref: str) -> str:
 
 
 def commits_api_url(owner: str, repo: str, ref: str) -> str:
-    return f"https://api.github.com/repos/{owner}/{repo}/commits/{ref}"
+    """The *list*-commits endpoint (``sha=<ref>&per_page=1``), not the
+    single-commit one (``/commits/<ref>``) -- the single-commit endpoint
+    embeds a full unified diff for every file the commit touched, which
+    blows well past our fetch size cap on anything but a tiny commit (a
+    real plugin-repo commit moving/adding several plugins' worth of files
+    easily tops several hundred KB -- hit this for real: a 91-file commit
+    came back as a 970 KB response against the 512 KB cap). The list
+    endpoint returns the exact same ``sha``/``commit``/``html_url`` fields
+    :func:`resolve_commit` actually uses, without the diff payload, at a
+    few KB regardless of how large the commit itself was."""
+    return f"https://api.github.com/repos/{owner}/{repo}/commits?sha={quote(ref, safe='')}&per_page=1"
 
 
 _MAX_COMMIT_JSON_BYTES = 512 * 1024
@@ -139,10 +153,16 @@ def resolve_commit(url: str, ref: str) -> dict:
         data = json.loads(raw.decode("utf-8"))
     except (ValueError, UnicodeDecodeError) as exc:
         raise PluginSourceError("fetch", f"bad commit JSON from GitHub: {exc}") from exc
-    sha = data.get("sha") if isinstance(data, dict) else None
+    # The list endpoint returns an array (empty for an unknown ref, an
+    # error object -- not a list -- for a malformed one); take the first
+    # (and only, per_page=1) entry.
+    if not isinstance(data, list) or not data or not isinstance(data[0], dict):
+        raise PluginSourceError("fetch", f"GitHub returned no commit for {ref!r}")
+    entry = data[0]
+    sha = entry.get("sha")
     if not isinstance(sha, str) or not re.fullmatch(r"[0-9a-f]{40}", sha):
         raise PluginSourceError("fetch", f"GitHub returned no commit for {ref!r}")
-    commit = data.get("commit") or {}
+    commit = entry.get("commit") or {}
     author = (commit.get("author") or {}) if isinstance(commit, dict) else {}
     return {
         "sha": sha,
@@ -150,7 +170,7 @@ def resolve_commit(url: str, ref: str) -> dict:
         "message": (commit.get("message") or "").splitlines()[0][:200]
         if isinstance(commit, dict) else "",
         "committed_at": author.get("date", "") if isinstance(author, dict) else "",
-        "html_url": data.get("html_url", "") if isinstance(data, dict) else "",
+        "html_url": entry.get("html_url", "") if isinstance(entry, dict) else "",
     }
 
 
@@ -220,6 +240,14 @@ def _entry(raw: dict, kind: str) -> dict:
     hook_host = raw.get("hook_host")
     hook_host = hook_host.strip() if isinstance(hook_host, str) and _SLUG_RE.match(hook_host.strip()) else ""
 
+    # Same deal as hook_host just above, for a plain top-level `requires`
+    # (a dependency that isn't a hook -- e.g. reticulum-browser/-dashboard
+    # needing reticulum enabled without attaching UI into its page). Also
+    # purely a browse-catalog display/grouping hint; re-derived for real
+    # from the installed plugin.toml once actually installed.
+    requires = raw.get("requires")
+    requires = requires.strip() if isinstance(requires, str) and _SLUG_RE.match(requires.strip()) else ""
+
     entry = {
         "id": pid,
         "kind": "theme" if kind == "theme" else "app",
@@ -236,6 +264,8 @@ def _entry(raw: dict, kind: str) -> dict:
     }
     if kind != "theme" and hook_host:
         entry["hook_host"] = hook_host
+    if kind != "theme" and requires:
+        entry["requires"] = requires
     return entry
 
 
