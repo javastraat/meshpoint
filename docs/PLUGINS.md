@@ -364,8 +364,11 @@ World Hook** (the hook —
 With both enabled, opening the Hello World page shows its usual content
 plus a second box below it, rendered by the hook plugin.
 
-A second, less toy example: **RTL-SDR** (`plugins/apps/rtlsdr/`) is the
-shared host page every RTL-SDR decoder plugin hooks a tab into — the
+A second, less toy example: **RTL-SDR** (now `meshpoint-plugins/apps/rtlsdr/` —
+the whole RTL-SDR family moved out of this repo into the community
+[meshpoint-plugins](https://github.com/javastraat/meshpoint-plugins) repo;
+still a real worked example, just not locally inspectable in this checkout
+anymore) is the shared host page every RTL-SDR decoder plugin hooks a tab into — the
 built-in Listener page these all used to live on directly (via `"panel"`)
 is gone entirely now. **DAB+** moved first — it dropped `"panel"` from
 `provides`; both its player and its Config panel hook into the RTL-SDR page

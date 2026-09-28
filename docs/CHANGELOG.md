@@ -26,6 +26,16 @@
 
 #### Plugins
 
+- **The whole RTL-SDR plugin family moved out of core, into the community
+  [meshpoint-plugins](https://github.com/javastraat/meshpoint-plugins)
+  repo.** RTL-SDR, Radio, ACARS, POCSAG, RTL433, ADS-B, DAB+, P2000 and
+  Pagers are no longer bundled with this repo -- install them from
+  Settings → Plugins like any other community plugin. They're also no
+  longer `locked`, so (unlike before) they can be deleted from the
+  Plugins page once installed. Existing installs: after upgrading, these
+  plugins are simply gone (the files no longer ship with core) -- add the
+  meshpoint-plugins source and reinstall + re-enable whichever ones you
+  were using, a one-time step. DAPNET stays a core plugin for now.
 - **Reticulum Browser spots sibling Meshpoints.** A blue ⓘ badge appears
   in the toolbar whenever the NomadNet node you're browsing also serves
   `/page/info.mu` -- checked silently in the background right after a

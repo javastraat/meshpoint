@@ -1427,6 +1427,13 @@ They load from two places:
 
 A built-in id wins if a community folder of the same name exists.
 
+The walkthrough below uses **ACARS** as the running example -- note it's no
+longer a built-in shipped with this repo: the whole RTL-SDR plugin family
+(ACARS included) has since moved to the community
+[meshpoint-plugins](https://github.com/javastraat/meshpoint-plugins) repo,
+installed like any other community plugin. The shape below is unchanged
+either way.
+
 ```yaml
 plugins:
   acars:                 # <id> = the plugin's folder name
@@ -1454,8 +1461,11 @@ meshpoint_api = 1
 provides = ["listener", "routes", "hook"]
 locked = true                             # optional, default false. Community-tier
                                            # only -- refuses the Plugins page's Delete
-                                           # button. For a shipped/bundled plugin like
-                                           # this one, not a user drop-in.
+                                           # button. For a shipped/bundled plugin, not
+                                           # a user drop-in (the real ACARS itself is
+                                           # unlocked -- it's an ordinary install from
+                                           # meshpoint-plugins, shown here purely to
+                                           # illustrate the field's syntax).
 
 [deps]                                    # optional
 apt = ["cmake", "libcjson-dev"]

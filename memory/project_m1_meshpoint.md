@@ -14616,3 +14616,117 @@ this isolated-logic test plus `py_compile` is the right bar per the
 established Mac-testing convention -- not a gap, the same tradeoff
 already accepted for every other `server.py`-only change this
 session.
+
+**RTL-SDR plugin family moved out of core into meshpoint-plugins --
+first pass of the "keep core clear" split, rtlsdr done, dapnet
+deferred.** Einstein wants internal plugins split out to the external
+meshpoint-plugins repo the same way bluetooth-scanner/oled-display
+already live there, starting with the RTL-SDR family and coming back
+for dapnet later (separate hardware -- USB companion board, not the
+dongle -- with deeper core touchpoints: firmware-flashing routes,
+capture-pipeline wiring unconditional at boot -- explicitly deferred,
+not attempted this pass).
+
+Investigated before moving anything: all 9 (rtlsdr, radio, acars,
+pocsag, rtl433, adsb, dab, p2000, pagers) already had the full plugin
+shape (plugin.toml + backend/__init__.py:register()) -- structurally
+identical to a community plugin already, nothing to rewrite. Confirmed
+via `src/plugins/loader.py` and `plugin_routes.py:324`'s hook/`requires`
+enforcement that builtin vs. community is purely "which of two
+directories it was found in" -- a community-sourced hook plugin
+enabling into a community-sourced host already worked with zero extra
+code, before touching anything. Grepped core's tests/*.py for these 9
+names: every hit was a synthetic fixture name in a temp dir (e.g.
+`_make_plugin(self.apps, "acars", ...)`), never a read of the real
+`plugins/apps/` tree -- confirmed deleting the real folders breaks none
+of them. Grepped all of `src/*.py` too: the only real hits were a
+same-named-but-unrelated `"radio"` config key (the LoRa/mesh SX1302
+region config, e.g. `src/config.py:899`) -- a false-positive name
+collision with the RTL-SDR Radio plugin, not real coupling. So the move
+needed zero core `src/` changes beyond deleting the folders.
+
+Real caveat carried forward, not fixed this pass: these plugin backends
+import core internals directly (`src.audio.sdr_registry`,
+`src.api.auth.*`, `src.models.packet`, `src.storage.packet_repository`)
+rather than only the documented `PluginRegistry` seam. Still runs fine
+post-move (same Python process, `src` still importable) but means core
+can no longer freely refactor those modules without also checking a
+different repo -- accepted tradeoff, flagged to Einstein before
+starting, not something to go fix as part of this move.
+
+Asked Einstein the one real policy question upfront rather than
+assuming: builtins were always-on by default and `locked = true`
+(undeletable); community plugins default to disabled and are normally
+deletable. Answer was **fully community, deletable** -- no `locked`
+flag, same tier as bluetooth-scanner/oled-display exactly. That means
+on upgrade, an existing Pi loses these 9 outright (files no longer
+ship with core) until the user adds the meshpoint-plugins source and
+reinstalls + re-enables them -- a one-time, expected step, not
+something migrated around.
+
+**Execution, all on the Mac, no Pi involved:**
+1. `rsync`'d the 9 folders as-is into `meshpoint-plugins/apps/<id>/`,
+   stripped the `locked = true` line from each copied `plugin.toml`.
+2. Fixed `homepage` in the copied manifests: rtlsdr and radio still
+   pointed at core's stale `KMX415/meshpoint` (an old fork name, core's
+   real remote is `javastraat/meshpoint`) -- repointed both to
+   `javastraat/meshpoint-plugins`, matching bluetooth-scanner/
+   oled-display's own convention. The other 7 (acars, pocsag, rtl433,
+   adsb, p2000, pagers, dab) already correctly pointed at their real
+   upstream tool repos (acarsdec, multimon-ng, rtl_433, dump1090,
+   welle.io) -- left untouched, confirmed by checking each one before
+   editing rather than blindly sed-ing all 9.
+3. `python3 make-repo-json.py --write` in meshpoint-plugins --
+   mechanical, reads each `plugin.toml` itself. 14 plugins total now
+   (5 existing + 9 new).
+4. `git rm -r` the 9 folders from core's `plugins/apps/` (104 tracked
+   files removed), then cleaned up the leftover untracked `__pycache__`
+   dirs it left behind (not tracked, didn't touch git status).
+5. Ran core's plugin test suite on the Mac
+   (`test_plugin_loader/manifest/assets/command/registry_facade.py`):
+   117 passed, 6 skipped, unaffected as predicted.
+   `test_plugin_routes.py` still can't collect on the Mac (needs
+   fastapi, the known Mac-venv gap) -- confirmed it at least
+   `py_compile`s clean, and per the grep above it only ever touches a
+   synthetic `"acars"` fixture too, so the same "unaffected" reasoning
+   applies; not independently run.
+6. Updated docs: `README.md` (both the "What's Different" feature
+   paragraph and the "Optional: RTL-SDR Radio Listener" Quickstart
+   section, which had literal now-dead `plugins/apps/rtlsdr/setup.sh`
+   commands and broken README links -- rewrote the install story around
+   Settings → Plugins + the meshpoint-plugins source rather than local
+   paths), `docs/WHATS-DIFFERENT.md` (two spots: the RTL-SDR intro bullet
+   and the "App plugins" architecture paragraph's ACARS-as-reference
+   line), `docs/PLUGINS.md` (the RTL-SDR hook-migration worked example),
+   `docs/CONFIGURATION.md` (the ACARS-as-teaching-example walkthrough,
+   plus its sample `locked = true` line which no longer matches the
+   real ACARS). Left the individual per-plugin `(plugins/apps/dab/)`
+   -style inline path mentions inside the bigger prose paragraphs alone
+   where they're illustrative rather than live links -- rewriting every
+   one of those was judged low-value churn once the top-level pointer
+   in each doc was fixed.
+7. Added a CHANGELOG bullet under the live `### Unreleased` top section's
+   `#### Plugins` subsection (confirmed it parses:
+   `ChangelogParser.parse_file` -> 31 sections, no error).
+
+**CLAUDE.md discrepancy surfaced, flagged to Einstein, not fixed
+myself (that file is untracked/user-owned):** its changelog convention
+note says never use "Unreleased", always the current version
+(claimed "v0.7.7 while it lasts"). The live file's actual top section
+is `### Unreleased` and `release_notes.py`'s `_UNRELEASED_RE` treats it
+as a first-class, current, intentional concept distinct from
+version-tagged sections -- `src/version.py` is at 0.8.1 now. The
+CLAUDE.md note is stale; I followed the live code/file convention
+instead of the stale doc note, and told Einstein so they can update
+CLAUDE.md if they want.
+
+**Not committed.** Two separate git repos touched (meshpoint and
+meshpoint-plugins) -- per working convention, only ready-to-use commit
+one-liners were handed back, no actual commit made.
+
+**Next, when Einstein is ready:** DAPNET's own move to meshpoint-plugins
+-- deferred deliberately, needs its own investigation pass first
+(firmware-flashing routes tied to Configuration → Firmware, the
+unconditional capture-pipeline wire-in at boot, `report_command.py`'s
+own `dapnet` device references in `src/cli/report_command.py` -- real
+core-side coupling that the RTL-SDR family didn't have).
