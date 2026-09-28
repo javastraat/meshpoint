@@ -15462,3 +15462,23 @@ regression -- subject accidentally inheriting issuer fields, or vice
 versa -- this whole feature exists to prevent) + a new
 `test_regenerates_when_device_name_changes` +
 `test_issuer_and_subject_differ`. 19/19 pass.
+
+**Same thread, one more quick adjustment: Einstein wanted O/OU back on
+the subject side too, just not Locality.** After seeing the live
+minimal-subject result on a real second node ("ti-meshpoint"),
+Einstein asked for O and OU restored on "Issued To" (explicitly not L
+-- said "o and ou" twice, once with reasoning implied by context, once
+as a bare confirmation, so didn't second-guess or offer L too).
+Pulled `_ORGANIZATION`/`_UPSTREAM_OU` out as shared module-level
+constants so issuer and subject can't drift apart by accident (subject
+now reuses the literal same values the issuer uses, not a re-typed
+copy), kept Locality issuer-only with a one-line rationale in the code
+comment (Earth fits the *software's* origin, not a specific device's).
+Re-verified live against the real local.yaml again (same "PD2EMC
+Meshpoint" device name came through correctly with O/OU now present).
+Rewrote the test that had asserted subject-is-CN-only (that assumption
+was exactly what just changed) into `test_subject_name_fields`,
+asserting CN/O/OU present and L explicitly absent -- 19/19 still pass.
+Docs/CHANGELOG updated in place again rather than layering a fourth
+separate entry, since this is one continuously-evolving feature within
+a single conversation, not a separate change.

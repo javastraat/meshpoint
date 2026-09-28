@@ -150,16 +150,21 @@ class TestEnsureCert(unittest.TestCase):
         cert = x509.load_pem_x509_certificate(self.cert_path.read_bytes())
         self.assertIsNotNone(cert)
 
-    def test_subject_is_just_the_device_name(self) -> None:
-        # "Issued To" should read as the specific device, not repeat the
-        # generic "meshpoint"/Organization/Locality/OU block that belongs
-        # on the issuer side -- see test_issuer_name_fields below.
+    def test_subject_name_fields(self) -> None:
+        # "Issued To" shares Organization/OU with the issuer (both belong
+        # to the same Meshpoint project) but not Locality -- "Earth" fits
+        # describing the software's origin, not this specific device's.
         self._ensure(device_name="attic-node")
         cert = x509.load_pem_x509_certificate(self.cert_path.read_bytes())
-        attrs = list(cert.subject)
-        self.assertEqual(len(attrs), 1)
-        self.assertEqual(attrs[0].oid, x509.NameOID.COMMON_NAME)
-        self.assertEqual(attrs[0].value, "attic-node")
+        attrs = {a.oid: a.value for a in cert.subject}
+        from cryptography.x509.oid import NameOID
+        self.assertEqual(attrs[NameOID.COMMON_NAME], "attic-node")
+        self.assertEqual(attrs[NameOID.ORGANIZATION_NAME], "Meshpoint")
+        self.assertEqual(
+            attrs[NameOID.ORGANIZATIONAL_UNIT_NAME],
+            "https://github.com/KMX415/meshpoint",
+        )
+        self.assertNotIn(NameOID.LOCALITY_NAME, attrs)
 
     def test_issuer_name_fields(self) -> None:
         self._ensure()

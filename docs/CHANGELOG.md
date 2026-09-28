@@ -7,11 +7,13 @@
 - **The self-signed HTTPS cert now reads "issued by us, to you"
   instead of "meshpoint" on both sides.** Issuer (fixed): `CN=meshpoint`,
   `O=Meshpoint`, `L=Earth`, `OU=https://github.com/KMX415/meshpoint`
-  (credit to the upstream project). Subject: just
-  `CN=<device.device_name>` -- the specific device the cert belongs to.
+  (credit to the upstream project). Subject: `CN=<device.device_name>`
+  -- the specific device the cert belongs to -- plus the same
+  `O=Meshpoint`/`OU=...` as the issuer, but not `L=Earth` (fine as the
+  software's own origin, a stretch as this specific device's).
   Purely cosmetic, no effect on browser trust (still self-signed by the
   same embedded key either way, still shows the expected warning) --
-  diverging the two DN strings doesn't change what "self-signed" means
+  diverging the CN doesn't change what "self-signed" means
   cryptographically. Renaming the device now also triggers the same
   automatic cert regeneration an IP/hostname drift already did. New
   `meshpoint tls-regenerate` CLI command force-regenerates the cert/key

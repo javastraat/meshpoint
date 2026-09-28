@@ -141,19 +141,21 @@ def _existing_subject_cn(cert_path: Path) -> str | None:
         return None
 
 
+_ORGANIZATION = "Meshpoint"
+# Credit to the original upstream project this fork is built on -- OU has
+# no real semantic fit for a URL, but it's free text and visible on a
+# cert viewer's General tab without digging into a Details/SAN view.
+_UPSTREAM_OU = "https://github.com/KMX415/meshpoint"
+
 _ISSUER_NAME = x509.Name([
     x509.NameAttribute(NameOID.COMMON_NAME, "meshpoint"),
-    x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Meshpoint"),
+    x509.NameAttribute(NameOID.ORGANIZATION_NAME, _ORGANIZATION),
     # There's no real answer for a LAN device's locality -- it's
     # wherever the box physically is, which this code has no way to
     # know. Rather than guess or leave it blank, own the honesty of
     # that with the one locality that's always technically correct.
     x509.NameAttribute(NameOID.LOCALITY_NAME, "Earth"),
-    # Credit to the original upstream project this fork is built on --
-    # OU has no real semantic fit for a URL, but it's free text and
-    # visible on a cert viewer's General tab without digging into
-    # a Details/SAN view.
-    x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, "https://github.com/KMX415/meshpoint"),
+    x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, _UPSTREAM_OU),
 ])
 
 
@@ -165,12 +167,21 @@ def _generate(
     # Issuer stays the fixed "meshpoint" identity (the software that
     # issued this cert); subject is the specific device it was issued
     # to -- so a cert viewer reads as "issued by us, to you" instead of
-    # both sides saying the same generic "meshpoint". Diverging the two
-    # doesn't affect self-signedness in the cryptographic sense (that's
-    # about the signature matching the embedded public key, not the
-    # subject/issuer strings matching each other) -- browsers still
-    # treat it exactly the same, same expected warning either way.
-    subject_name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, device_name)])
+    # both sides saying the same generic "meshpoint". Organization/OU
+    # are shared with the issuer (both belong to the same Meshpoint
+    # project); only Locality stays issuer-only -- "Earth" describing
+    # the *software's* origin reads fine, but repeating it as if it were
+    # this specific device's own location would be a stretch even for a
+    # joke. Diverging the CN doesn't affect self-signedness in the
+    # cryptographic sense (that's about the signature matching the
+    # embedded public key, not the subject/issuer strings matching each
+    # other) -- browsers still treat it exactly the same, same expected
+    # warning either way.
+    subject_name = x509.Name([
+        x509.NameAttribute(NameOID.COMMON_NAME, device_name),
+        x509.NameAttribute(NameOID.ORGANIZATION_NAME, _ORGANIZATION),
+        x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, _UPSTREAM_OU),
+    ])
     now = datetime.datetime.now(datetime.timezone.utc)
     cert = (
         x509.CertificateBuilder()
