@@ -155,6 +155,33 @@ class TestWifiStatus(unittest.TestCase):
         self.assertIsNone(status)
 
 
+class TestEthernetStatus(unittest.TestCase):
+    def test_finds_the_ethernet_device_among_others(self) -> None:
+        status_out = "wlan0:wifi:connected:HomeNet\neth0:ethernet:connected:Wired connection 1\n"
+        ip4_out = "IP4.ADDRESS[1]:192.168.4.20/24\nIP4.GATEWAY:192.168.4.1\nIP4.DNS[1]:192.168.4.1\n"
+        with _patched_sequence((status_out.encode(), 0), (ip4_out.encode(), 0)):
+            status = asyncio.run(nmcli.ethernet_status())
+        self.assertEqual(status, {
+            "device": "eth0", "state": "connected", "connection": "Wired connection 1",
+            "address": "192.168.4.20/24", "gateway": "192.168.4.1", "dns": ["192.168.4.1"],
+        })
+
+    def test_no_ethernet_device_at_all_returns_none(self) -> None:
+        out = "wlan0:wifi:connected:HomeNet\n"
+        with _patched(out.encode()):
+            status = asyncio.run(nmcli.ethernet_status())
+        self.assertIsNone(status)
+
+    def test_unplugged_ethernet_has_no_connection_name_or_ip4_info(self) -> None:
+        status_out = "eth0:ethernet:unavailable:\n"
+        with _patched_sequence((status_out.encode(), 0), (b"", 0)):
+            status = asyncio.run(nmcli.ethernet_status())
+        self.assertEqual(status, {
+            "device": "eth0", "state": "unavailable", "connection": None,
+            "address": None, "gateway": None, "dns": [],
+        })
+
+
 class TestIp4Info(unittest.TestCase):
     def test_parses_address_gateway_and_multiple_dns_servers(self) -> None:
         out = "IP4.ADDRESS[1]:10.0.0.5/24\nIP4.GATEWAY:10.0.0.1\nIP4.DNS[1]:10.0.0.1\nIP4.DNS[2]:1.1.1.1\n"

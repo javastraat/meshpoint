@@ -134,18 +134,20 @@ async def _ip4_info(device: str) -> dict:
     return {"address": address, "gateway": gateway, "dns": dns}
 
 
-async def wifi_status() -> dict | None:
-    """The wifi device's current state and IPv4 config: ``{device,
-    state, connection, address, gateway, dns}``, or ``None`` if this box
-    has no wifi device at all (Ethernet-only carriers, or wifi disabled
-    in raspi-config). ``address``/``gateway``/``dns`` are empty when not
-    connected."""
+async def _device_status(dev_type: str) -> dict | None:
+    """The first device of *dev_type* ("wifi" or "ethernet")'s current
+    state and IPv4 config: ``{device, state, connection, address,
+    gateway, dns}``, or ``None`` if this box has no device of that type
+    at all. ``address``/``gateway``/``dns`` are empty when not
+    connected. Shared by :func:`wifi_status` and
+    :func:`ethernet_status` -- same `nmcli device status` query either
+    way, just a different type filter on the same output."""
     _rc, out = await _run_nmcli("-t", "-f", _STATUS_FIELDS, "device", "status")
     for line in out.splitlines():
         if not line.strip():
             continue
-        device, dev_type, state, connection = _split_terse_line(line, 4)
-        if dev_type != "wifi":
+        device, found_type, state, connection = _split_terse_line(line, 4)
+        if found_type != dev_type:
             continue
         ip4 = await _ip4_info(device)
         return {
@@ -155,6 +157,20 @@ async def wifi_status() -> dict | None:
             **ip4,
         }
     return None
+
+
+async def wifi_status() -> dict | None:
+    """The wifi device's current state and IPv4 config -- see
+    :func:`_device_status`. ``None`` if this box has no wifi device at
+    all (Ethernet-only carriers, or wifi disabled in raspi-config)."""
+    return await _device_status("wifi")
+
+
+async def ethernet_status() -> dict | None:
+    """The (first) ethernet device's current state and IPv4 config --
+    see :func:`_device_status`. ``None`` if this box has no ethernet
+    device at all (WiFi-only carriers)."""
+    return await _device_status("ethernet")
 
 
 async def wifi_connect(ssid: str, password: str = "") -> tuple[int, str]:

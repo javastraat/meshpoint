@@ -15842,3 +15842,97 @@ a second time. 21/21 pass. CHANGELOG bullet extended in place again
 covering the whole feature's full arc: build, two live-bug fixes,
 alignment fix, and the new IP/gateway/DNS addition, rather than
 fragmenting one feature's story across many separate bullets).
+
+**Same plugin, restructured into tabs -- a real design detour worth
+recording since I got the reference pattern wrong twice before landing
+on the right structure.** Einstein asked for tabs "like we do in
+rtl-sdr fe" (WiFi scan/connect + a new Network/eth0 tab), then
+corrected mid-answer: "i mean like the reticulum page rtl-sdr hooks i
+dont want to hook into the network page" -- meaning Reticulum's own
+internal tabs (Peers/Messages/Send/Settings, built entirely within one
+plugin), not RTL-SDR's actual mechanism (separate plugins hooking into
+a shared host page via `window.registerPageHook`, confirmed by reading
+`frontend/sidebar/page_hook_registry.js` directly before answering).
+Recommended reusing Reticulum's real in-page tab pattern (`.lw-tabs`/
+`.lw-tab`, `data-rt-tab`/`data-rt-view`, plain click handlers, no
+cross-plugin registration) rather than either the hook mechanism or a
+hand-rolled tab UI -- read `reticulum_panel.js` directly for the exact
+mechanism to copy rather than guessing at "how tabs probably work."
+
+Made an explicit, stated scope call rather than assuming: built the
+Network tab as **read-only status only** (device/state/IP/gateway/DNS
+for eth0, mirroring what WiFi already shows), not configurable
+settings (static IP, etc.) -- said plainly this was a deliberate
+narrower reading of "network settings," since letting someone
+reconfigure the wired connection remotely carries the same "can strand
+you" risk class WiFi connect already does, arguably worse since
+there's no wireless fallback to reach for. Einstein didn't push back,
+proceeded on that basis.
+
+Backend: refactored `wifi_status()` into a shared `_device_status
+(dev_type)` helper (the underlying `nmcli device status` query already
+lists every device type, wifi and ethernet included -- just needed a
+different type filter, not a different query), added `ethernet_status()`
+as a one-line wrapper around the same helper. Confirmed this was a
+pure, behavior-preserving refactor by re-running the EXISTING
+`wifi_status()` tests unchanged before writing anything new -- all 21
+still passed with zero test edits, proving the extraction didn't
+change wifi_status's own contract. Added a new `/status/ethernet`
+route (session-gated, same as `/status` -- read-only, no reason for
+admin-only here) and a dedicated `TestEthernetStatus` test class.
+24/24 pass.
+
+**The frontend went through three real structural iterations before
+landing correctly -- worth recording the actual mistakes, not just the
+final shape, since the lesson generalizes:** First draft put the stat
+cards and warning/messages *inside* a `.lw-section > .panel` alongside
+the new tab bar, using a bare `.panel__header panel__header--tabs` div
+directly under `.plugin-page` (not wrapped in an actual `.panel`) --
+would have had the exact same clamp-based alignment bug fixed earlier
+this session, just relocated: `.panel__header`'s own base padding
+(`0.5rem 0.75rem`, dashboard.css) is scaled for being *inside* a
+`.panel`, not for sitting bare on the page. Caught this by actually
+reading `.panel__header`'s CSS rule and Reticulum's real markup
+side-by-side before shipping, rather than assuming the class names I
+already knew worked elsewhere would compose correctly in a new
+arrangement. Second draft over-corrected: moved the stat cards *inside*
+the panel too, switching to the real shared `.lw-stats` class (which
+carries its own `clamp(16px, 3vw, 32px)` padding) -- but nesting a
+clamp-padded element inside an already-clamp-padded `.lw-section`
+would have doubled the indent again, the same bug class inverted.
+Caught this one specifically by checking exactly where Reticulum's own
+`.lw-stats` sits in its real markup (`grep`, not assumption) -- turned
+out it's a page-level sibling *before* the `.lw-section > .panel` tab
+block entirely, not nested inside it. Third draft matches that
+exactly: `.lw-stats` (WiFi's and, newly, Ethernet's) plus the warning/
+error/success messages are page-level siblings tagged with
+`data-rn-view` for tab-visibility, matching how they already worked
+before this whole tabs refactor started; only the tab bar and the
+WiFi-specific table/connect-form live inside the one shared panel.
+Also found the real convention for a non-table `.panel__body`'s own
+internal padding (`.panel__body` itself has none by design, a table
+fills it edge-to-edge on purpose) by grepping for existing prior art
+instead of guessing a value -- `frontend/css/listener.css`'s own
+`.lsn-panel-body` utility class, "Add alongside `panel__body` on a
+bare body div," `padding: 12px 0.75rem` matching `.panel__header`'s
+own inset -- copied that exact convention for the connect form and the
+Network tab's placeholder note rather than inventing a new padding
+value.
+
+**The generalizable lesson, worth restating plainly**: composing two
+CSS conventions that each independently apply their own horizontal
+alignment (a page-level clamp inset here, a panel-level inset there)
+is exactly where double-application bugs hide -- verifying *where in
+the real DOM* an existing pattern's elements actually sit (via `grep`
+on the real source, not memory of "which classes exist") caught two
+separate near-misses in a row before either shipped, on top of the one
+that already shipped and had to be fixed earlier in this same
+conversation. Three strikes on the same underlying mistake type in one
+plugin is a strong signal this is worth remembering as a standing
+habit for any future page-structure work in this codebase, not
+dismissed as one-off carelessness.
+
+CHANGELOG bullet extended in place again (same still-uncommitted entry
+covering this plugin's whole arc), README/plugin.toml description
+updated for the new tab + endpoint, `repo.json` regenerated (still 20
+plugins -- no new plugin added, this was a same-plugin restructure).

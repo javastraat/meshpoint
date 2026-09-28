@@ -106,7 +106,18 @@
   matching `.lw-panel__head`'s own `clamp(16px, 3vw, 32px)` side inset
   (the same convention `bluetooth-scanner`'s `.bts-stats`/`.bts-error`
   already establish), so they sat flush left instead of lining up with
-  the page title above them.
+  the page title above them. The page is now two tabs -- **WiFi**
+  (everything above) and **Network** (the wired `eth0` connection's own
+  status, read-only, new `ethernet_status()` in `src/api/nmcli.py`,
+  same shape as `wifi_status()` minus the SSID scan) -- built the same
+  way the Reticulum plugin's own Peers/Messages/Send/Settings tabs are,
+  entirely within one plugin (`.lw-tabs`/`.lw-tab`, `data-rn-tab`/
+  `data-rn-view`), deliberately *not* the RTL-SDR host/hook pattern
+  (separate plugins hooking into a shared host page) -- that mechanism
+  is for independently-installable plugins sharing one page; WiFi and
+  Ethernet are two views of one "network settings" concern, always
+  shipped together, nothing gained by splitting into two plugin folders
+  just for a tabbar.
 - **Fix: a plugin source's browse catalog never showed a plain `requires`
   dependency, only a `[hook]` one -- two bugs, not one.**
   `reticulum-browser` and `reticulum-dashboard` (both
