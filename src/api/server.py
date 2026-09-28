@@ -472,12 +472,24 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
                 pipeline.capture_coordinator.sources,
             )
             loop = asyncio.get_running_loop()
+
+            def _on_short_press() -> None:
+                loop.create_task(advert_all_radios(advert_steps))
+                # Generic, decoupled wake signal: any plugin service
+                # (e.g. oled-display) that exposes an async wake()
+                # gets called too, so a physical button press both
+                # announces and wakes a blanked screen -- no import
+                # of, or reference to, any specific plugin here; a
+                # service that doesn't have one is just skipped.
+                for _name, service in service_registry.live():
+                    wake = getattr(service, "wake", None)
+                    if callable(wake):
+                        loop.create_task(wake())
+
             _button_controller_task = loop.create_task(
                 ButtonController(
                     pin=config.button.gpio_pin,
-                    on_short_press=lambda: loop.create_task(
-                        advert_all_radios(advert_steps)
-                    ),
+                    on_short_press=_on_short_press,
                     on_long_press=restart_service,
                     hold_time_s=config.button.hold_time_s,
                     advert_cooldown_s=config.button.advert_cooldown_s,

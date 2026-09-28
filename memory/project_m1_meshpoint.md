@@ -14567,3 +14567,52 @@ User is now testing the complete setup.sh flow on a genuinely fresh
 node to confirm the whole chain (bluez -> pi-bluetooth -> reboot ->
 config.txt check -> rfkill unblock -> power on -> bleak) works
 end-to-end without needing any of this manual back-and-forth again.
+
+**Confirmed on a second, different board (RAK V2, not just COTX where
+this was originally debugged) -- setup.sh's full chain works clean.**
+Stronger validation than a repeat test on the same hardware: the
+bluez/pi-bluetooth/config.txt/rfkill/power-on sequence generalizes
+across at least two different carrier boards, not just one lucky
+device. Treating this thread as closed unless something new comes up.
+
+**oled-display "wake on button press" -- finally resolved, and it
+turned out the user was half-right that "we already had this."**
+Earlier in this session (before a context compaction) the user twice
+asked for this "all in the plugin, no core change" and I'd concluded
+that's not achievable with zero core touch, then the thread went
+quiet without a final decision -- flagged as unresolved in every todo
+recap since. When asked "didn't we already have this?", I didn't just
+trust my own summary -- grepped the actual oled-display code first:
+turned out there's a REAL, separate feature that already existed
+(`display_service.py`'s `wake()`/`sleep()`, backing the Settings
+page's manual Wake/Sleep buttons) which the user was likely
+conflating with the one that never existed (auto-wake triggered BY
+the physical button/an advert, not by a dashboard click) -- confirmed
+by grepping core's `button_control.py` for any oled/hook reference at
+all: zero hits. Once that distinction was clear, user said go ahead.
+
+Implemented with the smallest possible core touch, using a seam that
+already existed for exactly this purpose (`src/api/service_registry`,
+the same one oled-display's own setup.sh comment already referenced
+for cross-plugin status checks): `server.py`'s button-controller
+wiring (`_on_short_press`, around line 476) now also iterates
+`service_registry.live()` and calls `.wake()` on any service that has
+one, via `getattr(service, "wake", None)` + `callable()` -- zero
+imports of, or references to, "oled-display" anywhere in core, so
+this is generic for any future plugin wanting the same hook, not a
+special case. `display_service.py`'s own `wake()` needed ZERO changes
+-- it already un-blanks AND restarts the auto-blank timer from now
+(confirmed by reading it directly, not assumed), exactly matching what
+"timer running for screen blank of course" asked for.
+
+Verified the actual iteration logic with a real (not mocked)
+`service_registry` import -- confirmed FastAPI-free by its own
+docstring, so it genuinely runs standalone on the Mac unlike most of
+`server.py` -- registering one fake service with `wake()` and one
+without, confirming the real code path calls the first and cleanly
+skips the second with no `AttributeError`. `server.py` itself still
+can't be imported/run whole on the Mac (fastapi/aiosqlite missing), so
+this isolated-logic test plus `py_compile` is the right bar per the
+established Mac-testing convention -- not a gap, the same tradeoff
+already accepted for every other `server.py`-only change this
+session.

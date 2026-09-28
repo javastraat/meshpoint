@@ -175,6 +175,18 @@ Serial multi-stick, Updates UX, native MQTT MapReport, and operator polish on `m
 
 ### v0.8.1 (August 2026)
 
+- **A physical user-button press now also wakes any plugin's display,
+  not just this box's own radios.** The short-press gesture (SenseCap M1
+  user button, `button.gpio_pin`) already announced on every TX-capable
+  radio; it now also calls `wake()` on every currently-loaded plugin
+  service that has one, via the existing `service_registry` seam — fully
+  generic, no plugin-specific import or reference in core. First real
+  user: the community `oled-display` plugin's Wake/Sleep buttons already
+  had exactly this method (un-blank + restart the auto-blank timer from
+  now); a button press just triggers the same thing it always could,
+  so pressing the physical button to fire an advert also lights the
+  screen back up to show status, instead of firing blind into a
+  blanked panel.
 - **The top-right reconnect pill now proactively shows "Restarting..." the
   moment the post-update page reload lands**, instead of only relabeling
   itself if a WebSocket hiccup happens to occur. With the readiness fix below
