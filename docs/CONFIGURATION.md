@@ -573,8 +573,10 @@ available without unplugging the stick into a laptop.
 
 ### POCSAG Companion / DAPNET (plugin)
 
-⚠️ **DAPNET is a plugin now** (`plugins/apps/dapnet/`), not built-in —
-everything below used to live under `capture.pocsag_serial` + a
+⚠️ **DAPNET is a community plugin now**, not built-in — install it from
+[meshpoint-plugins](https://github.com/javastraat/meshpoint-plugins) via
+Settings → Plugins (it's no longer bundled with core either).
+Everything below used to live under `capture.pocsag_serial` + a
 top-level `dapnet:` section and Configuration → POCSAG; all of that is
 gone, replaced by one `plugins.dapnet.*` block plus a **Settings** tab
 on the DAPNET page itself. See `docs/PLUGINS.md`'s [Adding a

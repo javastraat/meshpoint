@@ -14730,3 +14730,107 @@ one-liners were handed back, no actual commit made.
 unconditional capture-pipeline wire-in at boot, `report_command.py`'s
 own `dapnet` device references in `src/cli/report_command.py` -- real
 core-side coupling that the RTL-SDR family didn't have).
+
+**DAPNET followed the RTL-SDR family out to meshpoint-plugins --
+folder-only move, 3 known core touchpoints deliberately left behind.**
+Investigated first (same rigor as the RTL-SDR pass): dapnet already had
+the full plugin shape including its own `firmware_routes.py` *inside*
+the plugin folder (the Configuration -> Firmware "POCSAG" card is
+plugin-registered, not core-hardcoded) -- so the move mechanics were
+identical to RTL-SDR. But unlike RTL-SDR, dapnet leaves real core-side
+coupling behind even after moving: `src/log_format.py`'s 4-line
+`dapnet_alpha`/`dapnet_numeric`/etc. formatting branch,
+`src/storage/packet_repository.py`'s bespoke
+`delete_dapnet_capcodes()` method (with its own core test,
+`tests/test_packet_repository_dapnet_purge.py` -- retroactively purges
+already-stored pages for a capcode just added to the blacklist/ignore
+list, since the per-packet tier check in coordinator.py only stops
+FUTURE pages), and `src/cli/report_command.py`'s hardcoded
+`/api/dapnet/stats` + `/api/dapnet/status` polling for the `meshpoint
+report` diagnostics bundle -- the RTL-SDR family never got that
+treatment at all. Surfaced this explicitly with an AskUserQuestion
+before touching anything (recommended "move folder only, leave the 3
+as-is" since none of them actually break -- same process, same config
+access, regardless of which directory the plugin loads from) -- that
+question got interrupted/skipped when Einstein pivoted to asking about
+Reticulum instead, then came back to "yes move dapnet" afterward. Took
+that as confirmation of the recommended folder-only scope rather than
+re-asking, since it matched the lowest-risk option already laid out and
+Einstein's phrasing ("move that too... so it's an external plugin
+rather than internal") was a plain go-ahead, not a request to also
+refactor core. Said so explicitly before starting, in case that read
+was wrong.
+
+Execution mirrored the RTL-SDR pass exactly: rsync'd the folder into
+`meshpoint-plugins/apps/dapnet/` (`homepage` was already correctly
+`https://hampager.de`, the real DAPNET network's site -- no fix needed,
+unlike rtlsdr/radio last time), stripped `locked = true`, regenerated
+`repo.json` (15 plugins now), `git rm -r`'d the 28 tracked files from
+core (clean tree beforehand, confirmed via `git status` first), cleaned
+up the leftover untracked `__pycache__`. Core's plugin-loader test
+subset stayed green (117 passed, unaffected, matching the RTL-SDR
+result). `test_packet_repository_dapnet_purge.py` couldn't run on the
+Mac (needs real `aiosqlite` -- a shallow `sys.modules` stub isn't
+enough here since the test opens a real `:memory:` SQLite connection,
+unlike the plugin-loader tests' pure-Python fixtures) -- confirmed
+`py_compile` clean and reasoned it's unaffected since
+`delete_dapnet_capcodes()` itself was deliberately left untouched in
+`packet_repository.py`, so this test's pass/fail state can't have
+changed.
+
+**Also fixed while in the docs, unrelated to dapnet specifically:**
+`docs/PLUGINS.md`'s intro paragraph had real broken markdown links --
+`[`plugins/apps/acars/`](../plugins/apps/acars/)` -- left over from the
+*first* (RTL-SDR) pass; I'd fixed the "second, less toy example"
+mention further down that file but missed this earlier one entirely.
+Caught it this time by explicitly grepping every doc for real
+`](../plugins/apps/<moved-id>` link syntax (not just inline backtick
+mentions) before finishing -- worth doing that grep as a matter of
+course on any future plugin move, since it's cheap and catches exactly
+this class of miss.
+
+Docs touched: README.md (the DAPNET companion feature paragraph's
+opening clause), `docs/CONFIGURATION.md` (the existing "DAPNET is a
+plugin now" ⚠️ callout -- extended it rather than replacing, since the
+callout pattern was already exactly the right shape for this kind of
+update), `docs/WHATS-DIFFERENT.md` (two spots: the App-plugins
+architecture paragraph's DAPNET reference, and the Configuration ->
+Firmware POCSAG-card description), `docs/PLUGINS.md` (rewrote the
+intro paragraph's ACARS/DAPNET links into prose pointing at
+meshpoint-plugins, fixing the missed-earlier acars link in the same
+edit). CHANGELOG bullet added under the same `#### Plugins` subsection
+as the RTL-SDR one, explicitly naming the 3 touchpoints left behind so
+a future reader doesn't have to rediscover them. meshpoint-plugins'
+own README Contents table updated too (also had bluetooth-scanner
+missing from it, a pre-existing gap from before this session -- fixed
+in the same pass as the RTL-SDR table addition).
+
+**Still not committed** -- same reasoning as the RTL-SDR pass, two
+repos, ready-to-use commit one-liners handed back instead.
+
+**Reticulum investigated, explicitly NOT moved -- parked, much bigger
+than dapnet.** Einstein asked about it between the RTL-SDR and DAPNET
+moves. reticulum-call/reticulum-browser/reticulum-dashboard have zero
+direct `src.*` imports (cleaner than dapnet, only call reticulum's own
+`/api/reticulum/*`), but the `reticulum` plugin itself leaves far more
+behind than dapnet's 3 small touchpoints: a whole `reticulum_peers`
+TABLE baked into core's central `src/storage/database.py` schema, two
+substantial core-side route files totaling ~900 lines
+(`src/api/routes/reticulum_companion_firmware_routes.py`, 331 lines,
+mounted unconditionally in server.py's router table, not through the
+plugin registry at all; `src/api/routes/rnode_firmware_routes.py`, 532
+lines, deeply aware of `plugins.reticulum.rnode_serial_port` and rnsd's
+lifecycle), and `src/api/systemctl.py`, a small but security-relevant
+allowlisted-subcommand wrapper built specifically to let `rnsd` be
+stopped/started/restarted safely. A `reticulum_config_routes.py` the
+code comments reference as "until that file goes away in the
+reticulum-to-plugin cutover" is already gone (like dapnet's stale
+pre-extraction files were -- only `__pycache__` leftovers, confirmed
+via `find` before believing the comment) -- that part of a presumably
+earlier, partial migration already happened; what's left above is what
+remains. Presented this clearly and asked whether to do a folder-only
+move anyway (accepting a much bigger "not actually clear" gap than
+dapnet's) or pause -- Einstein didn't answer yet, moved on to dapnet
+instead. **Open thread**, revisit when Einstein wants to tackle it --
+don't assume folder-only is the right call here the way it was for
+RTL-SDR/dapnet, given the size of what would stay behind.

@@ -26,6 +26,18 @@
 
 #### Plugins
 
+- **DAPNET moved out of core, into the community
+  [meshpoint-plugins](https://github.com/javastraat/meshpoint-plugins)
+  repo.** Install it from Settings → Plugins like any other community
+  plugin. No longer `locked`, so it can be deleted once installed.
+  Existing installs: after upgrading, DAPNET is simply gone (the files
+  no longer ship with core) -- add the meshpoint-plugins source and
+  reinstall + re-enable it, a one-time step. A handful of small
+  DAPNET-aware touchpoints stay in core unchanged (log formatting for
+  DAPNET packet types, `PacketRepository.delete_dapnet_capcodes()` and
+  its own test, and the `meshpoint report` command's DAPNET status
+  section) -- all still work fine against the now-external plugin, just
+  not moved as part of this pass.
 - **The whole RTL-SDR plugin family moved out of core, into the community
   [meshpoint-plugins](https://github.com/javastraat/meshpoint-plugins)
   repo.** RTL-SDR, Radio, ACARS, POCSAG, RTL433, ADS-B, DAB+, P2000 and

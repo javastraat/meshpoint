@@ -6,17 +6,20 @@ Plugins page, the `meshpoint plugin` CLI), see
 [docs/CONFIGURATION.md § Plugins](CONFIGURATION.md#plugins) instead — this
 doc is for the plugin author.
 
-The canonical worked example is the shipped **ACARS** plugin —
-[`plugins/apps/acars/`](../plugins/apps/acars/) — for routes/listener/hook,
-the minimal **Hello World** / **Hello World Hook** /
-**Hello Service** plugins —
+The canonical worked example is the **ACARS** plugin — for
+routes/listener/hook — and **DAPNET**, for the `capture`/`protocol`/
+`topbar` seams; both have since moved out of this repo into the community
+[meshpoint-plugins](https://github.com/javastraat/meshpoint-plugins) repo
+(`meshpoint-plugins/apps/acars/`, `meshpoint-plugins/apps/dapnet/`) —
+still real, inspectable worked examples, just not locally checked out
+here anymore. In this repo, the minimal **Hello World** / **Hello World
+Hook** / **Hello Service** plugins —
 [`plugins/apps/hello-world/`](../plugins/apps/hello-world/) (sidebar),
 [`plugins/apps/hello-world-hook/`](../plugins/apps/hello-world-hook/) (hook),
 [`plugins/apps/hello-service/`](../plugins/apps/hello-service/) (service) —
-each isolating one seam, and **DAPNET**
-([`plugins/apps/dapnet/`](../plugins/apps/dapnet/)) and **Reticulum**
-([`plugins/apps/reticulum/`](../plugins/apps/reticulum/)) as full
-multi-seam plugins extracted out of core. **Reticulum Dashboard**
+each isolate one seam, and **Reticulum**
+([`plugins/apps/reticulum/`](../plugins/apps/reticulum/)) is a full
+multi-seam plugin extracted out of core. **Reticulum Dashboard**
 ([`plugins/apps/reticulum-dashboard/`](../plugins/apps/reticulum-dashboard/))
 is a fourth sidebar-only example, worth a look if your page wants to read
 *another* plugin's already-public routes/WS broadcasts instead of adding
