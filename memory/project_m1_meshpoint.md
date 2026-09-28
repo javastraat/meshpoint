@@ -14834,3 +14834,236 @@ dapnet's) or pause -- Einstein didn't answer yet, moved on to dapnet
 instead. **Open thread**, revisit when Einstein wants to tackle it --
 don't assume folder-only is the right call here the way it was for
 RTL-SDR/dapnet, given the size of what would stay behind.
+
+**Reticulum Call, Reticulum Browser, and Reticulum Dashboard moved to
+meshpoint-plugins too -- the clean-slice part of Reticulum, unlike the
+core `reticulum` plugin itself which stayed put.** Follow-up to the
+"don't move reticulum" advice above: Einstein asked specifically about
+these three companion plugins next. Confirmed what the earlier
+investigation already suggested -- all three have ZERO direct `src.*`
+imports (only call reticulum's own already-public `/api/reticulum/*`
+routes), unlike the core `reticulum` plugin itself. This is a clean
+parallel to the RTL-SDR host/decoder-family pattern already validated:
+`rtlsdr` stayed the plugin-shaped "host" and every decoder hooking
+into it became separately installable; here `reticulum` stays the
+core-embedded host (firmware routes + DB table + systemctl wrapper all
+still there, per the earlier finding) and these three genuinely
+optional UI extras move out the same way RTL-SDR's decoders did.
+Recommended this proactively (advice-first, matching the way the
+dapnet/RTL-SDR asks went) and Einstein said yes.
+
+Confirmed before moving: `plugin_routes.py`'s `requires`/`[hook].host`
+enforcement resolves against one merged builtin+community manifest
+list (`discover_plugins(builtin_dir, community_dir)`), so a
+community-sourced `reticulum-call`/`reticulum-browser`/
+`reticulum-dashboard` requiring/hooking into the still-builtin
+`reticulum` plugin was already known to work cross-source -- same
+mechanism proven by the RTL-SDR decoder family requiring/hooking into
+`rtlsdr` regardless of which side moved first.
+
+Execution, same mechanics as the last two passes: rsync'd all three
+into `meshpoint-plugins/apps/<name>/`, stripped `locked = true`
+(reticulum-call's was a differently-shaped two-line comment block than
+the other two's single-line form -- handled with a small Python regex
+sub instead of the usual `sed` one-liner since the exact multi-line
+text had to match first), fixed reticulum-call's stale
+`homepage = ".../KMX415/meshpoint"` to point at meshpoint-plugins
+(reticulum-browser and reticulum-dashboard's homepages were already
+correct -- fr33n0w/rBrowser attribution and reticulum.network
+respectively, left untouched), regenerated `repo.json` (18 plugins
+now), `git rm -r`'d the 3 folders from core (23 file deletions, clean
+tree confirmed first), core's plugin-loader test subset still green
+(117 passed, unaffected as expected -- these three never touched core
+`src/` at all so there was never real risk here).
+
+Grepped for real broken links this time as a matter of course (per the
+"worth doing on every future move" note from the dapnet pass) and
+caught one immediately in `docs/PLUGINS.md`'s intro paragraph (a
+`](../plugins/apps/reticulum-dashboard/)` link) -- fixed inline, plus a
+now-inaccurate "bundled" claim in `docs/CONFIGURATION.md`'s
+`landing_page` config docs. README.md and `docs/WHATS-DIFFERENT.md`
+had no mentions of these three at all -- they were never called out
+individually in the user-facing feature docs (only the core Reticulum
+plugin itself and Reticulum Dashboard's category="top" mechanism got a
+mention, both left alone). CHANGELOG bullet added under the same
+`#### Plugins` subsection, explicitly noting the core `reticulum`
+plugin itself is unaffected so a reader doesn't conflate the two.
+meshpoint-plugins' README Contents table extended with all three.
+
+Core `plugins/apps/` now holds just `reticulum` (deliberately, per the
+earlier advice) plus the `hello-*` reference examples -- everything
+else that was ever RTL-SDR-shaped or Reticulum-UI-shaped has moved
+out. Still not committed, same two-repo reasoning as every prior pass.
+
+**Reticulum itself also moved to meshpoint-plugins -- Einstein pushed
+back on my "leave it in core" advice by finding proof upstream
+(KMX415/meshpoint-plugins) already did it, which changed the actual
+scope of the decision.** Worth recording the full arc since it's a
+good example of advice needing to update when new evidence shows up,
+not just being restated more firmly.
+
+Investigated dapnet first (previous entry), advised "move it, leave 3
+small core touchpoints" -- Einstein agreed. Then asked about Reticulum
+next: investigated and found FAR more core coupling than dapnet
+(`reticulum_peers` table in core's central `database.py` schema, two
+substantial core route files totaling ~900 lines for RNode/Heltec-V4
+firmware flashing mounted unconditionally in `server.py` -- not
+through the plugin registry at all, and `src/api/systemctl.py`'s
+rnsd-specific allowlist wrapper). Advised NOT to move it -- the
+leftover footprint would dwarf the plugin itself, unlike dapnet.
+
+Einstein then asked about reticulum-call/browser/dashboard
+specifically -- confirmed those three have zero direct `src.*` imports
+(cleanest possible candidates, cleaner than dapnet even), advised
+moving them while leaving core `reticulum` alone, framed as mirroring
+the rtlsdr-host/decoder-family pattern. Einstein agreed, moved all
+three (68 file... actually 23 total: browser+call+dashboard).
+
+Then Einstein asked directly "what do you advise" about reticulum
+itself again -- gave a firm recommendation to leave it (the firmware
+routes being unconditionally available regardless of plugin-install
+state is a real feature, not a gap; coupling firmware flashing to a
+software plugin install would be a regression). Einstein then supplied
+a concrete counter: pointed at the ORIGINAL upstream maker's own
+meshpoint-plugins repo (`KMX415/meshpoint-plugins`), where `apps/
+reticulum/` already exists as a real, unlocked (`locked = false`),
+`[deps]`-free plugin. This was the right move on Einstein's part --
+investigated it for real (cloned both `KMX415/meshpoint` and
+`KMX415/meshpoint-plugins` via `curl`+tarball into the scratchpad
+rather than trusting file listings alone) instead of taking the link
+at face value, and found concretely:
+- The DB-table coupling IS solved upstream, but not the way its own
+  code comment claims -- `peer_repo.py`'s docstring still says "the
+  `reticulum_peers` table stays in core's schema" (stale), but grepping
+  upstream core's real `database.py` found zero mentions of it at all.
+  It actually lives in the PLUGIN's own `managed_service.py`, created
+  with a plain `CREATE TABLE IF NOT EXISTS` run against the shared
+  `DatabaseManager` connection the plugin already receives -- a fully
+  portable, copyable pattern, not something needing new core support.
+  (Caught myself almost trusting a docstring instead of checking the
+  actual file -- exactly the "verify before trusting a comment" lesson
+  from the dapnet pass's stale-file-reference discovery, applies again
+  here to a stale comment instead of a stale file.)
+- The systemd/rnsd coupling also looks solved -- no `rnsd.service`, no
+  `[deps] setup`, no `run_systemctl` reference anywhere in upstream's
+  plugin; instead `daemon_worker.py`/`managed_service.py`/
+  `worker_proxy.py`/`worker_runner.py` suggest a self-managed worker
+  process replacing systemd entirely. Flagged as not fully traced
+  before the conversation moved on to the actual decision.
+- The firmware routes have literally zero upstream equivalent --
+  `reticulum_companion_firmware_routes.py` and `rnode_firmware_routes.py`
+  both 404 on upstream's core repo. Confirmed these are genuinely THIS
+  FORK's own additions (RNode/Heltec-V4 board flashing via the
+  dashboard), not something upstream ever built or had to migrate --
+  upstream not having a feature doesn't mean it was decoupled, it
+  means it never existed there.
+
+Given that evidence, re-scoped rather than either blindly following
+upstream OR sticking to the original "don't move it" advice: DB table
+problem solved (proven pattern, though we did NOT actually implement
+the CREATE-TABLE-in-plugin refactor this pass -- see below), firmware
+routes have an in-fork precedent to copy if ever wanted (DAPNET's own
+`firmware_routes.py` already lives inside its plugin and registers via
+`reg.add_router()` instead of `server.py` -- proof the same shape works
+in this exact codebase), systemd/rnsd lifecycle is the one genuine
+unknown left unexplored. Landed on a middle path Einstein proposed and
+I validated point-by-point before executing (explicitly asked "tell me
+first"): move the plugin folder only, leave the DB table + both
+firmware route files + the systemctl wrapper in core exactly as they
+are -- NOT attempting the upstream-style deeper refactor (no
+CREATE-TABLE-in-plugin change made, no systemd-to-self-managed-worker
+rewrite attempted). Justified this as more than "just the easy
+option": the firmware routes being usable independent of plugin-install
+state is a genuine, deliberate feature (flash a spare RNode board with
+zero Reticulum software configured) that moving them into the plugin
+would break, not just refactor -- confirmed this by rereading how
+`rnode_firmware_routes.py` already reads `plugins.reticulum.*` via a
+defensive `.get("reticulum", {})` fallback, so it degrades gracefully
+with the plugin absent rather than crashing either way.
+
+Execution: same mechanics as every prior pass -- rsync'd into
+`meshpoint-plugins/apps/reticulum/`, stripped `locked = true`
+(homepage already correctly `reticulum.network`, matching upstream's
+own choice, no fix needed), regenerated `repo.json` (19 plugins now),
+`git rm -r`'d the 68 tracked files from core, cleaned up leftover
+`__pycache__`. Core's `plugins/apps/` now holds only the `hello-*`
+reference examples -- every real-feature plugin that ever lived there
+(RTL-SDR family, dapnet, the whole Reticulum family) has moved out.
+
+**Real gap caught by actual CI (not local testing) and fixed
+immediately**: Einstein pasted a GitHub Actions failure showing
+`tests/test_plugin_loader.py::TestShippedAcarsPlugin::
+test_acars_loads_when_enabled` and `TestShippedDapnetPlugin::
+test_dapnet_loads_when_enabled` both failing with "not found in []".
+Root cause: these were genuine integration tests (not the synthetic
+`_make_plugin()` fixtures I'd grepped for and correctly ruled safe
+back in the RTL-SDR/dapnet passes) that loaded the REAL on-disk
+`plugins/apps/acars`/`plugins/apps/dapnet` folder directly via
+`Path(__file__).resolve().parents[1] / "plugins" / "apps"` --
+`@unittest.skipUnless(_HAS_FASTAPI, ...)`-gated, so they were silently
+SKIPPED on the Mac (no fastapi) every single time I ran the local test
+subset and reported "unaffected" -- I never actually ran them, I only
+confirmed they didn't fail, which is a different and weaker claim I
+should have been more careful to distinguish at the time. CI (real
+fastapi) is what actually exercised them for the first time since the
+files moved. There was ALSO a third one, `TestShippedReticulumPlugin`,
+sitting the same time bomb for the reticulum move I'd just made
+locally but hadn't pushed yet -- caught and fixed preemptively in the
+same pass rather than waiting for a second CI failure.
+
+Fix: deleted all three test classes outright (their entire premise --
+"the real shipped folder for this specific plugin lives in this repo"
+-- is now false, they can't be repaired, only removed), plus the
+now-orphaned `try: import fastapi / _HAS_FASTAPI` block that existed
+solely to gate them, plus a dangling docstring cross-reference in
+`TestShippedHelloWorldPlugin` ("unlike TestShippedAcarsPlugin below")
+that would've pointed at nothing. Verified the underlying MECHANISM
+these tests exercised (listener/routes, capture/protocol, service
+registration) stays fully covered by `TestLoadPlugins`'s existing
+synthetic-fixture tests earlier in the same file, which were never
+tied to any specific real plugin -- so this is a pure subtraction of
+now-impossible integration coverage, not a mechanism-coverage
+regression. Grepped the rest of the test suite for the same
+`parents[1] / "plugins" / "apps"` + hardcoded-real-plugin-name pattern
+to make sure no other landmines existed (found
+`TestShippedPluginManifests` in `test_plugin_manifest.py`, but that one
+dynamically iterates whatever's actually present rather than hardcoding
+a name, so it's safe and needed no change; also checked
+reticulum-call/browser/dashboard specifically, only comment hits, safe).
+Confirmed with `py_compile` + a local pytest run (117 passed, 3
+subtests, no more skips -- the 6 prior skips were exactly these 3
+removed classes' 2 tests each).
+
+**Lesson for next time, worth remembering explicitly**: "ran the local
+subset and it passed/was unaffected" is a materially weaker claim than
+it sounds when tests are silently skip-gated (fastapi/aiosqlite
+missing on the Mac) -- always grep for `skipUnless`/`skipIf` in the
+files being claimed as verified, and read what specifically the
+skipped tests check before asserting "unaffected," rather than only
+confirming the ones that DID run stayed green. CI (or the user running
+CI) is genuinely the only ground truth for that fastapi-gated slice of
+the suite on this project, not something to treat as redundant
+double-checking.
+
+Docs for this move: README.md/WHATS-DIFFERENT.md/CONFIGURATION.md/
+API-ENDPOINTS.md/PLUGINS.md all touched, following the by-now
+established pattern (fix real broken markdown links and actionable
+"how do I get this" framing, leave illustrative inline path mentions
+alone since they stay valid post-install). One new find while at it:
+`docs/CONFIGURATION.md`'s "landing_page" section said "e.g. the
+*bundled* `reticulum-dashboard` plugin" -- factually wrong the moment
+reticulum-dashboard moved out a few turns earlier, caught and fixed in
+this same sweep since I was already grepping the whole doc tree for
+"reticulum" mentions. CHANGELOG got two bullets (the move itself, and
+a separate one for the CI-driven test fix, kept distinct since they're
+different kinds of change). meshpoint-plugins' own README Contents
+table updated too, plus fixed reticulum-call's row wording ("core
+Reticulum page" -> just "Reticulum page", since it's not core anymore
+either).
+
+Still not committed -- consistent with every prior pass, ready-to-use
+commit one-liners handed back instead, this time covering the test fix
+separately from the plugin move since Einstein may want them as
+distinct commits (the CI fix is arguably a bugfix on top of the
+already-committed RTL-SDR/dapnet moves, not part of the new reticulum
+work).

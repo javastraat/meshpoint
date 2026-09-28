@@ -26,6 +26,44 @@
 
 #### Plugins
 
+- **Reticulum itself moved out of core, into the community
+  [meshpoint-plugins](https://github.com/javastraat/meshpoint-plugins)
+  repo.** Install it from Settings → Plugins like any other community
+  plugin; no longer `locked`, so it can be deleted once installed.
+  Existing installs: after upgrading, Reticulum is simply gone until
+  reinstalled + re-enabled from the catalog, a one-time step (move your
+  `plugins.reticulum.*` config first if you had one, same as before --
+  nothing about the config shape changes). The `reticulum_peers` table,
+  the RNode/Heltec-V4 firmware-flashing routes (Configuration →
+  Firmware), and the `systemctl` allowlist wrapper for `rnsd` all stay
+  in core, deliberately: the firmware flashers are genuinely
+  independent of the messaging plugin (flash a board with or without
+  Reticulum installed), the DB table sits inert until the plugin is
+  present, and the systemctl wrapper is a thin, necessarily-shared OS
+  primitive -- same shape as `sdr_registry` staying in core for the
+  RTL-SDR family.
+- **CI caught what the earlier RTL-SDR/DAPNET plugin moves missed**:
+  `tests/test_plugin_loader.py` had three integration tests
+  (`TestShippedAcarsPlugin`, `TestShippedDapnetPlugin`,
+  `TestShippedReticulumPlugin`) that loaded the *real* on-disk
+  `plugins/apps/<id>/` folder for each -- FastAPI-gated, so they were
+  silently skipped on a machine without FastAPI installed and only ran
+  for real in CI. Removed all three now that their subject no longer
+  ships in this repo; the loader mechanism itself (listener/routes,
+  capture/protocol, service registration) stays covered by the
+  existing synthetic-fixture tests in the same file, which were never
+  tied to any specific real plugin.
+- **Reticulum Call, Reticulum Browser, and Reticulum Dashboard moved out
+  of core, into the community
+  [meshpoint-plugins](https://github.com/javastraat/meshpoint-plugins)
+  repo.** Install from Settings → Plugins like any other community
+  plugin; no longer `locked`, so each can be deleted once installed.
+  The core **Reticulum** plugin itself is unaffected and stays built
+  in -- these three only ever called its already-public
+  `/api/reticulum/*` routes, no direct core coupling, so nothing else
+  changes. Existing installs: after upgrading, these three are simply
+  gone until reinstalled + re-enabled from the catalog, a one-time
+  step.
 - **DAPNET moved out of core, into the community
   [meshpoint-plugins](https://github.com/javastraat/meshpoint-plugins)
   repo.** Install it from Settings → Plugins like any other community

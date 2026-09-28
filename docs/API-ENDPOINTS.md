@@ -164,7 +164,7 @@ Provided by the **DAPNET** plugin (`plugins/apps/dapnet/`, `plugins.dapnet.enabl
 
 ## Reticulum (plugin)
 
-Provided by the **Reticulum** plugin (`plugins/apps/reticulum/`, `plugins.reticulum.enabled: true`) — native Reticulum/LXMF messaging: meshpoint's own LXMF delivery destination (attached to a local `rnsd` shared instance) plus the peer roster built from announces. Uses the `"service"` plugin seam for the `LxmfService` lifecycle (see `docs/PLUGINS.md`). Message *history* is the shared `messages` table (`protocol='reticulum'`), read via the Messages endpoints below.
+Provided by the **Reticulum** community plugin (install from [meshpoint-plugins](https://github.com/javastraat/meshpoint-plugins), `plugins.reticulum.enabled: true`) — native Reticulum/LXMF messaging: meshpoint's own LXMF delivery destination (attached to a local `rnsd` shared instance) plus the peer roster built from announces. Uses the `"service"` plugin seam for the `LxmfService` lifecycle (see `docs/PLUGINS.md`). Message *history* is the shared `messages` table (`protocol='reticulum'`), read via the Messages endpoints below.
 
 | Method | Path | Role | Description |
 |---|---|---|---|

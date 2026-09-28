@@ -17,11 +17,11 @@ Hook** / **Hello Service** plugins —
 [`plugins/apps/hello-world/`](../plugins/apps/hello-world/) (sidebar),
 [`plugins/apps/hello-world-hook/`](../plugins/apps/hello-world-hook/) (hook),
 [`plugins/apps/hello-service/`](../plugins/apps/hello-service/) (service) —
-each isolate one seam, and **Reticulum**
-([`plugins/apps/reticulum/`](../plugins/apps/reticulum/)) is a full
-multi-seam plugin extracted out of core. **Reticulum Dashboard**
-([`plugins/apps/reticulum-dashboard/`](../plugins/apps/reticulum-dashboard/))
-is a fourth sidebar-only example, worth a look if your page wants to read
+each isolate one seam, and **Reticulum** (also now in meshpoint-plugins —
+`meshpoint-plugins/apps/reticulum/`) is a full multi-seam plugin extracted
+out of core. **Reticulum Dashboard** (meshpoint-plugins too,
+`requires = "reticulum"` rather than a `[hook]`) is a
+fourth sidebar-only example, worth a look if your page wants to read
 *another* plugin's already-public routes/WS broadcasts instead of adding
 its own backend — the manifest only allows one `[sidebar]` table per
 plugin, so a second top-level nav item companion to an existing plugin's
@@ -603,7 +603,7 @@ useful check.
 packet pipeline. `"service"` is neither — it's for a plugin that just
 needs to **run something async for the life of the app**: attach to an
 external daemon, hold a connection open, poll a device, run a router. The
-shipped example is **Reticulum** (`plugins/apps/reticulum/`), whose
+shipped example is **Reticulum** (meshpoint-plugins), whose
 `LxmfService` attaches to a local `rnsd` shared instance as an RNS/LXMF
 client; **Hello Service** (`plugins/apps/hello-service/`) is the minimal
 one — a no-op that just logs when it starts and stops.

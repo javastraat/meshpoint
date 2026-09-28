@@ -281,8 +281,7 @@ class TestShippedHelloWorldPlugin(unittest.TestCase):
     """The real plugins/apps/hello-world/ folder loads cleanly (community
     tier -- kept there rather than moved to built-in, so it stays easy for
     a user to actually find and copy as a template). FastAPI-free (its
-    register() has nothing to do), so this runs on the Mac too -- unlike
-    TestShippedAcarsPlugin below."""
+    register() has nothing to do), so this runs on the Mac too."""
 
     def setUp(self) -> None:
         route_registry.reset()
@@ -317,94 +316,6 @@ class TestShippedHelloWorldPlugin(unittest.TestCase):
             self._community / "nonexistent-builtin", self._community, {},
         )
         self.assertNotIn("hello-world", [p.manifest.name for p in loaded])
-
-
-try:
-    import fastapi  # noqa: F401
-    _HAS_FASTAPI = True
-except ImportError:
-    _HAS_FASTAPI = False
-
-
-@unittest.skipUnless(_HAS_FASTAPI, "acars backend imports fastapi (CI / Pi only)")
-class TestShippedAcarsPlugin(unittest.TestCase):
-    """The real plugins/apps/acars/ folder loads and registers its pieces."""
-
-    def setUp(self) -> None:
-        route_registry.reset()
-        listener_registry.reset()
-        capture_source_registry.reset()
-        protocol_registry.reset()
-        self._community = Path(__file__).resolve().parents[1] / "plugins" / "apps"
-
-    def tearDown(self) -> None:
-        for name in [m for m in list(sys.modules) if m.startswith("meshpoint_plugin_")]:
-            del sys.modules[name]
-        route_registry.reset()
-        listener_registry.reset()
-        capture_source_registry.reset()
-        protocol_registry.reset()
-
-    def test_acars_loads_when_enabled(self) -> None:
-        loaded = load_plugins(
-            self._community / "nonexistent-builtin",
-            self._community,
-            {"acars": {"enabled": True}},
-        )
-        self.assertIn("acars", [p.manifest.name for p in loaded])
-        self.assertTrue(
-            any(getattr(s.router, "prefix", "") == "/api/acars"
-                for s in route_registry.registered())
-        )
-        self.assertIn("acars", [s.name for s in listener_registry.plugin_specs()])
-
-    def test_acars_skipped_when_not_enabled(self) -> None:
-        loaded = load_plugins(
-            self._community / "nonexistent-builtin", self._community, {},
-        )
-        self.assertNotIn("acars", [p.manifest.name for p in loaded])
-
-
-@unittest.skipUnless(_HAS_FASTAPI, "dapnet backend imports fastapi (CI / Pi only)")
-class TestShippedDapnetPlugin(unittest.TestCase):
-    """The real plugins/apps/dapnet/ folder loads and registers its
-    capture source + protocol, in addition to routes -- the first
-    non-RTL-SDR-shaped plugin to exercise both of those capabilities."""
-
-    def setUp(self) -> None:
-        route_registry.reset()
-        listener_registry.reset()
-        capture_source_registry.reset()
-        protocol_registry.reset()
-        self._community = Path(__file__).resolve().parents[1] / "plugins" / "apps"
-
-    def tearDown(self) -> None:
-        for name in [m for m in list(sys.modules) if m.startswith("meshpoint_plugin_")]:
-            del sys.modules[name]
-        route_registry.reset()
-        listener_registry.reset()
-        capture_source_registry.reset()
-        protocol_registry.reset()
-
-    def test_dapnet_loads_when_enabled(self) -> None:
-        loaded = load_plugins(
-            self._community / "nonexistent-builtin",
-            self._community,
-            {"dapnet": {"enabled": True}},
-        )
-        self.assertIn("dapnet", [p.manifest.name for p in loaded])
-        self.assertTrue(
-            any(getattr(s.router, "prefix", "") == "/api/dapnet"
-                for s in route_registry.registered())
-        )
-        self.assertIn("dapnet", [s.name for s in capture_source_registry.plugin_specs()])
-        self.assertIsNotNone(protocol_registry.for_protocol("dapnet"))
-
-    def test_dapnet_skipped_when_not_enabled(self) -> None:
-        loaded = load_plugins(
-            self._community / "nonexistent-builtin", self._community, {},
-        )
-        self.assertNotIn("dapnet", [p.manifest.name for p in loaded])
 
 
 class TestShippedHelloServicePlugin(unittest.TestCase):
@@ -454,46 +365,6 @@ class TestShippedHelloServicePlugin(unittest.TestCase):
             self._community / "nonexistent-builtin", self._community, {},
         )
         self.assertNotIn("hello-service", [p.manifest.name for p in loaded])
-        self.assertEqual(service_registry.plugin_specs(), [])
-
-
-@unittest.skipUnless(_HAS_FASTAPI, "reticulum backend imports fastapi (CI / Pi only)")
-class TestShippedReticulumPlugin(unittest.TestCase):
-    """The real plugins/apps/reticulum/ folder loads and registers its
-    LxmfService (the "service" seam) + /api/reticulum/* routes. Phase 1 of
-    the core->plugin extraction -- see memory/plugin-reticulum.md."""
-
-    def setUp(self) -> None:
-        route_registry.reset()
-        service_registry.reset()
-        self._community = Path(__file__).resolve().parents[1] / "plugins" / "apps"
-
-    def tearDown(self) -> None:
-        for name in [m for m in list(sys.modules) if m.startswith("meshpoint_plugin_")]:
-            del sys.modules[name]
-        route_registry.reset()
-        service_registry.reset()
-
-    def test_reticulum_loads_when_enabled(self) -> None:
-        loaded = load_plugins(
-            self._community / "nonexistent-builtin",
-            self._community,
-            {"reticulum": {"enabled": True}},
-        )
-        self.assertIn("reticulum", [p.manifest.name for p in loaded])
-        prefixes = {getattr(s.router, "prefix", "") for s in route_registry.registered()}
-        self.assertIn("/api/reticulum", prefixes)        # peers/messages/send/announce
-        self.assertIn("/api/config", prefixes)           # /api/config/reticulum settings
-        self.assertIn("/api/reticulum/nomad", prefixes)  # NomadNet browsing
-        self.assertEqual(
-            [s.name for s in service_registry.plugin_specs()], ["reticulum"],
-        )
-
-    def test_reticulum_skipped_when_not_enabled(self) -> None:
-        loaded = load_plugins(
-            self._community / "nonexistent-builtin", self._community, {},
-        )
-        self.assertNotIn("reticulum", [p.manifest.name for p in loaded])
         self.assertEqual(service_registry.plugin_specs(), [])
 
 
