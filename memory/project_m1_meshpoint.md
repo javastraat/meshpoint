@@ -15567,3 +15567,105 @@ a detail worth preserving for the next person). CHANGELOG bullet
 placed above the earlier cert-identity bullets in the same `####
 Dashboard` subsection (chronological/severity ordering, this is the
 one with real confirmed user impact vs. the others being cosmetic).
+
+**Built a genuinely new plugin from scratch this time, not a move:
+`raspberry-network` (Einstein's naming, after first saying
+`raspberry-wifi` then self-correcting -- broader name, room to grow
+into more than just WiFi later without a rename).** WiFi scan/connect/
+status from the dashboard, no shell needed. Went through
+EnterPlanMode given the real scope (new external plugin + a core-side
+addition + new sudoers grants + genuine safety-critical UX), used one
+Explore agent for Phase 1 (hello-world's exact plugin shape, an
+admin-gated-route example, `systemctl.py`'s exact wrapper signature,
+sudoers exact syntax, `PluginRegistry.add_router`'s signature, and one
+concrete scan-then-connect frontend precedent) rather than re-deriving
+all of that myself, since the agent could gather it faster and I
+already knew roughly what to ask for.
+
+Confirmed the real backend before writing anything, not guessed:
+`scripts/provision_config.py::write_wifi_config()` already writes
+`.nmconnection` files "for Bookworm-era Pi OS" (offline SD-card
+provisioning) and `docs/COMMON-ERRORS.md` already documents
+`nmcli connection ...` as the real WiFi-troubleshooting method --
+NetworkManager/`nmcli` was never in question, just needed confirming
+it was really already the project's committed target rather than
+assuming from general Raspberry Pi OS knowledge.
+
+Architecture mirrors the Reticulum/`rnsd` precedent deliberately: a
+small core-owned `src/api/nmcli.py` (FastAPI-free, same
+`asyncio.create_subprocess_exec`/`(rc, output)` shape as
+`src/api/systemctl.py`, confirmed by reading that file directly rather
+than trusting the agent's paraphrase alone) plus matching lines in
+`config/sudoers-meshpoint`, with the actual feature/UI/routes living
+in the external plugin -- same "narrow OS-privilege primitive in core,
+feature in the plugin" split already proven for `rnsd`.
+
+**Real bug caught by actually running `visudo -cf`, not just writing
+sudoers lines by hand-pattern-matching**: the new sudoers entries used
+`-f SSID,SIGNAL,SECURITY,IN-USE` with literal unescaped commas --
+`visudo` rejected this outright ("expected a fully-qualified path
+name"), because sudoers' own Cmnd_Spec syntax treats an unescaped
+comma as a LIST SEPARATOR between multiple distinct commands on one
+line, not literal text. Fixed by backslash-escaping the commas
+(`SSID\,SIGNAL\,SECURITY\,IN-USE`) -- confirmed this doesn't change
+what the actual child process receives (sudoers' escaping is about its
+own config-file parsing, not a transform applied to the argv `sudo`
+hands to `nmcli`; the real Python code still passes the field list as
+one literal comma-containing string via `asyncio.create_subprocess_exec`,
+no shell involved). Worth remembering as a standing habit for any
+future sudoers edit: `visudo -cf` is fast, free, and catches exactly
+this class of subtle parsing gotcha before it ever reaches a real
+device -- always run it, don't just eyeball the syntax against
+existing lines.
+
+Test coverage for the terse-nmcli-output parser (`_split_terse_line`)
+deliberately includes an escaped-colon-within-a-field case (a real SSID
+can contain a literal `:`, which nmcli's own terse mode escapes as
+`\:` specifically to avoid corrupting the split) -- this is the one
+piece of genuinely non-obvious parsing logic in the whole plugin, and
+the one most likely to silently misbehave on a real network in the
+field if gotten wrong, so it got the most deliberate test attention
+(4 dedicated tests) even though it's pure string processing with zero
+external dependency, fully verifiable on the Mac. 15/15 pass.
+
+**Real risk mitigation baked into the design, not just documented as a
+caveat**: `wifi_connect()`'s docstring and the plugin's own README both
+state plainly that a bad SSID/password can strand the admin session
+reaching the dashboard over WiFi with no Ethernet fallback -- and the
+actual mitigating behavior (never tearing down a working connection to
+try a failing one) is inherent to how `nmcli device wifi connect`
+itself behaves, not something this code has to implement -- confirmed
+this understanding is accurate by reading nmcli's real documented
+semantics, but flagged in the plan (and again here) that the ACTUAL
+live behavior on a real device is the one thing that genuinely cannot
+be verified on the Mac at all, since there's no real NetworkManager
+here -- Einstein will need to confirm this live on a Pi before trusting
+it under real conditions, same as every other hardware-dependent thing
+this whole session.
+
+Also caught and fixed a smaller thing while building the CSS: first
+draft invented plausible-sounding CSS variable names
+(`--color-warning-bg`, `--color-danger-bg`, etc.) without checking they
+existed -- none did. Grepped the real theme system
+(`frontend/css/dashboard.css`'s `:root`, confirmed re-defined per-theme
+in `frontend/themes/{light,dark}/theme.css`) before shipping the CSS,
+found the real tokens (`--accent-red`/`--accent-amber`/`--accent-green`/
+`--bg-card`/`--border`/`--bg-inset`), and rewrote to use those instead
+-- otherwise the fallback values in `var(--x, fallback)` would have
+silently masked the missing tokens forever, working but never actually
+theme-aware. Worth the same "grep before inventing" discipline applied
+everywhere else this session (icon names, config field names, HAL
+function signatures) extended now to CSS custom properties too.
+
+Full file set: `src/api/nmcli.py` + `tests/test_nmcli.py` +
+`config/sudoers-meshpoint` (core); `meshpoint-plugins/apps/
+raspberry-network/` (plugin.toml, check.sh, backend/__init__.py,
+backend/routes.py, frontend/raspberry_network.{js,css}, README.md) +
+`repo.json` regenerated (20 plugins now) + meshpoint-plugins README
+table entry (external). CHANGELOG bullet in core under `#### Plugins`,
+naming the real safety property explicitly so a future reader doesn't
+have to re-derive it from the code. `python3.11 -m py_compile` +
+`node --check` + `visudo -cf` + `parse_manifest()` all confirmed clean;
+108 combined tests pass across the touched core test files. Not
+committed -- same two-repo, incremental-commit convention as every
+other pass this session.

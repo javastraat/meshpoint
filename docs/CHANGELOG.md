@@ -56,6 +56,29 @@
 
 #### Plugins
 
+- **New community plugin: `raspberry-network`** -- scan for WiFi
+  networks and switch the Pi's WiFi connection from the dashboard, no
+  shell needed. Install from Settings → Plugins
+  ([meshpoint-plugins](https://github.com/javastraat/meshpoint-plugins)).
+  Read-only status is always available; scanning and connecting are
+  admin-only. Uses NetworkManager (`nmcli`) -- already the real network
+  stack on Bookworm-era Raspberry Pi OS (`scripts/provision_config.py`
+  already writes `.nmconnection` files for offline SD-card
+  provisioning); its own `check.sh` verifies `nmcli`/NetworkManager are
+  actually present and running before claiming to be usable, since not
+  every supported board is (the Bobcat Miner 300 runs community
+  Armbian). New core addition: `src/api/nmcli.py`, a small FastAPI-free
+  `sudo nmcli ...` wrapper mirroring `src/api/systemctl.py`'s own
+  shape exactly, plus matching narrowly-scoped grants in
+  `config/sudoers-meshpoint` (exact literal argv for scan/status,
+  wildcarded only on the one line that genuinely needs it --
+  connecting, since the SSID/password vary). The one thing that
+  matters most: a connect attempt never tears down a working
+  connection to try a failing one -- `nmcli device wifi connect`
+  itself blocks until it knows the real outcome, and a failure leaves
+  whatever was connected before untouched, with `nmcli`'s own real
+  error text surfaced on the page rather than hidden behind a generic
+  message.
 - **Fix: a plugin source's browse catalog never showed a plain `requires`
   dependency, only a `[hook]` one -- two bugs, not one.**
   `reticulum-browser` and `reticulum-dashboard` (both

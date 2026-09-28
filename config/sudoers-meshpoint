@@ -29,6 +29,18 @@ meshpoint ALL=(ALL) NOPASSWD: /usr/bin/systemctl is-active rnsd
 # (rnsd's own ExecStartPre) without a full meshpoint restart.
 meshpoint ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart rnsd
 
+# ── WiFi scan/connect (raspberry-network plugin, src/api/nmcli.py) ────
+# Scan/status args are exact literal argv, same discipline as every other
+# line in this file -- only the connect line is wildcarded, since the
+# SSID/password genuinely vary. A bad SSID/password submitted through
+# this can strand the admin session using WiFi to reach the dashboard at
+# all if there's no Ethernet fallback -- see src/api/nmcli.py's own
+# docstring for why wifi_connect() never tears down a working connection
+# to try a failing one.
+meshpoint ALL=(ALL) NOPASSWD: /usr/bin/nmcli -t -f SSID\,SIGNAL\,SECURITY\,IN-USE device wifi list --rescan yes
+meshpoint ALL=(ALL) NOPASSWD: /usr/bin/nmcli -t -f DEVICE\,TYPE\,STATE\,CONNECTION device status
+meshpoint ALL=(ALL) NOPASSWD: /usr/bin/nmcli device wifi connect *
+
 # ── Self-update apply chain (Settings → Updates) ──────────────────────
 # NOTE: there are deliberately NO `git` or `pip install` grants here.
 # `/opt/meshpoint` and its venv are owned by the `meshpoint` service
