@@ -16357,3 +16357,147 @@ manual wrapper insertion), `ChangelogParser.parse_file()` re-parse (31
 sections, clean). Same live-verification caveat as the rest of this
 session's layout work -- grounded in reading the real CSS rules
 involved, not yet re-confirmed against a fresh screenshot.
+
+**Same "full-width card" pattern found and fixed on Configuration →
+Peripherals, same session, mid-way through the backup-encryption plan-
+mode detour.** Einstein sent a screenshot of `#/configuration/peripherals`
+mid-turn: "what about this page and the cards ?why also these full
+screen cards?" -- Board preset/Fan/Status LED/User Button
+(`frontend/js/configuration/hardware_card.js`) all stacked full-width
+in `.cfg-section` (plain flex-column, confirmed via its own comment:
+"Section wrapper used by the Radio editor to stack two cards" --
+i.e. genuinely meant for stacking elsewhere, not a universal bug).
+Same root shape as the System-page fix just before it, but a *second*,
+independent issue stacked on top this time: Fan's six
+`.cfg-field--narrow` fields (`max-width: 140px` each -- GPIO pin, ramp
+thresholds, minimum duty, hysteresis, poll interval) were never
+wrapped in `.cfg-row`, the existing grid-of-narrow-fields convention
+Configuration → GPS/MQTT/MeshRadar's own cards already use
+(`.cfg-row { display:grid; grid-template-columns:repeat(auto-fit,
+minmax(160px,1fr)); gap:12px; }`, configuration.css:67-71) -- so even
+though each field was individually narrow, they stacked one per row
+instead of flowing into columns, wasting even more space than the
+card-level stacking alone would have.
+
+Fixed both, scoped correctly: new `.cfg-section--grid` modifier
+(`display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr));
+align-items:start`) added right after `.cfg-section`'s own rule in
+configuration.css (same file, later in cascade order, so it reliably
+overrides `display:flex` when both classes are on one element) --
+deliberately a *modifier*, not a change to `.cfg-section` itself, since
+Configuration → Radio's own two-card page uses the same base class and
+explicitly wants its cards to keep stacking full-width (tall, complex
+forms, not a fit for this). Used `align-items:start` rather than
+leaving default `stretch` (what `.auth-panel__grid` uses) since these
+four cards' heights vary far more than System's four did -- Board
+preset is two lines, Fan is now several fields wide; stretching the
+short ones to match Fan's height would've looked worse, not better.
+Applied `cfg-section cfg-section--grid` to `hardware_card.js`'s one
+wrapper div, and wrapped each form's narrow-field group in a `.cfg-row`
+div (Fan: all six; Status LED: its one GPIO pin field, for consistency
+even though a single field doesn't strictly need wrapping; User
+Button: GPIO pin/hold time/cooldown).
+
+Checked blast radius before considering it done: `.cfg-section` is used
+by 15+ other Configuration card files (grepped), but most are
+single-card mounts inside the larger Firmware/MeshCore/Serial/etc.
+pages -- no stacking problem exists where there's only one card. The
+Firmware page specifically (7 firmware-update cards mounted side by
+side via `configuration_panel.js`'s own outer `.cfg-section`) is a
+plausible candidate for the *same* full-width-stacking issue, but
+wasn't screenshotted or asked about this turn -- flagged to Einstein as
+an optional follow-up rather than fixed unprompted, matching the
+"one by one" pace they've set for this whole review.
+
+Verified: `node --check` on `hardware_card.js` (clean), CSS
+brace-balance on `configuration.css` (131/131), HTML tag balance in the
+touched file (div 8/8, article 4/4, form 3/3), `ChangelogParser.
+parse_file()` re-parse (31 sections, clean).
+
+**Also this turn**: Einstein asked to confirm the backup-encryption
+design (see the plan-mode entry above) had actually been written into
+`memory/meshpoint_security_todo.md` and not just left in the ephemeral
+plan-mode file -- confirmed yes, it's backlog item #8, full design in
+the Notes column, `grep`-verified present before answering rather than
+assuming from memory of having done the edit.
+
+**OLED Display rebuilt on shared page chrome, same session, right after
+Peripherals.** Einstein sent a screenshot of `#/configuration/oled-display`:
+"qe why is the oled page looks different can you have a look if ihe
+page is correct?" then, mid-investigation, generalized the ask: "same
+spaceing cards etc so all pages will look the same so we have
+consistency" -- confirming the goal is convergence toward the one
+established look, not just diagnosing this one page in isolation.
+
+This page was one of the four community plugins flagged earlier this
+session as "genuinely minimal, correctly using `.plugin-page` alone, no
+bug" (offline-map, oled-display, hello-world-github, rtlsdr) when
+auditing the bluetooth-scanner/raspberry-network double-padding bug --
+that earlier finding was about padding stacking, and on THAT narrow
+question these four were correctly cleared. But Einstein is now asking
+a broader question (does the whole page's visual language match), and
+on that question OLED genuinely doesn't: bare `<h2>OLED Display</h2>` +
+`<p>` intro (core's `.plugin-page h2/p` fallback styling -- 22px title,
+14px secondary-color paragraph, meant for a plugin with no CSS of its
+own), plus a bespoke `.oled-card` class (own 6px radius, 14px/16px
+padding, `var(--bg-card)` background -- already correctly themed per an
+earlier fix noted in its own CSS comment, so not broken, just a
+different, parallel card style from `.cfg-card`/`.auth-card`). Its
+Settings form's fields were also plain `.cfg-field` (no `--narrow`,
+never wrapped in `.cfg-row`) and its two checkboxes nested the
+`<input type="checkbox">` *inside* the label's text `<span>` rather
+than using the real `.cfg-field--toggle` markup (checkbox as a direct
+sibling of the label span, `flex-direction:row`) -- worked visually by
+accident (a `<span>` is inline by default, so checkbox+text just sat
+next to each other in normal inline flow) without actually using the
+shared toggle convention.
+
+**Fix** (`meshpoint-plugins/apps/oled-display/frontend/
+oled_display_panel.{js,css}`): title switched to
+`.lw-panel__head`/`.lw-panel__title` (same convention Bluetooth
+Scanner/WiFi & Network/Reticulum Browser/Reticulum already use); new
+`.oled-page__intro` class for the description paragraph (mirrors
+`.dangerous-panel__subtitle`'s own values -- `margin:0 0 16px;
+color:var(--text-secondary); font-size:14px; line-height:1.5;` --
+rather than relying on the dropped `.plugin-page p` fallback). Both
+cards ("Live preview"/"Settings") now use `.cfg-card`/`.cfg-card__head`
+(dropping the bespoke `.oled-card`/`.oled-card__title`, which is now
+dead CSS, removed) wrapped in `.cfg-section cfg-section--grid` --
+reusing the SAME grid modifier just added for Peripherals two entries
+above, first proof it generalizes cleanly to a second, differently-
+shaped page (an image-preview card next to a form card, not four
+similar cards). Settings form fields (I2C address/controller/blank
+timeout/refresh interval/boot logo duration/rotate-seconds) now use
+`.cfg-field--narrow` wrapped in `.cfg-row`, matching Peripherals'
+Fan/User Button cards exactly. The two checkboxes converted to real
+`.cfg-field--toggle` markup. Removed `.oled-page form`'s old
+`max-width: 360px` (now genuinely dead -- the `.oled-page` class no
+longer exists in the markup at all) for the same reason the System
+page's old per-card `max-width` rules were removed: it would have
+fought `.cfg-row`'s own column sizing. Added
+`.section[data-section="oled-display"] { overflow-y: auto }`, same
+established fix as bluetooth-scanner/raspberry-network, since dropping
+`.plugin-page` also drops the scroll behavior it was quietly supplying.
+`.oled-preview`'s deliberately-hardcoded-black styling (the real
+physical OLED, explicitly commented "don't fix this one to --bg-card")
+is untouched -- correctly a permanent exception, not something this
+consistency pass should touch.
+
+Checked for dangling references before calling it done: `grep -rn
+"oled-page\|oled-card"` across the whole plugin folder found only the
+new `.oled-page__intro` class and the unrelated `data-oled-page-*`
+attribute names (page-rotation feature, not the old wrapper class) --
+confirmed no README/test/other file still expected the removed
+classes.
+
+Verified: `node --check` on the JS (clean), HTML tag balance (div 7/7,
+article 2/2, header 3/3, form 1/1, label 8/8), CSS brace-balance
+(7/7), `ChangelogParser.parse_file()` re-parse (31 sections, clean).
+
+**Given Einstein's generalized ask, three more community plugins still
+use the same old bare `.plugin-page` style unaddressed**: `offline-map`,
+`hello-world-github`, `rtlsdr`. Not touched yet -- flagged to Einstein
+as the natural next targets for this same consistency pass rather than
+done unprompted, matching this session's established "one page at a
+time, confirm before moving on" rhythm even though the *goal* is now
+explicitly stated as "make everything consistent."

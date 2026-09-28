@@ -394,6 +394,19 @@ select.cfg-field__input option:checked {
     gap: 16px;
 }
 
+/* Modifier for a `.cfg-section` whose cards are each short/narrow enough
+   to flow side by side instead of stacking full-width one per row --
+   Peripherals' Board preset/Fan/Status LED/User Button cards, which
+   otherwise sat full content-width with mostly empty space on anything
+   wider than a phone. Radio's own `.cfg-section` (the comment above)
+   keeps the plain stacked behavior -- its two cards are tall, complex
+   forms that genuinely want the full width, not a candidate for this. */
+.cfg-section--grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    align-items: start;
+}
+
 /* Inline field used as a fieldset for the freq-mode radio group. */
 .cfg-field--inline {
     flex-direction: row;

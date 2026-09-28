@@ -30,7 +30,7 @@ class HardwareConfigCard {
     mount(root) {
         this._root = root;
         this._root.innerHTML = `
-            <div class="cfg-section" data-hw-root>
+            <div class="cfg-section cfg-section--grid" data-hw-root>
                 <article class="cfg-card">
                     <header class="cfg-card__head">
                         <h3 class="cfg-card__title">Board preset</h3>
@@ -52,30 +52,32 @@ class HardwareConfigCard {
                             <input type="checkbox" data-fan-enabled>
                             <span class="cfg-field__label">Enabled</span>
                         </label>
-                        <label class="cfg-field cfg-field--narrow">
-                            <span class="cfg-field__label">GPIO pin</span>
-                            <input class="cfg-field__input" type="number" min="0" max="27" data-fan-pin>
-                        </label>
-                        <label class="cfg-field cfg-field--narrow">
-                            <span class="cfg-field__label">Ramp start (°C)</span>
-                            <input class="cfg-field__input" type="number" step="0.5" data-fan-min-temp>
-                        </label>
-                        <label class="cfg-field cfg-field--narrow">
-                            <span class="cfg-field__label">Full speed at (°C)</span>
-                            <input class="cfg-field__input" type="number" step="0.5" data-fan-max-temp>
-                        </label>
-                        <label class="cfg-field cfg-field--narrow">
-                            <span class="cfg-field__label">Minimum duty (0-1)</span>
-                            <input class="cfg-field__input" type="number" step="0.05" min="0" max="1" data-fan-min-duty>
-                        </label>
-                        <label class="cfg-field cfg-field--narrow">
-                            <span class="cfg-field__label">Hysteresis (°C)</span>
-                            <input class="cfg-field__input" type="number" step="0.5" min="0" data-fan-hysteresis>
-                        </label>
-                        <label class="cfg-field cfg-field--narrow">
-                            <span class="cfg-field__label">Poll interval (s)</span>
-                            <input class="cfg-field__input" type="number" step="1" min="1" data-fan-poll>
-                        </label>
+                        <div class="cfg-row">
+                            <label class="cfg-field cfg-field--narrow">
+                                <span class="cfg-field__label">GPIO pin</span>
+                                <input class="cfg-field__input" type="number" min="0" max="27" data-fan-pin>
+                            </label>
+                            <label class="cfg-field cfg-field--narrow">
+                                <span class="cfg-field__label">Ramp start (°C)</span>
+                                <input class="cfg-field__input" type="number" step="0.5" data-fan-min-temp>
+                            </label>
+                            <label class="cfg-field cfg-field--narrow">
+                                <span class="cfg-field__label">Full speed at (°C)</span>
+                                <input class="cfg-field__input" type="number" step="0.5" data-fan-max-temp>
+                            </label>
+                            <label class="cfg-field cfg-field--narrow">
+                                <span class="cfg-field__label">Minimum duty (0-1)</span>
+                                <input class="cfg-field__input" type="number" step="0.05" min="0" max="1" data-fan-min-duty>
+                            </label>
+                            <label class="cfg-field cfg-field--narrow">
+                                <span class="cfg-field__label">Hysteresis (°C)</span>
+                                <input class="cfg-field__input" type="number" step="0.5" min="0" data-fan-hysteresis>
+                            </label>
+                            <label class="cfg-field cfg-field--narrow">
+                                <span class="cfg-field__label">Poll interval (s)</span>
+                                <input class="cfg-field__input" type="number" step="1" min="1" data-fan-poll>
+                            </label>
+                        </div>
                         <div class="cfg-card__actions">
                             <button class="terminal-button terminal-button--primary" type="submit">Save fan</button>
                         </div>
@@ -92,10 +94,12 @@ class HardwareConfigCard {
                             <input type="checkbox" data-led-enabled>
                             <span class="cfg-field__label">Enabled</span>
                         </label>
-                        <label class="cfg-field cfg-field--narrow">
-                            <span class="cfg-field__label">GPIO pin</span>
-                            <input class="cfg-field__input" type="number" min="0" max="27" data-led-pin>
-                        </label>
+                        <div class="cfg-row">
+                            <label class="cfg-field cfg-field--narrow">
+                                <span class="cfg-field__label">GPIO pin</span>
+                                <input class="cfg-field__input" type="number" min="0" max="27" data-led-pin>
+                            </label>
+                        </div>
                         <label class="cfg-field cfg-field--toggle">
                             <input type="checkbox" data-led-blink>
                             <span class="cfg-field__label">Flicker on packet activity</span>
@@ -116,18 +120,20 @@ class HardwareConfigCard {
                             <input type="checkbox" data-button-enabled>
                             <span class="cfg-field__label">Enabled</span>
                         </label>
-                        <label class="cfg-field cfg-field--narrow">
-                            <span class="cfg-field__label">GPIO pin</span>
-                            <input class="cfg-field__input" type="number" min="0" max="27" data-button-pin>
-                        </label>
-                        <label class="cfg-field cfg-field--narrow">
-                            <span class="cfg-field__label">Hold time for restart (s)</span>
-                            <input class="cfg-field__input" type="number" step="0.5" min="0.5" data-button-hold>
-                        </label>
-                        <label class="cfg-field cfg-field--narrow">
-                            <span class="cfg-field__label">Advert cooldown (s)</span>
-                            <input class="cfg-field__input" type="number" step="1" min="0" data-button-cooldown>
-                        </label>
+                        <div class="cfg-row">
+                            <label class="cfg-field cfg-field--narrow">
+                                <span class="cfg-field__label">GPIO pin</span>
+                                <input class="cfg-field__input" type="number" min="0" max="27" data-button-pin>
+                            </label>
+                            <label class="cfg-field cfg-field--narrow">
+                                <span class="cfg-field__label">Hold time for restart (s)</span>
+                                <input class="cfg-field__input" type="number" step="0.5" min="0.5" data-button-hold>
+                            </label>
+                            <label class="cfg-field cfg-field--narrow">
+                                <span class="cfg-field__label">Advert cooldown (s)</span>
+                                <input class="cfg-field__input" type="number" step="1" min="0" data-button-cooldown>
+                            </label>
+                        </div>
                         <div class="cfg-card__actions">
                             <button class="terminal-button terminal-button--primary" type="submit">Save button</button>
                         </div>

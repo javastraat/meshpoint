@@ -146,6 +146,44 @@
   capping job in the old single-column layout and would've fought the
   grid's own `gap`/column tracks otherwise (double-applied spacing, and
   a fixed width narrower than the column actually available).
+- **Configuration → Peripherals' four cards (Board preset/Fan/Status
+  LED/User Button) get the same fix, plus their own narrow fields
+  finally flow into columns.** Same full-width-stacking issue as
+  Settings → System above, so a new `.cfg-section--grid` modifier
+  (`repeat(auto-fit, minmax(320px, 1fr))`, `align-items: start` since
+  these four cards' heights vary a lot more than System's did) wraps
+  them -- scoped to this modifier rather than changing `.cfg-section`
+  itself, since Radio's own two-card page also uses `.cfg-section` and
+  deliberately wants its (tall, complex) cards to keep stacking full
+  width. Separately, the Fan/Status LED/User Button forms' own
+  `.cfg-field--narrow` fields (GPIO pin, ramp thresholds, hold times,
+  ...) were never wrapped in `.cfg-row`, the grid-of-narrow-fields
+  convention Configuration → GPS/MQTT/MeshRadar's own cards already use
+  -- so six 140px-capped fields on the Fan card were stacking one per
+  row instead of flowing into a compact grid alongside each other.
+  Wrapped each form's narrow-field group in `.cfg-row` to match.
+- **OLED Display's page (a community plugin) rebuilt on the shared page
+  chrome instead of its own bespoke look.** It had a bare `<h2>`/`<p>`
+  page title (core's generic `.plugin-page` fallback, meant for a
+  minimal plugin with no CSS of its own) and its own `.oled-card` class
+  for "Live preview"/"Settings" -- visibly different from every other
+  settings-shaped page. Title now uses `.lw-panel__head`/
+  `.lw-panel__title` like every other plugin page; the two cards now
+  use the real shared `.cfg-card`/`.cfg-card__head`/`.cfg-form`, and
+  their fields get the same `.cfg-row`/`.cfg-field--narrow` treatment
+  Peripherals' cards just got above -- I2C address/blank timeout/
+  refresh interval/boot logo duration/rotate-seconds now flow into
+  columns instead of each taking a full row, and the two checkboxes
+  switched to the real `.cfg-field--toggle` markup instead of nesting a
+  checkbox inside a label's text span (worked by accident via normal
+  inline flow, wasn't actually using the shared toggle convention).
+  Dropped the old form's `max-width: 360px` cap, which would have
+  fought `.cfg-row`'s own column sizing the same way stale per-card
+  width caps did on the System page fix above. `.oled-preview`'s
+  hardcoded-black styling (the real physical screen, deliberately not
+  themed) is unchanged, as is `.oled-card`'s already-fixed `--bg-card`
+  token usage -- neither was broken, just no longer needed once the
+  card itself is `.cfg-card`.
 
 #### Plugins
 
