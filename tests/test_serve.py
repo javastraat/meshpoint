@@ -15,7 +15,7 @@ from unittest import mock
 from src import serve
 
 
-def _fake_config(**dashboard_kwargs):
+def _fake_config(device_name="Meshpoint", **dashboard_kwargs):
     defaults = dict(
         tls_enabled=False,
         tls_cert_path="data/tls/cert.pem",
@@ -23,7 +23,10 @@ def _fake_config(**dashboard_kwargs):
         tls_port=8443,
     )
     defaults.update(dashboard_kwargs)
-    return SimpleNamespace(dashboard=SimpleNamespace(**defaults))
+    return SimpleNamespace(
+        dashboard=SimpleNamespace(**defaults),
+        device=SimpleNamespace(device_name=device_name),
+    )
 
 
 class TestTlsFiles(unittest.TestCase):
@@ -33,13 +36,14 @@ class TestTlsFiles(unittest.TestCase):
 
     def test_returns_keyfile_certfile_port_when_enabled_and_cert_ready(self) -> None:
         cfg = _fake_config(
+            device_name="attic-node",
             tls_enabled=True, tls_cert_path="/tmp/x/cert.pem", tls_key_path="/tmp/x/key.pem",
             tls_port=8443,
         )
         with mock.patch("src.config.load_config", return_value=cfg), \
              mock.patch("src.tls_cert.ensure_cert") as ensure_cert:
             result = serve._tls_files()
-        ensure_cert.assert_called_once_with("/tmp/x/cert.pem", "/tmp/x/key.pem")
+        ensure_cert.assert_called_once_with("/tmp/x/cert.pem", "/tmp/x/key.pem", "attic-node")
         self.assertEqual(result, ("/tmp/x/key.pem", "/tmp/x/cert.pem", 8443))
 
     def test_falls_back_to_none_when_cert_generation_fails(self) -> None:
@@ -80,9 +84,24 @@ class TestHttpsRedirectApp(unittest.TestCase):
         }
         sent = self._run(app, scope)
         start = next(m for m in sent if m["type"] == "http.response.start")
-        self.assertEqual(start["status"], 308)
+        self.assertEqual(start["status"], 307)
         location = dict(start["headers"])[b"location"].decode()
         self.assertEqual(location, "https://192.168.4.4:8443/settings")
+
+    def test_redirect_is_explicitly_not_cacheable(self) -> None:
+        # Regression guard for the real bug: a 308 (permanent) redirect
+        # got cached by a real user's Firefox and kept firing hours after
+        # tls_enabled was disabled and the service restarted -- 307 alone
+        # relies on browsers' own (weaker, heuristic) default instead of
+        # being told outright, so assert the explicit header too.
+        app = serve._make_https_redirect_app(8443)
+        scope = {
+            "type": "http", "path": "/", "query_string": b"",
+            "headers": [(b"host", b"sensecap.local:8080")],
+        }
+        sent = self._run(app, scope)
+        start = next(m for m in sent if m["type"] == "http.response.start")
+        self.assertEqual(dict(start["headers"])[b"cache-control"], b"no-store")
 
     def test_preserves_query_string(self) -> None:
         app = serve._make_https_redirect_app(8443)

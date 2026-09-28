@@ -4,6 +4,21 @@
 
 #### Dashboard
 
+- **Fix: disabling `tls_enabled` could leave Firefox permanently
+  redirecting to HTTPS anyway.** The plain-HTTP `:8080` → HTTPS
+  redirect used `308` ("permanently" moved), which browsers are free
+  to cache indefinitely on that promise alone, no `Cache-Control`
+  needed -- confirmed live: a real user's Firefox kept redirecting to
+  `:8443` hours after `tls_enabled` was turned off and the service
+  restarted, because `308` had told it this was forever. But the
+  redirect isn't actually permanent -- it only exists while
+  `tls_enabled` is on. Now `307` (preserves the same "don't silently
+  convert a non-GET request to GET" behavior `308` did, unlike
+  `301`/`302`) with an explicit `Cache-Control: no-store`, so this
+  can't happen going forward. Recovering from an already-cached `308`
+  on an older build still needs a manual Firefox cache clear (with the
+  time range set to **Everything**, not a limited window) -- see
+  "Firefox still redirecting..." under `tls_port` below.
 - **The self-signed HTTPS cert now reads "issued by us, to you"
   instead of "meshpoint" on both sides.** Issuer (fixed): `CN=meshpoint`,
   `O=Meshpoint`, `L=Earth`, `OU=https://github.com/KMX415/meshpoint`

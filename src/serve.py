@@ -93,11 +93,24 @@ def _tls_files() -> tuple[str, str, int] | None:
 
 
 def _make_https_redirect_app(tls_port: int):
-    """A minimal ASGI app: 308-redirects every request to the same host
+    """A minimal ASGI app: 307-redirects every request to the same host
     and path, over HTTPS, on ``tls_port``. Uses the request's own Host
     header rather than a fixed address, so it works no matter which of
     the dashboard's several reachable addresses (LAN IP, VPN IP, ``.local``
-    hostname -- see ``src/tls_cert.py``) someone actually hit :8080 on."""
+    hostname -- see ``src/tls_cert.py``) someone actually hit :8080 on.
+
+    307, not 308 -- both preserve the request method/body on non-GET
+    requests (unlike 301/302, which some older clients silently convert
+    to GET), but 308 means "permanently" moved and browsers are free to
+    cache that indefinitely with no expiry at all, purely from the
+    status code itself, no Cache-Control needed. This redirect isn't
+    actually permanent -- it only exists while dashboard.tls_enabled is
+    on, and flips the moment someone turns it back off -- so 308 was
+    the wrong promise to make. Confirmed live: a real user's Firefox
+    kept redirecting to :tls_port hours after tls_enabled was disabled
+    and the service restarted, because 308 had told it this was forever.
+    ``Cache-Control: no-store`` on top is belt-and-suspenders -- explicit
+    rather than relying on 307's own (weaker, heuristic) default."""
 
     async def app(scope, receive, send) -> None:
         if scope["type"] != "http":
@@ -112,8 +125,11 @@ def _make_https_redirect_app(tls_port: int):
             target += f"?{query_string.decode('latin-1')}"
         await send({
             "type": "http.response.start",
-            "status": 308,
-            "headers": [(b"location", target.encode("latin-1"))],
+            "status": 307,
+            "headers": [
+                (b"location", target.encode("latin-1")),
+                (b"cache-control", b"no-store"),
+            ],
         })
         await send({"type": "http.response.body", "body": b""})
 

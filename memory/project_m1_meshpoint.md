@@ -15482,3 +15482,88 @@ asserting CN/O/OU present and L explicitly absent -- 19/19 still pass.
 Docs/CHANGELOG updated in place again rather than layering a fourth
 separate entry, since this is one continuously-evolving feature within
 a single conversation, not a separate change.
+
+**Same overall TLS thread, but a real fix this time instead of a
+browser workaround: Einstein hit the Firefox-cached-redirect symptom
+again on a THIRD node (sensecap.local) after properly restarting the
+service, and asked the sharper question -- "why do we cache the
+redirect... if someone tries and doesn't like it it will bring
+problems for them" -- correctly identifying this as a genuine product
+bug, not user error.** Confirmed the service restart precondition
+first (Einstein: "i did 2 changed the line and restarted meshpoint"),
+which ruled out the two things I'd asked about, then went straight to
+root cause instead of repeating the "clear your cache" advice a third
+time.
+
+Root cause, confirmed by reading the actual code: `src/serve.py`'s
+`_make_https_redirect_app()` sent HTTP `308` ("permanently moved") for
+the `:8080` -> `:8443` bounce. `308`'s whole semantic point is
+"permanent" -- browsers are explicitly allowed to cache it forever
+with zero `Cache-Control` header needed, purely from the status code
+itself. But this redirect is NOT actually permanent -- it only exists
+while `dashboard.tls_enabled` is on, and flips the moment someone
+turns it off. Using `308` was the wrong promise to make from day one;
+this was a real design bug in the original TLS feature (not something
+this session introduced), just never surfaced until someone actually
+exercised the disable-after-enabling path enough times to notice the
+caching artifact compounding.
+
+Fixed properly rather than just documenting around it: switched to
+`307` (Temporary Redirect -- keeps the same "don't silently convert a
+non-GET request to GET on redirect" behavior `308` has, unlike
+`301`/`302`, so no functional regression for e.g. a POST hitting the
+old port) plus an explicit `Cache-Control: no-store` header as
+belt-and-suspenders on top of 307's own weaker default. Verified for
+real with a standalone async ASGI call against the actual
+`_make_https_redirect_app()` function (not just reading the diff) --
+confirmed `status: 307` and both headers present in the real response.
+
+Caught a second, unrelated real regression while actually running
+`tests/test_serve.py` for the first time this session (hadn't run it
+before, despite having edited `_tls_files()` earlier in this same
+conversation to add the `device_name` param for the Issued-To/Issued-By
+cert split -- only smoke-tested that edit with a bare `import
+src.serve`, which passes even when a real call inside the function
+would blow up): `_fake_config()`'s test fixture was a hand-rolled
+`SimpleNamespace` with no `.device` attribute, so
+`config.device.device_name` inside `_tls_files()` raised a real
+`AttributeError` that got silently swallowed by the function's own
+broad `except Exception` (logged as "TLS cert could not be prepared",
+which is misleading for what's actually a fixture/wiring bug, not a
+cert problem -- pre-existing broad-catch design, not something to fix
+here, but worth noting the failure mode is unhelpfully generic).
+Confirmed this is a TEST-ONLY gap, not a real production bug: the real
+`AppConfig.device` field always exists via `field(default_factory=
+DeviceConfig)`, so `load_config()` in the actual running service always
+has `.device` -- only the synthetic fixture was missing it. Fixed the
+fixture (`_fake_config()` now also builds a `device=SimpleNamespace
+(device_name=...)`) and the stale 2-arg `ensure_cert.assert_called_
+once_with(...)` assertion to match the 3-arg signature from earlier
+this session. This is exactly the "tests passed locally" trap flagged
+earlier in this same session's dapnet/reticulum work (silently-skipped
+fastapi-gated tests that time) -- same underlying lesson, different
+mechanism this time (a test file simply never re-run after a relevant
+edit, rather than skipped). Worth internalizing as a standing habit,
+not just a one-off catch: after touching a function's call signature,
+grep for and actually run every test file that calls it, not just the
+ones that happened to be top-of-mind.
+
+Added `test_redirect_is_explicitly_not_cacheable` as a named regression
+guard (not just an incidental assertion folded into an existing test)
+specifically because this bug had real user impact and a named test
+makes the "why does this header exist" reasoning discoverable later,
+matching how `test_regenerates_when_device_name_changes` and similar
+earlier tests this session were also given standalone names/docstrings
+tied to the specific real bug they guard against, not just generic
+coverage. 9/9 in `test_serve.py`, 28/28 combined with `test_tls_cert.py`.
+
+Docs: rewrote the `tls_port` config description (was flatly describing
+`308` behavior as if it were simply correct) and the existing Firefox
+troubleshooting note (now framed as "if you're on a build from before
+the fix" + corrected the cache-clear advice to specify time range
+**Everything**, not a limited window -- the "last 24 hrs" clear
+Einstein tried was itself part of why the workaround hadn't worked,
+a detail worth preserving for the next person). CHANGELOG bullet
+placed above the earlier cert-identity bullets in the same `####
+Dashboard` subsection (chronological/severity ordering, this is the
+one with real confirmed user impact vs. the others being cosmetic).
