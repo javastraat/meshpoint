@@ -81,8 +81,6 @@ class ConfigurationPanel {
                 host.innerHTML = `
                     <div class="cfg-section">
                         <div data-cfg-radio></div>
-                        <div data-cfg-radio-advanced></div>
-                        <div data-cfg-radio-pager></div>
                         <div data-cfg-nodeinfo-edit></div>
                         <div data-cfg-telemetry-edit></div>
                         <div data-cfg-nodeinfo-status></div>
@@ -92,16 +90,6 @@ class ConfigurationPanel {
                 const radio = new window.RadioConfigEditCard(api);
                 radio.mount(host.querySelector('[data-cfg-radio]'));
                 this._cards.set('radio', radio);
-                if (window.RadioAdvancedConfigCard) {
-                    const radioAdv = new window.RadioAdvancedConfigCard(api);
-                    radioAdv.mount(host.querySelector('[data-cfg-radio-advanced]'));
-                    this._cards.set('radio-advanced', radioAdv);
-                }
-                if (window.RadioPagerConfigCard) {
-                    const radioPager = new window.RadioPagerConfigCard(api);
-                    radioPager.mount(host.querySelector('[data-cfg-radio-pager]'));
-                    this._cards.set('radio-pager', radioPager);
-                }
                 if (window.NodeInfoConfigCard) {
                     const edit = new window.NodeInfoConfigCard(api);
                     edit.mount(host.querySelector('[data-cfg-nodeinfo-edit]'));
@@ -126,6 +114,24 @@ class ConfigurationPanel {
                     });
                     telemStatus.mount(host.querySelector('[data-cfg-telemetry-status]'));
                     this._cards.set('telemetry-status', telemStatus);
+                }
+            }
+        } else if (section === 'concentrator' && window.RadioAdvancedConfigCard) {
+            const host = this._mountHost('cfg-concentrator-panel');
+            if (host) {
+                host.innerHTML = `
+                    <div class="cfg-section">
+                        <div data-cfg-radio-advanced></div>
+                        <div data-cfg-radio-pager></div>
+                    </div>
+                `;
+                const radioAdv = new window.RadioAdvancedConfigCard(api);
+                radioAdv.mount(host.querySelector('[data-cfg-radio-advanced]'));
+                this._cards.set('radio-advanced', radioAdv);
+                if (window.RadioPagerConfigCard) {
+                    const radioPager = new window.RadioPagerConfigCard(api);
+                    radioPager.mount(host.querySelector('[data-cfg-radio-pager]'));
+                    this._cards.set('radio-pager', radioPager);
                 }
             }
         } else if (section === 'channels') {

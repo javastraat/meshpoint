@@ -1,5 +1,5 @@
 /**
- * Configuration → Radio → Pager (ch9 FSK) card.
+ * Configuration → Concentrator → Radio (pager) card.
  *
  * Emergency pager project: lets the concentrator's dedicated FSK channel
  * (ch9 -- independent hardware from every LoRa channel, its own sync
@@ -7,7 +7,9 @@
  * experimental, but confirmed working end-to-end on real hardware
  * (extra/pager_client.ino, a Heltec V3) as of 2026-08 -- see
  * src/api/routes/emergency_pager_routes.py. Always requires a restart;
- * nothing here is hot-reloadable.
+ * nothing here is hot-reloadable. Lives under Configuration →
+ * Concentrator (Hardware sidebar group), not Meshtastic -- ch9 is
+ * independent of the Meshtastic protocol entirely.
  */
 
 class RadioPagerConfigCard {

@@ -251,19 +251,25 @@
   against that region's own anchor, not against EU868 at all. Reworded
   to make clear 869.4625 MHz is only the *default*, chosen for EU868,
   not a rule every region's hardware is held to.
-- **Configuration → Radio moved from the "Meshtastic" sidebar group to
-  "Hardware."** It (plus Radio (advanced) and Radio (pager)) configures
-  the concentrator's own shared RF hardware -- frequency/SF/BW,
-  spectral scan, the independent ch9 FSK pager channel -- none of which
-  is Meshtastic-protocol-specific; Meshtastic is just one of several
-  protocols that happens to ride on that same hardware. Filing it under
-  a "Meshtastic" heading implied otherwise, most visibly for the pager
-  card, which has nothing to do with Meshtastic at all. Purely a
-  sidebar-position change -- one `<li>` relocated in `index.html`, right
-  before GPS in the Hardware group; the route (`#/configuration/radio`),
-  `configuration_panel.js`'s mounting logic, and every other reference
-  are all keyed by route/section id, not sidebar position, so nothing
-  else needed to change.
+- **New Configuration → Concentrator page (Hardware sidebar group):
+  Radio (advanced) and Radio (pager) moved out of Configuration →
+  Radio.** Radio (advanced) (spectral scan/SX1261 SPI path) and Radio
+  (pager) (the independent ch9 FSK channel) configure the concentrator's
+  own shared RF hardware, not anything Meshtastic-protocol-specific --
+  unlike the base Radio card they used to sit alongside, which stays
+  under Meshtastic on purpose: region/modem preset/frequency/hop limit
+  are genuinely Meshtastic firmware concepts, as are the NodeInfo and
+  Telemetry broadcast cards that share that same page. Filing the
+  concentrator-level cards under "Meshtastic" implied otherwise, most
+  visibly for the pager card, which has nothing to do with Meshtastic
+  at all. New route `#/configuration/concentrator`
+  (`configuration_panel.js` gained a `concentrator` mount branch,
+  `cfg-radio-advanced`/`cfg-radio-pager` moved out of the `radio`
+  branch's host div into their own; `index.html` gained a matching
+  `<section>`/skeleton and sidebar `<li>`, registered in `app.js`'s
+  `allowedRoutes` and command palette). `radio_advanced_card.js`/
+  `radio_pager_card.js`'s own header comments updated to describe their
+  new home.
 
 #### Plugins
 

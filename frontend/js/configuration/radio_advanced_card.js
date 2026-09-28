@@ -1,11 +1,15 @@
 /**
- * Configuration → Radio → Radio (advanced) card.
+ * Configuration → Concentrator → Radio (advanced) card.
  *
  * Spectral scan interval and optional SX1261 SPI path, feeding the
  * hardware noise-floor readout (Band spectrum card, RF Environment tab).
  * Split out of the old Configuration → Advanced page (which also held
  * an unrelated Storage card) so it sits with the rest of the radio
- * settings instead of under Settings.
+ * settings instead of under Settings. Moved again, alongside Radio
+ * (pager), out of Configuration → Radio (Meshtastic-specific: modem
+ * presets, hop limit) into its own Concentrator page under the
+ * Hardware sidebar group -- this card configures the concentrator's
+ * shared RF hardware itself, not anything Meshtastic-protocol-specific.
  */
 
 class RadioAdvancedConfigCard {

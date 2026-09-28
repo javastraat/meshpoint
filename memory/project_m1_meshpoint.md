@@ -16782,3 +16782,75 @@ Verified: `node --check` on `radio_pager_card.js`,
 live-confirmed on the Pi (sidebar reorder is low-risk but still
 genuinely untested rendering, unlike the pure-text pager fix).
 
+**Corrected an overreach on that same sidebar move, same session,
+immediately after.** Einstein pasted the full base "Radio" card text
+(Region/Modem preset/Frequency/Hop limit) and said "eh i thoug just
+move radio advanced and radio pager ... needs to be in radio (identiy)
+and the other now radio we talked to call it concentrator? didnt we?"
+-- correctly catching that my previous move had relocated the WHOLE
+Radio subtab (base card included) out of Meshtastic, when only Radio
+(advanced) and Radio (pager) were ever actually agreed on, and that the
+destination page should be named "Concentrator," not just "Radio" moved
+to a new group (which would've been confusing sitting right next to the
+Radio card left behind in Meshtastic). Good catch: modem presets
+(LongFast/ShortTurbo/etc.) and hop limit are genuinely Meshtastic
+firmware concepts, unlike spectral-scan/SX1261 or the independent ch9
+pager channel -- the base Radio card correctly belongs with Identity/
+Channels/Transmit.
+
+Momentary false alarm right after starting the fix: Einstein pasted the
+NodeInfo/Telemetry broadcast card text with "also you moved NodeInfo
+broadcast interval ... we just talked about two cards!!!" -- re-checked
+my own edit before responding rather than assuming either way; confirmed
+`_mountSection('radio')` still mounts `NodeInfoConfigCard`/
+`RadioNodeInfoCard`/`TelemetryBroadcastCard`/`BroadcastStatusCard`
+exactly as before (lines 93-117), untouched -- only
+`RadioAdvancedConfigCard`/`RadioPagerConfigCard` moved to a new
+`section === 'concentrator'` branch. Einstein's follow-up ("thats
+meshtastic we only want the advanced two cards...") confirmed the edit
+was already correct -- they were double-checking, not reporting a real
+regression.
+
+**Implementation, once scope was actually nailed down**:
+1. Reverted the earlier sidebar move -- Radio `<li>` back to right after
+   Identity in the Meshtastic block.
+2. Renamed the Hardware-group `<li>` from "Radio" to "Concentrator",
+   pointing at a NEW route `#/configuration/concentrator` (not
+   `configuration/radio` reused).
+3. New static `<section data-section="configuration/concentrator">` +
+   `#cfg-concentrator-panel` skeleton host in `index.html`, matching
+   every sibling Configuration subtab's exact convention.
+4. `configuration_panel.js`: removed `data-cfg-radio-advanced`/
+   `data-cfg-radio-pager` mount points from the `'radio'` branch's host
+   div, added a new `else if (section === 'concentrator' &&
+   window.RadioAdvancedConfigCard)` branch mounting both into the new
+   `cfg-concentrator-panel` host -- `NodeInfoConfigCard`/
+   `TelemetryBroadcastCard`/etc. never touched.
+5. `app.js`: added `'configuration/concentrator'` to `allowedRoutes`
+   and a matching command-palette entry right after Radio's own.
+6. `radio_advanced_card.js`/`radio_pager_card.js`: updated their own
+   header comments ("Configuration → Radio → ..." to "Configuration →
+   Concentrator → ...") plus a short note explaining why they moved --
+   purely descriptive, no functional change.
+
+Deliberately left `PUT /api/config/radio/pager`/`radio/advanced`'s
+backend route paths unchanged -- renaming those would mean touching
+fetch call sites too, for zero user-facing benefit; the sidebar/route
+reorganization is a frontend-only concern, backend API paths are an
+internal contract independent of which nav item presents the UI for
+them. Also confirmed `data-requires-section="configuration.identity"`
+(the whole Configuration group's visibility gate) lives at the group
+level, not per-item, so the new Concentrator entry needed no gating
+attribute of its own -- matches every sibling entry (GPS, Peripherals)
+which also have none.
+
+Verified: `node --check` on all four touched JS files
+(app.js/configuration_panel.js/radio_advanced_card.js/
+radio_pager_card.js), `<li>`/`<section>` tag-balance across the whole
+`index.html` (40/40 each), `grep -c` confirming exactly one
+`configuration/radio` and exactly one `configuration/concentrator`
+sidebar link exist, `ChangelogParser.parse_file()` re-parse (31
+sections, clean) after replacing the earlier (now-wrong) changelog
+bullet outright rather than layering a correction on top of an
+inaccurate description. Not yet live-confirmed on the Pi.
+
