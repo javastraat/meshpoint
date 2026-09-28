@@ -87,7 +87,16 @@
   credentials or connecting outright to a genuinely open one, which is
   what a blank password on this page is actually meant to request. An
   empty password now omits the `password` argument to `nmcli`
-  entirely instead of passing `""`.
+  entirely instead of passing `""`. A second, related failure surfaced
+  next: connecting to a *different* network with a real password typed
+  hit the same error text. `nmcli device wifi connect` doesn't always
+  build a fresh connection profile -- it can reuse/update an existing
+  one of the same SSID, and a profile left over broken from an earlier
+  attempt can still be missing its security fields after only its
+  password gets updated. A non-empty password now deletes any existing
+  profile of that name first, guaranteeing a clean one every time real
+  credentials are actually supplied (never done on the empty-password
+  path, which explicitly wants to keep what's already saved).
 - **Fix: a plugin source's browse catalog never showed a plain `requires`
   dependency, only a `[hook]` one -- two bugs, not one.**
   `reticulum-browser` and `reticulum-dashboard` (both

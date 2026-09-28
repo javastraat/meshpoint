@@ -15722,3 +15722,54 @@ testing would have caught, since the mocks by construction only verify
 argv construction against what I already believed nmcli's behavior to
 be, not nmcli's actual behavior. Live testing surfaced a real gap in
 that belief within minutes of the feature actually running.
+
+**Same live-testing thread, a second real bug within minutes of the
+first: same error text, different network, different root cause.**
+Einstein connected to "einstein.amsterdam_5G" WITH a real password
+typed and hit the identical `802-11-wireless-security.key-mgmt:
+property is missing` error the empty-password bug had produced
+moments earlier -- asked directly why, correctly sensing this couldn't
+be the same bug since a real password was involved this time.
+
+Reasoned through nmcli's real documented behavior since real nmcli
+still isn't available to test directly on the Mac: `nmcli device wifi
+connect` doesn't always build a fresh connection profile from scratch
+-- if one already exists for that SSID, it can reuse/update the
+existing one instead. Best hypothesis: this exact SSID plausibly
+already had a broken leftover profile on this Pi from testing the
+FIRST bug (the empty-password one) before it was fixed -- reusing a
+profile that's missing its security block and only patching in a new
+password wouldn't necessarily repair the missing key-mgmt field.
+
+Was honest about this being the most likely explanation, not a
+certainty -- flagged an alternative (WPA2/WPA3 "transition mode"
+networks, which `einstein.amsterdam_5G`'s scanned security string
+"WPA2 WPA3" matches, are a separately well-known nmcli key-mgmt
+inference gotcha on some NetworkManager versions) as the next thing to
+chase if this fix doesn't resolve it, rather than presenting the
+stale-profile fix as guaranteed to be THE answer.
+
+Fix: `wifi_connect()` now runs `nmcli connection delete <ssid>`
+(best-effort -- "unknown connection" is the expected/common case, not
+an error, and doesn't block the connect attempt that follows) BEFORE
+`device wifi connect ... password ...`, but ONLY on the real-password
+path -- deliberately never on the empty-password path, which explicitly
+means "keep reusing what's already saved" and would be defeated by
+deleting it first. New sudoers grant: `/usr/bin/nmcli connection
+delete *` (same wildcard-only-where-genuinely-needed discipline as
+every other line in that file). Rewrote the connect tests to use a
+`side_effect` sequence (two real subprocess calls now happen on the
+password path, not one) rather than the single-fixed-response `_patched()`
+helper, added a dedicated test asserting a failed delete doesn't block
+the follow-up connect, and confirmed the empty-password path still
+makes exactly one call (no delete) -- 18/18 pass. `visudo -cf` and
+`py_compile` both clean again.
+
+Told Einstein plainly this is a reasoned best-guess given the evidence,
+not a confirmed-correct diagnosis -- asked them to test live again and
+flagged the WPA2/WPA3-transition hypothesis as the next thread to pull
+if the symptom persists. Worth remembering as the honest posture for
+every remaining live-testing round on this plugin: nothing here can be
+verified with certainty from the Mac, so present fixes as the best
+available reasoning plus a named fallback hypothesis, not as
+guaranteed resolutions.

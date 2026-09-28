@@ -136,8 +136,24 @@ async def wifi_connect(ssid: str, password: str = "") -> tuple[int, str]:
     "reconnect to a known network without retyping the password" case)
     or connect outright if the network is genuinely open -- both of
     which a *blank* password was actually trying to mean.
+
+    A *non-empty* password first deletes any existing connection
+    profile of the same name -- also confirmed live, on a different
+    network, same error text: `nmcli device wifi connect` doesn't
+    always build a fresh profile, it can reuse/update an existing one
+    of the same SSID, and a profile left over broken from an earlier
+    attempt (this SSID may well have one from testing the empty-
+    password bug above, before it was fixed) can still be missing its
+    security fields after only its password gets updated. Deleting
+    first guarantees a clean, correctly-typed profile every time a
+    real password is actually being supplied -- never done when
+    password is empty, since that path explicitly wants to *keep*
+    whatever's already saved, not wipe it. "no such connection" from
+    the delete is not an error, just nothing to clean up.
     """
-    args = ["device", "wifi", "connect", ssid]
     if password:
-        args += ["password", password]
+        await _run_nmcli("connection", "delete", ssid)
+        args = ["device", "wifi", "connect", ssid, "password", password]
+    else:
+        args = ["device", "wifi", "connect", ssid]
     return await _run_nmcli(*args)

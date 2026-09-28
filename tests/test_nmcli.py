@@ -135,34 +135,64 @@ class TestWifiStatus(unittest.TestCase):
 
 
 class TestWifiConnect(unittest.TestCase):
-    def test_builds_the_real_connect_argv(self) -> None:
-        with _patched(b"Device 'wlan0' successfully activated", 0) as spawn:
+    def _patched_sequence(self, *results: tuple[bytes, int]):
+        """Like _patched(), but each successive create_subprocess_exec
+        call gets the next (out, rc) pair -- for asserting the delete
+        and connect calls' results are handled independently."""
+        procs = [_FakeProc(out, rc) for out, rc in results]
+        return mock.patch.object(
+            nmcli.asyncio, "create_subprocess_exec",
+            new=mock.AsyncMock(side_effect=procs),
+        )
+
+    def test_builds_the_real_connect_argv_after_deleting_any_stale_profile(self) -> None:
+        with self._patched_sequence(
+            (b"", 0),  # connection delete
+            (b"Device 'wlan0' successfully activated", 0),  # device wifi connect
+        ) as spawn:
             rc, out = asyncio.run(nmcli.wifi_connect("HomeNet", "hunter2"))
         self.assertEqual(rc, 0)
         self.assertIn("successfully activated", out)
-        args, _kwargs = spawn.call_args
-        self.assertEqual(
-            args,
-            ("sudo", "nmcli", "device", "wifi", "connect", "HomeNet",
-             "password", "hunter2"),
-        )
+        calls = [c.args for c in spawn.call_args_list]
+        self.assertEqual(calls, [
+            ("sudo", "nmcli", "connection", "delete", "HomeNet"),
+            ("sudo", "nmcli", "device", "wifi", "connect", "HomeNet", "password", "hunter2"),
+        ])
+
+    def test_delete_failing_does_not_block_the_connect_attempt(self) -> None:
+        # "unknown connection" (nothing to delete -- first-ever attempt
+        # at this SSID) is the common case, not an error to propagate.
+        with self._patched_sequence(
+            (b"Error: unknown connection 'HomeNet'.", 1),
+            (b"Device 'wlan0' successfully activated", 0),
+        ):
+            rc, out = asyncio.run(nmcli.wifi_connect("HomeNet", "hunter2"))
+        # The returned (rc, out) reflects the connect call, not the delete.
+        self.assertEqual(rc, 0)
+        self.assertIn("successfully activated", out)
 
     def test_failure_is_passed_through_not_raised(self) -> None:
-        with _patched(b"Error: Secrets were required, but not provided.", 4):
+        with self._patched_sequence(
+            (b"", 0),
+            (b"Error: Secrets were required, but not provided.", 4),
+        ):
             rc, out = asyncio.run(nmcli.wifi_connect("HomeNet", "wrong"))
         self.assertEqual(rc, 4)
         self.assertIn("Secrets were required", out)
 
-    def test_empty_password_omits_the_password_argument_entirely(self) -> None:
+    def test_empty_password_omits_the_password_argument_and_skips_delete(self) -> None:
         # Regression guard for a real bug: passing an *empty* password
         # ("password", "") made nmcli build a malformed security block
         # ("802-11-wireless-security.key-mgmt: property is missing")
         # instead of reusing an already-saved network's real stored
         # credentials or connecting outright to a genuinely open one --
         # confirmed live, reconnecting to an already-known secured
-        # network with no new password typed.
+        # network with no new password typed. Must also NOT delete the
+        # existing profile first -- that's the one this path explicitly
+        # wants to keep and reuse, unlike the real-password path above.
         with _patched(b"Device 'wlan0' successfully activated", 0) as spawn:
             asyncio.run(nmcli.wifi_connect("KnownNet", ""))
+        self.assertEqual(spawn.call_count, 1)
         args, _kwargs = spawn.call_args
         self.assertEqual(args, ("sudo", "nmcli", "device", "wifi", "connect", "KnownNet"))
         self.assertNotIn("password", args)
@@ -170,6 +200,7 @@ class TestWifiConnect(unittest.TestCase):
     def test_password_defaults_to_empty_when_omitted(self) -> None:
         with _patched(b"", 0) as spawn:
             asyncio.run(nmcli.wifi_connect("KnownNet"))
+        self.assertEqual(spawn.call_count, 1)
         args, _kwargs = spawn.call_args
         self.assertEqual(args, ("sudo", "nmcli", "device", "wifi", "connect", "KnownNet"))
 

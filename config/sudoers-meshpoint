@@ -40,6 +40,10 @@ meshpoint ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart rnsd
 meshpoint ALL=(ALL) NOPASSWD: /usr/bin/nmcli -t -f SSID\,SIGNAL\,SECURITY\,IN-USE device wifi list --rescan yes
 meshpoint ALL=(ALL) NOPASSWD: /usr/bin/nmcli -t -f DEVICE\,TYPE\,STATE\,CONNECTION device status
 meshpoint ALL=(ALL) NOPASSWD: /usr/bin/nmcli device wifi connect *
+# Deletes a stale connection profile right before recreating it with a
+# real password -- see wifi_connect()'s own docstring. Only ever the
+# connection this plugin itself is about to reconnect to.
+meshpoint ALL=(ALL) NOPASSWD: /usr/bin/nmcli connection delete *
 
 # ── Self-update apply chain (Settings → Updates) ──────────────────────
 # NOTE: there are deliberately NO `git` or `pip install` grants here.
