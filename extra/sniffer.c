@@ -23,6 +23,7 @@
 #include <unistd.h>
 #include <signal.h>
 #include <time.h>
+#include <math.h>
 
 #include <openssl/evp.h>
 
@@ -1265,11 +1266,137 @@ static int init_concentrator(void) {
     return 0;
 }
 
+/* ── capture RAM probe (--capture) ─────────────────────────────────────── */
+
+/*
+ * Snapshots the SX1302's 16 KB capture RAM while RX keeps running, to see
+ * whether it can stand in for the missing SX1261 on RAK2287 (spectrum /
+ * per-channel power). Register sequence and sample decoding are copied from
+ * Semtech's tst/test_loragw_capture_ram.c; what each source actually carries
+ * is inferred, not documented -- that's what this probe is for.
+ */
+
+#define CAPTURE_RAM_SIZE 0x4000
+
+/* Per-source sample rate, verbatim from test_loragw_capture_ram.c */
+static const uint32_t CAPTURE_RATE_HZ[32] = {
+    4000000, 4000000, 4000000, 4000000, 4000000, 4000000, 4000000, 0,
+    0, 1000000, 125000, 125000, 125000, 125000, 125000, 125000,
+    125000, 125000, 8000000, 125000, 125000, 125000, 0, 32000000,
+    32000000, 0, 32000000, 32000000, 0, 32000000, 32000000, 32000000
+};
+
+static int capture_source = -1;          /* -1 = probe disabled */
+static int capture_every_s = 10;
+
+/* Decodes one 32-bit word into I/Q; returns false for sources the test tool
+ * doesn't know how to decode. */
+static bool capture_decode(int src, const uint8_t *w, int16_t *i, int16_t *q) {
+    if ((src >= 2 && src <= 3) || src == 9) {         /* 12-bit I/Q */
+        *i = (int16_t)(((uint16_t)w[3] << 8) | w[2]) >> 4;
+        *q = (int16_t)(((uint16_t)w[1] << 8) | w[0]) >> 4;
+    } else if (src >= 4 && src <= 6) {                /* 16-bit I/Q */
+        *i = (int16_t)(((uint16_t)w[3] << 8) | w[2]);
+        *q = (int16_t)(((uint16_t)w[1] << 8) | w[0]);
+    } else if (src >= 10 && src <= 17) {              /* 8-bit I/Q */
+        *i = (int8_t)w[3];
+        *q = (int8_t)w[1];
+    } else {
+        return false;
+    }
+    return true;
+}
+
+static void capture_snapshot(int src) {
+    static uint8_t buf[CAPTURE_RAM_SIZE];
+    uint32_t rate = CAPTURE_RATE_HZ[src];
+    int32_t done = 0;
+    int polls = 0;
+
+    uint32_t period = 32000000U / rate - 1;
+    lgw_reg_w(SX1302_REG_CAPTURE_RAM_CAPTURE_CFG_ENABLE, 1);
+    lgw_reg_w(SX1302_REG_CAPTURE_RAM_CAPTURE_CFG_CAPTUREWRAP, 0);  /* one shot */
+    lgw_reg_w(SX1302_REG_CAPTURE_RAM_CAPTURE_CFG_RAMCONFIG, 0);    /* 4k x 32 */
+    lgw_reg_w(SX1302_REG_CAPTURE_RAM_CAPTURE_SOURCE_A_SOURCEMUX, src);
+    lgw_reg_w(SX1302_REG_CAPTURE_RAM_CAPTURE_PERIOD_0_CAPTUREPERIOD, period & 0xFF);
+    lgw_reg_w(SX1302_REG_CAPTURE_RAM_CAPTURE_PERIOD_1_CAPTUREPERIOD, (period >> 8) & 0xFF);
+    lgw_reg_w(SX1302_REG_CAPTURE_RAM_CAPTURE_CFG_CAPTURESTART, 1);
+
+    /* 4096 samples: ~1 ms at 4 MHz, ~33 ms at 125 kHz. Give up after 1 s. */
+    do {
+        usleep(1000);
+        lgw_reg_r(SX1302_REG_CAPTURE_RAM_STATUS_CAPCOMPLETE, &done);
+    } while (done != 1 && ++polls < 1000 && keep_running);
+    lgw_reg_w(SX1302_REG_CAPTURE_RAM_CAPTURE_CFG_CAPTURESTART, 0);
+
+    if (done != 1) {
+        fprintf(stderr, "CAPTURE: src %d did not complete (CAPCOMPLETE never set)\n", src);
+        return;
+    }
+
+    lgw_reg_w(SX1302_REG_COMMON_PAGE_PAGE, 1);
+    lgw_mem_rb(0, buf, CAPTURE_RAM_SIZE, false);
+    lgw_reg_w(SX1302_REG_COMMON_PAGE_PAGE, 0);
+
+    char path[64];
+    time_t now = time(NULL);
+    snprintf(path, sizeof(path), "capture_src%02d_%ld.csv", src, (long)now);
+    FILE *f = fopen(path, "w");
+    if (!f) { perror("CAPTURE: fopen"); return; }
+    fprintf(f, "# source=%d rate_hz=%u rf0_hz=%u rf1_hz=%u\n",
+            src, rate, RF0_FREQ_HZ, RF1_FREQ_HZ);
+    fprintf(f, "i,q\n");
+
+    double power = 0.0;
+    int n = 0;
+    int16_t si, sq;
+    for (int k = 0; k < CAPTURE_RAM_SIZE; k += 4) {
+        if (!capture_decode(src, &buf[k], &si, &sq)) break;
+        fprintf(f, "%d,%d\n", si, sq);
+        power += (double)si * si + (double)sq * sq;
+        n++;
+    }
+    fclose(f);
+
+    if (n == 0) {
+        printf("CAPTURE: src %d → %s (raw words only: format unknown to the test tool)\n", src, path);
+    } else {
+        double mean = power / n;
+        printf("CAPTURE: src %d → %s  %d samples @ %u Hz  mean power %.1f dB (raw units)%s\n",
+               src, path, n, rate, mean > 0 ? 10.0 * log10(mean) : -999.0,
+               mean == 0 ? "  ← all zero: source idle or not routed" : "");
+    }
+    fflush(stdout);
+}
+
+static void usage(const char *argv0) {
+    printf("Usage: %s [--capture SRC] [--every SECONDS]\n", argv0);
+    printf("  --capture SRC   also snapshot SX1302 capture RAM source SRC (0-31)\n");
+    printf("                  every --every seconds (default 10) while receiving\n");
+    printf("                  2-3: 4 MHz 12-bit I/Q, 4-6: 4 MHz 16-bit, 10-17: 125 kHz 8-bit\n");
+}
+
 /* ── main ──────────────────────────────────────────────────────────────── */
 
-int main(void) {
+int main(int argc, char **argv) {
     signal(SIGINT,  sig_handler);
     signal(SIGTERM, sig_handler);
+
+    for (int a = 1; a < argc; a++) {
+        if (!strcmp(argv[a], "--capture") && a + 1 < argc) {
+            capture_source = atoi(argv[++a]);
+        } else if (!strcmp(argv[a], "--every") && a + 1 < argc) {
+            capture_every_s = atoi(argv[++a]);
+        } else {
+            usage(argv[0]);
+            return EXIT_FAILURE;
+        }
+    }
+    if (capture_source > 31 || capture_every_s < 1 ||
+        (capture_source >= 0 && CAPTURE_RATE_HZ[capture_source] == 0)) {
+        fprintf(stderr, "ERROR: bad --capture source (0-31 with a known rate) or --every\n");
+        return EXIT_FAILURE;
+    }
 
     printf("EU868 + Meshtastic Sniffer — Sencap M1 / SX1303\n");
     printf("=================================================\n");
@@ -1298,8 +1425,17 @@ int main(void) {
     printf("\nListening... (Ctrl+C to stop)\n\n");
 
     struct lgw_pkt_rx_s rxpkt[32];
+    time_t next_capture = time(NULL) + 2;   /* let RX settle first */
+
+    if (capture_source >= 0)
+        printf("Capture RAM probe: source %d every %d s\n\n", capture_source, capture_every_s);
 
     while (keep_running) {
+        if (capture_source >= 0 && time(NULL) >= next_capture) {
+            capture_snapshot(capture_source);
+            next_capture = time(NULL) + capture_every_s;
+        }
+
         int nb = lgw_receive(32, rxpkt);
         if (nb < 0) {
             fprintf(stderr, "ERROR: lgw_receive() returned %d\n", nb);
@@ -1311,7 +1447,7 @@ int main(void) {
             print_packet(
                 rxpkt[i].payload, rxpkt[i].size,
                 rxpkt[i].freq_hz, rxpkt[i].datarate,
-                rxpkt[i].rssi,    rxpkt[i].snr
+                rxpkt[i].rssic,   rxpkt[i].snr
             );
             if (is_meshtastic(rxpkt[i].freq_hz))
                 decode_meshtastic(rxpkt[i].payload, rxpkt[i].size);
