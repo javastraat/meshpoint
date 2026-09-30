@@ -6,7 +6,7 @@ LORAGW_PATH = $(CURDIR)/sx1302_hal
 CC      = gcc
 CFLAGS  = -Wall -Wextra -O2 -I$(LORAGW_PATH)/libloragw/inc -I$(LORAGW_PATH)/libtools/inc
 LDFLAGS = -L$(LORAGW_PATH)/libloragw -L$(LORAGW_PATH)/libtools \
-          -lloragw -ltools -lm -lpthread -lusb-1.0 -lcrypto
+          -lloragw -ltinymt32 -lrt -lm -lpthread -lusb-1.0 -lcrypto
 
 TARGET  = sniffer
 SRC     = sniffer.c
