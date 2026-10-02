@@ -286,8 +286,10 @@ class CaptureRamSpectrumService:
         if self._calibration_requested:
             self._calibration_requested = False
             await self._run_sweep(calibrate=True)
-        else:
-            await self._run_sweep()
+            # The calibration sweep minus its own baseline is flat by
+            # definition, so it's never shown; a normal sweep right after
+            # is what the card displays.
+        await self._run_sweep()
 
     def _radios(self) -> list[tuple[int, int]]:
         """(capture source, RF centre) per distinct radio centre."""
@@ -341,6 +343,7 @@ class CaptureRamSpectrumService:
                 "%s: calibrated from %d captures (%d points)",
                 self.name, acc.captures_added, len(points),
             )
+            return
 
         baseline = self._active_baseline()
         offsets = baseline["offsets_db"] if baseline else {}

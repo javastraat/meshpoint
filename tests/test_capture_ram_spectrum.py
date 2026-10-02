@@ -250,16 +250,27 @@ class TestCalibrationAndHistogram(unittest.TestCase):
         self.assertGreater(self._median_at(svc, 868.0), 15)
         self.assertFalse(svc.latest_sweep["calibrated"])
 
+        before = svc.latest_sweep["generated_at"]
         asyncio.run(svc._run_sweep(calibrate=True))
-        self.assertTrue(svc.latest_sweep["calibrated"])
+        # The calibration sweep itself is never shown (flat by definition).
+        self.assertEqual(svc.latest_sweep["generated_at"], before)
         self.assertTrue(self.path.exists())
         asyncio.run(svc._run_sweep())
+        self.assertTrue(svc.latest_sweep["calibrated"])
         self.assertLess(abs(self._median_at(svc, 868.0)), 3)
 
         # A fresh service (restart) picks the baseline up from disk.
         fresh = self._service(wrapper)
         fresh._load_baseline()
         self.assertTrue(fresh.calibration_status()["calibrated"])
+
+    def test_calibration_request_publishes_a_normal_sweep_after(self) -> None:
+        svc = self._service(_FakeWrapper())
+        svc._calibration_requested = True
+        asyncio.run(svc._next_sweep())
+        self.assertTrue(svc.latest_sweep["calibrated"])
+        self.assertEqual(svc.latest_sweep["captures"], 4)   # normal sweep, not the 8-capture calibration
+        self.assertFalse(svc._calibration_requested)
 
     def test_baseline_ignored_when_rf_centres_change(self) -> None:
         svc = self._service(_FakeWrapper())

@@ -544,7 +544,9 @@
   as a baseline (`data/capture_ram_baseline.json`, survives restarts) and
   subtracted from later sweeps, so the radios' own filter shape (e.g. a
   steady +8 dB hump near 868.0 MHz on the first live run) no longer looks
-  like a signal; **Reset cal** forgets it. The RF Environment page's
+  like a signal; **Reset cal** forgets it. The calibration sweep itself
+  is never shown (minus its own baseline it's flat by definition); a
+  normal sweep runs straight after and is what the card displays. The RF Environment page's
   **Channel histogram** is filled too, from the tuned channel's readings
   in each sweep (also dB over floor); its Spectral scan card shows the
   sweep interval, and stays enabled even with
