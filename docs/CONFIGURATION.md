@@ -1489,7 +1489,19 @@ plugins:
     freqs: [131.525, 131.725, 131.800, 131.825]
     gain: 34
     device: 0
+    keep_running: false  # see "RTL-SDR plugins: keep running" below
 ```
+
+**RTL-SDR plugins: keep running.** The RTL-SDR listener plugins (`adsb`, `rtl433`, `pagers`, `p2000`, `pocsag`, `dab`, `acars`; plugin version 1.1.0+) stop themselves after **10 minutes with nobody watching their tab**, since the tab only polls while it's on screen, so a forgotten listener doesn't hold the shared dongle forever. Set `keep_running: true` under the plugin's own section to switch that off; after a restart it runs until you press Stop:
+
+```yaml
+plugins:
+  adsb:
+    enabled: true
+    keep_running: true
+```
+
+The Radio tab has no such option (it stops when nobody is listening to its audio, which is the point). ADS-B also restarts dump1090 automatically if it exits on its own (backoff 5 s / 30 s / 2 min, gives up after 5 failed restarts in a row) whatever this key says.
 
 A plugin folder holds a `plugin.toml` manifest:
 

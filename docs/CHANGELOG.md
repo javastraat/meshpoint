@@ -564,6 +564,12 @@
 
 #### Docs
 
+- **`keep_running` documented for the RTL-SDR listener plugins.** Commented
+  examples in `config/default.yaml` and a "RTL-SDR plugins: keep running"
+  note in `docs/CONFIGURATION.md`: `plugins.<id>.keep_running: true`
+  (adsb, rtl433, pagers, p2000, pocsag, dab, acars; plugin 1.1.0+) stops
+  them auto-stopping after 10 minutes with nobody watching their tab.
+
 - **Bobcat 300 capture yaml.** Step 5 now uses `capture.concentrator_spi_device`
   instead of a nested `capture.concentrator` block that Meshpoint ignores.
   GPIO reset stays in the systemd drop-in. Fixes

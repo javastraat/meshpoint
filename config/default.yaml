@@ -365,6 +365,12 @@ plugins: {}
   #   freqs: [131.525, 131.725, 131.800, 131.825]  # optional, default: EU channels above
   #   gain: 34             # optional, default: 34 (not AGC -- overloads on strong ground stations)
   #   device: 0            # optional, default: 0 (RTL-SDR device index)
+  #   keep_running: false  # true = never auto-stop; runs until you press Stop
+  # adsb:                  # ADS-B air traffic (dump1090), from meshpoint-plugins
+  #   enabled: true
+  #   keep_running: true   # default false: stops after 10 min with nobody
+  #                        # watching its tab. Same key works for rtl433,
+  #                        # pagers, p2000, pocsag, dab and acars.
 
 # Operator-added plugin repositories (Settings -> Plugins -> "Add source").
 # Set by the dashboard when you add a source there, not normally hand-edited.
