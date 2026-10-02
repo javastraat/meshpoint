@@ -28,6 +28,11 @@ radio:                   # LoRa radio settings (concentrator + onboard SX1261)
   # RAK2287/RAK5146 this is usually unreachable from the Pi, but on the
   # SenseCap M1 setting "/dev/spidev0.1" has been verified to work.
   sx1261_spi_path: ""
+  # Band Spectrum card from the SX1302 capture RAM, for boards with no
+  # SX1261 (RAK2287). Only used when neither the SX1261 scan nor the
+  # rfenv companion is active. Partial band (+/-1.5 MHz around each RF
+  # chain), levels in dB over the noise floor. Off by default.
+  capture_ram_spectrum: false
 
 meshtastic:               # Meshtastic protocol settings
   # Default channel PSK -- "AQ==" is Meshtastic's public "LongFast" default

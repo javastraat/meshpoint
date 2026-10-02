@@ -45,6 +45,7 @@ radio:
   spectral_scan_interval_seconds: 60   # noise floor sampler cadence (0 disables)
   sx1261_spi_path: ""          # SX1261 SPI device for spectral scan (empty = disabled)
   spectrum_sweep_interval_seconds: 300 # band-sweep cadence for the spectrum card (0 = on-demand only)
+  capture_ram_spectrum: false  # Band Spectrum from SX1302 capture RAM on boards with no SX1261 (RAK2287); partial band, relative dB
   pager_enabled: false         # emergency pager project (EU868 only): enables the concentrator's
                                 # dedicated FSK channel (ch9). No real Heltec V3 firmware deployed
                                 # yet -- received frames are JSON envelopes, {"from":<capcode>,
@@ -166,6 +167,28 @@ Flash `extra/rfenv_companion/rfenv_companion.ino` (RadioLib 7.7.1, same board/pi
 Once connected: reachable at `http://rfenv-companion-eu868.local` (or `-70cm.local` for that band — band-suffixed so two boards on the same LAN don't collide under the same name), a password-gated single-page dashboard (Status / Channel Histogram / Band Spectrum / WiFi Credentials cards, styled with the same dark palette the real Meshpoint dashboard and the other companion firmwares already share) with "Scan now"/"Sweep now" buttons — useful e.g. carrying this board as a portable scanner and checking it from a phone/laptop browser instead of the 128x64 OLED. The Channel Histogram's "Scan now" takes a frequency input (pre-filled with a sensible per-band default — the shared Meshtastic/MeshCore-area anchor for EU868, DAPNET's real 439.9875 MHz for 70cm — freely editable), unlike the OLED's own button-triggered scan which is always locked to whatever Meshpoint last requested. ArduinoOTA lets firmware updates go out over WiFi afterward instead of needing USB. WiFi-triggered scans/sweeps never touch the radio directly from the web server's own thread — they stage a request (`queueWebScan()`/`queueWebSweep()`) that `loop()` picks up and runs itself, same cross-thread-safety discipline (`stateMutex`) `pocsag_companion.ino`/`pager_client.ino` already established for their own web dashboards.
 
 A config-editor UI for `capture.rfenv_companion` itself (a Configuration card + persisted `PUT` route, matching the POCSAG companion's own device-list card) is not yet built — adding/removing a device is still YAML-hand-edit only.
+
+### Capture-RAM band spectrum — for boards with no SX1261, no extra hardware
+
+On a RAK2287 (no SX1261) the Band Spectrum card can also be drawn from the SX1302's own **capture RAM**, a 16 KB debug buffer of raw radio samples. Opt in with:
+
+```yaml
+radio:
+  capture_ram_spectrum: true
+```
+
+(or tick **Band Spectrum from capture RAM** on Configuration → Concentrator → Radio (advanced)) and restart. Every `spectrum_sweep_interval_seconds` (default 300; `0` = only the card's "Sweep now" button) the service takes eight ~1 ms raw I/Q snapshots of each radio (capture RAM sources 2 = radio A, 3 = radio B), FFTs them in plain Python (16 × 256-point segments, ~15.6 kHz bins) and reports floor/median/p95 per 100 kHz step.
+
+What to expect, compared with the real SX1261 scan:
+
+- **Partial band.** Only ±1.5 MHz around each RF chain centre is used (the radio's filter rolls off beyond that). EU868 (radios at 868.3 / 869.525 MHz): about 866.8–870 MHz. 863–866.7 MHz isn't covered.
+- **Relative levels, not dBm.** The radios' AGC changes gain with the signal (the floor drops ~30 dB under a strong packet), so each snapshot is normalised to its own median: 0 = the noise floor, +20 = 20 dB above it. The card's legend and tooltip say "dB over floor · capture RAM".
+- **Card only.** It doesn't feed the noise-floor histogram or the RF Environment noise-floor readings: relative dB can't stand in for a dBm floor.
+- **Short snapshots.** Each snapshot is ~1 ms, so a packet only shows if it's on air during one: the p95 line catches activity, the median is the quiet level.
+
+**Precedence:** it's the last fallback. It's only built when the real SX1261 spectral scan isn't available **and** no RF Environment companion is configured; with either of those, `capture_ram_spectrum` is ignored. Nothing about the channel plan changes.
+
+**RX/TX safety.** Reading the capture RAM flips the SX1302's register page, so it runs under a HAL lock shared with TX and start/stop; `receive()` skips one ~10 ms poll instead of waiting while a capture holds it (packets stay in the SX1302 FIFO). A capture is skipped while TX is busy. Proven on a RAK2287 with `extra/sniffer.c --capture` before it was built: RX kept decoding during captures.
 
 ### Reticulum companion — standalone LoRa↔internet bridge (extra/heltec_v4_reticulum_bron)
 
@@ -1809,6 +1832,7 @@ radio:                 # LoRa physical layer
   spectral_scan_interval_seconds: 60   # noise floor sampler; 0 disables
   sx1261_spi_path: ""                  # SX1261 SPI device for hardware spectral scan (empty = packet fallback)
   spectrum_sweep_interval_seconds: 300 # band-sweep cadence for the spectrum card; 0 = on-demand only
+  capture_ram_spectrum: false          # capture-RAM Band Spectrum fallback (no SX1261); off by default
   pager_enabled: false                 # emergency pager project (EU868 only); off by default
   pager_frequency_mhz: 869.4625
   pager_sync_word: 0x946437

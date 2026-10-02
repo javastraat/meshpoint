@@ -2,7 +2,9 @@
  * Configuration → Concentrator → Radio (advanced) card.
  *
  * Spectral scan interval and optional SX1261 SPI path, feeding the
- * hardware noise-floor readout (Band spectrum card, RF Environment tab).
+ * hardware noise-floor readout (Band spectrum card, RF Environment tab),
+ * plus the capture-RAM Band Spectrum fallback toggle for boards with no
+ * SX1261 (radio.capture_ram_spectrum).
  * Split out of the old Configuration → Advanced page (which also held
  * an unrelated Storage card) so it sits with the rest of the radio
  * settings instead of under Settings. Moved again, alongside Radio
@@ -38,6 +40,14 @@ class RadioAdvancedConfigCard {
                         <input class="cfg-field__input" type="text"
                                placeholder="/dev/spidev0.1 or empty" data-radio-sx1261>
                     </label>
+                    <label class="cfg-field cfg-field--toggle">
+                        <input type="checkbox" data-radio-capture-ram>
+                        <span class="cfg-field__label">Band Spectrum from capture RAM (no SX1261)</span>
+                    </label>
+                    <p class="cfg-field__hint">For RAK2287 and other boards without an SX1261. Only
+                        used when the SX1261 scan and the RF Environment companion are both
+                        unavailable. Covers ±1.5 MHz around each radio, in dB over the noise
+                        floor (not dBm). Restart required.</p>
                     <div class="cfg-card__actions">
                         <button class="terminal-button terminal-button--primary"
                                 type="submit">Save radio advanced</button>
@@ -54,6 +64,8 @@ class RadioAdvancedConfigCard {
         const radioAdv = config.radio_advanced || {};
         this._setVal('[data-radio-scan-interval]', radioAdv.spectral_scan_interval_seconds);
         this._setVal('[data-radio-sx1261]', radioAdv.sx1261_spi_path || '');
+        const captureRam = this._root.querySelector('[data-radio-capture-ram]');
+        if (captureRam) captureRam.checked = !!radioAdv.capture_ram_spectrum;
     }
 
     _setVal(sel, v) {
@@ -71,6 +83,7 @@ class RadioAdvancedConfigCard {
                 this._root.querySelector('[data-radio-scan-interval]').value,
             ),
             sx1261_spi_path: this._root.querySelector('[data-radio-sx1261]').value.trim(),
+            capture_ram_spectrum: this._root.querySelector('[data-radio-capture-ram]').checked,
         });
         if (result) {
             status.dataset.kind = 'success';

@@ -80,6 +80,7 @@ class RelayUpdate(BaseModel):
 class RadioAdvancedUpdate(BaseModel):
     spectral_scan_interval_seconds: Optional[float] = Field(None, ge=0, le=3600)
     sx1261_spi_path: Optional[str] = None
+    capture_ram_spectrum: Optional[bool] = None
 
 
 # Generous but safety-bounding: comfortably covers the whole ETSI sub-band
@@ -576,6 +577,10 @@ async def update_radio_advanced(
         path = req.sx1261_spi_path.strip()
         radio.sx1261_spi_path = path
         updates["sx1261_spi_path"] = path
+        restart_needed = True
+    if req.capture_ram_spectrum is not None:
+        radio.capture_ram_spectrum = req.capture_ram_spectrum
+        updates["capture_ram_spectrum"] = req.capture_ram_spectrum
         restart_needed = True
 
     if not updates:

@@ -82,6 +82,7 @@ def enrich_config_payload(cfg: AppConfig, base: dict) -> dict:
     base["radio_advanced"] = {
         "spectral_scan_interval_seconds": radio.spectral_scan_interval_seconds,
         "sx1261_spi_path": radio.sx1261_spi_path or "",
+        "capture_ram_spectrum": radio.capture_ram_spectrum,
     }
     base["radio_pager"] = {
         "pager_enabled": radio.pager_enabled,

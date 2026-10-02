@@ -11,10 +11,12 @@ from __future__ import annotations
 import ctypes
 import logging
 import os
+import threading
 from dataclasses import dataclass
 from typing import Optional
 
 from src.hal.concentrator_config import ConcentratorChannelPlan
+from src.hal.sx1302_capture_ram import apply_capture_ram_signatures, read_capture_ram
 from src.hal.sx1302_signatures import apply_signatures
 from src.hal.sx1302_spectral_scan import (
     SpectralScanResult,
@@ -147,6 +149,16 @@ class SX1302Wrapper:
         self._unknown_status_count = 0
         self._spectral_scan: Optional[SX1302SpectralScan] = None
         self._sx1261_configured = False
+        self._capture_ram_supported = False
+        self._rf_center_hz: tuple[int, int] = (0, 0)
+        # Serialises the runtime HAL calls that can come from different
+        # threads (receive on the event loop, TX via asyncio.to_thread,
+        # capture RAM via asyncio.to_thread). Capture RAM needs it most:
+        # it flips the register page, so any other register access in
+        # that window would hit the wrong page. Same role as
+        # lora_pkt_fwd's mx_concent mutex. Reentrant because
+        # send_fsk_packet() calls send().
+        self._hal_lock = threading.RLock()
 
     def load(self) -> None:
         if not self._lib_path or not os.path.exists(self._lib_path):
@@ -156,6 +168,7 @@ class SX1302Wrapper:
             )
         self._lib = ctypes.CDLL(self._lib_path)
         self._setup_function_signatures()
+        self._capture_ram_supported = apply_capture_ram_signatures(self._lib)
         logger.info("Loaded libloragw from %s", self._lib_path)
 
     def reset(self, gpio_pins: list[int] | None = None) -> None:
@@ -234,6 +247,7 @@ class SX1302Wrapper:
 
         self._configure_board()
         self._configure_rf_chains(plan)
+        self._rf_center_hz = (plan.radio_0_freq_hz, plan.radio_1_freq_hz)
         self._configure_if_channels(plan)
         self._configure_sx1261_for_spectral_scan()
         logger.info("Concentrator configured with %d IF channels",
@@ -242,7 +256,8 @@ class SX1302Wrapper:
     def start(self) -> None:
         if self._lib is None:
             self.load()
-        result = self._lib.lgw_start()
+        with self._hal_lock:
+            result = self._lib.lgw_start()
         if result != LGW_HAL_SUCCESS:
             # If an SX1261 was staged as enabled (radio.sx1261_spi_path
             # set), it's the most likely cause: an enabled-but-unreachable
@@ -268,8 +283,9 @@ class SX1302Wrapper:
 
     def stop(self) -> None:
         if self._started and self._lib:
-            self._lib.lgw_stop()
-            self._started = False
+            with self._hal_lock:
+                self._lib.lgw_stop()
+                self._started = False
             logger.info("SX1302 concentrator stopped")
 
     def receive(self) -> list[ConcentratorPacket]:
@@ -283,7 +299,15 @@ class SX1302Wrapper:
 
         pkt_array = (LgwPktRxS * LGW_PKT_MAX)()
 
-        count = self._lib.lgw_receive(LGW_PKT_MAX, pkt_array)
+        # Never block the event loop on a capture/TX in another thread:
+        # skip this poll instead. The SX1302 RX FIFO holds packets until
+        # the next poll (~10 ms later), so nothing is lost.
+        if not self._hal_lock.acquire(blocking=False):
+            return []
+        try:
+            count = self._lib.lgw_receive(LGW_PKT_MAX, pkt_array)
+        finally:
+            self._hal_lock.release()
 
         if count < 0:
             logger.warning("lgw_receive returned error (%d)", count)
@@ -599,7 +623,8 @@ class SX1302Wrapper:
         if not self._started:
             raise RuntimeError("Concentrator not started, cannot transmit")
 
-        result = self._lib.lgw_send(ctypes.byref(tx_pkt))
+        with self._hal_lock:
+            result = self._lib.lgw_send(ctypes.byref(tx_pkt))
         if result != LGW_HAL_SUCCESS:
             logger.error("lgw_send failed (code %d)", result)
         else:
@@ -688,14 +713,16 @@ class SX1302Wrapper:
             raise RuntimeError("Library not loaded")
 
         status = ctypes.c_uint8(0)
-        self._lib.lgw_status(rf_chain, TX_STATUS, ctypes.byref(status))
+        with self._hal_lock:
+            self._lib.lgw_status(rf_chain, TX_STATUS, ctypes.byref(status))
         return status.value
 
     def abort_tx(self, rf_chain: int = 0) -> int:
         """Cancel a scheduled transmission."""
         if self._lib is None:
             raise RuntimeError("Library not loaded")
-        return self._lib.lgw_abort_tx(rf_chain)
+        with self._hal_lock:
+            return self._lib.lgw_abort_tx(rf_chain)
 
     def get_time_on_air(self, tx_pkt: LgwPktTxS) -> int:
         """Compute airtime in milliseconds for a TX packet."""
@@ -724,6 +751,37 @@ class SX1302Wrapper:
             logger.debug("Skipping spectral scan: concentrator not started")
             return None
         return self._spectral_scan.run(frequency_hz, nb_scan=nb_scan)
+
+    @property
+    def capture_ram_supported(self) -> bool:
+        """True if the loaded HAL exports what capture RAM needs."""
+        return self._capture_ram_supported
+
+    @property
+    def rf_center_hz(self) -> tuple[int, int]:
+        """(radio A, radio B) centre frequencies from the applied plan."""
+        return self._rf_center_hz
+
+    def capture_ram_snapshot(self, source: int) -> Optional[bytes]:
+        """Raw capture RAM bytes for ``source``, or None if skipped/failed.
+
+        Skipped while TX is busy (TX only ever runs on RF chain 0): a
+        capture then would record our own transmission, and it must not
+        interleave with lgw_send. Runs under the HAL lock end to end --
+        call it from a worker thread, it blocks for ~1 ms of capture plus
+        the 16 KB SPI read.
+        """
+        if self._lib is None or not self._capture_ram_supported:
+            return None
+        with self._hal_lock:
+            if not self._started:
+                return None
+            status = ctypes.c_uint8(0)
+            self._lib.lgw_status(0, TX_STATUS, ctypes.byref(status))
+            if status.value != TX_STATUS_FREE:
+                logger.debug("Capture RAM skipped: TX busy (status %d)", status.value)
+                return None
+            return read_capture_ram(self._lib, source)
 
     @property
     def spectral_scan_supported(self) -> bool:

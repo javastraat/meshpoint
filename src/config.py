@@ -70,6 +70,13 @@ class RadioConfig:
     # only set on carriers that expose SX1261 on a dedicated CE line
     # (Semtech reference kit, custom boards). See CONFIGURATION.md.
     sx1261_spi_path: str = ""
+    # Band Spectrum card from the SX1302's own capture RAM (raw radio
+    # A/B I/Q snapshots) for boards with no SX1261, e.g. RAK2287. Only
+    # used when neither the SX1261 scan nor the rfenv companion is
+    # active. Covers +/-1.5 MHz around each RF chain centre, in dB over
+    # the noise floor (not dBm). Uses spectrum_sweep_interval_seconds.
+    # Default off.
+    capture_ram_spectrum: bool = False
     # Emergency pager project: enables the concentrator's dedicated FSK
     # channel (ch9), independent hardware from every LoRa channel above.
     # Still internal/experimental, but confirmed working end-to-end on

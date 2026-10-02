@@ -122,6 +122,7 @@ from src.storage.message_repository import MessageRepository
 from src.api.telemetry.noise_floor import NoiseFloorTracker
 from src.api.telemetry.spectral_scan_service import SpectralScanService
 from src.api.telemetry.rfenv_companion_scan_service import RfEnvCompanionScanService
+from src.api.telemetry.capture_ram_spectrum_service import CaptureRamSpectrumService
 from src.transmit.broadcast_interval import clamp_interval_minutes
 from src.transmit.nodeinfo_broadcaster import NodeInfoBroadcaster
 from src.transmit.position_broadcaster import PositionBroadcaster
@@ -143,6 +144,7 @@ noise_floor_tracker = NoiseFloorTracker()
 _noise_floor_emitter_task = None
 _spectral_scan_service: SpectralScanService | None = None
 _rfenv_companion_service: RfEnvCompanionScanService | None = None
+_capture_ram_spectrum_service: CaptureRamSpectrumService | None = None
 _fan_controller_task = None
 _fan_controller = None
 _temp_sampler_task = None
@@ -408,10 +410,26 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
             if _rfenv_companion_service is not None:
                 await _rfenv_companion_service.start()
 
+        # Capture-RAM band spectrum -- last fallback, Band Spectrum card
+        # only (relative dB can't feed the dBm noise-floor histogram).
+        # Opt-in via radio.capture_ram_spectrum.
+        global _capture_ram_spectrum_service
+        if _spectral_scan_service is None and _rfenv_companion_service is None:
+            _capture_ram_spectrum_service = _build_capture_ram_spectrum_service(
+                pipeline, config,
+            )
+            if _capture_ram_spectrum_service is not None:
+                await _capture_ram_spectrum_service.start()
+
         # Band Spectrum sweep card -- same fallback precedence as the
         # histogram/noise-floor wiring above (real hardware wins; the
-        # companion only ever backs this when the real service is None).
-        spectrum_routes.init_routes(_spectral_scan_service or _rfenv_companion_service)
+        # companion only ever backs this when the real service is None,
+        # capture RAM only when both are).
+        spectrum_routes.init_routes(
+            _spectral_scan_service
+            or _rfenv_companion_service
+            or _capture_ram_spectrum_service
+        )
 
         global _fan_controller_task, _fan_controller, _temp_sampler_task, _temp_sampler
         if config.fan.enabled:
@@ -525,6 +543,8 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
             await _spectral_scan_service.stop()
         if _rfenv_companion_service is not None:
             await _rfenv_companion_service.stop()
+        if _capture_ram_spectrum_service is not None:
+            await _capture_ram_spectrum_service.stop()
         if _noise_floor_emitter_task is not None:
             _noise_floor_emitter_task.cancel()
             try:
@@ -1455,6 +1475,29 @@ def _build_rfenv_companion_service(
         nb_scan=device.nb_scan,
         interval_seconds=float(interval),
         label=device.label,
+        sweep_frequencies_hz=_sweep_frequencies_hz(config),
+        sweep_interval_seconds=float(config.radio.spectrum_sweep_interval_seconds),
+    )
+
+
+def _build_capture_ram_spectrum_service(
+    coord: PipelineCoordinator,
+    config: AppConfig,
+) -> CaptureRamSpectrumService | None:
+    """Build the capture-RAM Band Spectrum fallback if opted in.
+
+    Only ever called when neither the real SX1261 service nor the RF
+    Environment companion was built -- see
+    capture_ram_spectrum_service.py's module docstring.
+    """
+    if not config.radio.capture_ram_spectrum:
+        return None
+    wrapper = _get_concentrator_wrapper(coord)
+    if wrapper is None:
+        logger.info("Capture-RAM spectrum enabled but no concentrator running; skipping")
+        return None
+    return CaptureRamSpectrumService(
+        wrapper=wrapper,
         sweep_frequencies_hz=_sweep_frequencies_hz(config),
         sweep_interval_seconds=float(config.radio.spectrum_sweep_interval_seconds),
     )

@@ -530,6 +530,20 @@
   runs as an isolated one-shot with the service already stopped first
   (which it checks for and refuses to skip without `--force`), so
   there's no live capture to interrupt during the test.
+- **Band Spectrum card on RAK2287 boards (no SX1261), from the SX1302's
+  own capture RAM.** New opt-in `radio.capture_ram_spectrum: true` (default
+  off), also a toggle on Configuration → Concentrator → Radio (advanced). Every `spectrum_sweep_interval_seconds` it takes eight ~1 ms raw
+  I/Q snapshots of each radio (capture RAM sources 2/3), FFTs them in
+  plain Python and draws the result on the existing Band Spectrum card.
+  Only covers +/-1.5 MHz around each RF chain centre (EU868: ~866.8-870
+  MHz), and levels are **dB over the noise floor, not dBm**: the radios'
+  AGC makes raw levels meaningless, so each snapshot is normalised to its
+  own floor. The card labels it "dB over floor · capture RAM". It's the
+  last fallback: the real SX1261 scan wins, then the rfenv companion. It
+  doesn't feed the noise-floor histogram. The SX1302 wrapper now has a
+  shared HAL lock: capture, TX and start/stop take it, and `receive()`
+  skips a poll instead of blocking while it's held. A capture is skipped
+  while TX is busy. Channel plan untouched.
 
 #### Docs
 

@@ -8,6 +8,11 @@
  * overlaid as dashed markers. Admin "Sweep now" triggers
  * ``POST /api/device/spectrum/sweep``. Card hides itself when the
  * box has no spectral-scan support (no SX1261 path).
+ *
+ * A sweep with ``units: "db_rel"`` (the SX1302 capture-RAM fallback on
+ * boards without an SX1261) carries dB over the noise floor instead of
+ * dBm, and only covers part of the band: the axis is left unclamped and
+ * labels/legend say "dB over floor".
  */
 class RadioSpectrumCard {
     // Colours resolved live so they track the active theme -- median /
@@ -80,6 +85,10 @@ class RadioSpectrumCard {
     // no MeshCore radio is configured (mc.frequency_mhz unset), same
     // reasoning for Pager. Without this, the legend claimed a color
     // for a line that was never actually drawn on the chart.
+    _isRelative() {
+        return !!(this._sweep && this._sweep.units === 'db_rel');
+    }
+
     _renderLegend() {
         const legend = this._root.querySelector('[data-sp-legend]');
         if (!legend) return;
@@ -95,7 +104,10 @@ class RadioSpectrumCard {
         legend.innerHTML = entries
             .filter((e) => !e.protocol || present.has(e.protocol))
             .map((e) => `<span><i style="background:${e.color}"></i>${e.label}</span>`)
-            .join('');
+            .join('')
+            + (this._isRelative()
+                ? '<span title="SX1302 capture RAM: no SX1261 on this board, so levels are relative and only part of the band is covered">dB over floor · capture RAM</span>'
+                : '');
     }
 
     _buildMarkers(config) {
@@ -136,6 +148,7 @@ class RadioSpectrumCard {
             }
             this._root.style.display = '';
             this._sweep = data.sweep;
+            this._renderLegend();
             this._draw();
         } catch (e) {
             console.error('Spectrum load failed:', e);
@@ -229,8 +242,13 @@ class RadioSpectrumCard {
         const fMax = Math.max(...freqs);
         let yMin = Math.min(...points.map((p) => p.floor_dbm ?? p.median_dbm));
         let yMax = Math.max(...points.map((p) => p.p95_dbm ?? p.median_dbm));
-        yMin = Math.max(-150, Math.floor((yMin - 4) / 5) * 5);
-        yMax = Math.min(-40, Math.ceil((yMax + 4) / 5) * 5);
+        if (this._isRelative()) {
+            yMin = Math.floor((yMin - 2) / 5) * 5;
+            yMax = Math.ceil((yMax + 2) / 5) * 5;
+        } else {
+            yMin = Math.max(-150, Math.floor((yMin - 4) / 5) * 5);
+            yMax = Math.min(-40, Math.ceil((yMax + 4) / 5) * 5);
+        }
         if (yMax - yMin < 10) yMax = yMin + 10;
 
         const x = (mhz) => pad.l + ((mhz - fMin) / (fMax - fMin)) * plotW;
@@ -254,7 +272,7 @@ class RadioSpectrumCard {
         const fStep = (fMax - fMin) > 4 ? 1 : 0.5;
         for (let f = Math.ceil(fMin); f <= fMax; f += fStep) {
             ctx.textAlign = 'center';
-            ctx.fillText(f.toFixed(0), x(f), cssH - 8);
+            ctx.fillText(f.toFixed(fStep < 1 ? 1 : 0), x(f), cssH - 8);
         }
 
         // channel markers under the data lines
@@ -320,7 +338,8 @@ class RadioSpectrumCard {
         }
         const peak = best.p95_dbm != null ? ` · peak ${best.p95_dbm}` : '';
         this._tooltip.textContent =
-            `${best.frequency_mhz.toFixed(3)} MHz · median ${best.median_dbm}${peak} dBm`;
+            `${best.frequency_mhz.toFixed(3)} MHz · median ${best.median_dbm}${peak} `
+            + (this._isRelative() ? 'dB over floor' : 'dBm');
         this._tooltip.hidden = false;
         const bodyRect = this._canvas.parentElement.getBoundingClientRect();
         let left = event.clientX - bodyRect.left + 12;
