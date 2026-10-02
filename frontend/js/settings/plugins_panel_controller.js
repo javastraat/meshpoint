@@ -30,6 +30,17 @@
  * plugin with an available update shows an **Update vX → vY** button right
  * on its own row in the main list (not only inside that source's Browse
  * panel), calling the same ``POST /api/plugin-sources/install``.
+ *
+ * Batch actions (2026-10): an **Update all (N)** button whenever sources
+ * offer newer versions (downgrades excluded -- those stay a deliberate
+ * one-by-one click), plus a checkbox per row in both the installed list
+ * (Update / Reinstall / Enable / Disable selected) and each source's Browse
+ * panel (install/update/reinstall each selected entry, pulling in a missing
+ * hook host / `requires` from the same catalog, optional "enable newly
+ * installed"). One confirm per batch, then strictly one request at a time
+ * (the install endpoint handles one plugin per call), a summary of what
+ * worked and what didn't, and a single "restart to apply" at the end. No
+ * batch endpoint: it's the same per-plugin calls the single buttons make.
  */
 
 class PluginsPanelController {
@@ -97,6 +108,14 @@ class PluginsPanelController {
         // newer version shows an "Update" button on its own row in the
         // main list, not only inside that source's Browse panel.
         this._updates = {};
+        // Batch selection: installed-list ids, and per source url the
+        // selected catalog ids (kept across Browse re-renders/refreshes).
+        this._selected = new Set();
+        this._catSelected = new Map();
+        this._batchRunning = false;
+        // Last installed-list batch result, shown in the bar until the next
+        // batch -- refresh() re-renders the list, so it can't live in DOM.
+        this._batchSummary = null;
     }
 
     bind() {
@@ -115,6 +134,7 @@ class PluginsPanelController {
         if (this.srcAddForm) {
             this.srcAddForm.addEventListener('submit', (e) => { e.preventDefault(); this._addSource(); });
             this.srcListEl.addEventListener('click', (e) => this._onSourceClick(e));
+            this.srcListEl.addEventListener('change', (e) => this._onSourceChange(e));
             this._loadSources();
         }
         if (this.srcPresetEl) {
@@ -320,6 +340,17 @@ class PluginsPanelController {
         if (!row) return;
         const url = row.dataset.srcRow;
         if (e.target.closest('[data-src-remove]')) { this._removeSource(url); return; }
+        if (e.target.closest('[data-src-batch-apply]')) {
+            this._applyCatalogBatch(url, row.querySelector('[data-src-catalog]'));
+            return;
+        }
+        if (e.target.closest('[data-src-batch-clear]')) {
+            this._catSelected.delete(url);
+            const cat = row.querySelector('[data-src-catalog]');
+            cat.querySelectorAll('[data-src-select], [data-src-select-all]').forEach((cb) => { cb.checked = false; });
+            this._renderCatalogBatchBar(url, cat);
+            return;
+        }
         if (e.target.closest('[data-src-pin]')) { this._pinSource(url); return; }
         if (e.target.closest('[data-src-unpin]')) { this._unpinSource(url); return; }
         const installBtn = e.target.closest('[data-src-install]');
@@ -454,9 +485,18 @@ class PluginsPanelController {
         const countEl = catEl.closest('.plugins-source')?.querySelector('[data-src-count]');
         if (countEl) countEl.textContent = this._formatCatalogCount(cat);
 
+        catEl._catalog = cat;
+        const selected = this._catSelected.get(url) || new Set();
+        const actionable = new Set([...(cat.plugins || []), ...(cat.themes || [])]
+            .filter((p) => this._catalogBatchAction(p)).map((p) => p.id));
+        selected.forEach((id) => { if (!actionable.has(id)) selected.delete(id); });
+        this._catSelected.set(url, selected);
         const headerHtml = `<p class="plugins-sources__catmeta">${this._escape(cat.name || url)} — <code>@ ${this._escape(cat.ref)}</code>`
             + ` <button type="button" class="plugins-source__refresh" data-src-catalog-refresh `
-            + `title="raw.githubusercontent.com can take a few minutes to pick up a fresh push — re-fetch now">⟳ Refresh</button></p>`;
+            + `title="raw.githubusercontent.com can take a few minutes to pick up a fresh push — re-fetch now">⟳ Refresh</button></p>`
+            + `<div class="plugins-batchbar" data-src-batchbar hidden></div>`;
+        const sectionTitle = (label, kind) => `<h4 class="plugins-source__sectiontitle"><label class="plugins-select-all" title="Select all ${label.toLowerCase()}">`
+            + `<input type="checkbox" data-src-select-all data-kind="${kind}"> ${label}</label></h4>`;
 
         const apps = cat.plugins || [];
         const themes = cat.themes || [];
@@ -465,14 +505,15 @@ class PluginsPanelController {
             return;
         }
         const appsHtml = apps.length
-            ? `<h4 class="plugins-source__sectiontitle">Apps</h4><table class="plugins-table"><tbody>`
-              + this._orderCatalogApps(apps).map((row) => this._catalogRowHtml(row)).join('') + `</tbody></table>`
+            ? `${sectionTitle('Apps', 'app')}<table class="plugins-table"><tbody>`
+              + this._orderCatalogApps(apps).map((row) => this._catalogRowHtml({ ...row, selected })).join('') + `</tbody></table>`
             : '';
         const themesHtml = themes.length
-            ? `<h4 class="plugins-source__sectiontitle">Themes</h4><table class="plugins-table"><tbody>`
-              + themes.map((t) => this._catalogRowHtml({ plugin: t })).join('') + `</tbody></table>`
+            ? `${sectionTitle('Themes', 'theme')}<table class="plugins-table"><tbody>`
+              + themes.map((t) => this._catalogRowHtml({ plugin: t, selected })).join('') + `</tbody></table>`
             : '';
         catEl.innerHTML = headerHtml + appsHtml + themesHtml;
+        this._renderCatalogBatchBar(url, catEl);
     }
 
     /** Reorders a catalog's ``plugins`` array so an app that declares a
@@ -509,7 +550,14 @@ class PluginsPanelController {
     /** One Browse row -- shared by apps and themes (``plugin`` covers both;
      * ``grouped``/``dependent`` only apply to a hook nested under its host,
      * see _orderCatalogApps()). */
-    _catalogRowHtml({ plugin: p, grouped = false, dependent = false }) {
+    _catalogRowHtml({ plugin: p, grouped = false, dependent = false, selected = null }) {
+        const batchAction = this._catalogBatchAction(p);
+        const selectHtml = `<input type="checkbox" class="plugin-row__select" data-src-select data-id="${this._escape(p.id)}" `
+            + `data-kind="${this._escape(p.kind || 'app')}" aria-label="Select ${this._escape(p.id)}" `
+            + (batchAction
+                ? (selected && selected.has(p.id) ? 'checked' : '')
+                : `disabled title="${p.compatible ? 'Downgrades are one at a time — use the button on the right' : 'Needs a newer Meshpoint'}"`)
+            + '>';
         const down = p.update_available && this._cmpVersions(p.version, p.installed_version) < 0;
         const badge = !p.compatible
             ? '<span class="plugin-row__badge plugin-row__badge--community">needs newer Meshpoint</span>'
@@ -543,13 +591,145 @@ class PluginsPanelController {
                 ? `<p class="plugin-row__dep">Requires: <code>${this._escape(p.requires)}</code></p>` : '';
         const rowClass = dependent ? ' class="plugin-row--dependent"' : (grouped ? ' class="plugin-row--host"' : '');
         return `<tr${rowClass}>
-            <td><span class="plugin-row__name">${this._escape(p.id)}</span>
+            <td>${selectHtml}<span class="plugin-row__name">${this._escape(p.id)}</span>
                 <span class="plugin-row__version">v${this._escape(p.version)} · ${this._escape(p.kind)}${p.author ? ` · ${this._escape(p.author)}` : ''}</span>
                 ${p.description ? `<span class="plugin-row__version">${this._escape(p.description)}</span>` : ''}
                 ${provides ? `<p class="plugin-row__provides">${this._escape(provides)}</p>` : ''}
                 ${setupNote}${hookNote}</td>
             <td class="plugins-source__catright">${badge}${btn}</td>
         </tr>`;
+    }
+
+    // ── batch: Browse panel ─────────────────────────────────────────
+
+    /** What a batch does with this catalog entry: install / update /
+     * reinstall, or null (incompatible, or a downgrade -- never batched). */
+    _catalogBatchAction(p) {
+        if (!p.compatible) return null;
+        if (p.update_available) {
+            return this._cmpVersions(p.version, p.installed_version) < 0 ? null : 'update';
+        }
+        return p.installed ? 'reinstall' : 'install';
+    }
+
+    _onSourceChange(e) {
+        const row = e.target.closest('[data-src-row]');
+        if (!row) return;
+        const url = row.dataset.srcRow;
+        const cat = row.querySelector('[data-src-catalog]');
+        const selected = this._catSelected.get(url) || new Set();
+        this._catSelected.set(url, selected);
+        if (e.target.matches('[data-src-select-all]')) {
+            const kind = e.target.dataset.kind;
+            cat.querySelectorAll(`[data-src-select][data-kind="${kind}"]:not(:disabled)`).forEach((cb) => {
+                cb.checked = e.target.checked;
+                if (cb.checked) selected.add(cb.dataset.id); else selected.delete(cb.dataset.id);
+            });
+        } else if (e.target.matches('[data-src-select]')) {
+            if (e.target.checked) selected.add(e.target.dataset.id); else selected.delete(e.target.dataset.id);
+        } else {
+            return;
+        }
+        this._renderCatalogBatchBar(url, cat);
+    }
+
+    /** Selected entries plus any missing hook host / `requires` from the
+     * same catalog, hosts ordered before what depends on them. Returns
+     * {items: [{entry, action, isDep}], missing: ["x needs y"]}. */
+    _catalogBatchPlan(url, catEl) {
+        const cat = catEl._catalog || {};
+        const entries = [...(cat.plugins || []), ...(cat.themes || [])];
+        const byId = new Map(entries.map((p) => [p.id, p]));
+        const installedIds = new Set(this._plugins.map((p) => p.id));
+        const selected = this._catSelected.get(url) || new Set();
+        const chosen = new Map(); // id -> isDep
+        const missing = [];
+        const add = (id, isDep) => {
+            if (chosen.has(id)) return;
+            const p = byId.get(id);
+            chosen.set(id, isDep);
+            const host = p && (p.hook_host || p.requires);
+            if (!host || installedIds.has(host) || (byId.get(host) && byId.get(host).installed)) return;
+            const hostEntry = byId.get(host);
+            if (hostEntry && this._catalogBatchAction(hostEntry)) add(host, true);
+            else missing.push(`${id} needs ${host}, which isn't installed or in this source`);
+        };
+        selected.forEach((id) => add(id, false));
+        const ordered = [];
+        const visit = (id, seen = new Set()) => {
+            if (seen.has(id) || ordered.includes(id)) return;
+            seen.add(id);
+            const p = byId.get(id);
+            const host = p && (p.hook_host || p.requires);
+            if (host && chosen.has(host)) visit(host, seen);
+            ordered.push(id);
+        };
+        [...chosen.keys()].forEach((id) => visit(id));
+        const items = ordered.map((id) => ({ entry: byId.get(id), action: this._catalogBatchAction(byId.get(id)), isDep: chosen.get(id) }))
+            .filter((it) => it.entry && it.action);
+        return { items, missing };
+    }
+
+    _renderCatalogBatchBar(url, catEl) {
+        const bar = catEl && catEl.querySelector('[data-src-batchbar]');
+        if (!bar) return;
+        const { items } = this._catalogBatchPlan(url, catEl);
+        if (!items.length) { bar.hidden = true; bar.innerHTML = ''; return; }
+        const count = (a) => items.filter((it) => it.action === a).length;
+        const what = [['install', 'install'], ['update', 'update'], ['reinstall', 'reinstall']]
+            .filter(([a]) => count(a)).map(([a, label]) => `${count(a)} ${label}`).join(', ');
+        const deps = items.filter((it) => it.isDep).length;
+        const newInstalls = count('install');
+        bar.hidden = false;
+        bar.innerHTML = `<span class="plugins-batchbar__count">${items.length - deps} selected</span>`
+            + `<span class="plugins-batchbar__what">${what}${deps ? ` (incl. ${deps} dependenc${deps === 1 ? 'y' : 'ies'})` : ''}</span>`
+            + (newInstalls ? '<label class="plugins-select-all"><input type="checkbox" data-src-batch-enable checked> Enable newly installed</label>' : '')
+            + '<button type="button" class="terminal-button" data-src-batch-apply>Apply</button>'
+            + '<button type="button" class="plugins-source__refresh" data-src-batch-clear>Clear</button>';
+    }
+
+    async _applyCatalogBatch(url, catEl) {
+        if (this._batchRunning) return;
+        const { items, missing } = this._catalogBatchPlan(url, catEl);
+        if (!items.length) return;
+        const enableBox = catEl.querySelector('[data-src-batch-enable]');
+        const enableNew = !!(enableBox && enableBox.checked);
+        const ref = catEl.dataset.ref || null;
+        const lines = items.map(({ entry: p, action, isDep }) => `• ${p.id}: ${action}`
+            + (action === 'update' ? ` v${p.installed_version} → v${p.version}` : ` v${p.version}`)
+            + (isDep ? ' (needed by your selection)' : ''));
+        const ok = await this._confirm(
+            `From ${url}${ref ? ` @ ${ref}` : ''}:\n${lines.join('\n')}`
+            + (missing.length ? `\n\n⚠ ${missing.join('\n⚠ ')}` : '')
+            + (items.some((it) => it.action === 'reinstall') ? '\n\nReinstall replaces the files — changes made on the device are lost.' : '')
+            + `\n\n${enableNew && items.some((it) => it.action === 'install') ? 'Newly installed plugins are enabled. ' : 'New plugins stay disabled until you enable them. '}`
+            + 'Any setup.sh is a separate step. One at a time; restart once at the end.',
+            { label: 'Apply to selected plugins?', command: `${items.length} plugin${items.length === 1 ? '' : 's'}` },
+        );
+        if (!ok) return;
+        const steps = items.map(({ entry: p, action }) => ({
+            line: `${p.id}: ${action}`,
+            run: async () => {
+                const body = await this._postInstall(url, p.id, ref);
+                if (enableNew && action === 'install' && (p.kind || 'app') === 'app') {
+                    // The install itself worked either way -- a refused
+                    // enable (e.g. its host is installed but switched off)
+                    // is reported on the line, not counted as a failure.
+                    try {
+                        await this._putEnabled(p.id, true);
+                        return `${p.id} v${body.version} (enabled)`;
+                    } catch (err) {
+                        return `${p.id} v${body.version} (installed, not enabled: ${err.message})`;
+                    }
+                }
+                return `${p.id} v${body.version}`;
+            },
+        }));
+        const result = await this._runSteps(steps, (text) => this._setSrcStatus('pending', text));
+        this._setSrcStatus(result.kind === 'warn' ? 'error' : result.kind, result.text);
+        this._catSelected.delete(url);
+        await this.refresh();
+        this._loadSources();
     }
 
     async _installFromSource(url, id, ref, opts, catEl) {
@@ -876,10 +1056,24 @@ class PluginsPanelController {
             return;
         }
         this._setStatus('', '');
-        this.listEl.innerHTML = `<table class="plugins-table">
-            <thead><tr><th>Plugin</th><th>Source</th><th>Provides</th><th></th></tr></thead>
+        const known = new Set(this._plugins.map((p) => p.id));
+        this._selected.forEach((id) => { if (!known.has(id)) this._selected.delete(id); });
+        const visibleIds = rows.map((r) => r.plugin.id);
+        const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => this._selected.has(id));
+        this.listEl.innerHTML = `<div class="plugins-batchbar" data-plugins-batchbar></div>
+        <table class="plugins-table">
+            <thead><tr><th><label class="plugins-select-all" title="Select all shown">`
+            + `<input type="checkbox" data-select-all ${allVisibleSelected ? 'checked' : ''}> Plugin</label></th>`
+            + `<th>Source</th><th>Provides</th><th></th></tr></thead>
             <tbody></tbody>
         </table>`;
+        this.listEl.querySelector('[data-select-all]').addEventListener('change', (e) => {
+            visibleIds.forEach((id) => (e.target.checked ? this._selected.add(id) : this._selected.delete(id)));
+            this._render();
+        });
+        const bar = this.listEl.querySelector('[data-plugins-batchbar]');
+        bar.addEventListener('click', (e) => this._onBatchBarClick(e));
+        this._renderBatchBar(bar);
         const tbody = this.listEl.querySelector('tbody');
         rows.forEach(({ plugin, grouped, hostMeta }) => {
             tbody.appendChild(this._renderRow(plugin, grouped, hostMeta));
@@ -1016,6 +1210,7 @@ class PluginsPanelController {
         }
         row.innerHTML = `
             <td>
+                <input type="checkbox" class="plugin-row__select" data-select aria-label="Select ${this._escape(plugin.id)}" ${this._selected.has(plugin.id) ? 'checked' : ''}>
                 <span${hostMeta ? ' class="plugin-row__namewrap--foldable" data-group-toggle-cell' : ''}>
                     ${toggleHtml}<span class="plugin-row__name">${this._escape(plugin.id)}</span>
                     ${hostMeta && hostMeta.collapsed ? `<span class="plugin-row__count">+${hostMeta.memberCount} plugin${hostMeta.memberCount === 1 ? '' : 's'}</span>` : ''}
@@ -1041,6 +1236,14 @@ class PluginsPanelController {
                 <span class="plugin-row__result" data-result aria-live="polite"></span>
             </td>
         `;
+        row.querySelector('[data-select]').addEventListener('change', (e) => {
+            if (e.target.checked) this._selected.add(plugin.id);
+            else this._selected.delete(plugin.id);
+            const bar = this.listEl.querySelector('[data-plugins-batchbar]');
+            if (bar) this._renderBatchBar(bar);
+            const all = this.listEl.querySelector('[data-select-all]');
+            if (all && !e.target.checked) all.checked = false;
+        });
         const toggle = row.querySelector('[data-toggle]');
         const resultEl = row.querySelector('[data-result]');
         toggle.addEventListener('change', () => this._setEnabled(plugin, toggle, resultEl));
@@ -1073,6 +1276,153 @@ class PluginsPanelController {
             });
         }
         return row;
+    }
+
+    // ── batch: installed list ───────────────────────────────────────
+
+    /** Installed plugins with a newer (not older) version on a source. */
+    _updatablePlugins() {
+        return this._plugins.filter((p) => this._updates[p.id] && !this._updates[p.id].downgrade);
+    }
+
+    _selectedPlugins() {
+        return this._plugins.filter((p) => this._selected.has(p.id));
+    }
+
+    _renderBatchBar(bar) {
+        const updatable = this._updatablePlugins();
+        const sel = this._selectedPlugins();
+        const parts = [];
+        if (updatable.length) {
+            parts.push(`<button type="button" class="terminal-button" data-batch="update-all" `
+                + `title="${this._escape(updatable.map((p) => p.id).join(', '))}">Update all (${updatable.length})</button>`);
+        }
+        if (sel.length) {
+            const n = {
+                update: sel.filter((p) => this._updates[p.id] && !this._updates[p.id].downgrade).length,
+                reinstall: sel.filter((p) => p.provenance && p.provenance.url).length,
+                enable: sel.filter((p) => !p.enabled).length,
+                disable: sel.filter((p) => p.enabled).length,
+            };
+            const btn = (key, label, title) => `<button type="button" class="plugin-row__update" data-batch="${key}" `
+                + `${n[key] ? '' : 'disabled'} title="${title}">${label} (${n[key]})</button>`;
+            parts.push(`<span class="plugins-batchbar__count">${sel.length} selected</span>`
+                + btn('update', 'Update', 'Selected plugins with a newer version on their source')
+                + btn('reinstall', 'Reinstall', 'Fresh copy from the source they were installed from')
+                + btn('enable', 'Enable', 'Takes effect after a restart')
+                + btn('disable', 'Disable', 'Takes effect after a restart')
+                + '<button type="button" class="plugins-source__refresh" data-batch="clear">Clear selection</button>');
+        }
+        if (this._batchSummary) {
+            parts.push(`<span class="plugins-batchbar__result" data-kind="${this._batchSummary.kind}">${this._escape(this._batchSummary.text)}</span>`);
+        }
+        bar.innerHTML = parts.join('');
+        bar.hidden = parts.length === 0;
+    }
+
+    _onBatchBarClick(e) {
+        const btn = e.target.closest('[data-batch]');
+        if (!btn || btn.disabled || this._batchRunning) return;
+        const action = btn.dataset.batch;
+        if (action === 'clear') { this._selected.clear(); this._render(); return; }
+        const sel = this._selectedPlugins();
+        if (action === 'update-all' || action === 'update') {
+            const list = action === 'update-all' ? this._updatablePlugins()
+                : sel.filter((p) => this._updates[p.id] && !this._updates[p.id].downgrade);
+            const steps = list.map((p) => {
+                const u = this._updates[p.id];
+                return {
+                    line: `${p.id}: v${u.installed_version} → v${u.version}`,
+                    run: () => this._postInstall(u.url, p.id, u.ref).then((b) => `${p.id} → v${b.version}`),
+                };
+            });
+            this._runInstalledBatch(action === 'update-all' ? 'Update all plugins?' : 'Update selected plugins?', 'update', steps);
+        } else if (action === 'reinstall') {
+            const steps = sel.filter((p) => p.provenance && p.provenance.url).map((p) => ({
+                line: `${p.id}: fresh v${p.version} copy from ${p.provenance.url.replace(/^https?:\/\/github\.com\//, '')}`,
+                run: () => this._postInstall(p.provenance.url, p.id, p.provenance.ref || null)
+                    .then((b) => `${p.id} v${b.version}`),
+            }));
+            this._runInstalledBatch('Reinstall selected plugins?', 'reinstall', steps,
+                'Any changes made to these plugins on the device are lost. Enabled states are kept.');
+        } else if (action === 'enable' || action === 'disable') {
+            const on = action === 'enable';
+            // Hosts before their hooks when enabling (a hook is refused
+            // while its host is off), hooks before hosts when disabling.
+            const list = sel.filter((p) => p.enabled !== on)
+                .sort((a, b) => (on ? 1 : -1) * ((a.dependency ? 1 : 0) - (b.dependency ? 1 : 0)));
+            const steps = list.map((p) => ({
+                line: `${p.id}: ${on ? 'enable' : 'disable'}`,
+                run: () => this._putEnabled(p.id, on).then(() => p.id),
+            }));
+            this._runInstalledBatch(`${on ? 'Enable' : 'Disable'} selected plugins?`, action, steps);
+        }
+    }
+
+    async _runInstalledBatch(label, verb, steps, note = '') {
+        if (!steps.length) return;
+        const ok = await this._confirm(
+            `${steps.map((s) => `• ${s.line}`).join('\n')}\n\n`
+            + `${note ? `${note}\n\n` : ''}One at a time; a failure doesn't stop the rest. Restart once at the end to apply.`,
+            { label, command: `${verb} ${steps.length} plugin${steps.length === 1 ? '' : 's'}` },
+        );
+        if (!ok) return;
+        const bar = this.listEl.querySelector('[data-plugins-batchbar]');
+        const result = await this._runSteps(steps, (text) => {
+            this._batchSummary = { kind: 'pending', text };
+            if (bar) this._renderBatchBar(bar);
+        });
+        this._batchSummary = result;
+        this._selected.clear();
+        await this.refresh();
+        this._loadSources();
+    }
+
+    /** Runs batch steps strictly in order; returns {kind, text} summary. */
+    async _runSteps(steps, onProgress) {
+        this._batchRunning = true;
+        const done = [];
+        const failed = [];
+        try {
+            for (let i = 0; i < steps.length; i += 1) {
+                onProgress(`${i + 1}/${steps.length}: ${steps[i].line}…`);
+                try {
+                    done.push(await steps[i].run());
+                } catch (err) {
+                    failed.push(`${steps[i].line.split(':')[0]} (${err.message || 'failed'})`);
+                }
+            }
+        } finally {
+            this._batchRunning = false;
+        }
+        const parts = [];
+        if (done.length) parts.push(`✓ ${done.join(', ')}`);
+        if (failed.length) parts.push(`✗ ${failed.join(', ')}`);
+        parts.push('Restart the service to apply.');
+        return { kind: failed.length ? (done.length ? 'warn' : 'error') : 'success', text: parts.join(' · ') };
+    }
+
+    async _postInstall(url, id, ref) {
+        const r = await fetch('/api/plugin-sources/install', {
+            method: 'POST', credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url, id, ref: ref || null }),
+        });
+        const body = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(body.detail || `HTTP ${r.status}`);
+        delete this._updates[id];
+        return body;
+    }
+
+    async _putEnabled(id, enabled) {
+        const r = await fetch(`/api/plugins/${encodeURIComponent(id)}`, {
+            method: 'PUT', credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled }),
+        });
+        const body = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(r.status === 403 ? 'admin role required' : (body.detail || `HTTP ${r.status}`));
+        return body;
     }
 
     async _setEnabled(plugin, toggle, resultEl) {

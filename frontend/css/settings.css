@@ -1666,3 +1666,42 @@ select.update-field__input option:checked {
 .plugin-row__result[data-kind="pending"] { color: var(--text-secondary); }
 
 /* Commit timeline chrome lives in update_commits.css */
+
+/* ── Settings > Plugins batch actions (Update all, multi-select) ───── */
+.plugins-batchbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 10px;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+.plugins-batchbar[hidden] { display: none; }
+.plugins-batchbar .plugin-row__update { margin-left: 0; }
+.plugins-batchbar__count { font-weight: 600; color: var(--text-primary); }
+.plugins-batchbar__what { color: var(--text-muted); }
+.plugins-batchbar__result { flex-basis: 100%; }
+.plugins-batchbar__result[data-kind="success"] { color: var(--accent-green); }
+.plugins-batchbar__result[data-kind="warn"] { color: var(--accent-amber, #f59e0b); }
+.plugins-batchbar__result[data-kind="error"] { color: var(--accent-red); }
+.plugins-batchbar__result[data-kind="pending"] { color: var(--text-secondary); }
+.plugins-source__catalog .plugins-batchbar {
+    margin: 0.4rem 0 0.2rem;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--hairline);
+    border-radius: 6px;
+}
+.plugin-row__select {
+    margin: 0 6px 0 0;
+    vertical-align: middle;
+    cursor: pointer;
+}
+.plugin-row__select:disabled { cursor: default; opacity: 0.4; }
+.plugins-select-all {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+}
+.plugins-select-all input { margin: 0; cursor: pointer; }

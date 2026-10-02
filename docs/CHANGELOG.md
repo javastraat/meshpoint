@@ -280,6 +280,28 @@
 
 #### Plugins
 
+- **Settings → Plugins: Update all, and batch actions with checkboxes.**
+  An **Update all (N)** button appears above the list whenever sources
+  offer newer versions (downgrades are left out; they stay one-by-one).
+  Every installed row has a checkbox (plus select-all in the header) and a
+  bar for the selection: **Update / Reinstall / Enable / Disable**. A
+  source's Browse panel gets the same: tick entries (or a section's
+  select-all) and **Apply** installs, updates or reinstalls each one. A
+  hook plugin's missing host (or a `requires` dependency) from the same
+  catalog is added automatically and installed first, and "Enable newly
+  installed" switches new plugins on in the same go. Each batch has one
+  confirm listing every step, runs one plugin at a time (a failure doesn't
+  stop the rest), ends with a ✓/✗ summary and a single restart prompt. No
+  new backend endpoints: it uses the same per-plugin calls as the buttons.
+
+- **Fix: Settings → Plugins no longer collapses an open source's Browse
+  panel after Install/Update.** Every install ended in a full re-render of
+  the sources list, which recreated each Browse panel closed (and the
+  catalog refresh went into the old, already-replaced element), so you had
+  to press Browse and scroll again after every single install. Open panels
+  are now remembered across the re-render, keep their content on screen,
+  and refresh quietly in place.
+
 - **"Keep running" checkbox on the RTL-SDR decoder tabs.** The shared pager
   panel (P2000, Pagers, POCSAG, RTL433, ACARS tabs) shows a **Keep running**
   checkbox next to Start listening when the plugin supports it (plugin
