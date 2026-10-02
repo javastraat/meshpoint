@@ -38,7 +38,11 @@ async def get_spectrum():
     """Latest band sweep, or availability info before/without one."""
     if _service is None or not _service.sweep_supported:
         return {"available": False, "sweep": None}
-    return {"available": True, "sweep": _service.latest_sweep}
+    body = {"available": True, "sweep": _service.latest_sweep}
+    # Only the capture-RAM fallback has (or needs) a baseline calibration.
+    if hasattr(_service, "calibration_status"):
+        body["calibration"] = _service.calibration_status()
+    return body
 
 
 @router.post("/sweep")
@@ -51,3 +55,29 @@ async def trigger_sweep(
     if not _service.request_sweep():
         raise HTTPException(503, "Spectral scan loop is not running")
     return {"requested": True}
+
+
+def _calibratable():
+    if _service is None or not hasattr(_service, "request_calibration"):
+        raise HTTPException(404, "Calibration only applies to the capture-RAM spectrum")
+    return _service
+
+
+@router.post("/calibrate")
+async def calibrate(
+    _claims: SessionClaims = Depends(require_admin),
+):
+    """Run a calibration sweep; its median shape becomes the baseline."""
+    service = _calibratable()
+    if not service.request_calibration():
+        raise HTTPException(503, "Spectral scan loop is not running")
+    return {"requested": True}
+
+
+@router.delete("/calibrate")
+async def clear_calibration(
+    _claims: SessionClaims = Depends(require_admin),
+):
+    """Forget the baseline; sweeps show the radios' raw shape again."""
+    _calibratable().clear_calibration()
+    return {"cleared": True}

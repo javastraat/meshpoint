@@ -16,6 +16,9 @@ into Band Spectrum sweep points shaped exactly like
   (the power in that slot, like an RSSI reading -- a narrow carrier
   still lifts it), and floor/median/p95 are taken over those readings
   across all segments and captures.
+- Optionally, readings over the tuned channel (``channel_hz`` +/- half
+  its bandwidth, e.g. Meshtastic's 869.525 MHz / 250 kHz) are kept as a
+  flat list for the RF Environment page's Channel histogram.
 - Only +/-``usable_hz`` around each RF centre is used: the radio's
   filter rolls off ~5-8 dB towards +/-2 MHz. Where the two radios
   overlap, a point is taken from the radio whose centre is nearer.
@@ -107,6 +110,8 @@ class CaptureSweepAccumulator:
         step_hz: int = 100_000,
         usable_hz: int = DEFAULT_USABLE_HZ,
         n: int = SEGMENT_SIZE,
+        channel_hz: int = 0,
+        channel_bw_hz: int = 0,
     ) -> None:
         self._n = n
         self._usable_hz = usable_hz
@@ -122,6 +127,14 @@ class CaptureSweepAccumulator:
             if bins:
                 self._point_bins[f] = (radio, bins)
         self._values: dict[int, list[float]] = {f: [] for f in self._point_bins}
+        self._channel: Optional[tuple[int, list[int]]] = None
+        if channel_hz > 0 and channel_bw_hz > 0:
+            radio = self._nearest_radio(channel_hz)
+            if radio is not None:
+                bins = self._bins_for(channel_hz, self._centers[radio], channel_bw_hz)
+                if bins:
+                    self._channel = (radio, bins)
+        self.channel_values: list[float] = []
         self.captures_added = 0
 
     @property
@@ -164,6 +177,11 @@ class CaptureSweepAccumulator:
         floor = everything[len(everything) // 2]
         for f, vals in readings.items():
             self._values[f].extend(v - floor for v in vals)
+        if self._channel is not None and self._channel[0] == radio:
+            bins = self._channel[1]
+            self.channel_values.extend(
+                _mean_db([spec[k] for k in bins]) - floor for spec in spectra
+            )
         self.captures_added += 1
         return True
 

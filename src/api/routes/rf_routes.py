@@ -1,7 +1,7 @@
 """RF Environment dashboard — noise floor + spectral scan exposure."""
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from fastapi import APIRouter
 
@@ -109,11 +109,23 @@ def _spectral_status() -> dict:
         "scans_run": _scan_service.scans_run,
         "scans_failed": _scan_service.scans_failed,
         "histogram": _scan_service.histogram_payload(),
-        "message": (
+        "message": _fallback_message(_scan_service),
+    }
+
+
+def _fallback_message(service) -> Optional[str]:
+    if getattr(service, "is_companion", False):
+        return (
             "Histogram from the RF Environment companion "
             "(extra/rfenv_companion), not the concentrator's own hardware."
-        ) if getattr(_scan_service, "is_companion", False) else None,
-    }
+        )
+    if getattr(service, "is_capture_ram", False):
+        return (
+            "Histogram from the SX1302 capture RAM (no SX1261 on this board): "
+            "levels in dB over the noise floor, not dBm, refreshed with each "
+            "Band Spectrum sweep."
+        )
+    return None
 
 
 @router.get("/status")

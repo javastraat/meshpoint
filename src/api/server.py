@@ -1496,10 +1496,19 @@ def _build_capture_ram_spectrum_service(
     if wrapper is None:
         logger.info("Capture-RAM spectrum enabled but no concentrator running; skipping")
         return None
+    from src.backup.paths import resolve_data_dir
+
+    freq_mhz = config.radio.frequency_mhz
     return CaptureRamSpectrumService(
         wrapper=wrapper,
         sweep_frequencies_hz=_sweep_frequencies_hz(config),
         sweep_interval_seconds=float(config.radio.spectrum_sweep_interval_seconds),
+        baseline_path=(
+            resolve_data_dir(config.storage.database_path)
+            / "capture_ram_baseline.json"
+        ),
+        channel_hz=int(freq_mhz * 1_000_000) if freq_mhz else 0,
+        channel_bw_hz=int(config.radio.bandwidth_khz * 1000),
     )
 
 
@@ -1946,7 +1955,9 @@ def _init_routes(
     global _spectral_scan_service, _rfenv_companion_service
     rf_routes.init_routes(
         noise_floor_tracker,
-        _spectral_scan_service or _rfenv_companion_service,
+        _spectral_scan_service
+        or _rfenv_companion_service
+        or _capture_ram_spectrum_service,
         config,
         coord.stray_frame_log,
     )

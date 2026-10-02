@@ -17,8 +17,10 @@ import cmath
 import ctypes
 import math
 import random
+import tempfile
 import threading
 import unittest
+from pathlib import Path
 from unittest.mock import MagicMock
 
 from src.api.telemetry.capture_ram_spectrum import (
@@ -152,9 +154,10 @@ class TestAccumulator(unittest.TestCase):
 class _FakeWrapper:
     capture_ram_supported = True
 
-    def __init__(self, centers=(868_300_000, 869_525_000), fail=False) -> None:
+    def __init__(self, centers=(868_300_000, 869_525_000), fail=False, tone_hz=None) -> None:
         self.rf_center_hz = centers
         self._fail = fail
+        self._tone_hz = tone_hz   # steady tone on radio A, e.g. a fake filter bump
         self._rng = random.Random(6)
         self.sources: list[int] = []
 
@@ -162,6 +165,8 @@ class _FakeWrapper:
         self.sources.append(source)
         if self._fail:
             return None
+        if source == SOURCE_RADIO_A and self._tone_hz is not None:
+            return _encode_iq(_noise_with_tone(self._rng, 20, self._tone_hz, 200))
         return _encode_iq(_noise_with_tone(self._rng))
 
 
@@ -217,6 +222,83 @@ class TestService(unittest.TestCase):
             return svc
 
         self.assertIsNotNone(asyncio.run(run()).latest_sweep)
+
+
+class TestCalibrationAndHistogram(unittest.TestCase):
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.path = Path(self._tmp.name) / "capture_ram_baseline.json"
+
+    def tearDown(self) -> None:
+        self._tmp.cleanup()
+
+    def _service(self, wrapper) -> CaptureRamSpectrumService:
+        return CaptureRamSpectrumService(
+            wrapper, _EU_GRID, captures_per_radio=2, calibration_captures_per_radio=4,
+            capture_gap_seconds=0, baseline_path=self.path,
+            channel_hz=869_525_000, channel_bw_hz=250_000,
+        )
+
+    @staticmethod
+    def _median_at(svc, mhz) -> float:
+        return {p["frequency_mhz"]: p["median_dbm"] for p in svc.latest_sweep["points"]}[mhz]
+
+    def test_calibration_flattens_a_steady_shape_and_persists(self) -> None:
+        wrapper = _FakeWrapper(tone_hz=-300_000)          # steady bump at 868.0
+        svc = self._service(wrapper)
+        asyncio.run(svc._run_sweep())
+        self.assertGreater(self._median_at(svc, 868.0), 15)
+        self.assertFalse(svc.latest_sweep["calibrated"])
+
+        asyncio.run(svc._run_sweep(calibrate=True))
+        self.assertTrue(svc.latest_sweep["calibrated"])
+        self.assertTrue(self.path.exists())
+        asyncio.run(svc._run_sweep())
+        self.assertLess(abs(self._median_at(svc, 868.0)), 3)
+
+        # A fresh service (restart) picks the baseline up from disk.
+        fresh = self._service(wrapper)
+        fresh._load_baseline()
+        self.assertTrue(fresh.calibration_status()["calibrated"])
+
+    def test_baseline_ignored_when_rf_centres_change(self) -> None:
+        svc = self._service(_FakeWrapper())
+        asyncio.run(svc._run_sweep(calibrate=True))
+        svc._wrapper.rf_center_hz = (868_100_000, 869_525_000)
+        self.assertFalse(svc.calibration_status()["calibrated"])
+
+    def test_clear_calibration_removes_file(self) -> None:
+        svc = self._service(_FakeWrapper())
+        asyncio.run(svc._run_sweep(calibrate=True))
+        svc.clear_calibration()
+        self.assertFalse(self.path.exists())
+        self.assertFalse(svc.calibration_status()["calibrated"])
+
+    def test_unreadable_baseline_is_ignored(self) -> None:
+        self.path.write_text("{not json")
+        svc = self._service(_FakeWrapper())
+        svc._load_baseline()
+        self.assertFalse(svc.calibration_status()["calibrated"])
+
+    def test_histogram_from_tuned_channel(self) -> None:
+        svc = self._service(_FakeWrapper())
+        self.assertIsNone(svc.histogram_payload())
+        asyncio.run(svc._run_sweep())
+        hist = svc.histogram_payload()
+        self.assertEqual(hist["units"], "db_rel")
+        self.assertEqual(hist["frequency_hz"], 869_525_000)
+        # 2 radio-B captures x 16 segments
+        self.assertEqual(hist["total_samples"], 32)
+        self.assertEqual(len(hist["levels_dbm"]), len(hist["counts"]))
+        self.assertLess(abs(hist["median_dbm"]), 4)
+
+
+class TestRoutes(unittest.TestCase):
+    def test_rf_status_message_for_capture_ram(self) -> None:
+        from src.api.routes import rf_routes
+        svc = CaptureRamSpectrumService(_FakeWrapper(), _EU_GRID)
+        self.assertIn("capture RAM", rf_routes._fallback_message(svc))
+        self.assertIsNone(rf_routes._fallback_message(object()))
 
 
 def _mock_lib(tx_status: int = TX_STATUS_FREE, complete: int = 1) -> MagicMock:

@@ -162,6 +162,13 @@ class RfTab {
                     });
                     return r.ok ? r.json() : null;
                 },
+                delete: async (url) => {
+                    const r = await fetch(url, {
+                        method: 'DELETE',
+                        credentials: 'same-origin',
+                    });
+                    return r.ok ? r.json() : null;
+                },
             };
             this._bandSpectrum = new window.RadioSpectrumCard(api);
             this._bandSpectrum.mount(spectrumHost);
@@ -414,14 +421,14 @@ class RfTab {
                         legend: { display: false },
                         title: {
                             display: true,
-                            text: `Floor ${hist.floor_dbm ?? '--'} dBm · Median ${hist.median_dbm ?? '--'} dBm`,
+                            text: RfTab._histogramTitle(hist),
                             color: textSecondary,
                             font: { size: 11 },
                         },
                     },
                     scales: {
                         x: {
-                            title: { display: true, text: 'RSSI level (dBm)', color: textMuted },
+                            title: { display: true, text: RfTab._histogramAxis(hist), color: textMuted },
                             ticks: { color: textSecondary, maxTicksLimit: 12 },
                             grid: { color: gridCol },
                         },
@@ -440,8 +447,10 @@ class RfTab {
         this._histogramChart.data.labels = labels;
         this._histogramChart.data.datasets[0].data = counts;
         if (this._histogramChart.options.plugins.title) {
-            this._histogramChart.options.plugins.title.text =
-                `Floor ${hist.floor_dbm ?? '--'} dBm · Median ${hist.median_dbm ?? '--'} dBm`;
+            this._histogramChart.options.plugins.title.text = RfTab._histogramTitle(hist);
+        }
+        if (this._histogramChart.options.scales.x.title) {
+            this._histogramChart.options.scales.x.title.text = RfTab._histogramAxis(hist);
         }
         this._histogramChart.update('none');
     }
@@ -457,6 +466,17 @@ class RfTab {
             return 'Direct ambient channel power from the SX1302 spectral scan on the tuned frequency.';
         }
         return 'Upper bound from rolling minimum of (RSSI − SNR) on decoded packets. True floor is at or below this value.';
+    }
+
+    // Capture-RAM histograms (no SX1261) carry dB over the noise floor,
+    // not dBm -- see capture_ram_spectrum_service.py.
+    static _histogramTitle(hist) {
+        const unit = hist.units === 'db_rel' ? 'dB over floor' : 'dBm';
+        return `Floor ${hist.floor_dbm ?? '--'} ${unit} · Median ${hist.median_dbm ?? '--'} ${unit}`;
+    }
+
+    static _histogramAxis(hist) {
+        return hist.units === 'db_rel' ? 'Level (dB over floor)' : 'RSSI level (dBm)';
     }
 
     static _histogramEmptyText(scan) {

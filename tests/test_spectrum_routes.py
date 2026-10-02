@@ -61,6 +61,19 @@ class TestSpectrumRoutes(unittest.TestCase):
         body = client.get("/api/device/spectrum").json()
         self.assertTrue(body["available"])
         self.assertEqual(body["sweep"], envelope)
+        self.assertNotIn("calibration", body)
+
+    def test_capture_ram_service_reports_calibration(self) -> None:
+        class _FakeCaptureRam:
+            sweep_supported = True
+            latest_sweep = None
+
+            def calibration_status(self):
+                return {"supported": True, "calibrated": False,
+                        "calibrating": False, "created_at": None}
+
+        body = self._client(_FakeCaptureRam()).get("/api/device/spectrum").json()
+        self.assertFalse(body["calibration"]["calibrated"])
 
 
 if __name__ == "__main__":

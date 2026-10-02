@@ -539,8 +539,15 @@
   MHz), and levels are **dB over the noise floor, not dBm**: the radios'
   AGC makes raw levels meaningless, so each snapshot is normalised to its
   own floor. The card labels it "dB over floor · capture RAM". It's the
-  last fallback: the real SX1261 scan wins, then the rfenv companion. It
-  doesn't feed the noise-floor histogram. The SX1302 wrapper now has a
+  last fallback: the real SX1261 scan wins, then the rfenv companion.
+  Optional **Calibrate** button: a longer sweep whose median shape is saved
+  as a baseline (`data/capture_ram_baseline.json`, survives restarts) and
+  subtracted from later sweeps, so the radios' own filter shape (e.g. a
+  steady +8 dB hump near 868.0 MHz on the first live run) no longer looks
+  like a signal; **Reset cal** forgets it. The RF Environment page's
+  **Channel histogram** is filled too, from the tuned channel's readings
+  in each sweep (also dB over floor). It never feeds the noise-floor
+  tracker. The SX1302 wrapper now has a
   shared HAL lock: capture, TX and start/stop take it, and `receive()`
   skips a poll instead of blocking while it's held. A capture is skipped
   while TX is busy. Channel plan untouched.

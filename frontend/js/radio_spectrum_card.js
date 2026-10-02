@@ -12,7 +12,10 @@
  * A sweep with ``units: "db_rel"`` (the SX1302 capture-RAM fallback on
  * boards without an SX1261) carries dB over the noise floor instead of
  * dBm, and only covers part of the band: the axis is left unclamped and
- * labels/legend say "dB over floor".
+ * labels/legend say "dB over floor". That fallback also offers
+ * Calibrate / Reset (``POST``/``DELETE /api/device/spectrum/calibrate``):
+ * a saved baseline of the radios' own filter shape that later sweeps
+ * subtract, so flat = quiet.
  */
 class RadioSpectrumCard {
     // Colours resolved live so they track the active theme -- median /
@@ -32,6 +35,7 @@ class RadioSpectrumCard {
         this._pollTimer = null;
         this._refreshTimer = null;
         this._emptyRetryTimer = null;
+        this._calibration = null;
         this._redraw = () => this._draw();
         this._reskin = () => { if (this._root) this._renderLegend(); this._draw(); };
         window.addEventListener('meshpoint:themechange', this._reskin);
@@ -45,6 +49,10 @@ class RadioSpectrumCard {
             <div class="r-card__header">
                 <h3 class="r-card__title">Band Spectrum</h3>
                 <span class="spectrum-actions">
+                    <button class="spectrum-btn" type="button" data-sp-cal hidden
+                            title="Save the radios' quiet shape as a baseline">Calibrate</button>
+                    <button class="spectrum-btn" type="button" data-sp-cal-reset hidden
+                            title="Forget the baseline">Reset cal</button>
                     <button class="spectrum-btn" type="button" data-sp-sweep
                             title="Run a sweep now">Sweep now</button>
                 </span>
@@ -64,6 +72,10 @@ class RadioSpectrumCard {
 
         rootEl.querySelector('[data-sp-sweep]')
             .addEventListener('click', () => this._sweepNow());
+        rootEl.querySelector('[data-sp-cal]')
+            .addEventListener('click', () => this._calibrate());
+        rootEl.querySelector('[data-sp-cal-reset]')
+            .addEventListener('click', () => this._resetCalibration());
         window.addEventListener('resize', this._redraw);
         this._canvas.addEventListener('mousemove', (e) => this._onHover(e));
         this._canvas.addEventListener('mouseleave', () => {
@@ -106,7 +118,9 @@ class RadioSpectrumCard {
             .map((e) => `<span><i style="background:${e.color}"></i>${e.label}</span>`)
             .join('')
             + (this._isRelative()
-                ? '<span title="SX1302 capture RAM: no SX1261 on this board, so levels are relative and only part of the band is covered">dB over floor · capture RAM</span>'
+                ? '<span title="SX1302 capture RAM: no SX1261 on this board, so levels are relative and only part of the band is covered">dB over floor · capture RAM'
+                    + (this._sweep.calibrated ? ' · calibrated' : ' · uncalibrated')
+                    + '</span>'
                 : '');
     }
 
@@ -148,6 +162,8 @@ class RadioSpectrumCard {
             }
             this._root.style.display = '';
             this._sweep = data.sweep;
+            this._calibration = data.calibration || null;
+            this._renderCalButtons();
             this._renderLegend();
             this._draw();
         } catch (e) {
@@ -183,6 +199,62 @@ class RadioSpectrumCard {
                 this._load();
             }
         }, 60000);
+    }
+
+    _renderCalButtons() {
+        const cal = this._calibration;
+        const calBtn = this._root.querySelector('[data-sp-cal]');
+        const resetBtn = this._root.querySelector('[data-sp-cal-reset]');
+        calBtn.hidden = !cal;
+        resetBtn.hidden = !(cal && cal.calibrated);
+        if (!cal || this._calWaiting) return;
+        calBtn.disabled = !!cal.calibrating;
+        calBtn.textContent = cal.calibrating ? 'Calibrating…' : 'Calibrate';
+    }
+
+    async _calibrate() {
+        const ok = await window.confirmModal({
+            label: 'Calibrate band spectrum',
+            description: 'Takes ~20 s of captures and saves the median shape as the '
+                + 'baseline, so later sweeps show flat = quiet. Do it at a quiet time: '
+                + 'short packets are fine, but a signal on air the whole time gets '
+                + 'baked into the baseline (Reset cal undoes it). Keep the antenna '
+                + 'connected.',
+        });
+        if (!ok) return;
+        const before = this._sweep && this._sweep.generated_at;
+        const result = await this._api.post('/api/device/spectrum/calibrate', {});
+        if (!result) return;
+        const btn = this._root.querySelector('[data-sp-cal]');
+        this._calWaiting = true;
+        btn.disabled = true;
+        btn.textContent = 'Calibrating…';
+        let tries = 0;
+        clearInterval(this._calTimer);
+        this._calTimer = setInterval(async () => {
+            tries += 1;
+            await this._load();
+            const now = this._sweep && this._sweep.generated_at;
+            if ((now && now !== before && this._sweep.calibrated) || tries > 30) {
+                clearInterval(this._calTimer);
+                this._calTimer = null;
+                this._calWaiting = false;
+                this._renderCalButtons();
+            }
+        }, 2000);
+    }
+
+    async _resetCalibration() {
+        const ok = await window.confirmModal({
+            label: 'Reset calibration',
+            description: 'Forget the saved baseline? Sweeps go back to showing the '
+                + 'radios\' own filter shape until you calibrate again.',
+        });
+        if (!ok) return;
+        if (await this._api.delete('/api/device/spectrum/calibrate')) {
+            // Next sweep comes out uncalibrated; run one now so the chart matches.
+            await this._sweepNow();
+        }
     }
 
     async _sweepNow() {
@@ -271,8 +343,11 @@ class RadioSpectrumCard {
         }
         const fStep = (fMax - fMin) > 4 ? 1 : 0.5;
         for (let f = Math.ceil(fMin); f <= fMax; f += fStep) {
-            ctx.textAlign = 'center';
-            ctx.fillText(f.toFixed(fStep < 1 ? 1 : 0), x(f), cssH - 8);
+            // Keep the end labels inside the canvas instead of clipped.
+            const px = x(f);
+            ctx.textAlign = px > pad.l + plotW - 16 ? 'right'
+                : px < pad.l + 16 ? 'left' : 'center';
+            ctx.fillText(f.toFixed(fStep < 1 ? 1 : 0), px, cssH - 8);
         }
 
         // channel markers under the data lines
