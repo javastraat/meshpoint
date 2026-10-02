@@ -547,7 +547,12 @@
   like a signal; **Reset cal** forgets it. The RF Environment page's
   **Channel histogram** is filled too, from the tuned channel's readings
   in each sweep (also dB over floor). It never feeds the noise-floor
-  tracker. The SX1302 wrapper now has a
+  tracker.
+- **Band Spectrum card: "MC?" reference line at MeshCore's default
+  frequency** (EU868: 869.618 MHz, US: 910.525 MHz) when no MeshCore radio
+  is configured, faint and dotted, so a peak there reads as "probably
+  MeshCore" rather than an unknown signal. A configured MeshCore radio
+  still gets its normal MC marker instead. The SX1302 wrapper now has a
   shared HAL lock: capture, TX and start/stop take it, and `receive()`
   skips a poll instead of blocking while it's held. A capture is skipped
   while TX is busy. Channel plan untouched.

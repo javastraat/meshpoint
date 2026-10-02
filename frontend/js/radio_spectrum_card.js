@@ -17,10 +17,19 @@
  * a saved baseline of the radios' own filter shape that later sweeps
  * subtract, so flat = quiet.
  */
+// MeshCore's community default per Meshpoint region (REGION_PRESETS in
+// src/cli/meshcore_radio_config.py: EU_UK_NARROW / USA_CANADA). Drawn as
+// a faint dotted reference line when this box has no MeshCore radio, so
+// a peak there can be read as "probably MeshCore" -- it isn't a channel
+// this box monitors.
+const MESHCORE_REFERENCE_MHZ = { EU_868: 869.618, US: 910.525 };
+
 class RadioSpectrumCard {
     // Colours resolved live so they track the active theme -- median /
     // peak / per-protocol channel markers, matching the topbar chips.
     _color(key) {
+        // Reference marker: MeshCore's colour, drawn faint + dotted.
+        if (key === 'meshcore_ref') key = 'meshcore';
         return (window.ChartTheme && window.ChartTheme.series(key))
             || { median: '#06b6d4', peak: '#a855f7', lorawan: '#3b82f6',
                  meshtastic: '#10b981', meshcore: '#f59e0b', pager: '#ef4444' }[key]
@@ -112,10 +121,15 @@ class RadioSpectrumCard {
             { protocol: 'meshtastic', label: 'Meshtastic', color: this._color('meshtastic') },
             { protocol: 'meshcore', label: 'MeshCore', color: this._color('meshcore') },
             { protocol: 'pager', label: 'Pager', color: this._color('pager') },
+            { protocol: 'meshcore_ref', label: 'MeshCore (default, not monitored)',
+              color: this._color('meshcore_ref'), dotted: true,
+              title: "MeshCore's default frequency for this region. No MeshCore radio "
+                  + 'is configured on this box, so a peak here is probably MeshCore traffic.' },
         ];
         legend.innerHTML = entries
             .filter((e) => !e.protocol || present.has(e.protocol))
-            .map((e) => `<span><i style="background:${e.color}"></i>${e.label}</span>`)
+            .map((e) => `<span${e.title ? ` title="${e.title}"` : ''}><i style="background:${e.color}${
+                e.dotted ? ';opacity:0.6' : ''}"></i>${e.label}</span>`)
             .join('')
             + (this._isRelative()
                 ? '<span title="SX1302 capture RAM: no SX1261 on this board, so levels are relative and only part of the band is covered">dB over floor · capture RAM'
@@ -146,6 +160,12 @@ class RadioSpectrumCard {
                 protocol: 'meshcore',
                 label: 'MC',
             });
+        } else {
+            const region = config && config.radio && config.radio.region;
+            const ref = MESHCORE_REFERENCE_MHZ[region];
+            if (ref) {
+                markers.push({ mhz: ref, protocol: 'meshcore_ref', label: 'MC?', reference: true });
+            }
         }
         return markers;
     }
@@ -355,8 +375,8 @@ class RadioSpectrumCard {
             if (m.mhz < fMin || m.mhz > fMax) return;
             const color = this._color(m.protocol);
             ctx.strokeStyle = color;
-            ctx.globalAlpha = 0.55;
-            ctx.setLineDash([3, 4]);
+            ctx.globalAlpha = m.reference ? 0.4 : 0.55;
+            ctx.setLineDash(m.reference ? [1, 3] : [3, 4]);
             ctx.beginPath();
             ctx.moveTo(x(m.mhz), pad.t);
             ctx.lineTo(x(m.mhz), pad.t + plotH);
