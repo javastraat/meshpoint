@@ -546,8 +546,10 @@
   steady +8 dB hump near 868.0 MHz on the first live run) no longer looks
   like a signal; **Reset cal** forgets it. The RF Environment page's
   **Channel histogram** is filled too, from the tuned channel's readings
-  in each sweep (also dB over floor). It never feeds the noise-floor
-  tracker.
+  in each sweep (also dB over floor); its Spectral scan card shows the
+  sweep interval, and stays enabled even with
+  `spectral_scan_interval_seconds: 0`, since that key doesn't drive it.
+  It never feeds the noise-floor tracker.
 - **Band Spectrum card: "MC?" reference line at MeshCore's default
   frequency** (EU868: 869.618 MHz, US: 910.525 MHz) when no MeshCore radio
   is configured, faint and dotted, so a peak there reads as "probably

@@ -300,6 +300,24 @@ class TestRoutes(unittest.TestCase):
         self.assertIn("capture RAM", rf_routes._fallback_message(svc))
         self.assertIsNone(rf_routes._fallback_message(object()))
 
+    def test_rf_status_reports_sweep_interval_for_capture_ram(self) -> None:
+        from src.api.routes import rf_routes
+        from src.config import RadioConfig
+
+        class _Cfg:
+            radio = RadioConfig(spectral_scan_interval_seconds=0,
+                                spectrum_sweep_interval_seconds=300)
+
+        svc = CaptureRamSpectrumService(_FakeWrapper(), _EU_GRID)
+        saved = (rf_routes._scan_service, rf_routes._config)
+        rf_routes._scan_service, rf_routes._config = svc, _Cfg()
+        try:
+            status = rf_routes._spectral_status()
+        finally:
+            rf_routes._scan_service, rf_routes._config = saved
+        self.assertTrue(status["enabled"])
+        self.assertEqual(status["interval_seconds"], 300.0)
+
 
 def _mock_lib(tx_status: int = TX_STATUS_FREE, complete: int = 1) -> MagicMock:
     lib = MagicMock()

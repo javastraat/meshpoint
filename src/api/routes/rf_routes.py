@@ -56,6 +56,15 @@ def _spectral_status() -> dict:
         else 0.0
     )
     enabled = interval > 0
+    # The capture-RAM fallback ignores spectral_scan_interval_seconds: its
+    # histogram refreshes with each Band Spectrum sweep instead.
+    if getattr(_scan_service, "is_capture_ram", False):
+        interval = (
+            float(radio.spectrum_sweep_interval_seconds)
+            if radio and radio.spectrum_sweep_interval_seconds is not None
+            else 0.0
+        )
+        enabled = True
     frequency_hz = (
         int(radio.frequency_mhz * 1_000_000)
         if radio and radio.frequency_mhz is not None
