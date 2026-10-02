@@ -12,6 +12,10 @@
  * RTL-SDR dongle at a time (manual-stop-required design, 2026-07-12):
  * starting this while another is active returns an error from the
  * backend, shown inline rather than silently stopping the other one.
+ *
+ * "Keep running" checkbox: only shown when the plugin's status carries a
+ * ``keep_running`` field (plugin 1.1.0+), so an older plugin never shows a
+ * control it can't honour. Saved via ``PUT <apiPrefix>/keep-running``.
  */
 // Matches src/audio/sdr_registry.py's owner names.
 const _DONGLE_OWNER_LABELS = {
@@ -70,6 +74,11 @@ class PagerPanel {
                                 <input type="checkbox" data-pager-hide-idle ${this._hideIdle ? 'checked' : ''}>
                                 Hide idle frames
                             </label>
+                            <label class="pager-idle-toggle" data-pager-keep-wrap style="display: none"
+                                   title="Keep listening with this tab closed (no 10-minute auto-stop). Holds the RTL-SDR dongle until you press Stop.">
+                                <input type="checkbox" data-pager-keep-running>
+                                Keep running
+                            </label>
                             <button class="terminal-button" type="button" data-pager-start>Start listening</button>
                             <button class="terminal-button" type="button" data-pager-stop>Stop</button>
                             <button class="terminal-button" type="button" data-pager-clear>Clear</button>
@@ -91,6 +100,8 @@ class PagerPanel {
         this._root.querySelector('[data-pager-start]').addEventListener('click', () => this._start());
         this._root.querySelector('[data-pager-stop]').addEventListener('click', () => this._stop());
         this._root.querySelector('[data-pager-clear]').addEventListener('click', () => this._clear());
+        this._root.querySelector('[data-pager-keep-running]')
+            .addEventListener('change', (ev) => this._setKeepRunning(ev.target));
         this._root.querySelector('[data-pager-hide-idle]').addEventListener('change', (ev) => {
             this._hideIdle = ev.target.checked;
             try { localStorage.setItem(`meshpoint.pagerHideIdle.${this.kind}`, this._hideIdle ? '1' : '0'); } catch (_e) { /* ignore */ }
@@ -141,6 +152,28 @@ class PagerPanel {
         this._refresh();
     }
 
+    async _setKeepRunning(box) {
+        box.disabled = true;
+        try {
+            const res = await fetch(`${this._apiPrefix}/keep-running`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ keep_running: box.checked }),
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                box.checked = !box.checked;
+                this._showError(err.detail || `HTTP ${res.status}`);
+            }
+        } catch (e) {
+            box.checked = !box.checked;
+            this._showError(e.message);
+        } finally {
+            box.disabled = false;
+            this._refresh();
+        }
+    }
+
     async _refresh() {
         try {
             const res = await fetch(`${this._apiPrefix}/status`);
@@ -184,6 +217,14 @@ class PagerPanel {
             }
         }
         if (startBtn) startBtn.disabled = !!status.running || !!busyOwner;
+
+        const keepWrap = this._root.querySelector('[data-pager-keep-wrap]');
+        const keepBox = this._root.querySelector('[data-pager-keep-running]');
+        if (keepWrap && keepBox) {
+            const supported = Object.prototype.hasOwnProperty.call(status, 'keep_running');
+            keepWrap.style.display = supported ? '' : 'none';
+            if (supported && !keepBox.disabled) keepBox.checked = !!status.keep_running;
+        }
 
         const countEl = this._root.querySelector('[data-pager-count]');
         if (countEl) countEl.textContent = status.message_count ? `(${status.message_count})` : '';

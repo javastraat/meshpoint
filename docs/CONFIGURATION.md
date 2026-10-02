@@ -1492,7 +1492,7 @@ plugins:
     keep_running: false  # see "RTL-SDR plugins: keep running" below
 ```
 
-**RTL-SDR plugins: keep running.** The RTL-SDR listener plugins (`adsb`, `rtl433`, `pagers`, `p2000`, `pocsag`, `dab`, `acars`; plugin version 1.1.0+) stop themselves after **10 minutes with nobody watching their tab**, since the tab only polls while it's on screen, so a forgotten listener doesn't hold the shared dongle forever. Set `keep_running: true` under the plugin's own section to switch that off; after a restart it runs until you press Stop:
+**RTL-SDR plugins: keep running.** The RTL-SDR listener plugins (`adsb`, `rtl433`, `pagers`, `p2000`, `pocsag`, `dab`, `acars`; plugin version 1.1.0+) stop themselves after **10 minutes with nobody watching their tab**, since the tab only polls while it's on screen, so a forgotten listener doesn't hold the shared dongle forever. Tick **Keep running** on the plugin's tab (admin, plugin 1.2.0+) or set `keep_running: true` under the plugin's own section to switch that off. The checkbox saves to that same key and applies straight away; the yaml route needs a restart. Either way it then runs until you press Stop:
 
 ```yaml
 plugins:

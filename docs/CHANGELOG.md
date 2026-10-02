@@ -280,6 +280,14 @@
 
 #### Plugins
 
+- **"Keep running" checkbox on the RTL-SDR decoder tabs.** The shared pager
+  panel (P2000, Pagers, POCSAG, RTL433, ACARS tabs) shows a **Keep running**
+  checkbox next to Start listening when the plugin supports it (plugin
+  1.2.0+, detected from a `keep_running` field in its status), so the
+  10-minute auto-stop can be switched off from the web instead of
+  `local.yaml`. It saves `plugins.<id>.keep_running` through the plugin's
+  own `PUT /api/<id>/keep-running` and applies without a restart.
+
 - **New community plugin: `raspberry-network`** -- scan for WiFi
   networks and switch the Pi's WiFi connection from the dashboard, no
   shell needed. Install from Settings → Plugins
