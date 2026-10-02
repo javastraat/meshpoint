@@ -120,7 +120,7 @@ class RfTab {
                     <div id="rf-band-spectrum" class="rf-band-spectrum-host"></div>
                     <article class="rf-card rf-card--wide">
                         <h3 class="rf-card__title">Channel histogram</h3>
-                        <p class="rf-card__hint">Latest hardware scan — RSSI level distribution across the tuned channel.</p>
+                        <p class="rf-card__hint" id="rf-histogram-sub">Latest hardware scan — RSSI level distribution across the tuned channel.</p>
                         <div class="rf-histogram-wrap">
                             <canvas id="rf-histogram" aria-label="Spectral scan histogram"></canvas>
                             <div id="rf-histogram-empty" class="rf-histogram-empty" hidden>
@@ -371,6 +371,12 @@ class RfTab {
         }
 
         const hist = scan.histogram;
+        const subEl = document.getElementById('rf-histogram-sub');
+        if (subEl) {
+            subEl.textContent = hist && hist.source === 'capture_ram'
+                ? 'Latest capture-RAM sweep — level distribution across the tuned channel, in dB over the noise floor.'
+                : 'Latest hardware scan — RSSI level distribution across the tuned channel.';
+        }
         const hasHist = hist && Array.isArray(hist.levels_dbm) && hist.levels_dbm.length > 0
             && (hist.total_samples > 0 || (hist.counts || []).some((c) => c > 0));
 
