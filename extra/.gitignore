@@ -1,0 +1,6 @@
+# sniffer build output and runtime files
+/sniffer
+/nodes.csv
+/keys.txt
+/capture_src*.csv
+/capture_src*.png

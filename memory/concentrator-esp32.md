@@ -210,7 +210,60 @@ disturbs demodulation is unknown and has to be measured.
    calibrate the numbers (dBm offset), then trust them on the RAK.
 
 ### Implementation sketch
-- Probe first: **written 2026-09-30, not yet run on hardware.** `sudo ./sniffer --capture
+- **First hardware run 2026-09-30 (RAK2287 on Pi 5, source 3, every 5 s):** capture
+  completes every time: 4096 samples @ 4 MHz, non-zero, mean power 58.0–61.7 dB raw.
+  **RX kept working during captures:** 5 Meshtastic packets decoded in the same
+  ~2 min run (NODEINFO from the COTX, a POSITION). Build had to use Meshpoint's patched
+  HAL (`make LORAGW_PATH=/opt/sx1302_hal`), because the stock `extra/sx1302_hal` aborts
+  `lgw_start()` on "no temperature sensor found" (the RAK2287 has none). Reset before
+  **every** run, or the next run fails with `Failed to set SX1250_0 in STANDBY_RC` /
+  chip version 0x05.
+- **FFT results (source 3):**
+  - **Source 3 = radio B centred on rf1 (869.525 MHz): confirmed.** The capture taken
+    while a -32 dBm Meshtastic packet was on air (SF11/BW250) shows a narrow peak at
+    **-81 kHz, +59 dB over floor**. A 1 ms capture catches ~1/8 of an 8.2 ms SF11 chirp,
+    so a packet looks like a near-tone somewhere within ±125 kHz of centre.
+  - **AGC is active:** noise floor 89.5 dB (quiet) → 56.9 dB (strong packet), about 33 dB
+    of gain reduction. Raw power is therefore **not absolute**; it needs gain compensation
+    (find the AGC/SX1250 gain state in a register) before it can become dBm. Mean power
+    alone is useless as a level measure.
+  - The quiet capture shows a ~60 kHz-wide signal at **868.68–868.74 MHz**, +21 dB over
+    floor, near radio B's edge (-843 kHz). Either a real device (868.6–868.7 is the EU
+    alarm allocation) or a spur. Check with source 2 (radio A, 868.3 MHz, which covers it
+    at +380 kHz) and repeated quiet captures (constant = spur).
+- **FFT results (source 2, 20 captures, 20:12:47–20:14:22):**
+  - **Source 2 = radio A (rf0, 868.3 MHz), and the usable span is wide.** Capture
+    `…977` (20:12:57) shows a strong signal at **869.629 MHz = +1329 kHz, +55.6 dB over
+    floor**, with the floor dropping about 30 dB (AGC again). So radio A's capture is
+    usable to at least ±1.33 MHz; both radios together plausibly cover **~866.3–871.5 MHz**
+    (all of EU868 except 863–866.3). 869.629 is inside both the Meshtastic (869.4–869.65)
+    and the MeshCore EU (869.587–869.649) channel: check whether the sniffer decoded a
+    packet at 20:12:57. No = likely MeshCore, seen but undecodable.
+  - **A hump around 868.6–869.1 MHz, seen by both radios from opposite sides:** radio A
+    quiet peaks always +335…+790 kHz (868.63–869.09), radio B's quiet peak -780…-844 kHz
+    (868.68–868.74). The frequency wanders each capture, +17–21 dB over floor. Two radios
+    agreeing suggests real RF around 868.85 MHz, but it's also the midpoint between the two
+    LOs (868.9125), so internal interference isn't ruled out. **Test: antenna off /
+    50 Ω terminator** (safe: sniffer has `tx_enable = false`): gone = real RF, stays = internal.
+- **Plot of a quiet source 2 capture (`…992`/`…007`):** the spectrum isn't flat. It's
+  ~82–85 dB at the ±2 MHz edges and ~90 dB across ~867.5–869.3 MHz, which is the radio's
+  receive filter shape. So the "+18–21 dB over floor" numbers were inflated (median
+  includes the rolled-off edges). On top of that there's a distinct **~5–8 dB bump at
+  ~868.65–869.0 MHz**, off-centre (LO is 868.3), so not explained by the filter. The deep
+  single-bin dips (868.5, 868.63, 866.37, 870.02) are normal nulls in one noise FFT, not signals.
+  - Meshpoint needs **baseline flattening**: average many quiet captures, ideally with
+    the antenna off or terminated (otherwise a constant real signal gets baked into the
+    baseline), then subtract it from live FFTs. Also **average captures** (Welch or several
+    snapshots) for display; a single FFT scatters about ±10 dB.
+- **Source 10 (16 captures @ 125 kHz, ~33 ms each):** mean power very steady, 39.2–40.6 dB raw,
+  with no AGC swings (good for a per-channel floor/busy metric). But **0 packets decoded in ~80 s**
+  (source 3 run: 5 in 2 min). Probably a quiet spell; re-run ~3 min while a node transmits,
+  to rule out per-channel capture disturbing RX. FFT not yet run (use `--center 867.9`).
+- **Status 2026-09-30: proof of concept done; probe runs stopped, CSVs/PNGs cleaned up.**
+  Next step is a decision: build a `CaptureRamScanService` into Meshpoint or not. The
+  remaining refinements (antenna-off baseline, source 10 FFT + RX re-check, AGC gain
+  register, known-carrier calibration) get done on the real feature, not with more CSV runs.
+- Probe: written 2026-09-30. `sudo ./sniffer --capture
   <src> [--every N]` snapshots the capture RAM every N s (default 10) while RX keeps
   running, writing `capture_srcNN_<epoch>.csv`; `extra/capture_fft.py` FFTs it and
   prints peaks with absolute frequencies (verified on a synthetic 869.618 MHz carrier).
