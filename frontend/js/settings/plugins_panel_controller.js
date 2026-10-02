@@ -196,6 +196,17 @@ class PluginsPanelController {
 
     _renderSources() {
         if (!this.srcListEl) return;
+        // Remember which Browse panels are open (and what they show) so a
+        // re-render -- every Install/Update ends in _loadSources() -- doesn't
+        // slam them shut and lose the operator's place. Re-opened below with
+        // the old content kept on screen while a quiet re-fetch runs.
+        const openCatalogs = new Map();
+        this.srcListEl.querySelectorAll('[data-src-row]').forEach((row) => {
+            const cat = row.querySelector('[data-src-catalog]');
+            if (cat && !cat.hidden) {
+                openCatalogs.set(row.dataset.srcRow, { html: cat.innerHTML, ref: cat.dataset.ref || '' });
+            }
+        });
         if (!this._sources.length) {
             this.srcListEl.innerHTML = '<p class="plugins-sources__empty">No sources added.</p>';
             return;
@@ -227,6 +238,16 @@ class PluginsPanelController {
         // quiet "— unreachable".
         this._updates = {};
         this._sources.forEach((s) => this._scanSource(s.url, s.ref || 'main'));
+        openCatalogs.forEach(({ html, ref }, url) => {
+            const row = Array.from(this.srcListEl.querySelectorAll('[data-src-row]'))
+                .find((r) => r.dataset.srcRow === url);
+            const cat = row && row.querySelector('[data-src-catalog]');
+            if (!cat) return;
+            cat.innerHTML = html;
+            if (ref) cat.dataset.ref = ref;
+            cat.hidden = false;
+            this._browseSource(url, ref, cat, { quiet: true });
+        });
     }
 
     async _scanSource(url, ref) {
@@ -412,9 +433,12 @@ class PluginsPanelController {
         this._repointSource(url, back, `Unpinned — following ${back}`);
     }
 
-    async _browseSource(url, ref, catEl) {
+    async _browseSource(url, ref, catEl, { quiet = false } = {}) {
         catEl.hidden = false;
-        catEl.innerHTML = '<p class="plugins-sources__empty">Loading catalog…</p>';
+        // quiet: keep whatever is shown until the fresh catalog arrives (a
+        // re-open after Install/Update) instead of flashing "Loading" and
+        // collapsing the page height under the operator's scroll position.
+        if (!quiet) catEl.innerHTML = '<p class="plugins-sources__empty">Loading catalog…</p>';
         let cat = null;
         try {
             const qs = `url=${encodeURIComponent(url)}${ref ? `&ref=${encodeURIComponent(ref)}` : ''}`;
@@ -564,8 +588,9 @@ class PluginsPanelController {
                     : 'Enable it in the list above and restart to load it.'}`);
             delete this._updates[id];
             this.refresh();
+            // Re-renders the sources and re-opens (and quietly refreshes)
+            // any Browse panel that was open, this one included.
             this._loadSources();
-            if (catEl) this._browseSource(url, ref, catEl);
         } catch (e) {
             this._setSrcStatus('error', e.message || 'Failed.');
         }
