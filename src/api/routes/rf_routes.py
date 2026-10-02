@@ -119,6 +119,9 @@ def _spectral_status() -> dict:
         "scans_failed": _scan_service.scans_failed,
         "histogram": _scan_service.histogram_payload(),
         "message": _fallback_message(_scan_service),
+        # Lets the RF tab label capture-RAM counters correctly: scans_run
+        # counts sweeps there, scans_failed counts single skipped captures.
+        "source": "capture_ram" if getattr(_scan_service, "is_capture_ram", False) else None,
     }
 
 

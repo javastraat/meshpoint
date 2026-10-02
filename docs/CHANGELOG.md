@@ -549,7 +549,8 @@
   normal sweep runs straight after and is what the card displays. The RF Environment page's
   **Channel histogram** is filled too, from the tuned channel's readings
   in each sweep (also dB over floor); its Spectral scan card shows the
-  sweep interval, and stays enabled even with
+  sweep interval and labels its counters "Sweeps completed" / "Captures
+  skipped" (16 captures per sweep, skipped while TX is busy), and stays enabled even with
   `spectral_scan_interval_seconds: 0`, since that key doesn't drive it.
   It never feeds the noise-floor tracker.
 - **Band Spectrum card: "MC?" reference line at MeshCore's default

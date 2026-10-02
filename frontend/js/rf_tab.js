@@ -364,9 +364,12 @@ class RfTab {
         }
 
         if (statsEl) {
+            // Capture RAM: scans_run counts sweeps, scans_failed counts single
+            // captures (16 per sweep) skipped while TX was busy or incomplete.
+            const captureRam = scan.source === 'capture_ram';
             statsEl.innerHTML = `
-                <span>Scans completed: <strong>${scan.scans_run ?? 0}</strong></span>
-                <span>Failed: <strong>${scan.scans_failed ?? 0}</strong></span>
+                <span>${captureRam ? 'Sweeps completed' : 'Scans completed'}: <strong>${scan.scans_run ?? 0}</strong></span>
+                <span${captureRam ? ' title="Single captures skipped (TX busy or capture incomplete); each sweep takes 16"' : ''}>${captureRam ? 'Captures skipped' : 'Failed'}: <strong>${scan.scans_failed ?? 0}</strong></span>
             `;
         }
 

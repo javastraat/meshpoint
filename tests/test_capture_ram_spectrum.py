@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import asyncio
 import cmath
-import ctypes
 import math
 import random
 import tempfile
@@ -328,6 +327,7 @@ class TestRoutes(unittest.TestCase):
             rf_routes._scan_service, rf_routes._config = saved
         self.assertTrue(status["enabled"])
         self.assertEqual(status["interval_seconds"], 300.0)
+        self.assertEqual(status["source"], "capture_ram")
 
 
 def _mock_lib(tx_status: int = TX_STATUS_FREE, complete: int = 1) -> MagicMock:
