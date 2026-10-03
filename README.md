@@ -51,7 +51,13 @@ Everything is managed from a browser dashboard: full chat with channels and DMs,
 
 ## What's Different in This Fork
 
-This is a customized fork of upstream [KMX415/meshpoint](https://github.com/KMX415/meshpoint), tuned for a SenseCap M1 "mega-sniffer" **and** a browser radio receiver. It tracks upstream in full, and on top of everything upstream provides, adds an RTL-SDR listener with a family of decoders (Radio, ACARS, RTL433, ADS-B, DAB+, the three pager protocols), native Reticulum/LXMF messaging, expanded multi-protocol capture, a whole plugin architecture, and a long tail of hardware, UI, and self-update improvements.
+This is a customized fork of upstream [KMX415/meshpoint](https://github.com/KMX415/meshpoint), grown from a SenseCap M1 "mega-sniffer" into a multi-network base station that runs on RAK2287 (Pi 4 / Pi 5), SenseCap M1, COTX and the other supported boards. It's developed **together with KMX415** (upstream's maintainer) as the fast-moving **development version**: new features land here first and are still being tested, and KMX415 cherry-picks what's ready, re-tests it, and brings it into upstream. Fixes flow back the other way too. So the two aren't identical: this fork has a lot upstream doesn't have (yet), and leaves out some upstream work (e.g. WisMesh Node). For a stable install, use upstream; use this fork to get (and help test) the newest features. On top of the shared base it adds:
+
+- **Wider capture:** multiple MeshCore companions and Meshtastic USB sticks, LoRaWAN downlinks and payload decryption for your own devices, and an optional emergency pager link on the concentrator's FSK channel (ch9).
+- **RF tools:** band spectrum on any board (SX1261, RF Environment companion, or the SX1302's own capture RAM on RAK2287), RF Environment page, stray-frame log.
+- **A plugin system** with its own community repo, [meshpoint-plugins](https://github.com/javastraat/meshpoint-plugins): the RTL-SDR family (Radio, DAB+, ADS-B, ACARS, RTL433, P2000, Pagers, POCSAG), Reticulum (LXMF messaging, NomadNet browser, voice calls), DAPNET, and more — installed, updated and batch-managed from Settings → Plugins.
+- **Flashing from the dashboard** for Meshtastic, MeshCore, RNode and the project's own ESP32 companions.
+- **Hardening and ops:** optional HTTPS, a non-root service user, filesystem-only gates for the web terminal and plugin sources, backup/restore, Home Assistant integration, and a long tail of hardware, UI and self-update improvements.
 
 **Full writeup:** [docs/WHATS-DIFFERENT.md](docs/WHATS-DIFFERENT.md)
 

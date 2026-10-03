@@ -614,7 +614,11 @@
   DAPNET / pager companions). Plus a "Flashing companions and nodes" section: one
   table of every Configuration → Firmware card (Meshtastic, MeshCore,
   RNode, RF Environment, Pager, POCSAG, Reticulum node) and what they have
-  in common.
+  in common. "What's Different in This Fork" no longer claims to
+  track upstream in full (the forks have diverged; fixes are ported
+  selectively), no longer implies the RTL-SDR/Reticulum features are
+  built in (they're meshpoint-plugins), and lists the fork's main
+  additions per area.
 
 - **`keep_running` documented for the RTL-SDR listener plugins.** Commented
   examples in `config/default.yaml` and a "RTL-SDR plugins: keep running"
