@@ -594,6 +594,22 @@
 
 #### Docs
 
+- **README brought up to date with the code.** Capture table now shows
+  LoRaWAN downlinks on ch5 and the optional emergency pager on ch9 ("5+
+  networks"); architecture diagram no longer draws the RTL-SDR listener as
+  core (it's the `radio` plugin) and adds ch9, capture RAM, the RF
+  Environment companion and the spectrum sources; the plugin box lists all
+  plugins (they all live in meshpoint-plugins now; core only ships the
+  hello-world examples). Band Spectrum explains the SX1261 / companion /
+  capture-RAM options, LoRaWAN mentions payload decryption with your own
+  device keys, pager settings point at Configuration → Concentrator, the
+  RTL-SDR section gains ACARS and Keep running, and the CLI/API lists gain
+  the missing commands and routes (`stop`, `version`, `tls-regenerate`,
+  `plugin index`; pager, plugins, plugin sources, LoRaWAN keys, spectrum
+  calibration). Raspberry Pi 5 is now listed as supported (validated
+  with a RAK2287), and WisMesh Node is marked upstream-only instead of
+  "installs from feat/wismesh-hat until v0.7.6".
+
 - **`keep_running` documented for the RTL-SDR listener plugins.** Commented
   examples in `config/default.yaml` and a "RTL-SDR plugins: keep running"
   note in `docs/CONFIGURATION.md`: `plugins.<id>.keep_running: true`
