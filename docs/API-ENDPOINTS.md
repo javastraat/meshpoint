@@ -59,7 +59,11 @@ session gets `401 Unauthorized`. See `src/api/auth/dependencies.py` for the
 | PUT | `/api/config/gps` | Admin | Update GPS/location source settings |
 | PUT | `/api/config/storage` | Admin | Update data retention settings |
 | PUT | `/api/config/relay` | Admin | Update legacy USB-companion relay settings |
-| PUT | `/api/config/radio/advanced` | Admin | Advanced radio tuning (spreading factor, bandwidth, etc.) |
+| PUT | `/api/config/radio/advanced` | Admin | Concentrator: spectral scan interval, SX1261 SPI path, capture-RAM band spectrum toggle (Configuration → Concentrator; restart to apply) |
+| PUT | `/api/config/radio/pager` | Admin | Emergency pager (ch9 FSK): enable, frequency, sync word, own capcode (validated against the channel plan) |
+| PUT | `/api/config/dashboard` | Admin | Dashboard-level settings saved to `local.yaml` (e.g. web terminal on/off, only once `dashboard.web_terminal_toggle` is set) |
+| GET | `/api/config/lorawan` | Viewer | LoRaWAN device keys (DevEUI → OTAA root keys + optional payload field list) used to decrypt your own devices |
+| PUT | `/api/config/lorawan` | Admin | Replace that device list (applies to live decoding) |
 | GET | `/api/config/serial-ports` | Viewer | Enumerate connected USB-serial devices for the port-picker dropdown |
 
 ## Configuration — capture devices
@@ -71,10 +75,18 @@ session gets `401 Unauthorized`. See `src/api/auth/dependencies.py` for the
 | GET | `/api/config/meshcore/firmware-check` | Viewer | Compare a companion's firmware against the latest `meshcore-dev/MeshCore` release (cached 5 min) |
 | PUT | `/api/config/meshcore/companion-name` | Admin | Rename one MeshCore companion (label-scoped) |
 | POST | `/api/config/meshcore/companion-advert` | Admin | Send an advert from one specific MeshCore companion (label-scoped) |
+| PUT | `/api/config/meshcore/companion-radio` | Admin | Set one companion's radio (frequency/bandwidth/SF/CR, from a preset or custom) over its live connection |
 | PUT | `/api/config/capture/serial-devices` | Admin | Replace full Meshtastic USB stick list |
 | GET | `/api/config/serial/firmware-check` | Viewer | Compare a Meshtastic USB stick's firmware against the latest `meshtastic/firmware` release (cached 5 min) |
 | PUT | `/api/config/serial/identity` | Admin | Rename one Meshtastic USB stick's long/short name (label-scoped) |
 | POST | `/api/config/serial/advert` | Admin | Send a NodeInfo broadcast from one specific Meshtastic USB stick (label-scoped) |
+| PUT | `/api/config/serial/region` | Admin | Set one Meshtastic USB stick's LoRa region over its live serial connection |
+| PUT | `/api/config/serial/modem-preset` | Admin | Set one stick's LoRa modem preset |
+| PUT | `/api/config/serial/bluetooth` | Admin | Set one stick's Bluetooth config (enabled + pairing) |
+| PUT | `/api/config/serial/broadcast-intervals` | Admin | Set one stick's own NodeInfo/telemetry broadcast intervals |
+| PUT | `/api/config/rfenv-companion/wifi` | Admin | Set the RF Environment companion's WiFi SSID/password (direct one-off serial session) |
+| PUT | `/api/config/rfenv-companion/web-password` | Admin | Set the RF Environment companion's web dashboard password |
+| POST | `/api/config/rfenv-companion/reboot` | Admin | Reboot the RF Environment companion |
 | PUT | `/api/config/nodeinfo` | Admin | Update NodeInfo broadcast interval |
 | POST | `/api/config/nodeinfo/send` | Admin | Send a NodeInfo broadcast now |
 | PUT | `/api/config/position` | Admin | Set position broadcast interval |
@@ -93,6 +105,77 @@ session gets `401 Unauthorized`. See `src/api/auth/dependencies.py` for the
 | PUT | `/api/config/upstream` | Admin | Update Meshradar cloud connection settings |
 | PUT | `/api/config/repeater-poll` | Admin | Update MeshCore repeater-polling settings |
 | PUT | `/api/config/metrics` | Admin | Update Prometheus `/metrics` endpoint settings |
+| POST | `/api/config/metrics/api-keys` | Admin | Create a named `/metrics`-only API key (raw key shown once, only its hash is stored) |
+| DELETE | `/api/config/metrics/api-keys/{key_id}` | Admin | Revoke one API key |
+
+## Firmware flashing (Configuration → Firmware)
+
+All flash/compile routes stream NDJSON progress. Any connected USB-serial port can be the target; a board in use as a capture source (or an RNode held by `rnsd`) is released first and reconnected afterwards.
+
+| Method | Path | Role | Description |
+|---|---|---|---|
+| GET | `/api/config/serial/firmware/installed` | Admin | Firmware versions reported by the configured Meshtastic USB sticks |
+| GET | `/api/config/serial/firmware/releases` | Admin | Recent `meshtastic/firmware` releases for the version picker |
+| GET | `/api/config/serial/firmware/targets` | Admin | Board list, read live from the chosen release's manifest |
+| POST | `/api/config/serial/firmware/flash/stream` | Admin | Download (cached) and flash official Meshtastic firmware with `esptool` (optional erase-all) |
+| GET | `/api/config/meshcore/firmware/installed` | Admin | Firmware versions reported by the connected MeshCore companions |
+| GET | `/api/config/meshcore/firmware/releases` | Admin | Recent MeshCore `companion-` releases for the version picker |
+| GET | `/api/config/meshcore/firmware/targets` | Admin | Board list for the chosen release + flavour (USB/BLE) |
+| POST | `/api/config/meshcore/firmware/flash/stream` | Admin | Download (cached) and flash official MeshCore companion firmware with `esptool` |
+| GET | `/api/rnode/firmware/targets` | Admin | Supported RNode boards (Heltec v2/v3/v4/T114, LilyGO LoRa32; 433–923 MHz) |
+| POST | `/api/rnode/firmware/flash/stream` | Admin | Flash RNode firmware + bootstrap EEPROM + set firmware hash via `rnodeconf` (optional EEPROM erase first) |
+| GET | `/api/rfenv-companion/firmware/targets` | Admin | RF Environment companion board (single fixed target) |
+| POST | `/api/rfenv-companion/firmware/compile/stream` | Admin | Compile `rfenv_companion.ino` for the chosen band (EU868 / 70 cm) with `arduino-cli` |
+| POST | `/api/rfenv-companion/firmware/flash/stream` | Admin | Upload the compiled build |
+| GET | `/api/pager/firmware/targets` | Admin | Pager board (single fixed target) |
+| POST | `/api/pager/firmware/compile/stream` | Admin | Compile `pager_client.ino` for the capcode(s) this unit answers to |
+| POST | `/api/pager/firmware/flash/stream` | Admin | Upload the compiled build |
+| GET | `/api/reticulum-companion/firmware/targets` | Admin | Heltec V4 Reticulum node (single fixed PlatformIO environment) |
+| POST | `/api/reticulum-companion/firmware/compile/stream` | Admin | Write `node_config.h` (WiFi + backbone) and build with PlatformIO |
+| POST | `/api/reticulum-companion/firmware/flash/stream` | Admin | Upload the built image |
+
+The POCSAG/DAPNET companion flasher (`/api/pocsag/firmware/*`) is provided by the DAPNET plugin, see below.
+
+## Emergency pager (ch9)
+
+Core feature, enabled with `radio.pager_enabled` (settings: `PUT /api/config/radio/pager` above).
+
+| Method | Path | Role | Description |
+|---|---|---|---|
+| GET | `/api/pager/status` | Viewer | Config + live state (drives the sidebar/topbar and page header) |
+| GET | `/api/pager/messages` | Viewer | Inbox (`direction=in`) or Outbox (`direction=out`), newest first |
+| GET | `/api/pager/stats` | Viewer | Totals for the page's stat tiles |
+| GET | `/api/pager/export/inbox.csv` | Viewer | All received pager messages as CSV |
+| GET | `/api/pager/export/outbox.csv` | Viewer | All sent pager messages (with ack status) as CSV |
+| POST | `/api/pager/send` | Admin | Transmit one message on ch9 (needs `radio.pager_capcode`) |
+
+## Plugins & plugin sources
+
+| Method | Path | Role | Description |
+|---|---|---|---|
+| GET | `/api/plugins` | Viewer | Every discovered plugin with config, load state, dependency verdict and provenance |
+| PUT | `/api/plugins/{plugin_id}` | Admin | Enable/disable (`plugins.<id>.enabled`, restart to apply); refuses a hook whose host is off, cascades disables to dependents |
+| POST | `/api/plugins/{plugin_id}/check` | Admin | Re-run one plugin's `[deps] check` now |
+| POST | `/api/plugins/check-all` | Admin | Re-run every plugin's `[deps] check` concurrently |
+| POST | `/api/plugins/{plugin_id}/setup/stream` | Admin | Run the plugin's `setup.sh` (`sudo bash`), streamed |
+| DELETE | `/api/plugins/{plugin_id}` | Admin | Delete a community plugin's folder (not built-in or locked ones) |
+| GET | `/api/plugin-sources` | Viewer | Configured plugin sources (+ whether `plugin_sources_enabled` is on) |
+| POST | `/api/plugin-sources` | Admin | Add a source (needs `plugin_sources_enabled` + `confirm: true`) |
+| PATCH | `/api/plugin-sources` | Admin | Change a source's ref — pin to the current commit / unpin |
+| DELETE | `/api/plugin-sources` | Admin | Forget a source (installed plugins stay) |
+| GET | `/api/plugin-sources/catalog` | Admin | Fetch a source's `repo.json` with installed/update/compatible state per entry |
+| GET | `/api/plugin-sources/resolve` | Admin | Resolve a source ref to its current commit (for the update confirm) |
+| POST | `/api/plugin-sources/install` | Admin | Install, update or reinstall one plugin/theme from a source (needs `plugin_sources_enabled`) |
+| GET | `/plugins/apps/{plugin_id}/{path}` | Viewer | Serve a plugin's declared frontend files (scripts/styles from its `plugin.toml`, no other paths) |
+
+## Themes
+
+| Method | Path | Role | Description |
+|---|---|---|---|
+| GET | `/api/themes` | Viewer | Available themes (built-in, plugin theme packs, custom) + the server default |
+| PUT | `/api/config/dashboard/theme` | Admin | Set the default theme for all browsers (`dashboard.theme`) |
+| POST | `/api/themes` | Admin | Save a custom theme from the theme editor |
+| DELETE | `/api/themes/{theme_id}` | Admin | Delete a custom theme (locked theme-pack themes can't be deleted) |
 
 ---
 
@@ -140,7 +223,7 @@ session gets `401 Unauthorized`. See `src/api/auth/dependencies.py` for the
 
 ## DAPNET (plugin)
 
-Provided by the **DAPNET** plugin (`plugins/apps/dapnet/`, `plugins.dapnet.enabled: true`) — DAPNET/POCSAG amateur-radio paging via a serial-connected companion board. Unlike the RTL-SDR plugins below, DAPNET is a real `CaptureSource` joining the core packet pipeline directly (the `"capture"`/`"protocol"` plugin seams — see `docs/PLUGINS.md`), not an on-demand subprocess listener.
+Provided by the **DAPNET** community plugin (install from [meshpoint-plugins](https://github.com/javastraat/meshpoint-plugins), `plugins.dapnet.enabled: true`) — DAPNET/POCSAG amateur-radio paging via a serial-connected companion board. Unlike the RTL-SDR plugins below, DAPNET is a real `CaptureSource` joining the core packet pipeline directly (the `"capture"`/`"protocol"` plugin seams — see `docs/PLUGINS.md`), not an on-demand subprocess listener.
 
 | Method | Path | Role | Description |
 |---|---|---|---|
@@ -188,6 +271,16 @@ Provided by the **Reticulum** community plugin (install from [meshpoint-plugins]
 | GET | `/api/config/reticulum` | Admin | Current `plugins.reticulum.*` — display name, NomadNet timeout, NomadNet-node hosting (enabled/name/pages dir/interval), RNode radio, TCP backbone (the page's Settings tab loads this) |
 | PUT | `/api/config/reticulum` | Admin | Save those settings (NomadNet timeout applies immediately; the rest need a restart, and `rnsd` restart for RNode/backbone) |
 | POST | `/api/config/reticulum/restart-rnsd` | Admin | Restart the `rnsd` systemd unit so it re-reads its generated config |
+| GET | `/api/reticulum/announces` | Viewer | Recent announces heard, newest first (the Activity tab; in-memory) |
+| GET | `/api/reticulum/peers/{destination_hash}/link` | Viewer | Live routing + last-known signal for one peer (the peer drawer) |
+| GET | `/api/reticulum/attachments/{attachment_id}` | Viewer | Raw bytes of one image attachment from a message |
+| POST | `/api/reticulum/paper` | Admin | Build a Paper Message (a real LXMF message exported as a QR / `lxm://` link, never sent over the air) |
+| POST | `/api/reticulum/nomad/fingerprint` | Viewer | Identify our own Reticulum identity to a NomadNet node over its Link |
+| GET | `/api/reticulum/nomad/pages` | Admin | Editable `*.mu` files of this box's own hosted NomadNet node (index.mu first) |
+| GET/PUT/DELETE | `/api/reticulum/nomad/pages/{name}` | Admin | Read / save / delete one hosted page |
+| GET | `/api/reticulum/nomad/sample-page` | Admin | The bundled sample `index.mu` (the "Load sample" button) |
+| POST | `/api/reticulum/call/initiate` | Admin | Start a `call.audio` voice call to a peer (used by the reticulum-call plugin's Call tab) |
+| POST | `/api/reticulum/call/{call_hash}/hangup` | Admin | Hang up a call |
 
 ## Messages (chat)
 
@@ -215,8 +308,11 @@ Provided by the **Reticulum** community plugin (install from [meshpoint-plugins]
 | GET | `/api/device/metrics` | Viewer | Live CPU/RAM/disk/temp/load-average stats-bar data |
 | GET | `/api/device/thermals` | Viewer | CPU temperature + fan duty history (6 h in-memory, requires fan control) |
 | GET | `/api/device/update-check` | Viewer | Cached result of the last periodic update check |
-| GET | `/api/device/spectrum` | Viewer | Latest band sweep from the SX1302 spectral scanner (median/peak per 100 kHz step) |
+| GET | `/api/device/spectrum` | Viewer | Latest band sweep (median/peak per 100 kHz step) from the SX1261, the RF Environment companion, or the SX1302 capture RAM (then `units: "db_rel"` plus a `calibration` block) |
 | POST | `/api/device/spectrum/sweep` | Admin | Trigger an on-demand band sweep |
+| POST | `/api/device/spectrum/calibrate` | Admin | Capture-RAM spectrum only: run a calibration sweep and save its median shape as the baseline |
+| DELETE | `/api/device/spectrum/calibrate` | Admin | Capture-RAM spectrum only: forget the baseline |
+| GET | `/api/sdr/status` | Viewer | Who holds the shared RTL-SDR dongle right now (works whichever RTL-SDR plugins are installed; drives the sidebar badge) |
 | GET | `/api/rf/status` | Viewer | RF Environment tab data: noise floor, calibration, latest scan histogram |
 | GET | `/api/rf/stray-frames` | Viewer | Frames that failed every protocol decoder (in-memory ring buffer, newest 500) |
 | GET | `/metrics` | Public\* | Prometheus scrape endpoint (opt-in via `metrics.enabled`; \*auth is config-driven via `metrics.require_auth`, defaults to on) |
@@ -235,6 +331,21 @@ The routes below are provided by the **Radio** plugin (`plugins/apps/radio/`) an
 | POST | `/api/listener/tune` | Admin | Tune the RTL-SDR: frequency, mode, squelch, gain, level, optional preset station label |
 | POST | `/api/listener/stop` | Admin | Stop the RTL-SDR listener |
 | GET | `/api/listener/stream` | Viewer | Live MP3 audio stream for the browser player |
+
+The decoder plugins each mount their own prefix — `/api/pagers`, `/api/pocsag`, `/api/p2000`, `/api/rtl433`, `/api/acars` (`status` · `start` · `stop` · `clear`), `/api/adsb` (`status` · `start` · `stop`, aircraft snapshot instead of a message log) and `/api/dab` (tune / stop / status / MP3 stream, scan results, live-streamed channel scan). `GET .../status` is Viewer, the rest Admin. From plugin version 1.2.0 each of them, DAB+ included, also has `PUT .../keep-running` (Admin) to switch its 10-minute idle auto-stop off, saved to `plugins.<id>.keep_running`. See each plugin's README in meshpoint-plugins.
+
+## Other plugins
+
+Mounted only when the plugin is installed and enabled; see each plugin's README in [meshpoint-plugins](https://github.com/javastraat/meshpoint-plugins) for the exact routes.
+
+| Prefix | Plugin |
+|---|---|
+| `/api/bluetooth-scanner/...` | Bluetooth Scanner: start/stop a BLE scan, live device table |
+| `/api/offline-map/...` | Offline Maps: tile downloader builds and downloads |
+| `/api/oled-display/...` | OLED Display: settings and status of the I2C status screen |
+| `/api/raspberry-network/...` | Raspberry Network: WiFi scan and switch |
+
+`reticulum-browser`, `reticulum-call` and `reticulum-dashboard` add no routes of their own; they use the Reticulum plugin's routes above.
 
 ---
 
@@ -284,6 +395,9 @@ The routes below are provided by the **Radio** plugin (`plugins/apps/radio/`) an
 | Method | Path | Description |
 |---|---|---|
 | GET | `/api/public/recent_rx` | Deliberately scrubbed + IP rate-limited public radar feed — no session required by design |
+| GET | `/setup` | First-run page to create the admin account (only while unconfigured) |
+| GET | `/login` | Login page |
+| GET | `/` | The dashboard itself (redirects to `/login` or `/setup` without a session) |
 
 ## WebSocket
 
@@ -294,4 +408,4 @@ The routes below are provided by the **Radio** plugin (`plugins/apps/radio/`) an
 
 ---
 
-*Generated from a full route audit of `src/api/routes/*.py` and `src/api/server.py`. If you add a new route, add a row here — nothing enforces this file staying in sync automatically.*
+*Core routes re-audited against `src/api/routes/*.py` and `src/api/server.py` on 2026-10-03 (all 183 core routes listed), plugin routes against meshpoint-plugins. If you add a new route, add a row here — nothing enforces this file staying in sync automatically.*

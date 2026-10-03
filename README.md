@@ -470,7 +470,9 @@ sudo meshpoint reset-password  # recover forgotten admin password
 
 FastAPI server on port 8080 (configurable via `dashboard.port` in `local.yaml`).
 Highlights below; see [docs/API-ENDPOINTS.md](docs/API-ENDPOINTS.md) for the
-complete route list including config-write, admin-only, and one-off endpoints:
+complete route list (every core route with its access role, plus the routes
+each plugin adds) including config-write, admin-only, firmware-flash and
+one-off endpoints:
 
 | Endpoint | Description |
 |----------|-------------|

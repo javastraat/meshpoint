@@ -594,6 +594,16 @@
 
 #### Docs
 
+- **`docs/API-ENDPOINTS.md` complete again.** 60 core routes were missing:
+  emergency pager, LoRaWAN keys, plugins and plugin sources, themes, every
+  firmware-flash route (Meshtastic, MeshCore, RNode, RF Environment, pager,
+  Reticulum node), spectrum calibration, Metrics API keys, and several
+  Serial / MeshCore / RF Environment companion config routes. All 183 core
+  routes are now listed with their role; the Reticulum section gains the 12
+  routes it was missing, the DAPNET plugin points at meshpoint-plugins, the
+  RTL-SDR decoders (incl. `keep-running`) and the other plugins' prefixes
+  are listed, and outdated descriptions (`radio/advanced`, spectrum) fixed.
+
 - **README brought up to date with the code.** Capture table now shows
   LoRaWAN downlinks on ch5 and the optional emergency pager on ch9 ("5+
   networks"); architecture diagram no longer draws the RTL-SDR listener as
