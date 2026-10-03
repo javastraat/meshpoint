@@ -608,7 +608,13 @@
   `plugin index`; pager, plugins, plugin sources, LoRaWAN keys, spectrum
   calibration). Raspberry Pi 5 is now listed as supported (validated
   with a RAK2287), and WisMesh Node is marked upstream-only instead of
-  "installs from feat/wismesh-hat until v0.7.6".
+  "installs from feat/wismesh-hat until v0.7.6". New "Optional: Reticulum RNode" and
+  "Optional: Other ESP32 companions" hardware sections (RNode flasher and
+  supported boards, standalone Heltec V4 Reticulum node, RF Environment /
+  DAPNET / pager companions). Plus a "Flashing companions and nodes" section: one
+  table of every Configuration → Firmware card (Meshtastic, MeshCore,
+  RNode, RF Environment, Pager, POCSAG, Reticulum node) and what they have
+  in common.
 
 - **`keep_running` documented for the RTL-SDR listener plugins.** Commented
   examples in `config/default.yaml` and a "RTL-SDR plugins: keep running"

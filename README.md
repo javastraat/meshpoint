@@ -239,7 +239,7 @@ OTG not confirmed on G295).
 
 ### Optional: MeshCore USB Companion
 
-Add one or more Heltec V3/V4 or T-Beam nodes running [MeshCore USB companion firmware](https://flasher.meshcore.co.uk/) to monitor MeshCore traffic alongside Meshtastic. Up to 4 companions can be attached simultaneously, each labeled by band. The setup wizard auto-detects each device.
+Add one or more Heltec V3/V4 or T-Beam nodes running MeshCore USB companion firmware (flash it from the dashboard, see [Flashing companions and nodes](#flashing-companions-and-nodes), or with the [MeshCore web flasher](https://flasher.meshcore.co.uk/)) to monitor MeshCore traffic alongside Meshtastic. Up to 4 companions can be attached simultaneously, each labeled by band. The setup wizard auto-detects each device.
 
 **Flashing note:** Heltec V4 USB enumerates as `303a:0002` under MeshCore firmware and `303a:1001` under Meshtastic — the opposite of what you might expect.
 
@@ -248,6 +248,20 @@ Add one or more Heltec V3/V4 or T-Beam nodes running [MeshCore USB companion fir
 A Heltec V3 (or any Meshtastic node) flashed with **Meshtastic EU_433** firmware and connected via USB adds a fifth capture stream at 433 MHz. Use the `serial` source in `local.yaml` — not `meshcore_usb`. These two sources speak different protocols and are not interchangeable.
 
 More than one Meshtastic USB stick can be captured at once (e.g. one 433 MHz, one 868 MHz): use the `capture.serial` list instead of the single `serial_port`/`serial_baud` fields, each entry with its own `label` — same shape as the MeshCore companion list. Edit it from Configuration → Serial in the dashboard instead of hand-editing `local.yaml`. See [CONFIGURATION.md](docs/CONFIGURATION.md#capture-sources).
+
+### Optional: Reticulum RNode
+
+For the **Reticulum** plugin (native LXMF messaging, NomadNet, voice calls), plug in an **RNode**: a LoRa board flashed with RNode firmware, connected over USB. **Configuration → Firmware → RNode firmware** flashes it straight from the dashboard (wraps `rnodeconf`, which ships with the `rns` dependency — no extra install): Heltec LoRa32 v2/v3/v4, Heltec T114, and LilyGO LoRa32 v1.0–v2.1, each in its 433/868/915/923 MHz variant. Then pick its port under the Reticulum page's **Settings** tab (`plugins.reticulum.rnode_serial_port`, stable `/dev/serial/by-id/...` path); defaults match the common EU network: 869.463 MHz, SF8, 125 kHz, CR 4/5. The RNode is optional — the plugin can also run on its TCP backbone alone (`node.reticulumnet.nl:4242` by default), or both. See [CONFIGURATION.md](docs/CONFIGURATION.md#reticulum-native-lxmf-messaging--a-plugin).
+
+Separate from that: a **Heltec V4 standalone Reticulum node** (`extra/heltec_v4_reticulum_bron`, microReticulum firmware) bridges local LoRa to the Reticulum backbone over WiFi on its own, no USB link to Meshpoint. Configuration → Firmware has a Provision + Flash card for it (needs the optional PlatformIO toolchain from `install.sh`).
+
+### Optional: Other ESP32 companions
+
+All flashable from **Configuration → Firmware** (compile + flash from the dashboard, toolchain set up by `install.sh`):
+
+- **RF Environment companion** (`extra/rfenv_companion`, Heltec V3): full-band spectrum sweep and noise-floor histogram in real dBm for boards without an SX1261. Add `rfenv_companion` to `capture.sources`. See [CONFIGURATION.md](docs/CONFIGURATION.md#rf-environment-companion--for-boards-with-no-sx1261-extrarfenv_companion).
+- **DAPNET companion** (`pocsag_companion`, TTGO LoRa32 or Heltec V3): bridges the amateur DAPNET paging network over USB, for the DAPNET plugin (see Features).
+- **Emergency pager** (`extra/pager_client`, Heltec V3): the battery-powered pager that talks to the concentrator's ch9 FSK channel (see Features); capcodes are programmed at compile time from the Pager firmware card.
 
 ### Optional: RTL-SDR Radio Listener
 
@@ -265,6 +279,22 @@ Add an **RTL-SDR dongle** (RTL2832U + R820T/R860 — e.g. RTL-SDR Blog V3/V4, ~�
 - **Antenna:** give it its own wideband antenna (don't share the tuned LoRa antennas). A broadcast-FM band-pass/notch filter helps if strong local stations cause overload.
 
 Open the **RTL-SDR** page in the sidebar and pick a tab. For the radio: **Radio** tab, pick a preset (or type a frequency + mode) and hit **Tune & Listen**; switch between the Digital and Analogue faces with the toggle in the panel header. The decoder tabs auto-stop after 10 minutes with nobody watching; tick **Keep running** on a tab to leave it on.
+
+### Flashing companions and nodes
+
+Every board above can be flashed from the dashboard: **Configuration → Firmware**, with the board plugged into the Pi's USB. No Arduino IDE, no second computer, no Web Serial — the flash runs on the Pi itself, so it works from a browser anywhere on your network.
+
+| Card | Firmware | How |
+|---|---|---|
+| **Meshtastic** | Official `meshtastic/firmware` releases | Downloads the release (latest or a picked version), board list read from that release, flashed with `esptool`. Optional "Erase everything" for a board coming from another firmware. Shows the version already on the device. |
+| **MeshCore** | Official MeshCore **companion** releases (USB or BLE flavour) | Same flow: pick release + board, `esptool`, optional erase, installed-version callout. |
+| **RNode firmware** | RNode for Reticulum | Wraps `rnodeconf`: flashes, provisions the EEPROM and sets the firmware hash in one go (Heltec v2/v3/v4/T114, LilyGO LoRa32, 433–923 MHz variants). Optional EEPROM erase to reflash a board that's already an RNode. |
+| **RF Environment** | `extra/rfenv_companion` | Compiled on the Pi with `arduino-cli`, then flashed. EU868 or 70 cm band picker. |
+| **Pager** | `extra/pager_client` | Compiled on the Pi; the capcodes this unit answers to are set in the card at compile time. |
+| **POCSAG** | `pocsag_companion` (DAPNET plugin) | Compiled on the Pi; TTGO / Heltec board picked automatically from the sketch. |
+| **Reticulum node** | `extra/heltec_v4_reticulum_bron` (microReticulum) | Built with PlatformIO (optional toolchain in `install.sh`); WiFi and backbone written into the build from the form. |
+
+Common to all of them: pick any connected USB-serial device from a dropdown (it doesn't have to be configured yet), live compiler/flash output streams into the card, and if the board is currently in use (a capture source such as a MeshCore/Meshtastic/RF Environment/DAPNET companion, or `rnsd` holding an RNode), Meshpoint releases its port first and reconnects it afterwards — no service restart needed. The toolchains (`esptool`, `arduino-cli` + ESP32 core, optionally PlatformIO) are installed by `scripts/install.sh`.
 
 > **Full step-by-step guide:** See the [Onboarding Guide](docs/ONBOARDING.md) for detailed instructions covering SD flashing, Chameleon eMMC recovery, assembly, installation, MeshCore setup, and troubleshooting for all hardware options.
 
