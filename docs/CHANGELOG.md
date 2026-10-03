@@ -4,6 +4,10 @@
 
 #### Dashboard
 
+- **Settings → System: "Display units" card renamed "Display &
+  notifications"**, with a description that also covers the message
+  notification options (popup/sound) added to it earlier.
+
 - **Fix: disabling `tls_enabled` could leave Firefox permanently
   redirecting to HTTPS anyway.** The plain-HTTP `:8080` → HTTPS
   redirect used `308` ("permanently" moved), which browsers are free
