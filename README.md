@@ -454,12 +454,12 @@ meshpoint report         # full operational report (asks for admin login; sudo s
 meshpoint restart        # restart the service
 meshpoint stop           # stop the service
 meshpoint version        # print version information
-meshpoint meshcore-radio # configure MeshCore companion radio frequency
+meshpoint meshcore-radio [region] [--port P]  # set the MeshCore companion's radio preset (menu if no region given)
 meshpoint plugin list    # list discovered app plugins and their enabled/loaded state
 meshpoint plugin check [<id>]  # re-run [deps] check probes live (list shows a boot-time snapshot)
-meshpoint plugin setup <id>  # show + confirm + run a plugin's apt deps and setup.sh
-meshpoint plugin index [dir] # generate repo.json for a plugin repo (run in the repo, not on the device)
-sudo meshpoint tls-regenerate  # force-regenerate the dashboard's self-signed HTTPS cert
+meshpoint plugin setup <id> [-y]  # show + confirm + run a plugin's apt deps and setup.sh (-y skips the prompt)
+meshpoint plugin index [dir] [-w]  # generate a plugin repo's repo.json (prints it; -w writes it) -- run in the repo, not on the device
+sudo -u meshpoint meshpoint tls-regenerate  # force-regenerate the self-signed HTTPS cert (as the service user, so it can still read the key), then restart
 sudo meshpoint setup     # re-run config wizard
 sudo meshpoint reset-password  # recover forgotten admin password
 ```

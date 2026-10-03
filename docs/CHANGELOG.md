@@ -618,7 +618,10 @@
   track upstream in full (the forks have diverged; fixes are ported
   selectively), no longer implies the RTL-SDR/Reticulum features are
   built in (they're meshpoint-plugins), and lists the fork's main
-  additions per area.
+  additions per area. CLI list now shows the real arguments
+  (`meshcore-radio [region] [--port]`, `plugin setup -y`, `plugin index
+  -w`) and runs `tls-regenerate` as the service user (`sudo -u meshpoint`)
+  so a freshly created key isn't root-owned and unreadable to the service.
 
 - **`keep_running` documented for the RTL-SDR listener plugins.** Commented
   examples in `config/default.yaml` and a "RTL-SDR plugins: keep running"
