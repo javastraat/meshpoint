@@ -270,7 +270,7 @@ Provided by the **Reticulum** community plugin (install from [meshpoint-plugins]
 | POST | `/api/reticulum/nomad/file` | Admin | Fetch a `/file/...` path → the raw bytes as an attachment, or a 502 |
 | GET | `/api/config/reticulum` | Admin | Current `plugins.reticulum.*` — display name, NomadNet timeout, NomadNet-node hosting (enabled/name/pages dir/interval), RNode radio, TCP backbone (the page's Settings tab loads this) |
 | PUT | `/api/config/reticulum` | Admin | Save those settings (NomadNet timeout applies immediately; the rest need a restart, and `rnsd` restart for RNode/backbone) |
-| POST | `/api/config/reticulum/restart-rnsd` | Admin | Restart the `rnsd` systemd unit so it re-reads its generated config |
+| POST | `/api/config/reticulum/restart-rnsd` | Admin | Restart the `rnsd` systemd unit so it re-reads its generated config, then restart `meshpoint` itself too (detached) — both are needed, since whichever process has been running longer holds the live RNode/backbone interfaces as a shared RNS instance |
 | GET | `/api/reticulum/announces` | Viewer | Recent announces heard, newest first (the Activity tab; in-memory) |
 | GET | `/api/reticulum/peers/{destination_hash}/link` | Viewer | Live routing + last-known signal for one peer (the peer drawer) |
 | GET | `/api/reticulum/attachments/{attachment_id}` | Viewer | Raw bytes of one image attachment from a message |
