@@ -273,9 +273,26 @@ backbone-only with no RNode attached). The save is rejected if you try to
 turn both off — use Settings → Plugins to disable Reticulum entirely
 instead of leaving it running with no interfaces.
 
+`plugins.reticulum.rnode_interface_mode` (default `access_point`) and
+`plugins.reticulum.backbone_interface_mode` (default `full`), the
+**Interface mode** dropdown in each fieldset, set the RNS interface `mode`
+written into `rnsd`'s config. One of `full`, `gateway`, `access_point`,
+`roaming`, `boundary`. The defaults keep internet traffic off the RF channel
+in one direction only: RNS never rebroadcasts a forwarded announce onto an
+access-point interface, while announces heard over RF still go out on the
+full-mode backbone. Without that, the half-duplex RNode spends its airtime
+transmitting backbone announces and can miss local RF. (`roaming` +
+`boundary` would block both directions.) Trade-offs: this node's own
+announces aren't sent over LoRa either (local clients find it by path
+request), and paths learned over RF expire after a day instead of a week.
+Set the RNode to `full` to forward everything onto LoRa. An unknown value
+falls back to the default with a warning. Applied on **Restart rnsd**.
+
 `plugins.reticulum.extra_interfaces` (Settings tab → **Extra interfaces**):
 a list of additional RNS interfaces beyond the two above. Each entry is
-`{name, type, enabled, …type fields}` where `type` is one of
+`{name, type, enabled, mode, …type fields}` (`mode` optional, default
+`full`; the RNode's `access_point` already keeps their announces off
+LoRa) where `type` is one of
 `TCPClientInterface` (`target_host`/`target_port` — a second backbone, or
 connect out to another node), `TCPServerInterface` (`listen_ip`/
 `listen_port` — let other nodes connect *in*) or `UDPInterface`

@@ -284,6 +284,23 @@
 
 #### Plugins
 
+- **Reticulum: internet announce traffic no longer drowns out local
+  LoRa.** With the TCP backbone on, `rnsd` re-sent every announce heard
+  from the internet over the RNode radio. LoRa is half-duplex, so the
+  radio spent its airtime transmitting those and could miss local RF,
+  for example a nearby RT repeater (found live: the repeater was only heard
+  with TCP off). The generated `rnsd` config now puts the RNode
+  interface in `mode = access_point`, which RNS never rebroadcasts
+  forwarded announces onto, while the backbone stays `mode = full`, so
+  announces heard over RF still go out to the internet. This node's own
+  announces aren't sent over LoRa either; local clients find it by path
+  request. Both are new **Interface mode** dropdowns on the Reticulum
+  Settings tab (`plugins.reticulum.rnode_interface_mode` /
+  `backbone_interface_mode`; choices full, gateway, access point,
+  roaming, boundary), and each extra interface gets an optional mode too
+  (default full, as before). Applied on **Restart rnsd**. Set the RNode to
+  *Full* for the old behaviour.
+
 - **Settings → Plugins: Update all, and batch actions with checkboxes.**
   An **Update all (N)** button appears above the list whenever sources
   offer newer versions (downgrades are left out; they stay one-by-one).
