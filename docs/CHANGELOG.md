@@ -757,7 +757,7 @@ Serial multi-stick, Updates UX, native MQTT MapReport, and operator polish on `m
 ### v0.8.1 (August 2026)
 
 - **The setup wizard now asks whether to enable external plugin
-  repositories** (new `[5/9] External plugin repositories` step, right
+  repositories** (new `[5/10] External plugin repositories` step, right
   after the API key step) — writes `plugin_sources_enabled` to
   `local.yaml` directly, the only way to turn this on besides
   hand-editing that file (deliberately no Settings/API toggle, see
@@ -766,6 +766,13 @@ Serial multi-stick, Updates UX, native MQTT MapReport, and operator polish on `m
   of silently never discovering the flag exists. Prompted by third-party
   plugin repos moving: without this flag already set, an upgrading user
   has no way to find them again post-move short of reading the docs.
+- **The setup wizard also asks whether to allow the web terminal**
+  (new `[6/10] Web terminal` step) — writes `dashboard.web_terminal_toggle`
+  to `local.yaml`, same "no Settings/API route, filesystem-only" design
+  as the plugin-sources flag above (see `docs/CONFIGURATION.md` "Web
+  terminal"). Only opens the gate; the actual on/off
+  (`dashboard.web_terminal_enabled`) stays a normal Settings -> System
+  checkbox once this is set, so it isn't asked here too.
 - **A physical user-button press now also wakes any plugin's display,
   not just this box's own radios.** The short-press gesture (SenseCap M1
   user button, `button.gpio_pin`) already announced on every TX-capable

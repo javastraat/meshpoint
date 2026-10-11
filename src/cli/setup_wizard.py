@@ -44,7 +44,7 @@ def _preflight_check() -> None:
 
     Catches the common failure where a user runs ``meshpoint setup`` from
     the wrong directory or without ``sudo`` and only learns about it
-    after answering all nine wizard questions.
+    after answering all ten wizard questions.
     """
     config_dir = LOCAL_CONFIG_PATH.parent
     target = LOCAL_CONFIG_PATH
@@ -107,6 +107,7 @@ def run_setup() -> None:
     _step_capture_source(config, report)
     _step_api_key(config, existing)
     _step_plugin_sources(config, existing)
+    _step_web_terminal(config, existing)
     _step_device_name(config, existing)
     _step_location(config, report, existing)
     _step_relay(config, report)
@@ -139,7 +140,7 @@ _REGION_LABELS = {
 
 def _step_hardware_detect() -> HardwareReport:
     """Probe for all available hardware."""
-    print("  [1/9] Detecting hardware...")
+    print("  [1/10] Detecting hardware...")
     report = detect_all()
     print_report(report)
     return report
@@ -147,7 +148,7 @@ def _step_hardware_detect() -> HardwareReport:
 
 def _step_region(config: dict, existing: dict | None = None) -> None:
     """Select the LoRa frequency region."""
-    print("  [2/9] Frequency region")
+    print("  [2/10] Frequency region")
     print()
     print("        Select the region that matches your local Meshtastic")
     print("        network. This determines which frequencies the")
@@ -186,7 +187,7 @@ def _step_region(config: dict, existing: dict | None = None) -> None:
 
 def _step_capture_source(config: dict, report: HardwareReport) -> None:
     """Choose the LoRa capture source based on detected hardware."""
-    print("  [3/9] Capture source")
+    print("  [3/10] Capture source")
 
     if report.concentrator_available:
         print(f"        Concentrator detected on {report.spi_devices[0]}")
@@ -221,7 +222,7 @@ def _step_api_key(config: dict, existing: dict | None = None) -> None:
     """Ask whether to upstream data, then prompt for the API key (signature-verified) if so."""
     from src.activation import verify_license_key
 
-    print("  [4/9] API key")
+    print("  [4/10] API key")
     print()
 
     current_enabled = (existing or {}).get("upstream", {}).get("enabled", True)
@@ -279,7 +280,7 @@ def _step_plugin_sources(config: dict, existing: dict | None = None) -> None:
     local.yaml directly (no Settings page toggle or API route -- see
     docs/CONFIGURATION.md "Plugin sources" for why): a compromised admin
     session flipping this on over the API would guard nothing."""
-    print("  [5/9] External plugin repositories")
+    print("  [5/10] External plugin repositories")
     print()
 
     current_enabled = (existing or {}).get("plugin_sources_enabled", False)
@@ -298,9 +299,38 @@ def _step_plugin_sources(config: dict, existing: dict | None = None) -> None:
     print()
 
 
+def _step_web_terminal(config: dict, existing: dict | None = None) -> None:
+    """Ask whether to enable the web-terminal master switch
+    (dashboard.web_terminal_toggle). Off by default, and deliberately the
+    only way to turn it on besides hand-editing local.yaml directly (no
+    Settings page toggle or API route -- see docs/CONFIGURATION.md "Web
+    terminal" for why). Only gates whether the feature can exist at all --
+    the actual on/off (dashboard.web_terminal_enabled) stays a normal
+    Settings -> System checkbox once this is open, so it's not asked here."""
+    print("  [6/10] Web terminal")
+    print()
+
+    current_toggle = (existing or {}).get("dashboard", {}).get("web_terminal_toggle", False)
+    print("        Ops -> Terminal is a full interactive shell on the device,")
+    print("        sudo-capable -- any admin session is effectively root")
+    print("        while it's available. Off by default; this is the only")
+    print("        place to open it up besides hand-editing config/local.yaml.")
+    print("        Once open, it can be turned on/off anytime from")
+    print("        Settings -> System.")
+    print()
+    if _confirm("Allow the web terminal to be enabled?", default_yes=current_toggle):
+        config.setdefault("dashboard", {})["web_terminal_toggle"] = True
+        print("        Allowed. Turn it on from Settings -> System when needed.")
+    else:
+        config.setdefault("dashboard", {})["web_terminal_toggle"] = False
+        print("        Left off. Re-run 'meshpoint setup' or edit")
+        print("        config/local.yaml to allow it later.")
+    print()
+
+
 def _step_device_name(config: dict, existing: dict | None = None) -> None:
     """Choose a name for this Meshpoint."""
-    print("  [6/9] Device name")
+    print("  [7/10] Device name")
     current_name = (existing or {}).get("device", {}).get("device_name")
     default_name = current_name or _default_device_name()
     name = _prompt(f"Device name [{default_name}]:").strip()
@@ -397,7 +427,7 @@ def _step_location(
     existing: dict | None = None,
 ) -> None:
     """Set device GPS coordinates."""
-    print("  [7/9] Location")
+    print("  [8/10] Location")
 
     gps = report.gps
     if gps.got_fix:
@@ -444,7 +474,7 @@ def _step_location(
 
 def _step_relay(config: dict, report: HardwareReport) -> None:
     """Configure the optional SX1262 relay radio."""
-    print("  [8/9] Relay radio (optional)")
+    print("  [9/10] Relay radio (optional)")
 
     capture_port = config.get("capture", {}).get("serial_port")
     available_ports = [
@@ -478,7 +508,7 @@ def _step_relay(config: dict, report: HardwareReport) -> None:
 
 def _step_device_id(config: dict, existing: dict | None = None) -> None:
     """Preserve existing device/node IDs, or generate stable new ones."""
-    print("  [9/9] Device identity")
+    print("  [10/10] Device identity")
 
     current_id = (existing or {}).get("device", {}).get("device_id")
     if current_id:
