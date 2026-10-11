@@ -22,6 +22,7 @@ from src.analytics.signal_analyzer import SignalAnalyzer
 from src.analytics.traffic_monitor import TrafficMonitor
 from src.api.audit import AuditLogWriter
 from src.api.html_assets import bust_asset_urls
+from src.api.static_cache import StaticCacheHeaders
 from src.api import (
     capture_source_registry,
     listener_registry,
@@ -611,6 +612,12 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     # with Z_SYNC_FLUSH per chunk, so update/firmware progress streams
     # stay latency-neutral under compression.
     app.add_middleware(GZipMiddleware, minimum_size=1024, compresslevel=5)
+
+    # Cache-Control policy for static files (immutable for the ?v=-
+    # stamped JS/CSS URLs that serve_dashboard_root generates, ETag
+    # revalidation for media and un-stamped URLs, no-cache for html).
+    # See src/api/static_cache.py + html_assets.bust_asset_urls.
+    app.add_middleware(StaticCacheHeaders)
 
     protected = [Depends(require_auth)]
     for router, public in _BUILTIN_ROUTERS:
