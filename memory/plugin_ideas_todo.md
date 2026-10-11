@@ -76,11 +76,16 @@ against actual hardware/antenna setup yet.
   replaced), then a genuine second bug (`matrix` filled each column
   solid then flashed back empty instead of a falling streak -- "01
   flashing" per the user's own description) fixed into a proper
-  short-streak "digital rain" with per-column speed variation. **Next,
-  not yet built**: `matrix` is the one style that still doesn't react to
-  the activity level at all (the three pet styles all do) -- agreed
-  design: rain falls faster / denser as activity rises, decaying back
-  down smoothly since `_activity_level` already decays on its own.
+  short-streak "digital rain" with per-column speed variation. `matrix` is the one style that doesn't react to activity level (the
+  three pet styles all do) -- tried it (speed/density scaling by level)
+  and reverted the same day: multiplying the monotonic frame counter by
+  a value that itself changes made the streak's position snap/teleport
+  whenever the speed changed, instead of smoothly accelerating -- looked
+  like the rain randomly jumping to a different screen. Left alone,
+  plain constant-speed rain, matching what the user explicitly asked to
+  go back to. A real fix later would need an accumulated position
+  (add a variable increment per frame) instead of recomputing `head`
+  from scratch each tick -- not attempted.
 
 ## Not written up in detail, mentioned only in passing
 
