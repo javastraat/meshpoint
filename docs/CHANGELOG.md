@@ -756,6 +756,16 @@ Serial multi-stick, Updates UX, native MQTT MapReport, and operator polish on `m
 
 ### v0.8.1 (August 2026)
 
+- **The setup wizard now asks whether to enable external plugin
+  repositories** (new `[5/9] External plugin repositories` step, right
+  after the API key step) — writes `plugin_sources_enabled` to
+  `local.yaml` directly, the only way to turn this on besides
+  hand-editing that file (deliberately no Settings/API toggle, see
+  `docs/CONFIGURATION.md` "Plugin sources"). Off by default, same as
+  before; this just gives installs a one-time chance to opt in instead
+  of silently never discovering the flag exists. Prompted by third-party
+  plugin repos moving: without this flag already set, an upgrading user
+  has no way to find them again post-move short of reading the docs.
 - **A physical user-button press now also wakes any plugin's display,
   not just this box's own radios.** The short-press gesture (SenseCap M1
   user button, `button.gpio_pin`) already announced on every TX-capable

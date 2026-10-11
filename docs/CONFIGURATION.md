@@ -1161,7 +1161,7 @@ upstream:
 
 When `enabled: false` the Meshpoint never opens an upstream connection and never transmits any packet, heartbeat, or telemetry to meshradar.io. All capture, decoding, dashboard, MQTT, and storage features still work.
 
-No API key is required when running offline: `validate_activation()` skips the token check entirely whenever `upstream.enabled` is `false`. The setup wizard's `[4/8] API key` step now asks up front whether to upstream to meshradar.io — answering no writes `upstream.enabled: false` directly, with no key prompt.
+No API key is required when running offline: `validate_activation()` skips the token check entirely whenever `upstream.enabled` is `false`. The setup wizard's `[4/9] API key` step now asks up front whether to upstream to meshradar.io — answering no writes `upstream.enabled: false` directly, with no key prompt.
 
 ---
 
