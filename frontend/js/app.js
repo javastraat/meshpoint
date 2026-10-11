@@ -283,12 +283,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     // _updateStatusIndicator in websocket_client.js) -- connecting first
     // means that happens as soon as the WS is up instead of waiting on
     // the full _loadInitial + _updateStats fetch chain to resolve.
-    window.concentratorWS.on('packet', (packet) => {
+    // WS 'packet' hot path: enqueue instead of rendering synchronously
+    // (js/packet_batcher.js drains in rAF slices, strict FIFO; direct
+    // apply while the tab is hidden). The fan-out itself is unchanged.
+    window.MeshpointPacketBatch.init((packet) => {
         packetFeed.addPacket(packet);
         nodeMap.updateFromPacket(packet);
         nodeCards.updateFromPacket(packet);
         _incrementPacketCount();
     });
+    window.concentratorWS.on('packet',
+        (packet) => window.MeshpointPacketBatch.push(packet));
 
     window.concentratorWS.connect();
 
