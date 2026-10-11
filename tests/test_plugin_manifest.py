@@ -7,11 +7,13 @@ only), same as src/api/theme_registry.py.
 from __future__ import annotations
 
 import logging
+import re
 import tempfile
 import unittest
 from pathlib import Path
 
 from src.plugins.manifest import (
+    KNOWN_SIDEBAR_ICONS,
     PLUGIN_API_VERSION,
     PluginManifestError,
     discover_plugins,
@@ -297,14 +299,44 @@ styles = ["frontend/panel.css"]
         m = parse_manifest(d)
         self.assertEqual(m.sidebar.icon, "antenna")
 
-    def test_sidebar_icon_unknown_is_rejected(self) -> None:
+    def test_sidebar_icon_unknown_falls_back_to_plug(self) -> None:
+        # e.g. an icon only a newer core knows -- warn, don't refuse the plugin
         toml = self._sidebar_toml(
             '\n[sidebar]\nroute = "x"\nlabel = "X"\ncategory = "networks"\n'
             'icon = "unicorn"\n',
         )
+        d = _write_plugin(self.root, "acars", toml, extra_files=("frontend/x.js",))
+        with self.assertLogs("src.plugins.manifest", level="WARNING") as logs:
+            m = parse_manifest(d)
+        self.assertEqual(m.sidebar.icon, "plug")
+        self.assertIn("unicorn", logs.output[0])
+
+    def test_sidebar_icon_non_string_is_rejected(self) -> None:
+        toml = self._sidebar_toml(
+            '\n[sidebar]\nroute = "x"\nlabel = "X"\ncategory = "networks"\n'
+            'icon = 5\n',
+        )
         self.assertEqual(
             self._code("acars", toml, extra_files=("frontend/x.js",)), "sidebar",
         )
+
+    def test_sidebar_icon_lucide_name(self) -> None:
+        toml = self._sidebar_toml(
+            '\n[sidebar]\nroute = "x"\nlabel = "X"\ncategory = "networks"\n'
+            'icon = "satellite-dish"\n',
+        )
+        d = _write_plugin(self.root, "acars", toml, extra_files=("frontend/x.js",))
+        self.assertEqual(parse_manifest(d).sidebar.icon, "satellite-dish")
+
+    def test_sidebar_icon_keys_match_frontend_glyphs(self) -> None:
+        # manifest.py validates names, sidebar_plugin_registry.js draws them:
+        # every valid name needs a glyph and vice versa.
+        js = (Path(__file__).resolve().parent.parent
+              / "frontend/sidebar/sidebar_plugin_registry.js").read_text()
+        block = js[js.index("const _ICON_PATHS = {"):]
+        block = block[:block.index("\n    };")]
+        keys = set(re.findall(r"^        '?([a-z-]+)'?: '", block, re.M))
+        self.assertEqual(keys, set(KNOWN_SIDEBAR_ICONS))
 
     def test_sidebar_provides_without_table_is_rejected(self) -> None:
         toml = (

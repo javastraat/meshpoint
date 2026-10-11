@@ -756,6 +756,18 @@ Serial multi-stick, Updates UX, native MQTT MapReport, and operator polish on `m
 
 ### v0.8.1 (August 2026)
 
+- **46 new plugin sidebar icons**, and an unknown icon no longer breaks a
+  plugin. The curated set grows from 16 to 62 with icons copied
+  from [Lucide](https://lucide.dev) (ISC, same line style as the existing
+  ones): `bluetooth`, `wifi`, `network`, `radio`, `satellite`,
+  `satellite-dish`, `signal`, `cpu`, `server`, `monitor`, `plane`, `ship`,
+  `cloud`, `globe`, `bell`, `shield`, `database` and more — full list in
+  `docs/PLUGINS.md`. A plugin asking for an icon this Meshpoint doesn't
+  know (e.g. one added in a later version) now still loads with the
+  default `plug` icon and a warning in the log, instead of being refused
+  outright. A new test keeps the icon names in `src/plugins/manifest.py`
+  and the drawings in `sidebar_plugin_registry.js` in sync.
+
 - **Settings → Plugins split into Installed / Sources tabs**, reusing the
   same `.lw-tabs` component already shared by the Meshtastic/MeshCore/
   LoRaWAN/Reticulum pages instead of stacking both long cards on one

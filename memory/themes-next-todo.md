@@ -117,7 +117,7 @@ Theme dir split + source tier Pi-verified working 2026-08-31.
          `GET /plugins/apps/{id}/{path}` route in server.py (declared files
          only, both tiers, no traversal). 17 new pure-Python tests. Deploy
          no-op until a plugin exists.
-       - **B4d** (optional, not started) — `setup.sh` / apt consent CLI
+       - ~~**B4d** — `setup.sh` / apt consent CLI~~ **DONE** (confirmed in code 2026-10-11) —
          (`meshpoint plugin setup <name>`), never auto-run. Lower priority now
          that B5 shipped `plugins/apps/acars/setup.sh` as a plain `sudo bash`
          script.

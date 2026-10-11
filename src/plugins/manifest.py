@@ -118,10 +118,21 @@ def landing_page_ids(manifests: "list[PluginManifest]") -> set[str]:
 # reticulum/lorawan/gear/usb are exact copies of Meshpoint's own existing
 # sidebar icons for those pages -- reuse, not new geometry ("usb" is the
 # RTL-SDR page's own dongle glyph, inherited from the built-in Listener
-# page's nav item once that page was deleted).
+# page's nav item once that page was deleted). The second block is a
+# straight copy of Lucide icons (ISC, same 24x24 stroke style). An unknown
+# key is NOT an error: _parse_sidebar() falls back to "plug" with a warning,
+# so a plugin written for a newer core (with more icons) still loads here.
 KNOWN_SIDEBAR_ICONS = frozenset({
     "plug", "antenna", "chart", "message", "terminal", "map", "list", "grid",
     "topology", "rf", "pager", "dapnet", "reticulum", "lorawan", "gear", "usb",
+    # Lucide
+    "bluetooth", "wifi", "network", "radio", "satellite", "satellite-dish",
+    "signal", "cpu", "server", "monitor", "battery", "thermometer", "zap",
+    "plane", "ship", "car", "train", "cloud", "sun", "wind", "globe",
+    "compass", "navigation", "bell", "camera", "mic", "headphones", "music",
+    "phone", "users", "shield", "lock", "clock", "calendar", "database",
+    "folder", "download", "activity", "eye", "star", "flag", "wrench",
+    "code", "book", "home", "search",
 })
 _DEFAULT_SIDEBAR_ICON = "plug"
 
@@ -352,7 +363,7 @@ def parse_manifest(
             "least one 'frontend.scripts' file.",
         )
 
-    sidebar = _parse_sidebar(data.get("sidebar"), provides)
+    sidebar = _parse_sidebar(data.get("sidebar"), provides, name)
     hook = _parse_hook(data.get("hook"), provides)
     requires = _parse_requires(data.get("requires"), name)
 
@@ -393,7 +404,7 @@ def _parse_requires(value, own_name: str) -> str | None:
     return value
 
 
-def _parse_sidebar(value, provides: list) -> SidebarSpec | None:
+def _parse_sidebar(value, provides: list, name: str = "") -> SidebarSpec | None:
     """Validate ``[sidebar]``. Required iff ``"sidebar"`` is in ``provides``;
     an error either way if the two disagree (present-but-not-declared is
     almost always a typo in ``provides``, not intentional)."""
@@ -428,11 +439,16 @@ def _parse_sidebar(value, provides: list) -> SidebarSpec | None:
         )
 
     icon = value.get("icon", _DEFAULT_SIDEBAR_ICON)
+    if not isinstance(icon, str):
+        raise PluginManifestError("sidebar", "'sidebar.icon' must be a string.")
     if icon not in KNOWN_SIDEBAR_ICONS:
-        raise PluginManifestError(
-            "sidebar",
-            f"'sidebar.icon' must be one of {sorted(KNOWN_SIDEBAR_ICONS)}.",
+        # Most likely an icon added in a newer core -- a wrong glyph is no
+        # reason to refuse the whole plugin.
+        logger.warning(
+            "plugin %s: unknown sidebar icon %r, using %r",
+            name, icon, _DEFAULT_SIDEBAR_ICON,
         )
+        icon = _DEFAULT_SIDEBAR_ICON
 
     return SidebarSpec(route=route, label=label.strip(), category=category, icon=icon)
 

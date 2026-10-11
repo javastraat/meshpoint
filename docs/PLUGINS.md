@@ -158,7 +158,7 @@ author = "Your Name"
 | `[deps].check` | no | Path to an **unprivileged** "are my deps installed?" probe. Exit `0` = satisfied, non-zero = setup needed (stdout/stderr is shown to the admin as the reason). Run at boot by the loader and on demand from Settings → Plugins (`POST /api/plugins/{id}/check`). Must not use `sudo` — the service account has to be able to answer it. See [System dependencies](#system-dependencies). |
 | `[frontend].scripts` / `.styles` | scripts required iff `panel`, `sidebar`, `hook` or `topbar` in `provides` | Served at `/plugins/apps/<id>/<path>` — **only** the exact files listed here, from either tier, nothing else in the folder is reachable (`src/plugins/assets.py:resolve_plugin_asset`). |
 | `[sidebar].route` / `.label` / `.category` | required iff `sidebar` in `provides` | See [Adding a top-level sidebar page](#adding-a-top-level-sidebar-page-sidebar) below. `category` must be one of `KNOWN_SIDEBAR_CATEGORIES` in `src/plugins/manifest.py`. |
-| `[sidebar].icon` | no, default `"plug"` | One of `KNOWN_SIDEBAR_ICONS` (`src/plugins/manifest.py`) — a curated key, not raw SVG. See [Adding a top-level sidebar page](#adding-a-top-level-sidebar-page-sidebar). |
+| `[sidebar].icon` | no, default `"plug"` | One of `KNOWN_SIDEBAR_ICONS` (`src/plugins/manifest.py`) — a curated key, not raw SVG. An unknown name falls back to `plug` with a warning instead of refusing the plugin. See [Adding a top-level sidebar page](#adding-a-top-level-sidebar-page-sidebar). |
 | `[hook].host` | required iff `hook` in `provides` | Another plugin's `[sidebar].route` — not validated against real plugins at parse time (resolved at runtime in the browser). See [Injecting into another page](#injecting-into-another-page-hook). |
 | `requires` | no | Another plugin's **`name`** (not a route) that must be enabled first — for a plugin that needs another plugin's backend/data but isn't a `hook` (doesn't attach UI into its page). Enforced exactly like `[hook].host`: Settings → Plugins refuses to enable this plugin until the required one is enabled, and disabling the required plugin cascades to disable this one too (`src/api/routes/plugin_routes.py`). A plugin declares at most one dependency total — `[hook].host` or `requires`, not both. Reticulum Dashboard uses this: `requires = "reticulum"`. |
 | `[meta].*` | no | Shown on Settings → Plugins: description, a clickable homepage link, author. |
@@ -305,20 +305,33 @@ frontend script:
    `settings/plugins`) — so `category = "settings"` with `route =
    "hello-world"` ends up at `#/settings/hello-world`.
 
-   `icon` picks from a small curated set in `frontend/sidebar/
+   `icon` picks from a curated set in `frontend/sidebar/
    sidebar_plugin_registry.js`'s `_ICON_PATHS` (kept in sync with
-   `KNOWN_SIDEBAR_ICONS` in `src/plugins/manifest.py`) — currently `plug`
-   (default), `antenna`, `map`, `list` (generic), plus `chart`, `message`,
-   `terminal`, `grid`, `topology`, `rf`, `pager`, `dapnet`, `reticulum`,
-   `lorawan`, `gear`, `usb` (exact copies of Meshpoint's own existing sidebar
-   icons for those pages — reuse one that already fits your plugin's
-   domain; `usb` is a single fill-path glyph in its own larger viewBox
-   rather than the standard 24x24 stroke style every other entry shares,
-   handled via `_ICON_VIEWBOX` if you're adding something similarly
-   unusual). Deliberately a name, not raw SVG from the manifest — that would
-   let a plugin's `plugin.toml` inject arbitrary markup into every viewer's
-   sidebar. An unrecognized key falls back to `plug` rather than breaking
-   the page.
+   `KNOWN_SIDEBAR_ICONS` in `src/plugins/manifest.py`, enforced by a test):
+
+   - **Meshpoint's own:** `plug` (default), `antenna`, `map`, `list`,
+     `chart`, `message`, `terminal`, `grid`, `topology`, `rf`, `pager`,
+     `dapnet`, `reticulum`, `lorawan`, `gear`, `usb` (mostly exact copies of
+     Meshpoint's own sidebar icons for those pages).
+   - **From [Lucide](https://lucide.dev) (ISC):** `bluetooth`, `wifi`,
+     `network`, `radio`, `satellite`, `satellite-dish`, `signal`, `cpu`,
+     `server`, `monitor`, `battery`, `thermometer`, `zap`, `plane`, `ship`,
+     `car`, `train`, `cloud`, `sun`, `wind`, `globe`, `compass`,
+     `navigation`, `bell`, `camera`, `mic`, `headphones`, `music`, `phone`,
+     `users`, `shield`, `lock`, `clock`, `calendar`, `database`, `folder`,
+     `download`, `activity`, `eye`, `star`, `flag`, `wrench`, `code`,
+     `book`, `home`, `search`.
+
+   Deliberately a name, not raw SVG from the manifest — that would let a
+   plugin's `plugin.toml` inject arbitrary markup into every viewer's
+   sidebar. An unknown name is **not** an error: the plugin still loads,
+   the loader logs a warning and the page gets `plug`. So a plugin can use
+   an icon added in a newer Meshpoint and still run (with the default
+   icon) on an older one — as long as that older one already has this
+   fallback (v0.8.1 and later; earlier versions refuse the plugin).
+   `usb` is a single fill-path glyph in its own larger viewBox rather than
+   the standard 24x24 stroke style, handled via `_ICON_VIEWBOX` if you're
+   adding something similarly unusual.
 
 2. Your frontend script supplies the page content — same
    `mount(rootEl)`/`show()`/`hide()` shape `"panel"` uses:
