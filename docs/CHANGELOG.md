@@ -756,6 +756,30 @@ Serial multi-stick, Updates UX, native MQTT MapReport, and operator polish on `m
 
 ### v0.8.1 (August 2026)
 
+- **Fix: a restore could leave `meshpoint` stopped indefinitely with no
+  automatic recovery**, found during a live encrypted-backup restore test.
+  Two compounding bugs in `scripts/restore_finish.sh`: (1) `rnsd` (the
+  Reticulum plugin's daemon) is its own systemd unit, deliberately not a
+  dependency of `meshpoint.service`, so it kept running — and writing new
+  files into `data/reticulum/.../cache/announces/` — the whole time the
+  restore script was clearing that same directory, occasionally losing
+  the race with `rm -rf` ("Directory not empty"); (2) the script's own
+  safety net, a `trap ... ERR` meant to restart the service on *any*
+  failure, silently never fired for a failure inside a shell function
+  (`_clear_live_data_tree`) because `set -euo pipefail` alone doesn't
+  propagate `ERR` traps into functions — only `set -E`/`errtrace` does.
+  The combination meant the one realistic failure mode defeated the exact
+  mechanism meant to catch it, leaving the service down with no log entry
+  explaining why. Fixed: `set -Eeuo pipefail`; `rnsd` is now stopped
+  before the data tree is touched and restarted alongside `meshpoint`
+  (including from the error path); the clear loop retries a transient
+  "directory not empty" up to 3 times before giving up for real. Verified
+  with a local harness reproducing the original failure (old script:
+  silent, no restart) against the fixed one (new script: retries absorb
+  a transient race; a persistent failure now restarts both services and
+  logs why) — not a unit test, since this is a root-only bash script with
+  no existing test harness in the repo.
+
 - **Optional password-encrypted backups.** Settings → System's backup
   card now has an "Encrypt with a password" checkbox (off by default,
   same opt-in posture as everything else on that card) — checking it
