@@ -17006,3 +17006,36 @@ Verification (Mac, no Pi involved yet): `cryptography` is already importable dir
 **Live incident / recovery (same session):** manual restart masked the real problem — `concentrator.db` came back as a fresh *empty* 4KB SQLite file and `lxmf_service: generated new identity at data/reticulum/identity` (a brand new Reticulum/LXMF identity, different from the device's real one) — both silently recreated by meshpoint's own "tolerate missing files" startup robustness, which is good in general but papered over the data loss here. Real recovery: the script's own stash (`data/pre-restore-stash-20261011T141848Z/`, made successfully before the failure) held full untouched copies; copied `concentrator.db`(+wal/shm)/`keys.yaml`/`reticulum/` and `config/local.yaml` back from the stash, `chown -R meshpoint:meshpoint`, `systemctl start meshpoint`. Verified recovered: `Database connected: data/concentrator.db`, `Reticulum: loaded identity from data/reticulum/identity` (not "generated new"), LXMF address matched, all 153 MeshCore contacts repopulated.
 
 **Fix applied to `scripts/restore_finish.sh`** (same day, after recovery confirmed): `set -Eeuo pipefail` (errtrace so the ERR trap fires inside functions too); `systemctl stop rnsd` added right after stopping meshpoint and before the stash/clear/apply sequence, with `systemctl start rnsd` added alongside every existing `systemctl start meshpoint` (success path, archive-invalid early-exit, and the `_on_error` trap); `_clear_live_data_tree`'s `rm -rf` now retries up to 3 times (0.5s apart) on a per-entry failure before propagating a real error (so a genuinely stuck failure still aborts-and-restarts rather than silently skipping a half-cleared entry). **Verified via a local harness** (not a unit test — this is a root-only bash script with no existing test harness in the repo): built a fake `systemctl`/`rm`/`chown`/`logger` PATH-shadow rig and a real backup archive, then ran three scenarios — (a) normal run: clears/applies/restarts cleanly; (b) transient race (fake `rm` fails twice then succeeds): retries absorb it, restore still completes; (c) persistent failure (fake `rm` always fails): `_on_error` now correctly fires, logs "failed near line N; attempting meshpoint/rnsd restart", and calls `systemctl start rnsd` + `systemctl start meshpoint` before exiting 1. Negative control: reconstructed the exact old (pre-fix) script against the same persistent-failure scenario — confirmed it exits 1 with **no** restart calls logged at all, reproducing the original incident exactly. Docs: `CHANGELOG.md` v0.8.1 (new bullet, parser-verified).
+
+**Same day, two small side-quest fixes caught live on the Pi:**
+1. **Settings → Plugins "Run setup" button only ever showed while a `[deps]
+   check` script reported something missing** — once it passed, the button
+   vanished for good, leaving no way to re-run a plugin's `setup.sh` again
+   (e.g. bluetooth-scanner's vendor-DB refresh) short of SSH/terminal access,
+   which may itself be turned off. Fixed in
+   `frontend/js/settings/plugins_panel_controller.js`: the button now shows
+   whenever `plugin.setup_script` exists, regardless of `deps_ok`, relabeled
+   **Re-run setup** once deps already check out.
+2. **Real regression, found live by the user ("did we password protect run
+   setup? :)" + a screenshot showing a Password field inside the plain "Run
+   plugin setup?" confirm dialog, which should never have one).** Root
+   cause: both new password-toggle UIs added earlier today (the backup
+   card's password field, `DangerousModal`'s additive `passwordPrompt`
+   field) reused the `.auth-field` class — previously only ever used for
+   permanently-visible static form fields (change-password, viewer-password)
+   — which has its own `display: flex` beating the browser's native
+   `[hidden] { display: none }` rule (equal specificity, site CSS loads
+   after the UA sheet). Setting `.hidden = true`/`false` in JS silently did
+   nothing visually — so the backup card's password field was *also*
+   always visible regardless of the "Encrypt with a password" checkbox, not
+   just the modal's. Exact same bug class `configuration.css`'s
+   `.cfg-field[hidden]` rule already exists to fix; just not carried over.
+   Fixed with one general `.auth-field[hidden] { display: none; }` rule in
+   `settings.css`, covering both surfaces at once rather than two narrow
+   per-element selectors. CSS brace-balance checked (307/307).
+   **Lesson reinforced**: grep a shared/reused CSS class's existing rules
+   before assuming a toggle will just work, especially `[hidden]`/`display`
+   interactions — this is the second time this exact class of bug has
+   shown up in this codebase (`.cfg-field[hidden]` was the first).
+Docs: `CHANGELOG.md` v0.8.1, two more bullets (parser-verified, 31
+sections total now).

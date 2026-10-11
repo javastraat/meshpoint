@@ -130,6 +130,16 @@
     gap: 6px;
 }
 
+/* .auth-field's own `display: flex` otherwise beats the UA [hidden] rule
+   (equal specificity, site CSS loads after the UA sheet) -- needed now that
+   some .auth-field instances (DangerousModal's password prompt, the backup
+   card's password field) are toggled hidden/shown at runtime instead of
+   being permanently-visible static form fields like the rest of this class's
+   original uses. Same fix shape as configuration.css's .cfg-field[hidden]. */
+.auth-field[hidden] {
+    display: none;
+}
+
 .auth-field-row {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));

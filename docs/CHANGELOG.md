@@ -756,6 +756,19 @@ Serial multi-stick, Updates UX, native MQTT MapReport, and operator polish on `m
 
 ### v0.8.1 (August 2026)
 
+- **Fix: a password field that should only show up conditionally (the
+  backup card's "Encrypt with a password" field, and the restore-confirm
+  modal's password prompt for an encrypted upload) was always visible
+  regardless of its `hidden` state.** Both reuse the `.auth-field` class
+  (originally only ever used for permanently-visible static form fields),
+  whose own `display: flex` has the same specificity as the browser's
+  native `[hidden] { display: none }` rule and loads after it in the
+  cascade — so it always won, and setting `.hidden = true`/`false` in JS
+  never actually changed anything on screen. Same bug class
+  `configuration.css`'s `.cfg-field[hidden]` rule already exists to fix,
+  just not carried over when `.auth-field` started getting toggled too.
+  Added the matching `.auth-field[hidden] { display: none; }` override.
+
 - **Settings → Plugins: "Run setup" is now always available for any plugin
   that has a `setup.sh`, not only while a `[deps] check` script reports
   something missing.** Found while using the page: once a check script
