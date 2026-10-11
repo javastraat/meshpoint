@@ -82,14 +82,19 @@ def plugin_asset_tags(manifests: list[PluginManifest]) -> str:
                 f'<link rel="stylesheet" href="{plugin_asset_url(m.name, css)}">'
             )
         for js in m.frontend_scripts:
-            # Plain <script>, matching every other dashboard script: runs in
-            # document order at the marker -- after listener_panel_registry.js
-            # / sidebar_plugin_registry.js / page_hook_registry.js (define
-            # registerListenerPanel / registerSidebarPage / registerPageHook),
+            # defer, matching every other dashboard script (all 137 static
+            # ones carry it too -- see frontend/index.html): runs in document
+            # order at the marker -- after sidebar_plugin_registry.js /
+            # page_hook_registry.js / protocol_format_registry.js /
+            # topbar_plugin_registry.js (define registerSidebarPage /
+            # registerPageHook / registerProtocolFormat / registerTopbarChip),
             # before app.js. Guarantees the plugin is registered before any
-            # app code runs, without depending on app.js constructing panels
-            # lazily (a deferred script runs after app.js, so it would only
-            # work while that stays true).
+            # app code runs. A PLAIN <script> here breaks this entirely now
+            # that those registries are deferred too -- it would run
+            # immediately during parsing, before any deferred script
+            # (registries included) has executed at all (confirmed live:
+            # every plugin failed with "registerSidebarPage is not a
+            # function" the moment the static scripts picked up `defer`).
             #
             # Only an actual .js file gets tagged here -- `scripts` is also
             # the only way a non-JS asset (e.g. a .wasm binary a vendored JS
@@ -105,7 +110,7 @@ def plugin_asset_tags(manifests: list[PluginManifest]) -> str:
             if not js.endswith(".js"):
                 continue
             tags.append(
-                f'<script src="{plugin_asset_url(m.name, js)}"></script>'
+                f'<script defer src="{plugin_asset_url(m.name, js)}"></script>'
             )
     return "".join(tags)
 

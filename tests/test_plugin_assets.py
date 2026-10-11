@@ -37,7 +37,7 @@ class TestInjectPluginAssets(unittest.TestCase):
             '<link rel="stylesheet" href="/plugins/apps/acars/frontend/a.css">', out,
         )
         self.assertIn(
-            '<script src="/plugins/apps/acars/frontend/a.js"></script>', out,
+            '<script defer src="/plugins/apps/acars/frontend/a.js"></script>', out,
         )
         # injected before the marker, i.e. before app.js has already run? no --
         # after the app.js line but style before script
@@ -81,7 +81,7 @@ class TestInjectPluginAssets(unittest.TestCase):
         out = plugin_asset_tags([
             _m("codec", scripts=("frontend/c.js", "frontend/c.wasm")),
         ])
-        self.assertIn('<script src="/plugins/apps/codec/frontend/c.js"></script>', out)
+        self.assertIn('<script defer src="/plugins/apps/codec/frontend/c.js"></script>', out)
         self.assertNotIn("c.wasm", out)
 
     def test_non_js_scripts_entry_is_still_resolvable(self) -> None:
