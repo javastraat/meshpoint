@@ -78,6 +78,18 @@ class PluginsPanelController {
         this._setupModal = null;
         this._setupRunning = false;
         this.recheckAllBtn = rootEl.querySelector('[data-recheck-all]');
+        // Installed / Sources tabs (`.lw-tabs`, shared with Meshtastic/
+        // MeshCore/LoRaWAN/Reticulum). The Sources tab button starts
+        // `hidden` in the markup -- _renderSourcesGate() below is the only
+        // thing that ever un-hides it, same "nothing paints in a guessed
+        // state before /api/plugin-sources answers" reasoning the sources
+        // card itself already uses, and the exact same gate: visible iff
+        // the feature is enabled OR at least one source is already
+        // configured (nothing to show otherwise).
+        this.tabButtons = rootEl.querySelectorAll('[data-plugins-tab]');
+        this.viewEls = rootEl.querySelectorAll('[data-plugins-view]');
+        this.sourcesTabBtn = rootEl.querySelector('[data-plugins-tab="sources"]');
+        this._pluginsTab = this._loadPluginsTab();
         this.srcAddForm = rootEl.querySelector('[data-src-add-form]');
         this.srcPresetEl = rootEl.querySelector('[data-src-preset]');
         this.srcUrlEl = rootEl.querySelector('[data-src-url]');
@@ -121,7 +133,43 @@ class PluginsPanelController {
         this._batchSummary = null;
     }
 
+    // --- Installed / Sources tabs ----------------------------------------
+
+    _loadPluginsTab() {
+        try {
+            const stored = localStorage.getItem('meshpoint:plugins-tab');
+            return stored === 'sources' ? 'sources' : 'installed';
+        } catch (_) {
+            return 'installed';
+        }
+    }
+
+    _setPluginsTab(tab) {
+        // The Sources tab can be hidden (feature off + nothing configured
+        // yet) -- picking it anyway would show an empty panel with no way
+        // back via its own (hidden) button. Fall back to Installed instead.
+        if (tab === 'sources' && this.sourcesTabBtn && this.sourcesTabBtn.hidden) {
+            tab = 'installed';
+        }
+        this._pluginsTab = tab;
+        try { localStorage.setItem('meshpoint:plugins-tab', tab); } catch (_) {}
+        this._applyPluginsTab();
+    }
+
+    _applyPluginsTab() {
+        this.tabButtons.forEach((btn) => {
+            btn.classList.toggle('lw-tab--active', btn.dataset.pluginsTab === this._pluginsTab);
+        });
+        this.viewEls.forEach((el) => {
+            el.hidden = el.dataset.pluginsView !== this._pluginsTab;
+        });
+    }
+
     bind() {
+        this.tabButtons.forEach((btn) => {
+            btn.addEventListener('click', () => this._setPluginsTab(btn.dataset.pluginsTab));
+        });
+        this._applyPluginsTab();
         if (this.restartBtn) {
             this.restartBtn.addEventListener('click', () => this._restartService());
         }
@@ -209,11 +257,23 @@ class PluginsPanelController {
      * with no explanation is just confusing clutter, worse than not being
      * there. Any source already configured keeps the card (and its own
      * management UI) visible regardless of the flag, same reasoning as
-     * leaving list/remove/pin ungated server-side. */
+     * leaving list/remove/pin ungated server-side.
+     *
+     * Same gate extends to the Sources tab button itself: no point
+     * offering a tab that would only show the same empty/disabled
+     * clutter the card-hiding logic already avoids. If the tab the admin
+     * is currently on just lost its button (e.g. the last configured
+     * source got removed while the feature is off), fall back to
+     * Installed rather than stranding them on a now-unreachable tab. */
     _renderSourcesGate() {
         if (this.srcAddForm) this.srcAddForm.hidden = !this._sourcesEnabled;
         if (this.srcSubtitleEl) this.srcSubtitleEl.hidden = !this._sourcesEnabled;
-        if (this.srcCardEl) this.srcCardEl.hidden = !this._sourcesEnabled && this._sources.length === 0;
+        const showSources = this._sourcesEnabled || this._sources.length > 0;
+        if (this.srcCardEl) this.srcCardEl.hidden = !showSources;
+        if (this.sourcesTabBtn) {
+            this.sourcesTabBtn.hidden = !showSources;
+            if (!showSources && this._pluginsTab === 'sources') this._setPluginsTab('installed');
+        }
         if (!this._sourcesEnabled) this._setSrcStatus('', '');
     }
 

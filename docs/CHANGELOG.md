@@ -756,6 +756,17 @@ Serial multi-stick, Updates UX, native MQTT MapReport, and operator polish on `m
 
 ### v0.8.1 (August 2026)
 
+- **Settings → Plugins split into Installed / Sources tabs**, reusing the
+  same `.lw-tabs` component already shared by the Meshtastic/MeshCore/
+  LoRaWAN/Reticulum pages instead of stacking both long cards on one
+  scroll. The Sources tab itself only appears under the exact same
+  condition that previously hid the whole "Plugin sources" card outright:
+  `plugin_sources_enabled` on, or at least one source already configured
+  (nothing to show otherwise) — switches away to Installed automatically
+  if the tab it's on disappears out from under it (e.g. the last
+  configured source gets removed while the feature is off). Tab choice
+  persists across reloads (`localStorage`).
+
 - **Fix: a password field that should only show up conditionally (the
   backup card's "Encrypt with a password" field, and the restore-confirm
   modal's password prompt for an encrypted upload) was always visible

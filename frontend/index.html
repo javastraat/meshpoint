@@ -1078,27 +1078,35 @@
                         </div>
                         <p class="plugins-panel__subtitle">Built-in and community app plugins discovered under <code>plugins/apps/</code>. Enabling or disabling one only takes effect after restarting the service.</p>
                         <p class="plugins-panel__restart-status" data-restart-status aria-live="polite"></p>
-                    </header>
-                    <article class="auth-card">
-                        <p class="plugins-panel__status" data-plugins-status aria-live="polite"></p>
-                        <div data-plugins-list></div>
-                    </article>
-                    <article class="auth-card plugins-sources" data-plugin-sources-card hidden>
-                        <div class="plugins-sources__head">
-                            <h3 class="plugins-sources__title">Plugin sources</h3>
-                            <p class="plugins-sources__subtitle" data-src-subtitle hidden>Add a GitHub repository of plugins and themes, then browse what it offers. <strong>A source can install code that runs with the service's privileges</strong> — only add sources you trust.</p>
+                        <div class="lw-tabs" role="tablist">
+                            <button class="lw-tab" type="button" role="tab" data-plugins-tab="installed">Installed</button>
+                            <button class="lw-tab" type="button" role="tab" data-plugins-tab="sources" hidden>Sources</button>
                         </div>
-                        <form class="plugins-sources__add" data-src-add-form hidden>
-                            <select class="plugins-sources__preset" data-src-preset title="Fill in a known community repo">
-                                <option value="">Community presets…</option>
-                            </select>
-                            <input type="text" class="plugins-sources__url" data-src-url placeholder="https://github.com/you/meshpoint-plugins" autocomplete="off" spellcheck="false">
-                            <input type="text" class="plugins-sources__ref" data-src-ref placeholder="branch / tag (main)" autocomplete="off">
-                            <button class="terminal-button" type="submit">Add source</button>
-                        </form>
-                        <p class="plugins-panel__status" data-src-status aria-live="polite"></p>
-                        <div data-src-list></div>
-                    </article>
+                    </header>
+                    <div data-plugins-view="installed">
+                        <article class="auth-card">
+                            <p class="plugins-panel__status" data-plugins-status aria-live="polite"></p>
+                            <div data-plugins-list></div>
+                        </article>
+                    </div>
+                    <div data-plugins-view="sources" hidden>
+                        <article class="auth-card plugins-sources" data-plugin-sources-card hidden>
+                            <div class="plugins-sources__head">
+                                <h3 class="plugins-sources__title">Plugin sources</h3>
+                                <p class="plugins-sources__subtitle" data-src-subtitle hidden>Add a GitHub repository of plugins and themes, then browse what it offers. <strong>A source can install code that runs with the service's privileges</strong> — only add sources you trust.</p>
+                            </div>
+                            <form class="plugins-sources__add" data-src-add-form hidden>
+                                <select class="plugins-sources__preset" data-src-preset title="Fill in a known community repo">
+                                    <option value="">Community presets…</option>
+                                </select>
+                                <input type="text" class="plugins-sources__url" data-src-url placeholder="https://github.com/you/meshpoint-plugins" autocomplete="off" spellcheck="false">
+                                <input type="text" class="plugins-sources__ref" data-src-ref placeholder="branch / tag (main)" autocomplete="off">
+                                <button class="terminal-button" type="submit">Add source</button>
+                            </form>
+                            <p class="plugins-panel__status" data-src-status aria-live="polite"></p>
+                            <div data-src-list></div>
+                        </article>
+                    </div>
                 </div>
             </section>
         </main>
