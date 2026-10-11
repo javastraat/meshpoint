@@ -8,9 +8,12 @@
     <link rel="apple-touch-icon" href="/assets/meshpoint-logo.png">
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#0a0e17">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+    <!-- Self-hosted Leaflet + MarkerCluster (was unpkg CDN; a mesh
+         gateway has no internet for its own dashboard to depend on).
+         Versions pinned in frontend/vendor/{leaflet,markercluster}/. -->
+    <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
+    <link rel="stylesheet" href="vendor/markercluster/MarkerCluster.css" />
+    <link rel="stylesheet" href="vendor/markercluster/MarkerCluster.Default.css" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
@@ -1127,8 +1130,8 @@
         })();
     </script>
 
-    <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script defer src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+    <script defer src="vendor/leaflet/leaflet.js"></script>
+    <script defer src="vendor/markercluster/leaflet.markercluster.js"></script>
     <script defer src="js/websocket_client.js"></script>
     <script defer src="js/map_tile_source.js"></script>
     <script defer src="js/components/node_map.js"></script>
