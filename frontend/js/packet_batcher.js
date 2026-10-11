@@ -15,9 +15,10 @@
    Hidden-tab rule: requestAnimationFrame never fires in a background
    tab, and letting the queue grow until the user returns would turn
    the first visible frame into a giant catch-up. So while
-   document.hidden, packets are applied directly (DOM writes in a
-   hidden document are cheap — browsers coalesce layout) and the queue
-   only buffers between hidden->visible transitions.
+   document.hidden, packets bypass the queue and hit the handler
+   directly — the consumer's own policy then decides what "apply"
+   means (app.js skips all dashboard DOM work while hidden and lets
+   the poller re-sync on return; see route-aware skip note there).
 
    Safety valve: if the live queue exceeds MAX_QUEUED (a pathological
    storm outrunning frame budget even across frames), the oldest

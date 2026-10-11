@@ -286,14 +286,38 @@ document.addEventListener('DOMContentLoaded', async () => {
     // WS 'packet' hot path: enqueue instead of rendering synchronously
     // (js/packet_batcher.js drains in rAF slices, strict FIFO; direct
     // apply while the tab is hidden). The fan-out itself is unchanged.
+    //
+    // Route-aware skip: packetFeed/nodeMap/nodeCards are dashboard-only
+    // consumers, so while the dashboard is off-screen — either another
+    // hash route is active or the whole tab is hidden — we skip their
+    // per-packet DOM work instead of building it unseen. The counter
+    // still ticks (sidebar/topbar read it everywhere). Catch-up on
+    // return: the MeshpointIdle-gated 15 s poller replays _refreshData
+    // on becoming visible, and route changes back to #/dashboard sync
+    // immediately when we skipped packets. The server is the source of
+    // truth in every case, so nothing is lost, only re-fetched once.
+    let _dashboardStale = false;
+    const _routeRoot = () =>
+        (location.hash || '').replace(/^#\/?/, '').split('/')[0].trim() || 'dashboard';
+    window.MeshpointRoute = { currentRoot: _routeRoot };
     window.MeshpointPacketBatch.init((packet) => {
+        _incrementPacketCount();
+        if (document.hidden || _routeRoot() !== 'dashboard') {
+            _dashboardStale = true;
+            return;
+        }
         packetFeed.addPacket(packet);
         nodeMap.updateFromPacket(packet);
         nodeCards.updateFromPacket(packet);
-        _incrementPacketCount();
     });
     window.concentratorWS.on('packet',
         (packet) => window.MeshpointPacketBatch.push(packet));
+    window.addEventListener('hashchange', () => {
+        if (_routeRoot() === 'dashboard' && _dashboardStale) {
+            _dashboardStale = false;
+            _refreshData(nodeMap, nodeCards, packetFeed);
+        }
+    });
 
     window.concentratorWS.connect();
 
