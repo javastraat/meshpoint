@@ -9,6 +9,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 from starlette.background import BackgroundTask
 
 from src.api.audit import AuditLogWriter
@@ -17,6 +18,7 @@ from src.api.auth.dependencies import require_admin
 from src.api.auth.jwt_session import SessionClaims
 from src.api.routes.system_metrics import system_metrics
 from src.backup.archive_builder import BackupArchiveBuilder
+from src.backup.encryption import MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH
 from src.backup.paths import (
     MAX_UPLOAD_BYTES,
     is_excluded_data_relative,
@@ -31,6 +33,12 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/system/backup", tags=["backup"])
 
 _config: AppConfig | None = None
+
+
+class DownloadBackupRequest(BaseModel):
+    """Optional encryption password for a backup download."""
+
+    password: str | None = None
 
 
 def init_routes(config: AppConfig) -> None:
@@ -92,17 +100,29 @@ async def backup_status(
         "estimated_bytes": _estimate_backup_bytes(config),
         "disk_percent": disk_percent,
         "suggest_backup": disk_percent >= 90,
-        "encryption": "none",
+        "encryption": "optional",
+        "password_min_length": MIN_PASSWORD_LENGTH,
+        "password_max_length": MAX_PASSWORD_LENGTH,
         "max_upload_bytes": MAX_UPLOAD_BYTES,
     }
 
 
-@router.get("/download")
+@router.post("/download")
 async def download_backup(
+    body: DownloadBackupRequest,
     claims: SessionClaims = Depends(require_admin),
     audit: AuditLogWriter = Depends(get_audit_writer),
 ):
     config = _require_config()
+    password = body.password or None
+    if password is not None and not (
+        MIN_PASSWORD_LENGTH <= len(password) <= MAX_PASSWORD_LENGTH
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="invalid_password_length",
+        )
+
     builder = BackupArchiveBuilder(
         local_config_path=resolve_local_config_path(),
         data_dir=resolve_data_dir(config.storage.database_path),
@@ -113,7 +133,7 @@ async def download_backup(
 
     loop = asyncio.get_running_loop()
     try:
-        result = await loop.run_in_executor(None, builder.build)
+        result = await loop.run_in_executor(None, builder.build, password)
     except FileNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -124,6 +144,7 @@ async def download_backup(
         ctx.params["device_id"] = config.device.device_id
         ctx.params["entry_count"] = len(result.manifest.entries)
         ctx.params["total_bytes"] = result.manifest.total_bytes
+        ctx.params["encrypted"] = password is not None
 
     def _cleanup(path: Path) -> None:
         try:
@@ -131,9 +152,10 @@ async def download_backup(
         except OSError:
             pass
 
+    media_type = "application/octet-stream" if password is not None else "application/gzip"
     return FileResponse(
         path=result.archive_path,
-        media_type="application/gzip",
+        media_type=media_type,
         filename=result.download_filename,
         background=BackgroundTask(_cleanup, result.archive_path),
     )
@@ -180,8 +202,10 @@ async def restore_backup(
 
     data_dir = resolve_data_dir(config.storage.database_path)
     service = BackupRestoreService(data_dir=data_dir)
+    password = request.headers.get("x-backup-password") or None
 
     try:
+        payload = service.decrypt_upload(payload, password)
         manifest = service.validate_archive_bytes(payload)
     except RestoreValidationError as exc:
         raise HTTPException(
@@ -195,6 +219,7 @@ async def restore_backup(
         ctx.params["device_id"] = manifest.device_id
         ctx.params["backup_version"] = manifest.meshpoint_version
         ctx.params["archive_path"] = str(archive_path)
+        ctx.params["encrypted"] = password is not None
 
     try:
         launch = service.launch_restore(archive_path)

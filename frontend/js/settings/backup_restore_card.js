@@ -5,6 +5,8 @@
  * directory, and restores from an uploaded backup after confirmation.
  */
 
+const _BACKUP_ENCRYPTION_MAGIC = 'MPBKENC1';
+
 class BackupRestoreCard {
     constructor(rootEl) {
         this.root = rootEl;
@@ -14,6 +16,9 @@ class BackupRestoreCard {
         this.downloadBtn = rootEl.querySelector('[data-backup-download]');
         this.fileInput = rootEl.querySelector('[data-backup-file]');
         this.restoreBtn = rootEl.querySelector('[data-backup-restore]');
+        this.encryptToggle = rootEl.querySelector('[data-backup-encrypt]');
+        this.passwordField = rootEl.querySelector('[data-backup-password-field]');
+        this.passwordInput = rootEl.querySelector('[data-backup-password]');
         this.modal = window.DangerousModal ? new window.DangerousModal() : null;
         this._status = null;
     }
@@ -22,6 +27,15 @@ class BackupRestoreCard {
         this.downloadBtn?.addEventListener('click', () => this._download());
         this.restoreBtn?.addEventListener('click', () => this.fileInput?.click());
         this.fileInput?.addEventListener('change', () => this._onFileSelected());
+        this.encryptToggle?.addEventListener('change', () => this._onEncryptToggle());
+    }
+
+    _onEncryptToggle() {
+        if (!this.passwordField) return;
+        const checked = Boolean(this.encryptToggle?.checked);
+        this.passwordField.hidden = !checked;
+        if (checked) this.passwordInput?.focus();
+        else if (this.passwordInput) this.passwordInput.value = '';
     }
 
     async refresh() {
@@ -51,7 +65,7 @@ class BackupRestoreCard {
             + `(${this._status.device_id || 'unknown'}). `
             + `Estimated backup size about ${mb} MB. `
             + `Root disk use ${disk}%. `
-            + 'Archive is not encrypted.';
+            + 'Encryption is optional below; a plain archive still contains all secrets.';
     }
 
     _renderWarning() {
@@ -68,11 +82,24 @@ class BackupRestoreCard {
 
     async _download() {
         if (!this.downloadBtn) return;
+        const encrypt = Boolean(this.encryptToggle?.checked);
+        const password = encrypt ? (this.passwordInput?.value || '') : null;
+        if (encrypt) {
+            const min = this._status?.password_min_length || 8;
+            const max = this._status?.password_max_length || 256;
+            if (password.length < min || password.length > max) {
+                this._setStatus('error', `Password must be ${min}-${max} characters.`);
+                return;
+            }
+        }
         this.downloadBtn.disabled = true;
         this._setStatus('pending', 'Building backup…');
         try {
             const response = await fetch('/api/system/backup/download', {
+                method: 'POST',
                 credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password }),
             });
             if (!response.ok) {
                 this._setStatus('error', `Download failed (HTTP ${response.status}).`);
@@ -90,7 +117,13 @@ class BackupRestoreCard {
             link.click();
             link.remove();
             URL.revokeObjectURL(url);
-            this._setStatus('ok', 'Backup downloaded. Store the file offline and keep it private.');
+            if (this.passwordInput) this.passwordInput.value = '';
+            this._setStatus(
+                'ok',
+                encrypt
+                    ? 'Encrypted backup downloaded. Store the file (and password) offline, separately.'
+                    : 'Backup downloaded. Store the file offline and keep it private.',
+            );
         } catch (_e) {
             this._setStatus('error', 'Network error during download.');
         } finally {
@@ -101,29 +134,41 @@ class BackupRestoreCard {
     async _onFileSelected() {
         const file = this.fileInput?.files?.[0];
         if (!file || !this.modal) return;
-        const ok = await this.modal.confirm({
+        const encrypted = await this._sniffEncrypted(file);
+        const result = await this.modal.confirm({
             label: 'Restore backup?',
             command: 'Restore backup',
             description:
                 'This overwrites config/local.yaml and the full data/ directory, '
                 + 'then restarts the Meshpoint service. The dashboard will reload in about 30 seconds. '
                 + 'A copy of the current state is stashed on the Pi before restore.',
+            passwordPrompt: encrypted ? { label: 'Backup password' } : undefined,
         });
         this.fileInput.value = '';
-        if (!ok) return;
-        await this._restore(file);
+        if (!result) return;
+        const password = encrypted ? result : null;
+        await this._restore(file, password);
     }
 
-    async _restore(file) {
+    async _sniffEncrypted(file) {
+        try {
+            const head = await file.slice(0, _BACKUP_ENCRYPTION_MAGIC.length).text();
+            return head === _BACKUP_ENCRYPTION_MAGIC;
+        } catch (_e) {
+            return false;
+        }
+    }
+
+    async _restore(file, password) {
         if (this.restoreBtn) this.restoreBtn.disabled = true;
         this._setStatus('pending', 'Uploading backup and starting restore…');
         try {
+            const headers = { 'Content-Type': 'application/gzip' };
+            if (password) headers['X-Backup-Password'] = password;
             const response = await fetch('/api/system/backup/restore', {
                 method: 'POST',
                 credentials: 'same-origin',
-                headers: {
-                    'Content-Type': 'application/gzip',
-                },
+                headers,
                 body: file,
             });
             const body = await response.json().catch(() => ({}));

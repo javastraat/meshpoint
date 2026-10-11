@@ -18,6 +18,10 @@ class DangerousModal {
         this._confirmBtn = null;
         this._cancelBtn = null;
         this._currentResolver = null;
+        this._passwordFieldEl = null;
+        this._passwordInputEl = null;
+        this._passwordLabelEl = null;
+        this._passwordPromptActive = false;
     }
 
     _ensureMounted() {
@@ -31,6 +35,10 @@ class DangerousModal {
                 <h3 class="danger-modal__title" data-danger-title>Confirm</h3>
                 <p class="danger-modal__desc" data-danger-desc></p>
                 <pre class="danger-modal__code" data-danger-code></pre>
+                <label class="auth-field" data-danger-password-field hidden>
+                    <span class="auth-field__label" data-danger-password-label>Password</span>
+                    <input class="auth-field__input" type="password" autocomplete="current-password" data-danger-password>
+                </label>
                 <div class="danger-modal__actions">
                     <button type="button" class="terminal-button terminal-button--ghost" data-danger-cancel>Cancel</button>
                     <button type="button" class="terminal-button terminal-button--danger" data-danger-confirm>Confirm</button>
@@ -44,6 +52,9 @@ class DangerousModal {
         this._codeEl = root.querySelector('[data-danger-code]');
         this._confirmBtn = root.querySelector('[data-danger-confirm]');
         this._cancelBtn = root.querySelector('[data-danger-cancel]');
+        this._passwordFieldEl = root.querySelector('[data-danger-password-field]');
+        this._passwordInputEl = root.querySelector('[data-danger-password]');
+        this._passwordLabelEl = root.querySelector('[data-danger-password-label]');
         const backdrop = root.querySelector('[data-danger-backdrop]');
 
         this._confirmBtn.addEventListener('click', () => this._resolve(true));
@@ -63,16 +74,30 @@ class DangerousModal {
     /**
      * Returns a Promise that resolves to ``true`` when the user
      * clicks Confirm (or presses Enter), ``false`` otherwise.
+     *
+     * ``passwordPrompt`` is additive and opt-in: pass
+     * ``{ label }`` to also render a password field. When present,
+     * a Confirm click resolves the Promise to the entered password
+     * string instead of ``true`` -- Cancel/Esc still resolve to
+     * ``false`` exactly as before. Callers that never pass
+     * ``passwordPrompt`` see no change to the existing
+     * ``Promise<boolean>`` contract.
      */
-    confirm({ label, command, description }) {
+    confirm({ label, command, description, passwordPrompt }) {
         this._ensureMounted();
         const labelText = (label || '').trim() || 'Confirm';
         this._titleEl.textContent = `Confirm: ${labelText}`;
         this._descEl.textContent = description || 'This command can leave the host in a degraded state.';
         this._codeEl.textContent = command || '';
         this._codeEl.style.display = command ? '' : 'none';
+        this._passwordPromptActive = Boolean(passwordPrompt);
+        this._passwordInputEl.value = '';
+        this._passwordFieldEl.hidden = !passwordPrompt;
+        if (passwordPrompt) {
+            this._passwordLabelEl.textContent = passwordPrompt.label || 'Password';
+        }
         this._show();
-        setTimeout(() => this._confirmBtn.focus(), 50);
+        setTimeout(() => (passwordPrompt ? this._passwordInputEl : this._confirmBtn).focus(), 50);
         return new Promise((resolve) => { this._currentResolver = resolve; });
     }
 
@@ -95,10 +120,21 @@ class DangerousModal {
     }
 
     _resolve(value) {
+        const usePassword = this._passwordPromptActive && value;
+        const password = this._passwordInputEl.value;
+        if (usePassword && !password) {
+            // Confirm with an empty password field: keep the modal open
+            // rather than resolving a restore/download request that the
+            // server will just reject as "password required".
+            this._passwordInputEl.focus();
+            return;
+        }
         const resolver = this._currentResolver;
         this._currentResolver = null;
+        this._passwordPromptActive = false;
         this._hide();
-        if (resolver) resolver(value);
+        if (!resolver) return;
+        resolver(usePassword ? password : value);
     }
 }
 

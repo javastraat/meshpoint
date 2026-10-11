@@ -101,13 +101,57 @@ class TestBackupRoutes(unittest.TestCase):
                 "src.api.routes.backup_routes.BackupArchiveBuilder",
             ) as builder_cls:
                 builder_cls.return_value.build.return_value = fake_result
-                response = self.client.get("/api/system/backup/download")
+                response = self.client.post(
+                    "/api/system/backup/download", json={"password": None},
+                )
 
             self.assertEqual(response.status_code, 200)
             self.assertIn("application/gzip", response.headers.get("content-type", ""))
             self.assertIn(
                 "meshpoint-backup",
                 response.headers.get("content-disposition", ""),
+            )
+            builder_cls.return_value.build.assert_called_once_with(None)
+        finally:
+            try:
+                fake_result.archive_path.unlink(missing_ok=True)
+            except PermissionError:
+                pass
+
+    def test_download_rejects_short_password(self) -> None:
+        self.client.cookies.set("meshpoint_session", self.admin_token)
+        response = self.client.post(
+            "/api/system/backup/download", json={"password": "short"},
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_download_encrypted_returns_mpenc_attachment(self) -> None:
+        self.client.cookies.set("meshpoint_session", self.admin_token)
+        fake_result = BackupArchiveBuilder(
+            meshpoint_root=self.root,
+            local_config_path=self.config_dir / "local.yaml",
+            data_dir=self.data_dir,
+            database_path=str(self.data_dir / "concentrator.db"),
+            device_id="route-test-id",
+            device_name="Route Test",
+        ).build(password="correct horse battery staple")
+
+        try:
+            with mock.patch(
+                "src.api.routes.backup_routes.BackupArchiveBuilder",
+            ) as builder_cls:
+                builder_cls.return_value.build.return_value = fake_result
+                response = self.client.post(
+                    "/api/system/backup/download",
+                    json={"password": "correct horse battery staple"},
+                )
+
+            self.assertEqual(response.status_code, 200)
+            self.assertTrue(
+                response.headers.get("content-disposition", "").find(".mpenc") != -1,
+            )
+            builder_cls.return_value.build.assert_called_once_with(
+                "correct horse battery staple",
             )
         finally:
             try:
@@ -162,6 +206,93 @@ class TestBackupRoutes(unittest.TestCase):
         body = response.json()
         self.assertTrue(body["success"])
         launch.assert_called_once()
+
+    def test_restore_accepts_encrypted_upload_with_password(self) -> None:
+        local_bytes = (self.config_dir / "local.yaml").read_bytes()
+        digest = hashlib.sha256(local_bytes).hexdigest()
+        manifest = BackupManifest(
+            format_version=FORMAT_VERSION,
+            meshpoint_version="0.7.7",
+            created_at="2026-06-11T12:00:00Z",
+            device_id="route-test-id",
+            device_name="Route Test",
+            entries=[
+                BackupFileEntry(
+                    path="config/local.yaml",
+                    sha256=digest,
+                    size_bytes=len(local_bytes),
+                ),
+            ],
+            total_bytes=len(local_bytes),
+        )
+        buffer = io.BytesIO()
+        bundle = "meshpoint-backup-route0001-20260611T120000Z"
+        with tarfile.open(fileobj=buffer, mode="w:gz") as tar:
+            for rel_path, payload in {
+                "manifest.json": manifest.to_json().encode("utf-8"),
+                "config/local.yaml": local_bytes,
+            }.items():
+                info = tarfile.TarInfo(name=f"{bundle}/{rel_path}")
+                info.size = len(payload)
+                tar.addfile(info, io.BytesIO(payload))
+
+        from src.backup.encryption import encrypt_archive
+
+        encrypted = encrypt_archive(buffer.getvalue(), "correct horse battery staple")
+
+        self.client.cookies.set("meshpoint_session", self.admin_token)
+        with mock.patch(
+            "src.api.routes.backup_routes.BackupRestoreService.launch_restore",
+        ) as launch:
+            launch.return_value = mock.Mock(
+                message="restore initiated",
+                stash_hint="data/pre-restore-stash-test",
+            )
+            response = self.client.post(
+                "/api/system/backup/restore",
+                content=encrypted,
+                headers={
+                    "Content-Type": "application/gzip",
+                    "X-Backup-Password": "correct horse battery staple",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertTrue(body["success"])
+        launch.assert_called_once()
+
+    def test_restore_rejects_encrypted_upload_without_password(self) -> None:
+        buffer = io.BytesIO(b"not a real tar, just needs a header")
+        from src.backup.encryption import encrypt_archive
+
+        encrypted = encrypt_archive(buffer.getvalue(), "correct horse battery staple")
+
+        self.client.cookies.set("meshpoint_session", self.admin_token)
+        response = self.client.post(
+            "/api/system/backup/restore",
+            content=encrypted,
+            headers={"Content-Type": "application/gzip"},
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("password", response.json()["detail"])
+
+    def test_restore_rejects_encrypted_upload_with_wrong_password(self) -> None:
+        buffer = io.BytesIO(b"not a real tar, just needs a header")
+        from src.backup.encryption import encrypt_archive
+
+        encrypted = encrypt_archive(buffer.getvalue(), "correct horse battery staple")
+
+        self.client.cookies.set("meshpoint_session", self.admin_token)
+        response = self.client.post(
+            "/api/system/backup/restore",
+            content=encrypted,
+            headers={
+                "Content-Type": "application/gzip",
+                "X-Backup-Password": "totally wrong password",
+            },
+        )
+        self.assertEqual(response.status_code, 400)
 
 
 if __name__ == "__main__":

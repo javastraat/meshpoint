@@ -1024,10 +1024,18 @@
                         <p class="auth-card__hint">Download a timestamped archive of <code>config/local.yaml</code> and the full <code>data/</code> directory (SQLite snapshot, PKI keys, rollback state). The file contains all secrets. Store it offline. Do not commit it to git or email it.</p>
                         <p class="backup-card__warning" data-backup-warning hidden aria-live="polite"></p>
                         <p class="backup-card__summary" data-backup-summary aria-live="polite"></p>
+                        <label class="cfg-field cfg-field--toggle">
+                            <input type="checkbox" data-backup-encrypt>
+                            <span class="cfg-field__label">Encrypt with a password</span>
+                        </label>
+                        <label class="auth-field" data-backup-password-field hidden>
+                            <span class="auth-field__label">Backup password</span>
+                            <input class="auth-field__input" type="password" minlength="8" maxlength="256" autocomplete="new-password" data-backup-password>
+                        </label>
                         <div class="auth-card__actions backup-card__actions">
                             <button class="terminal-button" type="button" data-backup-download>Download backup</button>
                             <button class="terminal-button terminal-button--danger" type="button" data-backup-restore>Restore backup</button>
-                            <input type="file" accept=".tar.gz,application/gzip" data-backup-file hidden>
+                            <input type="file" accept=".tar.gz,application/gzip,.mpenc" data-backup-file hidden>
                         </div>
                         <p class="auth-status" data-backup-status aria-live="polite"></p>
                     </article>

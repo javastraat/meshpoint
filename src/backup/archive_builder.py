@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+from src.backup.encryption import encrypt_archive
 from src.backup.manifest import FORMAT_VERSION, BackupFileEntry, BackupManifest
 from src.backup.paths import (
     is_excluded_data_relative,
@@ -56,7 +57,7 @@ class BackupArchiveBuilder:
         self._device_id = device_id
         self._device_name = device_name
 
-    def build(self) -> BackupBuildResult:
+    def build(self, password: str | None = None) -> BackupBuildResult:
         created_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         short_id = (self._device_id or "unknown")[:8]
         stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
@@ -95,6 +96,11 @@ class BackupArchiveBuilder:
             with tarfile.open(archive_path, "w:gz") as tar:
                 tar.add(bundle_dir, arcname=bundle_name)
 
+            if password is not None:
+                archive_path, download_filename = self._encrypt(
+                    archive_path, download_filename, password,
+                )
+
             return BackupBuildResult(
                 archive_path=archive_path,
                 manifest=manifest,
@@ -102,6 +108,22 @@ class BackupArchiveBuilder:
             )
         finally:
             shutil.rmtree(staging_root, ignore_errors=True)
+
+    @staticmethod
+    def _encrypt(
+        plain_archive_path: Path,
+        plain_filename: str,
+        password: str,
+    ) -> tuple[Path, str]:
+        """Replace a plain ``.tar.gz`` with its encrypted ``.tar.gz.mpenc`` form."""
+        plaintext = plain_archive_path.read_bytes()
+        ciphertext = encrypt_archive(plaintext, password)
+        plain_archive_path.unlink()
+        encrypted_path = plain_archive_path.with_suffix(
+            plain_archive_path.suffix + ".mpenc",
+        )
+        encrypted_path.write_bytes(ciphertext)
+        return encrypted_path, f"{plain_filename}.mpenc"
 
     def _add_local_config(
         self,

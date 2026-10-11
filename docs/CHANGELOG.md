@@ -756,6 +756,26 @@ Serial multi-stick, Updates UX, native MQTT MapReport, and operator polish on `m
 
 ### v0.8.1 (August 2026)
 
+- **Optional password-encrypted backups.** Settings → System's backup
+  card now has an "Encrypt with a password" checkbox (off by default,
+  same opt-in posture as everything else on that card) — checking it
+  turns the download into AES-256-GCM ciphertext behind a Scrypt-derived
+  key (`N=2**14, r=8, p=1`, random salt + nonce per backup), 8-256
+  character password (same bounds `auth_service.py` already enforces for
+  login passwords). The whole already-built `.tar.gz` is encrypted as
+  one opaque blob behind a fixed 40-byte unencrypted header (magic
+  marker `MPBKENC1` + version + KDF params + salt + nonce) — detectable
+  by sniffing the first 8 bytes alone, both client- and server-side,
+  without ever touching `tarfile.open()` — and the file is renamed
+  `....tar.gz.mpenc` so it's obvious at a glance too. Restore sniffs an
+  uploaded file's header the same way and only then shows a password
+  step in the confirm dialog; a plain backup's restore flow is
+  unchanged. Wrong password and a corrupted/tampered file both surface
+  as the same generic error — no oracle for guessing which. The
+  encryption key is never logged; audit entries record only
+  `encrypted: true/false`. `download_backup` moved from `GET` to `POST`
+  so a password never sits in a URL or access log.
+
 - **Frontend performance/offline-readiness batch (9 patches from a
   realitygaps audit), applied and live-verified one at a time:**
   - Static JS/CSS now served gzip-compressed (`GZipMiddleware`, level 5,

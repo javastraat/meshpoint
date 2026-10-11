@@ -12,7 +12,9 @@ Restart after any config change: `sudo systemctl restart meshpoint`
 
 ### Backup and restore
 
-**Download backup (healthy Pi):** **Settings → System → Download backup** writes a timestamped `.tar.gz` to your browser. Save it on your PC or NAS, not only on the Pi. The archive is not encrypted and contains API keys, channel PSKs, PKI private material, and your full local database.
+**Download backup (healthy Pi):** **Settings → System → Download backup** writes a timestamped `.tar.gz` to your browser. Save it on your PC or NAS, not only on the Pi. The archive contains API keys, channel PSKs, PKI private material, and your full local database.
+
+**Encryption (optional):** check **Encrypt with a password** before downloading to wrap the archive in AES-256-GCM (password, 8-256 characters) — the file is renamed `....tar.gz.mpenc`. Store the password separately from the file; there is no recovery if you lose it. Restoring an encrypted `.mpenc` file prompts for the same password automatically; a plain `.tar.gz` restores with no extra step.
 
 **Restore** replaces `config/local.yaml` and resets the live `data/` tree to match the archive. Anything that happened on the Pi after that backup (including **Clear database**) is discarded. Upload staging folders (`data/restore-incoming/`) and prior `data/pre-restore-stash-*` folders are left untouched.
 
@@ -26,7 +28,7 @@ Restart after any config change: `sudo systemctl restart meshpoint`
 
 **Important:** Restore puts back the API key from the backup. If you deleted that key on [meshradar.io](https://meshradar.io) after taking the backup, local data will still restore but upstream will log `HTTP 403` until you generate a new key for the same `device_id` and update it via `sudo meshpoint setup` or `upstream.auth_token` in `config/local.yaml` (there is no dashboard field for the API key yet).
 
-Full walkthrough: [TROUBLESHOOTING.md](TROUBLESHOOTING.md#disaster-recovery-with-a-saved-backup-recommended). SSH-only restore: `sudo bash /opt/meshpoint/scripts/restore_finish.sh /path/to/backup.tar.gz`.
+Full walkthrough: [TROUBLESHOOTING.md](TROUBLESHOOTING.md#disaster-recovery-with-a-saved-backup-recommended). SSH-only restore: `sudo bash /opt/meshpoint/scripts/restore_finish.sh /path/to/backup.tar.gz` — this script only accepts a plain `.tar.gz`; an encrypted `.mpenc` file must be restored through the dashboard (which decrypts it) instead.
 
 ---
 

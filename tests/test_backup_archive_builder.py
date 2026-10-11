@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import json
 import sqlite3
 import tarfile
@@ -10,6 +11,7 @@ import unittest
 from pathlib import Path
 
 from src.backup.archive_builder import BackupArchiveBuilder
+from src.backup.encryption import decrypt_archive, is_encrypted
 
 
 class TestBackupArchiveBuilder(unittest.TestCase):
@@ -63,6 +65,51 @@ class TestBackupArchiveBuilder(unittest.TestCase):
                 self.assertIn("config/local.yaml", paths)
                 self.assertIn("data/concentrator.db", paths)
                 self.assertIn("data/keys.yaml", paths)
+        finally:
+            try:
+                result.archive_path.unlink(missing_ok=True)
+            except PermissionError:
+                pass
+
+    def test_build_with_password_produces_encrypted_mpenc(self) -> None:
+        builder = BackupArchiveBuilder(
+            meshpoint_root=self.root,
+            local_config_path=self.config_dir / "local.yaml",
+            data_dir=self.data_dir,
+            database_path="data/concentrator.db",
+            device_id="test-device-001",
+            device_name="Lab Meshpoint",
+        )
+        result = builder.build(password="correct horse battery staple")
+        try:
+            self.assertTrue(result.download_filename.endswith(".tar.gz.mpenc"))
+            payload = result.archive_path.read_bytes()
+            self.assertTrue(is_encrypted(payload))
+
+            plaintext = decrypt_archive(payload, "correct horse battery staple")
+            with tarfile.open(fileobj=io.BytesIO(plaintext), mode="r:gz") as tar:
+                names = tar.getnames()
+                self.assertTrue(any(n.endswith("manifest.json") for n in names))
+        finally:
+            try:
+                result.archive_path.unlink(missing_ok=True)
+            except PermissionError:
+                pass
+
+    def test_build_without_password_is_unchanged(self) -> None:
+        builder = BackupArchiveBuilder(
+            meshpoint_root=self.root,
+            local_config_path=self.config_dir / "local.yaml",
+            data_dir=self.data_dir,
+            database_path="data/concentrator.db",
+            device_id="test-device-001",
+            device_name="Lab Meshpoint",
+        )
+        result = builder.build(password=None)
+        try:
+            self.assertTrue(result.download_filename.endswith(".tar.gz"))
+            self.assertFalse(result.download_filename.endswith(".mpenc"))
+            self.assertFalse(is_encrypted(result.archive_path.read_bytes()))
         finally:
             try:
                 result.archive_path.unlink(missing_ok=True)

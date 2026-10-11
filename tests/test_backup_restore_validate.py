@@ -9,6 +9,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from src.backup.encryption import encrypt_archive
 from src.backup.manifest import FORMAT_VERSION, BackupFileEntry, BackupManifest
 from src.backup.restore_service import BackupRestoreService, RestoreValidationError
 
@@ -152,6 +153,47 @@ class TestBackupRestoreValidate(unittest.TestCase):
             tar.addfile(link)
         with self.assertRaises(RestoreValidationError):
             self.service.validate_archive_bytes(buffer.getvalue())
+
+    def test_decrypt_upload_passes_through_plain_archive(self) -> None:
+        manifest = self._valid_manifest()
+        payload = _build_archive(
+            manifest=manifest,
+            files={"config/local.yaml": b"device:\n  device_id: abc\n"},
+        )
+        out = self.service.decrypt_upload(payload, "stray password nobody needed")
+        self.assertEqual(out, payload)
+
+    def test_decrypt_upload_decrypts_with_correct_password(self) -> None:
+        manifest = self._valid_manifest()
+        payload = _build_archive(
+            manifest=manifest,
+            files={"config/local.yaml": b"device:\n  device_id: abc\n"},
+        )
+        encrypted = encrypt_archive(payload, "correct horse battery staple")
+        out = self.service.decrypt_upload(encrypted, "correct horse battery staple")
+        self.assertEqual(out, payload)
+        restored = self.service.validate_archive_bytes(out)
+        self.assertEqual(restored.device_id, "abc")
+
+    def test_decrypt_upload_rejects_missing_password(self) -> None:
+        manifest = self._valid_manifest()
+        payload = _build_archive(
+            manifest=manifest,
+            files={"config/local.yaml": b"device:\n  device_id: abc\n"},
+        )
+        encrypted = encrypt_archive(payload, "correct horse battery staple")
+        with self.assertRaises(RestoreValidationError):
+            self.service.decrypt_upload(encrypted, None)
+
+    def test_decrypt_upload_rejects_wrong_password(self) -> None:
+        manifest = self._valid_manifest()
+        payload = _build_archive(
+            manifest=manifest,
+            files={"config/local.yaml": b"device:\n  device_id: abc\n"},
+        )
+        encrypted = encrypt_archive(payload, "correct horse battery staple")
+        with self.assertRaises(RestoreValidationError):
+            self.service.decrypt_upload(encrypted, "wrong password")
 
     def test_rejects_fifo_member(self) -> None:
         manifest = self._valid_manifest()

@@ -108,7 +108,7 @@ The Hardware page keeps the read-only table of the full SX1302 channel plan (ch0
 
 **RF Environment tab.** A full-page view of your radio's health: live noise-floor readout with sparkline, calibration state, and the latest spectral-scan histogram — hardware-scanned when the SX1261 is available, from the RF Environment companion or the capture RAM (dB over floor) otherwise, with a packet-derived noise floor as the last fallback. A **Stray Frames** card also lists RF frames that failed every protocol decoder (time, source, protocol hint, size, RSSI/SNR, expandable raw hex) instead of dropping them silently — an in-memory ring buffer (newest 500, cleared on restart), not yet a persisted table.
 
-**Backup and restore.** Download a timestamped archive of `local.yaml` and the full `data/` directory (SQLite hot snapshot, PKI keys) from Settings, and restore it after an SD failure or bad experiment — the box returns to the snapshot, even after a database wipe. Admin-only; the archive contains all secrets, so store it offline.
+**Backup and restore.** Download a timestamped archive of `local.yaml` and the full `data/` directory (SQLite hot snapshot, PKI keys) from Settings, and restore it after an SD failure or bad experiment — the box returns to the snapshot, even after a database wipe. Admin-only; the archive contains all secrets, so store it offline. Optional password encryption (AES-256-GCM) is available at download time for anyone storing the file somewhere less trusted than the Pi itself.
 
 **Operator tooling.** Click any packet-feed row for a full decode-metadata modal. KPI status strips on the Dashboard and RF tabs, and live MQTT broker health on the MQTT page. A **Quick Deploy QR** exports public channel parameters for field provisioning straight into the Meshtastic app (default key only — private PSKs never leave the box). Optional **Prometheus `/metrics`** endpoint with packet, node, relay, and system counters — configurable from **Configuration → Metrics** (enable + auth toggle apply immediately, no restart), full metric list and a sample scrape config in `docs/CONFIGURATION.md`. Named, revocable **API keys** scoped only to `/metrics` let unattended scrapers (Home Assistant, Prometheus) authenticate without a browser session — generate and revoke them from the same Metrics page.
 
@@ -527,7 +527,7 @@ one-off endpoints:
 | `GET /api/rf/status` | RF Environment tab data: noise floor, calibration, latest scan histogram |
 | `GET /api/rf/stray-frames` | Frames that failed every protocol decoder (in-memory ring buffer, newest 500) |
 | `GET /api/config/export` | Quick Deploy export: public channel params + Meshtastic QR URL (no private PSKs) |
-| `GET /api/system/backup/download` | Download config + data backup archive (admin) |
+| `POST /api/system/backup/download` | Download config + data backup archive, optionally password-encrypted (admin) |
 | `POST /api/system/backup/restore` | Restore a backup archive (admin) |
 | `GET /metrics` | Prometheus scrape endpoint (opt-in via `metrics.enabled`) |
 | `WS /ws` | Real-time packet + message stream |

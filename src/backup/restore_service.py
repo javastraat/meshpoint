@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 
+from src.backup.encryption import BackupDecryptionError, decrypt_archive, is_encrypted
 from src.backup.manifest import FORMAT_VERSION, BackupManifest
 from src.backup.paths import (
     MAX_UPLOAD_BYTES,
@@ -54,6 +55,26 @@ class BackupRestoreService:
         self._data_dir = data_dir
         self._meshpoint_root = meshpoint_root
         self._finish_script = finish_script
+
+    def decrypt_upload(self, payload: bytes, password: str | None) -> bytes:
+        """Return the plain ``.tar.gz`` bytes, decrypting first if needed.
+
+        A plain (unencrypted) upload passes through unchanged, even if a
+        stray password header was sent with it. An encrypted upload with
+        no password, or a wrong one, raises ``RestoreValidationError`` --
+        the same error type (and HTTP handling) every other validation
+        failure in this class already uses.
+        """
+        if not is_encrypted(payload):
+            return payload
+        if not password:
+            raise RestoreValidationError(
+                "archive is password-encrypted; password required",
+            )
+        try:
+            return decrypt_archive(payload, password)
+        except BackupDecryptionError as exc:
+            raise RestoreValidationError(str(exc)) from exc
 
     def validate_archive_bytes(self, payload: bytes) -> BackupManifest:
         if len(payload) > MAX_UPLOAD_BYTES:
