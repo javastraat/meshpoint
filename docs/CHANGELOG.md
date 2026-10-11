@@ -756,6 +756,54 @@ Serial multi-stick, Updates UX, native MQTT MapReport, and operator polish on `m
 
 ### v0.8.1 (August 2026)
 
+- **Frontend performance/offline-readiness batch (9 patches from a
+  realitygaps audit), applied and live-verified one at a time:**
+  - Static JS/CSS now served gzip-compressed (`GZipMiddleware`, level 5,
+    min 1KB) — confirmed live: a representative JS asset dropped from
+    38.8KB to 10.2KB on the wire (~74% smaller).
+  - Cache-Control policy for static assets: version-stamped (`?v=`)
+    JS/CSS gets `public, max-age=31536000, immutable` (never revalidates,
+    the URL itself changes on every upgrade); un-stamped assets and media
+    get `must-revalidate`; HTML stays `no-cache`.
+  - All 137 external `<script>` tags in `index.html` now carry `defer`
+    (parser-parallel fetch, document order preserved) instead of blocking
+    the parser serially — the single biggest first-paint win in the
+    batch.
+  - Leaflet 1.9.4 + MarkerCluster 1.5.3 self-hosted (`frontend/vendor/`),
+    dropping the unpkg CDN dependency — the map engine itself now works
+    with zero internet access, independent of (and a prerequisite for)
+    the offline-map plugin's own tile-serving story.
+  - Inter + JetBrains Mono self-hosted (`css/fonts.css`), dropping Google
+    Fonts — `index.html` now has zero external resource references at
+    all. Also de-duplicates `terminal_theme.css`'s own font declarations
+    into the same canonical sheet.
+  - Chart.js, xterm, qrcode, and markercluster now lazy-load per route
+    (`js/vendor_loader.js`) instead of parsing ~660KB of JS on every cold
+    boot regardless of which page is ever visited.
+  - All 26 periodic UI pollers (sidebar badges, topbar, radio cards,
+    pager panels, stats/rf tabs, telemetry rail, update checker) now
+    pause while the browser tab is hidden (`js/idle_gate.js`) and replay
+    once on becoming visible again, instead of polling a backgrounded tab
+    at full rate.
+  - WebSocket packet fan-out (packet feed / node map / node cards) now
+    batches into 8ms animation-frame slices instead of running
+    synchronously per message — keeps the UI responsive under a packet
+    burst instead of stalling input.
+  - Dashboard-only packet DOM work (map/feed/cards) now skips entirely
+    while off the `#/dashboard` route or the tab is hidden — the packet
+    counter still ticks everywhere, and returning to Dashboard triggers
+    an immediate full resync so nothing shows stale.
+  - Two real bugs caught and fixed before any of this reached the device:
+    the plugin-injection path (`src/plugins/assets.py`) was still emitting
+    plain synchronous `<script>` tags after the `defer` change above,
+    which broke every installed plugin (`registerSidebarPage`/
+    `registerPageHook`/`registerTopbarChip`/`registerProtocolFormat` all
+    "not a function") until those tags got `defer` too; and
+    `idle_gate.js`'s `MeshpointIdle.every()` had its `(ms, fn)` parameter
+    order backwards from how all 23 call sites invoked it, which would
+    have broken every converted poller app-wide (caught with an isolated
+    Node test before ever touching the Pi).
+
 - **The setup wizard now asks whether to enable external plugin
   repositories** (new `[5/10] External plugin repositories` step, right
   after the API key step) — writes `plugin_sources_enabled` to
