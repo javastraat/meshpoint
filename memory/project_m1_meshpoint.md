@@ -17062,4 +17062,10 @@ gotcha: the bold headline must close on its own line or the parser drops it).
 **Follow-up, after deploy:** meshpoint-plugins bluetooth-scanner
 `antenna`→`bluetooth`, raspberry-network `antenna`→`network`/`wifi`,
 oled-display `gear`→`monitor`. Pi-verify: sidebar renders the new glyphs.
+**User-verified on the Pi 2026-10-11 ("uploaded works").** Follow-up done
+same day in meshpoint-plugins: bluetooth-scanner 0.2.2 `bluetooth`,
+oled-display 0.1.2 `monitor`, repo.json regenerated. raspberry-network left
+on `antenna` on purpose: that glyph IS Lucide wifi already, so renaming
+would only lock out older cores for zero visual change.
+**Bluetooth icon LIVE-VERIFIED 2026-10-11** (user screenshot: Bluetooth Scanner sidebar item shows the Lucide bluetooth glyph, active/green). oled-display `monitor` not yet seen.
 
