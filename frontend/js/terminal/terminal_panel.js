@@ -67,8 +67,20 @@ class TerminalPanelController {
         this.renderer?.fit();
     }
 
-    connect() {
+    async connect() {
         if (this.client.connected) return;
+        if (!window.Terminal) {
+            // Lazy vendor (js/vendor_loader.js): the xterm bundles only
+            // load with the terminal route; the warm is usually already
+            // in flight when the page mounted, so this just waits.
+            this._setStatus('connecting', 'loading terminal…');
+            try {
+                await window.MeshpointVendor.ensure('xterm');
+            } catch (_e) {
+                this._setStatus('error', 'terminal library failed to load');
+                return;
+            }
+        }
         this._ensureRenderer();
         this._setStatus('connecting', 'connecting…');
         this.client.connect();

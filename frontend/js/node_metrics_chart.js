@@ -32,7 +32,17 @@ class NodeMetricsChart {
      */
     render(history) {
         this.destroy();
-        if (!window.Chart || !this._canvas) return false;
+        if (!this._canvas) return false;
+        if (!window.Chart) {
+            // Lazy vendor (js/vendor_loader.js): retry once when chart
+            // lands; the drawer stays open so the redraw is visible.
+            if (window.MeshpointVendor) {
+                window.MeshpointVendor.ensure('chart')
+                    .then(() => { if (!this._chart) this.render(history); })
+                    .catch(() => {});
+            }
+            return false;
+        }
 
         const datasets = this._buildDatasets(history || {});
         if (datasets.length === 0) return false;

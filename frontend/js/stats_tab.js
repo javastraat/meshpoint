@@ -661,6 +661,12 @@ class StatsTab {
     }
 
     _renderDoughnut(canvasId, labels, values, colors, centerText) {
+        if (!window.Chart) {
+            // Lazy vendor (js/vendor_loader.js): the tab's refresh
+            // timer re-renders everything once chart.js lands.
+            if (window.MeshpointVendor) window.MeshpointVendor.ensure('chart').catch(() => {});
+            return;
+        }
         const data = {
             labels,
             datasets: [{
@@ -752,6 +758,10 @@ class StatsTab {
     }
 
     _renderChart(canvasId, type, data, extraOpts, centerLabel, extraPlugins) {
+        if (!window.Chart) {
+            if (window.MeshpointVendor) window.MeshpointVendor.ensure('chart').catch(() => {});
+            return;
+        }
         const canvas = document.getElementById(canvasId);
         if (!canvas) return;
 

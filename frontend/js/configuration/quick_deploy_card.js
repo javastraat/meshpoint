@@ -87,11 +87,18 @@ class QuickDeployCard {
             return;
         }
         if (typeof window.QRCode === 'undefined') {
-            this._qrHost.innerHTML = `
-                <p class="cfg-quick-deploy__url">${this._api.escape(url)}</p>
-                <p class="cfg-quick-deploy__placeholder">QR library unavailable: use Copy URL.</p>
-            `;
-            return;
+            // Lazy vendor (js/vendor_loader.js): the qrcode lib is
+            // loaded on demand now; keep the old text as the hard
+            // fallback if the load itself fails.
+            try {
+                await window.MeshpointVendor.ensure('qrcode');
+            } catch (_e) {
+                this._qrHost.innerHTML = `
+                    <p class="cfg-quick-deploy__url">${this._api.escape(url)}</p>
+                    <p class="cfg-quick-deploy__placeholder">QR library unavailable: use Copy URL.</p>
+                `;
+                return;
+            }
         }
         this._qrHost.innerHTML = '<canvas data-qr-canvas></canvas>';
         const canvas = this._qrHost.querySelector('[data-qr-canvas]');

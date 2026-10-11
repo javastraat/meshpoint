@@ -403,6 +403,12 @@ class RfTab {
         const counts = hist.counts || [];
 
         if (!this._histogramChart) {
+            if (!window.Chart) {
+                // Lazy vendor (js/vendor_loader.js): next refresh draws
+                // it once chart.js has landed.
+                if (window.MeshpointVendor) window.MeshpointVendor.ensure('chart').catch(() => {});
+                return;
+            }
             const root = getComputedStyle(document.documentElement);
             const token = (name, fallback) => root.getPropertyValue(name).trim() || fallback;
             const textSecondary = token('--text-secondary', '#94a3b8');

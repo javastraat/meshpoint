@@ -172,6 +172,27 @@ class NodeMap {
             this._markerGroup.clearLayers();   // detach markers so they can be re-added
             this._map.removeLayer(this._markerGroup);
         }
+        if (this._clustered && typeof L.markerClusterGroup !== 'function') {
+            // Lazy vendor (js/vendor_loader.js): markercluster is no
+            // longer eager in index.html. Paint a flat group now and
+            // re-cluster the moment the plugin lands — same rebuild as
+            // toggleClustered().
+            this._markerGroup = L.layerGroup();
+            this._map.addLayer(this._markerGroup);
+            if (window.MeshpointVendor) {
+                window.MeshpointVendor.ensure('markercluster')
+                    .then(() => {
+                        if (!this._clustered) return;
+                        const visible = Object.keys(this._markers)
+                            .filter((id) => this._isProtocolEnabled(this._markerProto[id]))
+                            .map((id) => this._markers[id]);
+                        this._buildMarkerGroup();
+                        this._groupAdd(visible);
+                    })
+                    .catch(() => { /* guard above already kept it flat */ });
+            }
+            return;
+        }
         this._markerGroup = this._clustered
             ? L.markerClusterGroup(this._clusterOpts)
             : L.layerGroup();

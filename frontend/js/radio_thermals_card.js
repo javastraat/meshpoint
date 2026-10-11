@@ -88,6 +88,11 @@ class RadioThermalsCard {
         const tempPanel = this._root.querySelector('[data-th-temp-panel]');
         const dutyPanel = this._root.querySelector('[data-th-duty-panel]');
         const tooFew = points.length < 2 || !window.Chart;
+        if (!window.Chart && window.MeshpointVendor) {
+            // Lazy vendor (js/vendor_loader.js): kick the load; the
+            // card's refresh timer redraws once chart.js lands.
+            window.MeshpointVendor.ensure('chart').catch(() => {});
+        }
         empty.hidden = !tooFew;
         tempPanel.hidden = tooFew;
         // No fan configured (e.g. RAK V2) -- there's nothing to chart
