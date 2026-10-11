@@ -1,39 +1,7 @@
 /* JetBrains Mono webfont (vendored, OFL 1.1).
-   Loads from /vendor/fonts/jetbrains-mono/*.woff2 so the dashboard
-   renders proper coding ligatures even on offline Pis.
-
-   font-display: swap so the terminal isn't blocked on font load --
-   xterm.js will start with the fallback stack and snap to JetBrains
-   Mono once the woff2 lands. */
-
-@font-face {
-    font-family: 'JetBrains Mono';
-    font-style: normal;
-    font-weight: 400;
-    font-display: swap;
-    src: url('/vendor/fonts/jetbrains-mono/JetBrainsMono-Regular.woff2') format('woff2');
-}
-
-@font-face {
-    font-family: 'JetBrains Mono';
-    font-style: normal;
-    font-weight: 700;
-    font-display: swap;
-    src: url('/vendor/fonts/jetbrains-mono/JetBrainsMono-Bold.woff2') format('woff2');
-}
-
-@font-face {
-    font-family: 'JetBrains Mono';
-    font-style: italic;
-    font-weight: 400;
-    font-display: swap;
-    src: url('/vendor/fonts/jetbrains-mono/JetBrainsMono-Italic.woff2') format('woff2');
-}
-
-@font-face {
-    font-family: 'JetBrains Mono';
-    font-style: italic;
-    font-weight: 700;
-    font-display: swap;
-    src: url('/vendor/fonts/jetbrains-mono/JetBrainsMono-BoldItalic.woff2') format('woff2');
-}
+   The @font-face declarations now live canonically in css/fonts.css,
+   which is linked by every page (dashboard + auth) — previously they
+   lived only here, so non-terminal pages silently fell back until the
+   Google Fonts <link> (removed; see fonts.css header). font-display:
+   swap behaviour is unchanged: xterm.js starts with the fallback stack
+   and snaps to JetBrains Mono once the woff2 lands. */
