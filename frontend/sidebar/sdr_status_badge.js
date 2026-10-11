@@ -24,7 +24,7 @@ class SdrStatusBadge {
 
     init() {
         this._refresh();
-        this._pollInterval = setInterval(() => this._refresh(), SDR_STATUS_BADGE_POLL_MS);
+        this._pollInterval = MeshpointIdle.every(() => this._refresh(), SDR_STATUS_BADGE_POLL_MS);
     }
 
     destroy() {

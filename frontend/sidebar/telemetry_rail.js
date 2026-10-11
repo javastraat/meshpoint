@@ -59,12 +59,12 @@ class SidebarTelemetryRail {
 
     init() {
         this._refreshStatus();
-        this._statusTimer = setInterval(() => this._refreshStatus(), 5_000);
+        this._statusTimer = MeshpointIdle.every(() => this._refreshStatus(), 5_000);
         if (this._ws) {
             this._ws.on('noise_floor', (data) => this._onNoiseFloor(data));
         }
         this._refreshPlayer();
-        this._playerTimer = setInterval(() => this._refreshPlayer(), 5_000);
+        this._playerTimer = MeshpointIdle.every(() => this._refreshPlayer(), 5_000);
         if (this._muteBtn) this._muteBtn.addEventListener('click', () => this._toggleMute());
         if (this._stopBtn) this._stopBtn.addEventListener('click', () => this._stopRadio());
     }

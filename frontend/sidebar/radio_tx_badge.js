@@ -56,11 +56,11 @@ class RadioTxBadge {
      */
     init() {
         this._refreshConfig();
-        this._refreshInterval = setInterval(
+        this._refreshInterval = MeshpointIdle.every(
             () => this._refreshConfig(),
             CONFIG_REFRESH_MS,
         );
-        this._tickInterval = setInterval(() => this._tick(), 1000);
+        this._tickInterval = MeshpointIdle.every(() => this._tick(), 1000);
     }
 
     destroy() {

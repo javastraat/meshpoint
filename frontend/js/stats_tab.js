@@ -55,7 +55,7 @@ class StatsTab {
         }
 
         if (!this._refreshInterval) {
-            this._refreshInterval = setInterval(() => {
+            this._refreshInterval = MeshpointIdle.every(() => {
                 const section = document.querySelector('[data-section="stats"]');
                 if (section && section.classList.contains('section--active')) {
                     this.refresh();

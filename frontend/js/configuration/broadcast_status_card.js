@@ -111,7 +111,7 @@ class BroadcastStatusCard {
 
     _startTimer() {
         if (this._timer) clearInterval(this._timer);
-        this._timer = setInterval(() => this._tick(), 1000);
+        this._timer = MeshpointIdle.every(() => this._tick(), 1000);
     }
 
     _tick() {

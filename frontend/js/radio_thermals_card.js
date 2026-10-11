@@ -75,7 +75,7 @@ class RadioThermalsCard {
 
     _armAutoRefresh() {
         if (this._refreshTimer) return;
-        this._refreshTimer = setInterval(() => {
+        this._refreshTimer = MeshpointIdle.every(() => {
             const section = this._root && this._root.closest('[data-section]');
             if (section && section.classList.contains('section--active')) {
                 this._load();

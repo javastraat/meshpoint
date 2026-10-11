@@ -32,7 +32,7 @@ class RepeatersTab {
         this._load();
         // Repeaters are polled every ~20 min, so a slow refresh is
         // plenty -- no point re-fetching the full history every 30s.
-        this._timer = setInterval(() => this._load(), 300_000);
+        this._timer = MeshpointIdle.every(() => this._load(), 300_000);
     }
 
     hide() {

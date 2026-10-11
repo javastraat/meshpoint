@@ -253,7 +253,7 @@ class MqttConfigCard {
 
     _startRuntimePolling() {
         if (this._runtimeInterval) return;
-        this._runtimeInterval = setInterval(() => {
+        this._runtimeInterval = MeshpointIdle.every(() => {
             const section = document.querySelector('[data-section="configuration/mqtt"]');
             if (section && section.classList.contains('section--active')) {
                 this._refreshRuntime();

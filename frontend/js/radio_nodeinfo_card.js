@@ -134,7 +134,7 @@ class RadioNodeInfoCard {
 
     _startTimer() {
         this._stopTimer();
-        this._timer = setInterval(() => this._tick(), 1000);
+        this._timer = MeshpointIdle.every(() => this._tick(), 1000);
     }
 
     _stopTimer() {

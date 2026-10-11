@@ -24,7 +24,7 @@ class UpdateCheckBadge {
 
     init() {
         this._refresh();
-        this._pollInterval = setInterval(() => this._refresh(), POLL_MS);
+        this._pollInterval = MeshpointIdle.every(() => this._refresh(), POLL_MS);
     }
 
     /** Re-fetch the (cheap, cache-only) badge status right away --

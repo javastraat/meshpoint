@@ -296,12 +296,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     await _updateStats();
     _checkForUpdate();
 
-    setInterval(() => {
+    MeshpointIdle.every(() => {
         _refreshData(nodeMap, nodeCards, packetFeed);
         _updateStats();
     }, 15_000);
 
-    setInterval(_checkForUpdate, 300_000);
+    MeshpointIdle.every(_checkForUpdate, 300_000);
 
     if (window.MeshpointDisplayUnits?.onChange) {
         window.MeshpointDisplayUnits.onChange(_renderCpuTemp);

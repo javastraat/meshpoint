@@ -41,7 +41,7 @@ class TopbarController {
     init() {
         this._wireWebSocket();
         this._refreshConfig();
-        this._refreshTimer = setInterval(
+        this._refreshTimer = MeshpointIdle.every(
             () => this._refreshConfig(), 10_000,
         );
     }

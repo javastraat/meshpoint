@@ -111,7 +111,7 @@ class PagerPanel {
 
     show() {
         this._refresh();
-        this._statusTimer = setInterval(() => this._refresh(), 2000);
+        this._statusTimer = MeshpointIdle.every(() => this._refresh(), 2000);
     }
 
     hide() {

@@ -50,7 +50,7 @@ class PagerDashboardPanel {
             this._mounted = true;
         }
         this._load();
-        this._refreshTimer = setInterval(() => this._load(), 15_000);
+        this._refreshTimer = MeshpointIdle.every(() => this._load(), 15_000);
     }
 
     /** Called by the router when the section is hidden. */

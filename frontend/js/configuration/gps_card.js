@@ -358,7 +358,7 @@ class GpsConfigCard {
         this._stopPolling();
         const interval = (source === 'gpsd' || source === 'uart') ? 2000 : 30000;
         this._pollOnce();
-        this._timer = window.setInterval(() => this._pollOnce(), interval);
+        this._timer = MeshpointIdle.every(() => this._pollOnce(), interval);
     }
 
     _stopPolling() {

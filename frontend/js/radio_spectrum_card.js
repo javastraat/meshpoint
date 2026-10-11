@@ -213,7 +213,7 @@ class RadioSpectrumCard {
 
     _armAutoRefresh() {
         if (this._refreshTimer) return;
-        this._refreshTimer = setInterval(() => {
+        this._refreshTimer = MeshpointIdle.every(() => {
             const section = this._root && this._root.closest('[data-section]');
             if (section && section.classList.contains('section--active')) {
                 this._load();
@@ -251,7 +251,7 @@ class RadioSpectrumCard {
         btn.textContent = 'Calibrating…';
         let tries = 0;
         clearInterval(this._calTimer);
-        this._calTimer = setInterval(async () => {
+        this._calTimer = MeshpointIdle.every(async () => {
             tries += 1;
             await this._load();
             const now = this._sweep && this._sweep.generated_at;
@@ -286,7 +286,7 @@ class RadioSpectrumCard {
         btn.textContent = 'Sweeping…';
         let tries = 0;
         clearInterval(this._pollTimer);
-        this._pollTimer = setInterval(async () => {
+        this._pollTimer = MeshpointIdle.every(async () => {
             tries += 1;
             await this._load();
             const now = this._sweep && this._sweep.generated_at;

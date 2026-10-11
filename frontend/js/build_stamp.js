@@ -39,7 +39,7 @@ class BuildStamp {
         this._root = root;
         this._labelEl = root.querySelector('#build-stamp-version');
         this._refresh();
-        this._timer = setInterval(() => this._refresh(), 60_000);
+        this._timer = MeshpointIdle.every(() => this._refresh(), 60_000);
     }
 
     destroy() {
