@@ -12,6 +12,7 @@ from fastapi import (
     WebSocket,
     WebSocketDisconnect,
 )
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -599,6 +600,17 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
         version=__version__,
         lifespan=lifespan,
     )
+
+    # Serve the ~2.7 MB of SPA JS/CSS compressed. Level 5 (not 9) keeps
+    # compression at a few ms per asset on Pi-class CPUs, and
+    # minimum_size avoids paying zlib for favicon-shaped responses.
+    # Starlette's GZipMiddleware passes non-"http" scopes (so the /ws
+    # upgrade) through untouched, and DEFAULT_EXCLUDED_CONTENT_TYPES
+    # keeps SSE (text/event-stream) and already-compressed formats
+    # (woff2/png/zip) out of the pipeline; streamed chunks are flushed
+    # with Z_SYNC_FLUSH per chunk, so update/firmware progress streams
+    # stay latency-neutral under compression.
+    app.add_middleware(GZipMiddleware, minimum_size=1024, compresslevel=5)
 
     protected = [Depends(require_auth)]
     for router, public in _BUILTIN_ROUTERS:

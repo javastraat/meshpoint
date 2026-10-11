@@ -70,3 +70,5 @@ scripts/_*
 secrets.h
 testplan-*.*
 
+/memory/patches/*
+
