@@ -11,8 +11,11 @@
  * a `[deps] check` script shows a live verdict from the loader (⚠ setup needed
  * with the reason, or ✓ installed) instead of the always-on "Requires:" hint,
  * with a Re-check button (``POST /api/plugins/{id}/check``) so running setup on
- * the device clears the warning without a restart. When a setup is genuinely
- * needed, a **Run setup** button streams ``sudo bash setup.sh``
+ * the device clears the warning without a restart. Any plugin with a
+ * `setup_script` always shows a **Run setup** button (not only while setup is
+ * outstanding -- some setup steps are safe/useful to re-run later, e.g.
+ * refreshing a vendored data file, and this is the only way to do that
+ * without SSH/terminal access), which streams ``sudo bash setup.sh``
  * (``POST /api/plugins/{id}/setup/stream``, NDJSON via ``UpdateStreamClient``)
  * into a modal, then offers Enable + Restart once it succeeds. A `deletable` plugin
  * (community tier, not `locked`) also gets a Delete button that removes its
@@ -1155,10 +1158,18 @@ class PluginsPanelController {
             ? ` <button type="button" class="plugin-row__recheck" data-recheck>Re-check</button>`
             : '';
         // "Run setup" streams `sudo bash setup.sh` output into a modal --
-        // offered only where a live verdict says it's actually needed, so a
-        // healthy row (or one with no check) doesn't invite a re-run.
-        const runSetupBtnHtml = (plugin.deps_ok === false && plugin.setup_script)
-            ? ` <button type="button" class="plugin-row__runsetup" data-run-setup>Run setup</button>`
+        // always offered whenever the plugin has one, not only when a live
+        // verdict says it's needed. A plugin's setup.sh can need re-running
+        // for reasons the deps-check script never reports at all (e.g.
+        // bluetooth-scanner's vendor-DB refresh, or any setup step that's
+        // idempotent/safe to repeat) -- once a check script happens to pass,
+        // the button used to vanish for good, leaving no way to re-run it
+        // from the web UI (only `sudo meshpoint plugin setup <id>` over
+        // SSH/terminal, which may itself be turned off -- see
+        // `dashboard.web_terminal_toggle`). Showing it unconditionally means
+        // "re-run setup" is always reachable from here, admin role only.
+        const runSetupBtnHtml = plugin.setup_script
+            ? ` <button type="button" class="plugin-row__runsetup" data-run-setup>${plugin.deps_ok === true ? 'Re-run setup' : 'Run setup'}</button>`
             : '';
         let depsNote = '';
         if (plugin.deps_ok === false) {
@@ -1167,11 +1178,11 @@ class PluginsPanelController {
             depsNote = `<p class="plugin-row__deps plugin-row__deps--bad" title="${this._escape(plugin.deps_detail || '')}">`
                 + `⚠ Setup needed — ${this._escape(why)}${runSetupBtnHtml}${recheckBtnHtml}</p>`;
         } else if (plugin.deps_ok === true) {
-            depsNote = `<p class="plugin-row__deps plugin-row__deps--ok">✓ Dependencies installed${recheckBtnHtml}</p>`;
+            depsNote = `<p class="plugin-row__deps plugin-row__deps--ok">✓ Dependencies installed${runSetupBtnHtml}${recheckBtnHtml}</p>`;
         } else if (plugin.has_deps_check) {
-            depsNote = `<p class="plugin-row__deps">Dependency state unknown${recheckBtnHtml}</p>`;
+            depsNote = `<p class="plugin-row__deps">Dependency state unknown${runSetupBtnHtml}${recheckBtnHtml}</p>`;
         } else if (staticHint) {
-            depsNote = `<p class="plugin-row__deps">${staticHint}</p>`;
+            depsNote = `<p class="plugin-row__deps">${staticHint}${runSetupBtnHtml}</p>`;
         }
         // A "hook" plugin (dependency != null) has nowhere to render
         // without its host enabled -- shown here regardless of current
@@ -1616,7 +1627,9 @@ class PluginsPanelController {
         if (success) {
             m.status.textContent = result.deps_ok === false
                 ? 'setup.sh finished, but the dependency check still fails — see output above.'
-                : 'setup.sh finished. Enable the plugin and restart to load it.';
+                : (plugin.enabled
+                    ? 'setup.sh finished. Restart the service to pick up any changes.'
+                    : 'setup.sh finished. Enable the plugin and restart to load it.');
             if (result.deps_ok !== false) {
                 m.enableBtn.hidden = plugin.enabled;
                 m.restartBtn.hidden = false;

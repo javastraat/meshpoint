@@ -756,6 +756,17 @@ Serial multi-stick, Updates UX, native MQTT MapReport, and operator polish on `m
 
 ### v0.8.1 (August 2026)
 
+- **Settings → Plugins: "Run setup" is now always available for any plugin
+  that has a `setup.sh`, not only while a `[deps] check` script reports
+  something missing.** Found while using the page: once a check script
+  passed, the button vanished for good — the only way to re-run setup
+  afterwards was `sudo meshpoint plugin setup <id>` over SSH/terminal,
+  which doesn't help if the web terminal is turned off (or an admin just
+  doesn't have SSH access at all). Some setup scripts are safe and useful
+  to re-run later (e.g. refreshing a vendored data file) even when the
+  dependency check already passes — relabeled **Re-run setup** in that
+  case so it's clear it's not re-doing a first-time install.
+
 - **Fix: a restore could leave `meshpoint` stopped indefinitely with no
   automatic recovery**, found during a live encrypted-backup restore test.
   Two compounding bugs in `scripts/restore_finish.sh`: (1) `rnsd` (the

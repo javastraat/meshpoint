@@ -129,48 +129,121 @@ Theme dir split + source tier Pi-verified working 2026-08-31.
      `plugins/` now. `PluginRegistry.add_listener(name,build,wire)`.
      **Plugin roadmap B1-B5 complete.** ⚠️ deploy = behaviour change for ACARS
      users (must enable + run setup.sh).
-  4. **B6 — Plugins management page (user asked 2026-09-02, NOT started).**
-     A Settings sub-page (sibling of Settings -> Themes) that lists every
-     discovered plugin (built-in + community) and toggles each on/off.
-     Sketch / open questions:
-     - `GET /api/plugins` (new route module) -> per plugin:
-       `{id, version, source, provides, description, homepage, enabled,
-       loaded, apt, setup, deps_ok}`. `loaded` = in `server._loaded_plugins`
-       this run; `deps_ok` = best-effort (e.g. `shutil.which` for a known
-       binary?) or just surface `apt`/`setup` so the user knows to run it.
-     - `PUT /api/plugins/{id}` `{enabled: bool}` (admin + audited) -> writes
-       `plugins.<id>.enabled` into `local.yaml`. Needs the yaml-patch helper
-       (`src/config.py save_section_to_yaml`, as `theme_routes` uses for
-       `dashboard.theme`) -- but `plugins` is an opaque dict, not a dataclass
-       section, so check `save_section_to_yaml` handles a plain-dict section
-       or add a small `save_plugin_enabled(id, bool)`.
-     - **Restart required**: plugins load once in `create_app`, so a toggle
-       can't take effect live (unlike theme default). Page must show a
-       "restart to apply" banner; maybe reuse the Settings -> Updates restart
-       affordance, or just tell the user.
-     - Frontend: `frontend/js/settings/plugins.js` + a nav entry; card per
-       plugin (name, source badge builtin/community, version, provides chips,
-       description, enable toggle, "needs setup.sh" hint when apt/setup set
-       and not loaded despite enabled).
-     - `_loaded_plugins` is already kept as a module global in server.py for
-       exactly this.
-  5. **B4d — deps-consent CLI (`meshpoint plugin setup <id>`).** NOT started,
-     optional/low-priority. Reads a plugin's `[deps]`, prints the apt packages
-     + `setup.sh` it would run, asks Y/n, then runs it (`sudo` needed for the
-     apt/`make install`). Pairs with `meshpoint plugins list` (reuse B6's
-     `GET /api/plugins` logic, or a shared `discover_plugins` call). Lower
-     priority because B5 shipped `plugins/apps/acars/setup.sh` as a plain
-     `sudo bash plugins/apps/acars/setup.sh` — the CLI is just nicer UX + a
-     confirmation gate, not required.
-  6. **B7 — plugin config schema.** `plugins.<id>` is opaque today; ACARS
-     hardcodes `_FREQUENCIES`/`_GAIN` in `backend/listener.py`. Let a plugin
-     declare a config schema (in `plugin.toml` or `register`) so B6's page can
-     render a settings form and `config.plugins.<id>` gets defaulted/validated.
-     Also: wire up `provides = ["config"]` (declared in `KNOWN_PROVIDES`, no
-     `PluginRegistry.add_config` yet) or drop it. Do after B6.
-  7. **B8 — community plugin uninstall.** "Remove" button on B6's page for
-     community plugins → delete `plugins/apps/<id>/`, mirroring
-     `theme_store.delete_theme`; built-ins locked like the locked theme pack.
+  4. ~~**B6 — Plugins management page**~~ **DONE** (this note was stale —
+     confirmed built 2026-10-11 while reviewing the backlog). Settings →
+     Plugins exists: `GET /api/plugins` (`src/api/routes/plugin_routes.py:275`)
+     lists every discovered plugin, built-in + community, with
+     enabled/loaded/`restart_required`/deps/source/install info; `PUT
+     /api/plugins/{id}` (`:291`) toggles `enabled` via `save_section_to_yaml`,
+     refuses enabling with an off dependency, cascades disable to dependents
+     (`:241`). Restart-required banner wired both ends (`:211` backend,
+     `index.html:1080 data-restart-status` frontend). Frontend:
+     `frontend/js/settings/plugins_panel_controller.js` (1714 lines) + nav
+     entry `#/settings/plugins` (`index.html:337`) + panel markup
+     (`index.html:1070-1099`). Also went beyond the original sketch:
+     `/api/plugins/{id}/check` + `/check-all` (live re-run of `[deps]`
+     check) and streamed setup (`/setup/stream`).
+  5. ~~**B4d — deps-consent CLI**~~ **DONE** (also stale — confirmed built).
+     `meshpoint plugin setup <id>` is `run_plugin_setup()`
+     (`src/cli/plugin_command.py:164`): prints the manifest's apt/setup
+     info, confirms via `_confirm()` (`:203`), runs `sudo bash setup.sh`
+     (`:208`). `meshpoint plugin list`/`plugin check` also exist (`:25`/`:49`).
+  6. **B7 — plugin config schema. Still open, confirmed not built** (no
+     `config_schema` field anywhere in `PluginManifest`,
+     `src/plugins/manifest.py:170-184`). `plugins.<id>` stays opaque today;
+     ACARS hardcodes `_FREQUENCIES`/`_GAIN` in `backend/listener.py`.
+     **Full design scoped 2026-10-11** (plan-mode session, not yet
+     implemented — written here since the plan file itself is ephemeral):
+     <br>• New `[config.<field>]` table in `plugin.toml`, read
+     unconditionally (NOT gated behind a `provides` entry — `"config"` was
+     briefly in `KNOWN_PROVIDES`, removed by `02e77123` since nothing ever
+     implemented it, confirming the table shouldn't need a capability at
+     all). One sub-table per field: `type` (`string`/`int`/`float`/`bool`/
+     `select`/`float_list` — `float_list` added specifically for ACARS's
+     frequency list rather than a generic nested scheme), `label`,
+     `default` (mandatory — every field always has a value to fall back
+     to), optional `hint`/`min`/`max`/`options` (`select` requires
+     non-empty `options`). Field names `^[a-z][a-z0-9_]{0,38}$` (underscore,
+     deliberately unlike the hyphen `_SLUG_RE`/`_ROUTE_RE` used everywhere
+     else in this file, since a field name becomes a Python dict/kwarg
+     key). <br>• New frozen `ConfigFieldSpec` dataclass + trailing
+     `PluginManifest.config_schema: tuple[...] = ()` field (safe addition —
+     all ~18 existing manifests have no `[config]` table, so every one
+     parses to `()`, zero behavior change) + `_parse_config_schema()` in
+     `src/plugins/manifest.py`, mirroring `_parse_sidebar`/`_parse_hook`'s
+     style. Parse-time (author-facing) validation: unknown `type`, missing
+     `default`/`label`, `select` without `options` or `default` not in
+     `options`, `min > max`, numeric `default` outside its own `min`/`max`,
+     `float_list` default not a list of numbers, or a `bool` sneaking into
+     a numeric/select/string default (`isinstance(True, int)` is `True` in
+     Python — needs an explicit `not isinstance(x, bool)` guard, same
+     pattern the existing `meshpoint_api` check already uses) — all raise
+     `PluginManifestError("config", ...)`, same as a bad `[sidebar]` today.
+     <br>• New `src/plugins/config_schema.py` (FastAPI-free, like the rest
+     of `src/plugins/`): `default_config(schema, raw) -> dict` fills ONLY
+     missing keys from their field defaults (a present-but-invalid
+     existing value is deliberately left alone — no silent config mutation
+     as a side effect of booting); `validate_config_update(schema,
+     submitted) -> (valid_values, errors)` is the one real enforcement
+     point, used only by the new write route — coerces numeric strings,
+     excludes `bool` from numeric coercion, checks `min`/`max`
+     (per-element for `float_list`), checks `select` membership, collects
+     every field's error rather than failing fast. `loader.py` gets one
+     line (`conf = default_config(manifest.config_schema, conf)` before
+     `PluginRegistry(manifest, conf)`) so a plugin's `register()` can
+     always assume every declared field is present. <br>• `plugin_routes.py`:
+     `_describe()` gains always-present `config_schema`/`config` keys
+     (empty for schema-less plugins); new `PUT /api/plugins/{id}/config`
+     (body `{"values": {...}}`) — 404 unknown plugin, 400 "nothing to
+     configure" if schema empty, 400 listing any submitted key not in the
+     schema (checked before validation, not folded into it), 400 with
+     per-field errors from `validate_config_update`, else read-modify-write
+     `_config.plugins.get(id, {})` exactly like the existing
+     `_save_enabled()` does, `save_section_to_yaml`, audited as
+     `config.plugin_config_update` (values logged directly — RF gain/
+     frequency/device-index, nothing sensitive). Response
+     `restart_required = plugin_id in loaded_names` (not an unconditional
+     `true` like the enable/disable PUT — config is baked into a plugin's
+     closures once at `register()` time, so a currently-disabled plugin has
+     nothing running to go stale; noted as a conservative default since a
+     `"service"`-type plugin reading live `AppConfig` instead of a snapshot
+     wouldn't technically need one, but the manifest has no way to signal
+     that distinction today). <br>• Frontend
+     (`plugins_panel_controller.js`): a `.plugin-row__cfg` "Settings"
+     button per row (only when `config_schema.length`), a new
+     `this._expandedConfig` `Set` (mirroring the existing
+     `this._collapsedGroups` fold state — expansion state lives in the Set,
+     not the DOM, so it survives the full re-render `refresh()` already
+     does after any save), pushed into `_render()`'s existing row-building
+     loop as a `<tr class="plugin-row__config-row"><td colspan="4">`
+     containing a `.cfg-form` built field-by-field from `config_schema`
+     (reusing `configuration.css`'s already-global `.cfg-field` family —
+     new CSS for the row/button chrome itself goes in `settings.css`
+     alongside the other `.plugin-row__*` rules, not `configuration.css`).
+     <br>• Tests: extend `tests/test_plugin_manifest.py` (pure Python,
+     existing `_write_plugin()` helper) for every parse-time check above;
+     new `tests/test_plugin_config_schema.py` (pure Python) for
+     `default_config`/`validate_config_update`; extend
+     `tests/test_plugin_routes.py` (FastAPI `TestClient`, needs the
+     throwaway-venv approach already established this session) for the new
+     PUT route's happy/validation/404/empty-schema paths and `GET`'s new
+     keys. <br>• Also update `docs/PLUGINS.md` ("Your plugin's own config"
+     + the "Current limitations" bullet about no plugin-contributed
+     settings UI — note what's now possible vs. still true: no seam inside
+     the core *Configuration* page itself, only Settings → Plugins).
+     <br>• Explicitly out of scope / follow-up, separate repo: porting
+     ACARS's actual `plugin.toml` to a real `[config]` table (its current
+     `gain`/`device`/`freqs` Python defaults are all **strings**, e.g.
+     `_DEFAULT_GAIN = "34"` — a `float`-typed schema field would hand
+     `reg.config["gain"]` a Python `float`, cosmetically changing the
+     `acarsdec` argv string; harmless almost certainly, but the porting
+     author should double-check, not assume it's a no-op). <br>Ask to
+     resume when ready to build.
+  7. ~~**B8 — community plugin uninstall**~~ **DONE** (also stale — confirmed
+     built). `DELETE /api/plugins/{id}` (`plugin_routes.py:590`) deletes a
+     community plugin's folder, refuses built-ins/`locked` plugins, cleans
+     up its `plugins.<id>` config key (`:627 remove_subsection_key`),
+     reports `restart_required: true`.
 
   **Full remaining-work list + unfinished capability surface + docs debt:**
   see the "Plugin system — remaining work" section in
