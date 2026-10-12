@@ -144,12 +144,15 @@ class UpdateCheckBadge {
         const hasTheme = Boolean(data && data.theme_update_available);
         if (hasPlugin && hasTheme) {
             headerPill.href = '#/settings/plugins';
+            headerPill.textContent = 'Updates available'; // both kinds -- keep it short, not "Plugin & theme updates available"
             this._pluginPillRoute = { storageKey: 'meshpoint:plugins-tab', tab: 'sources' };
         } else if (hasTheme) {
             headerPill.href = '#/settings/themes';
+            headerPill.textContent = 'Theme update available';
             this._pluginPillRoute = { storageKey: 'meshpoint:themes-tab', tab: 'installed' };
         } else {
             headerPill.href = '#/settings/plugins';
+            headerPill.textContent = 'Plugin update available';
             this._pluginPillRoute = { storageKey: 'meshpoint:plugins-tab', tab: 'installed' };
         }
     }
