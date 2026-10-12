@@ -130,6 +130,9 @@
     class ThemeEditor {
         constructor(el) {
             this.el = el;
+            this.tabButtons = el.querySelectorAll('[data-theme-tab]');
+            this.viewEls = el.querySelectorAll('[data-theme-view]');
+            this._themeTab = this._loadThemeTab();
             this.defaultSel = el.querySelector('[data-default-theme]');
             this.defaultStatus = el.querySelector('[data-default-theme-status]');
             this.baseSel = el.querySelector('[data-te-base]');
@@ -152,7 +155,35 @@
             this.active = false;
         }
 
+        _loadThemeTab() {
+            try {
+                const stored = localStorage.getItem('meshpoint:themes-tab');
+                return ['default', 'builder', 'installed'].includes(stored) ? stored : 'default';
+            } catch (_) {
+                return 'default';
+            }
+        }
+
+        _setThemeTab(tab) {
+            this._themeTab = tab;
+            try { localStorage.setItem('meshpoint:themes-tab', tab); } catch (_) {}
+            this._applyThemeTab();
+        }
+
+        _applyThemeTab() {
+            this.tabButtons.forEach((btn) => {
+                btn.classList.toggle('lw-tab--active', btn.dataset.themeTab === this._themeTab);
+            });
+            this.viewEls.forEach((el) => {
+                el.hidden = el.dataset.themeView !== this._themeTab;
+            });
+        }
+
         bind() {
+            this.tabButtons.forEach((btn) => {
+                btn.addEventListener('click', () => this._setThemeTab(btn.dataset.themeTab));
+            });
+            this._applyThemeTab();
             this.baseSel?.addEventListener('change', () => this._loadBase(this.baseSel.value));
             this.nameInput?.addEventListener('input', () => {
                 this._nameAuto = !this.nameInput.value.trim();

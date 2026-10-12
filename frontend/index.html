@@ -800,64 +800,75 @@
                     <header class="theme-editor__head">
                         <h2 class="theme-editor__title">Themes</h2>
                         <p class="theme-editor__subtitle">Pick the default theme for new sessions, or build your own — tweak the palette live and download a <code>theme.css</code> to drop into <code>plugins/themes/</code>.</p>
+                        <div class="lw-tabs" role="tablist">
+                            <button class="lw-tab" type="button" role="tab" data-theme-tab="default">Default theme</button>
+                            <button class="lw-tab" type="button" role="tab" data-theme-tab="builder">Theme builder</button>
+                            <button class="lw-tab" type="button" role="tab" data-theme-tab="installed">Installed themes</button>
+                        </div>
                     </header>
 
-                    <article class="auth-card">
-                        <h3 class="auth-card__title">Default theme</h3>
-                        <p class="auth-card__hint">What a browser shows when it hasn't picked one via the topbar toggle. Your own choice there still wins locally.</p>
-                        <label class="cfg-field">
-                            <span class="cfg-field__label">Default for new sessions</span>
-                            <select class="cfg-field__input" data-default-theme></select>
-                        </label>
-                        <p class="auth-status" data-default-theme-status aria-live="polite"></p>
-                    </article>
+                    <div data-theme-view="default">
+                        <article class="auth-card">
+                            <h3 class="auth-card__title">Default theme</h3>
+                            <p class="auth-card__hint">What a browser shows when it hasn't picked one via the topbar toggle. Your own choice there still wins locally.</p>
+                            <label class="cfg-field">
+                                <span class="cfg-field__label">Default for new sessions</span>
+                                <select class="cfg-field__input" data-default-theme></select>
+                            </label>
+                            <p class="auth-status" data-default-theme-status aria-live="polite"></p>
+                        </article>
+                    </div>
 
-                    <article class="auth-card theme-editor__builder">
-                        <h3 class="auth-card__title">Theme builder</h3>
-                        <p class="auth-card__hint">Edits preview on the whole dashboard as you go. Leaving this page reverts the preview — nothing is saved until you download.</p>
-                        <div class="theme-editor__controls">
-                            <label class="cfg-field">
-                                <span class="cfg-field__label">Start from</span>
-                                <select class="cfg-field__input" data-te-base></select>
-                            </label>
-                            <label class="cfg-field">
-                                <span class="cfg-field__label">New theme name</span>
-                                <input class="cfg-field__input" type="text" maxlength="32" placeholder="my-theme" data-te-name>
-                            </label>
-                            <label class="cfg-field">
-                                <span class="cfg-field__label">Author <span class="cfg-field__label-opt">(optional)</span></span>
-                                <input class="cfg-field__input" type="text" maxlength="80" placeholder="Your name" data-te-author>
-                            </label>
-                            <label class="cfg-field">
-                                <span class="cfg-field__label">Homepage <span class="cfg-field__label-opt">(optional)</span></span>
-                                <input class="cfg-field__input" type="url" maxlength="200" placeholder="https://…" data-te-homepage>
-                            </label>
-                            <label class="cfg-field theme-editor__controls-wide">
-                                <span class="cfg-field__label">Description <span class="cfg-field__label-opt">(optional)</span></span>
-                                <input class="cfg-field__input" type="text" maxlength="120" placeholder="One line about the palette" data-te-desc>
-                            </label>
-                        </div>
-                        <p class="theme-editor__base-meta" data-te-base-meta hidden></p>
-                        <div class="theme-editor__groups" data-te-groups></div>
-                        <div class="theme-editor__advanced-note">
-                            The Messages panel and Terminal keep their own colour sets (<code>--msg-*</code> / <code>--term-*</code>) — you can't preview them from here, so they aren't swatches. Where your <strong>Start from</strong> theme already overrides them (e.g. Light) the download carries those in; tick the box below to also get the rest as a commented-out scaffold to hand-tune.
-                            <label class="theme-editor__refopt"><input type="checkbox" data-te-carry-ref> Include Messages / Terminal tokens for reference</label>
-                        </div>
-                        <div class="cfg-card__actions">
-                            <button class="terminal-button" type="button" data-te-reset>Reset changes</button>
-                            <button class="terminal-button terminal-button--primary" type="button" data-te-save>Save to device</button>
-                            <button class="terminal-button" type="button" data-te-download>Download theme.css</button>
-                            <button class="terminal-button" type="button" data-te-download-json>Download theme.json</button>
-                        </div>
-                        <p class="auth-card__hint">Save writes it to <code>plugins/themes/</code> on the device (admin, logged). Reload the dashboard to see it in the picker. Download is for sharing or a pull request.</p>
-                        <p class="auth-status" data-te-status aria-live="polite"></p>
-                    </article>
+                    <div data-theme-view="builder" hidden>
+                        <article class="auth-card theme-editor__builder">
+                            <h3 class="auth-card__title">Theme builder</h3>
+                            <p class="auth-card__hint">Edits preview on the whole dashboard as you go. Leaving this page reverts the preview — nothing is saved until you download.</p>
+                            <div class="theme-editor__controls">
+                                <label class="cfg-field">
+                                    <span class="cfg-field__label">Start from</span>
+                                    <select class="cfg-field__input" data-te-base></select>
+                                </label>
+                                <label class="cfg-field">
+                                    <span class="cfg-field__label">New theme name</span>
+                                    <input class="cfg-field__input" type="text" maxlength="32" placeholder="my-theme" data-te-name>
+                                </label>
+                                <label class="cfg-field">
+                                    <span class="cfg-field__label">Author <span class="cfg-field__label-opt">(optional)</span></span>
+                                    <input class="cfg-field__input" type="text" maxlength="80" placeholder="Your name" data-te-author>
+                                </label>
+                                <label class="cfg-field">
+                                    <span class="cfg-field__label">Homepage <span class="cfg-field__label-opt">(optional)</span></span>
+                                    <input class="cfg-field__input" type="url" maxlength="200" placeholder="https://…" data-te-homepage>
+                                </label>
+                                <label class="cfg-field theme-editor__controls-wide">
+                                    <span class="cfg-field__label">Description <span class="cfg-field__label-opt">(optional)</span></span>
+                                    <input class="cfg-field__input" type="text" maxlength="120" placeholder="One line about the palette" data-te-desc>
+                                </label>
+                            </div>
+                            <p class="theme-editor__base-meta" data-te-base-meta hidden></p>
+                            <div class="theme-editor__groups" data-te-groups></div>
+                            <div class="theme-editor__advanced-note">
+                                The Messages panel and Terminal keep their own colour sets (<code>--msg-*</code> / <code>--term-*</code>) — you can't preview them from here, so they aren't swatches. Where your <strong>Start from</strong> theme already overrides them (e.g. Light) the download carries those in; tick the box below to also get the rest as a commented-out scaffold to hand-tune.
+                                <label class="theme-editor__refopt"><input type="checkbox" data-te-carry-ref> Include Messages / Terminal tokens for reference</label>
+                            </div>
+                            <div class="cfg-card__actions">
+                                <button class="terminal-button" type="button" data-te-reset>Reset changes</button>
+                                <button class="terminal-button terminal-button--primary" type="button" data-te-save>Save to device</button>
+                                <button class="terminal-button" type="button" data-te-download>Download theme.css</button>
+                                <button class="terminal-button" type="button" data-te-download-json>Download theme.json</button>
+                            </div>
+                            <p class="auth-card__hint">Save writes it to <code>plugins/themes/</code> on the device (admin, logged). Reload the dashboard to see it in the picker. Download is for sharing or a pull request.</p>
+                            <p class="auth-status" data-te-status aria-live="polite"></p>
+                        </article>
+                    </div>
 
-                    <article class="auth-card">
-                        <h3 class="auth-card__title">Installed themes</h3>
-                        <p class="auth-card__hint">Every theme installed on this device. Deleting a community theme removes its folder from <code>plugins/themes/</code>; built-ins can't be deleted.</p>
-                        <div data-te-installed></div>
-                    </article>
+                    <div data-theme-view="installed" hidden>
+                        <article class="auth-card">
+                            <h3 class="auth-card__title">Installed themes</h3>
+                            <p class="auth-card__hint">Every theme installed on this device. Deleting a community theme removes its folder from <code>plugins/themes/</code>; built-ins can't be deleted.</p>
+                            <div data-te-installed></div>
+                        </article>
+                    </div>
                 </div>
             </section>
             <section class="section" data-section="settings/auth" style="display:none">
