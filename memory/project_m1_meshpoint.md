@@ -17111,3 +17111,5 @@ Verified: 2 new tests in `test_plugin_source_routes.py` (theme-only update corre
 
 **Same day, follow-up: user asked (tell-me-first) whether the pill's text itself reflects which kind of update it is.** It didn't -- static "Plugin update available" regardless. Confirmed and built: `_applyPlugins()` now sets `headerPill.textContent` alongside the href/route it was already computing per the three cases above -- "Plugin update available" / "Theme update available" / and, for both at once, the user's own explicit call to keep it short: "Updates available" rather than something like "Plugin & theme updates available" which they flagged as too big for the pill.
 
+**Pi-verified (partial), 2026-10-12: plugin-only case confirmed working** — pill shows "Plugin update available", routes to Plugins/Installed correctly. Theme-only and both-at-once cases not yet exercised on the real device (no theme-only or mixed source available to test against yet, not a reported failure).
+
