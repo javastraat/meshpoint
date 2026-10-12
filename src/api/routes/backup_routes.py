@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import shutil
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -16,7 +17,6 @@ from src.api.audit import AuditLogWriter
 from src.api.audit.dependencies import get_audit_writer
 from src.api.auth.dependencies import require_admin
 from src.api.auth.jwt_session import SessionClaims
-from src.api.routes.system_metrics import system_metrics
 from src.backup.archive_builder import BackupArchiveBuilder
 from src.backup.encryption import MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH
 from src.backup.paths import (
@@ -88,8 +88,24 @@ async def backup_status(
     _claims: SessionClaims = Depends(require_admin),
 ) -> dict:
     config = _require_config()
-    metrics = await system_metrics()
-    disk_percent = float(metrics.get("disk_percent", 0))
+    # Plain disk_usage, not system_metrics() -- that pulls in a full
+    # psutil sweep (CPU/memory/temp/load-avg/fan) just for this one
+    # field, including psutil.cpu_percent(interval=0.5), a GUARANTEED
+    # 500ms+ synchronous block on the single-threaded asyncio event loop
+    # (not awaited internally despite the `async def`, so it stalls
+    # every other request/websocket on the whole app, not just this
+    # one). Confirmed live: the Settings -> System page's Backup card
+    # and Web terminal card both appeared late together, not
+    # independently slow -- exactly what a shared event-loop stall looks
+    # like. disk_usage() alone is instant, no psutil needed.
+    disk = shutil.disk_usage("/")
+    disk_percent = round(disk.used / disk.total * 100, 1) if disk.total else 0.0
+    loop = asyncio.get_running_loop()
+    # _estimate_backup_bytes() walks the full data/ directory (hundreds
+    # of MB, many files) with blocking stat() calls -- same event-loop-
+    # stall problem, same fix download_backup already uses below for an
+    # equally expensive call.
+    estimated_bytes = await loop.run_in_executor(None, _estimate_backup_bytes, config)
     return {
         "device_id": config.device.device_id,
         "device_name": config.device.device_name,
@@ -97,7 +113,7 @@ async def backup_status(
             "config/local.yaml",
             "data/ (full directory, SQLite hot snapshot)",
         ],
-        "estimated_bytes": _estimate_backup_bytes(config),
+        "estimated_bytes": estimated_bytes,
         "disk_percent": disk_percent,
         "suggest_backup": disk_percent >= 90,
         "encryption": "optional",

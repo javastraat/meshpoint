@@ -756,6 +756,26 @@ Serial multi-stick, Updates UX, native MQTT MapReport, and operator polish on `m
 
 ### v0.8.1 (August 2026)
 
+- **Fix: Settings → System was slow to load, with the Backup card's
+  estimated size and the Web terminal card both appearing late
+  together** — not independently slow, but queued up behind a shared
+  stall: `GET /api/system/backup/status` called `system_metrics()` (a
+  *different* endpoint's own handler, `GET /api/system/metrics`,
+  improperly reused as a plain function) just to read one field
+  (`disk_percent`), pulling in a full psutil sweep including
+  `psutil.cpu_percent(interval=0.5)` — a guaranteed 500ms+ synchronous
+  block that, despite the `async def`, never yields, freezing the
+  *entire* single-threaded event loop (every open tab, every other API
+  call, every websocket) for its duration, not just this request. On
+  top of that, estimating the backup size walked the full `data/`
+  directory with blocking `stat()` calls on every file, directly inside
+  the same handler — same event-loop-stall problem `download_backup`
+  right below it in the same file already solved with
+  `run_in_executor`, just never applied here. Fixed: `disk_percent` now
+  comes from a plain, instant `shutil.disk_usage("/")` instead of the
+  whole metrics sweep, and the directory walk now runs on a background
+  thread.
+
 - **46 new plugin sidebar icons**, and an unknown icon no longer breaks a
   plugin. The curated set grows from 16 to 62 with icons copied
   from [Lucide](https://lucide.dev) (ISC, same line style as the existing
