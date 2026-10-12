@@ -792,6 +792,21 @@ Serial multi-stick, Updates UX, native MQTT MapReport, and operator polish on `m
   top-level folder is never opened at all, replacing the old
   rglob-then-filter in both places.
 
+  **Regression caught the same day, from a live `HTTP 500` on this
+  exact page right after the fix above shipped:** the old `rglob()`
+  code filtered every entry through `path.is_file()` before trusting
+  it — which never raises, it just returns `False` for a broken
+  symlink, socket, FIFO, or device node, silently skipping it. The
+  `os.walk()` rewrite dropped that filter: its `filenames` list only
+  tests `is_dir()` to sort entries, so a dangling symlink anywhere
+  under `data/` lands there same as a real file, and `Path.stat()`
+  follows symlinks by default and raises `FileNotFoundError` on one
+  with no target — crashing the request instead of skipping it. Fixed
+  by restoring the same `is_file()` check before yielding. New test
+  (`tests/test_backup_paths.py`) plants a dangling symlink and asserts
+  it's silently skipped, not raised — the regression is now covered,
+  not just fixed blind.
+
 - **46 new plugin sidebar icons**, and an unknown icon no longer breaks a
   plugin. The curated set grows from 16 to 62 with icons copied
   from [Lucide](https://lucide.dev) (ISC, same line style as the existing

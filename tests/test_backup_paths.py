@@ -65,6 +65,21 @@ class TestIterIncludedDataFiles(unittest.TestCase):
         missing = self.data_dir / "does-not-exist"
         self.assertEqual(list(iter_included_data_files(missing)), [])
 
+    def test_broken_symlink_is_skipped_not_raised(self) -> None:
+        # Real regression caught live: os.walk()'s filenames list only
+        # tests is_dir() to sort entries, so a dangling symlink (or a
+        # socket/FIFO/device node) lands there same as a real file --
+        # Path.stat() follows symlinks by default and raises
+        # FileNotFoundError on one with no target, which previously
+        # 500'd GET /api/system/backup/status on a real device. A
+        # regular file alongside it must still come through fine.
+        self._touch("concentrator.db")
+        dangling = self.data_dir / "dangling-symlink"
+        dangling.symlink_to(self.data_dir / "does-not-exist-target")
+
+        names = {p.relative_to(self.data_dir).as_posix() for p in iter_included_data_files(self.data_dir)}
+        self.assertEqual(names, {"concentrator.db"})
+
 
 if __name__ == "__main__":
     unittest.main()

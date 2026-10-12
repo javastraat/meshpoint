@@ -52,6 +52,17 @@ def iter_included_data_files(data_dir: Path):
     never opened at all. The exclusion pattern only ever matches a
     name at ``relative_parts[0]`` (it never excluded anything nested
     deeper), so pruning only ever needs to happen at the top level.
+
+    Only yields entries that pass ``is_file()`` -- a broken symlink, a
+    socket, or a device/FIFO node all land in ``os.walk``'s
+    ``filenames`` list (it only tests ``is_dir()`` to sort entries into
+    ``dirnames`` vs ``filenames``, nothing stronger), and ``Path.stat()``
+    follows symlinks by default and raises ``FileNotFoundError`` on a
+    dangling one. The old ``rglob()``-based version filtered exactly
+    this way too (``if not path.is_file(): continue``) -- ``is_file()``
+    itself never raises, it just returns ``False`` for any of these, so
+    this preserves that same silent-skip behavior instead of ever
+    5xx-ing a caller over a stray broken symlink somewhere in `data/`.
     """
     data_dir = Path(data_dir)
     if not data_dir.is_dir():
@@ -63,7 +74,9 @@ def iter_included_data_files(data_dir: Path):
             top = False
         base = Path(dirpath)
         for name in filenames:
-            yield base / name
+            path = base / name
+            if path.is_file():
+                yield path
 
 
 def restore_finish_script(meshpoint_root: Path | None = None) -> Path:
