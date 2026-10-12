@@ -14,8 +14,10 @@
  * (`interval_minutes`) and re-times its own polling to match, instead
  * of polling on a separate hardcoded cadence of its own.
  *
- * Only drives the two header pills (#sidebar-update-pill,
- * #sidebar-plugin-update-pill, both plain links) -- the Settings-group/
+ * Only drives the two header pills: #sidebar-update-pill (a plain,
+ * fixed link) and #sidebar-plugin-update-pill (its href/target tab
+ * change per refresh -- see _applyPlugins -- since a plugin update and
+ * a theme update live on two different pages). The Settings-group/
  * Updates-subitem badges were dropped per user request (redundant once
  * the header pill existed).
  *
@@ -36,6 +38,25 @@ class UpdateCheckBadge {
         // replaced below the moment a real interval_minutes arrives.
         this._scheduleNext(DEFAULT_POLL_MINUTES);
         this._refresh();
+
+        // The plugin pill's destination depends on what actually has an
+        // update -- a plugin update belongs on Settings -> Plugins ->
+        // Installed, a theme update on Settings -> Themes -> Installed
+        // themes, entirely different pages each with their own sticky
+        // per-browser tab preference (localStorage). _applyPlugins()
+        // below keeps this._pluginPillRoute current on every refresh;
+        // one listener here reads whatever it says *at click time*
+        // (not bound to whatever it was when the pill first appeared)
+        // and sets that page's tab preference just before the plain
+        // href navigates there.
+        const pluginPill = document.getElementById('sidebar-plugin-update-pill');
+        if (pluginPill) {
+            pluginPill.addEventListener('click', () => {
+                const route = this._pluginPillRoute;
+                if (!route) return;
+                try { localStorage.setItem(route.storageKey, route.tab); } catch (_e) {}
+            });
+        }
     }
 
     /** Re-fetch both (cheap, cache-only) badge statuses right away --
@@ -104,10 +125,33 @@ class UpdateCheckBadge {
         if (headerPill) headerPill.style.display = available ? '' : 'none';
     }
 
+    /** Picks where the plugin pill points, since "an update is
+     * available" alone doesn't say which page actually shows it:
+     * - plugin update only -> Plugins page, Installed tab
+     * - theme update only -> Themes page, Installed themes tab
+     * - both at once (one source offering an updated plugin AND an
+     *   updated theme) -> Plugins page, Sources tab -- that tab's own
+     *   catalog view lists both kinds together, rather than guessing
+     *   which single page/tab combination to prioritize. */
     _applyPlugins(data) {
         const available = Boolean(data && data.update_available);
         const headerPill = document.getElementById('sidebar-plugin-update-pill');
-        if (headerPill) headerPill.style.display = available ? '' : 'none';
+        if (!headerPill) return;
+        headerPill.style.display = available ? '' : 'none';
+        if (!available) return;
+
+        const hasPlugin = Boolean(data && data.plugin_update_available);
+        const hasTheme = Boolean(data && data.theme_update_available);
+        if (hasPlugin && hasTheme) {
+            headerPill.href = '#/settings/plugins';
+            this._pluginPillRoute = { storageKey: 'meshpoint:plugins-tab', tab: 'sources' };
+        } else if (hasTheme) {
+            headerPill.href = '#/settings/themes';
+            this._pluginPillRoute = { storageKey: 'meshpoint:themes-tab', tab: 'installed' };
+        } else {
+            headerPill.href = '#/settings/plugins';
+            this._pluginPillRoute = { storageKey: 'meshpoint:plugins-tab', tab: 'installed' };
+        }
     }
 }
 

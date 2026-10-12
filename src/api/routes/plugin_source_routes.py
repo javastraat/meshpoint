@@ -312,18 +312,25 @@ async def source_catalog(
 _last_plugin_check: dict | None = None
 
 
-def _check_sources_sync(force: bool = False) -> bool:
-    """True if any configured source has at least one installed
-    plugin/theme with a newer version available. Blocking (network I/O
-    via ``fetch_catalog``/``_get_catalog_cached``) -- always run through
-    ``run_in_executor``, never awaited directly. Each source is
-    independent: one being unreachable/misconfigured just gets skipped,
-    not allowed to stop the rest from being checked.
+def _check_sources_sync(force: bool = False) -> dict:
+    """``{"plugin": bool, "theme": bool}`` -- whether any configured
+    source has at least one installed plugin, resp. theme, with a newer
+    version available. Tracked separately (not one blended flag) so the
+    sidebar pill can route to the right page: a plugin update belongs
+    on Settings -> Plugins -> Installed, a theme update on Settings ->
+    Themes -> Installed themes -- entirely different pages, so
+    collapsing them into one boolean left no way to pick the right one.
+
+    Blocking (network I/O via ``fetch_catalog``/``_get_catalog_cached``)
+    -- always run through ``run_in_executor``, never awaited directly.
+    Each source is independent: one being unreachable/misconfigured
+    just gets skipped, not allowed to stop the rest from being checked.
 
     ``force`` bypasses each source's catalog cache -- see
     ``run_periodic_plugin_check``."""
+    found = {"plugin": False, "theme": False}
     if _config is None or not _config.plugin_sources_enabled:
-        return False
+        return found
     installed = _installed_index()
     for source in _sources():
         url = source.get("url")
@@ -339,11 +346,17 @@ def _check_sources_sync(force: bool = False) -> bool:
                 exc_info=True,
             )
             continue
-        for entry in catalog.get("plugins", []) + catalog.get("themes", []):
-            cur = installed.get(entry.get("id"))
-            if cur and cur != entry.get("version"):
-                return True
-    return False
+        for kind, entries in (("plugin", catalog.get("plugins", [])), ("theme", catalog.get("themes", []))):
+            if found[kind]:
+                continue  # already confirmed for this kind, no need to re-check its entries
+            for entry in entries:
+                cur = installed.get(entry.get("id"))
+                if cur and cur != entry.get("version"):
+                    found[kind] = True
+                    break
+        if found["plugin"] and found["theme"]:
+            break  # both kinds already confirmed, no need to check remaining sources
+    return found
 
 
 async def run_periodic_plugin_check(force: bool = False) -> None:
@@ -364,13 +377,21 @@ async def run_periodic_plugin_check(force: bool = False) -> None:
         return
     loop = asyncio.get_running_loop()
     try:
-        available = await loop.run_in_executor(None, _check_sources_sync, force)
+        found = await loop.run_in_executor(None, _check_sources_sync, force)
         _last_plugin_check = {
-            "update_available": available,
+            "update_available": bool(found["plugin"] or found["theme"]),
+            "plugin_update_available": found["plugin"],
+            "theme_update_available": found["theme"],
             "checked_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         }
     except Exception:
         logger.exception("Periodic plugin-update check failed")
+
+
+_EMPTY_PLUGIN_BADGE = {
+    "update_available": False, "plugin_update_available": False,
+    "theme_update_available": False, "checked_at": None,
+}
 
 
 @router.get("/update-badge")
@@ -382,7 +403,7 @@ async def plugin_update_badge(
     Never fetches anything itself, just reads whatever the shared
     periodic loop last found, so polling this is cheap."""
     if _last_plugin_check is None:
-        return {"update_available": False, "checked_at": None}
+        return dict(_EMPTY_PLUGIN_BADGE)
     return dict(_last_plugin_check)
 
 
@@ -398,7 +419,7 @@ async def check_now(
     _require_config()
     await run_periodic_plugin_check(force=True)
     if _last_plugin_check is None:
-        return {"update_available": False, "checked_at": None}
+        return dict(_EMPTY_PLUGIN_BADGE)
     return dict(_last_plugin_check)
 
 

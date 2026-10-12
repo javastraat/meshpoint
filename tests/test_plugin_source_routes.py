@@ -310,7 +310,58 @@ class TestPluginSourceRoutes(unittest.TestCase):
         self.assertEqual(r.status_code, 200, r.text)
         body = r.json()
         self.assertFalse(body["update_available"])
+        self.assertFalse(body["plugin_update_available"])
+        self.assertFalse(body["theme_update_available"])
         self.assertIsNone(body["checked_at"])
+
+    def test_periodic_plugin_check_distinguishes_plugin_vs_theme_updates(self) -> None:
+        """The sidebar pill needs to know WHICH kind has an update --
+        a plugin update belongs on the Plugins page, a theme update on
+        the Themes page -- so these can't collapse into one boolean."""
+        import asyncio
+
+        self.client.post("/api/plugin-sources", json={
+            "url": "https://github.com/you/p", "confirm": True,
+        })
+        catalog = {
+            "name": "t", "description": "", "owner": "you", "repo": "p", "ref": "main",
+            "url": "https://github.com/you/p", "plugins": [],
+            "themes": [
+                {"id": "dark-theme", "kind": "theme", "path": "themes/dark-theme",
+                 "version": "2.0.0", "meshpoint_api": 1, "provides": [], "description": "",
+                 "author": "", "homepage": "", "has_setup": False, "compatible": True},
+            ],
+        }
+        self._mod.fetch_catalog = lambda url, ref: dict(catalog)
+        self._mod._installed_index = lambda: {"dark-theme": "1.0.0"}
+
+        asyncio.run(self._mod.run_periodic_plugin_check())
+
+        body = self.client.get("/api/plugin-sources/update-badge").json()
+        self.assertTrue(body["update_available"])
+        self.assertFalse(body["plugin_update_available"])
+        self.assertTrue(body["theme_update_available"])
+
+    def test_periodic_plugin_check_detects_both_plugin_and_theme_updates(self) -> None:
+        import asyncio
+
+        self.client.post("/api/plugin-sources", json={
+            "url": "https://github.com/you/p", "confirm": True,
+        })
+        catalog = self._catalog_with({"version": "2.0"})
+        catalog["themes"] = [
+            {"id": "dark-theme", "kind": "theme", "path": "themes/dark-theme",
+             "version": "2.0.0", "meshpoint_api": 1, "provides": [], "description": "",
+             "author": "", "homepage": "", "has_setup": False, "compatible": True},
+        ]
+        self._mod.fetch_catalog = lambda url, ref: dict(catalog)
+        self._mod._installed_index = lambda: {"demo": "1.0", "dark-theme": "1.0.0"}
+
+        asyncio.run(self._mod.run_periodic_plugin_check())
+
+        body = self.client.get("/api/plugin-sources/update-badge").json()
+        self.assertTrue(body["plugin_update_available"])
+        self.assertTrue(body["theme_update_available"])
 
     def test_periodic_plugin_check_detects_an_update(self) -> None:
         import asyncio
