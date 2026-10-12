@@ -30,12 +30,40 @@ def resolve_data_dir(database_path: str) -> Path:
     return Path(database_path).resolve().parent
 
 
-def is_excluded_data_relative(relative_parts: tuple[str, ...]) -> bool:
-    """True when a ``data/`` subtree should not be included in backups."""
-    if not relative_parts:
-        return False
-    head = relative_parts[0]
-    return bool(_EXCLUDED_DATA_DIR_PATTERN.match(head))
+def iter_included_data_files(data_dir: Path):
+    """Yield every file under ``data_dir`` that belongs in a backup,
+    skipping excluded top-level subtrees (``restore-incoming``,
+    ``backup-staging``, ``pre-restore-stash-*``) WITHOUT walking into
+    them first.
+
+    Both callers of this (``BackupArchiveBuilder._add_data_tree`` and
+    the backup-status size estimate) used to do ``Path.rglob("*")``
+    then check each result's relative path against
+    ``_EXCLUDED_DATA_DIR_PATTERN`` one file at a time -- ``rglob`` has no
+    pruning API, so it always recurses into an excluded directory
+    before that per-file check throws its contents away. A
+    ``pre-restore-stash-*`` dir is a full copy of the data tree at
+    restore time (made by ``scripts/restore_finish.sh``, never cleaned
+    up automatically) -- after even one or two real restores, that
+    silently multiplies the real file count several times over for
+    every size estimate and every real backup build, with nothing to
+    show for the extra I/O. ``os.walk`` lets a caller prune `dirnames`
+    in place before it descends, so an excluded top-level directory is
+    never opened at all. The exclusion pattern only ever matches a
+    name at ``relative_parts[0]`` (it never excluded anything nested
+    deeper), so pruning only ever needs to happen at the top level.
+    """
+    data_dir = Path(data_dir)
+    if not data_dir.is_dir():
+        return
+    top = True
+    for dirpath, dirnames, filenames in os.walk(data_dir):
+        if top:
+            dirnames[:] = [d for d in dirnames if not _EXCLUDED_DATA_DIR_PATTERN.match(d)]
+            top = False
+        base = Path(dirpath)
+        for name in filenames:
+            yield base / name
 
 
 def restore_finish_script(meshpoint_root: Path | None = None) -> Path:

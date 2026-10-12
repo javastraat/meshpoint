@@ -21,7 +21,7 @@ from src.backup.archive_builder import BackupArchiveBuilder
 from src.backup.encryption import MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH
 from src.backup.paths import (
     MAX_UPLOAD_BYTES,
-    is_excluded_data_relative,
+    iter_included_data_files,
     resolve_data_dir,
     resolve_local_config_path,
 )
@@ -71,12 +71,7 @@ def _estimate_backup_bytes(config: AppConfig) -> int:
         return total
 
     db_name = Path(config.storage.database_path).name
-    for path in data_dir.rglob("*"):
-        if not path.is_file():
-            continue
-        rel_parts = path.relative_to(data_dir).parts
-        if is_excluded_data_relative(rel_parts):
-            continue
+    for path in iter_included_data_files(data_dir):
         if path.name in {f"{db_name}-wal", f"{db_name}-shm"}:
             continue
         total += path.stat().st_size

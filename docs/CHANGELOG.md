@@ -776,6 +776,22 @@ Serial multi-stick, Updates UX, native MQTT MapReport, and operator polish on `m
   whole metrics sweep, and the directory walk now runs on a background
   thread.
 
+  **Follow-up, same day:** moving the walk off the event loop made the
+  rest of the page load promptly, but the Backup card's own text still
+  took several seconds on a real device. Real second bug: both that
+  size estimate and the real backup-build step (`BackupArchiveBuilder
+  ._add_data_tree`) used `Path.rglob("*")`, which has no pruning API —
+  it always recurses into a directory before a per-file check decides
+  to exclude it. A `pre-restore-stash-*` folder (a full copy of the
+  data tree, made by every restore and never cleaned up automatically)
+  is exactly the kind of thing meant to be excluded, so after even one
+  or two real restores on a device, every size estimate and every real
+  backup was silently walking several times the real file count just
+  to throw most of it away. New `src.backup.paths.iter_included_data_files()`
+  uses `os.walk()` with in-place directory pruning so an excluded
+  top-level folder is never opened at all, replacing the old
+  rglob-then-filter in both places.
+
 - **46 new plugin sidebar icons**, and an unknown icon no longer breaks a
   plugin. The curated set grows from 16 to 62 with icons copied
   from [Lucide](https://lucide.dev) (ISC, same line style as the existing

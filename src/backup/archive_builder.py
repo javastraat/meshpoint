@@ -15,7 +15,7 @@ from pathlib import Path
 from src.backup.encryption import encrypt_archive
 from src.backup.manifest import FORMAT_VERSION, BackupFileEntry, BackupManifest
 from src.backup.paths import (
-    is_excluded_data_relative,
+    iter_included_data_files,
     resolve_data_dir,
     resolve_local_config_path,
     resolve_meshpoint_root,
@@ -153,15 +153,11 @@ class BackupArchiveBuilder:
         db_name = self._database_path.name
         db_path = self._data_dir / db_name
 
-        for path in sorted(self._data_dir.rglob("*")):
-            if not path.is_file():
-                continue
-            rel_parts = path.relative_to(self._data_dir).parts
-            if is_excluded_data_relative(rel_parts):
-                continue
+        for path in sorted(iter_included_data_files(self._data_dir)):
             if path.name in {f"{db_name}-wal", f"{db_name}-shm"}:
                 continue
 
+            rel_parts = path.relative_to(self._data_dir).parts
             archive_rel = Path("data").joinpath(*rel_parts).as_posix()
             dest = bundle_dir / archive_rel
 
