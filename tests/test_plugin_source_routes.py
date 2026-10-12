@@ -399,6 +399,48 @@ class TestPluginSourceRoutes(unittest.TestCase):
         self.client.get("/api/plugin-sources/catalog?url=https://github.com/you/p&ref=main")
         self.assertEqual(calls["n"], 1)
 
+    def test_catalog_force_bypasses_the_cache(self) -> None:
+        """The manual "Check for updates" button passes force=true --
+        it must always get a fresh fetch, never the cached response."""
+        calls = {"n": 0}
+
+        def counting_fetch(url, ref):
+            calls["n"] += 1
+            return self._catalog_with({})
+
+        self._mod.fetch_catalog = counting_fetch
+        self.client.get("/api/plugin-sources/catalog?url=https://github.com/you/p&ref=main")
+        self.client.get("/api/plugin-sources/catalog?url=https://github.com/you/p&ref=main&force=true")
+        self.assertEqual(calls["n"], 2)
+
+    def test_check_now_forces_a_fresh_check_and_updates_the_badge(self) -> None:
+        self.client.post("/api/plugin-sources", json={
+            "url": "https://github.com/you/p", "confirm": True,
+        })
+        calls = {"n": 0}
+
+        def counting_fetch(url, ref):
+            calls["n"] += 1
+            return self._catalog_with({"version": "2.0"})
+
+        self._mod.fetch_catalog = counting_fetch
+        self._mod._installed_index = lambda: {"demo": "1.0"}
+
+        # Prime the cache with a plain GET, same as the automatic/page-load path.
+        self.client.get("/api/plugin-sources/catalog?url=https://github.com/you/p&ref=main")
+        self.assertEqual(calls["n"], 1)
+
+        r = self.client.post("/api/plugin-sources/check-now")
+        self.assertEqual(r.status_code, 200, r.text)
+        body = r.json()
+        self.assertTrue(body["update_available"])
+        self.assertIsNotNone(body["checked_at"])
+        # force=True inside check-now must have bypassed the still-fresh cache.
+        self.assertEqual(calls["n"], 2)
+
+        badge = self.client.get("/api/plugin-sources/update-badge").json()
+        self.assertEqual(badge, body)
+
 
 @unittest.skipUnless(_HAS_FASTAPI, "routes import fastapi (CI / Pi only)")
 class TestPluginSourcesDisabledByDefault(unittest.TestCase):

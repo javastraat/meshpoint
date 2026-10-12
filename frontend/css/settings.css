@@ -1281,12 +1281,20 @@ select.update-field__input option:checked {
 
 /* --- Plugin sources (Settings -> Plugins -> "Add source") -------------- */
 .plugins-sources { margin-top: 1rem; }
+.plugins-sources__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+}
 .plugins-sources__title { margin: 0 0 0.25rem; font-size: 0.95rem; }
 .plugins-sources__subtitle {
     margin: 0 0 0.75rem;
     font-size: 0.78rem;
     color: var(--text-muted);
     line-height: 1.5;
+    flex-basis: 100%;
 }
 .plugins-sources__add {
     display: flex;

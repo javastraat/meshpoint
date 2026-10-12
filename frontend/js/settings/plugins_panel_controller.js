@@ -98,6 +98,7 @@ class PluginsPanelController {
         this.srcListEl = rootEl.querySelector('[data-src-list]');
         this.srcSubtitleEl = rootEl.querySelector('[data-src-subtitle]');
         this.srcCardEl = rootEl.querySelector('[data-plugin-sources-card]');
+        this.srcCheckBtn = rootEl.querySelector('[data-src-check-updates]');
         this._sources = [];
         // data-src-subtitle / data-src-add-form both start `hidden` in the
         // markup itself (index.html) -- neither ever paints before
@@ -192,6 +193,47 @@ class PluginsPanelController {
             this.srcPresetEl.addEventListener('change', () => this._onPresetChange());
             this._loadSourcePresets();
         }
+        if (this.srcCheckBtn) {
+            this.srcCheckBtn.addEventListener('click', () => this._checkSourcesForUpdates());
+        }
+    }
+
+    /** Manual "Check for updates" (Sources tab). Forces a fresh catalog
+     * fetch for every configured source -- bypassing each one's 5-minute
+     * cache, since an explicit click should mean *now* -- both to refresh
+     * the per-row Update buttons on this page (_scanSource) and to make
+     * the sidebar's blue pill reflect it immediately via
+     * POST /api/plugin-sources/check-now + refreshNow(), rather than
+     * waiting for the next automatic tick on the shared "Automatic
+     * checks" interval. Mirrors the core Updates page's own "Check for
+     * updates" button in shape and intent. */
+    async _checkSourcesForUpdates() {
+        if (!this._sources.length) return;
+        this.srcCheckBtn.disabled = true;
+        this._setSrcStatus('pending', 'Checking…');
+        try {
+            await Promise.all(
+                this._sources.map((s) => this._scanSource(s.url, s.ref || 'main', { force: true })),
+            );
+            let body = null;
+            try {
+                const r = await fetch('/api/plugin-sources/check-now', {
+                    method: 'POST', credentials: 'same-origin',
+                });
+                if (r.ok) body = await r.json();
+            } catch (_) {}
+            window.updateCheckBadge?.refreshNow();
+            const updateCount = Object.keys(this._updates).length;
+            if (updateCount > 0) {
+                this._setSrcStatus('success', `${updateCount} update${updateCount === 1 ? '' : 's'} found.`);
+            } else if (body && body.checked_at) {
+                this._setSrcStatus('success', 'Up to date.');
+            } else {
+                this._setSrcStatus('error', 'Checked — one or more sources were unreachable.');
+            }
+        } finally {
+            this.srcCheckBtn.disabled = false;
+        }
     }
 
     /** Fills the "Community presets…" dropdown next to the free-text add-
@@ -279,6 +321,7 @@ class PluginsPanelController {
 
     _renderSources() {
         if (!this.srcListEl) return;
+        if (this.srcCheckBtn) this.srcCheckBtn.hidden = !this._sources.length;
         // Remember which Browse panels are open (and what they show) so a
         // re-render -- every Install/Update ends in _loadSources() -- doesn't
         // slam them shut and lose the operator's place. Re-opened below with
@@ -333,13 +376,13 @@ class PluginsPanelController {
         });
     }
 
-    async _scanSource(url, ref) {
+    async _scanSource(url, ref, { force = false } = {}) {
         const row = this.srcListEl.querySelector(`[data-src-row="${(window.CSS && CSS.escape) ? CSS.escape(url) : url}"]`);
         const el = row && row.querySelector('[data-src-count]');
         if (el) el.textContent = '— checking…';
         let cat = null;
         try {
-            const qs = `url=${encodeURIComponent(url)}${ref ? `&ref=${encodeURIComponent(ref)}` : ''}`;
+            const qs = `url=${encodeURIComponent(url)}${ref ? `&ref=${encodeURIComponent(ref)}` : ''}${force ? '&force=true' : ''}`;
             const r = await fetch(`/api/plugin-sources/catalog?${qs}`, { credentials: 'same-origin' });
             if (!r.ok) { if (el) el.textContent = '— unreachable'; return; }
             cat = await r.json();

@@ -246,19 +246,24 @@ _CATALOG_CACHE_TTL_SECONDS = 300
 _catalog_cache: dict[tuple[str, str], tuple[float, dict]] = {}
 
 
-def _get_catalog_cached(canon: str, ref: str) -> dict:
+def _get_catalog_cached(canon: str, ref: str, force: bool = False) -> dict:
     """``fetch_catalog(canon, ref)``, cached per ``(canon, ref)`` for
     ``_CATALOG_CACHE_TTL_SECONDS`` (same TTL/shape as the core
     self-update check in ``update_check.py``). Shared by the interactive
     ``/catalog`` route below AND the periodic plugin-update check
     (``run_periodic_plugin_check``) -- without this, the periodic check
     would re-fetch every configured source's ``repo.json`` from GitHub
-    on every tick, on top of whatever the Plugins page itself triggers."""
+    on every tick, on top of whatever the Plugins page itself triggers.
+
+    ``force=True`` skips the cache hit (but still refreshes it) -- for
+    an explicit "Check for updates" click, which should mean *now*, not
+    "whenever the last call happened to be"."""
     cache_key = (canon, ref)
     now = time.monotonic()
-    cached = _catalog_cache.get(cache_key)
-    if cached and now < cached[0]:
-        return cached[1]
+    if not force:
+        cached = _catalog_cache.get(cache_key)
+        if cached and now < cached[0]:
+            return cached[1]
     catalog = fetch_catalog(canon, ref)
     _catalog_cache[cache_key] = (now + _CATALOG_CACHE_TTL_SECONDS, catalog)
     return catalog
@@ -266,7 +271,7 @@ def _get_catalog_cached(canon: str, ref: str) -> dict:
 
 @router.get("/catalog")
 async def source_catalog(
-    url: str, ref: str | None = None,
+    url: str, ref: str | None = None, force: bool = False,
     _claims: SessionClaims = Depends(require_admin),
 ):
     """Fetch a source's ``repo.json`` and return its offerings,
@@ -274,7 +279,7 @@ async def source_catalog(
     configured ref, then ``main``. The installed/update-available
     annotations are recomputed fresh on every call regardless of cache
     hit, since they reflect this device's live state, not the remote
-    repo's."""
+    repo's. ``force=true`` bypasses the cache (see ``_get_catalog_cached``)."""
     _require_config()
     try:
         owner, repo = parse_github_url(url)
@@ -288,7 +293,7 @@ async def source_catalog(
     ref = normalise_ref(ref)
 
     try:
-        catalog = _get_catalog_cached(canon, ref)
+        catalog = _get_catalog_cached(canon, ref, force=force)
     except PluginSourceError as exc:
         raise HTTPException(400 if exc.code in ("url", "ref") else 502, str(exc)) from exc
 
@@ -307,13 +312,16 @@ async def source_catalog(
 _last_plugin_check: dict | None = None
 
 
-def _check_sources_sync() -> bool:
+def _check_sources_sync(force: bool = False) -> bool:
     """True if any configured source has at least one installed
     plugin/theme with a newer version available. Blocking (network I/O
     via ``fetch_catalog``/``_get_catalog_cached``) -- always run through
     ``run_in_executor``, never awaited directly. Each source is
     independent: one being unreachable/misconfigured just gets skipped,
-    not allowed to stop the rest from being checked."""
+    not allowed to stop the rest from being checked.
+
+    ``force`` bypasses each source's catalog cache -- see
+    ``run_periodic_plugin_check``."""
     if _config is None or not _config.plugin_sources_enabled:
         return False
     installed = _installed_index()
@@ -324,7 +332,7 @@ def _check_sources_sync() -> bool:
         try:
             owner, repo = parse_github_url(url)
             canon = canonical_url(owner, repo)
-            catalog = _get_catalog_cached(canon, normalise_ref(source.get("ref")))
+            catalog = _get_catalog_cached(canon, normalise_ref(source.get("ref")), force=force)
         except Exception:
             logger.warning(
                 "plugin-update check: could not fetch %s@%s", url, source.get("ref"),
@@ -338,18 +346,25 @@ def _check_sources_sync() -> bool:
     return False
 
 
-async def run_periodic_plugin_check() -> None:
+async def run_periodic_plugin_check(force: bool = False) -> None:
     """Called once per tick of the SAME shared timer that runs
     meshpoint's own self-update check (``update_routes.
     periodic_update_check_loop``'s ``extra_check``, wired in
     ``server.py``'s lifespan) -- deliberately not a second independent
-    timer, so exactly one configured interval governs both checks."""
+    timer, so exactly one configured interval governs both checks.
+
+    ``force=True`` (used only by the manual "Check for updates" button
+    below) bypasses each source's catalog cache -- an explicit click
+    should mean *now*, not "whatever the last automatic tick cached".
+    The automatic loop itself always calls this with the default
+    ``force=False``, so the configured interval is still the only thing
+    governing how often a real fetch happens on its own."""
     global _last_plugin_check
     if _config is None or not _config.plugin_sources_enabled:
         return
     loop = asyncio.get_running_loop()
     try:
-        available = await loop.run_in_executor(None, _check_sources_sync)
+        available = await loop.run_in_executor(None, _check_sources_sync, force)
         _last_plugin_check = {
             "update_available": available,
             "checked_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -366,6 +381,22 @@ async def plugin_update_badge(
     sidebar badge -- mirrors ``GET /api/update/badge``'s shape/role.
     Never fetches anything itself, just reads whatever the shared
     periodic loop last found, so polling this is cheap."""
+    if _last_plugin_check is None:
+        return {"update_available": False, "checked_at": None}
+    return dict(_last_plugin_check)
+
+
+@router.post("/check-now")
+async def check_now(
+    _claims: SessionClaims = Depends(require_admin),
+) -> dict:
+    """Manual "Check for updates" (Plugins -> Sources tab) -- runs the
+    same aggregate check the periodic loop does, but forced (bypasses
+    each source's catalog cache) and immediately, rather than waiting
+    for the next scheduled tick. Mirrors ``POST /api/update/check``'s
+    role for the core self-update badge."""
+    _require_config()
+    await run_periodic_plugin_check(force=True)
     if _last_plugin_check is None:
         return {"update_available": False, "checked_at": None}
     return dict(_last_plugin_check)
