@@ -36,6 +36,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -89,11 +90,14 @@ def init_routes(
 
 def reset_routes() -> None:
     global _config, _builtin_dir, _community_dir, _themes_dir, _community_themes_dir
+    global _last_plugin_check
     _config = None
     _builtin_dir = None
     _community_dir = None
     _themes_dir = None
     _community_themes_dir = None
+    _catalog_cache.clear()
+    _last_plugin_check = None
 
 
 def _require_config() -> AppConfig:
@@ -238,6 +242,28 @@ async def remove_source(
     return {"removed": True, "url": url}
 
 
+_CATALOG_CACHE_TTL_SECONDS = 300
+_catalog_cache: dict[tuple[str, str], tuple[float, dict]] = {}
+
+
+def _get_catalog_cached(canon: str, ref: str) -> dict:
+    """``fetch_catalog(canon, ref)``, cached per ``(canon, ref)`` for
+    ``_CATALOG_CACHE_TTL_SECONDS`` (same TTL/shape as the core
+    self-update check in ``update_check.py``). Shared by the interactive
+    ``/catalog`` route below AND the periodic plugin-update check
+    (``run_periodic_plugin_check``) -- without this, the periodic check
+    would re-fetch every configured source's ``repo.json`` from GitHub
+    on every tick, on top of whatever the Plugins page itself triggers."""
+    cache_key = (canon, ref)
+    now = time.monotonic()
+    cached = _catalog_cache.get(cache_key)
+    if cached and now < cached[0]:
+        return cached[1]
+    catalog = fetch_catalog(canon, ref)
+    _catalog_cache[cache_key] = (now + _CATALOG_CACHE_TTL_SECONDS, catalog)
+    return catalog
+
+
 @router.get("/catalog")
 async def source_catalog(
     url: str, ref: str | None = None,
@@ -245,20 +271,24 @@ async def source_catalog(
 ):
     """Fetch a source's ``repo.json`` and return its offerings,
     annotated with install/compat state. ``ref`` defaults to the source's
-    configured ref, then ``main``."""
+    configured ref, then ``main``. The installed/update-available
+    annotations are recomputed fresh on every call regardless of cache
+    hit, since they reflect this device's live state, not the remote
+    repo's."""
     _require_config()
+    try:
+        owner, repo = parse_github_url(url)
+        canon = canonical_url(owner, repo)
+    except PluginSourceError as exc:
+        raise HTTPException(400, str(exc)) from exc
     if ref is None:
-        try:
-            owner, repo = parse_github_url(url)
-            canon = canonical_url(owner, repo)
-        except PluginSourceError as exc:
-            raise HTTPException(400, str(exc)) from exc
         ref = next(
             (s.get("ref") for s in _sources() if s.get("url") == canon), None,
         )
+    ref = normalise_ref(ref)
 
     try:
-        catalog = fetch_catalog(url, ref)
+        catalog = _get_catalog_cached(canon, ref)
     except PluginSourceError as exc:
         raise HTTPException(400 if exc.code in ("url", "ref") else 502, str(exc)) from exc
 
@@ -272,6 +302,73 @@ async def source_catalog(
         entry["installed_commit"] = prov.get("commit") or ""
         entry["installed_ref"] = prov.get("ref") or ""
     return catalog
+
+
+_last_plugin_check: dict | None = None
+
+
+def _check_sources_sync() -> bool:
+    """True if any configured source has at least one installed
+    plugin/theme with a newer version available. Blocking (network I/O
+    via ``fetch_catalog``/``_get_catalog_cached``) -- always run through
+    ``run_in_executor``, never awaited directly. Each source is
+    independent: one being unreachable/misconfigured just gets skipped,
+    not allowed to stop the rest from being checked."""
+    if _config is None or not _config.plugin_sources_enabled:
+        return False
+    installed = _installed_index()
+    for source in _sources():
+        url = source.get("url")
+        if not url:
+            continue
+        try:
+            owner, repo = parse_github_url(url)
+            canon = canonical_url(owner, repo)
+            catalog = _get_catalog_cached(canon, normalise_ref(source.get("ref")))
+        except Exception:
+            logger.warning(
+                "plugin-update check: could not fetch %s@%s", url, source.get("ref"),
+                exc_info=True,
+            )
+            continue
+        for entry in catalog.get("plugins", []) + catalog.get("themes", []):
+            cur = installed.get(entry.get("id"))
+            if cur and cur != entry.get("version"):
+                return True
+    return False
+
+
+async def run_periodic_plugin_check() -> None:
+    """Called once per tick of the SAME shared timer that runs
+    meshpoint's own self-update check (``update_routes.
+    periodic_update_check_loop``'s ``extra_check``, wired in
+    ``server.py``'s lifespan) -- deliberately not a second independent
+    timer, so exactly one configured interval governs both checks."""
+    global _last_plugin_check
+    if _config is None or not _config.plugin_sources_enabled:
+        return
+    loop = asyncio.get_running_loop()
+    try:
+        available = await loop.run_in_executor(None, _check_sources_sync)
+        _last_plugin_check = {
+            "update_available": available,
+            "checked_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        }
+    except Exception:
+        logger.exception("Periodic plugin-update check failed")
+
+
+@router.get("/update-badge")
+async def plugin_update_badge(
+    _claims: SessionClaims = Depends(require_admin),
+) -> dict:
+    """Cached result of the periodic plugin-source update check, for the
+    sidebar badge -- mirrors ``GET /api/update/badge``'s shape/role.
+    Never fetches anything itself, just reads whatever the shared
+    periodic loop last found, so polling this is cheap."""
+    if _last_plugin_check is None:
+        return {"update_available": False, "checked_at": None}
+    return dict(_last_plugin_check)
 
 
 @router.get("/resolve")

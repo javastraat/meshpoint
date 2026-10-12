@@ -522,6 +522,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
             _update_check_task = asyncio.get_running_loop().create_task(
                 update_routes.periodic_update_check_loop(
                     config.update_check.interval_minutes,
+                    extra_check=plugin_source_routes.run_periodic_plugin_check,
                 )
             )
 

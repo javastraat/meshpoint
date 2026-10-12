@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import tempfile
 import unittest
 from pathlib import Path
@@ -410,6 +411,16 @@ class TestUpdateBadgeAndCheckSettings(unittest.TestCase):
         response = self.client.get("/api/update/badge")
         self.assertEqual(response.status_code, 403)
 
+    def test_badge_includes_the_configured_check_interval(self) -> None:
+        """The sidebar poller times itself off this value instead of a
+        hardcoded constant, so there's exactly one interval governing
+        both how often the real check runs and how often the browser
+        looks for a fresh result."""
+        self.config.update_check.interval_minutes = 45
+        self.client.cookies.set("meshpoint_session", self.admin_token)
+        response = self.client.get("/api/update/badge")
+        self.assertEqual(response.json()["interval_minutes"], 45)
+
     def test_check_settings_saves_and_updates_live_config(self) -> None:
         self.client.cookies.set("meshpoint_session", self.admin_token)
         with mock.patch.object(update_routes, "save_section_to_yaml") as mock_save:
@@ -470,6 +481,68 @@ class TestUpdateBadgeAndCheckSettings(unittest.TestCase):
         badge = self.client.get("/api/update/badge").json()
         self.assertFalse(badge["update_available"])
         self.assertIsNone(badge["commits_behind"])
+
+
+class TestPeriodicUpdateCheckLoopExtraCheck(unittest.IsolatedAsyncioTestCase):
+    """``periodic_update_check_loop``'s ``extra_check`` -- the plugin-
+    update check rides along on the SAME timer tick as the core check
+    (see ``plugin_source_routes.run_periodic_plugin_check`` /
+    server.py's wiring), rather than running its own independent
+    interval."""
+
+    async def test_extra_check_runs_once_per_tick_alongside_the_core_check(self) -> None:
+        core_calls: list[str] = []
+        extra_calls: list[int] = []
+
+        async def fake_core_check(log_context: str = "Periodic") -> None:
+            core_calls.append(log_context)
+
+        async def fake_extra_check() -> None:
+            extra_calls.append(1)
+            if len(extra_calls) >= 3:
+                raise asyncio.CancelledError
+
+        with mock.patch.object(update_routes, "_run_and_cache_check", fake_core_check), \
+                mock.patch("asyncio.sleep", new=mock.AsyncMock(return_value=None)):
+            await update_routes.periodic_update_check_loop(
+                interval_minutes=60, extra_check=fake_extra_check,
+            )
+
+        self.assertEqual(len(core_calls), 3)
+        self.assertEqual(len(extra_calls), 3)
+
+    async def test_extra_check_failure_does_not_stop_the_core_loop(self) -> None:
+        core_calls: list[str] = []
+
+        async def fake_core_check(log_context: str = "Periodic") -> None:
+            core_calls.append(log_context)
+            if len(core_calls) >= 3:
+                raise asyncio.CancelledError
+
+        async def flaky_extra_check() -> None:
+            raise RuntimeError("plugin check blew up")
+
+        with mock.patch.object(update_routes, "_run_and_cache_check", fake_core_check), \
+                mock.patch("asyncio.sleep", new=mock.AsyncMock(return_value=None)):
+            await update_routes.periodic_update_check_loop(
+                interval_minutes=60, extra_check=flaky_extra_check,
+            )
+
+        self.assertEqual(len(core_calls), 3)
+
+    async def test_no_extra_check_behaves_like_before(self) -> None:
+        core_calls: list[str] = []
+
+        async def fake_core_check(log_context: str = "Periodic") -> None:
+            core_calls.append(log_context)
+            if len(core_calls) >= 2:
+                raise asyncio.CancelledError
+
+        with mock.patch.object(update_routes, "_run_and_cache_check", fake_core_check), \
+                mock.patch("asyncio.sleep", new=mock.AsyncMock(return_value=None)):
+            await update_routes.periodic_update_check_loop(interval_minutes=60)
+
+        self.assertEqual(len(core_calls), 2)
 
 
 if __name__ == "__main__":

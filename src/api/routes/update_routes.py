@@ -21,7 +21,7 @@ import json
 import logging
 import time
 import urllib.request
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import asdict
 from pathlib import Path
 from typing import Optional
@@ -126,7 +126,10 @@ async def _run_and_cache_check(log_context: str = "Periodic") -> None:
         logger.exception("%s update check failed", log_context)
 
 
-async def periodic_update_check_loop(interval_minutes: float) -> None:
+async def periodic_update_check_loop(
+    interval_minutes: float,
+    extra_check: Callable[[], Awaitable[None]] | None = None,
+) -> None:
     """Background task: re-run the same check the "Check for updates"
     button does, on a timer, caching the result for the sidebar badge.
 
@@ -134,11 +137,24 @@ async def periodic_update_check_loop(interval_minutes: float) -> None:
     full interval after boot), then repeats every ``interval_minutes``.
     Same lifecycle pattern as the fan/LED/button controllers -- started
     via create_task in server.py's lifespan, cancelled on shutdown.
+
+    ``extra_check``, if given, is awaited once per tick alongside the
+    core check -- used to share this exact same configured interval
+    with the plugin-source update check
+    (``plugin_source_routes.run_periodic_plugin_check``) instead of
+    running a second, independent timer for it. A failure in it is
+    logged and otherwise ignored -- it must never take down the core
+    check it's riding along with.
     """
     interval_s = max(MIN_CHECK_INTERVAL_MINUTES, interval_minutes) * 60
     try:
         while True:
             await _run_and_cache_check("Periodic")
+            if extra_check is not None:
+                try:
+                    await extra_check()
+                except Exception:
+                    logger.exception("Periodic update loop: extra_check failed")
             await asyncio.sleep(interval_s)
     except asyncio.CancelledError:
         pass
@@ -176,13 +192,27 @@ async def update_badge(
 
     Never triggers a git fetch itself -- just reads whatever the
     background loop last found, so polling this is cheap.
+
+    ``interval_minutes`` is included so the sidebar poller can time
+    itself off the same configured value instead of a hardcoded
+    constant -- there should be exactly one interval governing both how
+    often the real check runs and how often the browser looks for a
+    fresh result, not two independent cadences.
     """
+    interval_minutes = (
+        _config.update_check.interval_minutes if _config is not None
+        else UpdateCheckSettingsUpdate.model_fields["interval_minutes"].default
+    )
     if _last_periodic_check is None:
-        return {"update_available": False, "commits_behind": None, "checked_at": None}
+        return {
+            "update_available": False, "commits_behind": None, "checked_at": None,
+            "interval_minutes": interval_minutes,
+        }
     return {
         "update_available": bool(_last_periodic_check.get("commits_behind")),
         "commits_behind": _last_periodic_check.get("commits_behind"),
         "checked_at": _last_periodic_check.get("checked_at"),
+        "interval_minutes": interval_minutes,
     }
 
 

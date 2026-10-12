@@ -305,6 +305,100 @@ class TestPluginSourceRoutes(unittest.TestCase):
         r = self.client.get("/api/plugin-sources")
         self.assertTrue(r.json()["sources_enabled"])
 
+    def test_update_badge_defaults_before_any_periodic_check(self) -> None:
+        r = self.client.get("/api/plugin-sources/update-badge")
+        self.assertEqual(r.status_code, 200, r.text)
+        body = r.json()
+        self.assertFalse(body["update_available"])
+        self.assertIsNone(body["checked_at"])
+
+    def test_periodic_plugin_check_detects_an_update(self) -> None:
+        import asyncio
+
+        self.client.post("/api/plugin-sources", json={
+            "url": "https://github.com/you/p", "confirm": True,
+        })
+        self._mod.fetch_catalog = lambda url, ref: self._catalog_with({"version": "2.0"})
+        self._mod._installed_index = lambda: {"demo": "1.0"}
+
+        asyncio.run(self._mod.run_periodic_plugin_check())
+
+        r = self.client.get("/api/plugin-sources/update-badge")
+        body = r.json()
+        self.assertTrue(body["update_available"])
+        self.assertIsNotNone(body["checked_at"])
+
+    def test_periodic_plugin_check_finds_nothing_when_up_to_date(self) -> None:
+        import asyncio
+
+        self.client.post("/api/plugin-sources", json={
+            "url": "https://github.com/you/p", "confirm": True,
+        })
+        self._mod.fetch_catalog = lambda url, ref: self._catalog_with({"version": "1.0"})
+        self._mod._installed_index = lambda: {"demo": "1.0"}
+
+        asyncio.run(self._mod.run_periodic_plugin_check())
+
+        r = self.client.get("/api/plugin-sources/update-badge")
+        self.assertFalse(r.json()["update_available"])
+
+    def test_periodic_plugin_check_skips_entirely_when_sources_disabled(self) -> None:
+        """The master switch being off must stop the periodic check from
+        ever touching the network -- same intent as the HTTP-level
+        TestPluginSourcesDisabledByDefault suite below, just exercised
+        against the background-loop entry point instead of a route."""
+        import asyncio
+
+        self.cfg.plugin_sources_enabled = False
+
+        def _must_not_be_called(url, ref):
+            raise AssertionError("fetch_catalog should not run while sources are disabled")
+
+        self._mod.fetch_catalog = _must_not_be_called
+
+        asyncio.run(self._mod.run_periodic_plugin_check())
+
+        r = self.client.get("/api/plugin-sources/update-badge")
+        self.assertFalse(r.json()["update_available"])
+
+    def test_one_broken_source_does_not_block_checking_the_rest(self) -> None:
+        import asyncio
+
+        self.client.post("/api/plugin-sources", json={
+            "url": "https://github.com/you/p", "confirm": True,
+        })
+        self.client.post("/api/plugin-sources", json={
+            "url": "https://github.com/you/q", "confirm": True,
+        })
+
+        def flaky_fetch(url, ref):
+            if url.endswith("/q"):
+                raise RuntimeError("network down")
+            return self._catalog_with({"version": "2.0"})
+
+        self._mod.fetch_catalog = flaky_fetch
+        self._mod._installed_index = lambda: {"demo": "1.0"}
+
+        asyncio.run(self._mod.run_periodic_plugin_check())
+
+        r = self.client.get("/api/plugin-sources/update-badge")
+        self.assertTrue(r.json()["update_available"])
+
+    def test_catalog_fetch_is_cached_within_ttl(self) -> None:
+        """GET /catalog is both the interactive Plugins-page lookup and
+        (via _get_catalog_cached) the periodic check's own data source --
+        a repeated call within the TTL must not re-fetch repo.json."""
+        calls = {"n": 0}
+
+        def counting_fetch(url, ref):
+            calls["n"] += 1
+            return self._catalog_with({})
+
+        self._mod.fetch_catalog = counting_fetch
+        self.client.get("/api/plugin-sources/catalog?url=https://github.com/you/p&ref=main")
+        self.client.get("/api/plugin-sources/catalog?url=https://github.com/you/p&ref=main")
+        self.assertEqual(calls["n"], 1)
+
 
 @unittest.skipUnless(_HAS_FASTAPI, "routes import fastapi (CI / Pi only)")
 class TestPluginSourcesDisabledByDefault(unittest.TestCase):

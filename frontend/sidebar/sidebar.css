@@ -491,6 +491,11 @@
     color: var(--accent-amber);
 }
 
+.sidebar__badge--plugin-update {
+    background: rgba(59, 130, 246, 0.18);
+    color: var(--accent-blue);
+}
+
 .sidebar__badge--header {
     /* Overrides the nav-row margin-left:auto -- this sits in the
        header's column layout (device name / status / pill), not a

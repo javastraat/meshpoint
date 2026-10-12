@@ -219,7 +219,7 @@ class UpdatePanelController {
             this._renderSyncHint(this._installStatus);
             // A plain check (no channel override) just refreshed the
             // same cache the sidebar badge reads -- pull it immediately
-            // instead of waiting for the badge's own 5-minute poll.
+            // instead of waiting for the badge's own next scheduled poll.
             window.updateCheckBadge?.refreshNow();
             const behind = this._installStatus.commits_behind;
             if (this._installStatus.sync_error) {
