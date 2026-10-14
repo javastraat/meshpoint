@@ -704,6 +704,69 @@ against actual hardware/antenna setup yet.
   distinct from the normal two-tone ones and the dead-pose+burst+text
   composition reads cleanly together.
 
+  **Same day: small drain-range widen (user tested live, saw "50-90" ->
+  asked for "50-100"), then the matrix screensaver rewrite the user
+  originally flagged weeks-equivalent-earlier-in-session as worth
+  revisiting.** User found two outside references on their own and
+  asked for an honest comparison before building anything:
+
+  1. `github.com/rm-hull/luma.examples/blob/main/examples/matrix.py` --
+     fetched and read the real file rather than going off the name.
+     Core technique: each "drop" is its own object with an accumulated
+     float position incremented every tick (`person[1] += speed`), NOT
+     derived from the frame counter -- directly validates the root-
+     cause diagnosis from the earlier matrix-speed-reactivity revert
+     (recomputing position from `frame * speed_mult` is what caused the
+     "jumping to a different screen" bug back then; genuine
+     accumulation can't have that failure mode, since changing speed
+     only affects future increments). Its 16-step RGB fade trail and
+     plain-pixel (not character) rendering don't apply to a 1-bit
+     monochrome panel though -- flagged clearly that only the drop-
+     population STRUCTURE would be borrowed, not the color/pixel parts.
+  2. A second, Arduino/Adafruit_GFX reference the user found afterward
+     -- investigated and reported back that it's actually a SIMPLER
+     version of the same core idea (one position per column, still a
+     true accumulator) plus one Arduino-specific technique (erase-only-
+     the-tail-character instead of a full redraw) that solves a
+     microcontroller memory problem this Python/Pillow-on-Pi plugin
+     doesn't have and would have been inconsistent with every other
+     screensaver mode's full-redraw-per-tick convention. Recommended
+     sticking with the luma.examples-based plan rather than switching;
+     user didn't push back.
+
+  Built: `_draw_matrix_frame` rewritten around a drop-list
+  (`self._matrix_drops`, each `{col, head: float, speed}`), replacing
+  the old fixed one-streak-per-column design that also never actually
+  despawned (just wrapped forever via `% cycle`). New drops spawn at a
+  random column with a random speed (`_MATRIX_SPEED_RANGE = (0.3,
+  1.2)` rows/tick, chosen to roughly match the old design's overall
+  pacing rather than accidentally speeding everything up) at a capped
+  rate (`_MATRIX_SPAWN_CHANCE = 0.25`/tick, `_MATRIX_MAX_DROPS = 24`
+  ceiling so a small 128x64 panel doesn't get cluttered/illegible);
+  existing drops are removed once fully scrolled past the bottom
+  (`head - TRAIL > rows`) instead of wrapping. Deliberately did NOT
+  reintroduce activity-reactive speed as part of this -- that was
+  explicitly the earlier reverted feature, now safely possible again
+  thanks to the real accumulator, but adding it wasn't asked for this
+  round; documented in the method's own docstring that the door is open
+  if wanted later, same as noting it rather than silently including it.
+
+  Verified: a 5000-tick simulation confirmed the drop population stays
+  well under the 24 cap in practice (max 12 concurrent), spawns/
+  despawns continuously without runaway growth or dying out entirely,
+  and every surviving drop's state stays within its valid ranges
+  (column index, non-negative head, speed within the configured range)
+  -- checked directly rather than assumed from the spawn-chance math
+  alone. Rendered both a single warmed-up frame (visibly multiple
+  independent streaks at different heights/columns at once, unlike the
+  old lockstep-per-column look) and a short sequence of frames to
+  confirm nothing jumps discontinuously -- though note the mechanical
+  guarantee (no formula-recompute anywhere in the new code, `head` only
+  ever increases via `+=`) is what actually rules out teleporting, not
+  the visual spot-check alone, since multiple drops can occupy the same
+  column at different times and make a naive frame-to-frame comparison
+  ambiguous by eye.
+
 ## Not written up in detail, mentioned only in passing
 
 Trunked digital voice (P25/DMR) and GNSS jamming/spoofing detection came up
