@@ -25,6 +25,9 @@
 		},
 		{
 			"path": "../RTNode-HeltecV4"
+		},
+		{
+			"path": "../microReticulum_Firmware"
 		}
 	],
 	"settings": {}
