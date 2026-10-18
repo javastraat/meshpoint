@@ -28,6 +28,12 @@
 		},
 		{
 			"path": "../microReticulum_Firmware"
+		},
+		{
+			"path": "../ratspeak-handheld"
+		},
+		{
+			"path": "../meshtastic"
 		}
 	],
 	"settings": {}
