@@ -34,6 +34,18 @@
 		},
 		{
 			"path": "../meshtastic"
+		},
+		{
+			"path": "../MeshCore-1.18"
+		},
+		{
+			"path": "../microReticulum_Logger"
+		},
+		{
+			"path": "../RNode_Firmware"
+		},
+		{
+			"path": "../Ratspeak"
 		}
 	],
 	"settings": {}
