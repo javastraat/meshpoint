@@ -43,9 +43,18 @@ _LPP_MAP = {
     (1, "voltage"): "voltage",
     (1, "temperature"): "temperature",
     (3, "temperature"): "temperature",
-    (3, "barometer"): "barometric_pressure",
     (4, "temperature"): "temperature",
-    (4, "humidity"): "humidity",
+}
+# Sensor types there's only one of per repeater: matched on ANY channel,
+# because the channel number is just the order the firmware found its
+# sensors in -- MeshCore 1.18 moved the barometer from channel 3 to 2 and
+# the humidity sensor from 4 to 3, and a fixed (channel, type) key then
+# silently stopped storing pressure and humidity (Trends lines ended while
+# the Sensors card, which lists every reading, still showed them).
+_LPP_TYPE_MAP = {
+    "barometer": "barometric_pressure",
+    "humidity": "humidity",
+    "relative_humidity": "humidity",
 }
 
 
@@ -320,7 +329,8 @@ class RepeaterPoller:
             telem.uptime_seconds = int(uptime)
 
         for reading in _iter_lpp(result.get("telemetry")):
-            field = _LPP_MAP.get((reading.get("channel"), reading.get("type")))
+            field = (_LPP_MAP.get((reading.get("channel"), reading.get("type")))
+                     or _LPP_TYPE_MAP.get(reading.get("type")))
             if field and getattr(telem, field, None) is None:
                 setattr(telem, field, reading.get("value"))
 

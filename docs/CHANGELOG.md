@@ -4,6 +4,14 @@
 
 #### Dashboard
 
+- **Fix: Repeaters page Trends lost the pressure and humidity lines after
+  a MeshCore 1.18 update.** The poller stored a repeater's sensors by fixed
+  LPP channel numbers (barometer on channel 3, humidity on 4), but 1.18
+  numbers its sensors differently (barometer on 2, humidity on 3), so
+  pressure and humidity were no longer written to the history, while the
+  Sensors card, which lists every reading, still showed them. Pressure and
+  humidity are now matched on sensor type, whatever channel they're on.
+  The gap since the update stays: those readings were never stored.
 - **Settings → System: "Display units" card renamed "Display &
   notifications"**, with a description that also covers the message
   notification options (popup/sound) added to it earlier.
