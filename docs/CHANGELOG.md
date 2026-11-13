@@ -292,6 +292,26 @@
 
 #### Plugins
 
+- **New plugin: Reticulum Repeaters** (`reticulum-repeaters`, requires
+  reticulum). A sidebar page in the Radio section, next to MeshCore
+  Repeaters, that monitors your own ScotMesh microReticulum repeaters over
+  NomadNet: battery, uptime, restarts and reset reason, radio (frequency,
+  SF, TX power, noise floor, RSSI/SNR, airtime), health (RAM, link pool and
+  fragmentation, closed links, TX failures), sensors, neighbours and
+  routes, with trends. An overview table lists every repeater (status,
+  battery, noise, neighbours, restarts, last poll); click one for its full
+  cards. Only repeaters you add are ever contacted. Stats
+  every 15 min, lists every 60 min, firmware/location daily, all set on
+  the page's Settings tab (admins). Adding a repeater fetches everything
+  once, including the 7 days of history the repeater keeps itself;
+  **Refresh now** fetches everything again (admins, once a minute).
+  Boards without sensors or history are never asked for them. A restart
+  (the repeater's restart count going up) shows as a warning on its card.
+  The repeater list and poll settings live in the plugin's own database
+  table, not in `local.yaml`: updating a plugin through Plugin sources (and
+  switching it on/off) rewrites its `local.yaml` section from the copy core
+  read at startup, which wiped the list in the first version (0.1.1 brings
+  repeaters it still has data for back by itself).
 - **Reticulum Dashboard: repeaters on the map.** Repeaters and other nodes
   that announce their location over Reticulum (the interface-discovery
   announces rmap.world collects: ScotMesh repeaters with their rmap option
