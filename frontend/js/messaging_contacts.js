@@ -35,14 +35,15 @@ class MessagingContacts {
     /**
      * LocalMesh channel titles. A stored message row only carries its sender's
      * name, so the channel's own name (Settings override, else what the
-     * receiver reports) comes from the plugin; empty when it isn't installed.
+     * receiver reports) comes from the plugin; empty when it isn't installed (404).
      */
     async _loadLocalMeshChannels() {
-        const plugins = window.MESHPOINT_SIDEBAR_PLUGINS || [];
-        if (!plugins.some((p) => p.route === 'localmesh')) return [];
         try {
             const res = await fetch('/api/localmesh/channels', { credentials: 'same-origin' });
-            if (!res.ok) return [];
+            if (!res.ok) {
+                if (res.status !== 404) console.warn('LocalMesh channels:', res.status);
+                return [];
+            }
             return (await res.json()).map((ch) => ({ ...ch, protocol: 'localmesh' }));
         } catch (e) {
             console.error('Failed to load LocalMesh channels:', e);
@@ -342,7 +343,9 @@ class MessagingContacts {
         const protoBadge = PROTO_LABELS[convo.protocol] || (convo.protocol || '').toUpperCase() || 'MT';
         const protoBadgeClass = convo.protocol === 'meshcore' ? 'mc'
             : convo.protocol === 'meshtastic' ? 'mt' : '';
-        const connLabel = this._formatConnectionLabel(convo.capture_source);
+        // LocalMesh capture sources are named after the plugin (localmesh_<label>), which says nothing
+        // the LM badge doesn't, and the badge squeezes the channel name out of the row.
+        const connLabel = convo.protocol === 'localmesh' ? '' : this._formatConnectionLabel(convo.capture_source);
         const connBadgeHtml = connLabel
             ? ` <span class="msg-convo__conn-badge" title="Heard via ${this._esc(convo.capture_source)}">${this._esc(connLabel)}</span>`
             : '';

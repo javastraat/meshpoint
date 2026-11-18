@@ -82,7 +82,7 @@ class MessagingChat {
         // through -- distinct from the protocol badge above, since a
         // multi-radio setup (2+ MeshCore companions, 2+ Meshtastic
         // sticks) can hear the SAME protocol on different bands.
-        const connectionLabel = this._formatConnectionLabel(convo.capture_source);
+        const connectionLabel = convo.protocol === 'localmesh' ? '' : this._formatConnectionLabel(convo.capture_source);
         this._connectionBadge.textContent = connectionLabel;
         this._connectionBadge.hidden = !connectionLabel;
 
