@@ -265,7 +265,18 @@ class MessagingChat {
         return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
     }
 
+    /** LocalMesh channel messages stored before the plugin named senders: the row's name is a bare member
+     * number and the text starts with the "Name: " the app puts in front. Show them like the newer rows. */
+    _normalizeLocalMeshChannelMessage(msg) {
+        if (msg.protocol !== 'localmesh' || msg.direction !== 'received'
+            || !(msg.node_id || '').startsWith('broadcast:')) return msg;
+        if (msg.node_name && !/^\d+$/.test(msg.node_name)) return msg;
+        const found = /^([^:\n]{1,32}): ([\s\S]*)$/.exec(msg.text || '');
+        return found ? { ...msg, node_name: found[1].trim(), text: found[2] } : msg;
+    }
+
     _appendBubble(msg) {
+        msg = this._normalizeLocalMeshChannelMessage(msg);
         const empty = this._messagesEl.querySelector('.msg-chat__empty');
         if (empty) empty.remove();
 
