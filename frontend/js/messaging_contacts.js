@@ -259,6 +259,10 @@ class MessagingContacts {
         if (existing) {
             existing.last_message = msg.text || msg.last_message || '';
             existing.last_timestamp = msg.timestamp || new Date().toISOString();
+            // Same "latest non-empty node_name wins" rule the server's own conversation
+            // query uses -- without this a channel/peer rename never reaches an already-
+            // open Messages tab, only a fresh page load (which re-fetches it).
+            if (msg.node_name) existing.node_name = msg.node_name;
             if (msg.direction === 'received' && msg.node_id !== this._activeNodeId) {
                 existing.unread_count = (existing.unread_count || 0) + 1;
             }
