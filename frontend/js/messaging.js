@@ -51,6 +51,7 @@ class MessagingPanel {
                         <button class="msg-protocol-toggle__btn"                                  data-filter="meshtastic" role="tab" aria-selected="false">MT</button>
                         <button class="msg-protocol-toggle__btn"                                  data-filter="meshcore"   role="tab" aria-selected="false">MC</button>
                         <button class="msg-protocol-toggle__btn"                                  data-filter="reticulum"  role="tab" aria-selected="false">RT</button>
+                        <button class="msg-protocol-toggle__btn"                                  data-filter="localmesh"  role="tab" aria-selected="false">LM</button>
                         <button class="msg-protocol-toggle__btn"                                  data-filter="pager"      role="tab" aria-selected="false">Pager</button>
                         <button class="msg-protocol-toggle__btn"                                  data-filter="fav"        role="tab" aria-selected="false" title="Favorited channels only">&#9733; Fav</button>
                     </div>
@@ -139,6 +140,8 @@ class MessagingPanel {
                     pager: !!(cfg.radio_pager && cfg.radio_pager.pager_enabled),
                     reticulum: (window.MESHPOINT_SIDEBAR_PLUGINS || [])
                         .some((p) => p.route === 'reticulum'),
+                    localmesh: (window.MESHPOINT_SIDEBAR_PLUGINS || [])
+                        .some((p) => p.route === 'localmesh'),
                 };
             }
         } catch (_) {
@@ -206,6 +209,13 @@ class MessagingPanel {
         // until the Reticulum-to-plugin cutover removes it.)
         if ((convo.protocol || '').toLowerCase() === 'reticulum') {
             return this._sendReticulumMessage(text, convo, image);
+        }
+        // LocalMesh is the same situation: its own transmit path (a USB
+        // companion receiver's airtime-budgeted radio, not a Meshtastic/
+        // MeshCore TX) has its own dedicated endpoint -- see
+        // _sendLocalMeshMessage()'s own comment for the request shape.
+        if ((convo.protocol || '').toLowerCase() === 'localmesh') {
+            return this._sendLocalMeshMessage(text, convo);
         }
 
         const isBroadcast = convo.is_broadcast || (convo.node_id || '').startsWith('broadcast:');
@@ -322,6 +332,60 @@ class MessagingPanel {
             });
         } catch (e) {
             console.error('Reticulum send failed:', e);
+            this._chat.updateMessageStatus(tempMsg.id, 'network error', '');
+        }
+    }
+
+    /** LocalMesh reply -- POST /api/localmesh/send ({channel|to, text}),
+     * which returns the sent entry ({status, counter, airtime_ms, ...}) on
+     * success or {detail} on error (see apps/localmesh/backend/send_routes.py).
+     * Same optimistic-bubble + status flow as the generic path above and
+     * _sendReticulumMessage() below. convo.node_id is either
+     * "localmesh:<member>" (direct) or "broadcast:localmesh:<channel>"
+     * (channel) -- the exact scheme the localmesh plugin's own listener.py
+     * writes into the shared message store (_save_sent/_save_received_async),
+     * so a conversation opened from the sidebar round-trips back to the
+     * right {to} or {channel} here unchanged. No image attachments --
+     * LocalMesh messages are plain text only (155/149-byte radio packets),
+     * unlike Reticulum's LXMF. */
+    async _sendLocalMeshMessage(text, convo) {
+        const direct = (convo.node_id || '').startsWith('localmesh:');
+        const target = direct
+            ? { to: parseInt(convo.node_id.slice('localmesh:'.length), 10) }
+            : { channel: parseInt((convo.node_id || '').replace(/^broadcast:localmesh:/, ''), 10) };
+
+        const tempMsg = this._chat.addOptimisticMessage(text, 'localmesh');
+        try {
+            const res = await fetch('/api/localmesh/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ text, ...target }),
+            });
+            const result = await res.json().catch(() => ({}));
+
+            if (!res.ok) {
+                const reason = result.detail || `HTTP ${res.status}`;
+                if (res.status === 403) {
+                    this._chat.removeMessage(tempMsg.id);
+                    this._showToast(`Not sent: ${reason}`);
+                } else {
+                    this._chat.updateMessageStatus(tempMsg.id, `failed: ${reason}`, '');
+                }
+                return;
+            }
+
+            this._chat.updateMessageStatus(tempMsg.id, result.status || 'sent', String(result.counter ?? ''));
+            this._contacts.addOrUpdateConversation({
+                node_id: convo.node_id,
+                node_name: convo.node_name,
+                protocol: 'localmesh',
+                text: text,
+                direction: 'sent',
+                timestamp: new Date().toISOString(),
+            });
+        } catch (e) {
+            console.error('LocalMesh send failed:', e);
             this._chat.updateMessageStatus(tempMsg.id, 'network error', '');
         }
     }

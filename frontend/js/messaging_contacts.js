@@ -302,7 +302,7 @@ class MessagingContacts {
             ? convo.node_name || `Ch ${convo.channel || 0}`
             : convo.node_name || convo.node_id;
 
-        const PROTO_LABELS = { meshtastic: 'MT', meshcore: 'MC', reticulum: 'RT', pager: 'PAGER' };
+        const PROTO_LABELS = { meshtastic: 'MT', meshcore: 'MC', reticulum: 'RT', localmesh: 'LM', pager: 'PAGER' };
         const protoBadge = PROTO_LABELS[convo.protocol] || (convo.protocol || '').toUpperCase() || 'MT';
         const protoBadgeClass = convo.protocol === 'meshcore' ? 'mc'
             : convo.protocol === 'meshtastic' ? 'mt' : '';
@@ -394,7 +394,7 @@ class MessagingContacts {
                 item.className = 'msg-contact';
                 const pClass = contact.protocol === 'meshcore' ? 'msg-contact__protocol--mc'
                     : contact.protocol === 'meshtastic' ? 'msg-contact__protocol--mt' : '';
-                const pLabel = { meshtastic: 'MT', meshcore: 'MC', reticulum: 'RT', pager: 'PAGER' }[contact.protocol]
+                const pLabel = { meshtastic: 'MT', meshcore: 'MC', reticulum: 'RT', localmesh: 'LM', pager: 'PAGER' }[contact.protocol]
                     || (contact.protocol || '').toUpperCase() || 'MT';
                 item.innerHTML = `
                     <span class="msg-contact__name">${this._esc(contact.name || contact.node_id)}</span>

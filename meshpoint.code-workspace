@@ -21,19 +21,31 @@
 			"path": "../basicstation-docker"
 		},
 		{
+			"name": "rBrowser",
 			"path": "../rBrowser"
 		},
 		{
+			"name": "RTNode-HeltecV4",
 			"path": "../RTNode-HeltecV4"
 		},
 		{
+			"name": "microReticulum_Firmware",
 			"path": "../microReticulum_Firmware"
 		},
 		{
+			"name": "microReticulum_Logger",
+			"path": "../microReticulum_Logger"
+		},
+		{
+			"name": "ratspeak-handheld",
 			"path": "../ratspeak-handheld"
 		},
 		{
+			"name": "meshtastic",
 			"path": "../meshtastic"
+		},
+		{
+			"path": "../MeshCore"
 		}
 	],
 	"settings": {}

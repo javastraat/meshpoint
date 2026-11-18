@@ -59,7 +59,7 @@ class MessagingChat {
         // to its own uppercased protocol name with the neutral badge/
         // avatar color (no --mt/--mc modifier applied), rather than being
         // mislabeled as Meshtastic.
-        const PROTO_LABELS = { meshtastic: 'MT', meshcore: 'MC', reticulum: 'RT', pager: 'PAGER' };
+        const PROTO_LABELS = { meshtastic: 'MT', meshcore: 'MC', reticulum: 'RT', localmesh: 'LM', pager: 'PAGER' };
         const proto = PROTO_LABELS[convo.protocol] || (convo.protocol || '').toUpperCase() || 'MT';
 
         this._headerName.textContent = name;
