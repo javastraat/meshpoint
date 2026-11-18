@@ -84,19 +84,6 @@ class MessagingContacts {
                 : this._channels.filter(c => c.protocol === this._filter);
         const filteredChannels = this._sortChannelsWithFavoritesFirst(baseChannels);
 
-        if (filteredChannels.length > 0) {
-            const label = document.createElement('div');
-            label.className = 'msg-sidebar__section-label';
-            label.textContent = 'Channels';
-            this._listEl.appendChild(label);
-
-            filteredChannels.forEach(ch => {
-                const convo = this._channelToConvo(ch);
-                const el = this._buildConvoEl(convo);
-                this._listEl.appendChild(el);
-            });
-        }
-
         // Broadcast conversations that exist in stored messages but aren't
         // in the configured /api/messages/channels list -- e.g. an unmapped
         // Meshtastic channel_hash (see ChannelHashResolver.lookup) routed to
@@ -113,13 +100,40 @@ class MessagingContacts {
             : this._conversations.filter(c => c.protocol === this._filter)
         ).filter(c => c.is_broadcast && !knownChannelIds.has(c.node_id));
 
+        // The keyed/unmapped split below is specifically about Meshtastic's
+        // channel_hash being a guess (it can collide, or decrypt under a key
+        // configured under a different name) -- /api/messages/channels simply
+        // has no concept of channels owned by other protocols/plugins (e.g.
+        // LocalMesh), not that those channels are actually unresolved. Their
+        // channel index is explicit on the wire, never hash-guessed, so they
+        // belong alongside the rest of "Channels" instead.
+        const namedBroadcastConvos = otherBroadcastConvos.filter(c => c.protocol !== 'meshtastic');
+        const hashAmbiguousConvos = otherBroadcastConvos.filter(c => c.protocol === 'meshtastic');
+
+        if (filteredChannels.length > 0 || namedBroadcastConvos.length > 0) {
+            const label = document.createElement('div');
+            label.className = 'msg-sidebar__section-label';
+            label.textContent = 'Channels';
+            this._listEl.appendChild(label);
+
+            filteredChannels.forEach(ch => {
+                const convo = this._channelToConvo(ch);
+                const el = this._buildConvoEl(convo);
+                this._listEl.appendChild(el);
+            });
+            namedBroadcastConvos.forEach(convo => {
+                const el = this._buildConvoEl(convo);
+                this._listEl.appendChild(el);
+            });
+        }
+
         // "keyed:" traffic decrypts fine with one of our configured
         // keys but under a channel name the remote side typed
         // differently (see server.py's on_text_packet) -- repliable,
         // unlike a true "unmapped" hash where no key matches at all.
         const isKeyed = (nodeId) => /:keyed:\d+:0x[0-9a-f]+$/i.test(nodeId || '');
-        const keyedConvos = otherBroadcastConvos.filter(c => isKeyed(c.node_id));
-        const unmappedConvos = otherBroadcastConvos.filter(c => !isKeyed(c.node_id));
+        const keyedConvos = hashAmbiguousConvos.filter(c => isKeyed(c.node_id));
+        const unmappedConvos = hashAmbiguousConvos.filter(c => !isKeyed(c.node_id));
 
         if (keyedConvos.length > 0) {
             const label = document.createElement('div');
@@ -167,7 +181,7 @@ class MessagingContacts {
             });
         }
 
-        if (filteredChannels.length === 0 && keyedConvos.length === 0 && unmappedConvos.length === 0 && dmConvos.length === 0) {
+        if (filteredChannels.length === 0 && namedBroadcastConvos.length === 0 && keyedConvos.length === 0 && unmappedConvos.length === 0 && dmConvos.length === 0) {
             const emptyMsg = this._filter === 'fav'
                 ? 'No favorited channels yet -- click the star on a channel to pin it here.'
                 : 'No conversations yet';
