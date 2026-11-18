@@ -26,6 +26,7 @@ class MessagingContacts {
             ]);
             this._conversations = await convosRes.json();
             this._channels = (await channelsRes.json()).concat(await this._loadLocalMeshChannels());
+            await this._nameLocalMeshConversations();
             this.render();
         } catch (e) {
             console.error('Failed to load conversations:', e);
@@ -48,6 +49,27 @@ class MessagingContacts {
         } catch (e) {
             console.error('Failed to load LocalMesh channels:', e);
             return [];
+        }
+    }
+
+    /**
+     * LocalMesh direct-message titles. The stored name is only the sender's advert name at the time, and a
+     * member heard before its first advert since a restart is just a number; the plugin's member list also
+     * knows the "Name: " in front of channel messages.
+     */
+    async _nameLocalMeshConversations() {
+        const dms = this._conversations.filter((c) => /^localmesh:\d+$/.test(c.node_id || ''));
+        if (dms.length === 0) return;
+        try {
+            const res = await fetch('/api/localmesh/members', { credentials: 'same-origin' });
+            if (!res.ok) return;
+            const names = new Map((await res.json()).filter((m) => m.name).map((m) => [String(m.member), m.name]));
+            dms.forEach((c) => {
+                const name = names.get(c.node_id.slice('localmesh:'.length));
+                if (name) c.node_name = name;
+            });
+        } catch (e) {
+            console.error('Failed to load LocalMesh members:', e);
         }
     }
 
@@ -281,7 +303,10 @@ class MessagingContacts {
             // Same "latest non-empty node_name wins" rule the server's own conversation
             // query uses -- without this a channel/peer rename never reaches an already-
             // open Messages tab, only a fresh page load (which re-fetches it).
-            if (msg.node_name) existing.node_name = msg.node_name;
+            // A bare member number must not replace a name already known (LocalMesh before its next advert).
+            if (msg.node_name && !(/^\d+$/.test(msg.node_name) && existing.node_name && !/^\d+$/.test(existing.node_name))) {
+                existing.node_name = msg.node_name;
+            }
             if (msg.direction === 'received' && msg.node_id !== this._activeNodeId) {
                 existing.unread_count = (existing.unread_count || 0) + 1;
             }
