@@ -25,10 +25,28 @@ class MessagingContacts {
                 fetch('/api/messages/channels'),
             ]);
             this._conversations = await convosRes.json();
-            this._channels = await channelsRes.json();
+            this._channels = (await channelsRes.json()).concat(await this._loadLocalMeshChannels());
             this.render();
         } catch (e) {
             console.error('Failed to load conversations:', e);
+        }
+    }
+
+    /**
+     * LocalMesh channel titles. A stored message row only carries its sender's
+     * name, so the channel's own name (Settings override, else what the
+     * receiver reports) comes from the plugin; empty when it isn't installed.
+     */
+    async _loadLocalMeshChannels() {
+        const plugins = window.MESHPOINT_SIDEBAR_PLUGINS || [];
+        if (!plugins.some((p) => p.route === 'localmesh')) return [];
+        try {
+            const res = await fetch('/api/localmesh/channels', { credentials: 'same-origin' });
+            if (!res.ok) return [];
+            return (await res.json()).map((ch) => ({ ...ch, protocol: 'localmesh' }));
+        } catch (e) {
+            console.error('Failed to load LocalMesh channels:', e);
+            return [];
         }
     }
 
