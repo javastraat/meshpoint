@@ -335,8 +335,11 @@ class MessagingChat {
         const name = this._receivedSenderLabel(msg);
         if (!name) return '';
         const nid = this._senderNodeId(msg);
-        const attr = nid ? ` data-node-id="${this._esc(nid)}"` : '';
-        const cls = nid ? ' msg-bubble__sender--clickable' : '';
+        // LocalMesh channel rows from before packet ids carry no member, only the name (or number) shown here.
+        const lmByName = !nid && msg.protocol === 'localmesh' && (msg.node_id || '').startsWith('broadcast:');
+        const attr = nid ? ` data-node-id="${this._esc(nid)}"`
+            : lmByName ? ` data-lm-name="${this._esc(name)}"` : '';
+        const cls = nid || lmByName ? ' msg-bubble__sender--clickable' : '';
         return `<div class="msg-bubble__sender${cls}"${attr}>${this._esc(name)}</div>`;
     }
 
@@ -348,7 +351,11 @@ class MessagingChat {
      * packet (message_name_resolver.py's _resolve_broadcast_sender). */
     _senderNodeId(msg) {
         const nid = msg.node_id || '';
-        if (nid.startsWith('broadcast:')) return msg.source_id || null;
+        if (nid.startsWith('broadcast:')) {
+            // LocalMesh packet ids are "localmesh:<member>:<channel>:<counter>" (see the plugin's listener.py).
+            const lm = msg.protocol === 'localmesh' ? /^localmesh:(\d+):/.exec(msg.packet_id || '') : null;
+            return lm ? `localmesh:${lm[1]}` : (msg.source_id || null);
+        }
         return nid || null;
     }
 
@@ -502,9 +509,10 @@ class MessagingChat {
         });
 
         this._messagesEl.addEventListener('click', (e) => {
-            const senderEl = e.target.closest('.msg-bubble__sender[data-node-id]');
+            const senderEl = e.target.closest('.msg-bubble__sender[data-node-id], .msg-bubble__sender[data-lm-name]');
             if (senderEl) {
-                this._openNodeInfo(senderEl.dataset.nodeId);
+                if (senderEl.dataset.nodeId) this._openNodeInfo(senderEl.dataset.nodeId);
+                else this._openLocalMeshMemberByName(senderEl.dataset.lmName);
                 return;
             }
             const attachmentEl = e.target.closest('[data-attachment-open]');
@@ -535,16 +543,32 @@ class MessagingChat {
                 const r = await fetch('/api/localmesh/members', { credentials: 'same-origin' });
                 const members = r.ok ? await r.json() : [];
                 const m = members.find((x) => x.member === member);
-                if (!m) return;
-                if (!this._lmDrawer) this._lmDrawer = new window.LocalMeshMemberDrawer();
-                const onMessage = (window.LocalMeshPanel && !m.blocked)
-                    ? (mem) => window.LocalMeshPanel.composeMessageTo(mem, m.name)
-                    : undefined;
-                this._lmDrawer.open(m, onMessage ? { onMessage } : {});
+                if (m) this._openLocalMeshDrawer(m);
             } catch (_) {}
             return;
         }
         if (window.nodeDrawer) window.nodeDrawer.open({ node_id: nodeId });
+    }
+
+    _openLocalMeshDrawer(m) {
+        if (!this._lmDrawer) this._lmDrawer = new window.LocalMeshMemberDrawer();
+        const onMessage = (window.LocalMeshPanel && !m.blocked)
+            ? (mem) => window.LocalMeshPanel.composeMessageTo(mem, m.name)
+            : undefined;
+        this._lmDrawer.open(m, onMessage ? { onMessage } : {});
+    }
+
+    /** Older LocalMesh channel messages only know the sender's name (or bare member number). */
+    async _openLocalMeshMemberByName(name) {
+        if (!window.LocalMeshMemberDrawer || !name) return;
+        try {
+            const r = await fetch('/api/localmesh/members', { credentials: 'same-origin' });
+            const members = r.ok ? await r.json() : [];
+            const m = /^\d+$/.test(name)
+                ? members.find((x) => x.member === parseInt(name, 10))
+                : members.find((x) => x.name === name);
+            if (m) this._openLocalMeshDrawer(m);
+        } catch (_) {}
     }
 
     async _loadOlderMessages() {
@@ -597,6 +621,7 @@ class MessagingChat {
     }
 
     _buildBubbleEl(msg) {
+        msg = this._normalizeLocalMeshChannelMessage(msg);
         const bubble = document.createElement('div');
         bubble.className = `msg-bubble msg-bubble--${msg.direction}`;
         bubble.dataset.msgId = msg.id;
