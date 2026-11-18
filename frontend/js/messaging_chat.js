@@ -484,16 +484,16 @@ class MessagingChat {
         });
 
         this._headerName.addEventListener('click', () => {
-            if (!this._conversation || !window.nodeDrawer) return;
+            if (!this._conversation) return;
             const isChannel = (this._conversation.node_id || '').startsWith('broadcast:');
             if (isChannel) return;
-            window.nodeDrawer.open({ node_id: this._conversation.node_id });
+            this._openNodeInfo(this._conversation.node_id);
         });
 
         this._messagesEl.addEventListener('click', (e) => {
             const senderEl = e.target.closest('.msg-bubble__sender[data-node-id]');
-            if (senderEl && window.nodeDrawer) {
-                window.nodeDrawer.open({ node_id: senderEl.dataset.nodeId });
+            if (senderEl) {
+                this._openNodeInfo(senderEl.dataset.nodeId);
                 return;
             }
             const attachmentEl = e.target.closest('[data-attachment-open]');
@@ -501,6 +501,39 @@ class MessagingChat {
                 window.open(attachmentEl.dataset.attachmentOpen, '_blank', 'noopener');
             }
         });
+    }
+
+    /** The generic node drawer (window.nodeDrawer) only knows GET /api/nodes/
+     * <id> -- Meshtastic/MeshCore's own nodes table. Reticulum peers aren't
+     * in it either (they have their own ReticulumPeerRepository), but
+     * nothing here has routed a Reticulum conversation's header click
+     * through a protocol-specific drawer yet -- that's a pre-existing gap,
+     * not something this LocalMesh branch is trying to fully solve. What
+     * *is* new: LocalMesh member ids ("localmesh:<member>") are even less
+     * likely to coincidentally resolve through that table, and the
+     * LocalMesh plugin already ships its own member drawer (same
+     * node_drawer.css chrome, GET /api/localmesh/members as the data
+     * source) -- so route those through it instead of a drawer that can
+     * never find them. */
+    async _openNodeInfo(nodeId) {
+        const lmMember = /^localmesh:(\d+)$/.exec(nodeId || '');
+        if (lmMember) {
+            if (!window.LocalMeshMemberDrawer) return;   // plugin not enabled -- nothing to open
+            const member = parseInt(lmMember[1], 10);
+            try {
+                const r = await fetch('/api/localmesh/members', { credentials: 'same-origin' });
+                const members = r.ok ? await r.json() : [];
+                const m = members.find((x) => x.member === member);
+                if (!m) return;
+                if (!this._lmDrawer) this._lmDrawer = new window.LocalMeshMemberDrawer();
+                const onMessage = (window.LocalMeshPanel && !m.blocked)
+                    ? (mem) => window.LocalMeshPanel.composeMessageTo(mem, m.name)
+                    : undefined;
+                this._lmDrawer.open(m, onMessage ? { onMessage } : {});
+            } catch (_) {}
+            return;
+        }
+        if (window.nodeDrawer) window.nodeDrawer.open({ node_id: nodeId });
     }
 
     async _loadOlderMessages() {
