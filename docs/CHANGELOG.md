@@ -4,6 +4,14 @@
 
 #### Dashboard
 
+- **Fix: Repeaters page Trends lost the pressure and humidity lines after
+  a MeshCore 1.18 update.** The poller stored a repeater's sensors by fixed
+  LPP channel numbers (barometer on channel 3, humidity on 4), but 1.18
+  numbers its sensors differently (barometer on 2, humidity on 3), so
+  pressure and humidity were no longer written to the history, while the
+  Sensors card, which lists every reading, still showed them. Pressure and
+  humidity are now matched on sensor type, whatever channel they're on.
+  The gap since the update stays: those readings were never stored.
 - **Settings → System: "Display units" card renamed "Display &
   notifications"**, with a description that also covers the message
   notification options (popup/sound) added to it earlier.
@@ -284,6 +292,67 @@
 
 #### Plugins
 
+- **New plugin: Reticulum Repeaters** (`reticulum-repeaters`, requires
+  reticulum). A sidebar page in the Radio section, next to MeshCore
+  Repeaters, that monitors your own ScotMesh microReticulum repeaters over
+  NomadNet: battery, uptime, restarts and reset reason, radio (frequency,
+  SF, TX power, noise floor, RSSI/SNR, airtime), health (RAM, link pool and
+  fragmentation, closed links, TX failures), sensors, neighbours and
+  routes, with trends. An overview table lists every repeater (status,
+  battery, noise, neighbours, restarts, last poll); click one for its full
+  cards. Only repeaters you add are ever contacted. Stats
+  every 15 min, lists every 60 min, firmware/location daily, all set on
+  the page's Settings tab (admins). Adding a repeater fetches everything
+  once, including the 7 days of history the repeater keeps itself;
+  **Refresh now** fetches everything again (admins, once a minute).
+  Boards without sensors or history are never asked for them. A restart
+  (the repeater's restart count going up) shows as a warning on its card.
+  The repeater list and poll settings live in the plugin's own database
+  table, not in `local.yaml`: updating a plugin through Plugin sources (and
+  switching it on/off) rewrites its `local.yaml` section from the copy core
+  read at startup, which wiped the list in the first version (0.1.1 brings
+  repeaters it still has data for back by itself).
+- **Reticulum Dashboard: repeaters on the map.** Repeaters and other nodes
+  that announce their location over Reticulum (the interface-discovery
+  announces rmap.world collects: ScotMesh repeaters with their rmap option
+  on, discoverable meshpoints, public TCP/backbone nodes) now appear on the
+  Dashboard's map as a separate layer with an antenna icon. Click one for
+  its name, frequency/SF/bandwidth, hops, when it was last heard and its
+  software; nodes not heard for 3+ days are greyed out. Two switches above
+  the map, **RNode only** and **Hide stale** (both on by default,
+  remembered per browser), keep it to nearby live LoRa repeaters, since
+  the backbone carries these announces from the whole network. Off by
+  default: turn it on with **Show discovered repeaters on the dashboard
+  map** in the Reticulum Settings tab (`plugins.reticulum.discover_interfaces`)
+  and restart rnsd. `rnsd` then stores the announces it hears
+  (`discover_interfaces = Yes`, autoconnect explicitly off) and the new
+  `GET /api/reticulum/discovered` reads them. The public address of
+  TCP/backbone nodes is only sent to admins. The map fills as nodes
+  announce, every few hours.
+- **Reticulum Dashboard: the map panel is now just "Map"** (was "Telemetry
+  Map"), since it shows discovered repeaters next to telemetry peers.
+- **Reticulum peer drawer: location, radio settings and telemetry.** Click
+  a ScotMesh repeater (its LXMF or NomadNet address) anywhere the peer
+  drawer opens, on the Reticulum Dashboard or the Reticulum page's Peers
+  tab, and it now shows a **Location & radio (announced)** section from
+  its discovery announce: location (OpenStreetMap link), height,
+  frequency, bandwidth, SF/CR, software and when it was last heard. A
+  peer that sent us telemetry (another meshpoint) gets a **Telemetry**
+  section: temperature, load/RAM/disk, location and when it arrived. The
+  match works because a repeater uses one identity for its discovery
+  announce, LXMF and NomadNet, so `GET /api/reticulum/discovered` now
+  returns each entry's `lxmf` and `nomadnet` addresses. A meshpoint's
+  discovery announce comes from rnsd's own transport identity, unrelated
+  to its LXMF address, so meshpoints show only their telemetry here.
+- **Fix: turning on the repeater map stopped Reticulum from starting.**
+  The generated `rnsd` config said `autoconnect_discovered_interfaces = No`,
+  but RNS reads that option as a number (how many discovered interfaces to
+  connect to automatically), so `RNS.Reticulum()` raised on it and neither
+  `rnsd` nor meshpoint's Reticulum service started. It now writes `0` (off),
+  and a test parses the lines the way RNS does. Also, browsing a NomadNet
+  page while Reticulum isn't running now says "Reticulum is not running"
+  instead of failing with HTTP 500: the check for a running RNS now also
+  requires its transport identity, which a half-started instance lacks.
 - **Reticulum: internet announce traffic no longer drowns out local
   LoRa.** With the TCP backbone on, `rnsd` re-sent every announce heard
   from the internet over the RNode radio. LoRa is half-duplex, so the

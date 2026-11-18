@@ -101,6 +101,32 @@ class PollerTelemetryTest(unittest.TestCase):
         self.assertEqual(t.humidity, 51.0)
         self.assertEqual(t.barometric_pressure, 1016.3)
 
+    def test_meshcore_118_channel_layout_still_maps(self):
+        # 1.18 numbers the sensors differently: barometer on ch2, humidity
+        # on ch3 (was 3 and 4). Pressure and humidity must still be stored.
+        result = {
+            "ok": True,
+            "status": {"bat": 4110},
+            "telemetry": {"lpp": [
+                {"channel": 1, "type": "temperature", "value": 23.7},
+                {"channel": 1, "type": "voltage", "value": 4.1},
+                {"channel": 2, "type": "altitude", "value": -55},
+                {"channel": 2, "type": "barometer", "value": 1019.8},
+                {"channel": 2, "type": "temperature", "value": 19.1},
+                {"channel": 3, "type": "humidity", "value": 78.0},
+                {"channel": 3, "type": "temperature", "value": 19.7},
+            ]},
+            "error": "",
+        }
+        repo = _FakeTelemetryRepo()
+        p = _poller(_FakeTx(result), repo, self._tmp)
+        asyncio.run(p._poll_one(p._repeaters[0]))
+
+        t = repo.inserted[0]
+        self.assertEqual(t.barometric_pressure, 1019.8)
+        self.assertEqual(t.humidity, 78.0)
+        self.assertEqual(t.temperature, 23.7)        # ch1 first, as before
+
     def test_latest_and_persistence(self):
         result = {"ok": True, "status": {"bat": 4119}, "telemetry": None, "error": ""}
         p = _poller(_FakeTx(result), _FakeTelemetryRepo(), self._tmp)

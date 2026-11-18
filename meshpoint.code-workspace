@@ -43,9 +43,6 @@
 		{
 			"name": "meshtastic",
 			"path": "../meshtastic"
-		},
-		{
-			"path": "../MeshCore"
 		}
 	],
 	"settings": {}

@@ -237,6 +237,7 @@ plugins:
     backbone_enabled: true
     backbone_host: "node.reticulumnet.nl"
     backbone_port: 4242
+    discover_interfaces: false                  # map other nodes' location announces (repeaters etc.) on the Reticulum Dashboard; see below
     extra_interfaces: []                        # extra RNS interfaces (Settings tab); see below
     notify_url: ""                              # optional: ntfy topic / webhook, POSTed on an inbound LXMF DM
     propagation_enabled: false                  # run an LXMF store-and-forward relay (added role, not a replacement)
@@ -292,6 +293,18 @@ internal backbone for a destination this node doesn't know is still
 searched for on the RNode, within RNS's usual airtime cap. Set the backbone
 to `full` to forward internet announces onto LoRa too. An unknown value
 falls back to the default with a warning. Applied on **Restart rnsd**.
+
+`plugins.reticulum.discover_interfaces` (default `false`; Settings tab →
+**Show discovered repeaters on the dashboard map**) writes
+`discover_interfaces = Yes` and `autoconnect_discovered_interfaces = 0`
+into `rnsd`'s `[reticulum]` section. `rnsd` then keeps the
+interface-discovery announces other nodes send (the ones rmap.world
+shows: ScotMesh repeaters with their rmap option on, discoverable
+meshpoints, public TCP/backbone nodes) under
+`<reticulum_config_dir>/storage/discovery/interfaces/`, and the Reticulum
+Dashboard map shows the ones with a location as a repeater layer
+(`GET /api/reticulum/discovered`). It only listens: it never connects to
+what it finds. Applied on **Restart rnsd**.
 
 `plugins.reticulum.extra_interfaces` (Settings tab → **Extra interfaces**):
 a list of additional RNS interfaces beyond the two above. Each entry is
