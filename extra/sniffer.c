@@ -24,6 +24,7 @@
 #include <signal.h>
 #include <time.h>
 #include <math.h>
+#include <inttypes.h>
 
 #include <openssl/evp.h>
 
@@ -80,6 +81,12 @@ static const multisf_chan_t MULTISF_CHANS[LGW_MULTI_NB] = {
 static volatile bool keep_running = true;
 static uint64_t pkt_count = 0;
 
+/* Phase-1 bridge-prototype logging (see memory/meshtastic_miner.md).
+ * Opt-in via --log-poll / --log-pkt; CSV, one line per poll / per packet,
+ * to size the polling-vs-interrupt latency gap before any firmware work. */
+static FILE *log_poll_fp = NULL;
+static FILE *log_pkt_fp  = NULL;
+
 static void sig_handler(int s) { (void)s; keep_running = false; }
 
 /* ── helpers ───────────────────────────────────────────────────────────── */
@@ -100,6 +107,21 @@ static const char *sf_str(uint32_t dr) {
 
 static bool is_meshtastic(uint32_t freq) {
     return freq >= MESHTASTIC_FREQ_HZ - 2000 && freq <= MESHTASTIC_FREQ_HZ + 2000;
+}
+
+static uint32_t bw_khz(uint8_t bw) {
+    switch (bw) {
+        case BW_500KHZ: return 500;
+        case BW_250KHZ: return 250;
+        case BW_125KHZ: return 125;
+        default:        return 0;
+    }
+}
+
+static uint64_t monotonic_us(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (uint64_t)ts.tv_sec * 1000000ULL + (uint64_t)ts.tv_nsec / 1000ULL;
 }
 
 static void print_packet(const uint8_t *buf, uint16_t len,
@@ -1370,10 +1392,12 @@ static void capture_snapshot(int src) {
 }
 
 static void usage(const char *argv0) {
-    printf("Usage: %s [--capture SRC] [--every SECONDS]\n", argv0);
+    printf("Usage: %s [--capture SRC] [--every SECONDS] [--log-poll FILE] [--log-pkt FILE]\n", argv0);
     printf("  --capture SRC   also snapshot SX1302 capture RAM source SRC (0-31)\n");
     printf("                  every --every seconds (default 10) while receiving\n");
     printf("                  2-3: 4 MHz 12-bit I/Q, 4-6: 4 MHz 16-bit, 10-17: 125 kHz 8-bit\n");
+    printf("  --log-poll FILE CSV, one row per lgw_receive() poll: mono_us,gap_us,nb_pkts\n");
+    printf("  --log-pkt FILE  CSV, one row per received packet: mono_us,count_us,is_mesh,sf,bw_khz,rssic,rssis,snr,len\n");
 }
 
 /* ── main ──────────────────────────────────────────────────────────────── */
@@ -1387,6 +1411,14 @@ int main(int argc, char **argv) {
             capture_source = atoi(argv[++a]);
         } else if (!strcmp(argv[a], "--every") && a + 1 < argc) {
             capture_every_s = atoi(argv[++a]);
+        } else if (!strcmp(argv[a], "--log-poll") && a + 1 < argc) {
+            log_poll_fp = fopen(argv[++a], "w");
+            if (!log_poll_fp) { perror("--log-poll"); return EXIT_FAILURE; }
+            fprintf(log_poll_fp, "mono_us,gap_us,nb_pkts\n");
+        } else if (!strcmp(argv[a], "--log-pkt") && a + 1 < argc) {
+            log_pkt_fp = fopen(argv[++a], "w");
+            if (!log_pkt_fp) { perror("--log-pkt"); return EXIT_FAILURE; }
+            fprintf(log_pkt_fp, "mono_us,count_us,is_mesh,sf,bw_khz,rssic,rssis,snr,len\n");
         } else {
             usage(argv[0]);
             return EXIT_FAILURE;
@@ -1426,9 +1458,13 @@ int main(int argc, char **argv) {
 
     struct lgw_pkt_rx_s rxpkt[32];
     time_t next_capture = time(NULL) + 2;   /* let RX settle first */
+    uint64_t prev_poll_us = 0;              /* 0 == no previous poll yet */
 
     if (capture_source >= 0)
         printf("Capture RAM probe: source %d every %d s\n\n", capture_source, capture_every_s);
+    if (log_poll_fp || log_pkt_fp)
+        printf("Bridge-prototype logging: poll=%s pkt=%s\n\n",
+               log_poll_fp ? "on" : "off", log_pkt_fp ? "on" : "off");
 
     while (keep_running) {
         if (capture_source >= 0 && time(NULL) >= next_capture) {
@@ -1436,11 +1472,18 @@ int main(int argc, char **argv) {
             next_capture = time(NULL) + capture_every_s;
         }
 
+        uint64_t poll_us = monotonic_us();
         int nb = lgw_receive(32, rxpkt);
         if (nb < 0) {
             fprintf(stderr, "ERROR: lgw_receive() returned %d\n", nb);
             break;
         }
+        if (log_poll_fp) {
+            uint64_t gap_us = prev_poll_us ? poll_us - prev_poll_us : 0;
+            fprintf(log_poll_fp, "%" PRIu64 ",%" PRIu64 ",%d\n", poll_us, gap_us, nb);
+        }
+        prev_poll_us = poll_us;
+
         for (int i = 0; i < nb; i++) {
             if (rxpkt[i].status != STAT_CRC_OK) continue;
             pkt_count++;
@@ -1449,16 +1492,27 @@ int main(int argc, char **argv) {
                 rxpkt[i].freq_hz, rxpkt[i].datarate,
                 rxpkt[i].rssic,   rxpkt[i].snr
             );
-            if (is_meshtastic(rxpkt[i].freq_hz))
+            bool is_mesh = is_meshtastic(rxpkt[i].freq_hz);
+            if (log_pkt_fp) {
+                fprintf(log_pkt_fp, "%" PRIu64 ",%u,%d,%s,%u,%.1f,%.1f,%.1f,%u\n",
+                        poll_us, rxpkt[i].count_us, is_mesh,
+                        sf_str(rxpkt[i].datarate), bw_khz(rxpkt[i].bandwidth),
+                        rxpkt[i].rssic, rxpkt[i].rssis, rxpkt[i].snr, rxpkt[i].size);
+            }
+            if (is_mesh)
                 decode_meshtastic(rxpkt[i].payload, rxpkt[i].size);
             else
                 decode_lorawan(rxpkt[i].payload, rxpkt[i].size);
             fflush(stdout);
         }
+        if (log_poll_fp) fflush(log_poll_fp);
+        if (log_pkt_fp)  fflush(log_pkt_fp);
         usleep(10000);
     }
 
     printf("Stopped — %llu packets received\n", (unsigned long long)pkt_count);
+    if (log_poll_fp) fclose(log_poll_fp);
+    if (log_pkt_fp)  fclose(log_pkt_fp);
     lgw_stop();
     return EXIT_SUCCESS;
 }
