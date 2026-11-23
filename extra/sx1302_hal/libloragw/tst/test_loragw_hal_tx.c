@@ -31,6 +31,8 @@ License: Revised BSD License, see LICENSE.TXT file include in the project
 #include <math.h>
 #include <signal.h>     /* sigaction */
 #include <getopt.h>     /* getopt_long */
+#include <time.h>       /* clock_gettime */
+#include <inttypes.h>   /* PRIu64 */
 
 #include "loragw_hal.h"
 #include "loragw_reg.h"
@@ -56,6 +58,17 @@ License: Revised BSD License, see LICENSE.TXT file include in the project
 /* Signal handling variables */
 static int exit_sig = 0; /* 1 -> application terminates cleanly (shut down hardware, close open files, etc) */
 static int quit_sig = 0; /* 1 -> application terminates without shutting down the hardware */
+
+/* TX-timing prototype logging (see memory/meshtastic_miner.md). Opt-in via
+ * --log-tx; CSV, one row per packet, to measure lgw_send()-to-actual-RF
+ * latency and scheduled-TX precision before any bridge firmware work. */
+static FILE *log_tx_fp = NULL;
+
+static uint64_t monotonic_us(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (uint64_t)ts.tv_sec * 1000000ULL + (uint64_t)ts.tv_nsec / 1000ULL;
+}
 
 /* -------------------------------------------------------------------------- */
 /* --- PRIVATE FUNCTIONS ---------------------------------------------------- */
@@ -98,6 +111,9 @@ void usage(void) {
     printf(" --loop        Number of loops for HAL start/stop (HAL unitary test)\n");
     printf( "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" );
     printf(" --fdd         Enable Full-Duplex mode (CN490 reference design)\n");
+    printf( "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" );
+    printf(" --log-tx <path>  CSV, one row per packet: i,t_call_us,chip_count_us,target_count_us,t_emit_start_us,t_emit_end_us\n");
+    printf("                  Also switches the TX_FREE poll from 5ms to 200us for finer precision.\n");
 }
 
 /* handle signals */
@@ -175,6 +191,7 @@ int main(int argc, char **argv)
         {"loop", required_argument, 0, 0},
         {"nhdr", no_argument, 0, 0},
         {"fdd",  no_argument, 0, 0},
+        {"log-tx", required_argument, 0, 0},
         {0, 0, 0, 0}
     };
 
@@ -405,6 +422,13 @@ int main(int argc, char **argv)
                     no_header = true;
                 } else if (strcmp(long_options[option_index].name, "fdd") == 0) {
                     full_duplex = true;
+                } else if (strcmp(long_options[option_index].name, "log-tx") == 0) {
+                    log_tx_fp = fopen(optarg, "w");
+                    if (log_tx_fp == NULL) {
+                        printf("ERROR: could not open --log-tx file '%s'\n", optarg);
+                        return EXIT_FAILURE;
+                    }
+                    fprintf(log_tx_fp, "i,t_call_us,chip_count_us,target_count_us,t_emit_start_us,t_emit_end_us\n");
                 } else {
                     printf("ERROR: argument parsing options. Use -h to print help\n");
                     return EXIT_FAILURE;
@@ -548,6 +572,9 @@ int main(int argc, char **argv)
                 } else {
                     printf("programming TX for next PPS (GPS)\n");
                 }
+            } else if (log_tx_fp != NULL) {
+                /* IMMEDIATE mode: still grab the chip clock at call time for the log */
+                lgw_get_instcnt(&count_us);
             }
 
             if( strcmp( mod, "LORA" ) == 0 ) {
@@ -573,16 +600,41 @@ int main(int argc, char **argv)
 
             pkt.payload[6] = (uint8_t)(i >> 0); /* FCnt */
             pkt.payload[7] = (uint8_t)(i >> 8); /* FCnt */
+
+            uint64_t t_call = 0, t_emit_start = 0, t_emit_end = 0;
+            if (log_tx_fp != NULL) {
+                t_call = monotonic_us();
+            }
+
             x = lgw_send(&pkt);
             if (x != 0) {
                 printf("ERROR: failed to send packet\n");
                 break;
             }
             /* wait for packet to finish sending */
-            do {
-                wait_ms(5);
-                lgw_status(pkt.rf_chain, TX_STATUS, &tx_status); /* get TX status */
-            } while ((tx_status != TX_FREE) && (quit_sig != 1) && (exit_sig != 1));
+            if (log_tx_fp != NULL) {
+                /* finer poll than the default 5ms, to resolve key-up latency */
+                while ((quit_sig != 1) && (exit_sig != 1)) {
+                    lgw_status(pkt.rf_chain, TX_STATUS, &tx_status);
+                    uint64_t now = monotonic_us();
+                    if (tx_status == TX_EMITTING && t_emit_start == 0) {
+                        t_emit_start = now;
+                    }
+                    if (tx_status == TX_FREE && t_emit_start != 0) {
+                        t_emit_end = now;
+                        break;
+                    }
+                    usleep(200);
+                }
+                fprintf(log_tx_fp, "%d,%" PRIu64 ",%u,%u,%" PRIu64 ",%" PRIu64 "\n",
+                        i, t_call, count_us, pkt.count_us, t_emit_start, t_emit_end);
+                fflush(log_tx_fp);
+            } else {
+                do {
+                    wait_ms(5);
+                    lgw_status(pkt.rf_chain, TX_STATUS, &tx_status); /* get TX status */
+                } while ((tx_status != TX_FREE) && (quit_sig != 1) && (exit_sig != 1));
+            }
 
             if ((quit_sig == 1) || (exit_sig == 1)) {
                 break;
@@ -605,6 +657,10 @@ int main(int argc, char **argv)
                 exit(EXIT_FAILURE);
             }
         }
+    }
+
+    if (log_tx_fp != NULL) {
+        fclose(log_tx_fp);
     }
 
     printf("=========== Test End ===========\n");
