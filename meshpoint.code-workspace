@@ -43,6 +43,9 @@
 		{
 			"name": "meshtastic",
 			"path": "../meshtastic"
+		},
+		{
+			"path": "../helium-miner-software"
 		}
 	],
 	"settings": {}
