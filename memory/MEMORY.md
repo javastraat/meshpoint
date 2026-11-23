@@ -4,3 +4,4 @@
 - [Sencap M1 / Meshpoint](project_m1_meshpoint.md) — Meshpoint/
 - [Plugin architecture review](plugin-architecture-review.md) — "should everything be plugins?" verdict: do it partially (internal registries + themes dir yes; out-of-tree sandboxed plugin marketplace no). **ACARS** identified as the reference-plugin candidate (2026-09-02) — needs Phase 0+2+3 + a system-deps mechanism
 - [Themes follow-up TODO](themes-next-todo.md) — backlog after the v0.8.1 drop-in themes + colour-tokenization push (theme editor, community themes, plugin Phase 0, chart palette)
+

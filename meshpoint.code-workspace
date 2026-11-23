@@ -46,6 +46,12 @@
 		},
 		{
 			"path": "../helium-miner-software"
+		},
+		{
+			"path": "../meshtastic-miner"
+		},
+		{
+			"path": "../meshtastic-firmware-bridge"
 		}
 	],
 	"settings": {}
