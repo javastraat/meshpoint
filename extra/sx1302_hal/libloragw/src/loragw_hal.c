@@ -1093,13 +1093,18 @@ int lgw_start(void) {
     dbg_init_random();
 
     if (CONTEXT_COM_TYPE == LGW_COM_SPI) {
-        /* Find the temperature sensor on the known supported ports */
+        /* Find the temperature sensor on the known supported ports. Some
+         * carrier boards (e.g. COTX X3) don't expose one on any of these
+         * addresses; fall back to a fixed 25C reading rather than refusing
+         * to start (matches scripts/install.sh's patch to the /opt copy
+         * used by the main meshpoint service on this same hardware). */
         for (i = 0; i < (int)(sizeof I2C_PORT_TEMP_SENSOR); i++) {
             ts_addr = I2C_PORT_TEMP_SENSOR[i];
             err = i2c_linuxdev_open(I2C_DEVICE, ts_addr, &ts_fd);
             if (err != LGW_I2C_SUCCESS) {
-                printf("ERROR: failed to open I2C for temperature sensor on port 0x%02X\n", ts_addr);
-                return LGW_HAL_ERROR;
+                printf("WARNING: could not open I2C on port 0x%02X\n", ts_addr);
+                ts_fd = -1;
+                continue;
             }
 
             err = stts751_configure(ts_fd, ts_addr);
@@ -1112,9 +1117,8 @@ int lgw_start(void) {
                 break;
             }
         }
-        if (i == sizeof I2C_PORT_TEMP_SENSOR) {
-            printf("ERROR: no temperature sensor found.\n");
-            return LGW_HAL_ERROR;
+        if (ts_fd < 0) {
+            printf("WARNING: sensor not available, using default\n");
         }
 
         /* Configure ADC AD338R for full duplex (CN490 reference design) */
@@ -1222,11 +1226,13 @@ int lgw_stop(void) {
     }
 
     if (CONTEXT_COM_TYPE == LGW_COM_SPI) {
-        DEBUG_MSG("INFO: Closing I2C for temperature sensor\n");
-        x = i2c_linuxdev_close(ts_fd);
-        if (x != 0) {
-            printf("ERROR: failed to close I2C temperature sensor device (err=%i)\n", x);
-            err = LGW_HAL_ERROR;
+        if (ts_fd > 0) {
+            DEBUG_MSG("INFO: Closing I2C for temperature sensor\n");
+            x = i2c_linuxdev_close(ts_fd);
+            if (x != 0) {
+                printf("ERROR: failed to close I2C temperature sensor device (err=%i)\n", x);
+                err = LGW_HAL_ERROR;
+            }
         }
 
         if (CONTEXT_BOARD.full_duplex == true) {
@@ -1597,7 +1603,12 @@ int lgw_get_temperature(float* temperature) {
 
     switch (CONTEXT_COM_TYPE) {
         case LGW_COM_SPI:
-            err = stts751_get_temperature(ts_fd, ts_addr, temperature);
+            if (ts_fd > 0) {
+                err = stts751_get_temperature(ts_fd, ts_addr, temperature);
+            } else {
+                *temperature = 25.0;
+                err = LGW_HAL_SUCCESS;
+            }
             break;
         case LGW_COM_USB:
             err = lgw_com_get_temperature(temperature);
