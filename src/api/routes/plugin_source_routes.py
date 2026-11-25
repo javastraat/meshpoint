@@ -48,7 +48,12 @@ from src.api.audit.dependencies import get_audit_writer
 from src.api.auth.dependencies import require_admin
 from src.api.auth.jwt_session import SessionClaims
 from src.api.theme_registry import scan_themes
-from src.config import AppConfig, save_section_to_yaml, save_top_level_to_yaml
+from src.config import (
+    AppConfig,
+    save_section_to_yaml,
+    save_top_level_to_yaml,
+    saved_plugin_section,
+)
 from src.plugins.installer import PluginInstallError, install_from_source
 from src.plugins.manifest import SOURCE_COMMUNITY, discover_plugins
 from src.plugins.sources import (
@@ -519,16 +524,18 @@ def _record_provenance(
     plugins = _require_config().plugins
     existing = plugins.get(plugin_id)
     existing = dict(existing) if isinstance(existing, dict) else {}
-    existing["source"] = {
+    source = {
         "url": url,
         "ref": ref,
         "version": version,
         "commit": commit,
         "installed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
-    plugins[plugin_id] = existing
     try:
-        save_section_to_yaml("plugins", {plugin_id: existing})
+        saved = saved_plugin_section(plugin_id, existing)
+        existing["source"] = saved["source"] = source
+        plugins[plugin_id] = existing
+        save_section_to_yaml("plugins", {plugin_id: saved})
     except PermissionError as exc:
         logger.warning("could not persist provenance for %s: %s", plugin_id, exc)
 

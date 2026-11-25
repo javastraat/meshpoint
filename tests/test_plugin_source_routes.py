@@ -247,6 +247,20 @@ class TestPluginSourceRoutes(unittest.TestCase):
         self.assertEqual(prov["version"], "2.0")
         self.assertEqual(prov["commit"], "abc1234")
 
+    def test_update_keeps_what_the_plugin_saved_since_startup(self) -> None:
+        """Updating a plugin only records where it came from: settings the plugin
+        itself wrote to local.yaml after startup stay."""
+        import yaml
+        self.cfg.plugins["demo"] = {"enabled": True, "gain": 1}   # as loaded at startup
+        self._local_yaml.write_text(yaml.safe_dump({
+            "plugins": {"demo": {"enabled": True, "gain": 7, "status_key": "secret"}},
+        }))
+        self._mod._record_provenance("demo", "https://github.com/you/p", "main", "2.0", "abc1234")
+        saved = yaml.safe_load(self._local_yaml.read_text())["plugins"]["demo"]
+        self.assertEqual((saved["gain"], saved["status_key"], saved["enabled"]), (7, "secret", True))
+        self.assertEqual(saved["source"]["version"], "2.0")
+        self.assertEqual(self.cfg.plugins["demo"]["source"]["version"], "2.0")
+
     def test_install_refuses_incompatible(self) -> None:
         self.client.post("/api/plugin-sources", json={
             "url": "https://github.com/you/p", "confirm": True,

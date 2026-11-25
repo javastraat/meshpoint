@@ -1014,6 +1014,22 @@ def save_section_to_yaml(section: str, values: dict) -> None:
         )
 
 
+def saved_plugin_section(plugin_id: str, fallback: object = None) -> dict:
+    """``plugins.<id>`` as it is in local.yaml right now, to change one key of
+    and save. Plugins write their own settings there at any time, so the copy
+    loaded at startup (``config.plugins``) may be out of date; saving that one
+    would undo what the plugin saved since. ``fallback`` (that startup copy) is
+    used only when local.yaml has no such section yet."""
+    path = _get_local_yaml_path()
+    if path.exists():
+        with open(path, "r") as fh:
+            data = yaml.safe_load(fh) or {}
+        plugins = data.get("plugins") if isinstance(data, dict) else None
+        if isinstance(plugins, dict) and isinstance(plugins.get(plugin_id), dict):
+            return dict(plugins[plugin_id])
+    return dict(fallback) if isinstance(fallback, dict) else {}
+
+
 def save_top_level_to_yaml(key: str, value) -> None:
     """Set a whole top-level key in local.yaml (for list/scalar values that
     aren't a mergeable section dict, e.g. ``plugin_sources``). Leaves every

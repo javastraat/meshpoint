@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 import textwrap
 import unittest
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import yaml
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -122,6 +124,11 @@ class _PluginRoutesTestBase(unittest.TestCase):
         self.community = root / "community"
         self.builtin.mkdir()
         self.community.mkdir()
+        # never the real config/local.yaml of the machine the tests run on
+        self.local_yaml = root / "local.yaml"
+        env = patch.dict(os.environ, {"CONCENTRATOR_CONFIG": str(self.local_yaml)})
+        env.start()
+        self.addCleanup(env.stop)
 
     def tearDown(self) -> None:
         plugin_module.reset_routes()
@@ -233,6 +240,23 @@ class TestUpdatePlugin(_PluginRoutesTestBase):
     def test_unknown_plugin_returns_404(self) -> None:
         resp = self.client.put("/api/plugins/nope", json={"enabled": True})
         self.assertEqual(resp.status_code, 404)
+
+    def test_enable_keeps_what_the_plugin_saved_since_startup(self) -> None:
+        """A plugin writes its own settings to local.yaml; the copy in memory is
+        from startup and must not be written over them."""
+        self.local_yaml.write_text(yaml.safe_dump({
+            "plugins": {"acars": {"enabled": False, "squelch": -5, "key": "new"}, "dab": {"x": 1}},
+        }))
+        self.client.put("/api/plugins/acars", json={"enabled": True})
+        saved = yaml.safe_load(self.local_yaml.read_text())["plugins"]
+        self.assertEqual(saved["acars"], {"enabled": True, "squelch": -5, "key": "new"})
+        self.assertEqual(saved["dab"], {"x": 1})
+
+    def test_disable_does_not_bring_back_what_the_plugin_removed(self) -> None:
+        self.local_yaml.write_text(yaml.safe_dump({"plugins": {"acars": {"enabled": True}}}))
+        self.client.put("/api/plugins/acars", json={"enabled": False})
+        saved = yaml.safe_load(self.local_yaml.read_text())["plugins"]
+        self.assertEqual(saved["acars"], {"enabled": False})
 
     def test_permission_error_returns_403(self) -> None:
         with patch(

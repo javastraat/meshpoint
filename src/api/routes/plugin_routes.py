@@ -61,7 +61,12 @@ from src.api.audit import AuditLogWriter
 from src.api.audit.dependencies import get_audit_writer
 from src.api.auth.dependencies import require_admin
 from src.api.auth.jwt_session import SessionClaims
-from src.config import AppConfig, remove_subsection_key, save_section_to_yaml
+from src.config import (
+    AppConfig,
+    remove_subsection_key,
+    save_section_to_yaml,
+    saved_plugin_section,
+)
 from src.plugins.loader import LoadedPlugin, is_plugin_enabled, run_deps_check
 from src.plugins.manifest import SOURCE_COMMUNITY, PluginManifest, discover_plugins
 
@@ -230,10 +235,11 @@ def _find_manifest(plugin_id: str) -> PluginManifest:
 def _save_enabled(plugin_id: str, enabled: bool) -> None:
     existing = _config.plugins.get(plugin_id)
     existing = dict(existing) if isinstance(existing, dict) else {}
-    existing["enabled"] = enabled
-    _config.plugins[plugin_id] = existing
     try:
-        save_section_to_yaml("plugins", {plugin_id: existing})
+        saved = saved_plugin_section(plugin_id, existing)
+        existing["enabled"] = saved["enabled"] = enabled
+        _config.plugins[plugin_id] = existing
+        save_section_to_yaml("plugins", {plugin_id: saved})
     except PermissionError as exc:
         raise HTTPException(403, str(exc)) from exc
 
