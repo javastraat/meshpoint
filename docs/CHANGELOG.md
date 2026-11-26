@@ -4,6 +4,12 @@
 
 #### Upstream sync
 
+- **MeshCore cards show a plugged-in USB companion even with TX off.**
+  Configuration → MeshCore said "No companion connected" and the Radio
+  page's companion card "NONE" whenever native TX was off, even while the
+  USB companion was connected and receiving. They now say "USB companion
+  connected" / "USB CONNECTED", using each capture source's own status
+  (already shown in the top bar) (upstream `23a5fe7e`).
 - **Fix: every dashboard stats refresh froze the whole service for 0.5 s.**
   `/api/device/metrics` (and remote `get_metrics`) measured the CPU with
   `psutil.cpu_percent(interval=0.5)` inside the event loop: every request,

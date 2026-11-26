@@ -568,6 +568,11 @@ class MeshcoreConfigCard {
         const tx = (config && config.transmit) || {};
         const mc = (config && config.meshcore) || {};
         const transmitOff = !tx.enabled || mc.status_note === 'transmit_disabled';
+        // USB capture runs independently of native TX: mc.connected only
+        // means "the TX client is up", mc.companions[] carries each capture
+        // source's own connection (upstream 23a5fe7e).
+        const captureConnected = (Array.isArray(mc.companions) ? mc.companions : [])
+            .some((c) => c && c.connected);
         const transmitCallout = transmitOff ? `
             <p class="cfg-callout">
                 <strong>Native TX is disabled.</strong>
@@ -580,10 +585,13 @@ class MeshcoreConfigCard {
         this._body.innerHTML = `
             ${transmitCallout}
             <div class="cfg-empty">
-                <div class="cfg-empty__title">No companion connected</div>
+                <div class="cfg-empty__title">${captureConnected ? 'USB companion connected' : 'No companion connected'}</div>
                 <p class="cfg-empty__body">
-                    Enable the USB capture source above, plug in a companion
-                    (Heltec V3/V4, T-Beam, ...), then restart the service.
+                    ${captureConnected
+                        ? (transmitOff
+                            ? 'USB capture is receiving MeshCore packets. Companion controls need native TX and a service restart.'
+                            : 'USB capture is receiving MeshCore packets, but companion controls are not available right now.')
+                        : 'Enable the USB capture source above, plug in a companion (Heltec V3/V4, T-Beam, ...), then restart the service.'}
                 </p>
             </div>
         `;

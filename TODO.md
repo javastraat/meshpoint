@@ -127,8 +127,10 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
 - [x] **22. `3fbfa9fa` Meshtastic chip only when configured** (S, 8 + tests 50). The top bar shows the Meshtastic
       chip only if a Meshtastic source is configured. `topbar_meshtastic_chip.js`, `topbar_controller.js`.
       → Already have it, closed 26-11 (Einstein's OK): upstream adapted it from our commits 7986b18e + f9dda48d.
-- [ ] **23. `23a5fe7e` MeshCore capture status apart from TX** (S, 23 + tests 66). MeshCore USB shows "capturing"
+- [x] **23. `23a5fe7e` MeshCore capture status apart from TX** (S, 23 + tests 66). MeshCore USB shows "capturing"
       even when TX is off. `meshcore_card.js`, `radio_companion_card.js`, `topbar_meshcore_chip.js`, `config_routes.py`.
+      → Done 26-11: our top bar already used per-companion capture status; the two cards now use the same
+        (`mc.companions`), so no new server field. Node test `tests/frontend_meshcore_capture_status.test.js`.
 
 ### E. Meshtastic USB recovery
 
