@@ -4,6 +4,13 @@
 
 #### Upstream sync
 
+- **Fix: every dashboard stats refresh froze the whole service for 0.5 s.**
+  `/api/device/metrics` (and remote `get_metrics`) measured the CPU with
+  `psutil.cpu_percent(interval=0.5)` inside the event loop: every request,
+  websocket and the concentrator receive loop stood still for half a
+  second, every 15 s per open dashboard. A background task now samples the
+  CPU every 2 s and requests read that value; for the first ~2 s after a
+  start it shows "N/A" (also in `meshpoint report`) (upstream `4d4b22df`).
 - **Meshtastic channel listens for the 16-symbol preamble Meshtastic sends.**
   The SX1302 HAL sets the LoRa service modem (ch8, Meshtastic) to an
   8-symbol RX preamble on every start; Meshtastic transmits 16. It is now

@@ -69,6 +69,9 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
       preamble verified after restart.
       → Done 26-11, with one change: a failed set/read-back logs an error and keeps RX on the HAL default (8)
         instead of stopping the concentrator. Test as unittest (`tests/test_service_preamble.py`).
+        COTX 26-11 19:20: `RX preamble verified: 16 symbols` after start; 46 HAL tests OK on the Pi.
+  - [ ] **Recheck later:** Meshtastic packets per hour before (until 26-11 19:20) vs after, on the COTX:
+        `journalctl -u meshpoint --since … --until … | grep -c 'Meshtastic packet'`. About equal or more = good.
 - [x] **10. `027899ed` Receive iterator survives a restart** (M, 29 + test 95). After a concentrator restart the
       receive loop keeps running instead of silently stopping. `src/capture/concentrator_source.py`. Pi: restart
       the radio from the dashboard, packets keep coming.
@@ -84,11 +87,16 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
   - [ ] **Live check later:** unit tests OK on the COTX (26-11), but it only hears packets of -19 to -46 dBm, all
         above `max_relay_rssi` (-50), so nothing is relayed there. Where a Meshpoint hears distant nodes: `RELAY [`
         lines in the log, none with its own ID, and other nodes show its last ID byte as relay byte.
-- [ ] **13. `ebbf6eb3` Gateway detection on a fresh install** (M, 93 + tests 179). The setup wizard probes the HAL
+- [x] **13. `ebbf6eb3` Gateway detection on a fresh install** (M, 93 + tests 179). The setup wizard probes the HAL
       version with a time limit instead of hanging. `src/cli/hardware_detect.py`, `hardware_probe.py`,
       `setup_wizard.py`. Pi: only testable on a fresh SD card; otherwise unit tests.
-- [ ] **14. `553bdd83` Transmit settings save** (S, 30 + test 62). Saving Configuration → Transmit finishes properly
+      → Skipped 26-11 (Einstein's choice): it fixes upstream's chip probe from `de78139d` (WisMesh work), which we
+        don't have; our wizard only checks SPI + libloragw. Taking the probe would be a new feature.
+- [x] **14. `553bdd83` Transmit settings save** (S, 30 + test 62). Saving Configuration → Transmit finishes properly
       (button state, message). `frontend/js/configuration/transmit_card.js`.
+      → Already have it, closed 26-11 (Einstein's OK): upstream's fix was a try/catch around the save request. Our
+        shared `_request()` (`configuration_panel.js`) catches network and HTTP errors for every card and returns
+        null, and the card then shows "Transmit save failed.". We keep our relay fields (upstream removed theirs).
 
 ### C. Messages and channels
 
@@ -109,13 +117,16 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
 
 ### D. Dashboard and status
 
-- [ ] **20. `4d4b22df` CPU sampled in the background** (M, 70 + test 94). Ours calls `psutil.cpu_percent(interval=0.5)`
+- [x] **20. `4d4b22df` CPU sampled in the background** (M, 70 + test 94). Ours calls `psutil.cpu_percent(interval=0.5)`
       per request, which blocks 0.5 s each time. New `src/system_metrics.py` sampler, used by `system_metrics.py`,
       `server.py`, `src/remote/executors.py`.
-- [ ] **21. `a16253be` Status before data on load** (S, 34 + test 62). The dashboard connects the websocket first, so
+      → Done 26-11: as upstream, plus a guard in `meshpoint report` (None while warming up crashed its health check).
+- [x] **21. `a16253be` Status before data on load** (S, 34 + test 62). The dashboard connects the websocket first, so
       it doesn't hang on "connecting…" while data loads. `frontend/js/app.js`, `websocket_client.js`.
-- [ ] **22. `3fbfa9fa` Meshtastic chip only when configured** (S, 8 + tests 50). The top bar shows the Meshtastic
+      → Already have it, closed 26-11 (Einstein's OK): upstream adapted it from our commit 93c4d4f (WS connects first).
+- [x] **22. `3fbfa9fa` Meshtastic chip only when configured** (S, 8 + tests 50). The top bar shows the Meshtastic
       chip only if a Meshtastic source is configured. `topbar_meshtastic_chip.js`, `topbar_controller.js`.
+      → Already have it, closed 26-11 (Einstein's OK): upstream adapted it from our commits 7986b18e + f9dda48d.
 - [ ] **23. `23a5fe7e` MeshCore capture status apart from TX** (S, 23 + tests 66). MeshCore USB shows "capturing"
       even when TX is off. `meshcore_card.js`, `radio_companion_card.js`, `topbar_meshcore_chip.js`, `config_routes.py`.
 

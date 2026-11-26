@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING, Optional
 
 from fastapi import APIRouter, Depends
 
+from src.system_metrics import cpu_sampler
+
 from src.api.auth.dependencies import require_auth
 from src.api.auth.metrics_api_key import require_session_or_metrics_key
 
@@ -75,7 +77,7 @@ async def system_metrics():
     load_avg = _read_load_avg()
 
     return {
-        "cpu_percent": psutil.cpu_percent(interval=0.5),
+        "cpu_percent": cpu_sampler.value,  # None while warming up
         "memory_percent": mem.percent,
         "memory_used_mb": round(mem.used / (1024 * 1024)),
         "memory_total_mb": round(mem.total / (1024 * 1024)),

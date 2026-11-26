@@ -137,8 +137,11 @@ def _print_system_section(d: ReportData) -> None:
 
     _section("SYSTEM")
 
-    cpu = m.get("cpu_percent", 0)
-    _kv("CPU", f"{cpu}%", _bar(cpu, 100))
+    cpu = m.get("cpu_percent")
+    if cpu is None:  # background sampler still warming up
+        _kv("CPU", "N/A")
+    else:
+        _kv("CPU", f"{cpu}%", _bar(cpu, 100))
     _kv("Temperature", _fmt_temp(m.get("cpu_temp_c")))
 
     mem_pct = m.get("memory_percent", 0)
@@ -544,7 +547,7 @@ def _print_health_summary(d: ReportData) -> None:
 
     m = d.metrics
     if m:
-        if m.get("cpu_percent", 0) > 85:
+        if (m.get("cpu_percent") or 0) > 85:
             issues.append(f"{_YELLOW}CPU usage high ({m['cpu_percent']}%){_RESET}")
         if m.get("memory_percent", 0) > 85:
             issues.append(f"{_YELLOW}Memory usage high ({m['memory_percent']}%){_RESET}")
