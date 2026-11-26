@@ -14,7 +14,10 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
-sys.modules.setdefault("aiosqlite", types.ModuleType("aiosqlite"))  # Mac dev box
+try:  # the real one on the Pi; a stub only where it isn't installed
+    import aiosqlite  # noqa: F401
+except ImportError:
+    sys.modules["aiosqlite"] = types.ModuleType("aiosqlite")
 
 from src.capture.meshcore_usb_source import (  # noqa: E402
     MeshcoreUsbCaptureSource,
