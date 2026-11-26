@@ -163,8 +163,10 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
       → Done 26-11, adapted to our multi-companion sending: copies of one send share a packet_id and add up
         (`src/transmit/meshcore_repeats.py`), observed in each companion's own event loop (RX log + ACK). Only wired
         when MeshCore capture sources exist. Test `tests/test_meshcore_send_feedback.py` (real AES/HMAC frames).
-- [ ] **29. `a451d1e2` MeshCore heard-path popover** (M-L, 301 + tests 88). Click the feedback to see which
+- [x] **29. `a451d1e2` MeshCore heard-path popover** (M-L, 301 + tests 88). Click the feedback to see which
       repeaters heard it. Needs 28.
+      → Done 26-11: paths per copy in the tracker (all companions' copies, first 32), `heard_paths` column,
+        `GET /api/messages/{id}/heard-paths`, popover from upstream in our chat. Python + Node tests.
 
 ### G. Dashboard presets
 

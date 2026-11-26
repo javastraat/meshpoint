@@ -123,19 +123,61 @@ class MessageRepository:
 
     async def update_meshcore_feedback(
         self, row_id: int, count: int | None, status: str,
+        observations: list | None = None,
     ) -> bool:
         """Store MeshCore send feedback: the repeat count only goes up, status
-        only ever becomes 'delivered'; never touches received messages."""
+        only ever becomes 'delivered'; never touches received messages.
+        ``observations`` (repeater paths, first 32) replace the saved ones
+        unless they belong to a lower count than already stored."""
         cursor = await self._db.execute(
             """UPDATE messages SET
                heard_repeats = CASE WHEN ? IS NULL THEN heard_repeats
                    ELSE MAX(COALESCE(heard_repeats, 0), ?) END,
-               status = CASE WHEN ? = 'delivered' THEN 'delivered' ELSE status END
+               status = CASE WHEN ? = 'delivered' THEN 'delivered' ELSE status END,
+               heard_paths = CASE WHEN ? IS NOT NULL AND ? >= COALESCE(heard_repeats, 0)
+                   THEN ? ELSE heard_paths END
                WHERE id = ? AND direction = 'sent' AND protocol = 'meshcore'""",
-            (count, count, status, row_id),
+            (count, count, status,
+             1 if observations is not None else None, count,
+             json.dumps(observations[:32], allow_nan=False) if observations is not None else None,
+             row_id),
         )
         await self._db.commit()
         return cursor.rowcount > 0
+
+    async def get_heard_paths(self, row_id: int) -> dict | None:
+        """Saved repeater paths of a sent MeshCore message, with best-effort
+        names from the local node list (no radio I/O). None if not found."""
+        row = await self._db.fetch_one(
+            "SELECT heard_repeats, heard_paths FROM messages WHERE id = ? "
+            "AND direction = 'sent' AND protocol = 'meshcore'", (row_id,)
+        )
+        if not row:
+            return None
+        try:
+            observations = json.loads(row["heard_paths"]) if row.get("heard_paths") else []
+        except (TypeError, ValueError):
+            observations = []
+        roster: dict[str, str | None] = {}
+        if observations:
+            nodes = await self._db.fetch_all(
+                "SELECT node_id, public_key, long_name, short_name FROM nodes "
+                "WHERE protocol = 'meshcore'"
+            )
+            for node in nodes:
+                key = (node.get("public_key") or node["node_id"] or "").lower()
+                key = key.removeprefix("mc:").lstrip("!")
+                if len(key) >= 12 and all(c in "0123456789abcdef" for c in key):
+                    roster[key] = node.get("long_name") or node.get("short_name")
+        for observation in observations:
+            hops = []
+            for prefix in observation.get("path", []):
+                matches = [name for key, name in roster.items() if key.startswith(prefix)]
+                hops.append({"id": prefix, "name": matches[0] if len(matches) == 1 else None,
+                             "ambiguous": len(matches) > 1})
+            observation["hops"] = hops
+        return {"count": row["heard_repeats"], "observations": observations,
+                "recorded": row.get("heard_paths") is not None}
 
     async def save_received(
         self,

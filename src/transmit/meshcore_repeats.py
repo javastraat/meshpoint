@@ -21,6 +21,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
+import math
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -30,6 +31,7 @@ logger = logging.getLogger(__name__)
 
 TRACK_SECONDS = 900      # echoes/ACKs matched for 15 minutes after a send
 MAX_PENDING = 128        # at most this many recent sends tracked
+MAX_PATHS = 32           # path details kept for the first copies per message
 ACK_KEEP_SECONDS = 30    # an ACK may arrive before the send result is bound
 
 
@@ -48,6 +50,8 @@ class PendingSend:
     expected_ack: str = ""
     status: str = "sent"
     ack_floor: int = 0
+    # Per heard copy: repeater path prefixes + RSSI/SNR at our radio (upstream a451d1e2).
+    observations: list = field(default_factory=list)
 
 
 @dataclass
@@ -211,6 +215,13 @@ class MeshcoreSendFeedback:
                         or decoded.get("message") != item.message:
                     continue
                 item.count += 1
+                if len(item.observations) < MAX_PATHS:
+                    item.observations.append({
+                        "path": [frame[i:i + width].hex() for i in range(offset + 1, body_start, width)],
+                        "received_at": time.time(),
+                        "rssi": _finite(payload.get("rssi")),
+                        "snr": _finite(payload.get("snr")),
+                    })
                 await self._publish(item.packet_id)
                 return
 
@@ -219,9 +230,15 @@ class MeshcoreSendFeedback:
         if binding is None:
             return
         totals = self._totals(packet_id)
+        observations = None
+        if totals["heard_repeats"] is not None:  # channel sends; DMs have no paths
+            observations = sorted(
+                (o for c in self._copies(packet_id) for o in c.observations),
+                key=lambda o: o["received_at"],
+            )[:MAX_PATHS]
         try:
             saved = await self.repository.update_meshcore_feedback(
-                binding.row_id, totals["heard_repeats"], totals["status"],
+                binding.row_id, totals["heard_repeats"], totals["status"], observations,
             )
         except Exception:
             logger.exception("MeshCore send feedback: could not store")
@@ -231,3 +248,9 @@ class MeshcoreSendFeedback:
                 "id": binding.row_id, "packet_id": packet_id,
                 "node_id": binding.node_id, "protocol": "meshcore", **totals,
             })
+
+
+def _finite(value):
+    if isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value):
+        return round(value, 2)
+    return None

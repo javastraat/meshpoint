@@ -4,6 +4,14 @@
 
 #### Upstream sync
 
+- **MeshCore: hover or tap "Heard N repeats" to see which repeaters.**
+  A small popover lists each heard copy's repeater path, with names from
+  the local node list where the ID prefix matches one node (else
+  "Ambiguous" / "Unknown repeater"), and RSSI/SNR as measured at this
+  Meshpoint's radio. Up to the first 32 copies per message keep their path
+  (new `heard_paths` column, added on startup); older messages may have a
+  count without paths. Escape, the close button or a tap outside closes it
+  (upstream `a451d1e2`).
 - **MeshCore send feedback in Messages: repeats heard, DMs delivered.**
   A channel message sent from the dashboard shows "Heard N repeats": how
   often this Meshpoint's own companions heard repeaters pass it on

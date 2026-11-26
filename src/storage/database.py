@@ -91,7 +91,8 @@ CREATE TABLE IF NOT EXISTS messages (
     snr           REAL,
     rx_count      INTEGER NOT NULL DEFAULT 1,
     attachments   TEXT,
-    heard_repeats INTEGER
+    heard_repeats INTEGER,
+    heard_paths   TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_messages_node ON messages(node_id);
@@ -188,6 +189,12 @@ class DatabaseManager:
                 "ALTER TABLE messages ADD COLUMN heard_repeats INTEGER"
             )
             logger.info("Migration: added heard_repeats column to messages table")
+        if msg_cols and "heard_paths" not in msg_cols:
+            # Repeater paths behind "Heard N repeats" (upstream a451d1e2).
+            await self._connection.execute(
+                "ALTER TABLE messages ADD COLUMN heard_paths TEXT"
+            )
+            logger.info("Migration: added heard_paths column to messages table")
 
         await self._cleanup_cross_protocol_name_contamination()
         await self._cleanup_meshcore_placeholder_names()

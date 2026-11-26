@@ -142,6 +142,77 @@ class FeedbackTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(await self.repo.update_meshcore_feedback(row, 5, "delivered"))
 
 
+class HeardPathTests(unittest.IsolatedAsyncioTestCase):
+    """Repeater paths behind "Heard N repeats" (upstream a451d1e2)."""
+
+    async def asyncSetUp(self):
+        self.db = DatabaseManager(":memory:")
+        await self.db.connect()
+        self.repo = MessageRepository(self.db)
+        self.fb = MeshcoreSendFeedback(self.repo, AsyncMock())
+
+    async def asyncTearDown(self):
+        await self.db.disconnect()
+
+    async def test_paths_signal_and_names_are_saved_and_resolved(self):
+        await self.db.execute(
+            "INSERT INTO nodes (node_id, long_name, protocol, public_key, last_heard, first_seen) "
+            "VALUES (?, ?, 'meshcore', ?, 'x', 'x')",
+            ("aabbccddeeff", "Roof repeater", "aa" + "bb" * 31),
+        )
+        await self.db.commit()
+        pid = new_packet_id()
+        self.fb.begin_channel(pid, CHANNEL, "Bench", "hello", 100)
+        row = await self.repo.save_sent("hello", "broadcast:meshcore", "Bench", "meshcore", packet_id=pid)
+        await self.fb.bind(pid, row, "broadcast:meshcore")
+        echo = frame()  # path byte 0xaa
+        echo.update(rssi=-71.5, snr=4.25)
+        await self.fb.observe(echo)
+        paths = await self.repo.get_heard_paths(row)
+        self.assertEqual((paths["count"], paths["recorded"]), (1, True))
+        observation = paths["observations"][0]
+        self.assertEqual((observation["rssi"], observation["snr"]), (-71.5, 4.25))
+        self.assertEqual(observation["hops"], [{"id": "aa", "name": "Roof repeater", "ambiguous": False}])
+
+    async def test_two_matches_are_ambiguous_and_unknown_stays_unnamed(self):
+        for i, key in enumerate(("aa11", "aa22")):
+            await self.db.execute(
+                "INSERT INTO nodes (node_id, long_name, protocol, public_key, last_heard, first_seen) "
+                "VALUES (?, ?, 'meshcore', ?, 'x', 'x')", (f"n{i}", f"R{i}", key + "00" * 30),
+            )
+        await self.db.commit()
+        pid = new_packet_id()
+        self.fb.begin_channel(pid, CHANNEL, "Bench", "hello", 100)
+        row = await self.repo.save_sent("hello", "broadcast:meshcore", "Bench", "meshcore", packet_id=pid)
+        await self.fb.bind(pid, row, "broadcast:meshcore")
+        await self.fb.observe(frame(hops=2))  # path aa, aa
+        await self.fb.observe(frame(hops=1, width=2))  # path aaaa: nobody
+        hops = [o["hops"] for o in (await self.repo.get_heard_paths(row))["observations"]]
+        self.assertTrue(hops[0][0]["ambiguous"])
+        self.assertEqual(hops[1], [{"id": "aaaa", "name": None, "ambiguous": False}])
+
+    async def test_dm_and_unknown_rows(self):
+        pid = new_packet_id()
+        self.fb.begin_direct(pid)
+        row = await self.repo.save_sent("hi", "aabbccddeeff", "X", "meshcore", packet_id=pid)
+        await self.fb.bind(pid, row, "aabbccddeeff")
+        self.assertEqual(await self.repo.get_heard_paths(row),
+                         {"count": None, "observations": [], "recorded": False})
+        self.assertIsNone(await self.repo.get_heard_paths(9999))
+        other = await self.repo.save_sent("x", "broadcast:0", "X", "meshtastic")
+        self.assertIsNone(await self.repo.get_heard_paths(other))
+
+    async def test_at_most_32_paths_are_kept(self):
+        pid = new_packet_id()
+        self.fb.begin_channel(pid, CHANNEL, "Bench", "hello", 100)
+        row = await self.repo.save_sent("hello", "broadcast:meshcore", "Bench", "meshcore", packet_id=pid)
+        await self.fb.bind(pid, row, "broadcast:meshcore")
+        for _ in range(40):
+            await self.fb.observe(frame())
+        paths = await self.repo.get_heard_paths(row)
+        self.assertEqual((paths["count"], len(paths["observations"])), (40, 32))
+
+
 class SendHelperTests(unittest.IsolatedAsyncioTestCase):
     async def test_channel_send_uses_an_explicit_timestamp_and_tracks(self):
         fb = MeshcoreSendFeedback(AsyncMock(), AsyncMock())
