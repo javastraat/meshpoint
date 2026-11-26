@@ -282,7 +282,7 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
       `src/audio/sdr_registry.py` gives the SDR receivers (ACARS, ADS-B, ...) region defaults. Docs: `RETICULUM-REGIONS.md`.
       Tests: `test_reticulum_regions.py`, `test_receiver_regions.py`. Our plugin has no region logic. Adjust EU to our
       band plan (869,4-869,65 MHz) before copying their numbers.
-- [ ] **42. MeshCore USB robustness** (M, `b91d994b`; item 26 did not cover it). In `meshcore_usb_source.py`:
+- [x] **42. MeshCore USB robustness** (M, `b91d994b`; item 26 did not cover it). In `meshcore_usb_source.py`:
   - `restart_auto_fetching()` must call `stop_auto_message_fetching()` first: `start_auto_message_fetching()` in
     `meshcore_py` is not idempotent (each call adds a subscription).
   - Release DTR after opening on CP210x USB bridges (it can hold BOOT and start the firmware rescue console):
@@ -294,6 +294,10 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
       "this fork does not do that yet (planned, TODO.md item 42)"; put back upstream's wording "Meshpoint releases DTR
       on identified CP210x bridges; native USB devices retain their existing behavior. This uses USB hardware
       identifiers, so it does not depend on the node label or a particular USB port number."
+      → Done 26-11: all four points; keeps the library's "retry with DTR inverted" (upstream dropped it); also acts on
+        the DISCONNECTED event we already subscribed to. USB-NODES.md CP210x paragraph put back to upstream's wording.
+        Tests `tests/test_meshcore_usb_robustness.py` (meshcore 2.3.14 and 2.3.19); exclusive-apply tests now fake
+        `_open_meshcore`.
 - [x] **43. Node list: sort by packet count** (S). `packets` key in `NodeCards.SORT_KEYS` and
       `node_cards_sort.js` (`packet_count` descending, missing/zero last, tie-break last heard). Credit: PR #128 by
       yourasmit15-web. Test: `tests/frontend/node_sort_stats_units.test.cjs`.

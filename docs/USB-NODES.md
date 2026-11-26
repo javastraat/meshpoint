@@ -103,9 +103,9 @@ double-open a port.
 On CP210x USB bridges, an asserted serial DTR line can act like a held boot
 button and put the companion into CLI Rescue mode shortly after startup.
 Symptoms include a brief successful connection followed by repeated query
-timeouts. Upstream releases DTR on identified CP210x bridges; this fork does
-not do that yet (planned, TODO.md item 42). Native USB boards (ESP32-S3
-such as the Heltec V3/V4) are not affected.
+timeouts. Meshpoint releases DTR on identified CP210x bridges; native USB
+devices retain their existing behavior. This uses USB hardware identifiers,
+so it does not depend on the node label or a particular USB port number.
 
 MeshCore is a different USB device and a different firmware. Walkthrough:
 [Onboarding > Adding a MeshCore Companion](ONBOARDING.md#adding-a-meshcore-companion-optional).

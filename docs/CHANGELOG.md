@@ -4,6 +4,16 @@
 
 #### Upstream sync
 
+- **MeshCore USB companions: steadier connection.** Restarting message
+  fetching after a send no longer stacks up an extra subscription each time
+  (the library's start isn't idempotent). On CP210x USB bridges (older
+  ESP32 boards) DTR is released after opening, so the companion no longer
+  falls into its rescue console; native USB boards are unchanged, and a
+  node that doesn't answer still gets one retry with DTR inverted. An
+  unplugged companion, or the library reporting the link gone, reconnects
+  within seconds instead of after missed health probes. A failed connect is
+  cleaned up, and an unplugged/busy port logs one line instead of a
+  traceback (upstream `b91d994b`).
 - **Messages is read-only for a Viewer.** A Viewer login no longer sees New,
   the compose box is disabled ("Read-only: sending needs an administrator"),
   there is no delete button, and opening a chat no longer tries to mark it

@@ -16,6 +16,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import time
 from dataclasses import replace
 from typing import AsyncIterator, Optional
@@ -124,6 +125,8 @@ class MeshcoreUsbCaptureSource(CaptureSource):
         # MeshCore send feedback (src/transmit/meshcore_repeats.py), shared
         # by all companions; set by the server.
         self._send_feedback = None
+        # restart_auto_fetching() runs after every send; serialize it.
+        self._auto_fetch_lock = asyncio.Lock()
         # Live Configuration -> Transmit switch, set by the server (see
         # MeshCoreTxClient.tx_enabled_provider): this companion's own sends
         # (fan-out channel messages, per-companion DMs and adverts).
@@ -248,13 +251,17 @@ class MeshcoreUsbCaptureSource(CaptureSource):
                 if raw is not None:
                     yield raw
             except asyncio.TimeoutError:
+                self._check_usb_presence()
                 continue
 
     async def _connect(self, port: str) -> None:
         try:
             from meshcore import MeshCore, EventType
 
-            self._meshcore = await self._open_meshcore(_MESHCORE_COMMAND_TIMEOUT_SECONDS, port)
+            def keep(mc):  # own it before connect(), so a failure gets cleaned up
+                self._meshcore = mc
+
+            self._meshcore = await self._open_meshcore(_MESHCORE_COMMAND_TIMEOUT_SECONDS, port, keep=keep)
             if self._meshcore is None:
                 logger.error(
                     "MeshCore companion handshake failed on %s. "
@@ -290,7 +297,17 @@ class MeshcoreUsbCaptureSource(CaptureSource):
                     self._on_connected_callback(),
                     name="meshcore-on-connected",
                 )
+        except asyncio.CancelledError:
+            await self._disconnect()
+            raise
+        except OSError as exc:
+            # Unplugged / busy / no permission: one line, the reconnect loop retries.
+            await self._disconnect()
+            logger.warning(
+                "MeshCore USB unavailable on %s (%s); waiting for reconnect", port, exc,
+            )
         except Exception:
+            await self._disconnect()
             logger.exception(
                 "Failed to start MeshCore USB source on %s", port
             )
@@ -464,8 +481,24 @@ class MeshcoreUsbCaptureSource(CaptureSource):
         except Exception:
             return False
 
+    def _check_usb_presence(self) -> None:
+        """USB companion unplugged? Reconnect now instead of waiting for the
+        health check's missed probes (upstream b91d994b). Only looks at the
+        /dev path; never probes or resets the radio."""
+        if (self._connected and self.connection_type == "serial"
+                and self._resolved_port and self._resolved_port.startswith("/dev/")
+                and os.name == "posix" and not os.path.exists(self._resolved_port)):
+            self._trigger_reconnect("USB device removed")
+
     async def _on_event(self, event) -> None:
         if not self._running:
+            return
+        event_type = getattr(event, "type", None)
+        if (getattr(event_type, "name", "") == "DISCONNECTED"
+                or getattr(event_type, "value", event_type) == "disconnected"):
+            # The library saw the transport go (we subscribe to it): recover now.
+            if self._connected:
+                self._trigger_reconnect("transport disconnected")
             return
         # Any event from the device is proof the connection is alive.
         # The health check loop uses this to skip its active probe.
@@ -873,21 +906,62 @@ class MeshcoreUsbCaptureSource(CaptureSource):
         return result
 
     async def restart_auto_fetching(self) -> None:
-        """Re-enable auto message fetching after TX operations."""
-        if self._meshcore and self._connected:
+        """Re-enable auto message fetching after TX operations.
+
+        meshcore's start_auto_message_fetching() is not idempotent: each call
+        adds another subscription and drops the handle of the previous one,
+        so restarting without stopping first piled up fetch subscriptions
+        after every send (upstream b91d994b).
+        """
+        async with self._auto_fetch_lock:
+            mc = self._meshcore
+            if not (mc and self._connected):
+                return
             try:
-                await self._meshcore.start_auto_message_fetching()
-                logger.info("MeshCore auto message fetching restarted")
+                await mc.stop_auto_message_fetching()
+                if self._meshcore is mc and self._connected:
+                    await mc.start_auto_message_fetching()
+                logger.debug("MeshCore auto message fetching restarted")
             except Exception:
                 logger.debug("Failed to restart auto fetching", exc_info=True)
 
-    async def _open_meshcore(self, timeout: float, port: Optional[str] = None):
-        """A MeshCore connection over this companion's transport (serial or TCP)."""
+    async def _open_meshcore(self, timeout: float, port: Optional[str] = None, keep=None):
+        """A connected MeshCore over this companion's transport, or None.
+
+        Builds the connection itself (upstream b91d994b): on serial, DTR is
+        released on CP210x bridges (src/capture/meshcore_serial.py), and the
+        library's "no answer -> retry once with DTR inverted" is kept. Every
+        instance is handed to ``keep`` before connect() and disconnected on
+        failure: connect() can raise after its reader already started.
+        """
         from meshcore import MeshCore
 
+        async def attempt(connection):
+            mc = MeshCore(connection, default_timeout=timeout)
+            if keep is not None:
+                keep(mc)
+            try:
+                result = await mc.connect()
+            except BaseException:
+                await _quiet_disconnect(mc)
+                raise
+            if result is None:
+                await _quiet_disconnect(mc)
+                return None
+            return mc
+
         if self.connection_type == "tcp":
-            return await MeshCore.create_tcp(self._tcp_host, self._tcp_port, default_timeout=timeout)
-        return await MeshCore.create_serial(port, self._baud_rate, default_timeout=timeout)
+            from meshcore.tcp_cx import TCPConnection
+            return await attempt(TCPConnection(self._tcp_host, self._tcp_port))
+
+        from src.capture.meshcore_serial import create_serial_connection, is_cp210x
+
+        released = is_cp210x(port)
+        mc = await attempt(create_serial_connection(port, self._baud_rate, release_dtr=released))
+        if mc is None:
+            logger.info("MeshCore %r: no answer on %s, retrying with DTR inverted", self.name, port)
+            mc = await attempt(create_serial_connection(port, self._baud_rate, release_dtr=not released))
+        return mc
 
     async def _resolve_port(self) -> Optional[str]:
         # For TCP this is just a label (logs, status); no serial probing.
@@ -1001,3 +1075,10 @@ def _raw_advertisement(payload: dict) -> Optional[dict]:
         return result
     except (TypeError, ValueError, IndexError):
         return None
+
+
+async def _quiet_disconnect(mc) -> None:
+    try:
+        await mc.disconnect()
+    except Exception:
+        pass

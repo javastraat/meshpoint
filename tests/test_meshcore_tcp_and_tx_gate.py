@@ -37,19 +37,39 @@ class TcpTransportTests(unittest.IsolatedAsyncioTestCase):
     async def test_tcp_opens_tcp_and_needs_no_port_probe(self):
         s = MeshcoreUsbCaptureSource(connection_type="tcp", tcp_host="10.0.0.5", tcp_port=5001)
         self.assertEqual(await s._resolve_port(), "tcp://10.0.0.5:5001")
-        fake = SimpleNamespace(create_tcp=AsyncMock(return_value="mc"), create_serial=AsyncMock())
-        with patch.dict("sys.modules", {"meshcore": SimpleNamespace(MeshCore=fake)}):
-            self.assertEqual(await s._open_meshcore(5.0, "ignored"), "mc")
-        fake.create_tcp.assert_awaited_once_with("10.0.0.5", 5001, default_timeout=5.0)
-        fake.create_serial.assert_not_called()
+        made = []
 
-    async def test_serial_still_opens_serial(self):
+        class FakeMeshCore:
+            def __init__(self, cx, default_timeout=None):
+                made.append(cx)
+
+            async def connect(self):
+                return {"ok": True}
+
+        tcp_cx = SimpleNamespace(TCPConnection=lambda host, port: ("tcp", host, port))
+        with patch.dict("sys.modules", {"meshcore": SimpleNamespace(MeshCore=FakeMeshCore),
+                                        "meshcore.tcp_cx": tcp_cx}), \
+             patch("src.capture.meshcore_serial.create_serial_connection") as serial:
+            self.assertIsNotNone(await s._open_meshcore(5.0, "ignored"))
+        self.assertEqual(made, [("tcp", "10.0.0.5", 5001)])
+        serial.assert_not_called()
+
+    async def test_serial_opens_serial(self):
         s = MeshcoreUsbCaptureSource(serial_port="/dev/ttyACM0", baud_rate=115200)
-        fake = SimpleNamespace(create_tcp=AsyncMock(), create_serial=AsyncMock(return_value="mc"))
-        with patch.dict("sys.modules", {"meshcore": SimpleNamespace(MeshCore=fake)}):
-            await s._open_meshcore(5.0, "/dev/ttyACM0")
-        fake.create_serial.assert_awaited_once_with("/dev/ttyACM0", 115200, default_timeout=5.0)
-        fake.create_tcp.assert_not_called()
+
+        class FakeMeshCore:
+            def __init__(self, cx, default_timeout=None):
+                self.cx = cx
+
+            async def connect(self):
+                return {"ok": True}
+
+        with patch.dict("sys.modules", {"meshcore": SimpleNamespace(MeshCore=FakeMeshCore)}), \
+             patch("src.capture.meshcore_serial.is_cp210x", return_value=False), \
+             patch("src.capture.meshcore_serial.create_serial_connection",
+                   side_effect=lambda port, baud, release_dtr=None: ("serial", port, baud, release_dtr)):
+            mc = await s._open_meshcore(5.0, "/dev/ttyACM0")
+        self.assertEqual(mc.cx, ("serial", "/dev/ttyACM0", 115200, False))
 
 
 class TxSwitchTests(unittest.IsolatedAsyncioTestCase):

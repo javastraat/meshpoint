@@ -74,6 +74,15 @@ class TestNotConnectedShortCircuits(unittest.TestCase):
         self.assertEqual(result.error, "Not connected")
 
 
+
+def _via_open(fake_create_serial):
+    """The exclusive apply opens through MeshcoreUsbCaptureSource._open_meshcore
+    (own connection: CP210x DTR release, cleanup on failure; item 42). The
+    tests fake that seam with the same (port, baud, timeout) fake as before."""
+    async def open_meshcore(timeout, port=None, keep=None):
+        return await fake_create_serial(port, 115200, default_timeout=timeout)
+    return open_meshcore
+
 class TestExclusiveApplySuccess(unittest.TestCase):
     def test_clean_success_detaches_verifies_and_reattaches(self):
         source = _make_connected_source()
@@ -92,7 +101,7 @@ class TestExclusiveApplySuccess(unittest.TestCase):
                 spreading_factor=11, coding_rate=5,
             )
 
-        with patch("meshcore.MeshCore.create_serial", side_effect=fake_create_serial, create=True), \
+        with patch.object(mus.MeshcoreUsbCaptureSource, "_open_meshcore", side_effect=_via_open(fake_create_serial)), \
              patch.object(mus, "send_set_radio_params", fake_send_set_radio_params), \
              patch.object(mus, "read_radio_status", fake_read_radio_status), \
              patch("src.capture.meshcore_dtr.pulse_dtr_reset"), \
@@ -119,7 +128,7 @@ class TestExclusiveApplySuccess(unittest.TestCase):
                 spreading_factor=11, coding_rate=5,
             )
 
-        with patch("meshcore.MeshCore.create_serial", side_effect=fake_create_serial, create=True), \
+        with patch.object(mus.MeshcoreUsbCaptureSource, "_open_meshcore", side_effect=_via_open(fake_create_serial)), \
              patch.object(mus, "send_set_radio_params", fake_send_set_radio_params), \
              patch.object(mus, "read_radio_status", fake_read_radio_status), \
              patch("src.capture.meshcore_dtr.pulse_dtr_reset"), \
@@ -144,7 +153,7 @@ class TestExclusiveApplySuccess(unittest.TestCase):
                 spreading_factor=11, coding_rate=5,
             )
 
-        with patch("meshcore.MeshCore.create_serial", side_effect=fake_create_serial, create=True), \
+        with patch.object(mus.MeshcoreUsbCaptureSource, "_open_meshcore", side_effect=_via_open(fake_create_serial)), \
              patch.object(mus, "send_set_radio_params", fake_send_set_radio_params), \
              patch.object(mus, "read_radio_status", fake_read_radio_status), \
              patch("src.capture.meshcore_dtr.pulse_dtr_reset"), \
@@ -172,7 +181,7 @@ class TestExclusiveApplyRejectionAndFailures(unittest.TestCase):
             verify_calls.append(True)
             return None
 
-        with patch("meshcore.MeshCore.create_serial", side_effect=fake_create_serial, create=True), \
+        with patch.object(mus.MeshcoreUsbCaptureSource, "_open_meshcore", side_effect=_via_open(fake_create_serial)), \
              patch.object(mus, "send_set_radio_params", fake_send_set_radio_params), \
              patch.object(mus, "read_radio_status", fake_read_radio_status), \
              patch("src.capture.meshcore_dtr.pulse_dtr_reset"), \
@@ -191,7 +200,7 @@ class TestExclusiveApplyRejectionAndFailures(unittest.TestCase):
         async def fake_create_serial(port, baud, default_timeout=15.0):
             return None  # handshake failed
 
-        with patch("meshcore.MeshCore.create_serial", side_effect=fake_create_serial, create=True), \
+        with patch.object(mus.MeshcoreUsbCaptureSource, "_open_meshcore", side_effect=_via_open(fake_create_serial)), \
              patch("src.capture.meshcore_dtr.pulse_dtr_reset"), \
              patch.object(mus, "_RADIO_EXCLUSIVE_REBOOT_SETTLE_SECONDS", 0.0), \
              patch.object(mus, "_RADIO_EXCLUSIVE_DTR_SETTLE_SECONDS", 0.0):
@@ -214,7 +223,7 @@ class TestExclusiveApplyRejectionAndFailures(unittest.TestCase):
         async def fake_send_set_radio_params(mc, freq, bw, sf, cr):
             return SendResult(success=True)
 
-        with patch("meshcore.MeshCore.create_serial", side_effect=fake_create_serial, create=True), \
+        with patch.object(mus.MeshcoreUsbCaptureSource, "_open_meshcore", side_effect=_via_open(fake_create_serial)), \
              patch.object(mus, "send_set_radio_params", fake_send_set_radio_params), \
              patch("src.capture.meshcore_dtr.pulse_dtr_reset"), \
              patch.object(mus, "_RADIO_EXCLUSIVE_REBOOT_SETTLE_SECONDS", 0.0), \
