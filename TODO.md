@@ -239,9 +239,12 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
         `auth_service.py`, `stats_routes.public_snapshot`, tests `test_public_view.py`). Off by default, aggregate
         numbers only (no IDs, positions, payloads), no session issued, no WebSocket access. Review it as an
         unauthenticated surface (rate limit, cache) before enabling.
-  - [ ] **37d. Viewer UI in Messages:** no `meshpointReadOnly` flag in our frontend, so a viewer still sees compose and
+  - [x] **37d. Viewer UI in Messages:** no `meshpointReadOnly` flag in our frontend, so a viewer still sees compose and
         Send and opening a chat posts "read". Hide compose, delete and Send Now for viewers; skip the read POST
         (`messaging_chat.js`, `messaging_contacts.js`, `viewer_access.js`). Goes with 37a.
+        → Done 26-11: `window.meshpointReadOnly` from the identity role (app.js); Messages hides New and delete,
+          disables compose, skips the read POST. Config pages needed nothing: our route guard keeps viewers out.
+          Node test `tests/frontend_viewer_messages.test.js`.
   - Have, no action: viewer role, terminal off by default (we keep our API toggle + restart), `plugin_sources_enabled`.
   - **Their plugin repo** (`KMX415/meshpoint-plugins`): the catalogs diverged. It is one snapshot of their `apps/`
     (11 plugins); ours has 188 commits and 26 plugins (versions 1.2.0 vs 1.0.0 for most shared ones, reticulum 1.1.3 vs

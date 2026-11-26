@@ -50,6 +50,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     // security boundary stays server-side either way (an admin-only route
     // already rejects a non-admin regardless of what the client shows).
     window.meshpointIdentity = identity;
+    // Viewer = read-only in the UI too (upstream b91d994b): Messages hides
+    // New/compose/delete and doesn't post "read". No identity (setup/dev)
+    // fails open like the route guard; the server enforces it regardless.
+    window.meshpointReadOnly = !!identity && !!identity.role && identity.role !== 'admin';
+    document.documentElement.classList.toggle('viewer-read-only', window.meshpointReadOnly);
 
     // Must run before the Router/SidebarController below are constructed --
     // it builds the plugin sidebar <li>/<section> DOM those two snapshot at

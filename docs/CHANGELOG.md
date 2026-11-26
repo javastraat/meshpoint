@@ -4,6 +4,11 @@
 
 #### Upstream sync
 
+- **Messages is read-only for a Viewer.** A Viewer login no longer sees New,
+  the compose box is disabled ("Read-only: sending needs an administrator"),
+  there is no delete button, and opening a chat no longer tries to mark it
+  read. Reading, filters, favourites and Monitor work as before. The server
+  already refuses these writes for a Viewer (upstream `b91d994b`).
 - **README: hardware and accessory links for EU868.** A table of optional
   parts (Heltec V3/V4, Seeed XIAO kit, RAK starter kit, CM4 base board,
   antennas, hub, cables, SD card, GPS) with plain manufacturer links and

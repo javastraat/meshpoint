@@ -105,12 +105,16 @@ class MessagingChat {
         // MeshCore/Pager have no wire-level attachment mechanism at all,
         // so the icon only makes sense, and only appears, for Reticulum.
         this._attachBtn.hidden = convo.protocol !== 'reticulum';
-        this._input.disabled = isUnmapped;
-        this._sendBtn.disabled = isUnmapped;
-        this._input.placeholder = isUnmapped
-            ? "Can't reply -- no matching local channel"
-            : 'Type a message…';
-        if (!isUnmapped) this._input.focus();
+        const readOnly = !!window.meshpointReadOnly;
+        if (readOnly) this._attachBtn.hidden = true;
+        this._input.disabled = isUnmapped || readOnly;
+        this._sendBtn.disabled = isUnmapped || readOnly;
+        this._input.placeholder = readOnly
+            ? 'Read-only: sending needs an administrator'
+            : isUnmapped
+                ? "Can't reply -- no matching local channel"
+                : 'Type a message…';
+        if (!isUnmapped && !readOnly) this._input.focus();
         this._loadMessages();
     }
 
@@ -247,7 +251,10 @@ class MessagingChat {
 
             if (messages.length < 50) this._allLoaded = true;
 
-            await fetch(`/api/messages/conversation/${nodeId}/read`, { method: 'POST' });
+            // Read state is shared: a viewer must not clear it (admin-only on the server too).
+            if (!window.meshpointReadOnly) {
+                await fetch(`/api/messages/conversation/${nodeId}/read`, { method: 'POST' });
+            }
         } catch (e) {
             console.error('Failed to load messages:', e);
         } finally {

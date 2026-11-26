@@ -98,6 +98,7 @@ class MessagingContacts {
      * we haven't designed yet.
      */
     async markConversationRead(nodeId) {
+        if (window.meshpointReadOnly) return;  // shared read state: admin only
         if (!nodeId || nodeId.startsWith('broadcast:')) return;
         const convo = this._conversations.find(c => c.node_id === nodeId);
         if (!convo || (convo.unread_count || 0) === 0) return;
@@ -403,11 +404,11 @@ class MessagingContacts {
                 ${favBtnHtml}
                 <div class="msg-convo__time">${timeStr}</div>
                 ${convo.unread_count > 0 ? `<div class="msg-convo__unread">${convo.unread_count}</div>` : ''}
-                <button class="msg-convo__delete" title="Delete conversation">&times;</button>
+                ${window.meshpointReadOnly ? '' : '<button class="msg-convo__delete" title="Delete conversation">&times;</button>'}
             </div>
         `;
 
-        el.querySelector('.msg-convo__delete').addEventListener('click', (e) => {
+        el.querySelector('.msg-convo__delete')?.addEventListener('click', (e) => {
             e.stopPropagation();
             this._deleteConversation(convo);
         });

@@ -67,7 +67,9 @@ class MessagingPanel {
         this._contacts = new MessagingContacts(listEl, (convo) => this._onConversationSelected(convo));
         this._chat = new MessagingChat(chatEl, (text, convo, image) => this._onSendMessage(text, convo, image));
 
-        document.getElementById('msg-new-btn').addEventListener('click', () => {
+        const newBtn = document.getElementById('msg-new-btn');
+        newBtn.hidden = !!window.meshpointReadOnly;  // a viewer can't start a chat
+        newBtn.addEventListener('click', () => {
             this._contacts.openContactPicker();
         });
 
