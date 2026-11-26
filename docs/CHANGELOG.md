@@ -4,6 +4,11 @@
 
 #### Upstream sync
 
+- **Fix: after "Restart concentrator" nothing was received any more.** The
+  restart ended the receive loop for good, so the gateway stayed deaf
+  until meshpoint itself was restarted. The loop now waits while the
+  SX1302 is stopped and reconfigured, and carries on after it; a failed
+  restart still stops capture cleanly (upstream `027899ed`, #176).
 - **Espressif USB rule keeps an operator's own rule.** And the service
   can't lose its radios over it. The installer and the updater used to overwrite
   any `99-meshpoint-esp.rules` that wasn't ours; now they only replace a

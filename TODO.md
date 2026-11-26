@@ -67,9 +67,10 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
 - [ ] **9. `fcacc92b` RX preamble on every start** (M, 54 + test 96). Set the service modem's RX preamble at every
       start and read it back. New `src/hal/sx1302_preamble.py`, hook in `sx1302_wrapper.py`. Pi: log shows the
       preamble verified after restart.
-- [ ] **10. `027899ed` Receive iterator survives a restart** (M, 29 + test 95). After a concentrator restart the
+- [x] **10. `027899ed` Receive iterator survives a restart** (M, 29 + test 95). After a concentrator restart the
       receive loop keeps running instead of silently stopping. `src/capture/concentrator_source.py`. Pi: restart
       the radio from the dashboard, packets keep coming.
+      → Done 26-11: confirmed bug here too (only caller: Dashboard "Restart concentrator"). Upstream's full test file.
 - [ ] **11. `e9286d84` HAL access and TX completion** (M-L, 145 + test 182). All HAL calls go through one lock,
       and a transmit waits until the radio is done before RX resumes. New `src/hal/sx1302_access.py`, changes in
       `sx1302_wrapper.py` and `src/transmit/tx_service.py`. We have a `_hal_lock` already: compare carefully.

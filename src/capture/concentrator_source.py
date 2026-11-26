@@ -101,6 +101,9 @@ class ConcentratorCaptureSource(CaptureSource):
             self._pager_rf_chain = PAGER_FSK_RF_CHAIN
         self._running = False
         self._restart_lock = asyncio.Lock()
+        # True while restart_pipeline() has the HAL stopped: packets() keeps
+        # its loop (and so the coordinator's iterator) alive meanwhile.
+        self._restarting = False
 
     @staticmethod
     def _resolve_channel_plan(
@@ -181,21 +184,40 @@ class ConcentratorCaptureSource(CaptureSource):
         )
 
     async def stop(self) -> None:
-        self._running = False
-        self._wrapper.stop()
-        logger.info("Concentrator capture stopped")
-
-    async def restart_pipeline(self) -> None:
-        """Stop RX, reset the SX1302, and restart without restarting meshpoint."""
         async with self._restart_lock:
             self._running = False
-            await asyncio.sleep(0.15)
             self._wrapper.stop()
-            await self.start()
+            logger.info("Concentrator capture stopped")
+
+    async def restart_pipeline(self) -> None:
+        """Stop RX, reset the SX1302, and restart without restarting meshpoint.
+
+        The coordinator iterates packets() once for the life of the service.
+        Before (upstream 027899ed, #176) this set _running False, which ended
+        that loop for good: after "Restart concentrator" nothing was received
+        until meshpoint itself restarted. _restarting keeps the loop waiting
+        instead, with no receive calls while the HAL is stopped/reconfigured.
+        """
+        async with self._restart_lock:
+            self._restarting = True
+            self._running = False
+            try:
+                await asyncio.sleep(0.15)
+                self._wrapper.stop()
+                await self.start()
+            except BaseException:
+                self._running = False
+                self._wrapper.stop()
+                raise
+            finally:
+                self._restarting = False
 
     async def packets(self) -> AsyncIterator[RawCapture]:
         poll_count = 0
-        while self._running:
+        while self._running or self._restarting:
+            if self._restarting:
+                await asyncio.sleep(self._poll_interval)
+                continue
             raw_packets = self._wrapper.receive()
             poll_count += 1
             if poll_count == 1 or poll_count % 50000 == 0:
