@@ -4,6 +4,14 @@
 
 #### Upstream sync
 
+- **Fix: a Meshtastic USB node that dropped while running never came back.**
+  The reconnect loop only ran when the first connect failed. Set Preset,
+  Set Region and Bluetooth saves reboot the node, and an unplug or USB
+  hiccup drops the link too: the dashboard stayed green, no packets came
+  in until a service restart. The dead link is now closed and reconnected
+  with the same backoff (5 s up to 60 s), on meshtastic's
+  `connection.lost` and right after those config writes (upstream
+  `93866842`).
 - **MeshCore cards show a plugged-in USB companion even with TX off.**
   Configuration → MeshCore said "No companion connected" and the Radio
   page's companion card "NONE" whenever native TX was off, even while the

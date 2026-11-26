@@ -56,6 +56,14 @@ class SerialCaptureSource(CaptureSource):
         self._radio_info: dict = {}
         self._queue: asyncio.Queue[RawCapture] = asyncio.Queue(maxsize=500)
         self._reconnect_task: Optional[asyncio.Task] = None
+        # Live-drop recovery (upstream 93866842): meshtastic-python publishes
+        # "meshtastic.connection.lost" from its reader thread, and a LoRa/
+        # Bluetooth config write reboots the node. Either way the old
+        # interface is dead, but _connected stayed True and the reconnect
+        # loop (armed only when the first connect failed) never ran:
+        # green on the dashboard, no packets until a service restart.
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
+        self._lost_subscribed = False
 
     @property
     def name(self) -> str:
@@ -293,6 +301,7 @@ class SerialCaptureSource(CaptureSource):
         # receive stream before the readout tile reflects it.
         self._radio_info["region"] = region
         logger.info("%s: region set to %s", self.name, region)
+        self.handle_link_drop("lora config write: node reboots")
         return {"success": True, "region": region}
 
     def set_bluetooth(
@@ -353,6 +362,7 @@ class SerialCaptureSource(CaptureSource):
         logger.info(
             "%s: bluetooth set (enabled=%s mode=%s)", self.name, enabled, mode,
         )
+        self.handle_link_drop("bluetooth config write: node reboots")
         return {"success": True, "enabled": enabled, "mode": mode, "fixed_pin": fixed_pin}
 
     def set_modem_preset(self, preset: str) -> dict:
@@ -396,6 +406,7 @@ class SerialCaptureSource(CaptureSource):
         self._radio_info["modem_preset"] = preset
         self._radio_info["use_preset"] = True
         logger.info("%s: modem preset set to %s", self.name, preset)
+        self.handle_link_drop("lora config write: node reboots")
         return {"success": True, "modem_preset": preset}
 
     def set_broadcast_intervals(
@@ -459,6 +470,7 @@ class SerialCaptureSource(CaptureSource):
 
     async def start(self) -> None:
         self._running = True
+        self._loop = asyncio.get_running_loop()
         if await self._attempt_connect():
             return
         logger.warning(
@@ -511,6 +523,9 @@ class SerialCaptureSource(CaptureSource):
         self._radio_info = radio_info
         self._connected = True
         pub.subscribe(self._on_receive, "meshtastic.receive")
+        if not self._lost_subscribed:
+            pub.subscribe(self._on_connection_lost, "meshtastic.connection.lost")
+            self._lost_subscribed = True
         logger.info(
             "Serial capture started on %s (region=%s channel_num=%s)",
             self._port or "auto-detect",
@@ -763,6 +778,13 @@ class SerialCaptureSource(CaptureSource):
             except Exception:
                 pass
             self._interface = None
+        if self._lost_subscribed:
+            try:
+                from pubsub import pub
+                pub.unsubscribe(self._on_connection_lost, "meshtastic.connection.lost")
+            except Exception:
+                logger.debug("%s: pubsub unsubscribe failed", self.name, exc_info=True)
+            self._lost_subscribed = False
         logger.info("Serial capture stopped")
 
     async def packets(self) -> AsyncIterator[RawCapture]:
@@ -774,6 +796,53 @@ class SerialCaptureSource(CaptureSource):
                 yield raw
             except asyncio.TimeoutError:
                 continue
+
+    def _on_connection_lost(self, interface=None, **_kwargs) -> None:
+        """pypubsub callback (meshtastic reader thread) for a dropped link."""
+        self.handle_link_drop("connection lost", interface)
+
+    def handle_link_drop(self, reason: str, interface=None) -> None:
+        """Treat the current interface as dead and reconnect with backoff.
+
+        Thread-safe: called from meshtastic's reader thread, from a worker
+        thread running a config write, or from the event loop itself. An
+        event for another stick's interface (multi-stick setups share the
+        process-wide topic) is ignored.
+        """
+        if not self._running:
+            return
+        if interface is not None and interface is not self._interface:
+            return
+        loop = self._loop
+        if loop is None or loop.is_closed():
+            return
+        try:
+            loop.call_soon_threadsafe(self._begin_reconnect, reason)
+        except RuntimeError:
+            pass  # loop shutting down
+
+    def _begin_reconnect(self, reason: str) -> None:
+        """On the event loop: mark disconnected and start the retry task once."""
+        if not self._running:
+            return
+        if self._reconnect_task and not self._reconnect_task.done():
+            return
+        dead = self._interface
+        self._interface = None
+        self._connected = False
+        logger.warning("%s: serial link dropped (%s); reconnecting", self.name, reason)
+        self._reconnect_task = asyncio.create_task(
+            self._close_then_reconnect(dead), name=f"{self.name}-reconnect",
+        )
+
+    async def _close_then_reconnect(self, dead) -> None:
+        if dead is not None:
+            try:
+                # close() joins meshtastic's reader thread: off the loop.
+                await asyncio.to_thread(dead.close)
+            except Exception:
+                logger.debug("%s: closing the dead interface failed", self.name, exc_info=True)
+        await self._reconnect_until_connected()
 
     def _on_receive(self, packet, interface) -> None:
         """Callback invoked by meshtastic-python on packet reception.

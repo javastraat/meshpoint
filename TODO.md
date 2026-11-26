@@ -134,9 +134,11 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
 
 ### E. Meshtastic USB recovery
 
-- [ ] **24. `93866842` Reconnect after Set Preset reboot** (M-L, 215 + test 75). After Set Preset the node reboots;
+- [x] **24. `93866842` Reconnect after Set Preset reboot** (M-L, 215 + test 75). After Set Preset the node reboots;
       Meshpoint now waits and reconnects. New `src/capture/serial_link_watch.py`, `serial_source.py`. Pi: Set
       Preset on a USB Meshtastic node.
+      → Done 26-11 in our own `serial_source.py` (upstream split theirs into modules): `connection.lost` + after
+        region/preset/bluetooth writes. Test `tests/test_serial_link_drop.py`. COTX has no USB Meshtastic node.
 - [ ] **25. `459c4d7c` REBOOTING vs RECONNECTING** (M, 210 + tests 30). Shows which of the two is happening, in
       Configuration → Serial and the top bar. Needs 24.
 
