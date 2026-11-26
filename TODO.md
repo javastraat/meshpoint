@@ -127,9 +127,12 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
       `channel_resolver.py`, `mqtt_formatter.py`, `mqtt_publisher.py`.
       → Done 26-11: patch applied (resolver, formatter, publisher, config route, MQTT card, tests); CSS by hand;
         frontend test ported to `tests/frontend_mqtt_topic_preview.test.js`.
-- [ ] **18. `4439c2a8` MeshCore contact positions to Meshradar** (M, 120 + tests 155). Positions of MeshCore contacts
+- [x] **18. `4439c2a8` MeshCore contact positions to Meshradar** (M, 120 + tests 155). Positions of MeshCore contacts
       are stored on the node and sent upstream. New `src/models/meshcore_position.py`, `node_repository.py`,
       `upstream_client.py`, `coordinator.py`, `meshcore_event_adapter.py`.
+      → Done 26-11: patch applied for the model, node repository, adapter, coordinator, upstream heartbeat and USB tests;
+        contact parser (ours lives in `meshcore_tx_client.get_contacts`, still requires a name) and contact sync by hand.
+        Tests ported into `tests/test_meshcore_contact_enrichment.py`.
 - [x] **19. `5a9383d2` Registered-pin position privacy** (M, 35 + tests 123). With "registered pin" chosen, the
       broadcaster sends the pin, never the live GPS. We have the option in `mesh_position_resolver.py` and
       `gps_card.js`: check where ours still leaks. Also `broadcast_interval.py`, `position_broadcaster.py`.

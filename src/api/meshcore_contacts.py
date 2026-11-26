@@ -28,6 +28,7 @@ import logging
 import time
 
 from src.models.packet import Packet, Protocol
+from src.models.meshcore_position import meshcore_position
 
 logger = logging.getLogger(__name__)
 
@@ -163,43 +164,28 @@ async def sync_meshcore_contacts_to_nodes(
         return 0
 
     for contact in contacts:
-        pk = str(contact.get("public_key", "")).lower().lstrip("!")
-        name = str(contact.get("name", "")).strip()
-        if not pk or not name or _is_hex_identifier(name):
+        pk = str(contact.get("public_key") or "").lower().lstrip("!")
+        name = str(contact.get("name") or "").strip()
+        if not pk:
             continue
-        # Only the canonical 12-char prefix (matching node_id's own
-        # established truncation, meshcore_event_adapter.py's
-        # pubkey[:12]) -- this used to also try 8/10/16-char prefixes
-        # via a LIKE 'prefix%' match, which let two different contacts
-        # sharing a short prefix silently overwrite an unrelated node's
-        # name (confirmed cross-contaminating real node names in
-        # production, e.g. a brand-new companion's own node picking up
-        # an unrelated contact's cached display name).
-        node_id_prefix = pk[:12] if len(pk) >= 12 else pk
-        short_name = name[:4]
-        cursor = await coord.node_repo._db.execute(
-            """
-            UPDATE nodes
-            SET long_name = ?,
-                short_name = CASE
-                    WHEN short_name IS NULL
-                      OR short_name = ''
-                      OR LOWER(LTRIM(short_name, '!')) = LOWER(SUBSTR(LTRIM(node_id, '!'), 1, 4))
-                        THEN ?
-                    ELSE short_name
-                END
-            WHERE protocol = 'meshcore'
-              AND LOWER(LTRIM(node_id, '!')) = ?
-            """,
-            (name, short_name, node_id_prefix),
-        )
-        if cursor.rowcount:
-            updated += cursor.rowcount
+        if not name or _is_hex_identifier(name):
+            name = None
+        # Names and, since upstream 4439c2a8, advertised positions from the
+        # companion's roster: a node heard via a key-only advert gets its
+        # place on the map. Exact 12-char node_id match only (never a short
+        # LIKE prefix, see enrich_meshcore_contact); never touches last_heard
+        # or packet_count, and an unset/invalid position keeps the known one.
+        position = meshcore_position(contact.get("adv_lat"), contact.get("adv_lon"))
+        if name is None and position is None:
+            continue
+        node = await coord.node_repo.enrich_meshcore_contact(pk, name, position)
+        if node is not None:
+            coord.stats_reporter.record_node(node.to_dict())
+            updated += 1
 
     if updated:
-        await coord.node_repo._db.commit()
         logger.info(
-            "MeshCore contact names applied to %d node row(s)", updated,
+            "MeshCore contact names/positions applied to %d node row(s)", updated,
         )
     return updated
 

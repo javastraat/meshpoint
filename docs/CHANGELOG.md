@@ -4,6 +4,14 @@
 
 #### Upstream sync
 
+- **MeshCore nodes get their position from the companion's contact list.**
+  The companion knows the advertised coordinates of its contacts, but we
+  only copied their names. Now a MeshCore node heard through a key-only
+  advert also lands on the map, a later advert without coordinates keeps
+  the known position, and an unset (0,0) or invalid pair never erases one.
+  A contact refresh doesn't count as reception (last heard and packet
+  count stay). For Meshradar users, these nodes reach the heartbeat with
+  their position (upstream `4439c2a8`).
 - **MQTT: right topics for LongTurbo and USB nodes, honest preview.**
   LongTurbo is now a known standard channel, so its packets get a proper
   MQTT topic instead of an unknown one. Packets from a Meshtastic USB node

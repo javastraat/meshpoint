@@ -13,6 +13,8 @@ import time
 from dataclasses import dataclass
 from typing import Optional
 
+from src.models.meshcore_position import meshcore_position
+
 logger = logging.getLogger(__name__)
 
 
@@ -927,11 +929,16 @@ class MeshCoreTxClient:
                 )
                 pk = entry.get("public_key", "")
                 if name and pk:
+                    # Advertised coordinates from the roster (upstream 4439c2a8);
+                    # (0, 0) or invalid -> None.
+                    position = meshcore_position(entry.get("adv_lat"), entry.get("adv_lon"))
                     contacts.append({
                         "index": i,
                         "name": name,
                         "public_key": pk,
                         "last_seen": entry.get("lastmod", 0),
+                        "adv_lat": position[0] if position else None,
+                        "adv_lon": position[1] if position else None,
                     })
             except Exception:
                 logger.debug(
