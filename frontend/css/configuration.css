@@ -343,6 +343,9 @@ select.cfg-field__input option:checked {
     font-family: 'JetBrains Mono', Menlo, monospace;
     font-size: 13px;
     color: var(--brand-amber);
+    /* Long MQTT topics wrap instead of overflowing the card (upstream 8ba70630). */
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
 }
 
 .cfg-note {

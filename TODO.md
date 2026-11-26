@@ -30,6 +30,10 @@ Legend: ⬜ to do · ❓ check first · ✅ have it (theirs or our own version) 
 
 ## Work list (in order, one at a time)
 
+Test note (26-11): `rakv21-meshpoint` has a newer starlette whose `TestClient` needs `httpx2` (not installed), so tests
+using `fastapi.testclient` (e.g. `test_gps_routes`) fail to import there; run those on the COTX, or install `httpx2`
+in the venv. Meshpoint itself doesn't need it.
+
 Per item: read `git show <hash>`, compare with our file(s), port in our style, adapt their test, a line in
 `docs/CHANGELOG.md`, tick it here, commit. **Pi** = needs a check on the real device after the commit.
 Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
@@ -118,9 +122,11 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
       (skip their `PIMESH.md`).
       → Checked 26-11: everything except the `channel=` fix (done in 15) is meshtasticd/PiMesh (API decode of
         `requestId`/routing, `channel_index` from the Phone API, PiMesh channel list). Do it with 38/39.
-- [ ] **17. `8ba70630` MQTT topic preview and LongTurbo** (M, 59 + tests 106). The MQTT settings preview shows the
+- [x] **17. `8ba70630` MQTT topic preview and LongTurbo** (M, 59 + tests 106). The MQTT settings preview shows the
       right topic; the LongTurbo preset resolves to the right channel. `mqtt_card.js`, `mqtt_config_routes.py`,
       `channel_resolver.py`, `mqtt_formatter.py`, `mqtt_publisher.py`.
+      → Done 26-11: patch applied (resolver, formatter, publisher, config route, MQTT card, tests); CSS by hand;
+        frontend test ported to `tests/frontend_mqtt_topic_preview.test.js`.
 - [ ] **18. `4439c2a8` MeshCore contact positions to Meshradar** (M, 120 + tests 155). Positions of MeshCore contacts
       are stored on the node and sent upstream. New `src/models/meshcore_position.py`, `node_repository.py`,
       `upstream_client.py`, `coordinator.py`, `meshcore_event_adapter.py`.

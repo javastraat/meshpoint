@@ -4,6 +4,13 @@
 
 #### Upstream sync
 
+- **MQTT: right topics for LongTurbo and USB nodes, honest preview.**
+  LongTurbo is now a known standard channel, so its packets get a proper
+  MQTT topic instead of an unknown one. Packets from a Meshtastic USB node
+  use the channel name that node reports (its hash byte is a table index,
+  not a real hash). Configuration → MQTT previews the topics for the
+  channels you actually publish, and none for one you don't; long topics
+  wrap (upstream `8ba70630`).
 - **Fix: the mesh position privacy setting was ignored with a fixed pin.**
   With `transmit.position.coordinate_source: static` (the default) the
   Meshpoint always broadcast its exact pin, whatever
