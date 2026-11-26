@@ -4,6 +4,14 @@
 
 #### Upstream sync
 
+- **Meshtastic channel listens for the 16-symbol preamble Meshtastic sends.**
+  The SX1302 HAL sets the LoRa service modem (ch8, Meshtastic) to an
+  8-symbol RX preamble on every start; Meshtastic transmits 16. It is now
+  set to 16 after every start, including "Restart concentrator", and read
+  back; the log says `LoRa service modem RX preamble verified: 16 symbols`.
+  LoRaWAN (ch0-7), the pager (ch9) and TX are untouched. Unlike upstream,
+  a failure here is logged and receiving carries on with the HAL default,
+  instead of stopping the concentrator (upstream `fcacc92b`, #179).
 - **Relay: no more relaying our own packets, and relays carry our ID.**
   The native relay could forward a Meshtastic packet this Meshpoint sent
   itself when it heard it back; those are now skipped (`own_packet`). A

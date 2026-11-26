@@ -64,9 +64,11 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
 
 ### B. Radio and concentrator (our COTX gateway): one per session, Pi test after each
 
-- [ ] **9. `fcacc92b` RX preamble on every start** (M, 54 + test 96). Set the service modem's RX preamble at every
+- [x] **9. `fcacc92b` RX preamble on every start** (M, 54 + test 96). Set the service modem's RX preamble at every
       start and read it back. New `src/hal/sx1302_preamble.py`, hook in `sx1302_wrapper.py`. Pi: log shows the
       preamble verified after restart.
+      → Done 26-11, with one change: a failed set/read-back logs an error and keeps RX on the HAL default (8)
+        instead of stopping the concentrator. Test as unittest (`tests/test_service_preamble.py`).
 - [x] **10. `027899ed` Receive iterator survives a restart** (M, 29 + test 95). After a concentrator restart the
       receive loop keeps running instead of silently stopping. `src/capture/concentrator_source.py`. Pi: restart
       the radio from the dashboard, packets keep coming.
@@ -79,6 +81,9 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
       it sent itself, and relayed packets carry our node ID as relay node. `src/relay/relay_manager.py`,
       `tx_service.py`. Applies cleanly. Pi: relay on, no echoes of our own packets.
       → Done 26-11: applied as-is (our files matched upstream's pre-change versions).
+  - [ ] **Live check later:** unit tests OK on the COTX (26-11), but it only hears packets of -19 to -46 dBm, all
+        above `max_relay_rssi` (-50), so nothing is relayed there. Where a Meshpoint hears distant nodes: `RELAY [`
+        lines in the log, none with its own ID, and other nodes show its last ID byte as relay byte.
 - [ ] **13. `ebbf6eb3` Gateway detection on a fresh install** (M, 93 + tests 179). The setup wizard probes the HAL
       version with a time limit instead of hanging. `src/cli/hardware_detect.py`, `hardware_probe.py`,
       `setup_wizard.py`. Pi: only testable on a fresh SD card; otherwise unit tests.

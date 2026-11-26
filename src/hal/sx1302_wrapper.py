@@ -17,6 +17,7 @@ from typing import Optional
 
 from src.hal.concentrator_config import ConcentratorChannelPlan
 from src.hal.sx1302_capture_ram import apply_capture_ram_signatures, read_capture_ram
+from src.hal.sx1302_preamble import configure_service_preamble
 from src.hal.sx1302_signatures import apply_signatures
 from src.hal.sx1302_spectral_scan import (
     SpectralScanResult,
@@ -159,6 +160,9 @@ class SX1302Wrapper:
         # lora_pkt_fwd's mx_concent mutex. Reentrant because
         # send_fsk_packet() calls send().
         self._hal_lock = threading.RLock()
+        # Set by configure(): only then does start() put the Meshtastic RX
+        # preamble on the LoRa service modem (see sx1302_preamble.py).
+        self._service_modem_enabled = False
 
     def load(self) -> None:
         if not self._lib_path or not os.path.exists(self._lib_path):
@@ -249,6 +253,9 @@ class SX1302Wrapper:
         self._configure_rf_chains(plan)
         self._rf_center_hz = (plan.radio_0_freq_hz, plan.radio_1_freq_hz)
         self._configure_if_channels(plan)
+        self._service_modem_enabled = bool(
+            plan.single_sf_channel and plan.single_sf_channel.enabled
+        )
         self._configure_sx1261_for_spectral_scan()
         logger.info("Concentrator configured with %d IF channels",
                      len(plan.multi_sf_channels) + (1 if plan.single_sf_channel else 0))
@@ -280,6 +287,18 @@ class SX1302Wrapper:
             raise RuntimeError("lgw_start() failed")
         self._started = True
         logger.info("SX1302 concentrator started")
+        if self._service_modem_enabled:
+            # Unlike upstream (which stops the concentrator here), a failure
+            # only costs the preamble tweak: RX keeps running with the HAL's
+            # default of 8, which is how it worked before.
+            try:
+                with self._hal_lock:
+                    configure_service_preamble(self._lib)
+            except Exception:
+                logger.exception(
+                    "Could not set the Meshtastic RX preamble; keeping the "
+                    "HAL default (8 symbols)"
+                )
 
     def stop(self) -> None:
         if self._started and self._lib:
