@@ -2,6 +2,15 @@
 
 ### Unreleased
 
+#### Upstream sync
+
+- **Fix: received packets always showed coding rate 4/8.** They now show
+  the rate they were sent with (upstream `536a9149`, #163). The concentrator never passed the
+  HAL's received coding rate on, so every packet got the default "4/8",
+  also LongFast and MeshCore traffic that is really 4/5. It now shows the
+  real rate (4/5-4/8), or "Unknown" for a value the HAL doesn't define.
+  Display only: our own TX setting is untouched.
+
 #### Dashboard
 
 - **Fix: Repeaters page Trends lost the pressure and humidity lines after

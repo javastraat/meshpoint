@@ -23,6 +23,11 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# The HAL's receive coding-rate enum (lgw_pkt_rx_s.coderate). This is what
+# the packet was actually sent with, independent of our own TX setting.
+# Without it every received packet showed SignalMetrics' default "4/8".
+_RX_CODING_RATES = {1: "4/5", 2: "4/6", 3: "4/7", 4: "4/8"}
+
 # Frequency (Hz) used by Meshtastic on EU868.  Packets on this frequency AND
 # at ch8's 250 kHz bandwidth are routed to the Meshtastic decoder; everything
 # else is treated as LoRaWAN. Frequency alone stopped being a unique key once
@@ -206,6 +211,7 @@ class ConcentratorCaptureSource(CaptureSource):
                     frequency_mhz=pkt.frequency_hz / 1_000_000.0,
                     spreading_factor=pkt.spreading_factor,
                     bandwidth_khz=BW_MAP.get(pkt.bandwidth, 125.0),
+                    coding_rate=_RX_CODING_RATES.get(pkt.coderate, "Unknown"),
                     timestamp=datetime.now(timezone.utc),
                 )
 
