@@ -4,6 +4,16 @@
 
 #### Upstream sync
 
+- **MeshCore send feedback in Messages: repeats heard, DMs delivered.**
+  A channel message sent from the dashboard shows "Heard N repeats": how
+  often this Meshpoint's own companions heard repeaters pass it on
+  (matched by channel key, exact text and timestamp; not unique repeaters
+  or reach). With several companions, their copies add up on one message.
+  A DM shows "Sent · Delivery unconfirmed" until the recipient's ACK comes
+  in, then "Delivered" (received, not read). Stored with the message
+  (new `heard_repeats` column, added on startup) and updated live; echoes
+  and ACKs are matched for 15 minutes after sending, up to 128 recent
+  sends (upstream `e8c4c6e1`).
 - **MeshCore: adverts get their own signal and hop count, packets their CR.**
   An advert took the RSSI/SNR of whatever RF frame the companion logged
   last, which could be another packet. It is now matched to its own raw

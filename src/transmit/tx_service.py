@@ -17,6 +17,7 @@ from typing import Optional
 
 from src.models.packet import Protocol
 from src.transmit.duty_cycle import DutyCycleTracker
+from src.transmit.meshcore_repeats import new_packet_id as new_mc_packet_id
 from src.transmit.reply_hop_policy import MeshtasticReplyHopPolicy
 
 logger = logging.getLogger(__name__)
@@ -55,6 +56,9 @@ class SendResult:
     timestamp: float = 0.0
     error: str = ""
     airtime_ms: int = 0
+    # MeshCore send feedback (src/transmit/meshcore_repeats.py).
+    heard_repeats: int | None = None
+    status: str = "sent"
 
 
 class TxService:
@@ -852,6 +856,11 @@ class TxService:
                 error="MeshCore companion not connected",
             )
 
+        # One id for every companion's copy of this message, so the repeats
+        # they hear back add up on one message row (meshcore_repeats.py).
+        feedback = getattr(self, "meshcore_feedback", None)
+        packet_id = new_mc_packet_id()
+
         is_broadcast = (
             destination == 0
             or destination == BROADCAST_ADDR_MC
@@ -870,29 +879,31 @@ class TxService:
             ]
             if connected_sources:
                 results = [
-                    await s.send_channel_message(channel, text)
+                    await s.send_channel_message(channel, text, packet_id=packet_id)
                     for s in connected_sources
                 ]
                 mc_result = next((r for r in results if r.success), results[0])
             else:
                 mc_result = await self._meshcore_tx.send_channel_message(
-                    channel, text
+                    channel, text, feedback, packet_id,
                 )
         else:
             source = await self._resolve_meshcore_send_source(destination)
             if source is not None:
-                mc_result = await source.send_direct_message(destination, text)
+                mc_result = await source.send_direct_message(destination, text, packet_id=packet_id)
             else:
                 mc_result = await self._meshcore_tx.send_direct_message(
-                    destination, text
+                    destination, text, feedback, packet_id,
                 )
 
         return SendResult(
             success=mc_result.success,
             protocol="meshcore",
-            packet_id=mc_result.event_type,
+            packet_id=packet_id,
             timestamp=time.time(),
             error=mc_result.error,
+            heard_repeats=mc_result.heard_repeats,
+            status=mc_result.status,
         )
 
     async def _resolve_meshcore_send_source(self, destination):

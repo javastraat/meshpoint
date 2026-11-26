@@ -100,16 +100,29 @@ async def send_message(
     node_id = _resolve_node_id(req.destination, req.protocol, req.channel, req.echo_hash)
     node_name = await _resolve_display_name(node_id, req.protocol)
 
+    row_id = None
+    feedback = {
+        "heard_repeats": getattr(result, "heard_repeats", None),
+        "status": getattr(result, "status", "sent") or "sent",
+    }
     if result.success:
-        await _message_repo.save_sent(
+        row_id = await _message_repo.save_sent(
             text=req.text,
             node_id=node_id,
             node_name=node_name,
             protocol=req.protocol,
             channel=req.channel,
             packet_id=result.packet_id,
-            status="sent",
+            status=feedback["status"],
+            heard_repeats=feedback["heard_repeats"],
         )
+        # MeshCore: link the saved row to the send's repeat/ACK tracking, so
+        # later echoes/ACKs update it (src/transmit/meshcore_repeats.py).
+        tracker = getattr(_tx_service, "meshcore_feedback", None)
+        if req.protocol == "meshcore" and tracker is not None and row_id is not None:
+            current = await tracker.bind(result.packet_id, row_id, node_id)
+            if current is not None:
+                feedback = current
 
     return {
         "success": result.success,
@@ -118,6 +131,8 @@ async def send_message(
         "timestamp": result.timestamp,
         "airtime_ms": result.airtime_ms,
         "error": result.error,
+        "id": row_id,
+        **feedback,
     }
 
 

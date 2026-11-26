@@ -39,6 +39,7 @@ class Message:
     snr: float | None = None
     rx_count: int = 1
     attachments: list[dict] | None = None
+    heard_repeats: int | None = None
 
     def to_dict(self) -> dict:
         d = {
@@ -53,6 +54,7 @@ class Message:
             "status": self.status,
             "packet_id": self.packet_id,
             "rx_count": self.rx_count,
+            "heard_repeats": self.heard_repeats,
         }
         if self.rssi is not None:
             d["rssi"] = round(self.rssi, 1)
@@ -103,20 +105,37 @@ class MessageRepository:
         packet_id: str = "",
         status: str = "sent",
         attachments: list[dict] | None = None,
+        heard_repeats: int | None = None,
     ) -> int:
         """Record an outbound message. Returns the row ID."""
         now = datetime.now(timezone.utc).isoformat()
         cursor = await self._db.execute(
             """INSERT INTO messages
                (direction, text, node_id, node_name, protocol,
-                channel, timestamp, status, packet_id, attachments)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                channel, timestamp, status, packet_id, attachments, heard_repeats)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             ("sent", text, node_id, node_name, protocol,
              channel, now, status, packet_id,
-             json.dumps(attachments) if attachments else None),
+             json.dumps(attachments) if attachments else None, heard_repeats),
         )
         await self._db.commit()
         return cursor.lastrowid
+
+    async def update_meshcore_feedback(
+        self, row_id: int, count: int | None, status: str,
+    ) -> bool:
+        """Store MeshCore send feedback: the repeat count only goes up, status
+        only ever becomes 'delivered'; never touches received messages."""
+        cursor = await self._db.execute(
+            """UPDATE messages SET
+               heard_repeats = CASE WHEN ? IS NULL THEN heard_repeats
+                   ELSE MAX(COALESCE(heard_repeats, 0), ?) END,
+               status = CASE WHEN ? = 'delivered' THEN 'delivered' ELSE status END
+               WHERE id = ? AND direction = 'sent' AND protocol = 'meshcore'""",
+            (count, count, status, row_id),
+        )
+        await self._db.commit()
+        return cursor.rowcount > 0
 
     async def save_received(
         self,
@@ -303,6 +322,7 @@ class MessageRepository:
             snr=row.get("snr"),
             rx_count=row.get("rx_count") or 1,
             attachments=attachments,
+            heard_repeats=row.get("heard_repeats"),
         )
 
 

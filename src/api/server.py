@@ -341,6 +341,19 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
                 asyncio.get_running_loop().create_task(
                     _send_meshcore_advert(meshcore_tx_ref, mc_source)
                 )
+        # MeshCore send feedback (upstream e8c4c6e1): repeats heard back and
+        # DM ACKs, observed through the companions' own event streams. Only
+        # with capture sources: a standalone TX connection's events are not
+        # read, so it would only ever report "0 repeats".
+        mc_sources = _find_meshcore_sources(pipeline)
+        if tx_service and mc_sources:
+            from src.transmit.meshcore_repeats import MeshcoreSendFeedback
+
+            meshcore_feedback = MeshcoreSendFeedback(message_repo, ws_manager.broadcast)
+            tx_service.meshcore_feedback = meshcore_feedback
+            for _mc_src in mc_sources:
+                if hasattr(_mc_src, "set_send_feedback"):
+                    _mc_src.set_send_feedback(meshcore_feedback)
         channel_hash_resolver = _setup_message_interception(
             pipeline, message_repo, config, meshcore_tx_ref, tx_service
         )

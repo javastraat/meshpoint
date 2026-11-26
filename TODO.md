@@ -34,7 +34,8 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
       concentrator source never fills `coding_rate`. Add a map of the HAL's `pkt.coderate` (1-4 → 4/5-4/8).
       `src/capture/concentrator_source.py`. Pi: packet modal shows 4/5 etc.
       Follow-up `51710121`: packets loaded from the database showed the "4/8" default; now no CR (not stored).
-  - [ ] **Recheck later (26-11):** with both commits on the COTX and meshpoint restarted, a **live** LongFast packet
+  - [x] **Recheck done 26-11 21:12:** live LongFast packet (amsterdamgw1, relay 0x8f) shows `CR 4/5` on the dashboard.
+        Earlier: a **live** LongFast packet
         must show `CR 4/5`. On 26-11 nearby Meshpoints (-18 to -36 dBm, relay `0xfb`) still showed `CR 4/8`, probably
         database packets before `51710121`. The chain checks out (Meshtastic LongFast 4/5, our TX 4/5, HAL 1→4/5,
         ctypes struct = `lgw_pkt_rx_s`). Still 4/8 live? Log the raw `pkt.coderate` and look in `journalctl`.
@@ -156,9 +157,12 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
       → Done 26-11 in our files: receiver snapshot (incl. CR) at capture, exact-key advert matching (RSSI/SNR + hops in
         `hop_start`, like our MeshCore messages), CR restored from the database. Unmatched adverts still fall back to
         the last RF frame, as upstream. No frontend change needed. Test `tests/test_meshcore_rf_metadata.py`.
-- [ ] **28. `e8c4c6e1` MeshCore send feedback** (L, 387 + tests 208). A sent message shows "heard repeated by N",
+- [x] **28. `e8c4c6e1` MeshCore send feedback** (L, 387 + tests 208). A sent message shows "heard repeated by N",
       kept in the database. New `src/transmit/meshcore_repeats.py`, `message_repository.py` (+ DB column),
       `messaging_chat.js`.
+      → Done 26-11, adapted to our multi-companion sending: copies of one send share a packet_id and add up
+        (`src/transmit/meshcore_repeats.py`), observed in each companion's own event loop (RX log + ACK). Only wired
+        when MeshCore capture sources exist. Test `tests/test_meshcore_send_feedback.py` (real AES/HMAC frames).
 - [ ] **29. `a451d1e2` MeshCore heard-path popover** (M-L, 301 + tests 88). Click the feedback to see which
       repeaters heard it. Needs 28.
 

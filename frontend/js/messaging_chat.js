@@ -12,6 +12,8 @@ class MessagingChat {
         this._loading = false;
         this._allLoaded = false;
         this._lastDayKey = null;
+        // MeshCore feedback that arrived before its bubble got a real id.
+        this._feedback = new Map();
         this._build();
     }
 
@@ -147,15 +149,70 @@ class MessagingChat {
         }
     }
 
-    updateMessageStatus(tempId, status, packetId) {
+    updateMessageStatus(tempId, status, packetId, feedback = {}) {
+        const msg = this._messages.find((m) => m.id === tempId);
         const bubble = this._messagesEl.querySelector(`[data-msg-id="${tempId}"]`);
-        if (bubble) {
-            const meta = bubble.querySelector('.msg-bubble__meta');
+        if (!msg) {
+            // Not in the list (shouldn't happen): keep the old plain update.
+            const meta = bubble && bubble.querySelector('.msg-bubble__meta');
             if (meta) {
                 const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
                 meta.textContent = `${time} · ${status}`;
             }
+            return;
         }
+        msg.status = status;
+        if (packetId) msg.packet_id = packetId;
+        if (!msg.timestamp) msg.timestamp = new Date().toISOString();
+        this._mergeFeedback(msg, feedback || {});
+        if (feedback && feedback.id != null) msg.id = feedback.id;
+        if (bubble) {
+            bubble.dataset.msgId = msg.id;
+            if (packetId) bubble.dataset.pktId = packetId;
+            const meta = bubble.querySelector('.msg-bubble__meta');
+            if (meta) meta.innerHTML = this._buildMetaHtml(msg, true);
+        }
+    }
+
+    /** WS 'message_repeats': a later echo or ACK for a MeshCore send. */
+    updateMeshcoreFeedback(data) {
+        if (!data || data.protocol !== 'meshcore' || !data.packet_id) return;
+        const cached = this._feedback.get(data.packet_id) || {};
+        this._mergeFeedback(cached, data);
+        this._feedback.set(data.packet_id, cached);
+        if (this._feedback.size > 128) this._feedback.delete(this._feedback.keys().next().value);
+        const msg = this._messages.find((m) => m.direction === 'sent'
+            && m.protocol === 'meshcore' && m.packet_id === data.packet_id);
+        if (msg) this.updateMessageStatus(msg.id, msg.status, msg.packet_id, cached);
+    }
+
+    /** Repeats only go up; status only ever becomes 'delivered'. */
+    _mergeFeedback(msg, data) {
+        if (Number.isInteger(data.heard_repeats) && data.heard_repeats >= 0) {
+            msg.heard_repeats = Math.max(msg.heard_repeats || 0, data.heard_repeats);
+        }
+        if (data.status === 'delivered') msg.status = 'delivered';
+    }
+
+    /** Bubble footer: time, status, MeshCore feedback, signal. */
+    _buildMetaHtml(msg, showStatus) {
+        this._mergeFeedback(msg, this._feedback.get(msg.packet_id) || {});
+        const time = msg.timestamp
+            ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
+            : '';
+        let status = showStatus && msg.status && !['delivered', 'read'].includes(msg.status)
+            ? msg.status : '';
+        let repeat = '';
+        if (msg.direction === 'sent' && msg.protocol === 'meshcore') {
+            const direct = !(msg.node_id || '').startsWith('broadcast:');
+            if (msg.status === 'delivered') status = 'Delivered';
+            else if (direct && msg.status === 'sent') status = 'Sent · Delivery unconfirmed';
+            if (Number.isInteger(msg.heard_repeats) && msg.heard_repeats >= 0) {
+                const n = msg.heard_repeats;
+                repeat = ` · <span class="msg-repeats" title="Repeated copies heard by this Meshpoint's own radio; not a delivery confirmation or a count of unique repeaters">Heard ${n} repeat${n === 1 ? '' : 's'}</span>`;
+            }
+        }
+        return `${time}${status ? ' · ' + this._esc(status) : ''}${repeat}${this._buildSignalHtml(msg)}`;
     }
 
     clear() {
@@ -287,21 +344,14 @@ class MessagingChat {
         bubble.dataset.msgId = msg.id;
         if (msg.packet_id) bubble.dataset.pktId = msg.packet_id;
 
-        const time = msg.timestamp
-            ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
-            : '';
-        const statusText = msg.status && msg.status !== 'delivered' && msg.status !== 'read'
-            ? ` · ${msg.status}` : '';
-
         const senderHtml = this._buildSenderHtml(msg);
-        const signalHtml = this._buildSignalHtml(msg);
         const attachmentHtml = this._buildAttachmentHtml(msg);
 
         bubble.innerHTML = `
             ${senderHtml}
             ${attachmentHtml}
             <div class="msg-bubble__text">${this._esc(msg.text)}</div>
-            <div class="msg-bubble__meta">${time}${statusText}${signalHtml}</div>
+            <div class="msg-bubble__meta">${this._buildMetaHtml(msg, true)}</div>
         `;
 
         this._messagesEl.appendChild(bubble);
@@ -626,10 +676,6 @@ class MessagingChat {
         bubble.className = `msg-bubble msg-bubble--${msg.direction}`;
         bubble.dataset.msgId = msg.id;
         if (msg.packet_id) bubble.dataset.pktId = msg.packet_id;
-        const time = msg.timestamp
-            ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
-            : '';
-        const signalHtml = this._buildSignalHtml(msg);
         const senderHtml = this._buildSenderHtml(msg);
         const attachmentHtml = this._buildAttachmentHtml(msg);
 
@@ -637,7 +683,7 @@ class MessagingChat {
             ${senderHtml}
             ${attachmentHtml}
             <div class="msg-bubble__text">${this._esc(msg.text)}</div>
-            <div class="msg-bubble__meta">${time}${signalHtml}</div>
+            <div class="msg-bubble__meta">${this._buildMetaHtml(msg, false)}</div>
         `;
         return bubble;
     }

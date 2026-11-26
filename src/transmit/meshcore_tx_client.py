@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from dataclasses import dataclass
 from typing import Optional
 
@@ -63,6 +64,10 @@ class SendResult:
     event_type: str = ""
     error: str = ""
     timed_out: bool = False
+    # Send feedback (src/transmit/meshcore_repeats.py): repeats heard so far
+    # (None = not tracked) and "sent"/"delivered".
+    heard_repeats: int | None = None
+    status: str = "sent"
 
 
 @dataclass
@@ -345,46 +350,103 @@ async def send_companion_advert(mc, flood: bool = False) -> SendResult:
         return SendResult(success=False, error=str(exc))
 
 
-async def send_mc_channel_message(mc, channel: int, text: str) -> SendResult:
+_last_send_timestamp = 0
+
+
+def _next_send_timestamp() -> int:
+    """A sender timestamp unique per process: repeat matching keys on it,
+    so two identical messages sent within a second must not collide."""
+    global _last_send_timestamp
+    _last_send_timestamp = max(int(time.time()), _last_send_timestamp + 1)
+    return _last_send_timestamp
+
+
+async def send_mc_channel_message(
+    mc, channel: int, text: str, feedback=None, packet_id: str = "",
+) -> SendResult:
     """Send a broadcast message on a MeshCore channel over a raw connection.
 
     Standalone for the same reason as send_set_companion_name() above --
     lets each companion source send on its own connection, not just the
     one "primary" companion the TX client is bound to.
+
+    With ``feedback`` (MeshcoreSendFeedback) and ``packet_id`` the send gets
+    an explicit sender timestamp and is tracked for repeats heard back.
     """
     if mc is None:
         return SendResult(success=False, error="Not connected")
+    pending = None
     try:
-        result = await asyncio.wait_for(mc.commands.send_chan_msg(channel, text), timeout=10.0)
+        if feedback is None or not packet_id:
+            result = await asyncio.wait_for(mc.commands.send_chan_msg(channel, text), timeout=10.0)
+        else:
+            timestamp = _next_send_timestamp()
+            try:
+                info = await asyncio.wait_for(mc.commands.get_channel(channel), timeout=3.0)
+                sender = (getattr(mc, "self_info", None) or {}).get("name", "")
+                if isinstance(getattr(info, "payload", None), dict):
+                    pending = feedback.begin_channel(packet_id, info.payload, sender, text, timestamp)
+            except Exception:
+                logger.warning("MeshCore repeat tracking unavailable for this send", exc_info=True)
+            result = await asyncio.wait_for(
+                mc.commands.send_chan_msg(channel, text, timestamp=timestamp), timeout=10.0,
+            )
         event_type = (
             result.type.value if hasattr(result.type, "value") else str(result.type)
         )
         logger.info("MeshCore channel %d message sent: %s", channel, event_type)
-        return SendResult(success=True, event_type=event_type)
+        return SendResult(
+            success=True, event_type=event_type,
+            heard_repeats=pending.count if pending else None,
+        )
     except asyncio.TimeoutError:
+        if feedback is not None:
+            feedback.discard(pending)
         return SendResult(success=False, error="Send timed out", timed_out=True)
     except Exception as exc:
+        if feedback is not None:
+            feedback.discard(pending)
         logger.exception("MeshCore channel send failed")
         return SendResult(success=False, error=str(exc))
 
 
-async def send_mc_direct_message(mc, destination, text: str) -> SendResult:
+async def send_mc_direct_message(
+    mc, destination, text: str, feedback=None, packet_id: str = "",
+) -> SendResult:
     """Send a direct message to a MeshCore contact over a raw connection.
 
     Standalone for the same reason as send_set_companion_name() above.
+    With ``feedback`` the recipient's ACK later marks it "delivered".
     """
     if mc is None:
         return SendResult(success=False, error="Not connected")
+    pending = None
     try:
-        result = await asyncio.wait_for(mc.commands.send_msg(destination, text), timeout=10.0)
+        if feedback is None or not packet_id:
+            result = await asyncio.wait_for(mc.commands.send_msg(destination, text), timeout=10.0)
+        else:
+            pending = feedback.begin_direct(packet_id)
+            result = await asyncio.wait_for(
+                mc.commands.send_msg(destination, text, timestamp=_next_send_timestamp()),
+                timeout=10.0,
+            )
+            if isinstance(getattr(result, "payload", None), dict):
+                feedback.expect_ack(pending, result.payload)
         event_type = (
             result.type.value if hasattr(result.type, "value") else str(result.type)
         )
         logger.info("MeshCore DM sent: %s", event_type)
-        return SendResult(success=True, event_type=event_type)
+        return SendResult(
+            success=True, event_type=event_type,
+            status=pending.status if pending else "sent",
+        )
     except asyncio.TimeoutError:
+        if feedback is not None:
+            feedback.discard(pending)
         return SendResult(success=False, error="Send timed out", timed_out=True)
     except Exception as exc:
+        if feedback is not None:
+            feedback.discard(pending)
         logger.exception("MeshCore DM send failed")
         return SendResult(success=False, error=str(exc))
 
@@ -486,22 +548,22 @@ class MeshCoreTxClient:
             return False
 
     async def send_channel_message(
-        self, channel: int, text: str
+        self, channel: int, text: str, feedback=None, packet_id: str = "",
     ) -> SendResult:
         """Send a broadcast message on a MeshCore channel."""
         if not self.connected:
             return SendResult(success=False, error="Not connected")
-        result = await send_mc_channel_message(self._mc, channel, text)
+        result = await send_mc_channel_message(self._mc, channel, text, feedback, packet_id)
         await self._run_post_command()
         return result
 
     async def send_direct_message(
-        self, destination, text: str
+        self, destination, text: str, feedback=None, packet_id: str = "",
     ) -> SendResult:
         """Send a direct message to a MeshCore contact."""
         if not self.connected:
             return SendResult(success=False, error="Not connected")
-        result = await send_mc_direct_message(self._mc, destination, text)
+        result = await send_mc_direct_message(self._mc, destination, text, feedback, packet_id)
         await self._run_post_command()
         return result
 

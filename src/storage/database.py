@@ -90,7 +90,8 @@ CREATE TABLE IF NOT EXISTS messages (
     rssi          REAL,
     snr           REAL,
     rx_count      INTEGER NOT NULL DEFAULT 1,
-    attachments   TEXT
+    attachments   TEXT,
+    heard_repeats INTEGER
 );
 
 CREATE INDEX IF NOT EXISTS idx_messages_node ON messages(node_id);
@@ -181,6 +182,12 @@ class DatabaseManager:
                 "ALTER TABLE messages ADD COLUMN attachments TEXT"
             )
             logger.info("Migration: added attachments column to messages table")
+        if msg_cols and "heard_repeats" not in msg_cols:
+            # MeshCore send feedback (upstream e8c4c6e1): NULL = not tracked.
+            await self._connection.execute(
+                "ALTER TABLE messages ADD COLUMN heard_repeats INTEGER"
+            )
+            logger.info("Migration: added heard_repeats column to messages table")
 
         await self._cleanup_cross_protocol_name_contamination()
         await self._cleanup_meshcore_placeholder_names()

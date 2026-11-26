@@ -20,7 +20,9 @@ import types
 import unittest
 from unittest.mock import AsyncMock, patch
 
-if "meshcore" not in sys.modules:
+try:  # the real package where installed (the Pi); a stub only where it isn't,
+    import meshcore  # noqa: F401  # so it can't shadow it for later test files
+except ImportError:
     _fake_meshcore = types.ModuleType("meshcore")
 
     class _FakeMeshCore:

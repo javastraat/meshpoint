@@ -110,6 +110,9 @@ class MeshcoreUsbCaptureSource(CaptureSource):
         # decoded ADVERTISEMENT event can take the RSSI/SNR/hops of *its own*
         # frame instead of whatever RF frame came last (upstream fc15bc36).
         self._recent_raw_adverts: dict = {}
+        # MeshCore send feedback (src/transmit/meshcore_repeats.py), shared
+        # by all companions; set by the server.
+        self._send_feedback = None
         self._last_event_at: float = 0.0
         self._on_connected_callback = None
         # Cached DEVICE_INFO round-trip result -- firmware doesn't change
@@ -215,6 +218,17 @@ class MeshcoreUsbCaptureSource(CaptureSource):
                 event = await asyncio.wait_for(
                     self._queue.get(), timeout=1.0
                 )
+                etype = getattr(getattr(event, "type", None), "value", None)
+                if self._send_feedback is not None and isinstance(getattr(event, "payload", None), dict):
+                    try:
+                        if etype == "rx_log_data":
+                            await self._send_feedback.observe(event.payload)
+                        elif etype == "acknowledgement":
+                            await self._send_feedback.acknowledge(event.payload)
+                    except Exception:
+                        logger.exception("MeshCore send feedback observation failed")
+                if etype == "acknowledgement":
+                    continue  # a delivery receipt, not a packet
                 raw = self._wrap_event(event)
                 if raw is not None:
                     yield raw
@@ -244,6 +258,7 @@ class MeshcoreUsbCaptureSource(CaptureSource):
 
             for event_type in (
                 EventType.RX_LOG_DATA,
+                EventType.ACK,
                 EventType.RAW_DATA,
                 EventType.CONTACT_MSG_RECV,
                 EventType.CHANNEL_MSG_RECV,
@@ -811,25 +826,33 @@ class MeshcoreUsbCaptureSource(CaptureSource):
         await self.restart_auto_fetching()
         return result
 
-    async def send_direct_message(self, destination, text: str) -> SendResult:
+    def set_send_feedback(self, feedback) -> None:
+        """Share the MeshCore send-feedback tracker (repeats heard, DM ACKs)."""
+        self._send_feedback = feedback
+
+    async def send_direct_message(self, destination, text: str, packet_id: str = "") -> SendResult:
         """Send a direct message to a contact via THIS companion's own
         connection -- lets a reply go out through whichever companion
         actually has RF reach to the recipient, instead of always the
         one "primary" companion TxService is otherwise bound to."""
         if not self.connected:
             return SendResult(success=False, error="Not connected")
-        result = await send_mc_direct_message(self._meshcore, destination, text)
+        result = await send_mc_direct_message(
+            self._meshcore, destination, text, self._send_feedback, packet_id,
+        )
         if result.timed_out:
             self._trigger_reconnect("direct message send timed out")
             return result
         await self.restart_auto_fetching()
         return result
 
-    async def send_channel_message(self, channel: int, text: str) -> SendResult:
+    async def send_channel_message(self, channel: int, text: str, packet_id: str = "") -> SendResult:
         """Broadcast a message on a MeshCore channel via THIS companion."""
         if not self.connected:
             return SendResult(success=False, error="Not connected")
-        result = await send_mc_channel_message(self._meshcore, channel, text)
+        result = await send_mc_channel_message(
+            self._meshcore, channel, text, self._send_feedback, packet_id,
+        )
         if result.timed_out:
             self._trigger_reconnect("channel message send timed out")
             return result
