@@ -333,6 +333,30 @@ LoRaWAN, MeshCore and the pager channel are **listen-only for capture** and are 
 
 ---
 
+## Hardware and accessory links
+
+Optional parts for USB nodes, installation and accessories. Pick the **868 MHz
+(EU868)** version of anything with a radio or antenna if you're in Europe; 915 MHz
+parts are for the US. Plain manufacturer links, no affiliate links. See the
+[Hardware Matrix](docs/HARDWARE-MATRIX.md) for supported setups and
+[USB nodes](docs/USB-NODES.md) for adding radios.
+
+| Item | Use |
+| --- | --- |
+| [Heltec WiFi LoRa 32 V3](https://heltec.org/project/wifi-lora-32-v3/) | ESP32-S3 + SX1262 with OLED; a USB node with Meshtastic or MeshCore firmware. Order the 863-928 MHz band. |
+| [Heltec WiFi LoRa 32 V4](https://heltec.org/project/wifi-lora-32-v4/) | Newer ESP32-S3 + SX1262 board (more PSRAM/flash, stronger output); same use as the V3. Choose the 863-870 MHz band. |
+| [Seeed XIAO ESP32S3 & Wio-SX1262 kit for Meshtastic](https://www.seeedstudio.com/XIAO-ESP32S3-for-Meshtastic-LoRa-with-3D-Printed-Enclosure-p-6314.html) | Small ready-made Meshtastic node with case and an 868/915 MHz antenna. |
+| RAK WisBlock Meshtastic Starter Kit, from the [RAK store](https://store.rakwireless.com/) | RAK19007 base board + RAK4631 (nRF52840); pick the **EU868** variant. Battery and case not included. |
+| [Waveshare Mini Base Board (A) for CM4](https://www.waveshare.com/cm4-io-base-a.htm) | Carrier board to flash a CM4 eMMC module, e.g. for the [Syncrobit Chameleon](docs/SYNCROBIT-CHAMELEON.md). |
+| 868 MHz SMA antenna | A whip or outdoor antenna tuned for 868 MHz, with the right connector (SMA or U.FL pigtail) for your node. Never transmit without an antenna. |
+| Powered USB hub | For several radios on one Pi; a hub with its own power supply avoids brown-outs. Use its data ports, not charge-only ones. |
+| Short USB-C data cables | Right-angle or short data cables (not charge-only) for tight installs. |
+| microSD card, 32-64 GB, A1 | For Pi-based gateways; A1-rated cards handle the database writes better. |
+| SD / microSD card reader | To flash the install image from a laptop. |
+| USB GPS receiver (u-blox 7/8) | NMEA over USB for a live position; see [GPS configuration](docs/CONFIGURATION.md#location-gps-source). |
+
+---
+
 ## Install
 
 ```bash

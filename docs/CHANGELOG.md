@@ -4,6 +4,11 @@
 
 #### Upstream sync
 
+- **README: hardware and accessory links for EU868.** A table of optional
+  parts (Heltec V3/V4, Seeed XIAO kit, RAK starter kit, CM4 base board,
+  antennas, hub, cables, SD card, GPS) with plain manufacturer links and
+  the 868 MHz variants. Upstream's version uses Amazon affiliate links and
+  915 MHz parts; this one has neither (upstream `d476e296`).
 - **Docs: USB nodes guide, "nodes" instead of "sticks", security notes.**
   New `docs/USB-NODES.md`: how to add Meshtastic USB nodes and MeshCore
   companions next to the concentrator (adapted to this fork: no nRF DFU or

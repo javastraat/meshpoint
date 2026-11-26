@@ -202,7 +202,10 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
       → Done 26-11: guide + `ba50853f` fix (SX1302), linked in README and HARDWARE-MATRIX (we have no docs/README.md index).
 - [x] **33. `c7bf59f4` Bobcat G285 community setup** in our `BOBCAT-300.md` and HARDWARE-MATRIX.
       → Done 26-11: G285 recipe in BOBCAT-300.md (patch applied), HARDWARE-MATRIX entry rewritten by hand.
-- [ ] **34. `d476e296` Hardware and accessory links** in README.
+- [x] **34. `d476e296` Hardware and accessory links** in README.
+      → Done 26-11, option b (Einstein's choice): own table in README, plain manufacturer links checked 26-11 (Heltec
+        V3/V4, Seeed kit, Waveshare CM4-IO-BASE-A; RAK store front page because its product page wasn't reachable),
+        EU868 variants, no affiliate links; generic accessories without links.
 - [x] **35. `72a9c2cd` RAK6421 HAT store URL**.
       → Done 26-11: README link updated; HARDWARE-MATRIX already had the new URL.
 
@@ -354,6 +357,13 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
         Still open: the MeshCore command lock (+3 lines, check against item 26), their CI files, and comparing their new
         docs (COMMON-ERRORS, FAQ, TROUBLESHOOTING, ONBOARDING, DASHBOARD-ACCESS, docs/README.md). Ask Einstein:
         `SECURITY.md` still says report to `security@meshradar.io` (upstream's address) and "supported: 0.7.x".
+
+### Last step (when everything above is done)
+
+- [ ] **Bump to 0.8.2** (Einstein, 26-11: "we will bump when all is done"). `src/version.py` `__version__ = "0.8.2"`, and
+      rename `### Unreleased` in `docs/CHANGELOG.md` to `### v0.8.2 (<month> 2026)`: the dashboard's "What's new"
+      (`select_preview_section` in `src/api/update/release_notes.py`) shows the section matching the installed version,
+      so bullets left under "Unreleased" wouldn't show. Earlier bump for reference: `28169a85`.
 
 The tables below are the full inventory (incl. what we already have and what we skip).
 
