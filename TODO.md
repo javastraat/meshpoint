@@ -191,6 +191,9 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
       dashboard (serial DFU, or UF2 volume), with firmware catalogs and upload. New `src/api/firmware/*` (8 files),
       `firmware_nrf_panel.js`, big rewrite of both firmware routes and cards. Ours: drag-and-drop note only.
       Plan it as a project of its own.
+      **When done, also update `docs/USB-NODES.md`** ("Add a Meshtastic USB node", step 1): it now says ESP32 via
+      esptool and nRF52 by dragging the `.uf2`; put back upstream's wording "Configuration → Firmware can do that for
+      catalog boards (ESP32 family via esptool, nRF via DFU)".
 
 ### I. Docs
 
@@ -281,14 +284,22 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
   - On idle timeouts check that the port path still exists and trigger a reconnect if it vanished.
   - Keep the `MeshCore` instance before `connect()` and clean up when it fails (`create_serial()` can raise after its
     dispatcher started); on `OSError` log one short warning. Test: `tests/test_meshcore_reconnect.py`.
+      **When done, also update `docs/USB-NODES.md`** ("Add a MeshCore companion", first paragraph): it now says
+      "this fork does not do that yet (planned, TODO.md item 42)"; put back upstream's wording "Meshpoint releases DTR
+      on identified CP210x bridges; native USB devices retain their existing behavior. This uses USB hardware
+      identifiers, so it does not depend on the node label or a particular USB port number."
 - [x] **43. Node list: sort by packet count** (S). `packets` key in `NodeCards.SORT_KEYS` and
       `node_cards_sort.js` (`packet_count` descending, missing/zero last, tie-break last heard). Credit: PR #128 by
       yourasmit15-web. Test: `tests/frontend/node_sort_stats_units.test.cjs`.
       → Done 26-11: comparator from upstream (our file was identical otherwise), option + SORT_KEYS. Node test.
-- [ ] **44. Docs wording and `USB-NODES.md`** (S, `58e4e9b1`, `4ad2903f`): USB radios are "nodes", not "sticks"; add
+- [x] **44. Docs wording and `USB-NODES.md`** (S, `58e4e9b1`, `4ad2903f`): USB radios are "nodes", not "sticks"; add
       `docs/USB-NODES.md`; touch HARDWARE-MATRIX, ONBOARDING, RADIO-CONFIG-EXPLAINED, `serial_card.js`,
       `meshtastic_firmware_card.js`. Upstream's new docs to compare: `COMMON-ERRORS`, `FAQ`, `TROUBLESHOOTING`,
       `ONBOARDING`, `DASHBOARD-ACCESS` (with 37c/37d), `docs/README.md` index.
+      → Done 26-11: `docs/USB-NODES.md` adapted to this fork (no nRF DFU / CP210x DTR yet, list YAML, TCP), linked from
+        README + CONFIGURATION; 45 lines "stick" → "node" (README, API-ENDPOINTS, CONFIGURATION, WHATS-DIFFERENT,
+        BANDPLAN, Serial + firmware cards); GPS sticks kept. Their other new docs (COMMON-ERRORS, FAQ, TROUBLESHOOTING,
+        ONBOARDING, DASHBOARD-ACCESS, docs/README.md index) not compared yet: still open, see item 50.
 - [ ] **45. Stats reporter test timing** (S, `4f62d644`): make `tests/test_stats_reporter.py` deterministic like theirs;
       only if our test is flaky.
 - [ ] **46. Check the rest of their `tests/frontend/*.test.cjs` and plugin docs** (`471a81da`, `dfe6bcf5`): port the tests
@@ -337,6 +348,12 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
       the terminal opt-in mean), README (+57 lines: optional apps, themes, dashboard access, USB nodes), and
       `src/transmit/meshcore_tx_client.py` (+3: takes the shared command lock, check against our item 26 version).
       Also `.github/` CI files of the release candidate: read once, take what fits our CI.
+      → 26-11, part done: `SECURITY.md` got a section on Viewer, web terminal and plugins, written for this fork (theirs
+        describes public view, DASHBOARD-ACCESS.md and Reticulum isolation, which we don't have yet). README: nothing to
+        add, ours already covers viewer, terminal, plugins and sources in more detail (theirs would add wrong claims).
+        Still open: the MeshCore command lock (+3 lines, check against item 26), their CI files, and comparing their new
+        docs (COMMON-ERRORS, FAQ, TROUBLESHOOTING, ONBOARDING, DASHBOARD-ACCESS, docs/README.md). Ask Einstein:
+        `SECURITY.md` still says report to `security@meshradar.io` (upstream's address) and "supported: 0.7.x".
 
 The tables below are the full inventory (incl. what we already have and what we skip).
 

@@ -214,7 +214,7 @@ run concurrently.
 
 `src/radio/presets.py` has its own `REGION_DEFAULTS` dict (frequency
 suggestions used elsewhere, e.g. default frequency for a serial/USB
-Meshtastic stick) — it agrees with the concentrator's table for `US` and
+Meshtastic node) — it agrees with the concentrator's table for `US` and
 `EU_868`, but **differs for `ANZ`, `IN`, `KR`, and `SG_923`**:
 
 | Region | `concentrator_config.py` (this doc, authoritative for the concentrator) | `presets.py` `REGION_DEFAULTS` |

@@ -53,7 +53,7 @@ Everything is managed from a browser dashboard: full chat with channels and DMs,
 
 This is a customized fork of upstream [KMX415/meshpoint](https://github.com/KMX415/meshpoint), grown from a SenseCap M1 "mega-sniffer" into a multi-network base station that runs on RAK2287 (Pi 4 / Pi 5), SenseCap M1, COTX and the other supported boards. It's developed **together with KMX415** (upstream's maintainer) as the fast-moving **development version**: new features land here first and are still being tested, and KMX415 cherry-picks what's ready, re-tests it, and brings it into upstream. Fixes flow back the other way too. So the two aren't identical: this fork has a lot upstream doesn't have (yet), and leaves out some upstream work (e.g. WisMesh Node). For a stable install, use upstream; use this fork to get (and help test) the newest features. On top of the shared base it adds:
 
-- **Wider capture:** multiple MeshCore companions and Meshtastic USB sticks, LoRaWAN downlinks and payload decryption for your own devices, and an optional emergency pager link on the concentrator's FSK channel (ch9).
+- **Wider capture:** multiple MeshCore companions and Meshtastic USB nodes, LoRaWAN downlinks and payload decryption for your own devices, and an optional emergency pager link on the concentrator's FSK channel (ch9).
 - **RF tools:** band spectrum on any board (SX1261, RF Environment companion, or the SX1302's own capture RAM on RAK2287), RF Environment page, stray-frame log.
 - **A plugin system** with its own community repo, [meshpoint-plugins](https://github.com/javastraat/meshpoint-plugins): the RTL-SDR family (Radio, DAB+, ADS-B, ACARS, RTL433, P2000, Pagers, POCSAG), Reticulum (LXMF messaging, NomadNet browser, voice calls), DAPNET, and more — installed, updated and batch-managed from Settings → Plugins.
 - **Flashing from the dashboard** for Meshtastic, MeshCore, RNode and the project's own ESP32 companions.
@@ -261,7 +261,7 @@ Add one or more Heltec V3/V4 or T-Beam nodes running MeshCore USB companion firm
 
 A Heltec V3 (or any Meshtastic node) flashed with **Meshtastic EU_433** firmware and connected via USB adds a fifth capture stream at 433 MHz. Use the `serial` source in `local.yaml` — not `meshcore_usb`. These two sources speak different protocols and are not interchangeable.
 
-More than one Meshtastic USB stick can be captured at once (e.g. one 433 MHz, one 868 MHz): use the `capture.serial` list instead of the single `serial_port`/`serial_baud` fields, each entry with its own `label` — same shape as the MeshCore companion list. Edit it from Configuration → Serial in the dashboard instead of hand-editing `local.yaml`. See [CONFIGURATION.md](docs/CONFIGURATION.md#capture-sources).
+More than one Meshtastic USB node can be captured at once (e.g. one 433 MHz, one 868 MHz): use the `capture.serial` list instead of the single `serial_port`/`serial_baud` fields, each entry with its own `label` — same shape as the MeshCore companion list. Edit it from Configuration → Serial in the dashboard instead of hand-editing `local.yaml`. See [USB nodes](docs/USB-NODES.md) for a walkthrough and [CONFIGURATION.md](docs/CONFIGURATION.md#capture-sources).
 
 ### Optional: Reticulum RNode
 
@@ -327,7 +327,7 @@ A fully-equipped Meshpoint captures all of these simultaneously from one device:
 | 5 | Meshtastic | 433 MHz | Heltec V3 USB serial (`/dev/ttyUSB0`) |
 | 6 | Emergency pager *(optional)* | 868 MHz | SX1302 concentrator FSK channel (ch9, default 869.4625 MHz, sync word 0x946437), `radio.pager_enabled` |
 
-EU868 channel plan shown; other regions get their own plan. ch6–ch7 are unused (ch5 already covers that frequency). More USB companions fit too: up to 4 MeshCore companions and several Meshtastic sticks (`capture.serial` list), each labeled by band.
+EU868 channel plan shown; other regions get their own plan. ch6–ch7 are unused (ch5 already covers that frequency). More USB companions fit too: up to 4 MeshCore companions and several Meshtastic nodes (`capture.serial` list), each labeled by band.
 
 LoRaWAN, MeshCore and the pager channel are **listen-only for capture** and are never relayed. Only Meshtastic traffic is eligible for relay; messaging works for Meshtastic, MeshCore (via a companion) and the pager.
 
@@ -500,9 +500,9 @@ one-off endpoints:
 | `GET /api/config/meshcore/firmware-check?current_version=...` | Compare a companion's firmware against the latest `meshcore-dev/MeshCore` release (on-demand, cached 5 min) |
 | `PUT /api/config/meshcore/companion-name` | Rename one MeshCore companion (label-scoped) |
 | `POST /api/config/meshcore/companion-advert` | Send an advert from one specific MeshCore companion (label-scoped) |
-| `GET /api/config/serial/firmware-check?current_version=...` | Compare a Meshtastic USB stick's firmware against the latest `meshtastic/firmware` release (on-demand, cached 5 min) |
-| `PUT /api/config/serial/identity` | Rename one Meshtastic USB stick's long/short name (label-scoped) |
-| `POST /api/config/serial/advert` | Send a NodeInfo broadcast from one specific Meshtastic USB stick (label-scoped) |
+| `GET /api/config/serial/firmware-check?current_version=...` | Compare a Meshtastic USB node's firmware against the latest `meshtastic/firmware` release (on-demand, cached 5 min) |
+| `PUT /api/config/serial/identity` | Rename one Meshtastic USB node's long/short name (label-scoped) |
+| `POST /api/config/serial/advert` | Send a NodeInfo broadcast from one specific Meshtastic USB node (label-scoped) |
 | `GET /api/config/serial-ports` | Enumerate connected USB-serial devices with a recommended stable path (by-path/by-id), for the port-picker dropdown |
 | `POST /api/messages/send` | Send a Meshtastic or MeshCore message |
 | `GET /api/messages/conversations` | Message history by conversation |
@@ -580,6 +580,7 @@ See [docs/COMMON-ERRORS.md](docs/COMMON-ERRORS.md#upgrades) if the service fails
 **Setup and configuration**
 - **[Onboarding Guide](docs/ONBOARDING.md):** step-by-step from empty Pi to running Meshpoint
 - **[Hardware Matrix](docs/HARDWARE-MATRIX.md):** RAK V2 vs SenseCap M1 vs Chameleon vs Bobcat vs DIY, WisMesh Node (experimental), MeshCore companion radios, antennas, what's not supported
+- **[USB nodes](docs/USB-NODES.md):** add Meshtastic USB nodes and MeshCore companions next to the concentrator
 - **[Bobcat Miner 300](docs/BOBCAT-300.md):** G295 Rockchip RK3566 + Armbian repurposing (manual SPI/GPIO)
 - **[Bobcat Miner 300 G285](docs/BOBCAT-G285.md):** image-specific microSD/SPI1 guide, with pending hardware clarifications
 - **[Heltec HT-M2808](docs/HELTEC-M2808.md):** Community-contributed Debian Bookworm installation guide (manual SPI/GPIO)

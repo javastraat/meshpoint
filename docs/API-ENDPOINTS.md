@@ -76,14 +76,14 @@ session gets `401 Unauthorized`. See `src/api/auth/dependencies.py` for the
 | PUT | `/api/config/meshcore/companion-name` | Admin | Rename one MeshCore companion (label-scoped) |
 | POST | `/api/config/meshcore/companion-advert` | Admin | Send an advert from one specific MeshCore companion (label-scoped) |
 | PUT | `/api/config/meshcore/companion-radio` | Admin | Set one companion's radio (frequency/bandwidth/SF/CR, from a preset or custom) over its live connection |
-| PUT | `/api/config/capture/serial-devices` | Admin | Replace full Meshtastic USB stick list |
-| GET | `/api/config/serial/firmware-check` | Viewer | Compare a Meshtastic USB stick's firmware against the latest `meshtastic/firmware` release (cached 5 min) |
-| PUT | `/api/config/serial/identity` | Admin | Rename one Meshtastic USB stick's long/short name (label-scoped) |
-| POST | `/api/config/serial/advert` | Admin | Send a NodeInfo broadcast from one specific Meshtastic USB stick (label-scoped) |
-| PUT | `/api/config/serial/region` | Admin | Set one Meshtastic USB stick's LoRa region over its live serial connection |
-| PUT | `/api/config/serial/modem-preset` | Admin | Set one stick's LoRa modem preset |
-| PUT | `/api/config/serial/bluetooth` | Admin | Set one stick's Bluetooth config (enabled + pairing) |
-| PUT | `/api/config/serial/broadcast-intervals` | Admin | Set one stick's own NodeInfo/telemetry broadcast intervals |
+| PUT | `/api/config/capture/serial-devices` | Admin | Replace full Meshtastic USB node list |
+| GET | `/api/config/serial/firmware-check` | Viewer | Compare a Meshtastic USB node's firmware against the latest `meshtastic/firmware` release (cached 5 min) |
+| PUT | `/api/config/serial/identity` | Admin | Rename one Meshtastic USB node's long/short name (label-scoped) |
+| POST | `/api/config/serial/advert` | Admin | Send a NodeInfo broadcast from one specific Meshtastic USB node (label-scoped) |
+| PUT | `/api/config/serial/region` | Admin | Set one Meshtastic USB node's LoRa region over its live serial connection |
+| PUT | `/api/config/serial/modem-preset` | Admin | Set one node's LoRa modem preset |
+| PUT | `/api/config/serial/bluetooth` | Admin | Set one node's Bluetooth config (enabled + pairing) |
+| PUT | `/api/config/serial/broadcast-intervals` | Admin | Set one node's own NodeInfo/telemetry broadcast intervals |
 | PUT | `/api/config/rfenv-companion/wifi` | Admin | Set the RF Environment companion's WiFi SSID/password (direct one-off serial session) |
 | PUT | `/api/config/rfenv-companion/web-password` | Admin | Set the RF Environment companion's web dashboard password |
 | POST | `/api/config/rfenv-companion/reboot` | Admin | Reboot the RF Environment companion |
@@ -114,7 +114,7 @@ All flash/compile routes stream NDJSON progress. Any connected USB-serial port c
 
 | Method | Path | Role | Description |
 |---|---|---|---|
-| GET | `/api/config/serial/firmware/installed` | Admin | Firmware versions reported by the configured Meshtastic USB sticks |
+| GET | `/api/config/serial/firmware/installed` | Admin | Firmware versions reported by the configured Meshtastic USB nodes |
 | GET | `/api/config/serial/firmware/releases` | Admin | Recent `meshtastic/firmware` releases for the version picker |
 | GET | `/api/config/serial/firmware/targets` | Admin | Board list, read live from the chosen release's manifest |
 | POST | `/api/config/serial/firmware/flash/stream` | Admin | Download (cached) and flash official Meshtastic firmware with `esptool` (optional erase-all) |

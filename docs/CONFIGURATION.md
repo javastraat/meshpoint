@@ -598,7 +598,9 @@ When running both Meshtastic concentrator capture and a MeshCore USB companion, 
 
 **Pinning by a stable path, not `/dev/ttyUSBn`.** Linux assigns `ttyUSB0`/`ttyUSB1`/etc. in whatever order devices are detected — unplugging and replugging (or a reboot) can renumber them, silently pointing a pinned config at the wrong physical device. Both the Configuration → MeshCore and → Serial cards' "Pinned serial port" field suggest currently-connected devices via a dropdown (`GET /api/config/serial-ports`), preferring `/dev/serial/by-path/usb-...` (identifies by physical USB port) over `/dev/serial/by-id/usb-...` (identifies by the device's own vendor+serial number) over the raw `/dev/ttyUSBn` path. by-path is the default recommendation because by-id can silently collide: cheap CP210x clone boards (common on Heltec V3/V4) often ship with an identical, unprogrammed factory-default serial number, so two such boards can produce the *same* by-id name — Linux keeps only one symlink, and the second device gets none at all. by-path avoids this since it's keyed on which physical hub port the device is plugged into instead. The trade-off: moving a device to a different USB port makes it look like a new device to Meshpoint (you'd need to re-pin it), rather than automatically following the board — a reasonable cost for a fixed Pi deployment where ports don't move around casually. You can still type a path manually (e.g. for a device that isn't currently plugged in).
 
-**Multiple Meshtastic USB sticks.** A single stick uses the `serial_port` / `serial_baud` fields above. To capture from more than one at once (e.g. one on 433 MHz, one on 868 MHz), use the `serial` list instead — same shape as `meshcore_usb`'s companion list:
+Step-by-step for adding Meshtastic USB nodes and MeshCore companions: [USB nodes](USB-NODES.md).
+
+**Multiple Meshtastic USB nodes.** A single node uses the `serial_port` / `serial_baud` fields above. To capture from more than one at once (e.g. one on 433 MHz, one on 868 MHz), use the `serial` list instead — same shape as `meshcore_usb`'s companion list:
 
 ```yaml
 capture:
@@ -617,25 +619,25 @@ Configuration → Serial in the dashboard edits this list without hand-editing `
 
 ### Serial Device Identity (v0.7.7+)
 
-Each Meshtastic USB stick's own long/short name can be renamed from
-the dashboard, per device — useful since these sticks have no
+Each Meshtastic USB node's own long/short name can be renamed from
+the dashboard, per device — useful since these nodes have no
 Bluetooth, so the official Meshtastic app's usual rename path isn't
-available without unplugging the stick into a laptop.
+available without unplugging the node into a laptop.
 
 - **Configuration → Serial → (each device's own) Long name / Short
   name** edits the inputs, ticks "Send advert after save" (default
   on), and clicks **Save Name**. The Meshpoint sends an admin
-  `setOwner` message to *that* stick over its own serial connection,
+  `setOwner` message to *that* node over its own serial connection,
   persists the values to `local.yaml` under that device's own
   `capture.serial` entry, and optionally sends a NodeInfo broadcast
-  from that same stick so neighbors pick up the new name immediately.
+  from that same node so neighbors pick up the new name immediately.
 - Unlike MeshCore's per-companion rename, there's no live
-  reconnect-hook to re-apply this if the stick is later swapped for a
+  reconnect-hook to re-apply this if the node is later swapped for a
   factory-default replacement (`SerialCaptureSource` has no
   auto-reconnect loop) — the persisted values are applied once, at
   the **next service restart**. The rename itself still takes effect
-  immediately on the currently connected stick; only the
-  swap-a-different-stick-in-later case needs a restart.
+  immediately on the currently connected node; only the
+  swap-a-different-node-in-later case needs a restart.
 
 ### POCSAG Companion / DAPNET (plugin)
 
@@ -765,14 +767,14 @@ by the plugin instead of core).
 capture:
   serial:
     - label: "433"
-      long_name: "Field Node 433"    # optional, this stick only
+      long_name: "Field Node 433"    # optional, this node only
       short_name: "F433"             # optional, max 4 characters
     - label: "868"
       long_name: "Field Node 868"    # optional, independent of the 433 one
 ```
 
 Leaving a device's `long_name`/`short_name` unset (the default) keeps
-whatever identity is already on the stick's own flash.
+whatever identity is already on the node's own flash.
 
 Validation (shared between the dashboard and the connect-time
 apply): long name max 36 characters, short name max 4 characters —
@@ -1351,7 +1353,7 @@ led:
   activity_blink: true   # brief off-dip per captured packet
 ```
 
-Drives the M1's onboard case LED as a glanceable status light with four states: **steady on** = service running and every configured capture source healthy (concentrator, MeshCore companions, Meshtastic USB sticks); **brief off-flicker** = a packet was just captured (set `activity_blink: false` for a calm steady light); **1 Hz blink** = one or more configured capture sources are down; **dark** = the service isn't running (when the process dies the kernel releases the GPIO line, so no watchdog is needed).
+Drives the M1's onboard case LED as a glanceable status light with four states: **steady on** = service running and every configured capture source healthy (concentrator, MeshCore companions, Meshtastic USB nodes); **brief off-flicker** = a packet was just captured (set `activity_blink: false` for a calm steady light); **1 Hz blink** = one or more configured capture sources are down; **dark** = the service isn't running (when the process dies the kernel releases the GPIO line, so no watchdog is needed).
 
 Plain on/off GPIO — no PWM involved, so unlike the fan it works even without `lgpio` (gpiozero's fallback pin factory handles simple output pins fine). Same venv note as the fan applies for `gpiozero` itself.
 
@@ -1367,7 +1369,7 @@ button:
   advert_cooldown_s: 30.0  # ignore further advert presses for this long
 ```
 
-Gives the M1's case button two gestures. **Short press** announces this box on every TX-capable radio — the concentrator's Meshtastic NodeInfo, the MeshCore companion's advert, and each Meshtastic USB stick's own NodeInfo — serialized ~2 s apart, because the two 868 MHz signals overlap outright (Meshtastic 869.525/BW250 contains MeshCore 869.618/BW62.5) and simultaneous TX would jam both. LoRaWAN is deliberately excluded: the box is a pure listener there. A 30 s cooldown stops accidental advert spam. **Hold 3 s** restarts the meshpoint service — the recovery action you need exactly when the dashboard is unreachable; the required sudoers rule already ships and self-installs.
+Gives the M1's case button two gestures. **Short press** announces this box on every TX-capable radio — the concentrator's Meshtastic NodeInfo, the MeshCore companion's advert, and each Meshtastic USB node's own NodeInfo — serialized ~2 s apart, because the two 868 MHz signals overlap outright (Meshtastic 869.525/BW250 contains MeshCore 869.618/BW62.5) and simultaneous TX would jam both. LoRaWAN is deliberately excluded: the box is a pure listener there. A 30 s cooldown stops accidental advert spam. **Hold 3 s** restarts the meshpoint service — the recovery action you need exactly when the dashboard is unreachable; the required sudoers rule already ships and self-installs.
 
 The status LED (when enabled) narrates: double-blink = advert sent, one long dark blink = press ignored (cooldown), fast blink while holding = restart warning, then the normal restart story (dark → steady) plays out. With the LED disabled the button still works, just silently. Booting with the button held (e.g. held straight through the restart it triggered) does nothing — a release must be seen first.
 
@@ -1911,9 +1913,9 @@ capture:               # what packet sources to read from
       auto_detect: true
       label: ""
       companion_name: null  # Optional, per-companion. When set, re-applied on every USB reconnect.
-  serial_port: "/dev/ttyUSB0"   # single-stick `serial` source (legacy)
+  serial_port: "/dev/ttyUSB0"   # single-node `serial` source (legacy)
   serial_baud: 115200
-  serial: []             # OR: list of devices for multiple Meshtastic USB sticks
+  serial: []             # OR: list of devices for multiple Meshtastic USB nodes
     # - serial_port: "/dev/ttyUSB0"
     #   label: "433"
     # - serial_port: "/dev/ttyUSB1"

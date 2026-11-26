@@ -1,11 +1,11 @@
 /**
  * Configuration → Serial (Meshtastic USB) card.
  *
- * Edits the list of Meshtastic USB serial devices (T5 multi-stick
- * support) so adding a second stick (e.g. one on 433 MHz, one on 868
+ * Edits the list of Meshtastic USB serial devices (T5 multi-node
+ * support) so adding a second node (e.g. one on 433 MHz, one on 868
  * MHz) doesn't need hand-editing local.yaml. Each device row also gets
  * its own live readouts plus editable long/short name + "Send advert
- * after save" -- these sticks have no Bluetooth, so this is the only
+ * after save" -- these nodes have no Bluetooth, so this is the only
  * way to rename them without a laptop and a USB cable running the
  * official Meshtastic app. Mirrors MeshcoreConfigCard's "USB capture
  * sources" card -- same shape, minus the auto-detect toggle:
@@ -35,7 +35,7 @@ class SerialConfigCard {
                     <header class="cfg-card__head">
                         <h3 class="cfg-card__title">USB capture sources</h3>
                         <p class="cfg-card__hint">
-                            One entry per Meshtastic USB stick (Heltec V3, T-Beam, etc.).
+                            One entry per Meshtastic USB node (Heltec V3, T-Beam, etc.).
                             Up to ${this._MAX_DEVICES}. Requires a service restart after changes.
                         </p>
                     </header>
@@ -425,7 +425,7 @@ class SerialConfigCard {
         { minutes: 1440, label: '24h' },
     ];
 
-    /** This stick's radio/security config -- LoRa region, modem preset
+    /** This node's radio/security config -- LoRa region, modem preset
      * (chip row), NodeInfo/telemetry broadcast intervals (chip row +
      * custom-minutes fallback, exactly the same pattern Configuration ->
      * Radio's own NodeInfoConfigCard/TelemetryBroadcastCard use), and
@@ -468,7 +468,7 @@ class SerialConfigCard {
                 <header class="cfg-card__head">
                     <h3 class="cfg-card__title">Modem settings</h3>
                     <p class="cfg-card__hint">
-                        Region and modem preset for this stick, set over its live
+                        Region and modem preset for this node, set over its live
                         serial connection.
                     </p>
                 </header>
@@ -482,7 +482,7 @@ class SerialConfigCard {
                     </label>
                     ${live.region === 'UNSET' ? `
                         <p class="cfg-field__hint">
-                            Region is UNSET -- this stick will not transmit at all until
+                            Region is UNSET -- this node will not transmit at all until
                             a region is set (Meshtastic's factory default on a fresh flash).
                         </p>
                     ` : ''}
@@ -512,7 +512,7 @@ class SerialConfigCard {
                 <header class="cfg-card__head">
                     <h3 class="cfg-card__title">Other settings</h3>
                     <p class="cfg-card__hint">
-                        This stick's own NodeInfo/telemetry broadcast timing and
+                        This node's own NodeInfo/telemetry broadcast timing and
                         Bluetooth -- not the same as Meshpoint's own concentrator
                         broadcast-interval cards on Configuration &rarr; Radio.
                     </p>

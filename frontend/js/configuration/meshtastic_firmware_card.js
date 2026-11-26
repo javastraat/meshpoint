@@ -112,10 +112,10 @@ class MeshtasticFirmwareConfigCard {
     }
 
     /** "Installed" callout in the card header -- the currently-connected
-     * stick's own reported firmware version, read fresh on every mount
+     * node's own reported firmware version, read fresh on every mount
      * and again right after a successful flash (so the callout reflects
      * the new version instead of the pre-flash one). Shows the first
-     * connected device prominently; a second configured stick (rare, but
+     * connected device prominently; a second configured node (rare, but
      * possible with multiple Serial devices) only adds a "+N more" hint
      * rather than a full second row -- this card flashes one board at a
      * time, so a compact "what's on the boards I already have" summary
@@ -131,7 +131,7 @@ class MeshtasticFirmwareConfigCard {
         const data = await this._api.get('/api/config/serial/firmware/installed');
         if (!data) {
             versionEl.textContent = 'Unavailable';
-            metaEl.textContent = 'Could not query serial sticks';
+            metaEl.textContent = 'Could not query serial nodes';
             return;
         }
         const devices = Array.isArray(data.devices) ? data.devices : [];

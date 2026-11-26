@@ -41,6 +41,28 @@ The following are in scope for security reports:
 - RF interference or jamming (physical layer, not software)
 - Issues requiring physical access to the Raspberry Pi
 
+## Viewer role, web terminal and plugins
+
+What these mean in this fork (adapted from upstream `b91d994b`):
+
+- **Viewer** is a read-only login. Every write in Messages (send, delete, mark
+  read) and every settings change needs an admin session. A Viewer can still
+  read more than an anonymous visitor, including conversations: only give it
+  to people you'd let read your messages. Report any route that lets a Viewer
+  change something.
+- **Web terminal** is off by default, and needs two switches in `local.yaml`
+  (`dashboard.web_terminal_toggle`, then `dashboard.web_terminal_enabled`).
+  While it's on, an admin session is effectively root on the Pi. The first
+  switch has no dashboard or API route on purpose, so a stolen admin session
+  can't turn the terminal on by itself.
+- **Plugins** are trusted code, not a sandbox: they run with the service's
+  privileges, and a source's `setup.sh` runs as root. Plugin sources are off
+  until `plugin_sources_enabled: true` is set by hand in `local.yaml` (no
+  dashboard or API route, like the terminal switch); adding one asks for
+  confirmation, and installs are pinned to a commit. A pin makes a revision
+  explicit, it doesn't certify it. Only install code and restore backups you
+  trust.
+
 ## Disclosure
 
 We follow coordinated disclosure. We ask that you give us reasonable time to

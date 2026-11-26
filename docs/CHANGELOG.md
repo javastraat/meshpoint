@@ -4,6 +4,15 @@
 
 #### Upstream sync
 
+- **Docs: USB nodes guide, "nodes" instead of "sticks", security notes.**
+  New `docs/USB-NODES.md`: how to add Meshtastic USB nodes and MeshCore
+  companions next to the concentrator (adapted to this fork: no nRF DFU or
+  CP210x DTR release yet, `meshcore_usb` as a list, TCP companions), linked
+  from the README and CONFIGURATION. Meshtastic radios on USB are called
+  "nodes" in the docs and the Serial/firmware cards (GPS sticks stay
+  sticks). `SECURITY.md` explains what the Viewer role, the web terminal
+  switches and plugin sources mean here (upstream `58e4e9b1`, `4ad2903f`,
+  `b91d994b`).
 - **Node list can sort by packets.** "Sort: Packets" puts the busiest nodes
   first (nodes without packets last, ties by last heard; favourites stay on
   top). Comparator by yourasmit15-web, upstream PR #128 (upstream `b91d994b`).
