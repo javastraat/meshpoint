@@ -4,15 +4,20 @@
 
 | Version | Supported |
 |---------|-----------|
-| 0.7.x   | Yes       |
-| < 0.7   | No        |
+| 0.8.x   | Yes       |
+| < 0.8   | No        |
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in Meshpoint, please report it
-responsibly. **Do not open a public GitHub issue.**
+If you discover a security vulnerability in this fork of Meshpoint
+(`javastraat/meshpoint`), please report it responsibly. **Do not open a public
+GitHub issue.**
 
-Email **security@meshradar.io** with:
+Report it privately through GitHub: on
+[javastraat/meshpoint](https://github.com/javastraat/meshpoint) open the
+**Security** tab and choose **Report a vulnerability**
+([direct link](https://github.com/javastraat/meshpoint/security/advisories/new)).
+Include:
 
 - Description of the vulnerability
 - Steps to reproduce

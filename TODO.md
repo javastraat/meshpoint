@@ -355,8 +355,9 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
         describes public view, DASHBOARD-ACCESS.md and Reticulum isolation, which we don't have yet). README: nothing to
         add, ours already covers viewer, terminal, plugins and sources in more detail (theirs would add wrong claims).
         Still open: the MeshCore command lock (+3 lines, check against item 26), their CI files, and comparing their new
-        docs (COMMON-ERRORS, FAQ, TROUBLESHOOTING, ONBOARDING, DASHBOARD-ACCESS, docs/README.md). Ask Einstein:
-        `SECURITY.md` still says report to `security@meshradar.io` (upstream's address) and "supported: 0.7.x".
+        docs (COMMON-ERRORS, FAQ, TROUBLESHOOTING, ONBOARDING, DASHBOARD-ACCESS, docs/README.md). `SECURITY.md`
+        (Einstein 26-11: 1a, 2a): reports now go through GitHub private vulnerability reporting on javastraat/meshpoint,
+        supported 0.8.x. Einstein must switch that reporting on in the repo settings.
 
 ### Last step (when everything above is done)
 
