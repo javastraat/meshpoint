@@ -33,20 +33,30 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
 - [x] **1. `536a9149` Received coding rate** (S, 4 + test 77). Received packets show the wrong coding rate: the
       concentrator source never fills `coding_rate`. Add a map of the HAL's `pkt.coderate` (1-4 → 4/5-4/8).
       `src/capture/concentrator_source.py`. Pi: packet modal shows 4/5 etc.
-- [ ] **2. `06af14ba` MQTT reception time** (S, 2 + test 46). Meshtastic MQTT packets get the time we received them
+      Follow-up `51710121`: packets loaded from the database showed the "4/8" default; now no CR (not stored).
+  - [ ] **Recheck later (26-11):** with both commits on the COTX and meshpoint restarted, a **live** LongFast packet
+        must show `CR 4/5`. On 26-11 nearby Meshpoints (-18 to -36 dBm, relay `0xfb`) still showed `CR 4/8`, probably
+        database packets before `51710121`. The chain checks out (Meshtastic LongFast 4/5, our TX 4/5, HAL 1→4/5,
+        ctypes struct = `lgw_pkt_rx_s`). Still 4/8 live? Log the raw `pkt.coderate` and look in `journalctl`.
+  - [ ] Idea: store the coding rate in the packets table (new column), so reloaded packets and the Meshtastic page
+        show it too.
+- [x] **2. `06af14ba` MQTT reception time** (S, 2 + test 46). Meshtastic MQTT packets get the time we received them
       (`rx_time`), not "now". `src/relay/mqtt_formatter.py`. Applies cleanly.
-- [ ] **3. `d870125f` MQTT signal test** (S, test 80 only). Test for partial RSSI/SNR in MQTT. Applies cleanly.
-- [ ] **4. `1b2c8ff5` Web terminal cleanup** (S-M, 81 + test 118). After `exit` in the web terminal the shell process
+- [x] **3. `d870125f` MQTT signal test** (S, test 80 only). Test for partial RSSI/SNR in MQTT. Applies cleanly.
+      → Skipped 26-11: our RSSI/SNR are never None, so the test guards nothing here.
+- [x] **4. `1b2c8ff5` Web terminal cleanup** (S-M, 81 + test 118). After `exit` in the web terminal the shell process
       is cleaned up properly. `src/api/terminal/pty_session.py`. Applies cleanly. Pi: open terminal, `exit`, no leftovers.
 - [ ] **5. `bc5b810c` python-multipart** (S, 1 line). Firmware upload (FormData) needs `python-multipart>=0.0.9`;
       it's missing from our `requirements.txt`.
 - [ ] **6. `5ff1ec6a` Espressif USB rule on old installs** (S, 15 + test 94). We already install the tight rule
       (`0660`, `dialout`), but an old install keeps the world-writable `0666` rule. Port their `post_update.sh` part:
       replace the old rule only if it's exactly the old one, and add `meshpoint` to `dialout`.
-- [ ] **7. `d0074db3` Short reconnect log lines** (S, 9 + test 105). Expected Meshradar reconnect failures get one
+- [x] **7. `d0074db3` Short reconnect log lines** (S, 9 + test 105). Expected Meshradar reconnect failures get one
       short line instead of a traceback. `src/api/upstream_client.py`. 70% already in: finish it.
-- [ ] **8. `d8db1301` Bound plugin source revision lookups** (S, 4 + test 20). Large imports don't hang on revision
+      → Already have it (26-11): same handler in `upstream_client.py:140`.
+- [x] **8. `d8db1301` Bound plugin source revision lookups** (S, 4 + test 20). Large imports don't hang on revision
       lookups. `src/plugins/sources.py`: check that ours has the same weak spot first.
+      → Already have it (26-11): ours uses `commits?sha=…&per_page=1`.
 
 ### B. Radio and concentrator (our COTX gateway): one per session, Pi test after each
 

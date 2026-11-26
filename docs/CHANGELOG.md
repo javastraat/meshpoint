@@ -4,6 +4,15 @@
 
 #### Upstream sync
 
+- **Fix: closing the web terminal with `exit` left the shell behind.** After
+  `exit` the read side marked the session closed, and `terminate()` then
+  returned straight away: the shell was never reaped (a zombie per
+  session) and the PTY file descriptor stayed open. Cleanup now always
+  reaps the shell and closes the PTY exactly once (upstream `1b2c8ff5`, #166).
+- **MQTT: Meshtastic packets carry the time we received them.** `rx_time`
+  is set from the capture time, for decoded and encrypted packets, so MQTT
+  consumers no longer have to guess it from the publish time (upstream
+  `06af14ba`).
 - **Fix: received packets always showed coding rate 4/8.** They now show
   the rate they were sent with (upstream `536a9149`, #163). The concentrator never passed the
   HAL's received coding rate on, so every packet got the default "4/8",
