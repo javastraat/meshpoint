@@ -394,7 +394,8 @@
         inset 0 0 14px rgba(239, 68, 68, 0.04);
 }
 
-.topbar-serial--reconnecting {
+.topbar-serial--reconnecting,
+.topbar-serial--rebooting {
     border-color: rgba(245, 158, 11, 0.45);
     box-shadow:
         0 0 12px rgba(245, 158, 11, 0.2),
@@ -436,7 +437,8 @@
     box-shadow: 0 0 6px rgba(239, 68, 68, 0.5);
 }
 
-.topbar-serial__lamp--reconnecting .topbar-serial__dot {
+.topbar-serial__lamp--reconnecting .topbar-serial__dot,
+.topbar-serial__lamp--rebooting .topbar-serial__dot {
     background: var(--accent-amber);
     animation: topbar-meshtastic-blink 0.9s steps(2, end) infinite;
 }
@@ -475,8 +477,16 @@
 .topbar-serial--offline .topbar-serial__freq,
 .topbar-serial--offline .topbar-serial__preset,
 .topbar-serial--reconnecting .topbar-serial__freq,
-.topbar-serial--reconnecting .topbar-serial__preset {
+.topbar-serial--reconnecting .topbar-serial__preset,
+.topbar-serial--rebooting .topbar-serial__freq {
     opacity: 0.55;
+}
+
+/* USB node recovering (upstream 459c4d7c): the preset slot shows
+   "REBOOTING 12s" / "RECONNECTING 5s" instead of the preset. */
+.topbar-serial .topbar-serial__preset--phase {
+    color: var(--accent-amber);
+    opacity: 1;
 }
 
 /* --- DAPNET companion chip(s) (blue) --------------------------------
@@ -645,6 +655,7 @@
     .topbar-meshtastic__preset { display: none; }
     .topbar-meshcore__channel { display: none; }
     .topbar-serial__preset { display: none; }
+    .topbar-serial__preset.topbar-serial__preset--phase { display: inline; }
 }
 
 @media (max-width: 768px) {

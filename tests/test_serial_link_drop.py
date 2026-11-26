@@ -1,4 +1,5 @@
-"""A Meshtastic USB link that drops while running must reconnect.
+"""A Meshtastic USB link that drops while running must reconnect,
+and report rebooting/reconnecting to the dashboard while it does.
 
 Ported idea from upstream KMX415/meshpoint 93866842. Before, our reconnect
 loop only ran when the *first* connect failed: after Set Preset / Set Region /
@@ -37,6 +38,7 @@ class LinkDropTests(unittest.IsolatedAsyncioTestCase):
 
         self.patches = [
             patch.object(ss, "_RECONNECT_BASE_DELAY_SECONDS", 0),
+            patch.object(ss, "_REBOOT_INITIAL_DELAY_SECONDS", 0),
             patch.object(SerialCaptureSource, "_blocking_connect", side_effect=connect),
         ]
         for p in self.patches:
@@ -120,6 +122,71 @@ class LinkDropTests(unittest.IsolatedAsyncioTestCase):
         await asyncio.sleep(0)
         await self.settle()
         self.assertEqual(len(self.ifaces), 2)
+
+
+
+class LinkStatusTests(unittest.IsolatedAsyncioTestCase):
+    """Dashboard recovery state (upstream 459c4d7c): phase + countdown."""
+
+    async def asyncSetUp(self):
+        self.ifaces = []
+        self.allow = asyncio.Event()
+
+        def connect():
+            iface = FakeIface()
+            self.ifaces.append(iface)
+            return iface, {"region": "EU_868"}
+
+        self.patches = [
+            patch.object(ss, "_RECONNECT_BASE_DELAY_SECONDS", 5),
+            patch.object(ss, "_REBOOT_INITIAL_DELAY_SECONDS", 15),
+            patch.object(SerialCaptureSource, "_blocking_connect", side_effect=connect),
+        ]
+        for p in self.patches:
+            p.start()
+        self.source = SerialCaptureSource(port="/dev/fake")
+        await self.source.start()
+
+    async def asyncTearDown(self):
+        await self.source.stop()
+        for p in self.patches:
+            p.stop()
+
+    async def test_connected_source_reports_no_recovery(self):
+        self.assertEqual(
+            self.source.link_status(),
+            {"reconnecting": False, "link_phase": None, "retry_in_s": 0},
+        )
+
+    async def test_config_write_reports_rebooting_with_countdown(self):
+        self.source.set_modem_preset("LONG_FAST")
+        await asyncio.sleep(0)
+        status = self.source.link_status()
+        self.assertTrue(status["reconnecting"])
+        self.assertEqual(status["link_phase"], "rebooting")
+        self.assertIn(status["retry_in_s"], (14, 15))
+
+    async def test_lost_link_reports_reconnecting(self):
+        self.source._on_connection_lost(interface=self.ifaces[0])
+        await asyncio.sleep(0)
+        status = self.source.link_status()
+        self.assertEqual(status["link_phase"], "reconnecting")
+        self.assertIn(status["retry_in_s"], (4, 5))
+
+    async def test_status_clears_after_recovery_and_on_stop(self):
+        with patch.object(ss, "_RECONNECT_BASE_DELAY_SECONDS", 0):
+            self.source._on_connection_lost(interface=self.ifaces[0])
+            await asyncio.sleep(0)
+            await asyncio.wait_for(self.source._reconnect_task, 1)
+        self.assertTrue(self.source.connected)
+        self.assertEqual(self.source.link_status()["link_phase"], None)
+        self.source.set_region("EU_868")
+        await asyncio.sleep(0)
+        await self.source.stop()
+        self.assertEqual(
+            self.source.link_status(),
+            {"reconnecting": False, "link_phase": None, "retry_in_s": 0},
+        )
 
 
 if __name__ == "__main__":

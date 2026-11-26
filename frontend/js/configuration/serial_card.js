@@ -72,6 +72,26 @@ class SerialConfigCard {
             .addEventListener('click', () => this._saveDevices());
         this._root.querySelector('[data-serial-rescan-usb]')
             .addEventListener('click', (e) => this._rescanUsb(e.currentTarget));
+
+        // The top bar polls /api/config (every second while a USB node is
+        // rebooting/reconnecting) and broadcasts it: keep each device's
+        // status line current without re-rendering the form, so nothing
+        // being typed is lost (upstream 459c4d7c).
+        if (this._onConfigUpdated) {
+            document.removeEventListener('meshpoint:configUpdated', this._onConfigUpdated);
+        }
+        this._onConfigUpdated = (ev) => this._syncLiveStatus(ev.detail || {});
+        document.addEventListener('meshpoint:configUpdated', this._onConfigUpdated);
+    }
+
+    _syncLiveStatus(cfg) {
+        if (!Array.isArray(cfg.serial) || !this._devicesEl) return;
+        this._liveStatuses = cfg.serial;
+        this._devicesEl.querySelectorAll('.cfg-companion').forEach((div) => {
+            const label = (div.querySelector('[data-device-label]')?.value || '').trim();
+            const slot = div.querySelector('[data-serial-link-status]');
+            if (slot) slot.outerHTML = this._readoutsHtml(this._liveStatusFor(label));
+        });
     }
 
     /** Manual re-scan for the port-picker datalist -- lets a user unplug
@@ -967,8 +987,18 @@ class SerialConfigCard {
     }
 
     _readoutsHtml(live) {
+        if (live && !live.connected && (live.reconnecting || live.link_phase)) {
+            const rebooting = live.link_phase === 'rebooting';
+            const n = Number(live.retry_in_s) || 0;
+            const why = rebooting
+                ? 'The node is rebooting to apply its new settings; USB comes back by itself.'
+                : 'The USB link dropped; retrying in the background.';
+            const wait = n > 0 ? ` Next try in ${n}s.` : ' Connecting…';
+            return `<p class="cfg-companion__offline-hint" data-serial-link-status>`
+                + `<strong>${rebooting ? 'Rebooting' : 'Reconnecting'}.</strong> ${why}${wait}</p>`;
+        }
         if (!live || !live.connected) {
-            return `<p class="cfg-companion__offline-hint">Not connected.</p>`;
+            return `<p class="cfg-companion__offline-hint" data-serial-link-status>Not connected.</p>`;
         }
         const nodeId = live.own_node_id_hex ? `!${live.own_node_id_hex}` : '--';
         const name = live.long_name || live.short_name || '--';
@@ -977,7 +1007,7 @@ class SerialConfigCard {
         const freq = live.frequency_mhz ? `${live.frequency_mhz} MHz` : '--';
         const txPower = (live.tx_power || live.tx_power === 0) ? `${live.tx_power} dBm` : '--';
         return `
-            <div class="cfg-mc-readouts">
+            <div class="cfg-mc-readouts" data-serial-link-status>
                 <div class="cfg-mc-readout">
                     <span class="cfg-mc-readout__label">Node ID</span>
                     <span class="cfg-mc-readout__value">${this._esc(nodeId)}</span>

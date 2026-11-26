@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import logging
+import time
 from datetime import datetime, timezone
 from typing import AsyncIterator, Optional
 
@@ -27,6 +28,9 @@ logger = logging.getLogger(__name__)
 # USB stick's own separate serial stack.
 _RECONNECT_BASE_DELAY_SECONDS = 5
 _RECONNECT_MAX_DELAY_SECONDS = 60
+# After a config write the node reboots; the first retry waits longer so
+# it isn't spent on a board that is still booting (upstream 459c4d7c).
+_REBOOT_INITIAL_DELAY_SECONDS = 15
 
 
 class SerialCaptureSource(CaptureSource):
@@ -64,6 +68,11 @@ class SerialCaptureSource(CaptureSource):
         # green on the dashboard, no packets until a service restart.
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._lost_subscribed = False
+        # Dashboard status while recovering: "rebooting" (after a config
+        # write) or "reconnecting" (link lost / first connect failed), and
+        # when the next attempt is due (time.monotonic()).
+        self._link_phase: Optional[str] = None
+        self._retry_at: Optional[float] = None
 
     @property
     def name(self) -> str:
@@ -76,6 +85,19 @@ class SerialCaptureSource(CaptureSource):
     @property
     def connected(self) -> bool:
         return self._connected
+
+    def link_status(self) -> dict:
+        """Recovery state for the dashboard: reconnecting, link_phase, retry_in_s."""
+        task = self._reconnect_task
+        busy = task is not None and not task.done() and not self._connected
+        retry_in = 0
+        if busy and self._retry_at is not None:
+            retry_in = max(0, int(round(self._retry_at - time.monotonic())))
+        return {
+            "reconnecting": busy,
+            "link_phase": (self._link_phase or "reconnecting") if busy else None,
+            "retry_in_s": retry_in,
+        }
 
     def get_radio_info(self) -> dict:
         """Region/channel/name from the connect-time handshake.
@@ -478,6 +500,7 @@ class SerialCaptureSource(CaptureSource):
             "instead of staying dead until a service restart",
             self.name,
         )
+        self._link_phase = "reconnecting"
         self._reconnect_task = asyncio.create_task(
             self._reconnect_until_connected(), name=f"{self.name}-reconnect",
         )
@@ -543,17 +566,24 @@ class SerialCaptureSource(CaptureSource):
                 )
         return True
 
-    async def _reconnect_until_connected(self) -> None:
-        delay = _RECONNECT_BASE_DELAY_SECONDS
-        while self._running:
-            logger.info("%s: reconnecting in %ds...", self.name, delay)
-            await asyncio.sleep(delay)
-            if not self._running:
-                return
-            if await self._attempt_connect():
-                logger.info("%s: reconnected successfully", self.name)
-                return
-            delay = min(delay * 2, _RECONNECT_MAX_DELAY_SECONDS)
+    async def _reconnect_until_connected(self, first_delay: Optional[float] = None) -> None:
+        delay = _RECONNECT_BASE_DELAY_SECONDS if first_delay is None else first_delay
+        try:
+            while self._running:
+                logger.info("%s: reconnecting in %ds...", self.name, delay)
+                self._retry_at = time.monotonic() + delay
+                await asyncio.sleep(delay)
+                if not self._running:
+                    return
+                self._retry_at = None  # attempt (handshake) in progress
+                if await self._attempt_connect():
+                    logger.info("%s: reconnected successfully", self.name)
+                    return
+                delay = min(max(delay, _RECONNECT_BASE_DELAY_SECONDS) * 2,
+                            _RECONNECT_MAX_DELAY_SECONDS)
+        finally:
+            self._link_phase = None
+            self._retry_at = None
 
     @staticmethod
     def _read_radio_info(interface) -> dict:
@@ -778,6 +808,8 @@ class SerialCaptureSource(CaptureSource):
             except Exception:
                 pass
             self._interface = None
+        self._link_phase = None
+        self._retry_at = None
         if self._lost_subscribed:
             try:
                 from pubsub import pub
@@ -830,19 +862,23 @@ class SerialCaptureSource(CaptureSource):
         dead = self._interface
         self._interface = None
         self._connected = False
-        logger.warning("%s: serial link dropped (%s); reconnecting", self.name, reason)
+        rebooting = "config write" in reason
+        self._link_phase = "rebooting" if rebooting else "reconnecting"
+        first_delay = _REBOOT_INITIAL_DELAY_SECONDS if rebooting else _RECONNECT_BASE_DELAY_SECONDS
+        self._retry_at = time.monotonic() + first_delay
+        logger.warning("%s: serial link dropped (%s); %s", self.name, reason, self._link_phase)
         self._reconnect_task = asyncio.create_task(
-            self._close_then_reconnect(dead), name=f"{self.name}-reconnect",
+            self._close_then_reconnect(dead, first_delay), name=f"{self.name}-reconnect",
         )
 
-    async def _close_then_reconnect(self, dead) -> None:
+    async def _close_then_reconnect(self, dead, first_delay: Optional[float] = None) -> None:
         if dead is not None:
             try:
                 # close() joins meshtastic's reader thread: off the loop.
                 await asyncio.to_thread(dead.close)
             except Exception:
                 logger.debug("%s: closing the dead interface failed", self.name, exc_info=True)
-        await self._reconnect_until_connected()
+        await self._reconnect_until_connected(first_delay)
 
     def _on_receive(self, packet, interface) -> None:
         """Callback invoked by meshtastic-python on packet reception.

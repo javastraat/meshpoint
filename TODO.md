@@ -139,8 +139,11 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
       Preset on a USB Meshtastic node.
       → Done 26-11 in our own `serial_source.py` (upstream split theirs into modules): `connection.lost` + after
         region/preset/bluetooth writes. Test `tests/test_serial_link_drop.py`. COTX has no USB Meshtastic node.
-- [ ] **25. `459c4d7c` REBOOTING vs RECONNECTING** (M, 210 + tests 30). Shows which of the two is happening, in
+- [x] **25. `459c4d7c` REBOOTING vs RECONNECTING** (M, 210 + tests 30). Shows which of the two is happening, in
       Configuration → Serial and the top bar. Needs 24.
+      → Done 26-11 in our own files (patch didn't apply): `link_status()` on the source, 3 fields in the serial status,
+        top-bar chip + 1 s polling while busy, live status line in Configuration → Serial (form not re-rendered;
+        radio controls of a device that was offline at page load appear after a reload). Node + Python tests.
 
 ### F. MeshCore features
 

@@ -44,9 +44,22 @@ class TopbarSerialChip {
         list.forEach((dev) => this._group.appendChild(this._buildBadge(dev)));
     }
 
+    /** "REBOOTING 12s" / "RECONNECTING" while the source recovers a lost
+     * USB link (upstream 459c4d7c), else null. Only when the dashboard
+     * itself is reachable and the device is not connected. */
+    _linkPhase(dev) {
+        if (!this._dashboardReachable || !dev || dev.connected) return null;
+        const phase = dev.link_phase || (dev.reconnecting ? 'reconnecting' : null);
+        if (!phase) return null;
+        const n = Number(dev.retry_in_s) || 0;
+        const word = phase === 'rebooting' ? 'REBOOTING' : 'RECONNECTING';
+        return { phase, text: n > 0 ? `${word} ${n}s` : word };
+    }
+
     _buildBadge(dev) {
         const reachable = this._dashboardReachable;
         const connected = reachable && Boolean(dev.connected);
+        const phase = this._linkPhase(dev);
         const ownId = this._shortNodeId(dev.own_node_id_hex);
         // Same wording as the MeshCore chip's name slot in this state.
         const callText = !reachable ? 'Reconnecting…' : (ownId || '----');
@@ -54,10 +67,12 @@ class TopbarSerialChip {
         const root = document.createElement('a');
         root.className = 'topbar-serial';
         root.href = '#/meshtastic';
+        const stateWord = !reachable
+            ? 'reconnecting'
+            : (connected ? 'connected' : (phase ? phase.text.toLowerCase() : 'offline'));
         root.setAttribute(
             'aria-label',
-            `Meshtastic USB ${ownId || 'device'} `
-                + `${!reachable ? 'reconnecting' : (connected ? 'connected' : 'offline')} -- go to Meshtastic page`,
+            `Meshtastic USB ${ownId || 'device'} ${stateWord} -- go to Meshtastic page`,
         );
         root.title = !reachable
             ? 'Reconnecting to the dashboard…'
@@ -70,7 +85,9 @@ class TopbarSerialChip {
         brand.textContent = 'Meshtastic';
         root.appendChild(brand);
 
-        const lampState = !reachable ? 'reconnecting' : (connected ? 'online' : 'offline');
+        const lampState = !reachable
+            ? 'reconnecting'
+            : (connected ? 'online' : (phase ? phase.phase : 'offline'));
         const lamp = document.createElement('span');
         lamp.className = `topbar-serial__lamp topbar-serial__lamp--${lampState}`;
         lamp.setAttribute('role', 'status');
@@ -94,12 +111,19 @@ class TopbarSerialChip {
 
         const presetEl = document.createElement('span');
         presetEl.className = 'topbar-serial__preset';
-        presetEl.textContent = !reachable ? '--' : this._formatPresetLabel(dev.modem_preset);
+        if (phase) {
+            presetEl.classList.add('topbar-serial__preset--phase');
+            presetEl.textContent = phase.text;
+        } else {
+            presetEl.textContent = !reachable ? '--' : this._formatPresetLabel(dev.modem_preset);
+        }
         root.appendChild(this._sep(true));
         root.appendChild(presetEl);
 
-        root.classList.toggle('topbar-serial--offline', reachable && !connected);
-        root.classList.toggle('topbar-serial--reconnecting', !reachable);
+        root.classList.toggle('topbar-serial--offline', reachable && !connected && !phase);
+        root.classList.toggle('topbar-serial--reconnecting',
+            !reachable || (phase !== null && phase.phase !== 'rebooting'));
+        root.classList.toggle('topbar-serial--rebooting', phase !== null && phase.phase === 'rebooting');
         return root;
     }
 

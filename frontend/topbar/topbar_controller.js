@@ -18,6 +18,7 @@ class TopbarController {
         this._root = rootEl;
         this._ws = dashboardWs;
         this._refreshTimer = null;
+        this._refreshMs = 10_000;
         this._meshtastic = new TopbarMeshtasticChip(
             rootEl.querySelector('.topbar-meshtastic'),
         );
@@ -98,6 +99,7 @@ class TopbarController {
             });
             this._meshcore.setMeshcore(cfg.meshcore || null);
             this._serial.setSerial(cfg.serial || []);
+            this._syncPollCadence(cfg.serial || []);
             this._pager.setPager(cfg.radio_pager || null);
             document.dispatchEvent(
                 new CustomEvent('meshpoint:configUpdated', { detail: cfg }),
@@ -105,6 +107,20 @@ class TopbarController {
         } catch (_e) {
             this._meshcore.setDashboardReachable(false);
         }
+    }
+
+    /** Poll every second while a USB node is rebooting/reconnecting, so
+     * the countdown and the return to "connected" show promptly; back to
+     * 10 s once it's done (upstream 459c4d7c). */
+    _syncPollCadence(serialDevices) {
+        const busy = (serialDevices || []).some(
+            (d) => d && !d.connected && (d.reconnecting || d.link_phase),
+        );
+        const ms = busy ? 1000 : 10_000;
+        if (ms === this._refreshMs) return;
+        this._refreshMs = ms;
+        if (this._refreshTimer) clearInterval(this._refreshTimer);
+        this._refreshTimer = MeshpointIdle.every(() => this._refreshConfig(), ms);
     }
 
     registerAction(spec) {

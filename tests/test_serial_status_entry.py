@@ -68,5 +68,27 @@ class SerialStatusEntryTest(unittest.TestCase):
         self.assertEqual(entry["frequency_mhz"], 0.0)
 
 
+class SerialLinkStatusFieldsTest(unittest.TestCase):
+    """Recovery state for the dashboard (upstream 459c4d7c)."""
+
+    def test_link_status_fields_pass_through(self):
+        src = _FakeSerialSource("serial", False, {})
+        src.link_status = lambda: {
+            "reconnecting": True, "link_phase": "rebooting", "retry_in_s": 12,
+        }
+        entry = _serial_status_entry(src)
+        self.assertEqual(
+            (entry["reconnecting"], entry["link_phase"], entry["retry_in_s"]),
+            (True, "rebooting", 12),
+        )
+
+    def test_source_without_link_status_reports_idle(self):
+        entry = _serial_status_entry(_FakeSerialSource("serial", True, {}))
+        self.assertEqual(
+            (entry["reconnecting"], entry["link_phase"], entry["retry_in_s"]),
+            (False, None, 0),
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

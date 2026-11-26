@@ -4,6 +4,14 @@
 
 #### Upstream sync
 
+- **Meshtastic USB shows REBOOTING or RECONNECTING while recovering.**
+  After Set Preset / Set Region / Bluetooth the node
+  reboots: the top-bar chip now shows an amber "REBOOTING 12s" countdown,
+  "RECONNECTING" after a lost link, and Configuration → Serial says which
+  of the two is happening and when the next try is, updating live. The
+  top bar polls every second while that lasts, back to 10 s after. The
+  first retry after a reboot waits 15 s so it isn't spent on a board that
+  is still booting (upstream `459c4d7c`).
 - **Fix: a Meshtastic USB node that dropped while running never came back.**
   The reconnect loop only ran when the first connect failed. Set Preset,
   Set Region and Bluetooth saves reboot the node, and an unplug or USB
