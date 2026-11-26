@@ -60,5 +60,26 @@ class TestConcentratorCodingRate(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(capture.signal.to_dict()["coding_rate"], "Unknown")
 
 
+class TestStoredPacketCodingRate(unittest.TestCase):
+    """The packets table doesn't store the coding rate, so a packet loaded from
+    the database must not claim one (it used to show the "4/8" default)."""
+
+    def test_row_without_coding_rate_reports_none(self):
+        import sys
+        import types
+
+        sys.modules.setdefault("aiosqlite", types.ModuleType("aiosqlite"))  # Mac dev box
+        from src.storage.packet_repository import PacketRepository
+
+        packet = PacketRepository._row_to_packet({
+            "packet_id": "8c19aac7", "source_id": "916fdd16",
+            "destination_id": "ffffffff", "protocol": "meshtastic",
+            "packet_type": "position", "rssi": -18.0, "snr": 7.3,
+            "frequency_mhz": 869.525, "spreading_factor": 11,
+            "bandwidth_khz": 250.0, "timestamp": "2026-11-26T16:27:31+00:00",
+        })
+        self.assertEqual(packet.signal.to_dict()["coding_rate"], "")
+
+
 if __name__ == "__main__":
     unittest.main()

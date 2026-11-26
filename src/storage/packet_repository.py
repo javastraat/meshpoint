@@ -286,6 +286,10 @@ class PacketRepository:
                 frequency_mhz=row.get("frequency_mhz", 906.875),
                 spreading_factor=row.get("spreading_factor", 11),
                 bandwidth_khz=row.get("bandwidth_khz", 250.0),
+                # The packets table has no coding-rate column: leave it empty
+                # so the dashboard hides CR instead of showing the "4/8"
+                # default for every stored packet.
+                coding_rate="",
             )
 
         decoded = None

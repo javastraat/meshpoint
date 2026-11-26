@@ -9,7 +9,10 @@
   HAL's received coding rate on, so every packet got the default "4/8",
   also LongFast and MeshCore traffic that is really 4/5. It now shows the
   real rate (4/5-4/8), or "Unknown" for a value the HAL doesn't define.
-  Display only: our own TX setting is untouched.
+  Packets loaded from the database (page reload) showed "4/8" for the
+  same reason; the packets table doesn't store the coding rate, so those
+  now show no CR at all instead of a wrong one. Display only: our own TX
+  setting is untouched.
 
 #### Dashboard
 
