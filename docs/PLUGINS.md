@@ -206,6 +206,10 @@ def register(reg) -> None:
 - `reg.add_router(router, *, public=False)` — requires `"routes"` in
   `provides`. Mounts a FastAPI `APIRouter` the same way every core route
   gets mounted, behind `Depends(require_auth)` unless `public=True`.
+  `require_auth` lets a **viewer only read** (GET/HEAD/OPTIONS): any other
+  method needs the admin role, even if your route forgot
+  `Depends(require_admin)`. So make read-only endpoints GET, and a write
+  that a viewer may do on its own session needs `require_session` in core.
 - `reg.add_listener(name, build, wire=None)` — requires `"listener"` in
   `provides`. `build` is a zero-arg callable returning your listener
   instance (or a tuple of several — see the built-in pager listener in

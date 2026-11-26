@@ -4,6 +4,14 @@
 
 #### Upstream sync
 
+- **A Viewer can only read, everywhere.** Every protected route (core and
+  plugins) now refuses a Viewer anything but GET/HEAD/OPTIONS, so a write
+  route that forgets `require_admin` is still admin-only. A Viewer can
+  still change its own password (new `require_session`). In core nothing
+  changes in practice (every write was already admin-only); the Reticulum
+  plugin 1.1.4 moved plain NomadNet page reads and downloads to GET so
+  viewers keep browsing; install it before or with this (upstream
+  `b91d994b`).
 - **MeshCore nodes get their position from the companion's contact list.**
   The companion knows the advertised coordinates of its contacts, but we
   only copied their names. Now a MeshCore node heard through a key-only

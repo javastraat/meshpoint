@@ -245,10 +245,14 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
         `src/api/routes/messages.py` has no `require_admin`. It is the only write route without it. Add the dependency
         and a test (a viewer gets 403).
         → Done 26-11: `require_admin` on the read route; test checks every write route in messages.py.
-  - [ ] **37b. Hardening:** make `require_auth` reject non-GET/HEAD/OPTIONS for the viewer role and add
+  - [x] **37b. Hardening:** make `require_auth` reject non-GET/HEAD/OPTIONS for the viewer role and add
         `require_session` for `change_password` (`src/api/auth/dependencies.py`, `auth_routes.py`). Then a new write route
         (also in a plugin) is admin-only by default. Reticulum's `/page`, `/disconnect`, `/file` POSTs
         (`nomad_routes.py`) are read-like and handled separately: check them first.
+        → Done 26-11 (Einstein chose option b): `require_session` + strict `require_auth`; `change_password` on
+          `require_session`. Core already had every protected write on admin (scan). meshpoint-plugins: reticulum
+          1.1.4 GET `/page` + `/file` for plain reads (POST stays for forms/identify), `/disconnect` admin;
+          reticulum-browser 0.1.1 and reticulum-dashboard 1.0.1 use GET. Plugins first, then core.
   - [ ] **37c. Public view** (decided 26-11: yes). Admin picks pages that anonymous visitors see: dashboard counts,
         stats averages, radio parameters. We have none; `public_radar_routes.py` only feeds the login-page radar. About
         600 lines (`public_view_routes.py`, `public.html`, `public_view.js`, settings form, `update_public_view` in

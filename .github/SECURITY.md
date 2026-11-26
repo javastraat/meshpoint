@@ -50,8 +50,9 @@ The following are in scope for security reports:
 
 What these mean in this fork (adapted from upstream `b91d994b`):
 
-- **Viewer** is a read-only login. Every write in Messages (send, delete, mark
-  read) and every settings change needs an admin session. A Viewer can still
+- **Viewer** is a read-only login: every request other than GET/HEAD/OPTIONS
+  needs an admin session, for core and plugin routes alike, except changing
+  the Viewer's own password. A Viewer can still
   read more than an anonymous visitor, including conversations: only give it
   to people you'd let read your messages. Report any route that lets a Viewer
   change something.

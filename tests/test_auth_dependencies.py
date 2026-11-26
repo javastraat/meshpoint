@@ -18,6 +18,7 @@ from src.api.auth.dependencies import (
     optional_auth,
     require_admin,
     require_auth,
+    require_session,
 )
 from src.api.auth.jwt_session import (
     ROLE_ADMIN,
@@ -34,6 +35,20 @@ def _build_app() -> FastAPI:
     @app.get("/protected")
     def protected(claims=Depends(require_auth)):
         return {"sub": claims.subject, "role": claims.role}
+
+    # Write routes guarded only by require_auth (e.g. a plugin route that
+    # forgot require_admin): a viewer may only read (TODO.md item 37b).
+    @app.post("/protected")
+    def protected_write(claims=Depends(require_auth)):
+        return {"role": claims.role}
+
+    @app.delete("/protected")
+    def protected_delete(claims=Depends(require_auth)):
+        return {"role": claims.role}
+
+    @app.post("/own-session")
+    def own_session(claims=Depends(require_session)):
+        return {"role": claims.role}
 
     @app.get("/admin-only")
     def admin_only(claims=Depends(require_admin)):
@@ -121,5 +136,47 @@ class TestAuthDependencies(unittest.TestCase):
         self.assertEqual(response.json(), {"signed_in": False})
 
 
-if __name__ == "__main__":  # pragma: no cover
+
+class TestViewerIsReadOnly(unittest.TestCase):
+    """require_auth: viewers may only read; require_session: any role."""
+
+    def setUp(self) -> None:
+        self.service = JwtSessionService(secret=_SECRET, expiry_minutes=60, session_version=1)
+        auth_deps.init_auth(self.service)
+        self.client = TestClient(_build_app())
+
+    def tearDown(self) -> None:
+        auth_deps.reset_auth()
+
+    def _as(self, role):
+        return {"Authorization": f"Bearer {self.service.issue(role, role)}"}
+
+    def test_viewer_reads_but_cannot_write(self) -> None:
+        viewer = self._as(ROLE_VIEWER)
+        self.assertEqual(self.client.get("/protected", headers=viewer).status_code, 200)
+        self.assertEqual(self.client.post("/protected", headers=viewer).status_code, 403)
+        self.assertEqual(self.client.delete("/protected", headers=viewer).status_code, 403)
+
+    def test_admin_can_write(self) -> None:
+        admin = self._as(ROLE_ADMIN)
+        self.assertEqual(self.client.post("/protected", headers=admin).status_code, 200)
+        self.assertEqual(self.client.delete("/protected", headers=admin).status_code, 200)
+
+    def test_anonymous_write_is_401_not_403(self) -> None:
+        self.assertEqual(self.client.post("/protected").status_code, 401)
+
+    def test_require_session_lets_a_viewer_act_on_itself(self) -> None:
+        self.assertEqual(self.client.post("/own-session", headers=self._as(ROLE_VIEWER)).status_code, 200)
+        self.assertEqual(self.client.post("/own-session").status_code, 401)
+
+    def test_change_password_uses_require_session(self) -> None:
+        from src.api.routes import auth_routes
+
+        route = next(r for r in auth_routes.router.routes if r.path.endswith("/change_password"))
+        calls = {d.call for d in route.dependant.dependencies}
+        self.assertIn(require_session, calls)
+        self.assertNotIn(require_auth, calls)
+
+
+if __name__ == "__main__":
     unittest.main()

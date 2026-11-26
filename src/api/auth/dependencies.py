@@ -1,8 +1,15 @@
 """FastAPI dependencies for the local dashboard auth contract.
 
-Exposes three callables routes can pin via ``Depends``:
+Exposes four callables routes can pin via ``Depends``:
 
-- ``require_auth``    -- reject unless a valid session is present.
+- ``require_session`` -- reject unless a valid session is present (any role,
+  any method). Only for a session acting on itself, e.g. changing its own
+  password.
+- ``require_auth``    -- a valid session; a viewer may only read
+  (GET/HEAD/OPTIONS), every other method needs the admin role. Every
+  protected router (core and plugins) is mounted with this, so a new write
+  route is admin-only even if it forgets ``require_admin`` (upstream
+  b91d994b).
 - ``require_admin``   -- reject unless the session is the admin role.
 - ``optional_auth``   -- attach claims if present, never reject.
 
@@ -90,16 +97,30 @@ def _raise_forbidden() -> NoReturn:
     )
 
 
-async def require_auth(
+_READ_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
+
+
+async def require_session(
     request: Request,
     authorization: Optional[str] = Header(default=None),
 ) -> SessionClaims:
-    """Dependency: 401 unless a valid session is presented."""
+    """Dependency: 401 unless a valid session is presented (any role/method)."""
     if _jwt_service is None:
         _raise_unauthorized()
     claims = _claims_or_none(_extract_token(request, authorization))
     if claims is None:
         _raise_unauthorized()
+    return claims
+
+
+async def require_auth(
+    request: Request,
+    authorization: Optional[str] = Header(default=None),
+) -> SessionClaims:
+    """Dependency: 401 without a session; 403 when a non-admin writes."""
+    claims = await require_session(request, authorization)
+    if request.method not in _READ_METHODS and claims.role != ROLE_ADMIN:
+        _raise_forbidden()
     return claims
 
 
