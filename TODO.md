@@ -150,9 +150,12 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
 - [ ] **26. `6ea8de00` Shared MeshCore TCP and verified radio commands** (M, 78 + test 38). MeshCore over TCP shared
       between capture and TX; radio commands serialized and checked. `meshcore_usb_source.py`, `meshcore_tx_client.py`,
       new `meshcore_channel_sync.py`.
-- [ ] **27. `fc15bc36` + `cad3c4a1` MeshCore RF metadata and hops** (M, 137 + tests 690). MeshCore packets get RSSI,
+- [x] **27. `fc15bc36` + `cad3c4a1` MeshCore RF metadata and hops** (M, 137 + tests 690). MeshCore packets get RSSI,
       SNR, SF/BW and hop count in the feed and packet modal. `meshcore_usb_source.py`, `meshcore_event_adapter.py`,
       `packet_repository.py`, `packet_detail_modal.js`, `simple_packet_feed.js`.
+      → Done 26-11 in our files: receiver snapshot (incl. CR) at capture, exact-key advert matching (RSSI/SNR + hops in
+        `hop_start`, like our MeshCore messages), CR restored from the database. Unmatched adverts still fall back to
+        the last RF frame, as upstream. No frontend change needed. Test `tests/test_meshcore_rf_metadata.py`.
 - [ ] **28. `e8c4c6e1` MeshCore send feedback** (L, 387 + tests 208). A sent message shows "heard repeated by N",
       kept in the database. New `src/transmit/meshcore_repeats.py`, `message_repository.py` (+ DB column),
       `messaging_chat.js`.

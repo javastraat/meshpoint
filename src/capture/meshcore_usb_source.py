@@ -16,6 +16,8 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import time
+from dataclasses import replace
 from typing import AsyncIterator, Optional
 
 from src.capture.base import CaptureSource
@@ -104,6 +106,10 @@ class MeshcoreUsbCaptureSource(CaptureSource):
         # what may be an already-marginal DTR line. See _reconnect().
         self._reconnect_in_progress: bool = False
         self._last_rf_signal: Optional[SignalMetrics] = None
+        # Raw advert frames (RX log) by full public key, kept ~2 s so the
+        # decoded ADVERTISEMENT event can take the RSSI/SNR/hops of *its own*
+        # frame instead of whatever RF frame came last (upstream fc15bc36).
+        self._recent_raw_adverts: dict = {}
         self._last_event_at: float = 0.0
         self._on_connected_callback = None
         # Cached DEVICE_INFO round-trip result -- firmware doesn't change
@@ -266,6 +272,7 @@ class MeshcoreUsbCaptureSource(CaptureSource):
 
     async def _disconnect(self) -> None:
         self._connected = False
+        self._recent_raw_adverts.clear()
         if self._meshcore:
             for sub in self._subscriptions:
                 self._meshcore.unsubscribe(sub)
@@ -438,6 +445,11 @@ class MeshcoreUsbCaptureSource(CaptureSource):
         # The health check loop uses this to skip its active probe.
         self._last_event_at = asyncio.get_event_loop().time()
         try:
+            # Receiver settings as they were when the event came in, not
+            # when the queued event is later decoded or displayed.
+            event._meshpoint_receiver = _receiver_settings(
+                getattr(self._meshcore, "self_info", {}) or {}
+            )
             self._queue.put_nowait(event)
         except asyncio.QueueFull:
             logger.warning("MeshCore USB queue full, dropping event")
@@ -454,12 +466,39 @@ class MeshcoreUsbCaptureSource(CaptureSource):
         )
 
         radio_info = self._meshcore.self_info if self._meshcore else None
+        # Snapshot taken in _on_event; a None snapshot (settings unknown then)
+        # must not pick up settings that only arrived later.
+        receiver = (event._meshpoint_receiver if hasattr(event, "_meshpoint_receiver")
+                    else _receiver_settings(radio_info or {}))
         signal = _extract_signal(payload_dict, radio_info)
+        now = time.monotonic()
+        self._recent_raw_adverts = {
+            key: entries for key, entries in self._recent_raw_adverts.items()
+            if now - entries[-1][0] < 2
+        }
 
         if etype == "rx_log_data":
             if signal.rssi > -119.0:
                 self._last_rf_signal = signal
+            advert = _raw_advertisement(payload_dict)
+            if advert is not None:
+                entries = self._recent_raw_adverts.setdefault(advert["public_key"], [])
+                entries.append((now, advert, signal, receiver))
+                # Two is enough to call it ambiguous (heard via two paths):
+                # never guess which copy the decoded event came from.
+                self._recent_raw_adverts[advert["public_key"]] = entries[-2:]
+                if len(self._recent_raw_adverts) > 128:
+                    self._recent_raw_adverts.pop(next(iter(self._recent_raw_adverts)))
             return None
+
+        if etype == "advertisement":
+            matches = [
+                item for item in self._recent_raw_adverts.pop(payload_dict.get("public_key"), [])
+                if now - item[0] < 2
+            ]
+            if len(matches) == 1:
+                _, advert, signal, receiver = matches[0]
+                payload_dict = {**payload_dict, **advert}
 
         safe_payload = _make_json_safe(payload_dict)
 
@@ -470,7 +509,16 @@ class MeshcoreUsbCaptureSource(CaptureSource):
                 signal = self._last_rf_signal
             self._last_rf_signal = None
 
+        if receiver:
+            signal = replace(
+                signal,
+                frequency_mhz=receiver["frequency_mhz"],
+                spreading_factor=receiver["spreading_factor"],
+                bandwidth_khz=receiver["bandwidth_khz"],
+                coding_rate=receiver["coding_rate"],
+            )
         envelope = {
+            "receiver_settings": receiver,
             "event_type": etype,
             "payload": safe_payload,
         }
@@ -852,3 +900,57 @@ def _make_json_safe(payload: dict) -> dict:
         else:
             safe[key] = val
     return safe
+
+
+def _receiver_settings(info: dict) -> Optional[dict]:
+    """This companion's radio settings from its cached SELF_INFO.
+
+    Configuration, not a per-packet measurement: the companion doesn't
+    report modem parameters per packet. None when anything is missing or
+    out of range (upstream fc15bc36).
+    """
+    try:
+        freq, bw = float(info["radio_freq"]), float(info["radio_bw"])
+        sf, cr = int(info["radio_sf"]), int(info["radio_cr"])
+        if not (0 < freq < 10000 and 0 < bw <= 2000 and 5 <= sf <= 12 and 5 <= cr <= 8):
+            return None
+        return {"frequency_mhz": freq, "bandwidth_khz": bw,
+                "spreading_factor": sf, "coding_rate": f"4/{cr}",
+                "source": "receiver_self_info_at_capture"}
+    except (KeyError, TypeError, ValueError, OverflowError):
+        return None
+
+
+def _raw_advertisement(payload: dict) -> Optional[dict]:
+    """RSSI/SNR/hops of a raw ADVERT frame from the RX log, keyed by its own
+    public key (checked against the meshcore library's ``adv_key``), or None
+    for anything that isn't a complete public advert (upstream fc15bc36)."""
+    try:
+        raw = bytes.fromhex(payload.get("payload", ""))
+        if len(raw) < 2 or len(raw) > 512:
+            return None
+        header = raw[0]
+        if (header >> 2) & 15 != 4 or header >> 6 != 0:  # ADVERT, version 0
+            return None
+        route = header & 3
+        offset = 5 if route in (0, 3) else 1  # transport codes on 0 and 3
+        path_byte = raw[offset]
+        count, size = path_byte & 63, (path_byte >> 6) + 1
+        body = raw[offset + 1 + count * size:]
+        if len(body) < 101:  # public key, timestamp, signature, flags
+            return None
+        key = body[:32].hex()
+        if payload.get("adv_key") != key:
+            return None
+        result = {"public_key": key, "rf_metadata_source": "raw_advertisement",
+                  "rssi": payload.get("rssi"), "snr": payload.get("snr")}
+        # A flood path lists the repeaters it passed; a direct route's path is
+        # a routing instruction, not a received hop count.
+        if route in (0, 1):
+            result["path_len"] = count
+        for field in ("adv_name", "adv_lat", "adv_lon"):
+            if payload.get(field) is not None:
+                result[field] = payload[field]
+        return result
+    except (TypeError, ValueError, IndexError):
+        return None

@@ -4,6 +4,14 @@
 
 #### Upstream sync
 
+- **MeshCore: adverts get their own signal and hop count, packets their CR.**
+  An advert took the RSSI/SNR of whatever RF frame the companion logged
+  last, which could be another packet. It is now matched to its own raw
+  advert frame by full public key (one copy within 2 s, else unchanged),
+  and then also gets its hop count from that frame's flood path. MeshCore
+  packets also carry the companion's coding rate (CR 4/5 instead of
+  "N/A"), taken when the packet came in, and it survives a page reload
+  (upstream `fc15bc36`).
 - **Meshtastic USB shows REBOOTING or RECONNECTING while recovering.**
   After Set Preset / Set Region / Bluetooth the node
   reboots: the top-bar chip now shows an amber "REBOOTING 12s" countdown,

@@ -48,7 +48,15 @@ def adapt_event(
         return None
 
     try:
-        return builder(payload, signal)
+        packet = builder(payload, signal)
+        # Receiver settings at capture (incl. coding rate, which the packets
+        # table has no column for) and the advert's own hop count from its
+        # raw frame (upstream fc15bc36).
+        receiver = envelope.get("receiver_settings")
+        if (isinstance(receiver, dict) and isinstance(packet.decoded_payload, dict)
+                and receiver.get("source") == "receiver_self_info_at_capture"):
+            packet.decoded_payload["meshcore_receiver"] = receiver
+        return packet
     except Exception:
         logger.exception("adapt_event: builder failed for %s", event_type)
         return None
@@ -171,7 +179,17 @@ def _build_advertisement(
         decoded_payload=decoded,
         signal=signal,
         timestamp=_parse_timestamp(payload.get("timestamp")),
+        # Only set when the advert was matched to its own raw flood frame.
+        hop_start=_advert_hops(payload),
     )
+
+
+def _advert_hops(payload: dict) -> int:
+    path_len = payload.get("path_len")
+    if payload.get("rf_metadata_source") == "raw_advertisement" and \
+            type(path_len) is int and 0 <= path_len <= 63:
+        return path_len
+    return 0
 
 
 def _first_payload_value(payload: dict, *keys: str, default: str = "") -> str:
@@ -306,7 +324,7 @@ def _rf_signal_from_payload(
         frequency_mhz=frequency_mhz,
         spreading_factor=spreading_factor,
         bandwidth_khz=bandwidth_khz,
-        coding_rate="N/A",
+        coding_rate=fallback.coding_rate if fallback else "N/A",
     )
 
 

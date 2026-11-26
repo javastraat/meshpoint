@@ -296,6 +296,13 @@ class PacketRepository:
         if row.get("decoded_payload"):
             decoded = json.loads(row["decoded_payload"])
 
+        # MeshCore packets keep the receiver's coding rate in their payload
+        # (the table has no column for it): restore that one (upstream fc15bc36).
+        if signal and row.get("protocol") == Protocol.MESHCORE.value and isinstance(decoded, dict):
+            receiver = decoded.get("meshcore_receiver")
+            if isinstance(receiver, dict) and receiver.get("coding_rate") in ("4/5", "4/6", "4/7", "4/8"):
+                signal.coding_rate = receiver["coding_rate"]
+
         return Packet(
             packet_id=row["packet_id"],
             source_id=row["source_id"],
