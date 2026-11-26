@@ -4,6 +4,13 @@
 
 #### Upstream sync
 
+- **Espressif USB rule keeps an operator's own rule.** And the service
+  can't lose its radios over it. The installer and the updater used to overwrite
+  any `99-meshpoint-esp.rules` that wasn't ours; now they only replace a
+  missing rule or our old world-writable `0666` one. Before tightening it
+  to `0660`/`dialout` they make sure the `meshpoint` user is in `dialout`,
+  so a box without that group doesn't lose access to its Heltec/T-Beam
+  (upstream `5ff1ec6a`).
 - **Fix: closing the web terminal with `exit` left the shell behind.** After
   `exit` the read side marked the session closed, and `terminate()` then
   returned straight away: the shell was never reaped (a zombie per

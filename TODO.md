@@ -46,11 +46,15 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
       → Skipped 26-11: our RSSI/SNR are never None, so the test guards nothing here.
 - [x] **4. `1b2c8ff5` Web terminal cleanup** (S-M, 81 + test 118). After `exit` in the web terminal the shell process
       is cleaned up properly. `src/api/terminal/pty_session.py`. Applies cleanly. Pi: open terminal, `exit`, no leftovers.
-- [ ] **5. `bc5b810c` python-multipart** (S, 1 line). Firmware upload (FormData) needs `python-multipart>=0.0.9`;
+- [x] **5. `bc5b810c` python-multipart** (S, 1 line). Firmware upload (FormData) needs `python-multipart>=0.0.9`;
       it's missing from our `requirements.txt`.
-- [ ] **6. `5ff1ec6a` Espressif USB rule on old installs** (S, 15 + test 94). We already install the tight rule
+      → Not needed yet (26-11): nothing of ours uses `UploadFile`/`Form` (backup restore reads the raw body). Add it
+        together with item 31 (nRF DFU flash), whose firmware upload is what needs it.
+- [x] **6. `5ff1ec6a` Espressif USB rule on old installs** (S, 15 + test 94). We already install the tight rule
       (`0660`, `dialout`), but an old install keeps the world-writable `0666` rule. Port their `post_update.sh` part:
       replace the old rule only if it's exactly the old one, and add `meshpoint` to `dialout`.
+      → Done 26-11: we had our own migration (`273ffdee`); now as upstream: only the exact old rule is replaced
+        (an operator's own rule stays), and `meshpoint` is put in `dialout` first. `install.sh` + `post_update.sh`.
 - [x] **7. `d0074db3` Short reconnect log lines** (S, 9 + test 105). Expected Meshradar reconnect failures get one
       short line instead of a traceback. `src/api/upstream_client.py`. 70% already in: finish it.
       → Already have it (26-11): same handler in `upstream_client.py:140`.

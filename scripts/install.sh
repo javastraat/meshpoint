@@ -921,12 +921,19 @@ fi
 # Espressif USB serial devices (Heltec V3/V4, T-Beam ESP32-S3) enumerate
 # with native USB (idVendor 303a) and may not land in the dialout group
 # on all Pi OS versions. Add a udev rule that puts them there at 0660 --
-# NOT 0666: the meshpoint user is already in dialout (see usermod above),
-# so world-writable would only hand every other local account raw access
-# to the mesh radios for nothing.
+# NOT 0666: world-writable would hand every other local account raw
+# access to the mesh radios for nothing. Only a missing rule or our own
+# old 0666 rule is replaced; a rule the operator wrote is left alone.
+# The meshpoint user must be in dialout before access is tightened, or the
+# service loses its radios (set -e stops here if usermod fails, old rule
+# kept). Same block in post_update.sh (upstream 5ff1ec6a).
 UDEV_RULE='SUBSYSTEM=="tty", ATTRS{idVendor}=="303a", MODE="0660", GROUP="dialout"'
+UDEV_RULE_OLD='SUBSYSTEM=="tty", ATTRS{idVendor}=="303a", MODE="0666"'
 UDEV_FILE="/etc/udev/rules.d/99-meshpoint-esp.rules"
-if [ "$(cat "$UDEV_FILE" 2>/dev/null)" != "$UDEV_RULE" ]; then
+if [ ! -f "$UDEV_FILE" ] || [ "$(cat "$UDEV_FILE")" = "$UDEV_RULE_OLD" ]; then
+    if ! id -nG meshpoint | grep -qw dialout; then
+        usermod -a -G dialout meshpoint
+    fi
     info "Installing/updating udev rule for Espressif USB serial devices..."
     echo "$UDEV_RULE" > "$UDEV_FILE"
     udevadm control --reload-rules 2>/dev/null || true

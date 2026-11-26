@@ -74,11 +74,16 @@ done
 
 # ── 3b. Espressif udev rule: 0666 → 0660 (idempotent) ──────────────
 # Installs before 2026-09 shipped MODE="0666" (world-writable) for
-# idVendor 303a devices. The meshpoint user is in dialout, so 0660 +
-# GROUP="dialout" is enough; tighten any box still carrying the old rule.
+# idVendor 303a devices. Tighten only that exact old rule (a rule the
+# operator wrote is left alone), and make sure the meshpoint user is in
+# dialout first, or the service loses its radios (upstream 5ff1ec6a).
 UDEV_RULE_ESP='SUBSYSTEM=="tty", ATTRS{idVendor}=="303a", MODE="0660", GROUP="dialout"'
+UDEV_RULE_ESP_OLD='SUBSYSTEM=="tty", ATTRS{idVendor}=="303a", MODE="0666"'
 UDEV_FILE_ESP="/etc/udev/rules.d/99-meshpoint-esp.rules"
-if [ -f "$UDEV_FILE_ESP" ] && [ "$(cat "$UDEV_FILE_ESP")" != "$UDEV_RULE_ESP" ]; then
+if [ -f "$UDEV_FILE_ESP" ] && [ "$(cat "$UDEV_FILE_ESP")" = "$UDEV_RULE_ESP_OLD" ]; then
+    if ! id -nG meshpoint | grep -qw dialout; then
+        usermod -a -G dialout meshpoint
+    fi
     info "Tightening Espressif udev rule (was world-writable)..."
     echo "$UDEV_RULE_ESP" > "$UDEV_FILE_ESP"
     udevadm control --reload-rules 2>/dev/null || true
