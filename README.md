@@ -221,7 +221,7 @@ firmware repos — failed.
 
 ### Option G: WisMesh Node (RAK6421 HAT, experimental)
 
-The [RAK WisMesh Pi Node](https://store.rakwireless.com/products/wismesh-pi-node) is a Pi HAT with a **WisBlock SX1262** LoRa module. Meshpoint drives RF through **meshtasticd** (Portduino), not the SX1302 concentrator path used by Options A–F.
+The [RAK WisMesh Pi Node](https://store.rakwireless.com/products/meshtastic-raspberry-pi-hat-rak6421) is a Pi HAT with a **WisBlock SX1262** LoRa module. Meshpoint drives RF through **meshtasticd** (Portduino), not the SX1302 concentrator path used by Options A–F.
 
 **Status in this fork:** not included. The installer, dashboard, and capture bridge only exist on upstream [KMX415/meshpoint](https://github.com/KMX415/meshpoint)'s branch **`feat/wismesh-hat`**; this fork (v0.8.x) has not merged them. The guides below are kept for reference; to run a WisMesh Node, install from upstream.
 
@@ -242,6 +242,14 @@ USB companion may need a **powered hub** (onboard micro-USB is for flashing;
 OTG not confirmed on G295).
 
 > **Step-by-step:** [Bobcat Miner 300 guide](docs/BOBCAT-300.md) and [Hardware Matrix](docs/HARDWARE-MATRIX.md).
+
+### Heltec HT-M2808 (community installation guide)
+
+sicXnull contributed a [Heltec HT-M2808 installation guide](docs/HELTEC-M2808.md)
+covering Debian Bookworm flashing, manual SPI/GPIO setup and troubleshooting.
+Meshtastic TX/RX is reported working by the contributor in
+[upstream PR #138](https://github.com/KMX415/meshpoint/pull/138); not verified on
+this fork.
 
 ### Optional: MeshCore USB Companion
 
@@ -573,6 +581,7 @@ See [docs/COMMON-ERRORS.md](docs/COMMON-ERRORS.md#upgrades) if the service fails
 - **[Onboarding Guide](docs/ONBOARDING.md):** step-by-step from empty Pi to running Meshpoint
 - **[Hardware Matrix](docs/HARDWARE-MATRIX.md):** RAK V2 vs SenseCap M1 vs Chameleon vs Bobcat vs DIY, WisMesh Node (experimental), MeshCore companion radios, antennas, what's not supported
 - **[Bobcat Miner 300](docs/BOBCAT-300.md):** Rockchip RK3566 + Armbian repurposing (manual SPI/GPIO)
+- **[Heltec HT-M2808](docs/HELTEC-M2808.md):** Community-contributed Debian Bookworm installation guide (manual SPI/GPIO)
 - **[WisMesh Node (experimental, upstream-only)](docs/plans/WISMESH-BRANCH.md):** RAK6421 HAT, meshtasticd; lives on upstream's `feat/wismesh-hat` branch, not in this fork
 - **[Gateway ↔ Node migration](docs/MIGRATE-GATEWAY-TO-NODE.md):** switch between concentrator Gateway and WisMesh Node platforms
 - **[Configuration Guide](docs/CONFIGURATION.md):** all config options, private channels, relay, upstream, MQTT, radio tuning

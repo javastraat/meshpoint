@@ -4,6 +4,13 @@
 
 #### Upstream sync
 
+- **Docs: Heltec HT-M2808 guide, Bobcat G285, RAK6421 store link.** New
+  community installation guide for the Heltec HT-M2808 (sicXnull, upstream
+  PR #138; not verified on this fork), linked from the README and hardware
+  matrix. The Bobcat guide now has a separate G285 recipe (SPI1, GPIO
+  125/122/149; upstream #137) next to the G295 one. The README's RAK
+  WisMesh Pi Node link points to the current RAK6421 store page
+  (upstream `486a2d2e`, `44262226`, `ba50853f`, `c7bf59f4`, `72a9c2cd`).
 - **MeshCore: TCP companions, TX switch, and verified channel saves.**
   A MeshCore companion can now also be reached over TCP (MeshCore on the
   same Pi, or a companion with WiFi firmware), set per companion in

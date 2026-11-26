@@ -3,7 +3,13 @@
 Keeps track of what KMX (upstream, `KMX415/meshpoint`) has that our fork (`javastraat/meshpoint`) doesn't.
 Earlier rounds (up to 2026-08-13): [memory/upstream_sync_todo.md](memory/upstream_sync_todo.md).
 
-Checked: **2026-11-26** against `upstream/main` at `4e78804d` (v0.8.0 release prep).
+Checked: **2026-11-26** against `upstream/main` at `4e78804d` (v0.8.0 release prep) and their other branches
+(`feat/v0.8.1` is one commit ahead of main: item 48).
+
+**Decision 26-11 (Einstein): we want everything they have.** Nothing is "skip" or "decide first" any more, unless it
+is only upstream's own housekeeping (release metadata, CI, merge commits) or code that is already ours. That
+includes WisMesh Node / meshtasticd, PiMesh, the public view, p25 and their plugin repo. Items we closed earlier as
+"skipped" because they only made sense with that hardware (13, and the tests in 3) are open again: see section K.
 
 ## Why GitHub says "100+ behind"
 
@@ -45,6 +51,7 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
       (`rx_time`), not "now". `src/relay/mqtt_formatter.py`. Applies cleanly.
 - [x] **3. `d870125f` MQTT signal test** (S, test 80 only). Test for partial RSSI/SNR in MQTT. Applies cleanly.
       → Skipped 26-11: our RSSI/SNR are never None, so the test guards nothing here.
+        **Reopened 26-11:** take it with `95247426` (unknown RSSI/SNR) in item 38.
 - [x] **4. `1b2c8ff5` Web terminal cleanup** (S-M, 81 + test 118). After `exit` in the web terminal the shell process
       is cleaned up properly. `src/api/terminal/pty_session.py`. Applies cleanly. Pi: open terminal, `exit`, no leftovers.
 - [x] **5. `bc5b810c` python-multipart** (S, 1 line). Firmware upload (FormData) needs `python-multipart>=0.0.9`;
@@ -93,6 +100,7 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
       `setup_wizard.py`. Pi: only testable on a fresh SD card; otherwise unit tests.
       → Skipped 26-11 (Einstein's choice): it fixes upstream's chip probe from `de78139d` (WisMesh work), which we
         don't have; our wizard only checks SPI + libloragw. Taking the probe would be a new feature.
+        **Reopened 26-11 (everything is wanted): do it together with item 38** (`de78139d` brings the probe).
 - [x] **14. `553bdd83` Transmit settings save** (S, 30 + test 62). Saving Configuration → Transmit finishes properly
       (button state, message). `frontend/js/configuration/transmit_card.js`.
       → Already have it, closed 26-11 (Einstein's OK): upstream's fix was a try/catch around the save request. Our
@@ -186,13 +194,16 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
 
 ### I. Docs
 
-- [ ] **32. `486a2d2e` + `44262226` + `ba50853f` Heltec HT-M2808 guide** (applies cleanly) and links in README,
+- [x] **32. `486a2d2e` + `44262226` + `ba50853f` Heltec HT-M2808 guide** (applies cleanly) and links in README,
       HARDWARE-MATRIX.
-- [ ] **33. `c7bf59f4` Bobcat G285 community setup** in our `BOBCAT-300.md` and HARDWARE-MATRIX.
+      → Done 26-11: guide + `ba50853f` fix (SX1302), linked in README and HARDWARE-MATRIX (we have no docs/README.md index).
+- [x] **33. `c7bf59f4` Bobcat G285 community setup** in our `BOBCAT-300.md` and HARDWARE-MATRIX.
+      → Done 26-11: G285 recipe in BOBCAT-300.md (patch applied), HARDWARE-MATRIX entry rewritten by hand.
 - [ ] **34. `d476e296` Hardware and accessory links** in README.
-- [ ] **35. `72a9c2cd` RAK6421 HAT store URL**.
+- [x] **35. `72a9c2cd` RAK6421 HAT store URL**.
+      → Done 26-11: README link updated; HARDWARE-MATRIX already had the new URL.
 
-### J. Decide first (not in the queue)
+### J. Plugins, Reticulum and access (decided 26-11: take it all)
 
 - [ ] **36. Reticulum interface discovery** `a890b318` (= `8e349c91`): checked 26-11, we have about 80% of it. Open
       work is in our plugin repo (`meshpoint-plugins/apps/reticulum`), not here.
@@ -211,22 +222,111 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
   - [ ] **37a. Fix: viewer marks a conversation read for everyone.** `POST /api/conversation/{node_id}/read` in
         `src/api/routes/messages.py` has no `require_admin`. It is the only write route without it. Add the dependency
         and a test (a viewer gets 403).
-  - [ ] **37b. Optional hardening:** make `require_auth` reject non-GET/HEAD/OPTIONS for the viewer role and add
+  - [ ] **37b. Hardening:** make `require_auth` reject non-GET/HEAD/OPTIONS for the viewer role and add
         `require_session` for `change_password` (`src/api/auth/dependencies.py`, `auth_routes.py`). Then a new write route
         (also in a plugin) is admin-only by default. Reticulum's `/page`, `/disconnect`, `/file` POSTs
         (`nomad_routes.py`) are read-like and handled separately: check them first.
-  - [ ] **37c. Decide: public view** (pick pages that anonymous visitors see: dashboard counts, stats averages, radio
-        parameters). We have none; `public_radar_routes.py` only feeds the login-page radar. About 600 lines plus a
-        settings form, and it adds an unauthenticated surface. Only if we want a public stats page.
+  - [ ] **37c. Public view** (decided 26-11: yes). Admin picks pages that anonymous visitors see: dashboard counts,
+        stats averages, radio parameters. We have none; `public_radar_routes.py` only feeds the login-page radar. About
+        600 lines (`public_view_routes.py`, `public.html`, `public_view.js`, settings form, `update_public_view` in
+        `auth_service.py`, `stats_routes.public_snapshot`, tests `test_public_view.py`). Off by default, aggregate
+        numbers only (no IDs, positions, payloads), no session issued, no WebSocket access. Review it as an
+        unauthenticated surface (rate limit, cache) before enabling.
+  - [ ] **37d. Viewer UI in Messages:** no `meshpointReadOnly` flag in our frontend, so a viewer still sees compose and
+        Send and opening a chat posts "read". Hide compose, delete and Send Now for viewers; skip the read POST
+        (`messaging_chat.js`, `messaging_contacts.js`, `viewer_access.js`). Goes with 37a.
   - Have, no action: viewer role, terminal off by default (we keep our API toggle + restart), `plugin_sources_enabled`.
   - **Their plugin repo** (`KMX415/meshpoint-plugins`): the catalogs diverged. It is one snapshot of their `apps/`
     (11 plugins); ours has 188 commits and 26 plugins (versions 1.2.0 vs 1.0.0 for most shared ones, reticulum 1.1.3 vs
     1.0.0). Their manifests parse on our core, but their Reticulum imports `src.plugins.runtime` and
     `src.plugins.python_dependencies`, which we don't have, and their plugins drop `setup.sh`/`check.sh`. Don't take
-    their updates to shared plugins. Only **p25** (0.1.0, experimental) is new: check that it runs on our core before
-    offering their repo as a source preset.
-- [ ] **38. WisMesh Node / meshtasticd** (15 commits, section 5): only with that hardware.
-- [ ] **39. PiMesh** (4 commits, section 5): only with that hardware.
+    their updates to shared plugins (ours are newer and have the setup scripts). Take **p25** (0.1.0, experimental) and
+    add `KMX415/meshpoint-plugins` as a source preset (37e, 37f).
+  - [ ] **37e. p25 plugin** (their `apps/p25`: OP25 adapter, needs `meshpoint-op25` + ffmpeg). Their manifest parses on
+        our core, but it may need their runtime (`src.plugins.runtime`, `python_dependencies`). Port it into
+        `meshpoint-plugins` with our `setup.sh`/`check.sh`, run it on our core.
+  - [ ] **37f. Source preset for `KMX415/meshpoint-plugins`** next to ours (`src/plugins/sources.py`,
+        `frontend/js/settings/plugin_catalog.js`, `docs/PLUGINS.md`). One line plus docs. Say in the UI which catalog is
+        which; their shared plugins are older than ours.
+  - [ ] **37g. Take what is better in their versions of the shared plugins.** Per plugin (acars, adsb, dab, p2000,
+        pagers, pocsag, radio, rtl433, rtlsdr, reticulum): diff theirs against ours and port real fixes, keep our
+        manifest and setup scripts. `reticulum` differs most (~4200 lines): their `managed_service.py`,
+        `worker_proxy.py`, `worker_runner.py` (separate worker process), regions (item 41) and discovery (item 36).
+- [ ] **38. WisMesh Node / meshtasticd** (15 commits, ~5000 lines, section 5): decided 26-11, we take it. Plan it as a
+      project of its own, like item 31, in the order of the commits (platform detection, install, bridge capture, decode,
+      region and channel sync, TX, control plane and WisBlock module picker, platform guards). Includes the pieces the
+      earlier sections skipped: `ebbf6eb3` (item 13), `9f9da27f` (decoder), `95247426` (unknown RSSI/SNR), `90d159c8`
+      (`platform_guards.py`), `3ca92469` (install.sh, item 40). Compare with our `docs/WISMESH-NODE.md` first.
+- [ ] **39. PiMesh** (4 commits, section 5): decided 26-11, we take it (`cdb2d235`, `48942ef2`, `529577dc`, `841ff7a5`:
+      device roles and forwarding, MeshCore config, docs, upstream credits). Needs `pimesh_*` modules, `openhop_control`
+      and the `config/meshtasticd/` presets. Plan after 38; they share the meshtasticd parts.
+
+### K. Found on 26-11 in the full compare (not covered by items 1-39)
+
+- [ ] **40. `3ca92469` install.sh hardening** (S). On an upgrade: `dpkg --configure -a` before apt and skip
+      `apt-get upgrade`; reuse the existing venv instead of recreating it (ours does `python3 -m venv` every time, line
+      ~876, and `apt-get upgrade` runs always, line ~243). Check the venv reuse against a Python version change.
+- [ ] **41. Reticulum regional starting profiles** (M). Upstream's Reticulum fills missing RNode settings from
+      `radio.region` (US, EU_868, ANZ, IN, KR, SG_923), has a "Use region starting profile" button, and
+      `src/audio/sdr_registry.py` gives the SDR receivers (ACARS, ADS-B, ...) region defaults. Docs: `RETICULUM-REGIONS.md`.
+      Tests: `test_reticulum_regions.py`, `test_receiver_regions.py`. Our plugin has no region logic. Adjust EU to our
+      band plan (869,4-869,65 MHz) before copying their numbers.
+- [ ] **42. MeshCore USB robustness** (M, `b91d994b`; item 26 did not cover it). In `meshcore_usb_source.py`:
+  - `restart_auto_fetching()` must call `stop_auto_message_fetching()` first: `start_auto_message_fetching()` in
+    `meshcore_py` is not idempotent (each call adds a subscription).
+  - Release DTR after opening on CP210x USB bridges (it can hold BOOT and start the firmware rescue console):
+    their `src/capture/meshcore_serial.py`. Keep native-USB CDC as is.
+  - On idle timeouts check that the port path still exists and trigger a reconnect if it vanished.
+  - Keep the `MeshCore` instance before `connect()` and clean up when it fails (`create_serial()` can raise after its
+    dispatcher started); on `OSError` log one short warning. Test: `tests/test_meshcore_reconnect.py`.
+- [ ] **43. Node list: sort by packet count** (S). `packets` key in `NodeCards.SORT_KEYS` and
+      `node_cards_sort.js` (`packet_count` descending, missing/zero last, tie-break last heard). Credit: PR #128 by
+      yourasmit15-web. Test: `tests/frontend/node_sort_stats_units.test.cjs`.
+- [ ] **44. Docs wording and `USB-NODES.md`** (S, `58e4e9b1`, `4ad2903f`): USB radios are "nodes", not "sticks"; add
+      `docs/USB-NODES.md`; touch HARDWARE-MATRIX, ONBOARDING, RADIO-CONFIG-EXPLAINED, `serial_card.js`,
+      `meshtastic_firmware_card.js`. Upstream's new docs to compare: `COMMON-ERRORS`, `FAQ`, `TROUBLESHOOTING`,
+      `ONBOARDING`, `DASHBOARD-ACCESS` (with 37c/37d), `docs/README.md` index.
+- [ ] **45. Stats reporter test timing** (S, `4f62d644`): make `tests/test_stats_reporter.py` deterministic like theirs;
+      only if our test is flaky.
+- [ ] **48. `c2e6c495` Malformed Meshtastic channel key at startup** (M, 9 files + test 85). **Real bug here too, only on
+      their `feat/v0.8.1` branch (not in main yet).** Ours: `CryptoService.add_channel_key()` does
+      `base64.b64decode(key_b64)` without checking, so a wrong Base64 PSK in `local.yaml` raises at startup. Theirs:
+      `decode_channel_psk()` (strict, whitespace-tolerant) and an unusable channel keeps its slot (`None`) so the other
+      channel indices don't shift; `get_all_keys()` returns slots with `None`; MeshCore keys go to their own list
+      (`add_meshcore_channel_key`) instead of being re-encoded as Base64 (`coordinator.py` lines ~681-684 now do
+      `binascii.unhexlify` + `b64encode`); `config_routes.py`, `tx_service.py`, `channel_hash_resolver.py`,
+      `channels_card.js` skip or flag the dead slot. Test: `tests/test_channel_key_startup.py`. First write a test that
+      shows the crash, then port. Because KMX keeps working on `feat/v0.8.1`, look at that branch every round.
+- [ ] **49. Bobcat G285 docs branch** (S, `fd5b4d1d` + `dd834718`, branch `upstream/fix/bobcat-g285-docs-reconciliation`,
+      not merged into their main). New `docs/BOBCAT-G285.md` (417 lines), reworked `BOBCAT-300.md`, README and
+      HARDWARE-MATRIX. Merge with item 33 (`c7bf59f4`) so we do the G285 docs once.
+- [ ] **50. Smaller things inside `b91d994b` and README** (S): `.github/SECURITY.md` (+20 lines: what the Viewer and
+      the terminal opt-in mean), README (+57 lines: optional apps, themes, dashboard access, USB nodes), and
+      `src/transmit/meshcore_tx_client.py` (+3: takes the shared command lock, check against our item 26 version).
+      Also `.github/` CI files of the release candidate: read once, take what fits our CI.
+- [ ] **47. Plugin pages and plugin store layout** (M-L, `b91d994b`, `ede788c8`, `471a81da`, `622ce563`). They redesigned
+      both. Checked 26-11 against `upstream/main`:
+  - **Store view** (`css/plugin_store.css`, `js/settings/plugin_catalog.js`, `plugin_store_data.js`, markup in
+    `index.html` `#settings-plugins-panel`): a hero banner ("optional modules", art squares), a search box, category
+    filter chips (Aviation, Radio, Sensors, Paging, ...) and a card grid. Each card has an icon, category colour,
+    installed/available badge, description, "details" fold-out, source picker and Install / Enable actions. Setup
+    instructions for a source show as an amber notice. Ours (`plugins_panel_controller.js`, 1830 lines) is a list with
+    **Installed** and **Sources** tabs and a Browse button per source. Take the grid look as a new browse view; keep
+    our logic (updates, dependencies with cascading disable, pinning to a commit, batch updates, provenance), which
+    theirs (129-line controller) does not have.
+  - **Plugin page shell** (`css/plugin_pages.css`, `js/settings/plugin_pages.js`): one scoped stylesheet
+    `.section[data-plugin-page]` that maps plugin pages onto the active theme (cards, tabs, buttons, tables, fieldsets,
+    inputs, focus rings), a mobile layout under 640 px (2-column stat grid, full-width actions), and compatibility
+    tokens for imported plugin UI. Ours only has a small opt-in `.plugin-page` block in `dashboard.css`, so plugin pages
+    look different per plugin. Port the shell; check every one of our 26 plugin pages afterwards, and our light theme
+    (`themes/light/theme.css`).
+  - **Plugin page loader:** theirs fetches `/api/plugin-ui` and loads each plugin's styles and scripts before the
+    sidebar snapshot (10 s script timeout, admin only). Ours mounts via `mountPluginSidebarPages()`; compare, no change
+    needed unless a plugin page fails to load.
+  - Check with screenshots (dark, light, mobile) before and after. The theme editor page uses the same shell
+    (`.theme-editor`).
+- [ ] **46. Check the rest of their `tests/frontend/*.test.cjs` and plugin docs** (`471a81da`, `dfe6bcf5`): port the tests
+      that cover code we already have (gps privacy, mqtt topic preview, transmit save, topbar, bootstrap, map tiles).
 
 The tables below are the full inventory (incl. what we already have and what we skip).
 
@@ -292,7 +392,7 @@ repo). Theirs is a different implementation. Only worth looking at for ideas and
 | ⏭️ | `471a81da`, `dfe6bcf5` | Their plugin docs and release plan | |
 | ✅ | `06730b06` | Map tile sources from the dashboard | Ours: `map_tile_source.js`, `dashboard.map_tile_url` (`7d9b3434`) |
 
-## 5. Hardware we may not have (decide first)
+## 5. Hardware we may not have (decided 26-11: take it, items 38 and 39)
 
 | | Commit(s) | What | Notes |
 |---|---|---|---|
@@ -326,11 +426,15 @@ repo). Theirs is a different implementation. Only worth looking at for ideas and
 
 ## 8. Skip
 
-Release and CI housekeeping: `78082ba2` (v0.8.0 metadata), `3907348a` (changelog), `4f62d644` (RC checks),
-`cfda01d8` (session drafts), and all merge commits.
+Only upstream's own release and CI housekeeping: `78082ba2` (v0.8.0 metadata), `3907348a` (changelog),
+`cfda01d8` (session drafts), and all merge commits. (`4f62d644` is item 45 and `e311f407` README wording:
+read it once, our README differs.)
 
 ## Next round
 
 1. `git fetch upstream`
 2. `git log --no-merges --reverse --format='%h %ad %s' --date=short 4e78804d..upstream/main`: only what's new since this check.
-3. Add the new commits here, update "Checked" at the top.
+3. **Also look at their other branches**, not only main. `feat/v0.8.1` already has a commit main doesn't (`c2e6c495`, item 48):
+   `git log --no-merges --remotes=upstream --not upstream/main origin/upstream-sync --format='%h %ad %s' --date=short | head`
+   (older entries there are rebased duplicates; compare subjects with main before adding them).
+4. Add the new commits here, update "Checked" at the top.

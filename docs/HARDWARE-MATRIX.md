@@ -85,10 +85,22 @@ supply enough current for CM4 + concentrator (plan for up to ~2-3 A at 5 V
 equivalent). Prefer `sudo poweroff` before removing PoE to avoid SPI latch
 (see below).
 
+### Heltec HT-M2808 community guide
+
+See the [HT-M2808 installation guide](HELTEC-M2808.md), contributed by
+sicXnull in [upstream PR #138](https://github.com/KMX415/meshpoint/pull/138).
+
+| Area | Contributor report |
+|---|---|
+| Host / storage | Rockchip RK3328 / eMMC |
+| OS | Board-specific Debian Bookworm image |
+| Setup | Manual SPI/GPIO and systemd configuration; see guide |
+| Meshtastic TX/RX | Reported working by the contributor; not verified on this fork |
+
 ### Bobcat Miner 300 notes
 
 The Bobcat is **not** a Raspberry Pi: it uses **Rockchip RK3566**, onboard
-**eMMC**, and an SX1302-class concentrator on SPI bus **`spidev5.0`** after the
+**eMMC**, and an SX1302-class concentrator. The G295 guide uses SPI bus **`spidev5.0`** after the
 `spi5-m1` Armbian overlay. Meshpoint does **not** auto-detect this layout;
 follow **[Bobcat Miner 300 guide](BOBCAT-300.md)** for kernel holds, `local.yaml`,
 and systemd `ExecStartPre` hooks (GPIO **149** reset, **147** PA enable, SPI
@@ -104,8 +116,13 @@ symlinks to `/dev/spidev0.0`).
 | **MeshCore USB** | Powered hub reported; OTG unconfirmed |
 | **Typical price (used)** | ~$15-40 |
 
-Models **G290** (SX1302) are expected to match; **G285** is untested in this
-guide. Do not confuse with **Nebra Indoor Rock Pi 4** units that ship **SX1301**
+Model **G290** remains unvalidated; similarity to G295 is not confirmation.
+**G285** is [community-reported working in upstream #137](https://github.com/KMX415/meshpoint/issues/137)
+with **`spi1` / `/dev/spidev1.0`**, power enables **125/122**, and reset **149**
+(Linux sysfs GPIO numbers). Use the [separate G285 recipe](BOBCAT-300.md#g285-specific-procedure-community-report),
+not the G295 GPIO 147/SPI5 setup. Individual reception, transmission, cold-boot
+and repeated-restart checks remain pending for G285.
+Do not confuse with **Nebra Indoor Rock Pi 4** units that ship **SX1301**
 concentrators (not supported).
 
 ### COTX X3 Helium Miner notes
@@ -279,7 +296,6 @@ Full runbook: **[WisMesh Node guide](WISMESH-NODE.md)**. See also [Onboarding](O
 | x86 / x86_64 host | Not supported | aarch64 Raspberry Pi family only |
 | RAK7268 / RAK7268V2 (commercial gateway) | Not supported | These are LoRaWAN gateways with different firmware path; SX1302 is similar but the platform stack does not match |
 | Helium WHIP / Linxdot Indoor | Not validated | Same chip family as RAK V2 but the carrier varies; community testing welcome |
-| Bobcat Miner 300 (G285) | Not validated | G290/G295 community path documented; G285 untested |
 | Nebra Indoor (Rock Pi 4 + SX1301) | Not supported | Daughter board uses SX1301, not SX1302/SX1303; different HAL |
 | Meryiot (and other SX1308 gateway boards) | Not supported | SX1308 is the same older concentrator generation as SX1301; different HAL |
 | Single-channel SX1276/SX1262 boards | Not for concentrator role | These are single-channel radios. They can run as a [MeshCore USB companion](#meshcore-usb-companion-radios), not as the main concentrator. |
