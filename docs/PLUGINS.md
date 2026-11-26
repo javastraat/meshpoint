@@ -971,6 +971,12 @@ tampered `repo.json` can't smuggle anything in.
 
 ### How an operator uses it
 
+Two sources are in the *Add source* dropdown already (`frontend/data/plugin_sources.json`):
+**Einstein PD2EMC** (`javastraat/meshpoint-plugins`, this fork's catalog) and **Meshpoint
+upstream (KMX415)** (`KMX415/meshpoint-plugins`). Upstream's catalog has fewer plugins and
+older versions of the shared ones (acars, adsb, dab, reticulum, ...), some of which may need
+upstream-only core modules; its own **p25** plugin is the main reason to add it.
+
 1. **Add source** → paste the repo URL → an explicit trust confirmation
    (a source can install code that runs with the service's privileges, and
    its `setup.sh` runs as root).

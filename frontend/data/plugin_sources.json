@@ -1,6 +1,7 @@
 {
   "_comment": "Preset options for Settings -> Plugins -> Add source's dropdown. Purely a convenience list -- the free-text URL/ref fields work with any GitHub repo without it. Add an entry to grow the list, no code change or restart needed (this file is served as a static asset). Each entry: label (shown in the dropdown -- a name, not the raw URL), url (github.com repo), ref (branch/tag, default 'main' if omitted), description (optional -- shown as a hover tooltip on the option).",
   "presets": [
-    { "label": "Einstein PD2EMC", "description": "Einstein's Meshpoint plugins and themes", "url": "https://github.com/javastraat/meshpoint-plugins", "ref": "main" }
+    { "label": "Einstein PD2EMC", "description": "Einstein's Meshpoint plugins and themes", "url": "https://github.com/javastraat/meshpoint-plugins", "ref": "main" },
+    { "label": "Meshpoint upstream (KMX415)", "description": "Upstream's plugin catalog. Fewer plugins, and its shared ones (acars, adsb, dab, reticulum, ...) are older than Einstein's; some may need upstream-only core modules. Has p25 (experimental).", "url": "https://github.com/KMX415/meshpoint-plugins", "ref": "main" }
   ]
 }

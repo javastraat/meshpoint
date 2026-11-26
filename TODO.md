@@ -219,9 +219,10 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
   - First check: does our RNS version read and write `discovery_lxmf_address`? (Upstream pinned RNS 1.5.3.)
 - [ ] **37. Their plugin repo and dashboard access controls** `622ce563`, `b91d994b`: checked 26-11. Most of it is ours
       already (their commit says it adapts `javastraat/meshpoint`).
-  - [ ] **37a. Fix: viewer marks a conversation read for everyone.** `POST /api/conversation/{node_id}/read` in
+  - [x] **37a. Fix: viewer marks a conversation read for everyone.** `POST /api/conversation/{node_id}/read` in
         `src/api/routes/messages.py` has no `require_admin`. It is the only write route without it. Add the dependency
         and a test (a viewer gets 403).
+        → Done 26-11: `require_admin` on the read route; test checks every write route in messages.py.
   - [ ] **37b. Hardening:** make `require_auth` reject non-GET/HEAD/OPTIONS for the viewer role and add
         `require_session` for `change_password` (`src/api/auth/dependencies.py`, `auth_routes.py`). Then a new write route
         (also in a plugin) is admin-only by default. Reticulum's `/page`, `/disconnect`, `/file` POSTs
@@ -245,9 +246,10 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
   - [ ] **37e. p25 plugin** (their `apps/p25`: OP25 adapter, needs `meshpoint-op25` + ffmpeg). Their manifest parses on
         our core, but it may need their runtime (`src.plugins.runtime`, `python_dependencies`). Port it into
         `meshpoint-plugins` with our `setup.sh`/`check.sh`, run it on our core.
-  - [ ] **37f. Source preset for `KMX415/meshpoint-plugins`** next to ours (`src/plugins/sources.py`,
+  - [x] **37f. Source preset for `KMX415/meshpoint-plugins`** next to ours (`src/plugins/sources.py`,
         `frontend/js/settings/plugin_catalog.js`, `docs/PLUGINS.md`). One line plus docs. Say in the UI which catalog is
         which; their shared plugins are older than ours.
+        → Done 26-11: preset in `frontend/data/plugin_sources.json` (ours keeps presets there, not in JS) + PLUGINS.md.
   - [ ] **37g. Take what is better in their versions of the shared plugins.** Per plugin (acars, adsb, dab, p2000,
         pagers, pocsag, radio, rtl433, rtlsdr, reticulum): diff theirs against ours and port real fixes, keep our
         manifest and setup scripts. `reticulum` differs most (~4200 lines): their `managed_service.py`,
@@ -279,9 +281,10 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
   - On idle timeouts check that the port path still exists and trigger a reconnect if it vanished.
   - Keep the `MeshCore` instance before `connect()` and clean up when it fails (`create_serial()` can raise after its
     dispatcher started); on `OSError` log one short warning. Test: `tests/test_meshcore_reconnect.py`.
-- [ ] **43. Node list: sort by packet count** (S). `packets` key in `NodeCards.SORT_KEYS` and
+- [x] **43. Node list: sort by packet count** (S). `packets` key in `NodeCards.SORT_KEYS` and
       `node_cards_sort.js` (`packet_count` descending, missing/zero last, tie-break last heard). Credit: PR #128 by
       yourasmit15-web. Test: `tests/frontend/node_sort_stats_units.test.cjs`.
+      → Done 26-11: comparator from upstream (our file was identical otherwise), option + SORT_KEYS. Node test.
 - [ ] **44. Docs wording and `USB-NODES.md`** (S, `58e4e9b1`, `4ad2903f`): USB radios are "nodes", not "sticks"; add
       `docs/USB-NODES.md`; touch HARDWARE-MATRIX, ONBOARDING, RADIO-CONFIG-EXPLAINED, `serial_card.js`,
       `meshtastic_firmware_card.js`. Upstream's new docs to compare: `COMMON-ERRORS`, `FAQ`, `TROUBLESHOOTING`,

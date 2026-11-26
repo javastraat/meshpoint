@@ -4,6 +4,17 @@
 
 #### Upstream sync
 
+- **Node list can sort by packets.** "Sort: Packets" puts the busiest nodes
+  first (nodes without packets last, ties by last heard; favourites stay on
+  top). Comparator by yourasmit15-web, upstream PR #128 (upstream `b91d994b`).
+- **Fix: a viewer opening a chat marked it read for everyone.** Marking a
+  conversation read is now admin-only, like every other write in Messages;
+  a viewer's chat still opens, the shared unread count stays (upstream
+  `b91d994b`).
+- **Plugin sources: upstream's catalog as a preset.** Settings → Plugins →
+  Add source now also offers "Meshpoint upstream (KMX415)" next to
+  Einstein's; its description says its shared plugins are older than ours
+  (upstream `622ce563`).
 - **Docs: Heltec HT-M2808 guide, Bobcat G285, RAK6421 store link.** New
   community installation guide for the Heltec HT-M2808 (sicXnull, upstream
   PR #138; not verified on this fork), linked from the README and hardware
