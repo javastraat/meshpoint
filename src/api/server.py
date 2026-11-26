@@ -807,14 +807,25 @@ def _add_meshcore_usb_source(
     try:
         from src.capture.meshcore_usb_source import MeshcoreUsbCaptureSource
         for usb_cfg in config.capture.meshcore_usb:
-            coordinator.capture_coordinator.add_source(
-                MeshcoreUsbCaptureSource(
+            try:
+                source = MeshcoreUsbCaptureSource(
                     serial_port=usb_cfg.serial_port,
                     baud_rate=usb_cfg.baud_rate,
                     auto_detect=usb_cfg.auto_detect,
                     label=usb_cfg.label,
+                    connection_type=getattr(usb_cfg, "connection_type", "serial"),
+                    tcp_host=getattr(usb_cfg, "tcp_host", "127.0.0.1"),
+                    tcp_port=getattr(usb_cfg, "tcp_port", 5000),
                 )
-            )
+            except (ValueError, TypeError) as exc:
+                # A bad connection_type/tcp_host/tcp_port in local.yaml skips
+                # this one companion instead of stopping the whole service.
+                logger.error("MeshCore companion %r skipped: %s", usb_cfg.label, exc)
+                continue
+            # Live Configuration -> Transmit switch for this companion's own
+            # sends, also when TX is off at startup (no TxService then).
+            source.tx_enabled_provider = lambda: bool(config.transmit.enabled)
+            coordinator.capture_coordinator.add_source(source)
     except ImportError:
         logger.warning(
             "MeshCore USB unavailable -- meshcore package not installed"
@@ -1064,6 +1075,7 @@ def _build_tx_service(
         ),
     )
     meshcore_tx = MeshCoreTxClient()
+    meshcore_tx.tx_enabled_provider = lambda: bool(config.transmit.enabled)
     mc_source = _find_meshcore_source(coord)
     if mc_source:
         # Bind to the live source so reconnects in the capture path

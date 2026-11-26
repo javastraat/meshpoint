@@ -119,6 +119,10 @@ class TxService:
 
     @property
     def meshcore_enabled(self) -> bool:
+        # Same live Transmit switch as meshtastic_enabled (upstream 6ea8de00):
+        # before, MeshCore kept sending after TX was switched off until a restart.
+        if self._config is not None and not self._config.enabled:
+            return False
         return self._meshcore_tx is not None and self._meshcore_tx.connected
 
     @property

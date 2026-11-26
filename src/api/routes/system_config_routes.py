@@ -283,6 +283,11 @@ async def update_meshcore_companions(
     # rename card's job) -- preserve each existing companion's own name by
     # label match so replacing the list here doesn't silently wipe it.
     old_names = {c.label: c.companion_name for c in _config.capture.meshcore_usb}
+    # Same for the TCP transport (local.yaml only, no dashboard field).
+    old_transport = {
+        c.label: {"connection_type": c.connection_type, "tcp_host": c.tcp_host, "tcp_port": c.tcp_port}
+        for c in _config.capture.meshcore_usb
+    }
 
     new_companions = [
         MeshcoreUsbConfig(
@@ -291,6 +296,7 @@ async def update_meshcore_companions(
             baud_rate=c.baud_rate,
             auto_detect=c.auto_detect,
             companion_name=old_names.get(c.label),
+            **old_transport.get(c.label, {}),
         )
         for c in req.companions
     ]
@@ -598,13 +604,16 @@ async def update_radio_advanced(
 
 
 def _meshcore_usb_dict(mc_usb) -> dict:
-    return {
+    d = {
         "serial_port": mc_usb.serial_port,
         "baud_rate": mc_usb.baud_rate,
         "auto_detect": mc_usb.auto_detect,
         "label": mc_usb.label,
         "companion_name": mc_usb.companion_name,
     }
+    if getattr(mc_usb, "connection_type", "serial") == "tcp":
+        d.update(connection_type="tcp", tcp_host=mc_usb.tcp_host, tcp_port=mc_usb.tcp_port)
+    return d
 
 
 def _serial_device_dict(dev) -> dict:

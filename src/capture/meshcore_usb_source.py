@@ -84,7 +84,18 @@ class MeshcoreUsbCaptureSource(CaptureSource):
         baud_rate: int = 115200,
         auto_detect: bool = True,
         label: str = "",
+        connection_type: str = "serial",
+        tcp_host: str = "127.0.0.1",
+        tcp_port: int = 5000,
     ):
+        # TCP (upstream 6ea8de00): MeshCore on the same Pi (PiMesh) or a
+        # companion with WiFi firmware, instead of a USB serial port.
+        if connection_type not in ("serial", "tcp"):
+            raise ValueError(f"Unknown MeshCore connection type: {connection_type!r}")
+        if connection_type == "tcp" and (not tcp_host or not 1 <= int(tcp_port) <= 65535):
+            raise ValueError("Invalid MeshCore TCP endpoint")
+        self.connection_type = connection_type
+        self._tcp_host, self._tcp_port = tcp_host, int(tcp_port)
         self._configured_port = serial_port
         self._baud_rate = baud_rate
         self._auto_detect = auto_detect
@@ -113,6 +124,10 @@ class MeshcoreUsbCaptureSource(CaptureSource):
         # MeshCore send feedback (src/transmit/meshcore_repeats.py), shared
         # by all companions; set by the server.
         self._send_feedback = None
+        # Live Configuration -> Transmit switch, set by the server (see
+        # MeshCoreTxClient.tx_enabled_provider): this companion's own sends
+        # (fan-out channel messages, per-companion DMs and adverts).
+        self.tx_enabled_provider = lambda: True
         self._last_event_at: float = 0.0
         self._on_connected_callback = None
         # Cached DEVICE_INFO round-trip result -- firmware doesn't change
@@ -239,11 +254,7 @@ class MeshcoreUsbCaptureSource(CaptureSource):
         try:
             from meshcore import MeshCore, EventType
 
-            self._meshcore = await MeshCore.create_serial(
-                port,
-                self._baud_rate,
-                default_timeout=_MESHCORE_COMMAND_TIMEOUT_SECONDS,
-            )
+            self._meshcore = await self._open_meshcore(_MESHCORE_COMMAND_TIMEOUT_SECONDS, port)
             if self._meshcore is None:
                 logger.error(
                     "MeshCore companion handshake failed on %s. "
@@ -361,7 +372,7 @@ class MeshcoreUsbCaptureSource(CaptureSource):
                 # ~15-20s of RX downtime a reset costs, see
                 # _health_check_loop's docstring) before even one plain
                 # attempt has been given a chance.
-                if attempt >= 1 and self._resolved_port:
+                if attempt >= 1 and self._resolved_port and self.connection_type == "serial":
                     from src.capture.meshcore_dtr import pulse_dtr_reset
 
                     await asyncio.to_thread(
@@ -728,13 +739,11 @@ class MeshcoreUsbCaptureSource(CaptureSource):
 
         from src.capture.meshcore_dtr import pulse_dtr_reset
 
-        await asyncio.to_thread(pulse_dtr_reset, port, self._baud_rate)
-        await asyncio.sleep(_RADIO_EXCLUSIVE_DTR_SETTLE_SECONDS)
+        if self.connection_type == "serial":  # no DTR line over TCP
+            await asyncio.to_thread(pulse_dtr_reset, port, self._baud_rate)
+            await asyncio.sleep(_RADIO_EXCLUSIVE_DTR_SETTLE_SECONDS)
 
-        mc = await MeshCore.create_serial(
-            port, self._baud_rate,
-            default_timeout=_RADIO_EXCLUSIVE_HANDSHAKE_TIMEOUT_SECONDS,
-        )
+        mc = await self._open_meshcore(_RADIO_EXCLUSIVE_HANDSHAKE_TIMEOUT_SECONDS, port)
         if mc is None:
             return SendResult(
                 success=False,
@@ -761,13 +770,11 @@ class MeshcoreUsbCaptureSource(CaptureSource):
             return result
 
         await asyncio.sleep(_RADIO_EXCLUSIVE_REBOOT_SETTLE_SECONDS)
-        await asyncio.to_thread(pulse_dtr_reset, port, self._baud_rate)
-        await asyncio.sleep(_RADIO_EXCLUSIVE_DTR_SETTLE_SECONDS)
+        if self.connection_type == "serial":
+            await asyncio.to_thread(pulse_dtr_reset, port, self._baud_rate)
+            await asyncio.sleep(_RADIO_EXCLUSIVE_DTR_SETTLE_SECONDS)
 
-        mc2 = await MeshCore.create_serial(
-            port, self._baud_rate,
-            default_timeout=_RADIO_EXCLUSIVE_HANDSHAKE_TIMEOUT_SECONDS,
-        )
+        mc2 = await self._open_meshcore(_RADIO_EXCLUSIVE_HANDSHAKE_TIMEOUT_SECONDS, port)
         if mc2 is None:
             return SendResult(
                 success=False,
@@ -817,6 +824,8 @@ class MeshcoreUsbCaptureSource(CaptureSource):
 
     async def send_advert(self, flood: bool = False) -> SendResult:
         """Broadcast a node advertisement from THIS companion."""
+        if not self.tx_enabled_provider():
+            return SendResult(success=False, error="MeshCore TX disabled")
         if not self.connected:
             return SendResult(success=False, error="Not connected")
         result = await send_companion_advert(self._meshcore, flood=flood)
@@ -835,6 +844,8 @@ class MeshcoreUsbCaptureSource(CaptureSource):
         connection -- lets a reply go out through whichever companion
         actually has RF reach to the recipient, instead of always the
         one "primary" companion TxService is otherwise bound to."""
+        if not self.tx_enabled_provider():
+            return SendResult(success=False, error="MeshCore TX disabled")
         if not self.connected:
             return SendResult(success=False, error="Not connected")
         result = await send_mc_direct_message(
@@ -848,6 +859,8 @@ class MeshcoreUsbCaptureSource(CaptureSource):
 
     async def send_channel_message(self, channel: int, text: str, packet_id: str = "") -> SendResult:
         """Broadcast a message on a MeshCore channel via THIS companion."""
+        if not self.tx_enabled_provider():
+            return SendResult(success=False, error="MeshCore TX disabled")
         if not self.connected:
             return SendResult(success=False, error="Not connected")
         result = await send_mc_channel_message(
@@ -868,7 +881,18 @@ class MeshcoreUsbCaptureSource(CaptureSource):
             except Exception:
                 logger.debug("Failed to restart auto fetching", exc_info=True)
 
+    async def _open_meshcore(self, timeout: float, port: Optional[str] = None):
+        """A MeshCore connection over this companion's transport (serial or TCP)."""
+        from meshcore import MeshCore
+
+        if self.connection_type == "tcp":
+            return await MeshCore.create_tcp(self._tcp_host, self._tcp_port, default_timeout=timeout)
+        return await MeshCore.create_serial(port, self._baud_rate, default_timeout=timeout)
+
     async def _resolve_port(self) -> Optional[str]:
+        # For TCP this is just a label (logs, status); no serial probing.
+        if self.connection_type == "tcp":
+            return f"tcp://{self._tcp_host}:{self._tcp_port}"
         if self._configured_port:
             return self._configured_port
         if not self._auto_detect:

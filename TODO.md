@@ -148,9 +148,12 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
 
 ### F. MeshCore features
 
-- [ ] **26. `6ea8de00` Shared MeshCore TCP and verified radio commands** (M, 78 + test 38). MeshCore over TCP shared
+- [x] **26. `6ea8de00` Shared MeshCore TCP and verified radio commands** (M, 78 + test 38). MeshCore over TCP shared
       between capture and TX; radio commands serialized and checked. `meshcore_usb_source.py`, `meshcore_tx_client.py`,
       new `meshcore_channel_sync.py`.
+      → Done 26-11, all three parts: TCP per companion (local.yaml only, like upstream; preserved by the dashboard save),
+        live TX switch for MeshCore (client, every companion, TxService), channel save waits and reads all slots back
+        (502 with the reason if not confirmed). Test `tests/test_meshcore_tcp_and_tx_gate.py`.
 - [x] **27. `fc15bc36` + `cad3c4a1` MeshCore RF metadata and hops** (M, 137 + tests 690). MeshCore packets get RSSI,
       SNR, SF/BW and hop count in the feed and packet modal. `meshcore_usb_source.py`, `meshcore_event_adapter.py`,
       `packet_repository.py`, `packet_detail_modal.js`, `simple_packet_feed.js`.
@@ -191,8 +194,37 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
 
 ### J. Decide first (not in the queue)
 
-- [ ] **36. Reticulum interface discovery** `a890b318`: idea for our Reticulum plugin.
-- [ ] **37. Their plugin repo and dashboard access controls** `622ce563`, `b91d994b`.
+- [ ] **36. Reticulum interface discovery** `a890b318` (= `8e349c91`): checked 26-11, we have about 80% of it. Open
+      work is in our plugin repo (`meshpoint-plugins/apps/reticulum`), not here.
+  - Have: listening (`discover_interfaces`, autoconnect 0), publishing our RNode (`rnode_discoverable`, name, interval,
+    lat/lon), reading the heard interfaces (`backend/discovered.py`, `GET /api/reticulum/discovered`, admin-only host).
+  - Missing: **operator contact**. A setting `rnode_discovery_lxmf_address` (32 hex, validated, written as
+    `discovery_lxmf_address` only when `rnode_discoverable` is on), the address read from the stored interface files, and a
+    **Contact operator** button that opens a draft in Messages (sends nothing).
+  - Missing: `discovered.py` `_entry()` drops interfaces without a location; theirs lists all (TCP/backbone without
+    coordinates).
+  - Don't copy: their forced `mode = access_point` for publishing (blocks announce forwarding; we coerce to `gateway`)
+    and their "no location" rule (we publish lat/lon on purpose).
+  - First check: does our RNS version read and write `discovery_lxmf_address`? (Upstream pinned RNS 1.5.3.)
+- [ ] **37. Their plugin repo and dashboard access controls** `622ce563`, `b91d994b`: checked 26-11. Most of it is ours
+      already (their commit says it adapts `javastraat/meshpoint`).
+  - [ ] **37a. Fix: viewer marks a conversation read for everyone.** `POST /api/conversation/{node_id}/read` in
+        `src/api/routes/messages.py` has no `require_admin`. It is the only write route without it. Add the dependency
+        and a test (a viewer gets 403).
+  - [ ] **37b. Optional hardening:** make `require_auth` reject non-GET/HEAD/OPTIONS for the viewer role and add
+        `require_session` for `change_password` (`src/api/auth/dependencies.py`, `auth_routes.py`). Then a new write route
+        (also in a plugin) is admin-only by default. Reticulum's `/page`, `/disconnect`, `/file` POSTs
+        (`nomad_routes.py`) are read-like and handled separately: check them first.
+  - [ ] **37c. Decide: public view** (pick pages that anonymous visitors see: dashboard counts, stats averages, radio
+        parameters). We have none; `public_radar_routes.py` only feeds the login-page radar. About 600 lines plus a
+        settings form, and it adds an unauthenticated surface. Only if we want a public stats page.
+  - Have, no action: viewer role, terminal off by default (we keep our API toggle + restart), `plugin_sources_enabled`.
+  - **Their plugin repo** (`KMX415/meshpoint-plugins`): the catalogs diverged. It is one snapshot of their `apps/`
+    (11 plugins); ours has 188 commits and 26 plugins (versions 1.2.0 vs 1.0.0 for most shared ones, reticulum 1.1.3 vs
+    1.0.0). Their manifests parse on our core, but their Reticulum imports `src.plugins.runtime` and
+    `src.plugins.python_dependencies`, which we don't have, and their plugins drop `setup.sh`/`check.sh`. Don't take
+    their updates to shared plugins. Only **p25** (0.1.0, experimental) is new: check that it runs on our core before
+    offering their repo as a source preset.
 - [ ] **38. WisMesh Node / meshtasticd** (15 commits, section 5): only with that hardware.
 - [ ] **39. PiMesh** (4 commits, section 5): only with that hardware.
 
@@ -243,7 +275,7 @@ The tables below are the full inventory (incl. what we already have and what we 
 | ⬜ | `23a5fe7e` | MeshCore USB capture status independent of TX | |
 | ⬜ | `3fbfa9fa` | Show Meshtastic status only for configured capture sources | |
 | ⬜ | `a16253be` | Connect dashboard status before the initial data load | |
-| ❓ | `a890b318` / `8e349c91` | Opt-in Reticulum interface discovery and operator contacts | Our Reticulum is a plugin; take the idea if wanted |
+| ❓ | `a890b318` / `8e349c91` | Opt-in Reticulum interface discovery and operator contacts | Mostly have it in our plugin; operator contact is missing (item 36) |
 | ⏭️ | `58e4e9b1`, `4ad2903f` | Docs/wording: USB radios are "nodes", not "sticks" | Optional |
 
 ## 4. Plugin system (compare, don't port)
@@ -253,9 +285,9 @@ repo). Theirs is a different implementation. Only worth looking at for ideas and
 
 | | Commit | What | Notes |
 |---|---|---|---|
-| ❓ | `b91d994b` | Optional apps, themes and dashboard access controls (34 000 lines) | Look at "dashboard access controls"; the rest we have our own way |
+| ❓ | `b91d994b` | Optional apps, themes and dashboard access controls (34 000 lines) | Checked 26-11: mostly ours already; one viewer fix + optional hardening (item 37a/b), public view is optional (37c) |
 | ✅ | `ede788c8`, `6b06ec5d` | Plugin source picker, dependencies + cascading disable | Our own (`5ec7fa52`, `6e9f7dfe`, `49a370b6`) |
-| ❓ | `622ce563` | Their official plugin repository | Do we want their repo as a source next to ours? |
+| ❓ | `622ce563` | Their official plugin repository | Catalogs diverged (item 37); only p25 is new, check it runs on our core first |
 | ❓ | `d8db1301` | Bound plugin source revision lookups for big imports | Possibly useful for our sources |
 | ⏭️ | `471a81da`, `dfe6bcf5` | Their plugin docs and release plan | |
 | ✅ | `06730b06` | Map tile sources from the dashboard | Ours: `map_tile_source.js`, `dashboard.map_tile_url` (`7d9b3434`) |

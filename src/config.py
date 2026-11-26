@@ -165,10 +165,16 @@ class MeshcoreUsbConfig:
     # physically separate radio with its own identity. Re-applied on every
     # connect by this companion's own capture source.
     companion_name: Optional[str] = None
+    # "serial" (USB) or "tcp" (upstream 6ea8de00): MeshCore on the same Pi or
+    # a companion with WiFi firmware. Set in local.yaml; no dashboard field.
+    connection_type: str = "serial"
+    tcp_host: str = "127.0.0.1"
+    tcp_port: int = 5000
 
 
 _MESHCORE_USB_FIELDS: frozenset[str] = frozenset(
-    {"serial_port", "baud_rate", "auto_detect", "label", "companion_name"}
+    {"serial_port", "baud_rate", "auto_detect", "label", "companion_name",
+     "connection_type", "tcp_host", "tcp_port"}
 )
 
 

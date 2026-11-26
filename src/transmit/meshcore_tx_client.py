@@ -462,6 +462,9 @@ class MeshCoreTxClient:
     """
 
     def __init__(self):
+        # Live Configuration -> Transmit switch (upstream 6ea8de00): set by the
+        # server, so switching TX off stops MeshCore sends without a restart.
+        self.tx_enabled_provider = lambda: True
         self._owned_mc = None
         self._owned_connected = False
         self._source = None
@@ -551,6 +554,8 @@ class MeshCoreTxClient:
         self, channel: int, text: str, feedback=None, packet_id: str = "",
     ) -> SendResult:
         """Send a broadcast message on a MeshCore channel."""
+        if not self.tx_enabled_provider():
+            return SendResult(success=False, error="MeshCore TX disabled")
         if not self.connected:
             return SendResult(success=False, error="Not connected")
         result = await send_mc_channel_message(self._mc, channel, text, feedback, packet_id)
@@ -561,6 +566,8 @@ class MeshCoreTxClient:
         self, destination, text: str, feedback=None, packet_id: str = "",
     ) -> SendResult:
         """Send a direct message to a MeshCore contact."""
+        if not self.tx_enabled_provider():
+            return SendResult(success=False, error="MeshCore TX disabled")
         if not self.connected:
             return SendResult(success=False, error="Not connected")
         result = await send_mc_direct_message(self._mc, destination, text, feedback, packet_id)
@@ -569,6 +576,8 @@ class MeshCoreTxClient:
 
     async def send_advert(self, flood: bool = False) -> SendResult:
         """Broadcast a node advertisement."""
+        if not self.tx_enabled_provider():
+            return SendResult(success=False, error="MeshCore TX disabled")
         if not self.connected:
             return SendResult(success=False, error="Not connected")
         result = await send_companion_advert(self._mc, flood=flood)
@@ -760,15 +769,20 @@ class MeshCoreTxClient:
             self._device_info_cache = info
         return info
 
-    async def sync_channels(self, channel_keys: dict) -> None:
+    async def sync_channels(self, channel_keys: dict, *, verify: bool = False) -> None:
         """Sync configured channels to the companion device.
 
         Slot 0 is reserved for Public. Each entry in channel_keys is written
         to slots 1, 2, … so device channel_idx matches the Messages tab. Extra
         user slots are cleared. channel_keys maps channel name → hex-encoded
         16-byte secret (use 32 zero digits for hashtag / no-PSK channels).
+
+        With ``verify`` (upstream 6ea8de00) the slots are read back afterwards
+        and a RuntimeError says what didn't stick; used by the dashboard save.
         """
         if not self.connected:
+            if verify:
+                raise RuntimeError("MeshCore companion not connected")
             logger.debug("sync_channels: not connected, skipping")
             return
         try:
@@ -850,8 +864,36 @@ class MeshCoreTxClient:
             except Exception:
                 logger.exception("sync_channels: failed to clear slot %d", idx)
 
+        if verify:
+            try:
+                await self._verify_channel_slots(desired, EventType)
+            finally:
+                await self._run_post_command()
+            logger.info("sync_channels: done and verified (%d configured)", len(desired))
+            return
         await self._run_post_command()
         logger.info("sync_channels: done (%d configured)", len(desired))
+
+    async def _verify_channel_slots(self, desired: list, EventType) -> None:
+        """Read every user slot back: configured ones must match name and key,
+        the rest must be empty (upstream 6ea8de00)."""
+        for slot in range(1, MESHCORE_MAX_DEVICE_SLOTS):
+            try:
+                result = await asyncio.wait_for(self._mc.commands.get_channel(slot), timeout=5.0)
+            except Exception as exc:
+                raise RuntimeError(f"channel slot {slot} could not be read back ({exc or 'timeout'})") from exc
+            if result.type == EventType.ERROR:
+                if slot <= len(desired):
+                    raise RuntimeError(f"channel slot {slot} could not be read back")
+                break  # firmware has fewer slots: nothing further to clear
+            payload = result.payload or {}
+            name, secret = payload.get("channel_name", ""), payload.get("channel_secret", b"")
+            if slot <= len(desired):
+                want_name, want_key = desired[slot - 1]
+                if name != want_name or secret != bytes.fromhex(want_key):
+                    raise RuntimeError(f"channel '{want_name}' did not stick in slot {slot}")
+            elif name:
+                raise RuntimeError(f"channel '{name}' in slot {slot} was not removed")
 
     async def get_contacts(self) -> list[dict]:
         """Retrieve the companion's contact list.

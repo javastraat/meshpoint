@@ -890,11 +890,25 @@ async def update_meshcore_channels(
         ", ".join(channel_keys) or "none",
     )
 
+    # Write to the companion and read every slot back before reporting
+    # success (upstream 6ea8de00); before, this ran in the background and a
+    # failed write went unnoticed. The config itself is already saved.
+    companion_error = None
+    companion_verified = False
     if _tx_service and hasattr(_tx_service, "_meshcore_tx"):
         mc_tx = _tx_service._meshcore_tx
         if mc_tx and mc_tx.connected:
             import asyncio
-            asyncio.create_task(mc_tx.sync_channels(channel_keys))
+            companion_verified = True
+            try:
+                await asyncio.wait_for(mc_tx.sync_channels(channel_keys, verify=True), timeout=90)
+            except asyncio.TimeoutError:
+                companion_error = "the companion did not answer in time"
+            except Exception as exc:
+                companion_error = str(exc) or type(exc).__name__
+            if companion_error:
+                companion_verified = False
+                logger.warning("MeshCore channel save not confirmed by the companion: %s", companion_error)
 
     if _crypto and hasattr(_crypto, "clear_channel_keys"):
         _crypto.clear_channel_keys()
@@ -906,10 +920,17 @@ async def update_meshcore_channels(
 
     _refresh_channel_hash_map()
 
+    if companion_error:
+        raise HTTPException(
+            502,
+            f"Saved to the configuration, but the companion did not confirm it: {companion_error}. "
+            "Save again, or restart the service to resync.",
+        )
     return {
         "saved": True,
         "restart_required": False,
         "channel_count": len(channel_keys),
+        "companion_verified": companion_verified,
     }
 
 

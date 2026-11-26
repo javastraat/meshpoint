@@ -4,6 +4,18 @@
 
 #### Upstream sync
 
+- **MeshCore: TCP companions, TX switch, and verified channel saves.**
+  A MeshCore companion can now also be reached over TCP (MeshCore on the
+  same Pi, or a companion with WiFi firmware), set per companion in
+  `local.yaml` under `capture.meshcore_usb`: `connection_type: tcp`,
+  `tcp_host`, `tcp_port` (default 127.0.0.1:5000); a wrong value skips
+  that companion with an error instead of stopping the service, and the
+  dashboard keeps these fields when it saves the companion list.
+  Switching TX off under Configuration → Transmit now also stops MeshCore
+  channel messages, DMs and adverts right away (before: only after a
+  restart). Saving MeshCore channels writes them to the companion and
+  reads every slot back before reporting success; if a key or removal
+  didn't stick, the save says so (upstream `6ea8de00`).
 - **MeshCore: hover or tap "Heard N repeats" to see which repeaters.**
   A small popover lists each heard copy's repeater path, with names from
   the local node list where the ID prefix matches one node (else
