@@ -9,8 +9,12 @@
   PR #138; not verified on this fork), linked from the README and hardware
   matrix. The Bobcat guide now has a separate G285 recipe (SPI1, GPIO
   125/122/149; upstream #137) next to the G295 one. The README's RAK
-  WisMesh Pi Node link points to the current RAK6421 store page
-  (upstream `486a2d2e`, `44262226`, `ba50853f`, `c7bf59f4`, `72a9c2cd`).
+  WisMesh Pi Node link points to the current RAK6421 store page. The
+  G285 then got its own guide, `BOBCAT-G285.md` (image-specific microSD/SPI1
+  install, upstream #165), and `BOBCAT-300.md` points there. These guides
+  clone this fork, like the README (upstream `486a2d2e`, `44262226`,
+  `ba50853f`, `c7bf59f4`, `72a9c2cd`, branch `fix/bobcat-g285-docs-
+  reconciliation`: `fd5b4d1d`, `dd834718`).
 - **MeshCore: TCP companions, TX switch, and verified channel saves.**
   A MeshCore companion can now also be reached over TCP (MeshCore on the
   same Pi, or a companion with WiFi firmware), set per companion in

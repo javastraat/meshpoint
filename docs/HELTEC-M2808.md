@@ -48,7 +48,7 @@ proceeding — the concentrator bus is available out of the box.
 ```bash
 sudo apt update
 sudo apt install -y git
-sudo git clone https://github.com/KMX415/meshpoint.git /opt/meshpoint
+sudo git clone https://github.com/javastraat/meshpoint.git /opt/meshpoint
 ```
 
 Run the installer. **Do not reboot** when it finishes (you still need config):

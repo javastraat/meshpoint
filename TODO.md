@@ -288,22 +288,8 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
       `ONBOARDING`, `DASHBOARD-ACCESS` (with 37c/37d), `docs/README.md` index.
 - [ ] **45. Stats reporter test timing** (S, `4f62d644`): make `tests/test_stats_reporter.py` deterministic like theirs;
       only if our test is flaky.
-- [ ] **48. `c2e6c495` Malformed Meshtastic channel key at startup** (M, 9 files + test 85). **Real bug here too, only on
-      their `feat/v0.8.1` branch (not in main yet).** Ours: `CryptoService.add_channel_key()` does
-      `base64.b64decode(key_b64)` without checking, so a wrong Base64 PSK in `local.yaml` raises at startup. Theirs:
-      `decode_channel_psk()` (strict, whitespace-tolerant) and an unusable channel keeps its slot (`None`) so the other
-      channel indices don't shift; `get_all_keys()` returns slots with `None`; MeshCore keys go to their own list
-      (`add_meshcore_channel_key`) instead of being re-encoded as Base64 (`coordinator.py` lines ~681-684 now do
-      `binascii.unhexlify` + `b64encode`); `config_routes.py`, `tx_service.py`, `channel_hash_resolver.py`,
-      `channels_card.js` skip or flag the dead slot. Test: `tests/test_channel_key_startup.py`. First write a test that
-      shows the crash, then port. Because KMX keeps working on `feat/v0.8.1`, look at that branch every round.
-- [ ] **49. Bobcat G285 docs branch** (S, `fd5b4d1d` + `dd834718`, branch `upstream/fix/bobcat-g285-docs-reconciliation`,
-      not merged into their main). New `docs/BOBCAT-G285.md` (417 lines), reworked `BOBCAT-300.md`, README and
-      HARDWARE-MATRIX. Merge with item 33 (`c7bf59f4`) so we do the G285 docs once.
-- [ ] **50. Smaller things inside `b91d994b` and README** (S): `.github/SECURITY.md` (+20 lines: what the Viewer and
-      the terminal opt-in mean), README (+57 lines: optional apps, themes, dashboard access, USB nodes), and
-      `src/transmit/meshcore_tx_client.py` (+3: takes the shared command lock, check against our item 26 version).
-      Also `.github/` CI files of the release candidate: read once, take what fits our CI.
+- [ ] **46. Check the rest of their `tests/frontend/*.test.cjs` and plugin docs** (`471a81da`, `dfe6bcf5`): port the tests
+      that cover code we already have (gps privacy, mqtt topic preview, transmit save, topbar, bootstrap, map tiles).
 - [ ] **47. Plugin pages and plugin store layout** (M-L, `b91d994b`, `ede788c8`, `471a81da`, `622ce563`). They redesigned
       both. Checked 26-11 against `upstream/main`:
   - **Store view** (`css/plugin_store.css`, `js/settings/plugin_catalog.js`, `plugin_store_data.js`, markup in
@@ -325,8 +311,29 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
     needed unless a plugin page fails to load.
   - Check with screenshots (dark, light, mobile) before and after. The theme editor page uses the same shell
     (`.theme-editor`).
-- [ ] **46. Check the rest of their `tests/frontend/*.test.cjs` and plugin docs** (`471a81da`, `dfe6bcf5`): port the tests
-      that cover code we already have (gps privacy, mqtt topic preview, transmit save, topbar, bootstrap, map tiles).
+- [ ] **48. `c2e6c495` Malformed Meshtastic channel key at startup** (M, 9 files + test 85). **In progress 26-11.**
+      A real bug here too, only on their `feat/v0.8.1` branch (not in their main yet). Ours:
+      `CryptoService.add_channel_key()` does `base64.b64decode(key_b64)` without checking, so a wrong Base64 PSK in
+      `local.yaml` raises at startup; the Channels editor (`PUT /api/config/channels`) saves the bad key to disk first
+      and then fails, so the next restart crashes too. Theirs: `decode_channel_psk()` (strict, whitespace-tolerant);
+      an unusable channel keeps its slot (`None`) so the other channel indices don't shift, `get_all_keys()` returns
+      slots with `None`; MeshCore keys go to their own list (`add_meshcore_channel_key`) instead of being re-encoded as
+      Base64 (so a MeshCore key with the same name can't overwrite a broken slot); TX on a dead slot is refused
+      (`tx_service.py`: `_resolve_channel` raises for an unknown or dead channel, no silent fallback to the primary key);
+      the editor rejects a bad key with 400 before saving; the card shows "Channel unavailable. Enter its Base64 PSK."
+      (`config_routes.py`, `channel_hash_resolver.py`, `meshtastic_decoder.py`, `coordinator.py`, `channels_card.js`).
+      Test first: `tests/test_channel_key_startup.py` is written (10 tests, all fail on current code); then port.
+      Their patch does not apply cleanly (3-way conflicts in `config_routes.py`, `coordinator.py`, `tx_service.py`).
+      Because KMX keeps working on `feat/v0.8.1`, look at that branch every round.
+- [x] **49. Bobcat G285 docs branch** (S, `fd5b4d1d` + `dd834718`, branch `upstream/fix/bobcat-g285-docs-reconciliation`,
+      not merged into their main). New `docs/BOBCAT-G285.md` (417 lines), reworked `BOBCAT-300.md`, README and
+      HARDWARE-MATRIX. Merge with item 33 (`c7bf59f4`) so we do the G285 docs once.
+      → Done 26-11 on top of item 33: `BOBCAT-G285.md` added, BOBCAT-300 points there (both patches applied), README and
+        HARDWARE-MATRIX by hand. Clone URL in BOBCAT-300, BOBCAT-G285 and HELTEC-M2808 set to javastraat/meshpoint.
+- [ ] **50. Smaller things inside `b91d994b` and README** (S): `.github/SECURITY.md` (+20 lines: what the Viewer and
+      the terminal opt-in mean), README (+57 lines: optional apps, themes, dashboard access, USB nodes), and
+      `src/transmit/meshcore_tx_client.py` (+3: takes the shared command lock, check against our item 26 version).
+      Also `.github/` CI files of the release candidate: read once, take what fits our CI.
 
 The tables below are the full inventory (incl. what we already have and what we skip).
 
