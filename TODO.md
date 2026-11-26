@@ -109,20 +109,27 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
 
 ### C. Messages and channels
 
-- [ ] **15. `121c2d3a` Keep received channel numbers** (S, 7 + test 37). A received message keeps its channel
+- [x] **15. `121c2d3a` Keep received channel numbers** (S, 7 + test 37). A received message keeps its channel
       index. `src/api/server.py`.
+      → Done 26-11: `message_channel` in `_setup_message_interception`, passed to `save_received`. Test
+        `tests/test_received_message_channel.py` (unittest, not upstream's pytest).
 - [ ] **16. `ffea55fd` Native channel routing and acknowledgements** (M, 41 + test 92). Replies go out on the right
       channel; Meshtastic ACKs aren't lost. `src/api/routes/messages.py`, `server.py`, `src/decode/meshtastic_decoder.py`
       (skip their `PIMESH.md`).
+      → Checked 26-11: everything except the `channel=` fix (done in 15) is meshtasticd/PiMesh (API decode of
+        `requestId`/routing, `channel_index` from the Phone API, PiMesh channel list). Do it with 38/39.
 - [ ] **17. `8ba70630` MQTT topic preview and LongTurbo** (M, 59 + tests 106). The MQTT settings preview shows the
       right topic; the LongTurbo preset resolves to the right channel. `mqtt_card.js`, `mqtt_config_routes.py`,
       `channel_resolver.py`, `mqtt_formatter.py`, `mqtt_publisher.py`.
 - [ ] **18. `4439c2a8` MeshCore contact positions to Meshradar** (M, 120 + tests 155). Positions of MeshCore contacts
       are stored on the node and sent upstream. New `src/models/meshcore_position.py`, `node_repository.py`,
       `upstream_client.py`, `coordinator.py`, `meshcore_event_adapter.py`.
-- [ ] **19. `5a9383d2` Registered-pin position privacy** (M, 35 + tests 123). With "registered pin" chosen, the
+- [x] **19. `5a9383d2` Registered-pin position privacy** (M, 35 + tests 123). With "registered pin" chosen, the
       broadcaster sends the pin, never the live GPS. We have the option in `mesh_position_resolver.py` and
       `gps_card.js`: check where ours still leaks. Also `broadcast_interval.py`, `position_broadcaster.py`.
+      → Done 26-11: patch applied (resolver, schedule `mark_attempt`, GPS card, CONFIGURATION.md, tests); default.yaml
+        comment by hand; frontend test ported. rakv21 has no `position:` section: on the defaults it now sends
+        approximate instead of exact (told Einstein; `location_precision: exact` keeps the old behaviour).
 
 ### D. Dashboard and status
 

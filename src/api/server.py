@@ -1748,11 +1748,16 @@ def _setup_message_interception(
             or dest == "self"
         )
 
+        # The channel index of a received channel message, stored with it
+        # (upstream 121c2d3a); stays 0 for DMs and unmapped/named buckets.
+        message_channel = 0
+
         if is_broadcast:
             if our_node_hex and source == our_node_hex:
                 return
             if packet.protocol == Protocol.MESHCORE:
                 ch_idx = packet.channel_hash or 0
+                message_channel = ch_idx
                 node_id = f"broadcast:{packet.protocol.value}:{ch_idx}"
             elif packet.remote_channel_name:
                 # A capture source (Meshtastic USB stick) decoded this
@@ -1767,6 +1772,7 @@ def _setup_message_interception(
                 # or index-based match that could silently misroute.
                 _idx = name_to_channel_index.get(packet.remote_channel_name)
                 if _idx is not None:
+                    message_channel = _idx
                     node_id = f"broadcast:{packet.protocol.value}:{_idx}"
                 else:
                     node_id = (
@@ -1776,6 +1782,7 @@ def _setup_message_interception(
             else:
                 ch_idx = channel_hash_resolver.lookup(packet.channel_hash)
                 if ch_idx is None and packet.matched_channel_index is not None:
+                    message_channel = packet.matched_channel_index
                     # Hash doesn't match any locally-computed name+key
                     # combo, but the packet still decrypted with one of
                     # our configured keys -- the remote side just named
@@ -1797,6 +1804,7 @@ def _setup_message_interception(
                         f"unmapped:0x{packet.channel_hash:02x}"
                     )
                 else:
+                    message_channel = ch_idx
                     node_id = f"broadcast:{packet.protocol.value}:{ch_idx}"
             direction = "received"
         elif is_for_us:
@@ -1901,6 +1909,7 @@ def _setup_message_interception(
                 protocol=packet.protocol.value,
                 packet_id=packet.packet_id or "",
                 direction=direction,
+                channel=message_channel,
                 rssi=rssi,
                 snr=snr,
             )

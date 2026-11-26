@@ -4,6 +4,21 @@
 
 #### Upstream sync
 
+- **Fix: the mesh position privacy setting was ignored with a fixed pin.**
+  With `transmit.position.coordinate_source: static` (the default) the
+  Meshpoint always broadcast its exact pin, whatever
+  `location_precision` said; that setting only worked for live GPS. It now
+  applies to both. **The default is `approximate`**, so a Meshpoint on the
+  defaults now broadcasts its pin rounded to two decimals (about a 1 km
+  grid) instead of exactly; set `location_precision: exact` to keep the old
+  behaviour. Configuration → GPS always shows the setting. A skipped
+  broadcast ("none" or no coordinates) now also waits a full interval
+  before trying again (upstream `5a9383d2`).
+- **Fix: received channel messages were all stored as channel 0.** The
+  conversation knew the channel (broadcast:<protocol>:<index>), but the
+  message row itself always said channel 0; now it stores the real index
+  (MeshCore, Meshtastic by hash, USB-node channel name, keyed channels).
+  DMs and unmapped channels stay 0 (upstream `121c2d3a`).
 - **MeshCore USB companions: steadier connection.** Restarting message
   fetching after a send no longer stacks up an extra subscription each time
   (the library's start isn't idempotent). On CP210x USB bridges (older
