@@ -217,8 +217,7 @@ class MessagingChat {
                 const label = `Heard ${n} repeat${n === 1 ? '' : 's'}`;
                 // A button: hover/tap shows which repeaters (upstream a451d1e2).
                 repeat = ` · <button type="button" class="msg-heard" aria-haspopup="dialog" aria-expanded="false"`
-                    + ` aria-label="${label}. Show heard paths"`
-                    + ` title="Repeated copies heard by this Meshpoint's own radio; not a delivery confirmation or a count of unique repeaters">${label}</button>`;
+                    + ` aria-label="${label}. Show heard paths">${label}</button>`;
             }
         }
         return `${time}${status ? ' · ' + this._esc(status) : ''}${repeat}${this._buildSignalHtml(msg)}`;
@@ -728,7 +727,7 @@ class MessagingChat {
         panel.id = 'msg-heard-paths';
         panel.setAttribute('role', 'dialog');
         panel.setAttribute('aria-label', 'Heard paths');
-        panel.innerHTML = '<header class="msg-paths__header"><strong>Heard paths</strong><button type="button" class="msg-paths__close" aria-label="Close heard paths"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 4 8 8M12 4l-8 8"/></svg></button></header><div class="msg-paths__body" aria-live="polite"><p class="msg-paths__empty">Loading saved paths…</p></div><footer>Signal received here · names matched locally.</footer>';
+        panel.innerHTML = '<header class="msg-paths__header"><strong>Heard paths</strong><button type="button" class="msg-paths__close" aria-label="Close heard paths"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 4 8 8M12 4l-8 8"/></svg></button></header><div class="msg-paths__body" aria-live="polite"><p class="msg-paths__empty">Loading saved paths…</p></div><footer>Copies heard by this Meshpoint\'s own radio, not unique repeaters or delivery. Signal received here · names matched locally.</footer>';
         this._pathPanel = panel;
         document.body.appendChild(panel);
         panel.querySelector('.msg-paths__close').addEventListener('click', () => {
