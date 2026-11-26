@@ -4,6 +4,13 @@
 
 #### Upstream sync
 
+- **Relay: no more relaying our own packets, and relays carry our ID.**
+  The native relay could forward a Meshtastic packet this Meshpoint sent
+  itself when it heard it back; those are now skipped (`own_packet`). A
+  relayed packet now carries this node as the last relayer (header byte
+  15), instead of the previous relayer's byte, so other nodes see who
+  really passed it on. Source, packet ID, channel, next hop and payload
+  stay untouched (upstream `f4d19492`, #175/#182).
 - **Fix: after "Restart concentrator" nothing was received any more.** The
   restart ended the receive loop for good, so the gateway stayed deaf
   until meshpoint itself was restarted. The loop now waits while the

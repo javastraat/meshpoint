@@ -75,9 +75,10 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
       and a transmit waits until the radio is done before RX resumes. New `src/hal/sx1302_access.py`, changes in
       `sx1302_wrapper.py` and `src/transmit/tx_service.py`. We have a `_hal_lock` already: compare carefully.
       Pi: send messages while traffic comes in, no lost packets or hangs.
-- [ ] **12. `f4d19492` Own Meshtastic packets and relay identity** (S-M, 23 + test 40). The relay doesn't relay what
+- [x] **12. `f4d19492` Own Meshtastic packets and relay identity** (S-M, 23 + test 40). The relay doesn't relay what
       it sent itself, and relayed packets carry our node ID as relay node. `src/relay/relay_manager.py`,
       `tx_service.py`. Applies cleanly. Pi: relay on, no echoes of our own packets.
+      → Done 26-11: applied as-is (our files matched upstream's pre-change versions).
 - [ ] **13. `ebbf6eb3` Gateway detection on a fresh install** (M, 93 + tests 179). The setup wizard probes the HAL
       version with a time limit instead of hanging. `src/cli/hardware_detect.py`, `hardware_probe.py`,
       `setup_wizard.py`. Pi: only testable on a fresh SD card; otherwise unit tests.
