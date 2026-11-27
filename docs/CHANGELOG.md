@@ -86,6 +86,10 @@
   connection now waits 3 s after closing the live one before the reset
   pulse, 3 s after the pulse before opening, and 1 s before the retry with
   DTR inverted (as the meshcore library does itself).
+- **Update progress at the top.** Settings → Updates shows the progress of
+  an apply or rollback (steps, live output) at the top of the page and
+  scrolls to it, instead of below "Automatic checks" where it was easy to
+  miss. Release notes and the update log stay below.
 - **Thin scrollbars everywhere; small "24h / total" labels.** Every page,
   core and plugin, gets thin scrollbars in theme colours instead of the
   browser's bright default track (Dashboard Nodes list, packet table, plugin

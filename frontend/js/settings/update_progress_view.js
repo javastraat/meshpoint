@@ -69,6 +69,11 @@ class UpdateProgressView {
         `;
         this._appendTerminalLine('Waiting for first step…', 'info');
         this._startElapsedClock();
+        // The panel sits at the top of the Updates page; bring it into view
+        // in case the page was scrolled (Apply/Rollback are further down).
+        if (typeof this.root.scrollIntoView === 'function') {
+            this.root.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
     }
 
     onStreamEvent(event) {

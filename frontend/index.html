@@ -730,6 +730,9 @@
                         <h2 class="update-panel__title">Updates</h2>
                         <p class="update-panel__subtitle">Pin the install tree to a release channel and apply changes from the dashboard.</p>
                     </header>
+                    <!-- Progress of a running apply/rollback: at the top, where you look after clicking
+                         Apply (hidden when nothing runs). Release notes and the log stay below. -->
+                    <section class="update-progress" data-update-progress hidden aria-live="polite"></section>
                     <article class="update-card">
                         <div class="update-card__row">
                             <label class="update-field">
@@ -794,7 +797,6 @@
                             <p class="cfg-status" data-update-auto-status aria-live="polite"></p>
                         </form>
                     </article>
-                    <section class="update-progress" data-update-progress hidden aria-live="polite"></section>
                     <section class="update-release-notes" data-update-release-notes aria-live="polite"></section>
                     <section class="update-log" data-update-log></section>
                 </div>
