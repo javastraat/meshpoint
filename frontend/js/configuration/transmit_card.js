@@ -128,14 +128,17 @@ class TransmitConfigCard {
             relay,
         };
         this._setStatus('pending', 'Saving…');
-        const txResult = await this._api.put('/api/config/transmit', payload);
+        // A rejected request must end in an error too, not stay on "Saving…"
+        // (upstream 553bdd83). Our panel's put() returns null rather than
+        // throwing today; this keeps the card right if that ever changes.
+        const txResult = await this._putOrNull('/api/config/transmit', payload);
         if (!txResult) {
             this._setStatus('error', 'Transmit save failed.');
             return;
         }
 
         if (Object.keys(filters).length) {
-            const relayResult = await this._api.put('/api/config/relay', filters);
+            const relayResult = await this._putOrNull('/api/config/relay', filters);
             if (!relayResult) {
                 this._setStatus('error', 'Relay filter save failed.');
                 return;
@@ -177,6 +180,14 @@ class TransmitConfigCard {
             return null;
         }
         return filters;
+    }
+
+    async _putOrNull(url, payload) {
+        try {
+            return await this._api.put(url, payload);
+        } catch (_error) {
+            return null;
+        }
     }
 
     _setStatus(kind, message) {

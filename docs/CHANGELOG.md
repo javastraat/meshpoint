@@ -71,6 +71,40 @@
   sticks). `SECURITY.md` explains what the Viewer role, the web terminal
   switches and plugin sources mean here (upstream `58e4e9b1`, `4ad2903f`,
   `b91d994b`).
+- **MeshCore: one command at a time per companion.** Sends, adverts,
+  contacts, repeater polls, channel sync, renames, device queries and the
+  health probe used to overlap on the companion's serial line, so the
+  library could take another command's reply or time out, and a timeout
+  made Meshpoint reconnect the companion. They now take turns on one lock
+  per companion, shared by the TX client and that companion's capture
+  source; a radio change holds it for the whole set-and-reboot. A send
+  during a repeater poll waits for the poll to finish (upstream
+  `b91d994b`, `6ea8de00`).
+- **Docs: dashboard access, docs index, more common errors and FAQ.**
+  New `docs/DASHBOARD-ACCESS.md` (administrator vs. Viewer, enabling a
+  Viewer, the switches only the device can set; no public view in this
+  fork) and a `docs/README.md` index of all guides. COMMON-ERRORS gains:
+  Viewer gets 403, restore rejecting symlinks and other non-regular
+  members, USB `Permission denied` after the `0660`/`dialout` rule, a
+  Meshtastic USB node that keeps retrying while the rest runs, and the
+  REBOOTING/RECONNECTING pill after Set Preset. FAQ: adding USB radios,
+  the USB workaround for a second preset, plugins are optional, Viewer as
+  read-only login, and MeshCore over TCP is now a yes. ONBOARDING: adding
+  a Meshtastic USB radio and optional extras (upstream `b91d994b` and the
+  v0.8.0 docs; their public-view, nRF DFU, PiMesh and P25 parts left out).
+- **Stats: range follows a km/mi switch at once; small frontend fixes.**
+  The Range cards (direct, mesh, MeshCore) redraw as soon as the distance
+  unit changes instead of on the next poll. The packet detail popup shows
+  `n/a` instead of "0.000 MHz · SF0 · BW0" for MeshCore packets stored
+  before the receiver snapshot. Transmit settings end in "Transmit save
+  failed." when a request is rejected instead of staying on "Saving…".
+  More tests: top-bar MeshCore badges, MeshCore send feedback in the chat,
+  and an audit that every write route in the app needs an admin or a
+  write-checked session, also on newer FastAPI (upstream `b91d994b`,
+  `553bdd83`, `471a81da`, `fc15bc36`).
+- **CI: frontend tests and `httpx2`.** CI also runs the Node frontend tests
+  and installs `httpx2`, which newer starlette's TestClient needs; ruff
+  stays pinned at 0.15.1 (upstream release-candidate CI).
 - **Node list can sort by packets.** "Sort: Packets" puts the busiest nodes
   first (nodes without packets last, ties by last heard; favourites stay on
   top). Comparator by yourasmit15-web, upstream PR #128 (upstream `b91d994b`).

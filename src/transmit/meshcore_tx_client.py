@@ -472,6 +472,13 @@ class MeshCoreTxClient:
         self._source = None
         self._post_command_callback = None
         self._device_info_cache: Optional[DeviceInfo] = None
+        # One command at a time on the companion's line (upstream b91d994b):
+        # a send, a contacts refresh, a repeater poll and the source's health
+        # probe used to interleave, so the library could take another
+        # command's reply or time out (and a timeout reconnects). Shared with
+        # the bound capture source (set_source). Not reentrant: the post-
+        # command callback (restart_auto_fetching) runs after release.
+        self._cmd_lock = asyncio.Lock()
 
     @property
     def _mc(self):
@@ -492,6 +499,9 @@ class MeshCoreTxClient:
     def set_source(self, source) -> None:
         """Attach the capture source so we always see live connect state."""
         self._source = source
+        bind_lock = getattr(source, "set_command_lock", None)
+        if callable(bind_lock):
+            bind_lock(self._cmd_lock)
         logger.info("MeshCore TX client bound to live capture source")
 
     def set_connection(self, mc_instance) -> None:
@@ -560,7 +570,8 @@ class MeshCoreTxClient:
             return SendResult(success=False, error="MeshCore TX disabled")
         if not self.connected:
             return SendResult(success=False, error="Not connected")
-        result = await send_mc_channel_message(self._mc, channel, text, feedback, packet_id)
+        async with self._cmd_lock:
+            result = await send_mc_channel_message(self._mc, channel, text, feedback, packet_id)
         await self._run_post_command()
         return result
 
@@ -572,7 +583,8 @@ class MeshCoreTxClient:
             return SendResult(success=False, error="MeshCore TX disabled")
         if not self.connected:
             return SendResult(success=False, error="Not connected")
-        result = await send_mc_direct_message(self._mc, destination, text, feedback, packet_id)
+        async with self._cmd_lock:
+            result = await send_mc_direct_message(self._mc, destination, text, feedback, packet_id)
         await self._run_post_command()
         return result
 
@@ -582,7 +594,8 @@ class MeshCoreTxClient:
             return SendResult(success=False, error="MeshCore TX disabled")
         if not self.connected:
             return SendResult(success=False, error="Not connected")
-        result = await send_companion_advert(self._mc, flood=flood)
+        async with self._cmd_lock:
+            result = await send_companion_advert(self._mc, flood=flood)
         await self._run_post_command()
         return result
 
@@ -605,7 +618,15 @@ class MeshCoreTxClient:
             logger.debug("contact lookup failed for %s", key, exc_info=True)
         if contact is None:
             return {"ok": False, "error": "contact not in companion roster"}
+        try:
+            async with self._cmd_lock:
+                return await self._poll_repeater_locked(key, password, contact)
+        finally:
+            await self._run_post_command()
 
+    async def _poll_repeater_locked(self, key: str, password: str, contact) -> dict:
+        """poll_repeater()'s login/status/telemetry/neighbours sequence; the
+        caller holds the command lock for the whole conversation."""
         # A full copy (not the library's own live reference, which keeps
         # getting mutated in place -- e.g. reset_path() below rewrites
         # out_path fields on this same object) of the raw roster record,
@@ -712,7 +733,6 @@ class MeshCoreTxClient:
                     logger.debug(
                         "reset_path failed for %s", key, exc_info=True,
                     )
-            await self._run_post_command()
         return out
 
     async def set_companion_name(self, name: str) -> SendResult:
@@ -725,7 +745,8 @@ class MeshCoreTxClient:
         """
         if not self.connected:
             return SendResult(success=False, error="Not connected")
-        result = await send_set_companion_name(self._mc, name)
+        async with self._cmd_lock:
+            result = await send_set_companion_name(self._mc, name)
         await self._run_post_command()
         if result.success:
             logger.info("MeshCore companion renamed to %r", (name or "").strip())
@@ -766,7 +787,8 @@ class MeshCoreTxClient:
             return self._device_info_cache
         if not self.connected:
             return None
-        info = await read_device_info(self._mc)
+        async with self._cmd_lock:
+            info = await read_device_info(self._mc)
         if info is not None:
             self._device_info_cache = info
         return info
@@ -793,6 +815,14 @@ class MeshCoreTxClient:
             logger.warning("sync_channels: meshcore library unavailable")
             return
 
+        try:
+            async with self._cmd_lock:
+                await self._sync_channels_locked(channel_keys, verify, EventType)
+        finally:
+            await self._run_post_command()
+
+    async def _sync_channels_locked(self, channel_keys: dict, verify: bool, EventType) -> None:
+        """sync_channels()'s read/write/verify; the caller holds the lock."""
         _MAX_SLOTS = MESHCORE_MAX_DEVICE_SLOTS
 
         # Read current device slots.
@@ -867,13 +897,9 @@ class MeshCoreTxClient:
                 logger.exception("sync_channels: failed to clear slot %d", idx)
 
         if verify:
-            try:
-                await self._verify_channel_slots(desired, EventType)
-            finally:
-                await self._run_post_command()
+            await self._verify_channel_slots(desired, EventType)
             logger.info("sync_channels: done and verified (%d configured)", len(desired))
             return
-        await self._run_post_command()
         logger.info("sync_channels: done (%d configured)", len(desired))
 
     async def _verify_channel_slots(self, desired: list, EventType) -> None:
@@ -908,10 +934,11 @@ class MeshCoreTxClient:
         if not self.connected:
             return []
         try:
-            result = await asyncio.wait_for(
-                self._mc.commands.get_contacts(),
-                timeout=10.0,
-            )
+            async with self._cmd_lock:
+                result = await asyncio.wait_for(
+                    self._mc.commands.get_contacts(),
+                    timeout=10.0,
+                )
             entries = self._normalize_contact_payload(result.payload)
         except Exception:
             logger.exception("Failed to retrieve MeshCore contacts")
@@ -972,9 +999,10 @@ class MeshCoreTxClient:
         if not self.connected:
             return False
         try:
-            result = await asyncio.wait_for(
-                self._mc.commands.add_contact(contact), timeout=10.0,
-            )
+            async with self._cmd_lock:
+                result = await asyncio.wait_for(
+                    self._mc.commands.add_contact(contact), timeout=10.0,
+                )
         except Exception:
             logger.exception(
                 "add_contact failed for %s", contact.get("public_key", "?"),

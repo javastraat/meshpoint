@@ -334,6 +334,15 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
       only if our test is flaky.
 - [ ] **46. Check the rest of their `tests/frontend/*.test.cjs` and plugin docs** (`471a81da`, `dfe6bcf5`): port the tests
       that cover code we already have (gps privacy, mqtt topic preview, transmit save, topbar, bootstrap, map tiles).
+      → 27-11: transmit save (`tests/frontend_transmit_save.test.js` + try/catch in `transmit_card.js`; ours keeps the
+        relay filters), top-bar MeshCore (`frontend_meshcore_topbar.test.js`, our badge-per-companion chip, passed as-is),
+        messaging feedback (`frontend_messaging_feedback.test.js`, upstream's unchanged, passes), stats units
+        (`frontend_stats_range_units.test.js` + live redraw in `stats_tab.js`, also our MeshCore card), packet metadata
+        (`frontend_packet_modal_rf.test.js`: 0 MHz/SF0/BW0 → n/a in the modal; their meshcore_hops shape isn't ours, 27),
+        route audit (`tests/test_write_route_audit.py`, with their newer-FastAPI fix from 471a81da). Skipped:
+        `configuration_navigation` (PiMesh, with 39). Plugin docs: 471a81da's PLUGINS.md text is about their plugin
+        store ("How to enable downloads", RC catalog) → with 47; dfe6bcf5 is their release plan, nothing for us.
+        Bootstrap and map tiles: no upstream test files for those.
 - [ ] **47. Plugin pages and plugin store layout** (M-L, `b91d994b`, `ede788c8`, `471a81da`, `622ce563`). They redesigned
       both. Checked 26-11 against `upstream/main`:
   - **Store view** (`css/plugin_store.css`, `js/settings/plugin_catalog.js`, `plugin_store_data.js`, markup in
@@ -387,6 +396,12 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
         docs (COMMON-ERRORS, FAQ, TROUBLESHOOTING, ONBOARDING, DASHBOARD-ACCESS, docs/README.md). `SECURITY.md`
         (Einstein 26-11: 1a, 2a): reports now go through GitHub private vulnerability reporting on javastraat/meshpoint,
         supported 0.8.x. Einstein must switch that reporting on in the repo settings.
+      → 27-11: CI done (`httpx2`, Node frontend-test step, ruff stays 0.15.1; 5 lint errors of ours fixed). Docs done:
+        own `DASHBOARD-ACCESS.md` (admin/Viewer only) and `docs/README.md` index; COMMON-ERRORS +5 entries (Viewer 403,
+        restore non-regular member, USB permission after the dialout rule, serial retry, REBOOTING after Set Preset;
+        their GPS entry we already had); FAQ (USB radios, USB preset workaround, plugins optional, Viewer, TCP now yes);
+        ONBOARDING (Meshtastic USB radio, optional extras). Left out: public view, esptool-in-venv, nRF DFU touch,
+        P25/DAPNET/Flock, Reticulum radio test, their "v0.8.0 development checks", PiMesh/WisMesh notes. Open: 50a.
   - [ ] **50a. MeshCore command serialization** (M, found 27-11; do after the rest of 50 and 46). Upstream's "+3 lines"
         in `set_source()` bind a `_cmd_lock` they built earlier; we have none. Upstream: every TX-client command
         (send, contacts, repeater poll, channel sync, name/radio) runs under one `asyncio.Lock`, shared with each
@@ -394,6 +409,12 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
         serial line, the library can pick up the other command's response or time out, and a timeout triggers a
         reconnect. Port: lock on the client, shared per companion, around every command and the probe; tests for
         "two commands wait for each other" and "no deadlock when one command calls another". Pi test on rakv21.
+        → 27-11: `_cmd_lock` on `MeshCoreTxClient`, shared via `set_source()` → `set_command_lock()`; around sends, advert,
+          rename, device info, contacts, add_contact, the whole repeater poll and channel sync (read/write/verify). The
+          source takes it for the health probe (as upstream) and, unlike upstream, also for its own per-companion
+          sends/advert/rename/device info, the whole exclusive radio change, and `restart_auto_fetching` (stop/start
+          talk to the companion too; post-command callbacks run after release, so no deadlock). Test
+          `tests/test_meshcore_command_lock.py` (4 of 6 fail on the old code). Still to do: the Pi test.
 
 ### Last step (when everything above is done)
 

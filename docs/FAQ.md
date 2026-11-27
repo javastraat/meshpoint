@@ -1,8 +1,10 @@
 # FAQ
 
 Quick answers to questions that come up often. For setup walkthroughs see
-[Onboarding](ONBOARDING.md), for error catalogs see [Common Errors](COMMON-ERRORS.md),
+[Onboarding](ONBOARDING.md), for USB radios see [USB nodes](USB-NODES.md),
+for error catalogs see [Common Errors](COMMON-ERRORS.md),
 and for config syntax see [Configuration](CONFIGURATION.md).
+For a full guide index, see [Documentation](README.md).
 
 ---
 
@@ -112,16 +114,34 @@ the old SD card first if you want it gone for good.
 
 ## Can I listen to multiple modem presets (LongFast, MediumFast, etc.) at once?
 
-**No, not today.** Pick **one** modem preset in **Configuration → Radio**
-(region, frequency, bandwidth, spreading factor). The SX1302 runs eight
-demod chains on **that** channel plan so you still hear nodes using
-different spreading factors (SF7-SF12) on the same frequency and bandwidth.
+**Not on one concentrator.** Pick **one** modem preset in
+**Configuration → Radio** (region, frequency, bandwidth, spreading factor).
+The SX1302 runs eight demod chains on **that** channel plan so you still
+hear nodes using different spreading factors (SF7-SF12) on the same
+frequency and bandwidth.
 
 A Meshtastic **preset** is not just SF: it is frequency plus bandwidth plus
 spreading factor (LongFast, MediumFast, ShortFast, and so on). You cannot
 monitor multiple presets or multiple frequencies on one concentrator at the
 same time. Multi-preset / multi-frequency capture is on the roadmap and is
 limited by concentrator hardware, not missing UI.
+
+**USB workaround:** attach a Meshtastic USB node and set **its** preset on
+**Configuration → Serial**, while the concentrator stays on LongFast. Full
+steps: [USB nodes](USB-NODES.md).
+
+If your local MediumFast mesh uses the same frequency and bandwidth as
+LongFast, the concentrator already hears its SF and you may not need the
+extra node.
+
+---
+
+## How do I add a USB Meshtastic or MeshCore radio?
+
+See [USB nodes](USB-NODES.md). Meshtastic USB nodes go on
+**Configuration → Serial**, MeshCore companions on
+**Configuration → MeshCore**. When two USB radios are plugged in, pin both
+ports (prefer `/dev/serial/by-path/…`).
 
 ---
 
@@ -167,9 +187,29 @@ database.
 
 ## Can the MeshCore companion talk to Meshpoint over TCP instead of USB?
 
-Not yet. Currently MeshCore companions must be USB serial. TCP support
-would allow the companion to live somewhere else on the network with its
-own antenna, separate from the concentrator antenna. It is on the roadmap.
+Yes. Under `capture.meshcore_usb` in `local.yaml`, set
+`connection_type: tcp` with `tcp_host` and `tcp_port` (default
+`127.0.0.1:5000`). That works for MeshCore running on the same Pi or a
+companion with WiFi elsewhere on the network, with its own antenna. See
+[USB nodes](USB-NODES.md) for the yaml.
+
+---
+
+## Do I need plugins for Meshtastic or MeshCore?
+
+No. Meshtastic and MeshCore capture, messaging and the map are part of
+Meshpoint itself. Plugins (SDR decoders, Reticulum and so on) are optional
+extras you pick one by one. See [Plugins](PLUGINS.md).
+
+---
+
+## Can I give someone a read-only dashboard login?
+
+Yes: a **Viewer** login (Settings → Auth). A Viewer sees the dashboard,
+stats, messages and radio pages but can't change anything; every write
+needs an administrator session. A Viewer does read your conversations, so
+only give it to people you trust with them. See
+[Dashboard access](DASHBOARD-ACCESS.md).
 
 ---
 

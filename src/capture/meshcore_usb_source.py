@@ -127,6 +127,12 @@ class MeshcoreUsbCaptureSource(CaptureSource):
         self._send_feedback = None
         # restart_auto_fetching() runs after every send; serialize it.
         self._auto_fetch_lock = asyncio.Lock()
+        # One command at a time on this companion's line (upstream
+        # b91d994b): the health probe, this source's own commands and
+        # auto-fetch restarts take it, and the TX client bound to this
+        # source shares it (set_command_lock). Not reentrant: never call
+        # restart_auto_fetching() or another locked method while holding it.
+        self._command_lock = asyncio.Lock()
         # Live Configuration -> Transmit switch, set by the server (see
         # MeshCoreTxClient.tx_enabled_provider): this companion's own sends
         # (fan-out channel messages, per-companion DMs and adverts).
@@ -467,19 +473,28 @@ class MeshcoreUsbCaptureSource(CaptureSource):
         return (now - self._last_event_at) < _RECENT_EVENT_HEALTHY_WINDOW_SECONDS
 
     async def _check_health(self) -> bool:
-        """Send a device query and verify we get a response."""
+        """Send a device query and verify we get a response. Waits for a
+        running command first, so the probe never answers in its place."""
         if not self._meshcore:
             return False
         try:
             from meshcore import EventType
 
-            result = await asyncio.wait_for(
-                self._meshcore.commands.send_device_query(),
-                timeout=_HEALTH_CHECK_TIMEOUT_SECONDS,
-            )
+            async with self._command_lock:
+                if not self._meshcore:
+                    return False
+                result = await asyncio.wait_for(
+                    self._meshcore.commands.send_device_query(),
+                    timeout=_HEALTH_CHECK_TIMEOUT_SECONDS,
+                )
             return result.type != EventType.ERROR
         except Exception:
             return False
+
+    def set_command_lock(self, lock: asyncio.Lock) -> None:
+        """Share the TX client's command lock (upstream b91d994b), so its
+        commands, this source's commands and the health probe take turns."""
+        self._command_lock = lock
 
     def _check_usb_presence(self) -> None:
         """USB companion unplugged? Reconnect now instead of waiting for the
@@ -611,7 +626,8 @@ class MeshcoreUsbCaptureSource(CaptureSource):
             return self._device_info_cache
         if not self._meshcore:
             return None
-        info = await read_device_info(self._meshcore)
+        async with self._command_lock:
+            info = await read_device_info(self._meshcore)
         if info is not None:
             self._device_info_cache = info
         return info
@@ -661,7 +677,8 @@ class MeshcoreUsbCaptureSource(CaptureSource):
         """
         if not self.connected:
             return SendResult(success=False, error="Not connected")
-        result = await send_set_companion_name(self._meshcore, name)
+        async with self._command_lock:
+            result = await send_set_companion_name(self._meshcore, name)
         if result.timed_out:
             self._trigger_reconnect("set_name timed out")
             return result
@@ -702,15 +719,19 @@ class MeshcoreUsbCaptureSource(CaptureSource):
         if not self.connected:
             return SendResult(success=False, error="Not connected")
 
-        port = await self._detach_for_exclusive_radio_apply()
-        if not port:
-            await self._reattach_after_exclusive_radio_apply()
-            return SendResult(success=False, error="MeshCore serial port not resolved")
+        # Held for the whole detach -> set -> reboot -> verify: nothing else
+        # may talk to this companion meanwhile (it would find no handle, or
+        # the exclusive connection's port in use).
+        async with self._command_lock:
+            port = await self._detach_for_exclusive_radio_apply()
+            if not port:
+                await self._reattach_after_exclusive_radio_apply()
+                return SendResult(success=False, error="MeshCore serial port not resolved")
 
-        try:
-            return await self._apply_radio_params_exclusive(port, freq, bw, sf, cr)
-        finally:
-            await self._reattach_after_exclusive_radio_apply()
+            try:
+                return await self._apply_radio_params_exclusive(port, freq, bw, sf, cr)
+            finally:
+                await self._reattach_after_exclusive_radio_apply()
 
     async def _detach_for_exclusive_radio_apply(self) -> Optional[str]:
         """Hand the serial port over from this source's own live
@@ -861,7 +882,8 @@ class MeshcoreUsbCaptureSource(CaptureSource):
             return SendResult(success=False, error="MeshCore TX disabled")
         if not self.connected:
             return SendResult(success=False, error="Not connected")
-        result = await send_companion_advert(self._meshcore, flood=flood)
+        async with self._command_lock:
+            result = await send_companion_advert(self._meshcore, flood=flood)
         if result.timed_out:
             self._trigger_reconnect("advert send timed out")
             return result
@@ -881,9 +903,10 @@ class MeshcoreUsbCaptureSource(CaptureSource):
             return SendResult(success=False, error="MeshCore TX disabled")
         if not self.connected:
             return SendResult(success=False, error="Not connected")
-        result = await send_mc_direct_message(
-            self._meshcore, destination, text, self._send_feedback, packet_id,
-        )
+        async with self._command_lock:
+            result = await send_mc_direct_message(
+                self._meshcore, destination, text, self._send_feedback, packet_id,
+            )
         if result.timed_out:
             self._trigger_reconnect("direct message send timed out")
             return result
@@ -896,9 +919,10 @@ class MeshcoreUsbCaptureSource(CaptureSource):
             return SendResult(success=False, error="MeshCore TX disabled")
         if not self.connected:
             return SendResult(success=False, error="Not connected")
-        result = await send_mc_channel_message(
-            self._meshcore, channel, text, self._send_feedback, packet_id,
-        )
+        async with self._command_lock:
+            result = await send_mc_channel_message(
+                self._meshcore, channel, text, self._send_feedback, packet_id,
+            )
         if result.timed_out:
             self._trigger_reconnect("channel message send timed out")
             return result
@@ -913,7 +937,9 @@ class MeshcoreUsbCaptureSource(CaptureSource):
         so restarting without stopping first piled up fetch subscriptions
         after every send (upstream b91d994b).
         """
-        async with self._auto_fetch_lock:
+        # Command lock first (stop/start talk to the companion), then the
+        # auto-fetch lock; callers must not hold the command lock.
+        async with self._command_lock, self._auto_fetch_lock:
             mc = self._meshcore
             if not (mc and self._connected):
                 return

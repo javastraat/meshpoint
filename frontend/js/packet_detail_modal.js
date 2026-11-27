@@ -215,9 +215,12 @@ class PacketDetailModal {
         const sig = packet.signal || {};
         const rssi = sig.rssi != null ? sig.rssi : packet.rssi;
         const snr = sig.snr != null ? sig.snr : packet.snr;
-        const freq = sig.frequency_mhz != null ? sig.frequency_mhz : packet.frequency_mhz;
-        const sf = sig.spreading_factor != null ? sig.spreading_factor : packet.spreading_factor;
-        const bw = sig.bandwidth_khz != null ? sig.bandwidth_khz : packet.bandwidth_khz;
+        // 0 = not reported (e.g. MeshCore rows stored before the receiver
+        // snapshot), same as the feed table: "n/a", not "0.000 MHz · SF0".
+        const reported = (v) => (v != null && Number(v) !== 0 ? v : null);
+        const freq = reported(sig.frequency_mhz != null ? sig.frequency_mhz : packet.frequency_mhz);
+        const sf = reported(sig.spreading_factor != null ? sig.spreading_factor : packet.spreading_factor);
+        const bw = reported(sig.bandwidth_khz != null ? sig.bandwidth_khz : packet.bandwidth_khz);
         const protocol = (packet.protocol || '').toLowerCase();
         const cr = sig.coding_rate || packet.coding_rate;
 

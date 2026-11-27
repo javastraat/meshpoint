@@ -34,6 +34,17 @@ class StatsTab {
         this._rendered = false;
         this._statusStrip = null;
         this._fetchedAt = null;
+        // Last range data, so a km/mi switch redraws the range cards at once
+        // instead of on the next poll (upstream b91d994b).
+        this._rangeData = null;
+        this._mcRangeData = null;
+        if (window.MeshpointDisplayUnits) {
+            window.MeshpointDisplayUnits.onChange(() => {
+                if (!this._rendered) return;
+                if (this._rangeData) this._updateRange(...this._rangeData);
+                if (this._mcRangeData) this._updateMeshCoreRange(...this._mcRangeData);
+            });
+        }
     }
 
     async refresh() {
@@ -438,6 +449,7 @@ class StatsTab {
     }
 
     _updateRange(live, farthestMesh) {
+        this._rangeData = [live, farthestMesh];
         const fd = live.farthest_direct;
         if (fd && fd.miles > 0) {
             const formatted = MeshpointDisplayUnits.formatDistanceKm(fd.miles * 1.60934) || `${fd.miles.toFixed(1)} mi`;
@@ -467,6 +479,7 @@ class StatsTab {
     }
 
     _updateMeshCoreRange(farthest) {
+        this._mcRangeData = [farthest];
         if (farthest && farthest.miles > 0) {
             const formatted = MeshpointDisplayUnits.formatDistanceKm(farthest.miles * 1.60934) || `${farthest.miles.toFixed(1)} mi`;
             this._setText('ss-mc-mi', formatted);

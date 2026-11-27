@@ -359,6 +359,28 @@ sudo usermod -a -G spi meshpoint
 sudo systemctl restart meshpoint
 ```
 
+### `Permission denied` on a USB node's serial port after an update
+
+**Cause:** The installer's udev rule for Espressif boards (native USB,
+`idVendor 303a`: Heltec V3/V4 and similar) gives the port mode `0660`,
+group `dialout`, instead of world-writable access. The `meshpoint` user
+must be in `dialout`, and a running service only picks up a new group
+after a restart. A flasher or serial monitor holding the port gives the
+same error.
+
+**Fix:**
+
+```bash
+id meshpoint                      # dialout must be listed
+ls -l /dev/serial/by-path/        # then ls -l the device it points to
+sudo usermod -a -G dialout meshpoint
+sudo systemctl restart meshpoint
+```
+
+Close any flasher or `screen`/`minicom` session on the port first. Don't
+work around it with `chmod 666`. More detail:
+[USB nodes: serial permissions](USB-NODES.md#serial-permissions-after-an-update).
+
 ### `no GPIO tool found (pinctrl or gpioset)`
 
 **Cause:** The concentrator reset script needs `pinctrl` (Pi OS Lite default)
@@ -732,6 +754,18 @@ If you also lost SSH access, the only path forward is to re-image the
 SD card and re-run `meshpoint setup`. There is no way to recover an
 admin password without host-level access by design.
 
+### Viewer login can't change anything (`403 Forbidden`)
+
+**Cause:** By design. A Viewer is a read-only login: every request other
+than GET/HEAD/OPTIONS needs an administrator session, for core and plugin
+routes alike. The dashboard hides or disables the controls (Messages:
+no New, delete or compose). The only write a Viewer may do is change its
+own password.
+
+**Fix:** Sign in as administrator for changes. A Viewer still reads
+conversations, so only give it to people you'd let read your messages.
+See [Dashboard access](DASHBOARD-ACCESS.md).
+
 ### Restore backup stopped the service and it never came back
 
 **Cause:** Two different failures look similar in `journalctl`:
@@ -813,6 +847,17 @@ sudo bash /opt/meshpoint/scripts/restore_finish.sh "$ARCHIVE"
 sudo systemctl reset-failed 'meshpoint-restore-finish*' 2>/dev/null || true
 ```
 
+### Restore rejected: `archive contains a non-regular-file member`
+
+**Cause:** Restore only accepts regular files and directories. Symlinks,
+hard links, device and FIFO entries are refused before anything is
+extracted, because a symlink in a backup could make the root-run restore
+write outside Meshpoint's folders. Archives made by Meshpoint never
+contain them; a hand-edited or repacked archive can.
+
+**Fix:** Use the original archive from **Settings → Backup**, or make a
+fresh backup. Don't repack it with `tar` and don't bypass the check.
+
 ### Setup wizard says "Existing config/local.yaml found" on a fresh SD
 
 **Cause:** Pre-v0.7.3 RC builds eagerly persisted the auto-generated
@@ -868,6 +913,38 @@ dropdown, and an amber warning appears under the field once one is
 selected. Saving with a GPS port selected asks for confirmation first.
 Prefer a `/dev/serial/by-path/…` entry pointing at the actual radio
 instead; leave the GPS receiver for Configuration → GPS / `gpsd`.
+
+---
+
+### Meshtastic USB node not connecting, but the dashboard and concentrator work
+
+**Cause:** The Meshtastic serial source couldn't open its port (busy,
+wrong path, held by `gpsd`, or no radio there). It doesn't stop the
+service: it logs a warning and keeps retrying in the background, so the
+concentrator, MeshCore and everything else keep running.
+
+**Fix:**
+
+```bash
+sudo journalctl -u meshpoint --since "5 min ago" | grep -iE 'serial|initial connect failed|reconnect'
+```
+
+Check that **Configuration → Serial** points at the Meshtastic radio
+(prefer `/dev/serial/by-path/…`), not a GPS receiver (see above). If
+`gpsd` holds the port, move the radio to another USB port. Once the port
+is right, the next retry connects (`reconnected successfully`).
+
+### USB node looks connected after Set Preset, but no packets arrive
+
+**Cause:** Changing the region or modem preset makes the node reboot,
+which drops its USB connection for a moment.
+
+**Fix:** Wait. Meshpoint notices the dropped link, and the USB pill in
+the top bar shows **REBOOTING** (after Set Preset or region) or
+**RECONNECTING** (after an unplug) with a countdown until it's back. In
+the log: `serial link dropped`, then `reconnected successfully`. If it
+never comes back, check the port pin and USB cable, then
+`sudo systemctl restart meshpoint` as a last resort.
 
 ---
 

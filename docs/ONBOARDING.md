@@ -298,6 +298,35 @@ The command auto-detects the USB port, stops the service, configures the radio, 
 
 ---
 
+## Adding a Meshtastic USB Radio (Optional)
+
+A second Meshtastic radio (Seeed Xiao S3, Heltec, T-Beam and similar
+boards running Meshtastic firmware) can listen on another preset or slot
+while the concentrator stays on LongFast.
+
+On the dashboard: **Configuration → Serial**. Enable serial capture, pin
+the port (prefer `/dev/serial/by-path/…`, skip anything tagged **[GPS]**),
+save, restart, then set the node's modem preset on that same card.
+
+This is not the MeshCore companion: that is a separate USB device on
+**Configuration → MeshCore**. With both plugged in, pin both ports. Full
+steps: [USB nodes](USB-NODES.md).
+
+---
+
+## Optional Extras
+
+Meshtastic and MeshCore work without any plugins, SDR or RNode. Once
+normal capture works, an administrator can add plugins one by one under
+**Settings → Plugins** and pick a theme under **Settings → Themes**. See
+[Plugins](PLUGINS.md).
+
+To share the dashboard with someone you trust, enable a read-only
+**Viewer** login under **Settings → Auth**. See
+[Dashboard access](DASHBOARD-ACCESS.md).
+
+---
+
 ## Enabling the SenseCap M1 Onboard Fan (Optional)
 
 The SenseCap M1 has an onboard fan header, an LED, and a user button on GPIO 13, 22, and 27 respectively (BCM numbering, confirmed live via `scripts/test_gpio_hardware.py` -- no public schematic exists for this board, so these were found by testing rather than documented anywhere). Meshpoint can drive the fan proportionally from CPU temperature (PWM, not just on/off) -- useful in hot weather so it isn't either silent-and-overheating or full-speed-and-loud all the time. This hardware doesn't exist on RAK V2, Chameleon, or DIY builds, so it's opt-in and does nothing unless enabled.
