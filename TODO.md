@@ -415,8 +415,14 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
     in `_storeFilters`). New `frontend/css/plugin_store.css` (upstream's grid/card/chips, no hero banner, our Sources
     form kept) and `frontend/js/settings/plugin_store_meta.js` (category, tagline, icon for our 26 plugins + themes;
     fallback: rtlsdr hook → Radio, reticulum/localmesh → Networks, else Other). Third-party homepage only as http(s)
-    link. Test `tests/frontend_plugin_store.test.js`. Still to do: screenshots after (dark, light, phone), then 47b
-    (plugin page shell).
+    link. Test `tests/frontend_plugin_store.test.js`. Plus upstream's "Optional modules" banner on the Sources tab and
+    "(n of total)" counts. Screenshots 27-11: dark and light OK (phone not yet).
+  → 27-11, **47b (plugin page shell) built:** `frontend/css/plugin_pages.css` = upstream's file as-is (our plugins use
+    the same class names: lw-panel, panel, lsn-, cfg-, stat-card ...); `sidebar_plugin_registry.js` marks each plugin
+    section `data-plugin-page="<id>"` like upstream; `.plugin-page` in `dashboard.css` lost its padding/scroll (the
+    section has them now, as upstream). Also styles Settings → Themes (`.theme-editor`). Test
+    `tests/frontend_plugin_page_shell.test.js` (marker; every selector scoped). Still to do: before/after screenshots
+    of the plugin pages (dark, light, phone).
 - [ ] **48. `c2e6c495` Malformed Meshtastic channel key at startup** (M, 9 files + test 85). **In progress 26-11.**
       A real bug here too, only on their `feat/v0.8.1` branch (not in their main yet). Ours:
       `CryptoService.add_channel_key()` does `base64.b64decode(key_b64)` without checking, so a wrong Base64 PSK in

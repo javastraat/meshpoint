@@ -276,6 +276,9 @@ window.MESHPOINT_SIDEBAR_PLUGINS = window.MESHPOINT_SIDEBAR_PLUGINS || [];
 
             const section = document.createElement('section');
             section.className = 'section';
+            // Marks a plugin page for the shared look in css/plugin_pages.css
+            // (upstream KMX415/meshpoint; built-in pages don't get it).
+            section.dataset.pluginPage = desc.id;
             section.dataset.section = routeId;
             section.style.display = 'none';
             content.appendChild(section);

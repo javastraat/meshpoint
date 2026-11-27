@@ -86,6 +86,12 @@
   connection now waits 3 s after closing the live one before the reset
   pulse, 3 s after the pulse before opening, and 1 s before the retry with
   DTR inverted (as the meshcore library does itself).
+- **One look for all plugin pages.** Plugin pages (and the theme editor)
+  share upstream's plugin-page style: cards, tabs, buttons, input fields,
+  tables and fieldsets follow the active theme the same way on every
+  plugin, with clear focus rings and disabled buttons, and a phone layout
+  under 640 px (stats two per row, tables scroll in their box). Built-in
+  pages are untouched (upstream `b91d994b`, `css/plugin_pages.css`).
 - **Plugin store look for Browse.** Settings → Plugins → Sources → Browse
   shows a source's plugins and themes as cards in a grid: icon, category,
   a one-line description, installed/update badge, details fold-out and the

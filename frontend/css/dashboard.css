@@ -102,9 +102,8 @@ html, body {
    mount() renders, so a minimal plugin gets sane padding/typography for
    free without needing its own CSS file. */
 .plugin-page {
-    padding: 24px clamp(16px, 3vw, 32px);
-    height: 100%;
-    overflow-y: auto;
+    /* Padding and scrolling now come from the plugin section itself
+       (.section[data-plugin-page] in css/plugin_pages.css, as upstream). */
     color: var(--text-primary);
 }
 
