@@ -40,6 +40,7 @@
     <link rel="stylesheet" href="css/repeaters.css" />
     <link rel="stylesheet" href="css/topology.css" />
     <link rel="stylesheet" href="css/settings.css" />
+    <link rel="stylesheet" href="css/plugin_store.css" />
     <link rel="stylesheet" href="css/update_commits.css" />
     <link rel="stylesheet" href="css/theme_editor.css" />
     <link rel="stylesheet" href="css/configuration.css" />
@@ -1103,6 +1104,16 @@
                         </article>
                     </div>
                     <div data-plugins-view="sources" hidden>
+                        <section class="store-hero" aria-labelledby="store-hero-title">
+                            <div>
+                                <p class="store-eyebrow">OPTIONAL MODULES</p>
+                                <h2 id="store-hero-title">Add what you need, nothing more.</h2>
+                                <p>Plugins add receivers, networks and tools to your Meshpoint. Meshtastic and MeshCore
+                                    work without any of them. Pick a source below, browse it, and install one at a time
+                                    or a few together.</p>
+                            </div>
+                            <div class="store-hero__art" aria-hidden="true"><span></span><span></span><span></span><b>+</b></div>
+                        </section>
                         <article class="auth-card plugins-sources" data-plugin-sources-card hidden>
                             <div class="plugins-sources__head">
                                 <h3 class="plugins-sources__title">Plugin sources</h3>
@@ -1211,6 +1222,7 @@
     <script defer src="js/settings/theme_editor.js"></script>
     <script defer src="js/settings/backup_restore_card.js"></script>
     <script defer src="js/settings/dangerous_panel_controller.js"></script>
+    <script defer src="js/settings/plugin_store_meta.js"></script>
     <script defer src="js/settings/plugins_panel_controller.js"></script>
     <script defer src="js/configuration/identity_card.js"></script>
     <script defer src="js/configuration/radio_card.js"></script>

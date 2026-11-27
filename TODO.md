@@ -336,7 +336,15 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
           start), `plugins.radio.deemphasis_us` (50/75) overrides; status shows `deemphasis_us`/`region`. Core: plugins
           get `reg.radio_region` (`load_plugins(..., radio_region=config.radio.region)`, as upstream's runtime.py),
           test in `tests/test_plugin_loader.py`. Plugin tests in `apps/radio/backend/tests/test_listener.py` (fail on the
-          old code). NFM/AM/SSB get none. radio 1.0.2. Still to do: listen on the Pi.
+          old code). NFM/AM/SSB get none. radio 1.0.2.
+    - [ ] **Pi test, waits for an RTL-SDR dongle** (none in a Meshpoint now, 27-11). Needs the core pull + radio 1.0.2,
+          then `sudo systemctl restart meshpoint`.
+          1. `cd /opt/meshpoint && sudo venv/bin/python -m unittest -v tests.test_plugin_loader` (all OK).
+          2. Radio page: tune a broadcast station in WFM (e.g. 100.7 MHz); it plays.
+          3. `ps -eo args | grep -E '[f]fmpeg' | grep -o 'aemphasis[^,]*'` → `aemphasis=mode=reproduction:type=50fm`
+             (region EU_868); logged in, `/api/listener/status` shows `"deemphasis_us": 50, "region": "EU_868"`.
+          4. Without `redsea` (`which redsea` empty): `ps -eo args | grep '[r]tl_fm'` has no `-E deemp`; by ear a bit
+             more treble than before. With `redsea` the RDS path was already 50 µs, so nothing changes by ear.
 - [x] **42. MeshCore USB robustness** (M, `b91d994b`; item 26 did not cover it). In `meshcore_usb_source.py`:
   - `restart_auto_fetching()` must call `stop_auto_message_fetching()` first: `start_auto_message_fetching()` in
     `meshcore_py` is not idempotent (each call adds a subscription).
@@ -402,6 +410,13 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
     needed unless a plugin page fails to load.
   - Check with screenshots (dark, light, mobile) before and after. The theme editor page uses the same shell
     (`.theme-editor`).
+  → 27-11, **47a (store) built:** Browse renders cards (`_catalogCardHtml`, same data-src-* hooks as the rows, so
+    install/update/batch/dependencies unchanged) with a search box and category chips (`_applyStoreFilter`, per source
+    in `_storeFilters`). New `frontend/css/plugin_store.css` (upstream's grid/card/chips, no hero banner, our Sources
+    form kept) and `frontend/js/settings/plugin_store_meta.js` (category, tagline, icon for our 26 plugins + themes;
+    fallback: rtlsdr hook → Radio, reticulum/localmesh → Networks, else Other). Third-party homepage only as http(s)
+    link. Test `tests/frontend_plugin_store.test.js`. Still to do: screenshots after (dark, light, phone), then 47b
+    (plugin page shell).
 - [ ] **48. `c2e6c495` Malformed Meshtastic channel key at startup** (M, 9 files + test 85). **In progress 26-11.**
       A real bug here too, only on their `feat/v0.8.1` branch (not in their main yet). Ours:
       `CryptoService.add_channel_key()` does `base64.b64decode(key_b64)` without checking, so a wrong Base64 PSK in

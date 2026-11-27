@@ -86,6 +86,14 @@
   connection now waits 3 s after closing the live one before the reset
   pulse, 3 s after the pulse before opening, and 1 s before the retry with
   DTR inverted (as the meshcore library does itself).
+- **Plugin store look for Browse.** Settings → Plugins → Sources → Browse
+  shows a source's plugins and themes as cards in a grid: icon, category,
+  a one-line description, installed/update badge, details fold-out and the
+  Install/Update/Reinstall button, with a search box and category chips
+  (Networks, Radio, Aviation, Sensors, Paging, Tools, Examples, Themes).
+  The Sources tab opens with upstream's "Optional modules" banner.
+  Batch selection, dependencies and pinning work as before (look after
+  upstream `b91d994b`, `ede788c8`).
 - **Plugins know the Meshpoint's region.** Plugins get `reg.radio_region`
   (the configured `radio.region`), so they can pick region defaults; the
   radio plugin uses it for FM de-emphasis, 75 µs in the US and South Korea,

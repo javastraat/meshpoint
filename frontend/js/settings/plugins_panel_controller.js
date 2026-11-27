@@ -128,6 +128,7 @@ class PluginsPanelController {
         // selected catalog ids (kept across Browse re-renders/refreshes).
         this._selected = new Set();
         this._catSelected = new Map();
+        this._storeFilters = new Map(); // source url -> {text, category} (Browse search/chips, TODO 47a)
         this._batchRunning = false;
         // Last installed-list batch result, shown in the bar until the next
         // batch -- refresh() re-renders the list, so it can't live in DOM.
@@ -187,6 +188,16 @@ class PluginsPanelController {
             this.srcAddForm.addEventListener('submit', (e) => { e.preventDefault(); this._addSource(); });
             this.srcListEl.addEventListener('click', (e) => this._onSourceClick(e));
             this.srcListEl.addEventListener('change', (e) => this._onSourceChange(e));
+            this.srcListEl.addEventListener('input', (e) => {
+                const box = e.target.closest('[data-store-search]');
+                const row = box && box.closest('[data-src-row]');
+                if (!row) return;
+                const url = row.dataset.srcRow;
+                const filter = this._storeFilters.get(url) || { text: '', category: 'All' };
+                filter.text = box.value;
+                this._storeFilters.set(url, filter);
+                this._applyStoreFilter(url, row.querySelector('[data-src-catalog]'));
+            });
             this._loadSources();
         }
         if (this.srcPresetEl) {
@@ -457,6 +468,14 @@ class PluginsPanelController {
             this._renderCatalogBatchBar(url, cat);
             return;
         }
+        const chip = e.target.closest('[data-store-chip]');
+        if (chip) {
+            const filter = this._storeFilters.get(url) || { text: '', category: 'All' };
+            filter.category = chip.dataset.storeChip;
+            this._storeFilters.set(url, filter);
+            this._applyStoreFilter(url, row.querySelector('[data-src-catalog]'));
+            return;
+        }
         if (e.target.closest('[data-src-pin]')) { this._pinSource(url); return; }
         if (e.target.closest('[data-src-unpin]')) { this._unpinSource(url); return; }
         const installBtn = e.target.closest('[data-src-install]');
@@ -601,8 +620,14 @@ class PluginsPanelController {
             + ` <button type="button" class="plugins-source__refresh" data-src-catalog-refresh `
             + `title="raw.githubusercontent.com can take a few minutes to pick up a fresh push — re-fetch now">⟳ Refresh</button></p>`
             + `<div class="plugins-batchbar" data-src-batchbar hidden></div>`;
-        const sectionTitle = (label, kind) => `<h4 class="plugins-source__sectiontitle"><label class="plugins-select-all" title="Select all ${label.toLowerCase()}">`
-            + `<input type="checkbox" data-src-select-all data-kind="${kind}"> ${label}</label></h4>`;
+        // Store look (TODO 47a, after upstream's plugin store): one card per
+        // entry in a grid, with a search box and category chips that only
+        // hide cards. Buttons and checkboxes keep their data-src-* hooks, so
+        // install/update/batch/dependencies work as before.
+        const sectionTitle = (label, kind, count) => `<div class="store-results"><h4>${label} `
+            + `<span class="plugin-row__version">(${count})</span></h4>`
+            + `<label class="plugins-select-all" title="Select all ${label.toLowerCase()}">`
+            + `<input type="checkbox" data-src-select-all data-kind="${kind}"> Select all</label></div>`;
 
         const apps = cat.plugins || [];
         const themes = cat.themes || [];
@@ -610,16 +635,50 @@ class PluginsPanelController {
             catEl.innerHTML = `${headerHtml}<p class="plugins-sources__empty">This source lists no plugins or themes.</p>`;
             return;
         }
+        const filter = this._storeFilters.get(url) || { text: '', category: 'All' };
+        this._storeFilters.set(url, filter);
+        const used = new Set([...apps, ...themes].map((e) => window.meshpointStoreMeta(e).category));
+        const chips = ['All', ...window.MESHPOINT_STORE_CATEGORIES.filter((c) => used.has(c))]
+            .map((c) => `<button type="button" class="terminal-button" data-store-chip="${this._escape(c)}" `
+                + `aria-pressed="${filter.category === c}">${this._escape(c)}</button>`).join('');
+        const toolbarHtml = `<div class="store-toolbar"><label class="store-search">`
+            + `<input type="search" class="cfg-field__input" data-store-search placeholder="Search plugins and themes…" `
+            + `aria-label="Search this source" value="${this._escape(filter.text)}"></label></div>`
+            + `<div class="store-filters" role="group" aria-label="Category">${chips}</div>`;
         const appsHtml = apps.length
-            ? `${sectionTitle('Apps', 'app')}<table class="plugins-table"><tbody>`
-              + this._orderCatalogApps(apps).map((row) => this._catalogRowHtml({ ...row, selected })).join('') + `</tbody></table>`
+            ? `${sectionTitle('Apps', 'app', apps.length)}<div class="store-grid">`
+              + this._orderCatalogApps(apps).map((row) => this._catalogCardHtml({ ...row, selected })).join('')
+              + `<p class="store-empty" data-store-empty hidden>Nothing here matches.</p></div>`
             : '';
         const themesHtml = themes.length
-            ? `${sectionTitle('Themes', 'theme')}<table class="plugins-table"><tbody>`
-              + themes.map((t) => this._catalogRowHtml({ plugin: t, selected })).join('') + `</tbody></table>`
+            ? `${sectionTitle('Themes', 'theme', themes.length)}<div class="store-grid">`
+              + themes.map((t) => this._catalogCardHtml({ plugin: t, selected })).join('')
+              + `<p class="store-empty" data-store-empty hidden>Nothing here matches.</p></div>`
             : '';
-        catEl.innerHTML = headerHtml + appsHtml + themesHtml;
+        catEl.innerHTML = headerHtml + toolbarHtml + appsHtml + themesHtml;
+        this._applyStoreFilter(url, catEl);
         this._renderCatalogBatchBar(url, catEl);
+    }
+
+    /** Show only the cards matching the source's search text and category
+     * chip; a grid with nothing left shows "Nothing here matches". */
+    _applyStoreFilter(url, catEl) {
+        const filter = this._storeFilters.get(url) || { text: '', category: 'All' };
+        const words = filter.text.toLowerCase().split(/\s+/).filter(Boolean);
+        catEl.querySelectorAll('[data-store-chip]').forEach((chip) => {
+            chip.setAttribute('aria-pressed', String(chip.dataset.storeChip === filter.category));
+        });
+        catEl.querySelectorAll('.store-grid').forEach((grid) => {
+            let shown = 0;
+            grid.querySelectorAll('.store-card').forEach((card) => {
+                const ok = (filter.category === 'All' || card.dataset.category === filter.category)
+                    && words.every((w) => card.dataset.storeText.includes(w));
+                card.hidden = !ok;
+                if (ok) shown += 1;
+            });
+            const empty = grid.querySelector('[data-store-empty]');
+            if (empty) empty.hidden = shown > 0;
+        });
     }
 
     /** Reorders a catalog's ``plugins`` array so an app that declares a
@@ -653,9 +712,71 @@ class PluginsPanelController {
         return rows;
     }
 
+    /** One Browse card -- shared by apps and themes. Same checkbox, badge
+     * logic and data-src-install button as the old table row; category,
+     * tagline and icon come from plugin_store_meta.js. A hook or a plugin
+     * that requires another sits right after its host (_orderCatalogApps())
+     * and says so on the card. */
+    _catalogCardHtml({ plugin: p, dependent = false, selected = null }) {
+        const meta = window.meshpointStoreMeta(p);
+        const batchAction = this._catalogBatchAction(p);
+        const selectHtml = `<input type="checkbox" class="plugin-row__select" data-src-select data-id="${this._escape(p.id)}" `
+            + `data-kind="${this._escape(p.kind || 'app')}" aria-label="Select ${this._escape(p.id)}" `
+            + (batchAction
+                ? (selected && selected.has(p.id) ? 'checked' : '')
+                : `disabled title="${p.compatible ? 'Downgrades are one at a time — use the button below' : 'Needs a newer Meshpoint'}"`)
+            + '>';
+        const down = p.update_available && this._cmpVersions(p.version, p.installed_version) < 0;
+        const badge = !p.compatible
+            ? '<span class="store-badge" data-state="incompatible">needs newer Meshpoint</span>'
+            : p.update_available
+                ? `<span class="store-badge" data-state="update">${down ? 'downgrade' : 'update'} ${this._escape(p.installed_version)} → ${this._escape(p.version)}</span>`
+                : p.installed
+                    ? '<span class="store-badge" data-state="installed">installed</span>'
+                    : '<span class="store-badge">available</span>';
+        const attrs = (action) => `data-src-install data-id="${this._escape(p.id)}" `
+            + `data-action="${action}" data-from="${this._escape(p.installed_version || '')}" `
+            + `data-to="${this._escape(p.version)}"`;
+        let btn;
+        if (!p.compatible) {
+            btn = '<button type="button" class="terminal-button" disabled title="Update Meshpoint first">Install</button>';
+        } else if (p.update_available) {
+            btn = `<button type="button" class="terminal-button store-install" ${attrs(down ? 'downgrade' : 'update')}>${down ? 'Downgrade' : 'Update'}</button>`;
+        } else if (p.installed) {
+            btn = `<button type="button" class="terminal-button" ${attrs('reinstall')} title="Replace with a fresh copy from the source">Reinstall</button>`;
+        } else {
+            btn = `<button type="button" class="terminal-button store-install" ${attrs('install')}>Install</button>`;
+        }
+        const provides = (p.provides || []).join(', ');
+        const host = p.hook_host || p.requires;
+        const notes = (host ? `<p class="store-card__notes">${p.hook_host ? 'Hooks into' : 'Requires'} <code>${this._escape(host)}</code></p>` : '')
+            + (p.has_setup ? '<p class="store-card__notes store-card__notes--setup">⚙ Runs a setup script after install</p>' : '');
+        const details = (p.description && p.description !== meta.tagline ? `<p>${this._escape(p.description)}</p>` : '')
+            + (provides ? `<p>Provides: ${this._escape(provides)}</p>` : '')
+            // homepage comes from a third-party catalog: http(s) links only.
+            + (/^https?:\/\//i.test(p.homepage || '') ? `<p><a href="${this._escape(p.homepage)}" target="_blank" rel="noopener">Homepage</a></p>` : '');
+        const text = [p.id, p.kind, p.author, p.description, meta.category, meta.tagline, provides, host]
+            .filter(Boolean).join(' ').toLowerCase();
+        return `<article class="store-card${dependent ? ' store-card--dependent' : ''}" data-category="${this._escape(meta.category)}" `
+            + `data-store-text="${this._escape(text)}">
+            <div class="store-card__top">
+                <span class="store-icon">${window.meshpointStoreIcon(meta.icon)}</span>
+                <div class="store-card__badges">${badge}<label class="store-card__select" title="Select for a batch">${selectHtml}</label></div>
+            </div>
+            <p class="store-card__category">${this._escape(meta.category)}</p>
+            <h5>${this._escape(p.id)}</h5>
+            <p class="store-card__version">v${this._escape(p.version)} · ${this._escape(p.kind || 'app')}${p.author ? ` · ${this._escape(p.author)}` : ''}</p>
+            ${meta.tagline ? `<p class="store-card__tagline">${this._escape(meta.tagline)}</p>` : ''}
+            ${notes}
+            ${details ? `<details class="store-card__details"><summary>Details</summary>${details}</details>` : '<div class="store-card__details"></div>'}
+            <div class="store-card__actions">${btn}</div>
+        </article>`;
+    }
+
     /** One Browse row -- shared by apps and themes (``plugin`` covers both;
      * ``grouped``/``dependent`` only apply to a hook nested under its host,
-     * see _orderCatalogApps()). */
+     * see _orderCatalogApps()). Kept for reference/tests; Browse now renders
+     * _catalogCardHtml(). */
     _catalogRowHtml({ plugin: p, grouped = false, dependent = false, selected = null }) {
         const batchAction = this._catalogBatchAction(p);
         const selectHtml = `<input type="checkbox" class="plugin-row__select" data-src-select data-id="${this._escape(p.id)}" `

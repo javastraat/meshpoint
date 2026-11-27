@@ -1,0 +1,161 @@
+/* Settings -> Plugins -> Sources -> Browse as a store: search, category chips
+   and a card grid (TODO 47a). Look after upstream KMX415/meshpoint
+   css/plugin_store.css; follows the active theme's variables. The logic
+   (install/update/batch/dependencies) stays in plugins_panel_controller.js. */
+
+/* Banner at the top of the Sources tab (upstream's store hero). Decorative. */
+.store-hero {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 24px;
+    margin-bottom: 20px;
+    padding: clamp(20px, 3.5vw, 40px);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    background: linear-gradient(120deg,
+        color-mix(in srgb, var(--bg-card), var(--accent-blue) 16%),
+        var(--bg-card) 65%,
+        color-mix(in srgb, var(--bg-card), var(--accent-cyan) 10%));
+}
+.store-eyebrow { color: var(--accent-cyan); font: 600 .7rem var(--font-mono); letter-spacing: .14em; margin: 0 0 12px; }
+.store-hero h2 { font-size: clamp(1.5rem, 2.6vw, 2.2rem); letter-spacing: -.03em; line-height: 1.15; margin: 0 0 12px; }
+.store-hero p:not(.store-eyebrow) { color: var(--text-secondary); font-size: .95rem; line-height: 1.7; max-width: 40rem; margin: 0; }
+.store-hero__art { position: relative; width: 140px; height: 140px; flex-shrink: 0; }
+.store-hero__art span {
+    position: absolute;
+    inset: 0;
+    border: 1px solid color-mix(in srgb, var(--accent-cyan), transparent 55%);
+    border-radius: 30px;
+    transform: rotate(15deg);
+}
+.store-hero__art span:nth-child(2) { inset: 18px; transform: rotate(-12deg); }
+.store-hero__art span:nth-child(3) { inset: 36px; transform: rotate(8deg); background: color-mix(in srgb, var(--accent-cyan), transparent 88%); }
+.store-hero__art b { position: absolute; inset: 0; display: grid; place-items: center; font-size: 2.8rem; font-weight: 300; color: var(--accent-cyan); }
+
+.store-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin: 12px 0 10px;
+}
+.store-search { flex: 1 1 16rem; }
+.store-search input { width: 100%; min-height: 40px; }
+.store-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+.store-filters .terminal-button {
+    border-radius: 999px;
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+}
+.store-filters .terminal-button[aria-pressed="true"] {
+    background: color-mix(in srgb, var(--bg-card), var(--accent-cyan) 18%);
+    color: var(--text-primary);
+    border-color: var(--accent-cyan);
+}
+.store-results {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    margin: 18px 0 10px;
+}
+.store-results h4 { font-size: 1rem; font-weight: 600; margin: 0; }
+.store-results label { color: var(--text-secondary); font-size: .8rem; display: inline-flex; align-items: center; gap: 6px; }
+
+.store-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 270px), 1fr));
+    gap: 16px;
+}
+.store-card {
+    --module-accent: var(--accent-cyan);
+    position: relative;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    border-radius: 14px;
+    border: 1px solid color-mix(in srgb, var(--border), var(--text-secondary) 18%);
+    background: linear-gradient(150deg, color-mix(in srgb, var(--bg-card), var(--module-accent) 7%), var(--bg-card) 60%);
+    transition: border-color .18s ease, box-shadow .18s ease;
+}
+.store-card[hidden] { display: none; }
+.store-card[data-category="Networks"] { --module-accent: var(--accent-cyan); }
+.store-card[data-category="Radio"] { --module-accent: var(--accent-amber); }
+.store-card[data-category="Aviation"] { --module-accent: var(--accent-blue); }
+.store-card[data-category="Sensors"] { --module-accent: var(--accent-green); }
+.store-card[data-category="Paging"] { --module-accent: var(--accent-purple); }
+.store-card[data-category="Tools"] { --module-accent: var(--accent-blue); }
+.store-card[data-category="Themes"] { --module-accent: var(--accent-purple); }
+.store-card[data-category="Examples"],
+.store-card[data-category="Other"] { --module-accent: var(--text-secondary); }
+.store-card:hover, .store-card:focus-within {
+    border-color: var(--module-accent);
+    box-shadow: 0 8px 24px color-mix(in srgb, var(--bg-primary), transparent 45%);
+}
+.store-card__top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 18px; }
+.store-icon {
+    display: grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    flex-shrink: 0;
+    border: 1px solid color-mix(in srgb, var(--module-accent), transparent 70%);
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--module-accent), transparent 90%);
+    color: var(--module-accent);
+}
+.store-icon svg { width: 26px; height: 26px; }
+.store-card__badges { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.store-badge {
+    font-size: .68rem;
+    line-height: 1.4;
+    padding: 4px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    text-align: center;
+    white-space: nowrap;
+}
+.store-badge[data-state="installed"] { color: var(--accent-green); border-color: color-mix(in srgb, var(--accent-green), transparent 60%); }
+.store-badge[data-state="update"] { color: var(--accent-amber); border-color: color-mix(in srgb, var(--accent-amber), transparent 55%); }
+.store-badge[data-state="incompatible"] { color: var(--accent-red, #ef4444); border-color: color-mix(in srgb, var(--accent-red, #ef4444), transparent 55%); }
+.store-card__select { display: inline-flex; align-items: center; }
+.store-card__category {
+    font: 500 .65rem var(--font-mono);
+    color: var(--module-accent);
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    margin: 0 0 6px;
+}
+.store-card h5 { font-size: 1.15rem; font-weight: 600; margin: 0 0 4px; overflow-wrap: anywhere; }
+.store-card__version { font: .72rem var(--font-mono); color: var(--text-secondary); margin: 0 0 10px; overflow-wrap: anywhere; }
+.store-card__tagline { color: var(--text-primary); font-size: .88rem; line-height: 1.5; margin: 0 0 8px; }
+.store-card__notes { font-size: .75rem; line-height: 1.55; color: var(--text-secondary); margin: 0 0 4px; }
+.store-card__notes--setup { color: var(--accent-amber); }
+.store-card__details { font-size: .75rem; line-height: 1.6; color: var(--text-secondary); margin: 6px 0 14px; overflow-wrap: anywhere; flex: 1; }
+.store-card__details summary { cursor: pointer; color: var(--text-primary); padding-block: 4px; }
+.store-card__details p { margin: 6px 0 0; }
+.store-card__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: auto; }
+.store-card__actions .terminal-button { flex: 1; }
+.store-card__actions .store-install {
+    border-color: var(--accent-cyan);
+    background: color-mix(in srgb, var(--bg-card), var(--accent-cyan) 18%);
+}
+.store-empty {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 36px 20px;
+    border: 1px dashed var(--border);
+    border-radius: 14px;
+    color: var(--text-secondary);
+}
+
+@media (max-width: 640px) {
+    .store-hero { padding: 20px; }
+    .store-hero__art { display: none; }
+    .store-search { flex-basis: 100%; }
+    .store-card { padding: 16px; }
+}
+@media (prefers-reduced-motion: reduce) { .store-card { transition: none; } }
