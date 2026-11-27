@@ -638,6 +638,12 @@ class WebAuthConfig:
     lockout_attempts: int = 5
     lockout_cooldown_minutes: int = 5
     session_version: int = 1
+    # Public view (TODO 37c, upstream b91d994b): off by default. When on,
+    # a signed-out visitor at / gets public.html with only aggregate numbers
+    # of the chosen pages ("dashboard", "stats", "radio"); never IDs,
+    # positions, messages or payloads. Settings -> Auth.
+    public_view_enabled: bool = False
+    public_view_pages: list[str] = field(default_factory=lambda: ["dashboard"])
 
 
 @dataclass

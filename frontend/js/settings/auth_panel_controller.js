@@ -29,6 +29,10 @@ class AuthPanelController {
         this.viewerRole = new window.ViewerRoleForm(
             rootEl.querySelector('[data-viewer-root]')
         );
+        // Public view (TODO 37c): admin-only opt-in for anonymous summaries.
+        this.publicView = window.PublicViewForm
+            ? new window.PublicViewForm(rootEl.querySelector('[data-public-view-root]'))
+            : null;
         this.lockout = new window.LockoutConfigForm(
             rootEl.querySelector('[data-lockout-root]')
         );
@@ -41,6 +45,7 @@ class AuthPanelController {
         this.passwordChange.bind();
         this.signOutAll.bind();
         this.viewerRole.bind();
+        this.publicView?.bind();
         this.lockout.bind();
         this.sessionLifetime.bind();
     }
@@ -54,6 +59,7 @@ class AuthPanelController {
             this.viewerRole.setEnabled(!!identity.viewer_enabled);
         }
         if (settings) {
+            this.publicView?.setValues(settings);
             this.lockout.setValues(
                 settings.lockout_attempts,
                 settings.lockout_cooldown_minutes,

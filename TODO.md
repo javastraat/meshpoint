@@ -6,8 +6,8 @@ Earlier rounds (up to 2026-08-13): [memory/upstream_sync_todo.md](memory/upstrea
 Checked: **2026-11-26** against `upstream/main` at `4e78804d` (v0.8.0 release prep) and their other branches
 (`feat/v0.8.1` is one commit ahead of main: item 48).
 
-**Status 27-11:** done 1-10, 12-15, 17-29, 32-36, 40-47, 49-51 (42 of the 50, plus 51). Open: 11, 16, 30, 31, 37c/e/g,
-38, 39, 41a (Pi test waits for an RTL-SDR dongle), 48 (someone else's), the rechecks marked "Recheck later", then the
+**Status 27-11:** done 1-10, 12-15, 17-30, 32-36, 40-51 (44 of the 50, plus 51). Open: 11, 16, 31, 37c/e/g, 38, 39,
+41a (Pi test waits for an RTL-SDR dongle), the rechecks marked "Recheck later", then the
 0.8.2 bump.
 
 **Decision 26-11 (Einstein): we want everything they have.** Nothing is "skip" or "decide first" any more, unless it
@@ -206,7 +206,7 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
 
 ### G. Dashboard presets
 
-- [ ] **30. `829a17e4` + `45adf5c5` Preset chips and filter** (L, 450 + tests). LF/MF/LT/MC chips on nodes and
+- [x] **30. `829a17e4` + `45adf5c5` Preset chips and filter** (L, 450 + tests). LF/MF/LT/MC chips on nodes and
       packets, and a "show only" preset filter, pills appear once a preset is heard. New `modem_preset_label.js`,
       `radio_view_filter.js`, `packet_feed.css`; `node_map.js`, `node_cards.js`, `simple_packet_feed.js`.
       → 27-11, **30a built** (Einstein: LongMod = "LMd", "LM" stays LocalMesh): `modem_preset_label.js` +
@@ -219,7 +219,7 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
         the preset chip next to it, green pulse when recent, amber when favourite (`markerMarkup`, `_stampNodeModem`;
         circleMarker/setStyle code gone); marker CSS in `packet_feed.css`. Also upstream's `responsive.css` fix missed
         in 30a: narrow screens hide columns 9-12 (Freq, SF, Hops, Details) so Preset (8) stays. Tests added. Still to
-        do: map screenshot.
+        do: map screenshot. Pi 27-11 on the COTX: LF chips next to the map dots, LM filter empties the map.
 
 ### H. Big one
 
@@ -288,6 +288,14 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
         `auth_service.py`, `stats_routes.public_snapshot`, tests `test_public_view.py`). Off by default, aggregate
         numbers only (no IDs, positions, payloads), no session issued, no WebSocket access. Review it as an
         unauthenticated surface (rate limit, cache) before enabling.
+        → 27-11 built as upstream: `WebAuthConfig.public_view_enabled/pages` (off, ["dashboard"]),
+          `AuthService.update_public_view` (persist first, then live), `PUT /api/config/public_view` (admin, audit) and the
+          fields in `auth_settings`, `stats_routes.public_snapshot` (explicit fields only, 503 while starting),
+          `public_view_routes.py` (GET only, 404 unless enabled for that page, 10 s cache, revocation checked after the
+          query), `/` serves `public.html` to signed-out visitors when enabled; `public.html`, `public_view.js/.css`,
+          Settings → Auth card (`public_view_form.js`). Tests `tests/test_public_view.py` (upstream's, as unittest so the
+          Pi can run it; plus the page assets load without a session). `DASHBOARD-ACCESS.md` updated (it said "no public
+          view"). Still to do: Pi test.
   - [x] **37d. Viewer UI in Messages:** no `meshpointReadOnly` flag in our frontend, so a viewer still sees compose and
         Send and opening a chat posts "read". Hide compose, delete and Send Now for viewers; skip the read POST
         (`messaging_chat.js`, `messaging_contacts.js`, `viewer_access.js`). Goes with 37a.
@@ -448,7 +456,7 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
     "ours" block: yellow primary buttons kept, the theme editor's active tab marked, the installed-themes table full
     width (scrolls only under 640 px), thin theme-coloured scrollbars on plugin pages. bluetooth-scanner 0.2.3: stat
     cards line up with the title. Screenshots 27-11 on the COTX (dark, light, phone): OK.
-- [ ] **48. `c2e6c495` Malformed Meshtastic channel key at startup** (M, 9 files + test 85). **In progress 26-11.**
+- [x] **48. `c2e6c495` Malformed Meshtastic channel key at startup** (M, 9 files + test 85). **In progress 26-11.**
       A real bug here too, only on their `feat/v0.8.1` branch (not in their main yet). Ours:
       `CryptoService.add_channel_key()` does `base64.b64decode(key_b64)` without checking, so a wrong Base64 PSK in
       `local.yaml` raises at startup; the Channels editor (`PUT /api/config/channels`) saves the bad key to disk first
@@ -472,7 +480,8 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
         and saves once, list flags `key_unavailable`, card shows "Channel unavailable. Enter its Base64 PSK."; MQTT only
         gets usable keys. Also fixed: a Meshtastic channel save dropped the MeshCore keys until restart (upstream does
         it too). `test_channel_key_startup.py` 10/10 (CI green), `test_meshcore_channels.py` and the echo-hash fixture in
-        `test_tx_service.py` adjusted. Still to do: Pi test.
+        `test_tx_service.py` adjusted. Pi 27-11 on the COTX: 10/10 unit tests, Channels refuses an invalid PSK ("Invalid
+        Base64 PSK for channel 'abc'"), nothing saved.
 - [x] **49. Bobcat G285 docs branch** (S, `fd5b4d1d` + `dd834718`, branch `upstream/fix/bobcat-g285-docs-reconciliation`,
       not merged into their main). New `docs/BOBCAT-G285.md` (417 lines), reworked `BOBCAT-300.md`, README and
       HARDWARE-MATRIX. Merge with item 33 (`c7bf59f4`) so we do the G285 docs once.
@@ -571,7 +580,7 @@ the work list on 27-11: ✅ done, ⬜ still open.
 |---|---|---|---|
 | ⬜ | `6011f846` | nRF DFU flash for MeshCore and Meshtastic companions | Big (2000 lines). Ours only says "drag-and-drop the .uf2" for nRF52 |
 | ✅ | `93866842` + `459c4d7c` | Reconnect Meshtastic USB after Set Preset reboots it; show REBOOTING vs RECONNECTING | |
-| ⬜ | `829a17e4` + `45adf5c5` | LF/MF/LT/MC preset chips and a show-only preset filter on the dashboard | |
+| ✅ | `829a17e4` + `45adf5c5` | LF/MF/LT/MC preset chips and a show-only preset filter on the dashboard | |
 | ✅ | `e8c4c6e1` | Persistent MeshCore send feedback (#151) | |
 | ✅ | `a451d1e2` | MeshCore heard-path popover (#152) | |
 | ✅ | `fc15bc36` + `cad3c4a1` | MeshCore packet RF metadata and received hops | |

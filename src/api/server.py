@@ -79,6 +79,7 @@ from src.api.routes import (
     plugin_routes,
     plugin_source_routes,
     public_radar_routes,
+    public_view_routes,
     metrics_config_routes,
     repeater_config_routes,
     serial_config_routes,
@@ -645,6 +646,9 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     protected = [Depends(require_auth)]
     for router, public in _BUILTIN_ROUTERS:
         app.include_router(router, dependencies=None if public else protected)
+    # Public view (TODO 37c): anonymous on purpose, but every route 404s
+    # unless an admin switched it on for that page; GET only, aggregates only.
+    app.include_router(public_view_routes.build_router(config, auth_subsystem.service))
     for spec in route_registry.registered():
         app.include_router(
             spec.router, dependencies=None if spec.public else protected,
@@ -683,6 +687,14 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
         if not _request_has_valid_session(
             request, auth_subsystem.jwt_service
         ):
+            # Public view on: a signed-out visitor gets the read-only
+            # summary page (it links to /login) instead of a redirect.
+            if public_view_routes.available_pages(auth_subsystem.service):
+                public_html = (static_dir / "public.html").read_text(encoding="utf-8")
+                return HTMLResponse(
+                    bust_asset_urls(public_html),
+                    headers={"Cache-Control": "no-store"},
+                )
             target = "/login" if auth_subsystem.service.is_setup_complete() else "/setup"
             return RedirectResponse(url=target, status_code=302)
         # Rewrite local JS/CSS URLs with a per-boot ?v= token so every

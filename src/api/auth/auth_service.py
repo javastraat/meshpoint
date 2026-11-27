@@ -296,6 +296,17 @@ class AuthService:
             "allow_read_only": False,
         })
 
+    def update_public_view(self, enabled: bool, pages: list[str]) -> None:
+        """Persist the public-page selection, then publish it to live
+        requests (a failed write leaves the public view as it was)."""
+        allowed = {"dashboard", "stats", "radio"}
+        if any(page not in allowed for page in pages) or (enabled and not pages):
+            raise ValueError("Select at least one supported public page")
+        pages = list(dict.fromkeys(pages))
+        self._persist({"public_view_enabled": enabled, "public_view_pages": pages})
+        self._config.public_view_enabled = enabled
+        self._config.public_view_pages = pages
+
     def viewer_enabled(self) -> bool:
         return bool(self._config.viewer_password_hash) and self._config.allow_read_only
 

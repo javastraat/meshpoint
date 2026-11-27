@@ -1,8 +1,9 @@
 # Dashboard access
 
-The dashboard always needs a login. There are two kinds: the administrator,
-and an optional read-only **Viewer**. There is no public, no-login view in
-this fork.
+The dashboard needs a login: the administrator, or an optional read-only
+**Viewer**. Next to that there is an optional **public view**: a separate
+page with a few aggregate numbers that anyone can open without a login.
+It is off by default.
 
 ## Access levels
 
@@ -10,6 +11,7 @@ this fork.
 | --- | --- | --- |
 | Administrator | Everything: dashboard, stats, messages, radio, configuration, Settings, plugin pages, and the Terminal if it's switched on | Everything |
 | Viewer | Dashboard, Stats, Messages, Radio and the configuration pages | Nothing, except its own password |
+| Public visitor (no login, only when switched on) | Only the aggregate numbers of the chosen pages, see below | Nothing |
 
 A Viewer is for people you trust: it reads your conversations and node
 information. In Messages, New, compose and delete are hidden, and opening a
@@ -27,6 +29,26 @@ the Terminal are administrator-only.
 
 **Disable viewer** removes the Viewer login again. **Sign out everywhere**
 ends all open sessions at once; use it when a password may have leaked.
+
+## Public view (optional)
+
+Settings → Auth → **Public view**: tick *Enable public viewing*, choose the
+pages to share, and save. A signed-out visitor who opens the dashboard
+address then gets a read-only summary page (with an *Admin sign in* link)
+instead of the login page. It refreshes every 15 seconds.
+
+| Page | What a visitor sees |
+| --- | --- |
+| Dashboard | Number of known nodes, and how many were active in the last 24 hours |
+| Stats | Stored packets, packets in the last hour, packets per minute, average RSSI and SNR |
+| Radio | Configured region, frequency, bandwidth and spreading factor |
+
+Never shown: node names or IDs, positions, messages, payloads, keys or any
+configuration. The visitor gets no login session and no live connection;
+every other page and API stays behind the login. The numbers are cached for
+10 seconds, so many visitors don't load the Pi. Switching a page off (or the
+whole public view) takes effect at once. Check it in a private browser
+window before sharing the address.
 
 ## Things only the device itself can switch on
 

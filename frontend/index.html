@@ -943,6 +943,22 @@
                             </form>
                         </article>
 
+                        <article class="auth-card" data-public-view-root>
+                            <h3 class="auth-card__title">Public view</h3>
+                            <p class="auth-card__hint">Off by default. When enabled, anyone who can reach this dashboard can see the selected summaries without signing in. Messages, node names and locations, and all configuration stay private.</p>
+                            <form class="auth-card__form">
+                                <label><input type="checkbox" data-public-enabled disabled> Enable public viewing</label>
+                                <fieldset>
+                                    <legend>Pages to share</legend>
+                                    <label class="auth-field"><span><input type="checkbox" data-public-page value="dashboard" disabled> Dashboard</span><span class="auth-card__hint">Known and recently active node counts</span></label>
+                                    <label class="auth-field"><span><input type="checkbox" data-public-page value="stats" disabled> Stats</span><span class="auth-card__hint">Packet counts, rate and signal averages</span></label>
+                                    <label class="auth-field"><span><input type="checkbox" data-public-page value="radio" disabled> Radio</span><span class="auth-card__hint">Configured region, frequency, bandwidth and spreading factor</span></label>
+                                </fieldset>
+                                <div class="auth-card__actions"><button type="submit" class="auth-button auth-button--primary" disabled>Save public view</button></div>
+                                <p class="auth-status" role="status" aria-live="polite"></p>
+                            </form>
+                        </article>
+
                         <article class="auth-card" data-lockout-root>
                             <h3 class="auth-card__title">Failed-login lockout</h3>
                             <p class="auth-card__hint">After this many failures, login is blocked for the cooldown window. Defaults to 5 attempts / 5 minutes.</p>
@@ -1217,6 +1233,7 @@
     <script defer src="js/settings/password_change_form.js"></script>
     <script defer src="js/settings/sign_out_all_form.js"></script>
     <script defer src="js/settings/viewer_role_form.js"></script>
+    <script defer src="js/settings/public_view_form.js"></script>
     <script defer src="js/settings/lockout_config_form.js"></script>
     <script defer src="js/settings/session_lifetime_form.js"></script>
     <script defer src="js/settings/auth_panel_controller.js"></script>

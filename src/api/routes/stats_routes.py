@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
 from src.api.auth.metrics_api_key import require_session_or_metrics_key
 from src.analytics.network_mapper import NetworkMapper
@@ -160,6 +160,29 @@ def _get_device_context() -> dict:
         "firmware": __version__,
         "uptime_seconds": uptime_s,
         "days_online": days_online,
+    }
+
+
+async def public_snapshot(page: str) -> dict:
+    """Aggregates for the public view (TODO 37c): explicit fields only,
+    never IDs, positions, payloads or secrets. 503 while starting up."""
+    if _node_repo is None or _traffic_monitor is None or _signal_analyzer is None:
+        raise HTTPException(503, "Statistics are starting up")
+    if page == "dashboard":
+        return {
+            "total_nodes": await _node_repo.get_count(),
+            "active_24h": await _node_repo.get_active_count(24),
+        }
+    if page != "stats":
+        raise HTTPException(404, "Public page unavailable")
+    traffic = await _traffic_monitor.get_traffic_summary()
+    signal = await _signal_analyzer.get_signal_summary()
+    return {
+        "total_packets": traffic.get("total_packets", 0),
+        "packets_last_hour": traffic.get("packets_last_hour", 0),
+        "packets_per_minute": traffic.get("packets_per_minute", 0),
+        "avg_rssi": signal.get("avg_rssi"),
+        "avg_snr": signal.get("avg_snr"),
     }
 
 

@@ -86,6 +86,13 @@
   connection now waits 3 s after closing the live one before the reset
   pulse, 3 s after the pulse before opening, and 1 s before the retry with
   DTR inverted (as the meshcore library does itself).
+- **Optional public view.** Settings → Auth → Public view lets an
+  administrator share a read-only summary page that anyone can open without a
+  login: node counts (Dashboard), packet and signal averages (Stats) and the
+  configured radio parameters (Radio), each page chosen separately. Off by
+  default; never names, IDs, positions, messages or configuration; no session
+  and no live connection for visitors; numbers cached for 10 seconds. See
+  `docs/DASHBOARD-ACCESS.md` (upstream `b91d994b`).
 - **A broken channel key no longer crashes Meshpoint.** A Meshtastic channel
   with an invalid Base64 PSK in `local.yaml` used to stop the service at
   startup. Now that one channel is marked unavailable (the other channel
