@@ -59,3 +59,9 @@ test('primary buttons keep their colour and the theme editor marks its active ta
     assert.match(css, /:is\(\.section\[data-plugin-page\], \.theme-editor\) \.terminal-button--primary \{[^}]*var\(--term-accent\)/);
     assert.match(css, /\.theme-editor :is\(\.lw-tab--active/);
 });
+
+test('plugin pages get thin theme-coloured scrollbars', () => {
+    const css = fs.readFileSync(path.join(__dirname, '..', 'frontend/css/plugin_pages.css'), 'utf8');
+    assert.match(css, /\.section\[data-plugin-page\] \{ scrollbar-color: var\(--overlay-strong\) transparent; \}/);
+    assert.match(css, /\.section\[data-plugin-page\] \* \{ scrollbar-width: thin; \}/);
+});

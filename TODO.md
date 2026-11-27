@@ -389,7 +389,7 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
         `configuration_navigation` (PiMesh, with 39). Plugin docs: 471a81da's PLUGINS.md text is about their plugin
         store ("How to enable downloads", RC catalog) → with 47; dfe6bcf5 is their release plan, nothing for us.
         Bootstrap and map tiles: no upstream test files for those.
-- [ ] **47. Plugin pages and plugin store layout** (M-L, `b91d994b`, `ede788c8`, `471a81da`, `622ce563`). They redesigned
+- [x] **47. Plugin pages and plugin store layout** (M-L, `b91d994b`, `ede788c8`, `471a81da`, `622ce563`). They redesigned
       both. Checked 26-11 against `upstream/main`:
   - **Store view** (`css/plugin_store.css`, `js/settings/plugin_catalog.js`, `plugin_store_data.js`, markup in
     `index.html` `#settings-plugins-panel`): a hero banner ("optional modules", art squares), a search box, category
@@ -424,8 +424,10 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
     `tests/frontend_plugin_page_shell.test.js` (marker; every selector scoped). First after-screenshots 27-11: the
     LocalMesh and Reticulum Dashboard maps collapsed (upstream's `.panel { height: auto }`) and the stat row overflowed;
     fixed with an "ours" block at the end of plugin_pages.css: plugin pages using the core `.dashboard` layout keep
-    the core Dashboard's values (no section padding, panels 100 % high, compact stat cards). Test added. Still to do:
-    after-screenshots of the other pages (dark, light, phone).
+    the core Dashboard's values (no section padding, panels 100 % high, compact stat cards). Test added. Also in the
+    "ours" block: yellow primary buttons kept, the theme editor's active tab marked, the installed-themes table full
+    width (scrolls only under 640 px), thin theme-coloured scrollbars on plugin pages. bluetooth-scanner 0.2.3: stat
+    cards line up with the title. Screenshots 27-11 on the COTX (dark, light, phone): OK.
 - [ ] **48. `c2e6c495` Malformed Meshtastic channel key at startup** (M, 9 files + test 85). **In progress 26-11.**
       A real bug here too, only on their `feat/v0.8.1` branch (not in their main yet). Ours:
       `CryptoService.add_channel_key()` does `base64.b64decode(key_b64)` without checking, so a wrong Base64 PSK in
