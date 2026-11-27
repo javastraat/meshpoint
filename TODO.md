@@ -421,8 +421,11 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
     the same class names: lw-panel, panel, lsn-, cfg-, stat-card ...); `sidebar_plugin_registry.js` marks each plugin
     section `data-plugin-page="<id>"` like upstream; `.plugin-page` in `dashboard.css` lost its padding/scroll (the
     section has them now, as upstream). Also styles Settings → Themes (`.theme-editor`). Test
-    `tests/frontend_plugin_page_shell.test.js` (marker; every selector scoped). Still to do: before/after screenshots
-    of the plugin pages (dark, light, phone).
+    `tests/frontend_plugin_page_shell.test.js` (marker; every selector scoped). First after-screenshots 27-11: the
+    LocalMesh and Reticulum Dashboard maps collapsed (upstream's `.panel { height: auto }`) and the stat row overflowed;
+    fixed with an "ours" block at the end of plugin_pages.css: plugin pages using the core `.dashboard` layout keep
+    the core Dashboard's values (no section padding, panels 100 % high, compact stat cards). Test added. Still to do:
+    after-screenshots of the other pages (dark, light, phone).
 - [ ] **48. `c2e6c495` Malformed Meshtastic channel key at startup** (M, 9 files + test 85). **In progress 26-11.**
       A real bug here too, only on their `feat/v0.8.1` branch (not in their main yet). Ours:
       `CryptoService.add_channel_key()` does `base64.b64decode(key_b64)` without checking, so a wrong Base64 PSK in

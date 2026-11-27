@@ -116,3 +116,35 @@
     .section[data-plugin-page] .panel__header { padding: 12px; }
     .theme-editor__controls { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ── Ours, not upstream ───────────────────────────────────────────────────
+   Plugin pages that reuse the core Dashboard layout (<main class="dashboard">:
+   LocalMesh Dashboard, Reticulum Dashboard) are full-height grids like the
+   built-in Dashboard. Upstream's rules above (section padding/scroll,
+   ".panel { height: auto }", bigger stat cards) collapse their maps and
+   overflow their stat row, so inside .dashboard the core Dashboard's own
+   values (css/dashboard.css) win again. Upstream has no such plugins. */
+.section[data-plugin-page]:has(> .dashboard) { padding: 0; overflow: hidden; }
+.section[data-plugin-page] .dashboard .panel {
+    height: 100%;
+    background: var(--bg-glass);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: none;
+}
+.section[data-plugin-page] .dashboard .panel__header {
+    padding: 0.5rem 0.75rem;
+    background: none;
+    color: var(--text-muted);
+    gap: 0;
+    flex-wrap: nowrap;
+}
+.section[data-plugin-page] .dashboard .stat-card {
+    padding: 0.35rem 0.6rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: none;
+}
+.section[data-plugin-page] .dashboard .stat-card__label { font-size: 0.6rem; color: var(--text-muted); }
+.section[data-plugin-page] .dashboard .stat-card__value { margin-top: 0; font-size: 1.1rem; }

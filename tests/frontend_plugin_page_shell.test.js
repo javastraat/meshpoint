@@ -46,3 +46,10 @@ test('the shared stylesheet is loaded and only targets plugin pages and the them
         }
     }
 });
+
+test('plugin dashboards (core .dashboard layout) keep full height and their maps', () => {
+    const css = fs.readFileSync(path.join(__dirname, '..', 'frontend/css/plugin_pages.css'), 'utf8');
+    assert.match(css, /\.section\[data-plugin-page\]:has\(> \.dashboard\)\s*\{\s*padding: 0; overflow: hidden;/);
+    const panel = css.match(/\.section\[data-plugin-page\] \.dashboard \.panel \{([^}]*)\}/);
+    assert.ok(panel && /height: 100%/.test(panel[1]), 'dashboard panels must keep height 100% (maps collapse otherwise)');
+});
