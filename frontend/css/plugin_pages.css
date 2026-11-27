@@ -148,3 +148,24 @@
 }
 .section[data-plugin-page] .dashboard .stat-card__label { font-size: 0.6rem; color: var(--text-muted); }
 .section[data-plugin-page] .dashboard .stat-card__value { margin-top: 0; font-size: 1.1rem; }
+
+/* Ours: the shared button style above also greys out the yellow primary
+   buttons ("Start scan", "Save receivers" ...); keep the core's primary look
+   (css/terminal.css), it marks the main action of a page. */
+:is(.section[data-plugin-page], .theme-editor) .terminal-button--primary {
+    background: var(--term-accent);
+    color: #1a1d24;
+    border-color: transparent;
+}
+:is(.section[data-plugin-page], .theme-editor) .terminal-button--primary:hover:not(:disabled) {
+    background: #ffc266;
+    color: #1a1d24;
+}
+
+/* Ours: upstream styles the theme editor's tabs (.lw-tab) as buttons but only
+   marks the active one on plugin pages, so Settings -> Themes lost it. */
+.theme-editor :is(.lw-tab--active, .lw-tab[aria-selected="true"]) {
+    background: color-mix(in srgb, var(--bg-card), var(--accent-cyan) 18%);
+    border-color: var(--accent-cyan);
+    color: var(--text-primary);
+}

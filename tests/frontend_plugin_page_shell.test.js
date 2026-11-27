@@ -53,3 +53,9 @@ test('plugin dashboards (core .dashboard layout) keep full height and their maps
     const panel = css.match(/\.section\[data-plugin-page\] \.dashboard \.panel \{([^}]*)\}/);
     assert.ok(panel && /height: 100%/.test(panel[1]), 'dashboard panels must keep height 100% (maps collapse otherwise)');
 });
+
+test('primary buttons keep their colour and the theme editor marks its active tab', () => {
+    const css = fs.readFileSync(path.join(__dirname, '..', 'frontend/css/plugin_pages.css'), 'utf8');
+    assert.match(css, /:is\(\.section\[data-plugin-page\], \.theme-editor\) \.terminal-button--primary \{[^}]*var\(--term-accent\)/);
+    assert.match(css, /\.theme-editor :is\(\.lw-tab--active/);
+});
