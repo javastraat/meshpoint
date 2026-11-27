@@ -86,6 +86,15 @@
   connection now waits 3 s after closing the live one before the reset
   pulse, 3 s after the pulse before opening, and 1 s before the retry with
   DTR inverted (as the meshcore library does itself).
+- **A broken channel key no longer crashes Meshpoint.** A Meshtastic channel
+  with an invalid Base64 PSK in `local.yaml` used to stop the service at
+  startup. Now that one channel is marked unavailable (the other channel
+  numbers stay the same), sending on it is refused instead of quietly using
+  the primary key, and Configuration → Channels shows "Channel unavailable.
+  Enter its Base64 PSK." The Channels editor rejects an invalid key before
+  saving anything. MeshCore channel keys have their own list, and a
+  Meshtastic channel save no longer drops them until the next restart
+  (upstream `c2e6c495`).
 - **Preset chips and a preset filter on the dashboard.** Every packet in the
   table gets a chip for the preset it came in on (LF, MF, LT, SF ... from its
   SF and bandwidth; MC for MeshCore, LM for LocalMesh; LongMod is "LMd" here,

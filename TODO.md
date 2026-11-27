@@ -464,6 +464,15 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
       Because KMX keeps working on `feat/v0.8.1`, look at that branch every round.
       Note 27-11: `tests/test_channel_key_startup.py` is committed (in 264d3430) and fails on purpose until this item
       is ported, so CI (`.github/workflows/ci.yml`, pytest step) stays red until then.
+      → 27-11 ported (Einstein: not someone else's after all): `CryptoService.decode_channel_psk()` (strict,
+        whitespace-tolerant), `add_channel_key` keeps a None slot, `get_channel_key`, `add_meshcore_channel_key` (own
+        list), `get_all_keys` with None slots; coordinator/config routes load MeshCore keys separately; decoder and hash
+        resolver skip None; `tx_service`: `_secondary_channel` raises for unknown/unavailable, send refuses early,
+        replies on an unknown hash get no key when a slot is unavailable; Channels editor validates before saving (400)
+        and saves once, list flags `key_unavailable`, card shows "Channel unavailable. Enter its Base64 PSK."; MQTT only
+        gets usable keys. Also fixed: a Meshtastic channel save dropped the MeshCore keys until restart (upstream does
+        it too). `test_channel_key_startup.py` 10/10 (CI green), `test_meshcore_channels.py` and the echo-hash fixture in
+        `test_tx_service.py` adjusted. Still to do: Pi test.
 - [x] **49. Bobcat G285 docs branch** (S, `fd5b4d1d` + `dd834718`, branch `upstream/fix/bobcat-g285-docs-reconciliation`,
       not merged into their main). New `docs/BOBCAT-G285.md` (417 lines), reworked `BOBCAT-300.md`, README and
       HARDWARE-MATRIX. Merge with item 33 (`c7bf59f4`) so we do the G285 docs once.
