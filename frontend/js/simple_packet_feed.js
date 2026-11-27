@@ -9,6 +9,27 @@ class SimplePacketFeed {
         this._count = 0;
         this._nodeByLastByte = new Map();
         this._onFocus = null;
+        // Preset chips and "show only" pills (upstream 829a17e4/45adf5c5, TODO
+        // 30). Unlike upstream, rows are not rebuilt on every packet: each row
+        // carries its preset (data-preset) and a filter change only hides/shows.
+        if (window.MeshpointRadioViewFilter) {
+            MeshpointRadioViewFilter.wirePills(document.getElementById('packet-preset-pills'));
+            document.addEventListener(MeshpointRadioViewFilter.EVENT, () => this._applyPresetFilter());
+        }
+    }
+
+    /** Hide the rows that don't match the selected preset pill. */
+    _applyPresetFilter() {
+        if (!this._tbody || !window.MeshpointRadioViewFilter) return;
+        const key = MeshpointRadioViewFilter.current();
+        for (const tr of this._tbody.children) {
+            tr.hidden = !(key === 'all' || tr.dataset.preset === key);
+        }
+    }
+
+    _presetChip(preset) {
+        if (!preset) return '<span class="packet-chip packet-chip--unknown">--</span>';
+        return `<span class="packet-chip packet-chip--${preset.tone}" title="${preset.name}">${preset.chip}</span>`;
     }
 
     setOnFocus(cb) {
@@ -75,6 +96,14 @@ class SimplePacketFeed {
         const sfVal = sig.spreading_factor || packet.spreading_factor;
         const sf = !sfVal ? '--' : (protocol === 'pager' ? `${sfVal}bps` : `SF${sfVal}`);
 
+        const preset = window.ModemPresetLabel ? ModemPresetLabel.fromPacket(packet) : null;
+        tr.dataset.preset = preset ? preset.key : '';
+        if (window.MeshpointRadioViewFilter) {
+            MeshpointRadioViewFilter.notePreset(preset);
+            const key = MeshpointRadioViewFilter.current();
+            tr.hidden = !(key === 'all' || tr.dataset.preset === key);
+        }
+
         tr.innerHTML = `
             <td>${time}</td>
             <td class="${protocolClass}">${protocol}</td>
@@ -83,6 +112,7 @@ class SimplePacketFeed {
             <td class="${typeClass}">${type}</td>
             <td class="${rssiClass}">${rssi}</td>
             <td>${snr}</td>
+            <td>${this._presetChip(preset)}</td>
             <td class="td-freq">${freq}</td>
             <td class="td-sf">${sf}</td>
             <td>${hops}</td>

@@ -50,6 +50,8 @@ class NodeCards {
         if (window.MeshpointNodeFavorites) {
             window.MeshpointNodeFavorites.onChange(() => this._render());
         }
+        // Preset "show only" pills (radio_view_filter.js, TODO 30).
+        document.addEventListener('meshpoint:radioView', () => this._render());
     }
 
     _loadSavedSort() {
@@ -152,17 +154,26 @@ class NodeCards {
 
     loadNodes(nodes) {
         this._nodes = nodes;
+        if (window.MeshpointRadioViewFilter) {
+            MeshpointRadioViewFilter.noteNodes(nodes);
+        }
         this._render();
     }
 
     updateFromPacket(packet) {
         if (!packet.source_id) return;
+        // Latest modem, for the preset filter (upstream 829a17e4).
+        const sig = packet.signal || {};
+        const sf = sig.spreading_factor ?? packet.spreading_factor;
+        const bw = sig.bandwidth_khz ?? packet.bandwidth_khz;
         const idx = this._nodes.findIndex(n => n.node_id === packet.source_id);
         if (idx >= 0) {
             const n = this._nodes[idx];
             n.last_heard = new Date().toISOString();
             if (packet.rssi != null) n.latest_rssi = packet.rssi;
             if (packet.snr != null) n.latest_snr = packet.snr;
+            if (sf != null) n.latest_spreading_factor = sf;
+            if (bw != null) n.latest_bandwidth_khz = bw;
             if (packet.decoded_payload?.long_name) {
                 n.long_name = packet.decoded_payload.long_name;
             }
@@ -177,6 +188,8 @@ class NodeCards {
                 last_heard: new Date().toISOString(),
                 latest_rssi: packet.rssi,
                 latest_snr: packet.snr,
+                latest_spreading_factor: sf,
+                latest_bandwidth_khz: bw,
             });
         }
         this._render();
@@ -223,9 +236,13 @@ class NodeCards {
     }
 
     _applyFilter(nodes) {
-        const filtered = window.MeshpointNodeCardsSort
+        let filtered = window.MeshpointNodeCardsSort
             ? window.MeshpointNodeCardsSort.applyFilter(nodes, this._filter)
             : nodes;
+        if (window.MeshpointRadioViewFilter) {
+            const key = MeshpointRadioViewFilter.current();
+            filtered = filtered.filter((n) => MeshpointRadioViewFilter.matchesNode(n, key));
+        }
         if (this._favoritesOnly && window.MeshpointNodeFavorites) {
             const favs = new Set(window.MeshpointNodeFavorites.list());
             return filtered.filter((n) => favs.has(n.node_id));

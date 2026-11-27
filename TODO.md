@@ -209,6 +209,13 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
 - [ ] **30. `829a17e4` + `45adf5c5` Preset chips and filter** (L, 450 + tests). LF/MF/LT/MC chips on nodes and
       packets, and a "show only" preset filter, pills appear once a preset is heard. New `modem_preset_label.js`,
       `radio_view_filter.js`, `packet_feed.css`; `node_map.js`, `node_cards.js`, `simple_packet_feed.js`.
+      → 27-11, **30a built** (Einstein: LongMod = "LMd", "LM" stays LocalMesh): `modem_preset_label.js` +
+        `radio_view_filter.js` from upstream (plus LMd, an LM entry for protocol localmesh, no chip for pager/LoRaWAN);
+        `packet_feed.css` (chips, pills, orange LM); node repository sends `latest_spreading_factor/bandwidth_khz`
+        (test); packet table gets a Preset column and `data-preset` per row, the filter hides rows instead of rebuilding
+        them (upstream re-renders 200 rows per packet); node cards and map follow the filter, map popup names the
+        preset. Test `tests/frontend_preset_chips.test.js`. Still to do: Pi screenshots, then **30b**: upstream's map
+        markers with a preset badge next to each dot (`ModemPresetLabel.markerMarkup`, node_map marker rewrite).
 
 ### H. Big one
 

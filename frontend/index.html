@@ -49,6 +49,7 @@
     <link rel="stylesheet" href="css/listener.css" />
     <link rel="stylesheet" href="css/gps.css" />
     <link rel="stylesheet" href="css/packet_detail_modal.css" />
+    <link rel="stylesheet" href="css/packet_feed.css" />
     <link rel="stylesheet" href="css/terminal_theme.css" />
     <link rel="stylesheet" href="css/terminal.css" />
     <link rel="stylesheet" href="/vendor/xterm/xterm.css" />
@@ -581,6 +582,7 @@
                         <div class="panel">
                             <div class="panel__header">
                                 Packets
+                                <div class="packet-pills" id="packet-preset-pills" role="group" aria-label="Filter by heard presets"></div>
                                 <span class="packet-count" id="packet-count">0</span>
                             </div>
                             <div class="panel__body">
@@ -594,6 +596,7 @@
                                             <th>Type</th>
                                             <th>RSSI</th>
                                             <th>SNR</th>
+                                            <th>Preset</th>
                                             <th>Freq</th>
                                             <th>SF</th>
                                             <th>Hops</th>
@@ -1178,6 +1181,8 @@
     <script defer src="js/packet_batcher.js"></script>
     <script defer src="js/websocket_client.js"></script>
     <script defer src="js/map_tile_source.js"></script>
+    <script defer src="js/modem_preset_label.js"></script>
+    <script defer src="js/radio_view_filter.js"></script>
     <script defer src="js/components/node_map.js"></script>
     <script defer src="js/meshpoint_display_units.js"></script>
     <script defer src="js/meshpoint_node_favorites.js"></script>

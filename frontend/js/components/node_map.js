@@ -120,16 +120,27 @@ class NodeMap {
                 this.loadNodes(this._lastNodes, this._lastDevice);
             }
         });
+        // Preset "show only" pills (radio_view_filter.js, TODO 30).
+        document.addEventListener('meshpoint:radioView', () => {
+            if (this._lastNodes) {
+                this.loadNodes(this._lastNodes, this._lastDevice);
+            }
+        });
     }
 
     _nodesForMapMarkers(nodes) {
-        const filter = window.MeshpointNodeCardsSort
-            ? window.MeshpointNodeCardsSort.readSavedFilter()
-            : 'all';
-        if (filter === 'all' || !window.MeshpointNodeCardsSort) {
-            return nodes;
+        let out = nodes;
+        if (window.MeshpointNodeCardsSort) {
+            const hop = window.MeshpointNodeCardsSort.readSavedFilter();
+            if (hop !== 'all') {
+                out = window.MeshpointNodeCardsSort.applyFilter(out, hop);
+            }
         }
-        return window.MeshpointNodeCardsSort.applyFilter(nodes, filter);
+        if (window.MeshpointRadioViewFilter) {
+            const key = MeshpointRadioViewFilter.current();
+            out = out.filter((n) => MeshpointRadioViewFilter.matchesNode(n, key));
+        }
+        return out;
     }
 
     _loadSavedView() {
@@ -336,6 +347,9 @@ class NodeMap {
 
         this._lastNodes = nodes;
         this._lastDevice = device;
+        if (window.MeshpointRadioViewFilter) {
+            MeshpointRadioViewFilter.noteNodes(nodes);
+        }
 
         this._markerGroup.clearLayers();
         this._markers = {};
@@ -448,9 +462,11 @@ class NodeMap {
             ? `${Number(n.rssi ?? n.latest_rssi).toFixed(0)} dBm` : '--';
         const lastHeard = this._formatRelativeTime(heard);
 
+        const preset = window.ModemPresetLabel ? ModemPresetLabel.fromNode(n) : null;
         marker.bindPopup(
             `<strong>${this._esc(name)}</strong><br>` +
             `Protocol: ${n.protocol || 'meshtastic'}<br>` +
+            (preset ? `Preset: ${preset.name}<br>` : '') +
             `RSSI: ${rssi}<br>` +
             `Last heard: ${lastHeard}`
         );

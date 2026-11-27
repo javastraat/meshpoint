@@ -1,0 +1,65 @@
+/* Preset chips and filter pills for the packet feed (upstream 829a17e4/45adf5c5, TODO 30).
+   The map-badge part of upstream's file comes with 30b. */
+
+.packet-pills {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+
+.packet-chip {
+    display: inline-block;
+    min-width: 1.6rem;
+    padding: 0.05rem 0.35rem;
+    border-radius: 3px;
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-align: center;
+    line-height: 1.3;
+}
+
+.packet-chip--short {
+    color: var(--accent-green);
+    background: rgba(34, 197, 94, 0.15);
+}
+
+.packet-chip--medium {
+    color: var(--accent-cyan);
+    background: rgba(6, 182, 212, 0.15);
+}
+
+.packet-chip--long {
+    color: var(--accent-blue);
+    background: rgba(59, 130, 246, 0.15);
+}
+
+.packet-chip--turbo {
+    color: var(--accent-amber);
+    background: rgba(245, 158, 11, 0.15);
+}
+
+.packet-chip--vlong {
+    color: var(--accent-red);
+    background: rgba(239, 68, 68, 0.15);
+}
+
+.packet-chip--mc {
+    color: var(--accent-purple);
+    background: rgba(168, 85, 247, 0.15);
+}
+
+.packet-chip--unknown {
+    color: var(--text-muted);
+    background: rgba(100, 116, 139, 0.12);
+}
+
+/* Ours: LocalMesh packets (protocol localmesh), orange like its topbar chip. */
+.packet-chip--lm {
+    color: #fb923c;
+    background: rgba(251, 146, 60, 0.15);
+}
+
+/* Filter pills sit in the Packets panel header, next to the count. */
+.panel__header .packet-pills { margin-left: auto; margin-right: 0.5rem; }

@@ -175,6 +175,22 @@ class TestNodeRepository(unittest.TestCase):
         row = next(r for r in rows if r["node_id"] == node_id)
         self.assertEqual(row["latest_capture_source"], "serial_433")
 
+    def test_get_all_with_signal_reports_latest_modem(self):
+        # The dashboard's preset chips (LF/MF/...) and preset filter read the
+        # node's latest SF and bandwidth (upstream 829a17e4, TODO 30).
+        node_id = "1a2b3c4d"
+        _run(self.repo.upsert(Node(node_id=node_id, long_name="MF node", protocol="meshtastic")))
+        for pid, sf, bw, ts in (("old", 11, 250.0, "2026-07-09T11:00:00+00:00"),
+                                ("new", 9, 250.0, "2026-07-09T12:00:00+00:00")):
+            _run(self.db.execute(
+                "INSERT INTO packets (packet_id, source_id, destination_id, protocol, packet_type, "
+                "spreading_factor, bandwidth_khz, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (pid, node_id, "ffffffff", "meshtastic", "data", sf, bw, ts),
+            ))
+        rows = _run(self.repo.get_all_with_signal())
+        row = next(r for r in rows if r["node_id"] == node_id)
+        self.assertEqual((row["latest_spreading_factor"], row["latest_bandwidth_khz"]), (9, 250.0))
+
     def test_meshcore_display_name_ignores_id_placeholder(self):
         node = Node(
             node_id="abcdef123456",

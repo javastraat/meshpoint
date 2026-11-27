@@ -86,6 +86,13 @@
   connection now waits 3 s after closing the live one before the reset
   pulse, 3 s after the pulse before opening, and 1 s before the retry with
   DTR inverted (as the meshcore library does itself).
+- **Preset chips and a preset filter on the dashboard.** Every packet in the
+  table gets a chip for the preset it came in on (LF, MF, LT, SF ... from its
+  SF and bandwidth; MC for MeshCore, LM for LocalMesh; LongMod is "LMd" here,
+  because LM already means LocalMesh). Pills in the Packets header ("All"
+  plus every preset heard so far) show only that preset in the packet table,
+  the node list and on the map; the choice is remembered. Map popups name the
+  preset (upstream `829a17e4`, `45adf5c5`).
 - **Update progress at the top.** Settings → Updates shows the progress of
   an apply or rollback (steps, live output) at the top of the page and
   scrolls to it, instead of below "Automatic checks" where it was easy to
