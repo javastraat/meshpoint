@@ -6,6 +6,10 @@ Earlier rounds (up to 2026-08-13): [memory/upstream_sync_todo.md](memory/upstrea
 Checked: **2026-11-26** against `upstream/main` at `4e78804d` (v0.8.0 release prep) and their other branches
 (`feat/v0.8.1` is one commit ahead of main: item 48).
 
+**Status 27-11:** done 1-10, 12-15, 17-29, 32-36, 40-47, 49-51 (42 of the 50, plus 51). Open: 11, 16, 30, 31, 37c/e/g,
+38, 39, 41a (Pi test waits for an RTL-SDR dongle), 48 (someone else's), the rechecks marked "Recheck later", then the
+0.8.2 bump.
+
 **Decision 26-11 (Einstein): we want everything they have.** Nothing is "skip" or "decide first" any more, unless it
 is only upstream's own housekeeping (release metadata, CI, merge commits) or code that is already ours. That
 includes WisMesh Node / meshtasticd, PiMesh, the public view, p25 and their plugin repo. Items we closed earlier as
@@ -35,7 +39,8 @@ using `fastapi.testclient` (e.g. `test_gps_routes`) fail to import there; run th
 in the venv. Meshpoint itself doesn't need it.
 
 Per item: read `git show <hash>`, compare with our file(s), port in our style, adapt their test, a line in
-`docs/CHANGELOG.md`, tick it here, commit. **Pi** = needs a check on the real device after the commit.
+`docs/CHANGELOG.md`, tick it here (only after Einstein's OK, once the Pi test passed), Einstein commits.
+**Pi** = needs a check on the real device after the commit.
 Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
 
 ### A. Warm-up: small, no radio risk
@@ -117,6 +122,8 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
       index. `src/api/server.py`.
       → Done 26-11: `message_channel` in `_setup_message_interception`, passed to `save_received`. Test
         `tests/test_received_message_channel.py` (unittest, not upstream's pytest).
+  - [ ] **Recheck later:** a new channel message received on the COTX is stored with its channel number (DB rows
+        from before 26-11 still show 0; `grep` showed the fix is on the Pi).
 - [ ] **16. `ffea55fd` Native channel routing and acknowledgements** (M, 41 + test 92). Replies go out on the right
       channel; Meshtastic ACKs aren't lost. `src/api/routes/messages.py`, `server.py`, `src/decode/meshtastic_decoder.py`
       (skip their `PIMESH.md`).
@@ -133,6 +140,8 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
       → Done 26-11: patch applied for the model, node repository, adapter, coordinator, upstream heartbeat and USB tests;
         contact parser (ours lives in `meshcore_tx_client.get_contacts`, still requires a name) and contact sync by hand.
         Tests ported into `tests/test_meshcore_contact_enrichment.py`.
+  - [ ] **Recheck later:** more MeshCore contacts with a position show up on the map / reach Meshradar (few nodes
+        with a position so far).
 - [x] **19. `5a9383d2` Registered-pin position privacy** (M, 35 + tests 123). With "registered pin" chosen, the
       broadcaster sends the pin, never the live GPS. We have the option in `mesh_position_resolver.py` and
       `gps_card.js`: check where ours still leaks. Also `broadcast_interval.py`, `position_broadcaster.py`.
@@ -502,54 +511,55 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
       (`select_preview_section` in `src/api/update/release_notes.py`) shows the section matching the installed version,
       so bullets left under "Unreleased" wouldn't show. Earlier bump for reference: `28169a85`.
 
-The tables below are the full inventory (incl. what we already have and what we skip).
+The tables below are the full inventory (incl. what we already have and what we skip). Status column synced with
+the work list on 27-11: ✅ done, ⬜ still open.
 
 ## 1. Radio, concentrator and relay fixes (high: our COTX gateway runs on this)
 
 | | Commit | What | Notes |
 |---|---|---|---|
-| ⬜ | `536a9149` | Show the real received coding rate (#163) | Tiny. `concentrator_source.py` doesn't set `coding_rate` from `pkt.coderate` |
-| ❓ | `e9286d84` | Serialize native HAL access and wait for TX completion (#181) | We have a `_hal_lock` in `sx1302_wrapper.py`; they add `sx1302_access.py` + TX wait in `tx_service.py` |
-| ⬜ | `fcacc92b` | Set and verify the service-modem RX preamble on every start (#179) | New `sx1302_preamble.py` |
-| ❓ | `027899ed` | Keep the concentrator receive iterator alive during a restart (#176) | 24% already similar |
-| ⬜ | `f4d19492` | Skip our own Meshtastic packets, stamp the native relay identity (#175, #182) | Applies cleanly |
-| ⬜ | `ebbf6eb3` | Fresh gateway detection with a bounded HAL version probe (#178) | Setup wizard / `hardware_probe.py` |
-| ⬜ | `553bdd83` | Transmit settings save completion (#177) | `transmit_card.js` |
+| ✅ | `536a9149` | Show the real received coding rate (#163) | Tiny. `concentrator_source.py` doesn't set `coding_rate` from `pkt.coderate` |
+| ⬜ | `e9286d84` | Serialize native HAL access and wait for TX completion (#181) | We have a `_hal_lock` in `sx1302_wrapper.py`; they add `sx1302_access.py` + TX wait in `tx_service.py` |
+| ✅ | `fcacc92b` | Set and verify the service-modem RX preamble on every start (#179) | New `sx1302_preamble.py` |
+| ✅ | `027899ed` | Keep the concentrator receive iterator alive during a restart (#176) | 24% already similar |
+| ✅ | `f4d19492` | Skip our own Meshtastic packets, stamp the native relay identity (#175, #182) | Applies cleanly |
+| ✅ | `ebbf6eb3` | Fresh gateway detection with a bounded HAL version probe (#178) | Setup wizard / `hardware_probe.py` |
+| ✅ | `553bdd83` | Transmit settings save completion (#177) | `transmit_card.js` |
 | ⬜ | `ffea55fd` | Native channel routing, keep Meshtastic acknowledgements | |
-| ⬜ | `121c2d3a` | Keep received message channel numbers | |
-| ⬜ | `8ba70630` | MQTT previews and LongTurbo channel resolution (#146/#147) | |
-| ⬜ | `06af14ba` | Keep reception timestamps in Meshtastic MQTT packets | Applies cleanly |
-| ⬜ | `d870125f` | Test only: MQTT partial signal metric | Applies cleanly |
-| ⬜ | `4439c2a8` | MeshCore contact positions reaching Meshradar (#136) | |
-| ❓ | `5a9383d2` | Honor registered-pin mesh position privacy | We have `registered pin` in `mesh_position_resolver.py`; compare |
+| ✅ | `121c2d3a` | Keep received message channel numbers | |
+| ✅ | `8ba70630` | MQTT previews and LongTurbo channel resolution (#146/#147) | |
+| ✅ | `06af14ba` | Keep reception timestamps in Meshtastic MQTT packets | Applies cleanly |
+| ✅ | `d870125f` | Test only: MQTT partial signal metric | Applies cleanly |
+| ✅ | `4439c2a8` | MeshCore contact positions reaching Meshradar (#136) | |
+| ✅ | `5a9383d2` | Honor registered-pin mesh position privacy | We have `registered pin` in `mesh_position_resolver.py`; compare |
 | ⏭️ | `408f9ea2` | Privacy validation notes (docs to the above) | |
 
 ## 2. System and security (high, mostly small)
 
 | | Commit | What | Notes |
 |---|---|---|---|
-| ⬜ | `4d4b22df` | Sample host CPU in the background (#149/#150) | Ours calls `psutil.cpu_percent(interval=0.5)` per request: 0.5 s blocked each time |
-| ⬜ | `5ff1ec6a` | Restrict Espressif USB access to the dialout group | We install the tight rule; missing: upgrading the old `0666` rule in `post_update.sh` |
-| ⬜ | `bc5b810c` | Pin `python-multipart` for firmware upload | Missing from our `requirements.txt` |
-| ⬜ | `1b2c8ff5` | Web terminal cleanup after shell EOF (#166) | Applies cleanly |
-| ❓ | `d0074db3` | Keep expected upstream reconnect failures short in the log | 70% already in |
-| ❓ | `3ca92469` | Harden `install.sh` for dashboard Apply on upgrade | 46% in |
+| ✅ | `4d4b22df` | Sample host CPU in the background (#149/#150) | Ours calls `psutil.cpu_percent(interval=0.5)` per request: 0.5 s blocked each time |
+| ✅ | `5ff1ec6a` | Restrict Espressif USB access to the dialout group | We install the tight rule; missing: upgrading the old `0666` rule in `post_update.sh` |
+| ✅ | `bc5b810c` | Pin `python-multipart` for firmware upload | Missing from our `requirements.txt` |
+| ✅ | `1b2c8ff5` | Web terminal cleanup after shell EOF (#166) | Applies cleanly |
+| ✅ | `d0074db3` | Keep expected upstream reconnect failures short in the log | 70% already in |
+| ✅ | `3ca92469` | Harden `install.sh` for dashboard Apply on upgrade | 46% in |
 
 ## 3. Features: MeshCore and Meshtastic USB (medium)
 
 | | Commit | What | Notes |
 |---|---|---|---|
 | ⬜ | `6011f846` | nRF DFU flash for MeshCore and Meshtastic companions | Big (2000 lines). Ours only says "drag-and-drop the .uf2" for nRF52 |
-| ⬜ | `93866842` + `459c4d7c` | Reconnect Meshtastic USB after Set Preset reboots it; show REBOOTING vs RECONNECTING | |
+| ✅ | `93866842` + `459c4d7c` | Reconnect Meshtastic USB after Set Preset reboots it; show REBOOTING vs RECONNECTING | |
 | ⬜ | `829a17e4` + `45adf5c5` | LF/MF/LT/MC preset chips and a show-only preset filter on the dashboard | |
-| ⬜ | `e8c4c6e1` | Persistent MeshCore send feedback (#151) | |
-| ⬜ | `a451d1e2` | MeshCore heard-path popover (#152) | |
-| ⬜ | `fc15bc36` + `cad3c4a1` | MeshCore packet RF metadata and received hops | |
-| ⬜ | `6ea8de00` | Shared MeshCore TCP transport, verified serialized radio commands | |
-| ⬜ | `23a5fe7e` | MeshCore USB capture status independent of TX | |
-| ⬜ | `3fbfa9fa` | Show Meshtastic status only for configured capture sources | |
-| ⬜ | `a16253be` | Connect dashboard status before the initial data load | |
-| ❓ | `a890b318` / `8e349c91` | Opt-in Reticulum interface discovery and operator contacts | Mostly have it in our plugin; operator contact is missing (item 36) |
+| ✅ | `e8c4c6e1` | Persistent MeshCore send feedback (#151) | |
+| ✅ | `a451d1e2` | MeshCore heard-path popover (#152) | |
+| ✅ | `fc15bc36` + `cad3c4a1` | MeshCore packet RF metadata and received hops | |
+| ✅ | `6ea8de00` | Shared MeshCore TCP transport, verified serialized radio commands | |
+| ✅ | `23a5fe7e` | MeshCore USB capture status independent of TX | |
+| ✅ | `3fbfa9fa` | Show Meshtastic status only for configured capture sources | |
+| ✅ | `a16253be` | Connect dashboard status before the initial data load | |
+| ✅ | `a890b318` / `8e349c91` | Opt-in Reticulum interface discovery and operator contacts | Mostly have it in our plugin; operator contact is missing (item 36) |
 | ⏭️ | `58e4e9b1`, `4ad2903f` | Docs/wording: USB radios are "nodes", not "sticks" | Optional |
 
 ## 4. Plugin system (compare, don't port)
@@ -559,10 +569,10 @@ repo). Theirs is a different implementation. Only worth looking at for ideas and
 
 | | Commit | What | Notes |
 |---|---|---|---|
-| ❓ | `b91d994b` | Optional apps, themes and dashboard access controls (34 000 lines) | Checked 26-11: mostly ours already; one viewer fix + optional hardening (item 37a/b), public view is optional (37c) |
+| ⬜ | `b91d994b` | Optional apps, themes and dashboard access controls (34 000 lines) | Checked 26-11: mostly ours already; one viewer fix + optional hardening (item 37a/b), public view is optional (37c) |
 | ✅ | `ede788c8`, `6b06ec5d` | Plugin source picker, dependencies + cascading disable | Our own (`5ec7fa52`, `6e9f7dfe`, `49a370b6`) |
-| ❓ | `622ce563` | Their official plugin repository | Catalogs diverged (item 37); only p25 is new, check it runs on our core first |
-| ❓ | `d8db1301` | Bound plugin source revision lookups for big imports | Possibly useful for our sources |
+| ⬜ | `622ce563` | Their official plugin repository | Catalogs diverged (item 37); only p25 is new, check it runs on our core first |
+| ✅ | `d8db1301` | Bound plugin source revision lookups for big imports | Possibly useful for our sources |
 | ⏭️ | `471a81da`, `dfe6bcf5` | Their plugin docs and release plan | |
 | ✅ | `06730b06` | Map tile sources from the dashboard | Ours: `map_tile_source.js`, `dashboard.map_tile_url` (`7d9b3434`) |
 
@@ -570,18 +580,18 @@ repo). Theirs is a different implementation. Only worth looking at for ideas and
 
 | | Commit(s) | What | Notes |
 |---|---|---|---|
-| ❓ | `de78139d` `cb5495e1` `43cd37aa` `f82898ef` `95247426` `349c56da` `74305f1d` `e043fb4a` `5bca93d2` `387f08be` `cb38865f` `9124ab55` `90d159c8` `9f9da27f` `c44642ea` | **WisMesh Node / RAK6421 HAT** via meshtasticd (bridge, install, dashboard control) | ~5000 lines. Only if we use that hardware. We do have `docs/WISMESH-NODE.md`; check what it covers |
-| ❓ | `cdb2d235` `48942ef2` `529577dc` `841ff7a5` | **PiMesh** (device roles, forwarding, MeshCore config) | Only if we use PiMesh |
+| ⬜ | `de78139d` `cb5495e1` `43cd37aa` `f82898ef` `95247426` `349c56da` `74305f1d` `e043fb4a` `5bca93d2` `387f08be` `cb38865f` `9124ab55` `90d159c8` `9f9da27f` `c44642ea` | **WisMesh Node / RAK6421 HAT** via meshtasticd (bridge, install, dashboard control) | ~5000 lines. Only if we use that hardware. We do have `docs/WISMESH-NODE.md`; check what it covers |
+| ⬜ | `cdb2d235` `48942ef2` `529577dc` `841ff7a5` | **PiMesh** (device roles, forwarding, MeshCore config) | Only if we use PiMesh |
 
 ## 6. Docs (low, copy what's useful)
 
 | | Commit | What |
 |---|---|---|
-| ⬜ | `486a2d2e` + `44262226` | Heltec HT-M2808 installation guide (applies cleanly) |
-| ⬜ | `c7bf59f4` | Bobcat G285 community setup (we have `BOBCAT-300.md`) |
-| ⬜ | `d476e296` | Hardware and accessory links |
-| ⬜ | `ba50853f` | GPIO reference SX1301 → SX1302 |
-| ⬜ | `72a9c2cd` | RAK6421 HAT store URL |
+| ✅ | `486a2d2e` + `44262226` | Heltec HT-M2808 installation guide (applies cleanly) |
+| ✅ | `c7bf59f4` | Bobcat G285 community setup (we have `BOBCAT-300.md`) |
+| ✅ | `d476e296` | Hardware and accessory links |
+| ✅ | `ba50853f` | GPIO reference SX1301 → SX1302 |
+| ✅ | `72a9c2cd` | RAK6421 HAT store URL |
 | ⏭️ | `e311f407` | README: installation leads with concentrator gateways (our README differs) |
 
 ## 7. Already have (no action)
