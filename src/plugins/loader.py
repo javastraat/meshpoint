@@ -151,13 +151,16 @@ def is_plugin_enabled(manifest: PluginManifest, conf: dict) -> bool:
 
 def load_plugins(
     builtin_dir: Path, community_dir: Path | None, plugins_config: dict,
+    *, radio_region: str = "UNKNOWN",
 ) -> list[LoadedPlugin]:
     """Load every enabled plugin.
 
     Built-ins come from *builtin_dir* (``src/plugins/apps/``) and load unless
     ``plugins.<id>.enabled`` is explicitly ``false``. Community plugins come
     from *community_dir* (``<plugins_dir>/apps/``) and load only when
-    ``plugins.<id>.enabled`` is truthy. *plugins_config* is ``config.plugins``.
+    ``plugins.<id>.enabled`` is truthy. *plugins_config* is ``config.plugins``;
+    *radio_region* (``config.radio.region``) is handed to each plugin as
+    ``reg.radio_region``.
     """
     loaded: list[LoadedPlugin] = []
     manifests = discover_plugins(builtin_dir, community_dir)
@@ -176,7 +179,7 @@ def load_plugins(
             register = getattr(module, "register", None)
             if not callable(register):
                 raise AttributeError("backend has no module-level register(reg)")
-            register(PluginRegistry(manifest, conf))
+            register(PluginRegistry(manifest, conf, radio_region))
         except Exception:
             logger.exception("plugin %s failed to load -- skipping", manifest.name)
             continue

@@ -329,6 +329,14 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
         rtl433, ACARS, FM radio) refuse to start without a valid frequency and take FM de-emphasis from the region
         (EU 50 µs, US 75 µs); `src/audio/sdr_registry.py`, `tests/test_receiver_regions.py`. Compare with our versions
         in the plugin repo first; probably mostly fine for EU.
+        → 27-11: frequencies: nothing to do (ours are fixed NL/EU frequencies on purpose: pagers 172.45, POCSAG 439.9875,
+          P2000 169.65, rtl433 433.92, ACARS EU channels). FM radio: without RDS it used `rtl_fm -E deemp` (fixed 75 µs,
+          US); now ffmpeg `aemphasis` on both wfm paths (method after upstream). Einstein 27-11: not upstream's chooser
+          but automatic from the region: 75 µs for US/KR, 50 µs for everything else (unknown too, no refusing to
+          start), `plugins.radio.deemphasis_us` (50/75) overrides; status shows `deemphasis_us`/`region`. Core: plugins
+          get `reg.radio_region` (`load_plugins(..., radio_region=config.radio.region)`, as upstream's runtime.py),
+          test in `tests/test_plugin_loader.py`. Plugin tests in `apps/radio/backend/tests/test_listener.py` (fail on the
+          old code). NFM/AM/SSB get none. radio 1.0.2. Still to do: listen on the Pi.
 - [x] **42. MeshCore USB robustness** (M, `b91d994b`; item 26 did not cover it). In `meshcore_usb_source.py`:
   - `restart_auto_fetching()` must call `stop_auto_message_fetching()` first: `start_auto_message_fetching()` in
     `meshcore_py` is not idempotent (each call adds a subscription).

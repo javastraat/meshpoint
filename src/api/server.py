@@ -245,6 +245,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
         Path(__file__).resolve().parents[1] / "plugins" / "apps",
         Path(config.dashboard.plugins_dir) / "apps",
         config.plugins,
+        radio_region=config.radio.region,
     )
 
     auth_subsystem = build_auth_subsystem(config)

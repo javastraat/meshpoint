@@ -86,6 +86,10 @@
   connection now waits 3 s after closing the live one before the reset
   pulse, 3 s after the pulse before opening, and 1 s before the retry with
   DTR inverted (as the meshcore library does itself).
+- **Plugins know the Meshpoint's region.** Plugins get `reg.radio_region`
+  (the configured `radio.region`), so they can pick region defaults; the
+  radio plugin uses it for FM de-emphasis, 75 µs in the US and South Korea,
+  50 µs elsewhere (upstream `b91d994b`).
 - **Installer repairs an interrupted dpkg first.** On an upgrade,
   `install.sh` and `install-debian.sh` now run `dpkg --configure -a`
   before any apt call, so an earlier run or apt upgrade cut short (power

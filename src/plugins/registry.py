@@ -38,12 +38,18 @@ class PluginRegistry:
     * ``reg.name`` -- the plugin id (folder name).
     * ``reg.config`` -- a copy of ``config.plugins["<name>"]`` (freqs, gain,
       device, ... -- the plugin's own sub-schema).
+    * ``reg.radio_region`` -- the Meshpoint's ``radio.region`` (e.g. "EU_868",
+      "US"), for region defaults such as the radio's FM de-emphasis;
+      "UNKNOWN" when not given (upstream KMX415/meshpoint runtime.py).
     """
 
-    def __init__(self, manifest: PluginManifest, plugin_config: dict) -> None:
+    def __init__(
+        self, manifest: PluginManifest, plugin_config: dict, radio_region: str = "UNKNOWN",
+    ) -> None:
         self.manifest = manifest
         self.name = manifest.name
         self.config = dict(plugin_config)
+        self.radio_region = str(radio_region or "UNKNOWN")
 
     def _require(self, capability: str, call: str) -> None:
         if capability not in self.manifest.provides:

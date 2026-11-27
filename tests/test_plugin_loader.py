@@ -93,6 +93,26 @@ class TestLoadPlugins(unittest.TestCase):
         self.assertEqual(len(specs), 1)
         self.assertTrue(specs[0].public)
 
+    def test_plugins_get_the_meshpoint_radio_region(self) -> None:
+        # reg.radio_region (upstream KMX415/meshpoint runtime.py): lets a
+        # plugin pick region defaults, e.g. the radio's FM de-emphasis.
+        _make_plugin(self.apps, "radio", """
+            SEEN = []
+
+            def register(reg):
+                SEEN.append(reg.radio_region)
+        """, provides='["routes"]')
+        load_plugins(self.builtin, self.apps, {"radio": {"enabled": True}}, radio_region="US")
+        mod = next(m for n, m in sys.modules.items() if n.startswith("meshpoint_plugin_") and hasattr(m, "SEEN"))
+        self.assertEqual(mod.SEEN, ["US"])
+
+    def test_radio_region_defaults_to_unknown(self) -> None:
+        from types import SimpleNamespace
+
+        from src.plugins.registry import PluginRegistry
+        reg = PluginRegistry(SimpleNamespace(name="x", provides=[]), {})
+        self.assertEqual(reg.radio_region, "UNKNOWN")
+
     def test_disabled_and_absent_are_skipped(self) -> None:
         _make_plugin(self.apps, "off", "def register(reg): raise AssertionError")
         _make_plugin(self.apps, "unset", "def register(reg): raise AssertionError")
