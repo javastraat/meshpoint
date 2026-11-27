@@ -317,6 +317,17 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
       `src/audio/sdr_registry.py` gives the SDR receivers (ACARS, ADS-B, ...) region defaults. Docs: `RETICULUM-REGIONS.md`.
       Tests: `test_reticulum_regions.py`, `test_receiver_regions.py`. Our plugin has no region logic. Adjust EU to our
       band plan (869,4-869,65 MHz) before copying their numbers.
+      → 27-11 (Einstein: b + c, with an own NL profile): plugin repo `backend/regional.py`, profiles NL / our network
+        (= the plugin defaults, preselected for EU_868 and unknown regions), EU (upstream), US, ANZ, IN, KR, SG;
+        `GET /api/config/reticulum/radio-profiles` (admin; region read live via `state.set_region_provider`); Settings:
+        **Starting profile** + **Apply** (fills the five radio fields, saves nothing). Optional airtime caps
+        `rnode_airtime_limit_short/long` (percent, blank = none) → RNS `airtime_limit_short/long`; upstream's 1 %/hour
+        default not copied. README section. Tests `test_regional.py`, `test_config_routes.py`,
+        `test_write_rnsd_config.py`. Still to do: plugin version bump (ask), Pi test.
+  - [ ] **41a. SDR receiver region defaults** (S, the third part of 41): upstream's receiver plugins (pagers, POCSAG,
+        rtl433, ACARS, FM radio) refuse to start without a valid frequency and take FM de-emphasis from the region
+        (EU 50 µs, US 75 µs); `src/audio/sdr_registry.py`, `tests/test_receiver_regions.py`. Compare with our versions
+        in the plugin repo first; probably mostly fine for EU.
 - [x] **42. MeshCore USB robustness** (M, `b91d994b`; item 26 did not cover it). In `meshcore_usb_source.py`:
   - `restart_auto_fetching()` must call `stop_auto_message_fetching()` first: `start_auto_message_fetching()` in
     `meshcore_py` is not idempotent (each call adds a subscription).
