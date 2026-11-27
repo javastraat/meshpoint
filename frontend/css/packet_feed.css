@@ -1,5 +1,5 @@
-/* Preset chips and filter pills for the packet feed (upstream 829a17e4/45adf5c5, TODO 30).
-   The map-badge part of upstream's file comes with 30b. */
+/* Preset chips and filter pills for the packet feed and map badges
+   (upstream 829a17e4/45adf5c5, TODO 30). */
 
 .packet-pills {
     display: inline-flex;
@@ -63,3 +63,56 @@
 
 /* Filter pills sit in the Packets panel header, next to the count. */
 .panel__header .packet-pills { margin-left: auto; margin-right: 0.5rem; }
+
+/* Map markers: dot (Meshtastic) or diamond (others) with the preset chip next to it (30b). */
+.node-marker-wrap {
+    position: relative;
+    width: 28px;
+    height: 16px;
+}
+
+.node-marker__dot {
+    position: absolute;
+    left: 0;
+    top: 4px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--accent-cyan);
+    border: 1px solid var(--accent-cyan);
+    opacity: 0.85;
+}
+
+.node-marker-wrap--recent .node-marker__dot {
+    border-color: #00ff88;
+    border-width: 2px;
+    animation: pulseRing 1.5s ease-out infinite;
+}
+
+.node-marker-wrap--fav .node-marker__dot {
+    border-color: var(--accent-amber);
+    border-width: 2px;
+}
+
+.node-marker-wrap--recent .node-marker__diamond {
+    border-color: #00ff88;
+    border-width: 2px;
+    animation: pulseRing 1.5s ease-out infinite;
+}
+
+.node-marker-wrap--fav .node-marker__diamond {
+    border-color: var(--accent-amber);
+    border-width: 2px;
+}
+
+.node-marker-wrap .node-marker__diamond {
+    position: absolute;
+    left: 0;
+    top: 3px;
+}
+
+.node-marker__preset {
+    position: absolute;
+    left: 12px;
+    top: 1px;
+}

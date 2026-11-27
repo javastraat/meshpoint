@@ -96,3 +96,19 @@ test('packet table: preset column, data-preset, hidden by the filter', () => {
     w.MeshpointRadioViewFilter.set('all');
     assert.ok(rows.every((tr) => !tr.hidden));
 });
+
+test('map marker: dot or diamond with the preset chip next to it (30b)', () => {
+    const L = load().ModemPresetLabel;
+    const lf = L.fromProtocolAndModem('meshtastic', 11, 250);
+    const html = L.markerMarkup(lf, true, ' node-marker-wrap--recent');
+    assert.match(html, /^<div class="node-marker-wrap node-marker-wrap--recent"><div class="node-marker__dot"><\/div>/);
+    assert.match(html, /<span class="node-marker__preset packet-chip packet-chip--long">LF<\/span>/);
+    assert.match(L.markerMarkup(L.fromProtocolAndModem('meshcore'), false, ''), /node-marker__diamond.*packet-chip--mc">MC</);
+    assert.doesNotMatch(L.markerMarkup(null, true, ''), /node-marker__preset/);
+});
+
+test('narrow screens hide Freq/SF/Hops/Details but keep the Preset column (8)', () => {
+    const css = fs.readFileSync(path.join(__dirname, '..', 'frontend/css/responsive.css'), 'utf8');
+    const block = css.slice(css.indexOf('.packet-table th:nth-child(9)'), css.indexOf('{ display: none; }', css.indexOf('.packet-table th:nth-child(9)')));
+    assert.ok(/nth-child\(12\)/.test(block) && !/nth-child\(8\)/.test(block), block);
+});

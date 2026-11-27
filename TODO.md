@@ -214,8 +214,12 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
         `packet_feed.css` (chips, pills, orange LM); node repository sends `latest_spreading_factor/bandwidth_khz`
         (test); packet table gets a Preset column and `data-preset` per row, the filter hides rows instead of rebuilding
         them (upstream re-renders 200 rows per packet); node cards and map follow the filter, map popup names the
-        preset. Test `tests/frontend_preset_chips.test.js`. Still to do: Pi screenshots, then **30b**: upstream's map
-        markers with a preset badge next to each dot (`ModemPresetLabel.markerMarkup`, node_map marker rewrite).
+        preset. Test `tests/frontend_preset_chips.test.js`. Pi 27-11 on the COTX: LF and LM filters OK.
+      → 27-11, **30b built:** map markers as upstream: one divIcon per node (dot = Meshtastic, diamond = others) with
+        the preset chip next to it, green pulse when recent, amber when favourite (`markerMarkup`, `_stampNodeModem`;
+        circleMarker/setStyle code gone); marker CSS in `packet_feed.css`. Also upstream's `responsive.css` fix missed
+        in 30a: narrow screens hide columns 9-12 (Freq, SF, Hops, Details) so Preset (8) stays. Tests added. Still to
+        do: map screenshot.
 
 ### H. Big one
 
