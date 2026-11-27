@@ -86,6 +86,12 @@
   connection now waits 3 s after closing the live one before the reset
   pulse, 3 s after the pulse before opening, and 1 s before the retry with
   DTR inverted (as the meshcore library does itself).
+- **Thin scrollbars everywhere; small "24h / total" labels.** Every page,
+  core and plugin, gets thin scrollbars in theme colours instead of the
+  browser's bright default track (Dashboard Nodes list, packet table, plugin
+  lists); lists with their own style keep it. The Dashboard's "24h / total"
+  labels used an unstyled class and showed as large text; they now look like
+  every other card's small grey label.
 - **One look for all plugin pages.** Plugin pages (and the theme editor)
   share upstream's plugin-page style: cards, tabs, buttons, input fields,
   tables and fieldsets follow the active theme the same way on every

@@ -60,8 +60,15 @@ test('primary buttons keep their colour and the theme editor marks its active ta
     assert.match(css, /\.theme-editor :is\(\.lw-tab--active/);
 });
 
-test('plugin pages get thin theme-coloured scrollbars', () => {
-    const css = fs.readFileSync(path.join(__dirname, '..', 'frontend/css/plugin_pages.css'), 'utf8');
-    assert.match(css, /\.section\[data-plugin-page\] \{ scrollbar-color: var\(--overlay-strong\) transparent; \}/);
-    assert.match(css, /\.section\[data-plugin-page\] \* \{ scrollbar-width: thin; \}/);
+test('every page (core and plugin) gets thin theme-coloured scrollbars', () => {
+    const css = fs.readFileSync(path.join(__dirname, '..', 'frontend/css/dashboard.css'), 'utf8');
+    assert.match(css, /\.section \{ scrollbar-color: var\(--overlay-strong\) transparent; \}/);
+    assert.match(css, /\.section, \.section \* \{ scrollbar-width: thin; \}/);
+});
+
+test('dashboard stat cards only use styled sub-label classes', () => {
+    // "24h / total" used .stat-card__subtitle, which has no style anywhere, so it rendered
+    // as large plain text instead of the small grey .stat-card__sub every other card uses.
+    const html = fs.readFileSync(path.join(__dirname, '..', 'frontend/index.html'), 'utf8');
+    assert.doesNotMatch(html, /stat-card__subtitle/);
 });

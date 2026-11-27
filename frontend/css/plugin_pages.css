@@ -178,10 +178,4 @@
     .theme-editor .te-installed { display: block; width: auto; }
 }
 
-/* Ours: thin scrollbars in theme colours on plugin pages, like the core's own
-   lists (Messages, command palette): no bright default track on a dark panel
-   (e.g. the LocalMesh Dashboard's Members/Repeaters list). scrollbar-color
-   inherits, scrollbar-width doesn't, hence the "*". Follows light/dark. */
-.section[data-plugin-page] { scrollbar-color: var(--overlay-strong) transparent; }
-.section[data-plugin-page],
-.section[data-plugin-page] * { scrollbar-width: thin; }
+/* Thin theme-coloured scrollbars: now for every page, see .section in css/dashboard.css. */
