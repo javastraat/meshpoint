@@ -13,7 +13,7 @@ from __future__ import annotations
 import asyncio
 import unittest
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 from src.capture import meshcore_serial
 from src.capture.meshcore_usb_source import MeshcoreUsbCaptureSource

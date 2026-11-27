@@ -256,7 +256,7 @@ class MeshcoreUsbCaptureSource(CaptureSource):
 
     async def _connect(self, port: str) -> None:
         try:
-            from meshcore import MeshCore, EventType
+            from meshcore import EventType
 
             def keep(mc):  # own it before connect(), so a failure gets cleaned up
                 self._meshcore = mc
@@ -766,7 +766,7 @@ class MeshcoreUsbCaptureSource(CaptureSource):
         set_radio_params()) and is responsible for reattaching after.
         """
         try:
-            from meshcore import MeshCore
+            import meshcore  # noqa: F401  (library present? _open_meshcore imports it)
         except Exception:
             return SendResult(success=False, error="meshcore library unavailable")
 

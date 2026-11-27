@@ -369,6 +369,8 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
       Test first: `tests/test_channel_key_startup.py` is written (10 tests, all fail on current code); then port.
       Their patch does not apply cleanly (3-way conflicts in `config_routes.py`, `coordinator.py`, `tx_service.py`).
       Because KMX keeps working on `feat/v0.8.1`, look at that branch every round.
+      Note 27-11: `tests/test_channel_key_startup.py` is committed (in 264d3430) and fails on purpose until this item
+      is ported, so CI (`.github/workflows/ci.yml`, pytest step) stays red until then.
 - [x] **49. Bobcat G285 docs branch** (S, `fd5b4d1d` + `dd834718`, branch `upstream/fix/bobcat-g285-docs-reconciliation`,
       not merged into their main). New `docs/BOBCAT-G285.md` (417 lines), reworked `BOBCAT-300.md`, README and
       HARDWARE-MATRIX. Merge with item 33 (`c7bf59f4`) so we do the G285 docs once.
@@ -385,6 +387,13 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
         docs (COMMON-ERRORS, FAQ, TROUBLESHOOTING, ONBOARDING, DASHBOARD-ACCESS, docs/README.md). `SECURITY.md`
         (Einstein 26-11: 1a, 2a): reports now go through GitHub private vulnerability reporting on javastraat/meshpoint,
         supported 0.8.x. Einstein must switch that reporting on in the repo settings.
+  - [ ] **50a. MeshCore command serialization** (M, found 27-11; do after the rest of 50 and 46). Upstream's "+3 lines"
+        in `set_source()` bind a `_cmd_lock` they built earlier; we have none. Upstream: every TX-client command
+        (send, contacts, repeater poll, channel sync, name/radio) runs under one `asyncio.Lock`, shared with each
+        companion's `set_command_lock()`, and the companion's health probe takes it too. Ours: those can overlap on the
+        serial line, the library can pick up the other command's response or time out, and a timeout triggers a
+        reconnect. Port: lock on the client, shared per companion, around every command and the probe; tests for
+        "two commands wait for each other" and "no deadlock when one command calls another". Pi test on rakv21.
 
 ### Last step (when everything above is done)
 

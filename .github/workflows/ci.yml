@@ -26,10 +26,22 @@ jobs:
         # through 0.15.1 passes this repo cleanly with zero config changes.
         # Bump this deliberately (and fix/ignore whatever it newly flags)
         # rather than letting it drift and fail on an unrelated PR again.
-        run: pip install -r requirements.txt "ruff==0.15.1" pytest pytest-asyncio httpx
+        # httpx2: newer starlette's TestClient requires it (older ones only
+        # warn and use httpx); keep both so either starlette works.
+        run: pip install -r requirements.txt "ruff==0.15.1" pytest pytest-asyncio httpx httpx2
 
       - name: Lint
         run: ruff check src/ tests/ plugins/
 
       - name: Run tests
         run: python -m pytest tests/ plugins/ -v --ignore=tests/test_crypto_service.py --ignore=tests/test_meshtastic_decoder.py --ignore=tests/test_meshcore_decoder.py
+
+      # Frontend behaviour tests (Node's built-in runner, no npm deps):
+      # tests/*.test.js load the dashboard JS in a vm (upstream b91d994b
+      # added the same step for theirs).
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Frontend tests
+        run: node --test tests/

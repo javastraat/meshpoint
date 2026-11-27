@@ -54,7 +54,6 @@ class ReceivedChannelTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(kwargs["channel"], 1)
 
     async def test_direct_message_stays_channel_0(self):
-        cfg = AppConfig()
         packet = Packet("44", "a1b2c3d4", "deadbeef", Protocol.MESHTASTIC,
                         PacketType.TEXT, channel_hash=0, decoded_payload={"text": "hi"})
         kwargs = await self.deliver(packet)

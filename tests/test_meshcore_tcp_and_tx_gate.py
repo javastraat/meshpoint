@@ -6,7 +6,6 @@ config (a list in local.yaml) and our own sync_channels.
 
 from __future__ import annotations
 
-import asyncio
 import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
