@@ -61,6 +61,7 @@
     margin: 18px 0 10px;
 }
 .store-results h4 { font-size: 1rem; font-weight: 600; margin: 0; }
+.store-results__count { font: 400 .8rem var(--font-mono); color: var(--text-secondary); margin-left: 4px; }
 .store-results label { color: var(--text-secondary); font-size: .8rem; display: inline-flex; align-items: center; gap: 6px; }
 
 .store-grid {

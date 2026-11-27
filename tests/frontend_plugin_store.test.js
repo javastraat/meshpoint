@@ -59,7 +59,8 @@ test('search text and category chip only hide cards; an empty grid says so', () 
     const mk = (category, text) => ({ dataset: { category, storeText: text }, hidden: false });
     const cards = [mk('Aviation', 'adsb aviation air traffic'), mk('Radio', 'radio rtlsdr fm'), mk('Aviation', 'acars aviation')];
     const empty = { hidden: true };
-    const grid = { querySelectorAll: () => cards, querySelector: () => empty };
+    const count = { textContent: '(3)' };
+    const grid = { querySelectorAll: () => cards, querySelector: () => empty, previousElementSibling: { querySelector: () => count } };
     const chips = ['All', 'Aviation', 'Radio'].map((c) => ({ dataset: { storeChip: c }, attrs: {}, setAttribute(k, v) { this.attrs[k] = v; } }));
     const catEl = { querySelectorAll: (sel) => (sel === '.store-grid' ? [grid] : chips) };
     const c = Object.create(C.prototype);
@@ -70,7 +71,9 @@ test('search text and category chip only hide cards; an empty grid says so', () 
         return cards.map((x) => !x.hidden);
     };
     assert.deepStrictEqual(show('', 'All'), [true, true, true]);
+    assert.strictEqual(count.textContent, '(3)');
     assert.deepStrictEqual(show('', 'Aviation'), [true, false, true]);
+    assert.strictEqual(count.textContent, '(2 of 3)');
     assert.strictEqual(chips[1].attrs['aria-pressed'], 'true');
     assert.deepStrictEqual(show('air traffic', 'All'), [true, false, false]);
     assert.strictEqual(empty.hidden, true);

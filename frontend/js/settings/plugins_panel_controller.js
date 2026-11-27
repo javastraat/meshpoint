@@ -625,7 +625,7 @@ class PluginsPanelController {
         // hide cards. Buttons and checkboxes keep their data-src-* hooks, so
         // install/update/batch/dependencies work as before.
         const sectionTitle = (label, kind, count) => `<div class="store-results"><h4>${label} `
-            + `<span class="plugin-row__version">(${count})</span></h4>`
+            + `<span class="store-results__count" data-store-count data-total="${count}">(${count})</span></h4>`
             + `<label class="plugins-select-all" title="Select all ${label.toLowerCase()}">`
             + `<input type="checkbox" data-src-select-all data-kind="${kind}"> Select all</label></div>`;
 
@@ -670,14 +670,20 @@ class PluginsPanelController {
         });
         catEl.querySelectorAll('.store-grid').forEach((grid) => {
             let shown = 0;
+            let total = 0;
             grid.querySelectorAll('.store-card').forEach((card) => {
                 const ok = (filter.category === 'All' || card.dataset.category === filter.category)
                     && words.every((w) => card.dataset.storeText.includes(w));
                 card.hidden = !ok;
+                total += 1;
                 if (ok) shown += 1;
             });
             const empty = grid.querySelector('[data-store-empty]');
             if (empty) empty.hidden = shown > 0;
+            // "(8 of 26)" while filtering, "(26)" otherwise; the count sits in
+            // the section header just before this grid.
+            const count = grid.previousElementSibling && grid.previousElementSibling.querySelector('[data-store-count]');
+            if (count) count.textContent = shown === total ? `(${total})` : `(${shown} of ${total})`;
         });
     }
 
