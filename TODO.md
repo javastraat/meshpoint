@@ -416,6 +416,17 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
           talk to the companion too; post-command callbacks run after release, so no deadlock). Test
           `tests/test_meshcore_command_lock.py` (4 of 6 fail on the old code). Still to do: the Pi test.
 
+- [ ] **51. Set Radio from the dashboard fails on rakv21** (S, found 27-11 while testing 50a; not from 50a: the code from
+      before the lock fails the same way; Einstein: never set through the web before, so unknown whether it ever worked).
+      Configuration → MeshCore → Set Radio on the Heltec V4.3 always ends in "MeshCore handshake failed during exclusive
+      radio set": DTR pulse right after detaching, open 2 s later, no answer to the library's fixed 2 s handshake, DTR-
+      inverted retry at once, also no answer. The normal reconnect (5 s after closing, pulse, 2 s, open) works.
+      → 27-11: 3 s after detaching before the pulse (`_RADIO_EXCLUSIVE_DETACH_SETTLE_SECONDS`), 3 s instead of 2 after
+        the pulse (`_RADIO_EXCLUSIVE_DTR_SETTLE_SECONDS`), 1 s before `_open_meshcore`'s DTR-inverted retry, as the
+        library's `create_serial()` does. Test `tests/test_meshcore_radio_set_timing.py` (3 fail on the old code; only
+        order and pauses, the board itself is the Pi test). Still to do: Set Radio once on rakv21; if it still fails, look
+        at the log together, no retry loop.
+
 ### Last step (when everything above is done)
 
 - [ ] **Bump to 0.8.2** (Einstein, 26-11: "we will bump when all is done"). `src/version.py` `__version__ = "0.8.2"`, and

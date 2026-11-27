@@ -80,6 +80,12 @@
   source; a radio change holds it for the whole set-and-reboot. A send
   during a repeater poll waits for the poll to finish (upstream
   `b91d994b`, `6ea8de00`).
+- **MeshCore: Set Radio waits for the companion.** Changing a companion's
+  radio from Configuration → MeshCore failed on a Heltec V4.3 with
+  "MeshCore handshake failed during exclusive radio set". The exclusive
+  connection now waits 3 s after closing the live one before the reset
+  pulse, 3 s after the pulse before opening, and 1 s before the retry with
+  DTR inverted (as the meshcore library does itself).
 - **Docs: dashboard access, docs index, more common errors and FAQ.**
   New `docs/DASHBOARD-ACCESS.md` (administrator vs. Viewer, enabling a
   Viewer, the switches only the device can set; no public view in this

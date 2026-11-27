@@ -106,7 +106,7 @@ class TestExclusiveApplySuccess(unittest.TestCase):
              patch.object(mus, "read_radio_status", fake_read_radio_status), \
              patch("src.capture.meshcore_dtr.pulse_dtr_reset"), \
              patch.object(mus, "_RADIO_EXCLUSIVE_REBOOT_SETTLE_SECONDS", 0.0), \
-             patch.object(mus, "_RADIO_EXCLUSIVE_DTR_SETTLE_SECONDS", 0.0):
+             patch.object(mus, "_RADIO_EXCLUSIVE_DTR_SETTLE_SECONDS", 0.0), patch.object(mus, "_RADIO_EXCLUSIVE_DETACH_SETTLE_SECONDS", 0.0):
             result = _run(source.set_radio_params(868.1, 250.0, 11, 5))
 
         self.assertTrue(result.success)
@@ -133,7 +133,7 @@ class TestExclusiveApplySuccess(unittest.TestCase):
              patch.object(mus, "read_radio_status", fake_read_radio_status), \
              patch("src.capture.meshcore_dtr.pulse_dtr_reset"), \
              patch.object(mus, "_RADIO_EXCLUSIVE_REBOOT_SETTLE_SECONDS", 0.0), \
-             patch.object(mus, "_RADIO_EXCLUSIVE_DTR_SETTLE_SECONDS", 0.0):
+             patch.object(mus, "_RADIO_EXCLUSIVE_DTR_SETTLE_SECONDS", 0.0), patch.object(mus, "_RADIO_EXCLUSIVE_DETACH_SETTLE_SECONDS", 0.0):
             result = _run(source.set_radio_params(868.1, 250.0, 11, 5))
 
         self.assertTrue(result.success, "ambiguous no-response still verifies as success if params match")
@@ -158,7 +158,7 @@ class TestExclusiveApplySuccess(unittest.TestCase):
              patch.object(mus, "read_radio_status", fake_read_radio_status), \
              patch("src.capture.meshcore_dtr.pulse_dtr_reset"), \
              patch.object(mus, "_RADIO_EXCLUSIVE_REBOOT_SETTLE_SECONDS", 0.0), \
-             patch.object(mus, "_RADIO_EXCLUSIVE_DTR_SETTLE_SECONDS", 0.0):
+             patch.object(mus, "_RADIO_EXCLUSIVE_DTR_SETTLE_SECONDS", 0.0), patch.object(mus, "_RADIO_EXCLUSIVE_DETACH_SETTLE_SECONDS", 0.0):
             result = _run(source.set_radio_params(868.1, 250.0, 11, 5))
 
         self.assertFalse(result.success)
@@ -186,7 +186,7 @@ class TestExclusiveApplyRejectionAndFailures(unittest.TestCase):
              patch.object(mus, "read_radio_status", fake_read_radio_status), \
              patch("src.capture.meshcore_dtr.pulse_dtr_reset"), \
              patch.object(mus, "_RADIO_EXCLUSIVE_REBOOT_SETTLE_SECONDS", 0.0), \
-             patch.object(mus, "_RADIO_EXCLUSIVE_DTR_SETTLE_SECONDS", 0.0):
+             patch.object(mus, "_RADIO_EXCLUSIVE_DTR_SETTLE_SECONDS", 0.0), patch.object(mus, "_RADIO_EXCLUSIVE_DETACH_SETTLE_SECONDS", 0.0):
             result = _run(source.set_radio_params(9999.0, 250.0, 11, 5))
 
         self.assertFalse(result.success)
@@ -203,7 +203,7 @@ class TestExclusiveApplyRejectionAndFailures(unittest.TestCase):
         with patch.object(mus.MeshcoreUsbCaptureSource, "_open_meshcore", side_effect=_via_open(fake_create_serial)), \
              patch("src.capture.meshcore_dtr.pulse_dtr_reset"), \
              patch.object(mus, "_RADIO_EXCLUSIVE_REBOOT_SETTLE_SECONDS", 0.0), \
-             patch.object(mus, "_RADIO_EXCLUSIVE_DTR_SETTLE_SECONDS", 0.0):
+             patch.object(mus, "_RADIO_EXCLUSIVE_DTR_SETTLE_SECONDS", 0.0), patch.object(mus, "_RADIO_EXCLUSIVE_DETACH_SETTLE_SECONDS", 0.0):
             result = _run(source.set_radio_params(868.1, 250.0, 11, 5))
 
         self.assertFalse(result.success)
@@ -227,7 +227,7 @@ class TestExclusiveApplyRejectionAndFailures(unittest.TestCase):
              patch.object(mus, "send_set_radio_params", fake_send_set_radio_params), \
              patch("src.capture.meshcore_dtr.pulse_dtr_reset"), \
              patch.object(mus, "_RADIO_EXCLUSIVE_REBOOT_SETTLE_SECONDS", 0.0), \
-             patch.object(mus, "_RADIO_EXCLUSIVE_DTR_SETTLE_SECONDS", 0.0):
+             patch.object(mus, "_RADIO_EXCLUSIVE_DTR_SETTLE_SECONDS", 0.0), patch.object(mus, "_RADIO_EXCLUSIVE_DETACH_SETTLE_SECONDS", 0.0):
             result = _run(source.set_radio_params(868.1, 250.0, 11, 5))
 
         self.assertFalse(result.success)

@@ -63,9 +63,17 @@ _RADIO_EXCLUSIVE_HANDSHAKE_TIMEOUT_SECONDS = 15.0
 # post-apply reconnect -- matches the real observed ESP32-S3 boot time
 # this whole recovery path was built around.
 _RADIO_EXCLUSIVE_REBOOT_SETTLE_SECONDS = 8.0
-# Settle time after a DTR pulse, before the next connect attempt --
-# same value the main reconnect loop already uses for the same reason.
-_RADIO_EXCLUSIVE_DTR_SETTLE_SECONDS = 2.0
+# Settle time after a DTR pulse, before the next connect attempt. Longer
+# than the reconnect loop's 2 s: on rakv21 (Heltec V4.3) the exclusive
+# handshake got no answer 2 s after the pulse (TODO 51).
+_RADIO_EXCLUSIVE_DTR_SETTLE_SECONDS = 3.0
+# Pause between closing the live connection and the first DTR pulse, so
+# the port is really released first. The reconnect loop, which works on
+# the same board, waits 5 s here (_RECONNECT_BASE_DELAY_SECONDS).
+_RADIO_EXCLUSIVE_DETACH_SETTLE_SECONDS = 3.0
+# Pause before _open_meshcore's retry with DTR inverted, as the meshcore
+# library's own create_serial() does (1 s).
+_OPEN_RETRY_PAUSE_SECONDS = 1.0
 # Tolerance for comparing a requested preset against what the radio
 # reports back post-reconnect -- SELF_INFO values round-trip through the
 # firmware's own fixed-point representation, so an exact `==` would
@@ -794,6 +802,8 @@ class MeshcoreUsbCaptureSource(CaptureSource):
         from src.capture.meshcore_dtr import pulse_dtr_reset
 
         if self.connection_type == "serial":  # no DTR line over TCP
+            # Let the just-closed live connection release the port first.
+            await asyncio.sleep(_RADIO_EXCLUSIVE_DETACH_SETTLE_SECONDS)
             await asyncio.to_thread(pulse_dtr_reset, port, self._baud_rate)
             await asyncio.sleep(_RADIO_EXCLUSIVE_DTR_SETTLE_SECONDS)
 
@@ -986,6 +996,7 @@ class MeshcoreUsbCaptureSource(CaptureSource):
         mc = await attempt(create_serial_connection(port, self._baud_rate, release_dtr=released))
         if mc is None:
             logger.info("MeshCore %r: no answer on %s, retrying with DTR inverted", self.name, port)
+            await asyncio.sleep(_OPEN_RETRY_PAUSE_SECONDS)
             mc = await attempt(create_serial_connection(port, self._baud_rate, release_dtr=not released))
         return mc
 
