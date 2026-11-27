@@ -169,3 +169,11 @@
     border-color: var(--accent-cyan);
     color: var(--text-primary);
 }
+
+/* Ours: upstream makes the installed-themes table display:block (to scroll
+   sideways on a phone), which also shrinks it on a wide screen; keep it a
+   full-width table there and only scroll under 640 px. */
+.theme-editor .te-installed { display: table; width: 100%; }
+@media (max-width: 640px) {
+    .theme-editor .te-installed { display: block; width: auto; }
+}
