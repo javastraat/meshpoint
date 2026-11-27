@@ -312,7 +312,7 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
         reuse (breaks on a Python version change). Test `tests/test_install_dpkg_repair.py` (fails on the old scripts).
         Pi test 27-11 on the COTX: unit tests OK; full `install.sh` run: repair before "Updating system packages",
         finished (incl. a new kernel), Meshpoint active, no errors.
-- [ ] **41. Reticulum regional starting profiles** (M). Upstream's Reticulum fills missing RNode settings from
+- [x] **41. Reticulum regional starting profiles** (M). Upstream's Reticulum fills missing RNode settings from
       `radio.region` (US, EU_868, ANZ, IN, KR, SG_923), has a "Use region starting profile" button, and
       `src/audio/sdr_registry.py` gives the SDR receivers (ACARS, ADS-B, ...) region defaults. Docs: `RETICULUM-REGIONS.md`.
       Tests: `test_reticulum_regions.py`, `test_receiver_regions.py`. Our plugin has no region logic. Adjust EU to our
@@ -323,7 +323,8 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
         **Starting profile** + **Apply** (fills the five radio fields, saves nothing). Optional airtime caps
         `rnode_airtime_limit_short/long` (percent, blank = none) → RNS `airtime_limit_short/long`; upstream's 1 %/hour
         default not copied. README section. Tests `test_regional.py`, `test_config_routes.py`,
-        `test_write_rnsd_config.py`. Still to do: plugin version bump (ask), Pi test.
+        `test_write_rnsd_config.py`. reticulum 1.1.6. Pi test 27-11 on the COTX: NL preselected (EU_868), US Apply fills
+        the fields without saving, `airtime_limit_long = 10.0` in rnsd's config.
   - [ ] **41a. SDR receiver region defaults** (S, the third part of 41): upstream's receiver plugins (pagers, POCSAG,
         rtl433, ACARS, FM radio) refuse to start without a valid frequency and take FM de-emphasis from the region
         (EU 50 µs, US 75 µs); `src/audio/sdr_registry.py`, `tests/test_receiver_regions.py`. Compare with our versions
