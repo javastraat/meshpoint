@@ -139,6 +139,17 @@ INSTALL_VERSION="$(
         2>/dev/null || echo "unknown"
 )"
 
+# ── Repair an interrupted dpkg (upgrades only) ─────────────────────
+# A previous run or apt upgrade cut short (power cut, Ctrl+C, a dropped
+# SSH session) leaves dpkg half-configured, and every apt-get below then
+# refuses with "dpkg was interrupted". Runs before the first apt call,
+# including the upgrade fast path's; a no-op when nothing is pending
+# (upstream 3ca92469).
+if [ "$IS_UPGRADE" = "1" ]; then
+    info "Checking for an interrupted dpkg..."
+    dpkg --configure -a
+fi
+
 # ── Upgrade fast path ──────────────────────────────────────────────
 
 _upgrade_refresh_python_deps() {

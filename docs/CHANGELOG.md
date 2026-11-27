@@ -86,6 +86,13 @@
   connection now waits 3 s after closing the live one before the reset
   pulse, 3 s after the pulse before opening, and 1 s before the retry with
   DTR inverted (as the meshcore library does itself).
+- **Installer repairs an interrupted dpkg first.** On an upgrade,
+  `install.sh` and `install-debian.sh` now run `dpkg --configure -a`
+  before any apt call, so an earlier run or apt upgrade cut short (power
+  cut, Ctrl+C, dropped SSH) no longer makes every apt-get refuse with
+  "dpkg was interrupted". The full `apt-get upgrade` and the venv refresh
+  stay as they were (upstream `3ca92469`, which skips both; ours keeps
+  them because the dashboard Apply never runs `install.sh`).
 - **Docs: dashboard access, docs index, more common errors and FAQ.**
   New `docs/DASHBOARD-ACCESS.md` (administrator vs. Viewer, enabling a
   Viewer, the switches only the device can set; no public view in this

@@ -297,6 +297,10 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
 - [ ] **40. `3ca92469` install.sh hardening** (S). On an upgrade: `dpkg --configure -a` before apt and skip
       `apt-get upgrade`; reuse the existing venv instead of recreating it (ours does `python3 -m venv` every time, line
       ~876, and `apt-get upgrade` runs always, line ~243). Check the venv reuse against a Python version change.
+      → 27-11 (Einstein: a, keep `apt-get upgrade`): `dpkg --configure -a` on upgrades in `install.sh` and
+        `install-debian.sh`, before the first apt call (also before the upgrade fast path's `apt-get install`, which
+        upstream's placement missed). Not taken: skipping `apt-get upgrade` (our Apply doesn't run install.sh), venv
+        reuse (breaks on a Python version change). Test `tests/test_install_dpkg_repair.py` (fails on the old scripts).
 - [ ] **41. Reticulum regional starting profiles** (M). Upstream's Reticulum fills missing RNode settings from
       `radio.region` (US, EU_868, ANZ, IN, KR, SG_923), has a "Use region starting profile" button, and
       `src/audio/sdr_registry.py` gives the SDR receivers (ACARS, ADS-B, ...) region defaults. Docs: `RETICULUM-REGIONS.md`.
@@ -332,6 +336,8 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
         ONBOARDING, DASHBOARD-ACCESS, docs/README.md index) not compared yet: still open, see item 50.
 - [ ] **45. Stats reporter test timing** (S, `4f62d644`): make `tests/test_stats_reporter.py` deterministic like theirs;
       only if our test is flaky.
+      → 27-11: `test_positive_after_packets` with a fixed `time.monotonic` (100 → 110 s, 10 packets = exactly 60.0/min);
+        our docstrings kept. `stats_reporter.py` itself is the same as upstream's.
 - [x] **46. Check the rest of their `tests/frontend/*.test.cjs` and plugin docs** (`471a81da`, `dfe6bcf5`): port the tests
       that cover code we already have (gps privacy, mqtt topic preview, transmit save, topbar, bootstrap, map tiles).
       → 27-11: transmit save (`tests/frontend_transmit_save.test.js` + try/catch in `transmit_card.js`; ours keeps the
