@@ -117,6 +117,7 @@ class ChannelsConfigCard {
                         <button class="ch-table__reveal" type="button"
                                 title="Show/hide key">&#128065;</button>
                     </div>
+                    ${ch.key_unavailable ? '<small class="ch-table__warn">Channel unavailable. Enter its Base64 PSK.</small>' : ''}
                 </td>
             `;
         const enabledCell = isPrimary

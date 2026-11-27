@@ -142,6 +142,8 @@ class MeshtasticDecoder:
         matched_channel_index: Optional[int] = None
         if not decrypted and pre_decoded is None:
             for key_index, key in enumerate(self._crypto.get_all_keys()):
+                if key is None:  # unavailable channel: index kept, nothing to try
+                    continue
                 decrypted_bytes = self._crypto.decrypt_meshtastic(
                     encrypted_payload,
                     header["packet_id"],

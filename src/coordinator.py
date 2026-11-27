@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import base64
-import binascii
 import logging
 from typing import Any, Callable, Optional
 
@@ -660,7 +658,9 @@ class PipelineCoordinator:
             self._mqtt = MqttPublisher(
                 self._config.mqtt,
                 device_name,
-                channel_keys=self._config.meshtastic.channel_keys or None,
+                # Only channels with a usable key (a broken PSK stays local).
+                channel_keys={name: value for name, value in self._config.meshtastic.channel_keys.items()
+                              if self._crypto.get_channel_key(name) is not None} or None,
             )
             if self._mqtt.connect():
                 logger.info(
@@ -686,8 +686,7 @@ class PipelineCoordinator:
         for name, key in self._config.meshtastic.channel_keys.items():
             self._crypto.add_channel_key(name, key)
         for name, key in self._config.meshcore.channel_keys.items():
-            key_b64 = base64.b64encode(binascii.unhexlify(key)).decode()
-            self._crypto.add_channel_key(name, key_b64)
+            self._crypto.add_meshcore_channel_key(name, key)
         loaded = 0
         for dev_eui, keys in self._config.lorawan.devices.items():
             if _is_lorawan_placeholder(dev_eui, keys):

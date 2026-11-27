@@ -249,6 +249,8 @@ class TestEchoHashOverride(unittest.IsolatedAsyncioTestCase):
         tx = TxService()
         tx._config = Mock(enabled=True, hop_limit=3, tx_power_dbm=17)
         tx._crypto = Mock()
+        # Two usable channel slots: the send path refuses an unavailable one (TODO 48).
+        tx._crypto._keys = {"One": b"k1", "Two": b"k2"}
         tx._wrapper = Mock()
         tx._wrapper.send = Mock(return_value=0)
         tx._wrapper.get_tx_status = Mock(return_value=2)

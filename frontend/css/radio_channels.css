@@ -139,3 +139,11 @@
     background: var(--bg-inset);
     box-shadow: var(--glow-cyan);
 }
+
+/* Saved PSK that isn't valid Base64: the channel is unusable until fixed (TODO 48). */
+.ch-table__warn {
+    display: block;
+    margin-top: 0.25rem;
+    color: var(--accent-amber);
+    font-size: 0.72rem;
+}

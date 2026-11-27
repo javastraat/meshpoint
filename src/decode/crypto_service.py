@@ -27,7 +27,8 @@ class CryptoService:
     """AES-CTR encryption/decryption for Meshtastic and Meshcore packets."""
 
     def __init__(self, default_key_b64: str = MESHTASTIC_DEFAULT_KEY_B64):
-        self._keys: dict[str, bytes] = {}
+        self._keys: dict[str, bytes | None] = {}
+        self._meshcore_keys: dict[str, bytes] = {}
         self._private_key: bytes | None = None
         self._public_key: bytes | None = None
         self._public_keys: dict[int, bytes] = {}
@@ -40,12 +41,41 @@ class CryptoService:
             self._default_key = None
 
     def add_channel_key(self, channel_name: str, key_b64: str) -> None:
-        raw = base64.b64decode(key_b64)
+        """Load a Meshtastic channel PSK. A malformed one no longer raises
+        (it crashed startup): the channel keeps its slot as None, so later
+        channels keep their dashboard indices, and it stays unusable until
+        its PSK is corrected (upstream c2e6c495, TODO 48)."""
+        try:
+            raw = self.decode_channel_psk(key_b64)
+        except ValueError:
+            self._keys[channel_name] = None
+            logger.warning("Meshtastic channel %r unavailable: correct its Base64 PSK in Channels", channel_name)
+            return
         self._keys[channel_name] = self._expand_key(raw)
 
+    @staticmethod
+    def decode_channel_psk(value: str) -> bytes:
+        """Strict Base64 (raises ValueError); whitespace such as line wraps
+        is tolerated, invalid symbols or padding are not."""
+        if not isinstance(value, str):
+            raise ValueError("Expected a Base64 PSK")
+        return base64.b64decode("".join(value.split()), validate=True)
+
+    def add_meshcore_channel_key(self, name: str, key_hex: str) -> None:
+        """MeshCore channel secrets live in their own list (they used to be
+        re-encoded into the Meshtastic table, where a same-named one could
+        silently replace a broken Meshtastic slot)."""
+        self._meshcore_keys[name] = self._expand_key(bytes.fromhex(key_hex))
+
+    def get_channel_key(self, channel_name: str) -> bytes | None:
+        """The expanded key of a Meshtastic channel; None when it isn't
+        loaded or its PSK is unusable."""
+        return self._keys.get(channel_name)
+
     def clear_channel_keys(self) -> None:
-        """Drop all non-default channel keys."""
+        """Drop all non-default channel keys (Meshtastic and MeshCore)."""
         self._keys.clear()
+        self._meshcore_keys.clear()
 
     def set_keypair(self, private_key: bytes, public_key: bytes) -> None:
         """Install the Meshpoint Meshtastic PKI keypair."""
@@ -159,12 +189,12 @@ class CryptoService:
             and payload_len > PKC_OVERHEAD
         )
 
-    def get_all_keys(self) -> list[bytes]:
-        """Return all available keys, default first then channel keys."""
-        keys: list[bytes] = []
-        if self._default_key:
-            keys.append(self._default_key)
-        keys.extend(self._keys.values())
+    def get_all_keys(self) -> list[bytes | None]:
+        """Ordered key slots for RX: default first, then the Meshtastic
+        channel keys (None = an unavailable channel, its index reserved),
+        then the MeshCore channel keys. Callers skip None."""
+        keys = [self._default_key, *self._keys.values()]
+        keys.extend(self._meshcore_keys.values())
         return keys
 
     def decrypt_meshtastic(
