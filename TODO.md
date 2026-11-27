@@ -227,7 +227,7 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
 
 ### J. Plugins, Reticulum and access (decided 26-11: take it all)
 
-- [ ] **36. Reticulum interface discovery** `a890b318` (= `8e349c91`): checked 26-11, we have about 80% of it. Open
+- [x] **36. Reticulum interface discovery** `a890b318` (= `8e349c91`): checked 26-11, we have about 80% of it. Open
       work is in our plugin repo (`meshpoint-plugins/apps/reticulum`), not here.
   - Have: listening (`discover_interfaces`, autoconnect 0), publishing our RNode (`rnode_discoverable`, name, interval,
     lat/lon), reading the heard interfaces (`backend/discovered.py`, `GET /api/reticulum/discovered`, admin-only host).
@@ -239,6 +239,15 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
   - Don't copy: their forced `mode = access_point` for publishing (blocks announce forwarding; we coerce to `gateway`)
     and their "no location" rule (we publish lat/lon on purpose).
   - First check: does our RNS version read and write `discovery_lxmf_address`? (Upstream pinned RNS 1.5.3.)
+  → 27-11 (plugin repo): RNS 1.5.4 (COTX) and 1.6.1 both support it. `rnode_discovery_lxmf_address` (settings field +
+    "Use this Meshpoint's address", validated to 32 hex, written as `discovery_lxmf_address` only when discoverable;
+    `_discoverable_block()` in `write_rnsd_config.py`); `discovered.py` lists entries without a location (lat/lon null,
+    map skips them) and carries `operator_lxmf_address`; map popup (reticulum-dashboard) shows the operator and, for
+    admins, **Contact operator** (draft in Messages via `composeMessageTo`); detail panel: Operator row, no 0,0 location.
+    Tests in `test_config_routes.py`, `test_discovered.py`, `test_write_rnsd_config.py` (fail on the old code).
+    reticulum 1.1.5, reticulum-dashboard 1.0.2. Pi test 27-11 on the COTX: block with `discovery_lxmf_address`
+    (dry run), nothing published with rmap off, address saved in local.yaml (after a Meshpoint restart).
+  - [ ] **Recheck later:** "Contact operator" in the map popup, once a heard interface publishes an operator address.
 - [ ] **37. Their plugin repo and dashboard access controls** `622ce563`, `b91d994b`: checked 26-11. Most of it is ours
       already (their commit says it adapts `javastraat/meshpoint`).
   - [x] **37a. Fix: viewer marks a conversation read for everyone.** `POST /api/conversation/{node_id}/read` in
@@ -294,13 +303,15 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
 
 ### K. Found on 26-11 in the full compare (not covered by items 1-39)
 
-- [ ] **40. `3ca92469` install.sh hardening** (S). On an upgrade: `dpkg --configure -a` before apt and skip
+- [x] **40. `3ca92469` install.sh hardening** (S). On an upgrade: `dpkg --configure -a` before apt and skip
       `apt-get upgrade`; reuse the existing venv instead of recreating it (ours does `python3 -m venv` every time, line
       ~876, and `apt-get upgrade` runs always, line ~243). Check the venv reuse against a Python version change.
       → 27-11 (Einstein: a, keep `apt-get upgrade`): `dpkg --configure -a` on upgrades in `install.sh` and
         `install-debian.sh`, before the first apt call (also before the upgrade fast path's `apt-get install`, which
         upstream's placement missed). Not taken: skipping `apt-get upgrade` (our Apply doesn't run install.sh), venv
         reuse (breaks on a Python version change). Test `tests/test_install_dpkg_repair.py` (fails on the old scripts).
+        Pi test 27-11 on the COTX: unit tests OK; full `install.sh` run: repair before "Updating system packages",
+        finished (incl. a new kernel), Meshpoint active, no errors.
 - [ ] **41. Reticulum regional starting profiles** (M). Upstream's Reticulum fills missing RNode settings from
       `radio.region` (US, EU_868, ANZ, IN, KR, SG_923), has a "Use region starting profile" button, and
       `src/audio/sdr_registry.py` gives the SDR receivers (ACARS, ADS-B, ...) region defaults. Docs: `RETICULUM-REGIONS.md`.
@@ -334,10 +345,11 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
         README + CONFIGURATION; 45 lines "stick" → "node" (README, API-ENDPOINTS, CONFIGURATION, WHATS-DIFFERENT,
         BANDPLAN, Serial + firmware cards); GPS sticks kept. Their other new docs (COMMON-ERRORS, FAQ, TROUBLESHOOTING,
         ONBOARDING, DASHBOARD-ACCESS, docs/README.md index) not compared yet: still open, see item 50.
-- [ ] **45. Stats reporter test timing** (S, `4f62d644`): make `tests/test_stats_reporter.py` deterministic like theirs;
+- [x] **45. Stats reporter test timing** (S, `4f62d644`): make `tests/test_stats_reporter.py` deterministic like theirs;
       only if our test is flaky.
       → 27-11: `test_positive_after_packets` with a fixed `time.monotonic` (100 → 110 s, 10 packets = exactly 60.0/min);
         our docstrings kept. `stats_reporter.py` itself is the same as upstream's.
+        Pi test 27-11 on the COTX: OK.
 - [x] **46. Check the rest of their `tests/frontend/*.test.cjs` and plugin docs** (`471a81da`, `dfe6bcf5`): port the tests
       that cover code we already have (gps privacy, mqtt topic preview, transmit save, topbar, bootstrap, map tiles).
       → 27-11: transmit save (`tests/frontend_transmit_save.test.js` + try/catch in `transmit_card.js`; ours keeps the
