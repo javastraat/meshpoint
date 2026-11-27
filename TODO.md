@@ -332,7 +332,7 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
         ONBOARDING, DASHBOARD-ACCESS, docs/README.md index) not compared yet: still open, see item 50.
 - [ ] **45. Stats reporter test timing** (S, `4f62d644`): make `tests/test_stats_reporter.py` deterministic like theirs;
       only if our test is flaky.
-- [ ] **46. Check the rest of their `tests/frontend/*.test.cjs` and plugin docs** (`471a81da`, `dfe6bcf5`): port the tests
+- [x] **46. Check the rest of their `tests/frontend/*.test.cjs` and plugin docs** (`471a81da`, `dfe6bcf5`): port the tests
       that cover code we already have (gps privacy, mqtt topic preview, transmit save, topbar, bootstrap, map tiles).
       → 27-11: transmit save (`tests/frontend_transmit_save.test.js` + try/catch in `transmit_card.js`; ours keeps the
         relay filters), top-bar MeshCore (`frontend_meshcore_topbar.test.js`, our badge-per-companion chip, passed as-is),
@@ -385,7 +385,7 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
       HARDWARE-MATRIX. Merge with item 33 (`c7bf59f4`) so we do the G285 docs once.
       → Done 26-11 on top of item 33: `BOBCAT-G285.md` added, BOBCAT-300 points there (both patches applied), README and
         HARDWARE-MATRIX by hand. Clone URL in BOBCAT-300, BOBCAT-G285 and HELTEC-M2808 set to javastraat/meshpoint.
-- [ ] **50. Smaller things inside `b91d994b` and README** (S): `.github/SECURITY.md` (+20 lines: what the Viewer and
+- [x] **50. Smaller things inside `b91d994b` and README** (S): `.github/SECURITY.md` (+20 lines: what the Viewer and
       the terminal opt-in mean), README (+57 lines: optional apps, themes, dashboard access, USB nodes), and
       `src/transmit/meshcore_tx_client.py` (+3: takes the shared command lock, check against our item 26 version).
       Also `.github/` CI files of the release candidate: read once, take what fits our CI.
@@ -402,7 +402,7 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
         their GPS entry we already had); FAQ (USB radios, USB preset workaround, plugins optional, Viewer, TCP now yes);
         ONBOARDING (Meshtastic USB radio, optional extras). Left out: public view, esptool-in-venv, nRF DFU touch,
         P25/DAPNET/Flock, Reticulum radio test, their "v0.8.0 development checks", PiMesh/WisMesh notes. Open: 50a.
-  - [ ] **50a. MeshCore command serialization** (M, found 27-11; do after the rest of 50 and 46). Upstream's "+3 lines"
+  - [x] **50a. MeshCore command serialization** (M, found 27-11; do after the rest of 50 and 46). Upstream's "+3 lines"
         in `set_source()` bind a `_cmd_lock` they built earlier; we have none. Upstream: every TX-client command
         (send, contacts, repeater poll, channel sync, name/radio) runs under one `asyncio.Lock`, shared with each
         companion's `set_command_lock()`, and the companion's health probe takes it too. Ours: those can overlap on the
@@ -414,9 +414,13 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
           source takes it for the health probe (as upstream) and, unlike upstream, also for its own per-companion
           sends/advert/rename/device info, the whole exclusive radio change, and `restart_auto_fetching` (stop/start
           talk to the companion too; post-command callbacks run after release, so no deadlock). Test
-          `tests/test_meshcore_command_lock.py` (4 of 6 fail on the old code). Still to do: the Pi test.
+          `tests/test_meshcore_command_lock.py` (4 of 6 fail on the old code). Pi test 27-11 on rakv21: unit tests OK,
+          channel messages and a DM ("Delivered") OK, startup advert + 2 contact fetches at once without timeouts, Set Radio
+          OK (after 51). COTX: write-route audit OK, km/mi and n/a OK.
+    - [ ] **Recheck later:** a message sent during a repeater poll waits for the poll instead of timing out (rakv21
+          polls no repeaters; do it on a Meshpoint that does).
 
-- [ ] **51. Set Radio from the dashboard fails on rakv21** (S, found 27-11 while testing 50a; not from 50a: the code from
+- [x] **51. Set Radio from the dashboard fails on rakv21** (S, found 27-11 while testing 50a; not from 50a: the code from
       before the lock fails the same way; Einstein: never set through the web before, so unknown whether it ever worked).
       Configuration → MeshCore → Set Radio on the Heltec V4.3 always ends in "MeshCore handshake failed during exclusive
       radio set": DTR pulse right after detaching, open 2 s later, no answer to the library's fixed 2 s handshake, DTR-
@@ -424,8 +428,8 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
       → 27-11: 3 s after detaching before the pulse (`_RADIO_EXCLUSIVE_DETACH_SETTLE_SECONDS`), 3 s instead of 2 after
         the pulse (`_RADIO_EXCLUSIVE_DTR_SETTLE_SECONDS`), 1 s before `_open_meshcore`'s DTR-inverted retry, as the
         library's `create_serial()` does. Test `tests/test_meshcore_radio_set_timing.py` (3 fail on the old code; only
-        order and pauses, the board itself is the Pi test). Still to do: Set Radio once on rakv21; if it still fails, look
-        at the log together, no retry loop.
+        order and pauses, the board itself is the Pi test). Pi test 27-11 on rakv21: SF7/CR5 verified, back to SF8/CR8
+        verified, companion reconnected both times.
 
 ### Last step (when everything above is done)
 
