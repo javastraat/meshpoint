@@ -60,10 +60,20 @@ test('primary buttons keep their colour and the theme editor marks its active ta
     assert.match(css, /\.theme-editor :is\(\.lw-tab--active/);
 });
 
-test('every page (core and plugin) gets thin theme-coloured scrollbars', () => {
+test('every page (core and plugin) and its popups get thin theme-coloured scrollbars', () => {
     const css = fs.readFileSync(path.join(__dirname, '..', 'frontend/css/dashboard.css'), 'utf8');
-    assert.match(css, /\.section \{ scrollbar-color: var\(--overlay-strong\) transparent; \}/);
-    assert.match(css, /\.section, \.section \* \{ scrollbar-width: thin; \}/);
+    // Popups hang on <body>, outside .section: the packet detail modal (also used by plugins),
+    // release notes and the contact edit dialog are listed with it.
+    const roots = ['.section', '.pdm-overlay', '.rn-modal-overlay', '.msg-modal-overlay'];
+    const color = css.match(/([^{}]+)\{\s*scrollbar-color: var\(--overlay-strong\) transparent;\s*\}/);
+    assert.ok(color, 'a scrollbar-color rule with --overlay-strong');
+    const width = css.match(/([^{}]+)\{\s*scrollbar-width: thin;\s*\}/);
+    assert.ok(width, 'a scrollbar-width: thin rule');
+    const list = (sel) => sel.replace(/\/\*[\s\S]*?\*\//g, '').split(',').map((s) => s.trim());
+    for (const root of roots) {
+        assert.ok(list(color[1]).includes(root), `${root} gets the theme colour`);
+        assert.ok(list(width[1]).includes(root) && list(width[1]).includes(`${root} *`), `${root} and its children are thin`);
+    }
 });
 
 test('dashboard stat cards only use styled sub-label classes', () => {
