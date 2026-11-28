@@ -6,7 +6,7 @@ Earlier rounds (up to 2026-08-13): [memory/upstream_sync_todo.md](memory/upstrea
 Checked: **2026-11-26** against `upstream/main` at `4e78804d` (v0.8.0 release prep) and their other branches
 (`feat/v0.8.1` is one commit ahead of main: item 48).
 
-**Status 27-11:** done 1-10, 12-15, 17-30, 32-36, 37c, 40-51 (44 of the 50, plus 51 and 37c). Open: 11, 16, 31, 37e/g, 38, 39,
+**Status 28-11:** done 1-10, 12-15, 17-30, 32-36, 37c, 37g, 40-51 (44 of the 50, plus 51, 37c and 37g). Open: 11, 16, 31, 37e, 38, 39,
 41a (Pi test waits for an RTL-SDR dongle), the rechecks marked "Recheck later", then the
 0.8.2 bump.
 
@@ -318,7 +318,7 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
         `frontend/js/settings/plugin_catalog.js`, `docs/PLUGINS.md`). One line plus docs. Say in the UI which catalog is
         which; their shared plugins are older than ours.
         → Done 26-11: preset in `frontend/data/plugin_sources.json` (ours keeps presets there, not in JS) + PLUGINS.md.
-  - [ ] **37g. Take what is better in their versions of the shared plugins.** Per plugin (acars, adsb, dab, p2000,
+  - [x] **37g. Take what is better in their versions of the shared plugins.** Per plugin (acars, adsb, dab, p2000,
         pagers, pocsag, radio, rtl433, rtlsdr, reticulum): diff theirs against ours and port real fixes, keep our
         manifest and setup scripts. `reticulum` differs most (~4200 lines): their `managed_service.py`,
         `worker_proxy.py`, `worker_runner.py` (separate worker process), regions (item 41) and discovery (item 36).
@@ -337,7 +337,7 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
           `src.plugins.python_dependencies` (install a plugin's Python dependencies from Settings) we don't have; ours
           uses the system `rnsd` via `setup.sh`. Each would be an item of its own.
           → Pi 28-11 (COTX, acars 1.2.1): `unittest plugins.apps.acars.backend.tests.test_listener` 17 OK.
-          Still to do: the message in the tab with a bad `freqs` (needs acarsdec), a real Start needs an RTL-SDR dongle.
+          Ticked 28-11 (Einstein): no acarsdec on the COTX, so the tab check goes with the dongle test of 41a.
 - [ ] **38. WisMesh Node / meshtasticd** (15 commits, ~5000 lines, section 5): decided 26-11, we take it. Plan it as a
       project of its own, like item 31, in the order of the commits (platform detection, install, bridge capture, decode,
       region and channel sync, TX, control plane and WisBlock module picker, platform guards). Includes the pieces the
@@ -391,6 +391,9 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
              (region EU_868); logged in, `/api/listener/status` shows `"deemphasis_us": 50, "region": "EU_868"`.
           4. Without `redsea` (`which redsea` empty): `ps -eo args | grep '[r]tl_fm'` has no `-E deemp`; by ear a bit
              more treble than before. With `redsea` the RDS path was already 50 µs, so nothing changes by ear.
+          5. ACARS (37g, acars 1.2.1, needs acarsdec): `freqs: [131.725MHz]` under `plugins.acars` in `local.yaml`,
+             restart, Start in the ACARS tab → "ACARS frequency '131.725MHz' is not a number in MHz
+             (plugins.acars.freqs)", acarsdec not started. Remove the line; Start with the defaults decodes.
 - [x] **42. MeshCore USB robustness** (M, `b91d994b`; item 26 did not cover it). In `meshcore_usb_source.py`:
   - `restart_auto_fetching()` must call `stop_auto_message_fetching()` first: `start_auto_message_fetching()` in
     `meshcore_py` is not idempotent (each call adds a subscription).
