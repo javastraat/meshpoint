@@ -44,4 +44,4 @@ jobs:
           node-version: "22"
 
       - name: Frontend tests
-        run: node --test tests/
+        run: node --test "tests/*.test.js"
