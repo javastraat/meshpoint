@@ -60,7 +60,10 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
           it if it's a new extra"). `packets.coding_rate TEXT` (in `CREATE TABLE`, migration in `_run_migrations` like
           `relay_node`), `insert` stores only 4/5-4/8 (Unknown/N/A/"" → NULL), `_row_to_packet` reads it, the MeshCore
           payload stays the fallback. Tests in `tests/test_concentrator_coding_rate.py` (round trip, NULL for
-          placeholders, migration of an old table; fail on the old code). Still to do: Pi test.
+          placeholders, migration of an old table; fail on the old code).
+        → Pi 28-11 (COTX): migration logged once at 11:31, unittests 7 OK, new Meshtastic rows `4/5` (rows before the
+          restart NULL), after a page reload the packet modal shows `SF11 · BW250 · CR 4/5`.
+          LocalMesh too: DB rows `4/5`, the stored advert of 11:37:31 shows `SF7 · BW62.5 · CR 4/5` in the modal.
 - [x] **2. `06af14ba` MQTT reception time** (S, 2 + test 46). Meshtastic MQTT packets get the time we received them
       (`rx_time`), not "now". `src/relay/mqtt_formatter.py`. Applies cleanly.
 - [x] **3. `d870125f` MQTT signal test** (S, test 80 only). Test for partial RSSI/SNR in MQTT. Applies cleanly.
