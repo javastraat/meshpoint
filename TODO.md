@@ -6,7 +6,7 @@ Earlier rounds (up to 2026-08-13): [memory/upstream_sync_todo.md](memory/upstrea
 Checked: **2026-11-26** against `upstream/main` at `4e78804d` (v0.8.0 release prep) and their other branches
 (`feat/v0.8.1` is one commit ahead of main: item 48).
 
-**Status 28-11:** done 1-10, 12-15, 17-30, 32-36, 37c, 37g, 40-51 (44 of the 50, plus 51, 37c and 37g). Open: 11, 16, 31, 37e, 38, 39,
+**Status 28-11:** done 1-10, 12-15, 17-30, 32-36, 37c, 37e, 37g, 40-51 (44 of the 50, plus 51, 37c, 37e and 37g). Open: 11, 16, 31, 38, 39,
 41a (Pi test waits for an RTL-SDR dongle), the rechecks marked "Recheck later", then the
 0.8.2 bump.
 
@@ -319,9 +319,13 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
     `src.plugins.python_dependencies`, which we don't have, and their plugins drop `setup.sh`/`check.sh`. Don't take
     their updates to shared plugins (ours are newer and have the setup scripts). Take **p25** (0.1.0, experimental) and
     add `KMX415/meshpoint-plugins` as a source preset (37e, 37f).
-  - [ ] **37e. p25 plugin** (their `apps/p25`: OP25 adapter, needs `meshpoint-op25` + ffmpeg). Their manifest parses on
+  - [x] **37e. p25 plugin** (their `apps/p25`: OP25 adapter, needs `meshpoint-op25` + ffmpeg). Their manifest parses on
         our core, but it may need their runtime (`src.plugins.runtime`, `python_dependencies`). Port it into
         `meshpoint-plugins` with our `setup.sh`/`check.sh`, run it on our core.
+        → 28-11: not ported. We don't copy other people's plugins into ours; users install it from the KMX catalog
+          (source preset, 37f). It only uses APIs our core already has (`add_router`, `add_listener`, `sdr_registry`,
+          `require_admin`); their `[deps] executables` key is ignored by our manifest. Not in KMX's `repo.json` yet
+          (upstream calls it a draft); it appears in the catalog once they publish it.
   - [x] **37f. Source preset for `KMX415/meshpoint-plugins`** next to ours (`src/plugins/sources.py`,
         `frontend/js/settings/plugin_catalog.js`, `docs/PLUGINS.md`). One line plus docs. Say in the UI which catalog is
         which; their shared plugins are older than ours.
