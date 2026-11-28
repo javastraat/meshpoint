@@ -54,7 +54,7 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
         must show `CR 4/5`. On 26-11 nearby Meshpoints (-18 to -36 dBm, relay `0xfb`) still showed `CR 4/8`, probably
         database packets before `51710121`. The chain checks out (Meshtastic LongFast 4/5, our TX 4/5, HAL 1→4/5,
         ctypes struct = `lgw_pkt_rx_s`). Still 4/8 live? Log the raw `pkt.coderate` and look in `journalctl`.
-  - [ ] Idea: store the coding rate in the packets table (new column), so reloaded packets and the Meshtastic page
+  - [x] Idea: store the coding rate in the packets table (new column), so reloaded packets and the Meshtastic page
         show it too.
         → 28-11 built as our own addition (upstream has no such column, checked main and all branches; Einstein: "make
           it if it's a new extra"). `packets.coding_rate TEXT` (in `CREATE TABLE`, migration in `_run_migrations` like
