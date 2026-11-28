@@ -11,6 +11,16 @@ from src.storage.time_bucket import bucket_seconds
 
 logger = logging.getLogger(__name__)
 
+# Coding rates worth storing. "Unknown" (a HAL value we don't map), "N/A"
+# (MeshCore events without RF) and "" are stored as NULL.
+_CODING_RATES = ("4/5", "4/6", "4/7", "4/8")
+
+
+def _stored_coding_rate(signal: SignalMetrics | None) -> str | None:
+    if signal is None or signal.coding_rate not in _CODING_RATES:
+        return None
+    return signal.coding_rate
+
 
 class PacketRepository:
     """CRUD operations for captured mesh packets."""
@@ -31,8 +41,8 @@ class PacketRepository:
                 packet_type, hop_limit, hop_start, channel_hash,
                 want_ack, via_mqtt, relay_node, decoded_payload, decrypted,
                 rssi, snr, frequency_mhz, spreading_factor,
-                bandwidth_khz, capture_source, timestamp
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                bandwidth_khz, capture_source, timestamp, coding_rate
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 packet.packet_id, packet.source_id,
@@ -47,6 +57,7 @@ class PacketRepository:
                 packet.signal.spreading_factor if packet.signal else None,
                 packet.signal.bandwidth_khz if packet.signal else None,
                 packet.capture_source, packet.timestamp.isoformat(),
+                _stored_coding_rate(packet.signal),
             ),
         )
         await self._db.commit()
@@ -286,21 +297,21 @@ class PacketRepository:
                 frequency_mhz=row.get("frequency_mhz", 906.875),
                 spreading_factor=row.get("spreading_factor", 11),
                 bandwidth_khz=row.get("bandwidth_khz", 250.0),
-                # The packets table has no coding-rate column: leave it empty
+                # Rows from before the coding_rate column (NULL) stay empty,
                 # so the dashboard hides CR instead of showing the "4/8"
-                # default for every stored packet.
-                coding_rate="",
+                # default.
+                coding_rate=row.get("coding_rate") if row.get("coding_rate") in _CODING_RATES else "",
             )
 
         decoded = None
         if row.get("decoded_payload"):
             decoded = json.loads(row["decoded_payload"])
 
-        # MeshCore packets keep the receiver's coding rate in their payload
-        # (the table has no column for it): restore that one (upstream fc15bc36).
-        if signal and row.get("protocol") == Protocol.MESHCORE.value and isinstance(decoded, dict):
+        # MeshCore packets also keep the receiver's coding rate in their
+        # payload: restore that one for rows without the column (upstream fc15bc36).
+        if signal and not signal.coding_rate and row.get("protocol") == Protocol.MESHCORE.value and isinstance(decoded, dict):
             receiver = decoded.get("meshcore_receiver")
-            if isinstance(receiver, dict) and receiver.get("coding_rate") in ("4/5", "4/6", "4/7", "4/8"):
+            if isinstance(receiver, dict) and receiver.get("coding_rate") in _CODING_RATES:
                 signal.coding_rate = receiver["coding_rate"]
 
         return Packet(

@@ -45,7 +45,8 @@ CREATE TABLE IF NOT EXISTS packets (
     spreading_factor INTEGER,
     bandwidth_khz    REAL,
     capture_source   TEXT,
-    timestamp        TEXT NOT NULL
+    timestamp        TEXT NOT NULL,
+    coding_rate      TEXT
 );
 
 CREATE TABLE IF NOT EXISTS telemetry (
@@ -155,6 +156,13 @@ class DatabaseManager:
                 "ALTER TABLE packets ADD COLUMN relay_node INTEGER DEFAULT 0"
             )
             logger.info("Migration: added 'relay_node' column to packets table")
+        if "coding_rate" not in pkt_cols:
+            # Ours, not upstream's: the received coding rate (4/5-4/8), so a
+            # packet loaded from the database shows it too. Old rows stay NULL.
+            await self._connection.execute(
+                "ALTER TABLE packets ADD COLUMN coding_rate TEXT"
+            )
+            logger.info("Migration: added 'coding_rate' column to packets table")
 
         cursor = await self._connection.execute("PRAGMA table_info(nodes)")
         columns = {row[1] for row in await cursor.fetchall()}

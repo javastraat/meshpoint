@@ -56,6 +56,11 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
         ctypes struct = `lgw_pkt_rx_s`). Still 4/8 live? Log the raw `pkt.coderate` and look in `journalctl`.
   - [ ] Idea: store the coding rate in the packets table (new column), so reloaded packets and the Meshtastic page
         show it too.
+        → 28-11 built as our own addition (upstream has no such column, checked main and all branches; Einstein: "make
+          it if it's a new extra"). `packets.coding_rate TEXT` (in `CREATE TABLE`, migration in `_run_migrations` like
+          `relay_node`), `insert` stores only 4/5-4/8 (Unknown/N/A/"" → NULL), `_row_to_packet` reads it, the MeshCore
+          payload stays the fallback. Tests in `tests/test_concentrator_coding_rate.py` (round trip, NULL for
+          placeholders, migration of an old table; fail on the old code). Still to do: Pi test.
 - [x] **2. `06af14ba` MQTT reception time** (S, 2 + test 46). Meshtastic MQTT packets get the time we received them
       (`rx_time`), not "now". `src/relay/mqtt_formatter.py`. Applies cleanly.
 - [x] **3. `d870125f` MQTT signal test** (S, test 80 only). Test for partial RSSI/SNR in MQTT. Applies cleanly.

@@ -314,6 +314,12 @@
 
 #### Dashboard
 
+- **Reloaded packets keep their coding rate.** The packets table now stores
+  the received coding rate (4/5-4/8), so after a page reload the packet
+  modal still shows `CR 4/5` (or whatever was really received) instead of
+  no CR at all. Packets stored before this update have none and stay
+  without. A placeholder ("Unknown", "N/A") is never stored. The new column
+  is added once at startup. Our own addition, not in upstream.
 - **Fix: Repeaters page Trends lost the pressure and humidity lines after
   a MeshCore 1.18 update.** The poller stored a repeater's sensors by fixed
   LPP channel numbers (barometer on channel 3, humidity on 4), but 1.18
