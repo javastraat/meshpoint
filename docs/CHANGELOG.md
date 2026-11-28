@@ -305,6 +305,13 @@
   now show no CR at all instead of a wrong one. Display only: our own TX
   setting is untouched.
 
+- **ACARS refuses a mistyped frequency.** A wrong entry in
+  `plugins.acars.freqs` (`131.725MHz`, `1317.25`, more than 8 channels) used
+  to go straight to acarsdec, which failed vaguely or listened on nothing.
+  Start now stops with a clear message in the tab (1 to 8 numbers between
+  118 and 137 MHz); without the setting the EU channels stay the default
+  (acars plugin, check after upstream `meshpoint-plugins`).
+
 #### Dashboard
 
 - **Fix: Repeaters page Trends lost the pressure and humidity lines after

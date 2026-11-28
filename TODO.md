@@ -322,6 +322,21 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
         pagers, pocsag, radio, rtl433, rtlsdr, reticulum): diff theirs against ours and port real fixes, keep our
         manifest and setup scripts. `reticulum` differs most (~4200 lines): their `managed_service.py`,
         `worker_proxy.py`, `worker_runner.py` (separate worker process), regions (item 41) and discovery (item 36).
+        → 28-11 compared with upstream `meshpoint-plugins` `02512e1` (one snapshot, 15-09, from an older copy of ours):
+          adsb/dab/p2000 lack our keep running, dump1090 auto-restart and dongle-release fix; their frontend changes
+          are an automatic `—` → `:` swap (with broken characters in places), the old `plugin-page` wrapper and a
+          50/75 µs dropdown (we chose automatic, 41a); pagers/POCSAG/P2000/rtl433 ask for a frequency (ours fixed NL,
+          41a). Taken: ACARS checks `plugins.acars.freqs` at Start (1-8 numbers, 118-137 MHz, clear message instead
+          of handing a typo to acarsdec; defaults unchanged); tests in `apps/acars/backend/tests/test_listener.py`
+          (fail on the old code).
+          Not taken, for later: (1) a frequency field in the tab for pagers/POCSAG/rtl433/ACARS, our NL value
+          pre-filled (new feature, only if wanted); (2) self-contained plugins: upstream moved `pager_panel.js` and
+          `listener.css` from the core into `rtlsdr`/`radio` (core and plugins have to change together, a second copy
+          would clash with the core's); (3) reticulum's own unprivileged `rnsd` child with its own config and store
+          (`managed_service.py`, `worker_proxy.py`, `worker_runner.py`, `rns_config.py`, ~720 lines), needs a core
+          `src.plugins.python_dependencies` (install a plugin's Python dependencies from Settings) we don't have; ours
+          uses the system `rnsd` via `setup.sh`. Each would be an item of its own.
+          Still to do: Pi test (needs an RTL-SDR dongle for a real Start; the unit tests run without one).
 - [ ] **38. WisMesh Node / meshtasticd** (15 commits, ~5000 lines, section 5): decided 26-11, we take it. Plan it as a
       project of its own, like item 31, in the order of the commits (platform detection, install, bridge capture, decode,
       region and channel sync, TX, control plane and WisBlock module picker, platform guards). Includes the pieces the
