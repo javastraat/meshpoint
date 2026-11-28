@@ -6,7 +6,7 @@ Earlier rounds (up to 2026-08-13): [memory/upstream_sync_todo.md](memory/upstrea
 Checked: **2026-11-26** against `upstream/main` at `4e78804d` (v0.8.0 release prep) and their other branches
 (`feat/v0.8.1` is one commit ahead of main: item 48).
 
-**Status 27-11:** done 1-10, 12-15, 17-30, 32-36, 40-51 (44 of the 50, plus 51). Open: 11, 16, 31, 37c/e/g, 38, 39,
+**Status 27-11:** done 1-10, 12-15, 17-30, 32-36, 37c, 40-51 (44 of the 50, plus 51 and 37c). Open: 11, 16, 31, 37e/g, 38, 39,
 41a (Pi test waits for an RTL-SDR dongle), the rechecks marked "Recheck later", then the
 0.8.2 bump.
 
@@ -282,7 +282,7 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
           `require_session`. Core already had every protected write on admin (scan). meshpoint-plugins: reticulum
           1.1.4 GET `/page` + `/file` for plain reads (POST stays for forms/identify), `/disconnect` admin;
           reticulum-browser 0.1.1 and reticulum-dashboard 1.0.1 use GET. Plugins first, then core.
-  - [ ] **37c. Public view** (decided 26-11: yes). Admin picks pages that anonymous visitors see: dashboard counts,
+  - [x] **37c. Public view** (decided 26-11: yes). Admin picks pages that anonymous visitors see: dashboard counts,
         stats averages, radio parameters. We have none; `public_radar_routes.py` only feeds the login-page radar. About
         600 lines (`public_view_routes.py`, `public.html`, `public_view.js`, settings form, `update_public_view` in
         `auth_service.py`, `stats_routes.public_snapshot`, tests `test_public_view.py`). Off by default, aggregate
@@ -295,7 +295,9 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
           query), `/` serves `public.html` to signed-out visitors when enabled; `public.html`, `public_view.js/.css`,
           Settings → Auth card (`public_view_form.js`). Tests `tests/test_public_view.py` (upstream's, as unittest so the
           Pi can run it; plus the page assets load without a session). `DASHBOARD-ACCESS.md` updated (it said "no public
-          view"). Still to do: Pi test.
+          view"). Card in Settings → Auth styled like the other auth cards.
+        → Pi 27-11 (COTX): public page in a private window showed only the Dashboard tab, 316 known / 88 active in 24 h
+          (same as the admin dashboard), "Admin sign in" link; `/api/nodes` gave 401. Admin dashboards unchanged.
   - [x] **37d. Viewer UI in Messages:** no `meshpointReadOnly` flag in our frontend, so a viewer still sees compose and
         Send and opening a chat posts "read". Hide compose, delete and Send Now for viewers; skip the read POST
         (`messaging_chat.js`, `messaging_contacts.js`, `viewer_access.js`). Goes with 37a.
