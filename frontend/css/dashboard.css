@@ -97,9 +97,16 @@ html, body {
    no bright default track on a dark panel (Dashboard's Nodes list, packet
    table ...). scrollbar-color inherits, scrollbar-width doesn't, hence "*".
    Lists with their own scrollbar style (Messages, command palette) keep it:
-   their rules are more specific. Follows light/dark via --overlay-strong. */
-.section { scrollbar-color: var(--overlay-strong) transparent; }
-.section, .section * { scrollbar-width: thin; }
+   their rules are more specific. Follows light/dark via --overlay-strong.
+   Popups hang on <body>, outside .section, so they are listed too
+   (packet detail and its plugin users, release notes, contact edit). */
+.section, .pdm-overlay, .rn-modal-overlay, .msg-modal-overlay {
+    scrollbar-color: var(--overlay-strong) transparent;
+}
+.section, .section *,
+.pdm-overlay, .pdm-overlay *,
+.rn-modal-overlay, .rn-modal-overlay *,
+.msg-modal-overlay, .msg-modal-overlay * { scrollbar-width: thin; }
 
 .section--active {
     animation: sectionFadeIn 220ms cubic-bezier(0.16, 1, 0.3, 1);
