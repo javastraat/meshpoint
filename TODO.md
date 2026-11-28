@@ -336,7 +336,8 @@ Size = lines upstream changed (code + tests). Work on a branch `upstream-sync`.
           (`managed_service.py`, `worker_proxy.py`, `worker_runner.py`, `rns_config.py`, ~720 lines), needs a core
           `src.plugins.python_dependencies` (install a plugin's Python dependencies from Settings) we don't have; ours
           uses the system `rnsd` via `setup.sh`. Each would be an item of its own.
-          Still to do: Pi test (needs an RTL-SDR dongle for a real Start; the unit tests run without one).
+          → Pi 28-11 (COTX, acars 1.2.1): `unittest plugins.apps.acars.backend.tests.test_listener` 17 OK.
+          Still to do: the message in the tab with a bad `freqs` (needs acarsdec), a real Start needs an RTL-SDR dongle.
 - [ ] **38. WisMesh Node / meshtasticd** (15 commits, ~5000 lines, section 5): decided 26-11, we take it. Plan it as a
       project of its own, like item 31, in the order of the commits (platform detection, install, bridge capture, decode,
       region and channel sync, TX, control plane and WisBlock module picker, platform guards). Includes the pieces the
